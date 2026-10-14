@@ -20,6 +20,7 @@ import { PlayerView } from '../lighting/PlayerView';
 import type { SceneLightingView } from '../lighting/sceneLightingView';
 import type { HideableLayer } from '../playerSafeFrame';
 import { addBeforeRender, BEFORE_RENDER_ORDER, requestRender } from '../RenderScheduler';
+import { usesCanvasRenderer } from '../utils/rendererType';
 
 const NO_ZONES: readonly AmbientZone[] = [];
 
@@ -47,7 +48,8 @@ export interface ViewRoofsDeps {
  * players' picture (their frame, session view, the peek; `modeLayer`), under the selected tokens in
  * the GM's, hidden from the GM's picture by the switcher's Roofs, whole in a picture of the scene.
  * It follows the store, and the lighting's sight before each render; the players' rule asks
- * `covers` (a token whose centre a drawn roof covers is not seen by them).
+ * `covers` (a token whose centre a drawn roof covers is not seen by them). PIXI's Canvas renderer
+ * has no filters, so it could draw a roof neither in pieces nor faded: there no roof is drawn, and none covers.
  */
 export class ViewRoofs {
   /** Visible means the players' picture: flipped by the player frame's capture, held in session view. */
@@ -58,6 +60,8 @@ export class ViewRoofs {
   /** A picture of the scene holds the roof on its own camera. */
   private held = false;
   private readonly tick = (): void => this.roof.animate(performance.now());
+  /** Roofs can be drawn on this renderer. */
+  private readonly drawn: boolean;
 
   constructor(private readonly deps: ViewRoofsDeps) {
     const { app, viewport, store } = deps;
@@ -69,7 +73,8 @@ export class ViewRoofs {
     });
     this.modeLayer = new PlayerView((players) => this.roof.setMode(players ? 'player' : 'gm'));
     this.roof.layer.view.onRender = (): void => this.followCamera();
-    viewport.addChild(this.roof.layer.view);
+    this.drawn = !usesCanvasRenderer(app.renderer);
+    if (this.drawn) viewport.addChild(this.roof.layer.view);
     this.modeLayer.visible = store.getState().isPlayerView || !store.getState().isGMView;
     this.cleanups.push(
       store.subscribe((state, previous) => {
@@ -85,6 +90,7 @@ export class ViewRoofs {
 
   /** Whether a drawn roof covers `point` in the players' picture: a token there is not seen by them. */
   covers(point: Point): boolean {
+    if (!this.drawn) return false;
     this.sync();
     return this.roof.coversForPlayers(point);
   }
@@ -119,7 +125,7 @@ export class ViewRoofs {
 
   /** Updates the roof where what it is drawn from changed. */
   private sync(): void {
-    if (this.roof.update(this.scene())) this.deps.onChange?.();
+    if (this.drawn && this.roof.update(this.scene())) this.deps.onChange?.();
   }
 
   private scene(): RoofScene {
