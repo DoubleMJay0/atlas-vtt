@@ -37,13 +37,35 @@ export type RoofViewers = 'all' | readonly RoofViewer[];
  */
 export function roofViewers(sight: Sight, tokens: Readonly<Record<string, TokenEntity>>): RoofViewers {
   if (sight.all) return 'all';
-  return sight.regions.flatMap((region) => {
+  const viewers = sight.regions.flatMap((region) => {
     if (!showsMap(region.sense)) return [];
     const token = tokens[region.tokenId];
     const eyes = !region.sense.worksWhileBlinded;
     const cone = region.cone ?? (eyes && token?.vision ? visionCone(token.rotation, token.vision.angle, region.apex) : undefined);
     return [{ origin: region.origin, radius: region.radius, cone, sense: region.sense }];
-  }).slice(0, MAX_ROOF_VIEWERS);
+  });
+  return withoutCovered(viewers).slice(0, MAX_ROOF_VIEWERS);
+}
+
+const LEVELS: readonly LightLevel[] = ['dark', 'dim', 'bright'];
+
+/**
+ * `viewers` without those another sees all of: one that looks all around, perceives in every light
+ * they do and whose disc holds theirs. Where the party sees all around, as far as the map goes, one
+ * of them stands for all: the roof's picture reads the list for every pixel. The largest come first,
+ * so most pixels find theirs early. Where a roof is seen does not change.
+ */
+function withoutCovered(viewers: RoofViewer[]): RoofViewer[] {
+  const levels = (viewer: RoofViewer): boolean[] => LEVELS.map((level) => perceivedLevel(viewer.sense, level) !== null);
+  const sorted = viewers.map((viewer) => ({ viewer, levels: levels(viewer) })).sort((a, b) => b.viewer.radius - a.viewer.radius);
+  const kept: typeof sorted = [];
+  for (const entry of sorted) {
+    const { origin, radius } = entry.viewer;
+    const covered = kept.some((other) => !other.viewer.cone && entry.levels.every((seen, i) => !seen || other.levels[i])
+      && Math.hypot(origin.x - other.viewer.origin.x, origin.y - other.viewer.origin.y) + radius <= other.viewer.radius);
+    if (!covered) kept.push(entry);
+  }
+  return kept.map(({ viewer }) => viewer);
 }
 
 /** Whether `viewer` reaches `point` from above: within its radius and its cone, whatever walls stand between. */

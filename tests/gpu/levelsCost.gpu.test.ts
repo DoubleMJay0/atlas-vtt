@@ -19,6 +19,10 @@ import { computeSight, lightReach, NO_SIGHT } from '../../src/app/vision/sight';
 import { belowTokenPerception, sightBelow } from '../../src/app/vision/throughSight';
 import { rng } from '../../src/app/pixi/lighting/engine/__tests__/fuzzRooms';
 import { belowNoise, LEVELS, openLevelsView, paintedTexture, type FakeMap, type LevelsView } from '../helpers/levelsView';
+import { roofMap } from '../helpers/roofsFuzz';
+import { roofPieces } from '../../src/app/levels/roofs';
+import { ambientRaster } from '../../src/app/lighting/ambientRaster';
+import type { LightZone } from '../../src/app/types/lightingTypes';
 
 vi.mock('events', async () => import('eventemitter3'));
 
@@ -325,4 +329,79 @@ describe('the cost of levels below (budgets asserted with VITE_PERF_STRICT)', ()
       client.dispose();
     }
   }, 300_000);
+
+  it('measures a roof over a lit view of an 8,192 px map at 1440 × 900, and its pieces and ambient light on the CPU', async (ctx) => {
+    const rand = rng(17);
+    const boxes = Array.from({ length: 40 }, (): [number, number, number, number] => {
+      const [x, y] = [2500 + rand() * 3000, 2500 + rand() * 3000];
+      return [x, y, x + 150 + rand() * 400, y + 150 + rand() * 400];
+    });
+    const roof = roofMap(2048, MAP, boxes, 'green', 3);
+    const view = await openLevelsView({ map: MAP, pane: WIDTH, paneHeight: HEIGHT, roofs: true, maps: { 'roof.png': roof } });
+    try {
+      const upper = scene('upper', 3);
+      // A party of thirty with darkvision: sixty senses each roof pixel looks through.
+      const tokens = { ...upper.tokens };
+      for (let i = 0; i < Number(import.meta.env.VITE_ROOF_PARTY ?? 30); i++) tokens[`p${i}`] = { id: `p${i}`, kind: 'token', imagePath: '', x: 2600 + rand() * 2800, y: 2600 + rand() * 2800, level: 'upper', vision: { enabled: true, senses: [{ id: 'darkvision', range: 60 }] } } as TokenEntity;
+      const star = (cx: number, cy: number, reach: number): LightZone['polygon'] => Array.from({ length: 64 }, (_, i) => ({ x: cx + Math.cos((i / 64) * Math.PI * 2) * reach, y: cy + Math.sin((i / 64) * Math.PI * 2) * reach }));
+      const zones: Record<string, LightZone> = Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`z${i}`, { id: `z${i}`, kind: 'light-zone', levels: ['upper'], ambient: rand(), polygon: star(2600 + rand() * 2800, 2600 + rand() * 2800, 200 + rand() * 600) } as LightZone]));
+      const objects = { ...view.store.getState().objects, walls: upper.walls, lights: upper.lights, tokens, lightZones: zones };
+      view.store.setState({ mapLoaded: true, isMapLoading: false, levels: LEVELS, viewedLevel: 'upper', objects });
+      view.store.getState().setSceneLighting({ enabled: true, ambient: 0.1 });
+      await view.settle();
+      view.viewport.scale.set(0.5);
+      view.viewport.position.set(WIDTH / 2 - 4100 * 0.5, HEIGHT / 2 - 4100 * 0.5);
+      const renderer = view.app.renderer as WebGLRenderer;
+      const ext = renderer.gl.getExtension('EXT_disjoint_timer_query_webgl2') as TimerExt | null;
+      if (!ext) ctx.skip('no GPU timer');
+      const target = RenderTexture.create({ width: WIDTH, height: HEIGHT });
+      const playersView = (): void => {
+        const layers = view.controller.playerLayers();
+        const before = layers.map(({ layer }) => layer.visible);
+        for (const { layer, visible } of layers) layer.visible = visible;
+        try {
+          renderer.render({ container: view.app.stage, target, clear: true });
+        } finally {
+          layers.forEach(({ layer }, i) => { layer.visible = before[i]!; });
+        }
+      };
+      const without = await medianGpu(renderer.gl, ext!, playersView);
+      const memoryWithout = textureMb(renderer);
+      view.store.setState({ levels: LEVELS.map((level) => (level.id === 'upper' ? { ...level, foreground: 'roof.png' } : level)) });
+      await view.settle();
+      playersView();
+      const withRoof = await medianGpu(renderer.gl, ext!, playersView);
+      const memoryWith = textureMb(renderer);
+      const gm = await medianGpu(renderer.gl, ext!, () => renderer.render({ container: view.app.stage, target, clear: true }));
+      // The roof's own pass, in the players' view: everything else of the stage left out.
+      const others = view.viewport.children.filter((child) => child.label !== 'roof' && child.visible);
+      for (const child of others) child.visible = false;
+      const roofAlone = await medianGpu(renderer.gl, ext!, playersView);
+      for (const child of others) child.visible = true;
+      target.destroy(true);
+      // What a token's step asks of the roof: its pieces faded anew, and the players' rule for a hundred tokens.
+      const points = Array.from({ length: 100 }, () => ({ x: 2500 + rand() * 3000, y: 2500 + rand() * 3000 }));
+      const coversMs = medianCpu(() => { for (const point of points) view.roofs!.covers(point); }, 9);
+      // What the measurements above changed on the stage is drawn once; then an idle map with a roof renders nothing.
+      view.displayFrames(2);
+      const render = vi.spyOn(view.app, 'render');
+      view.displayFrames(30);
+      const idleRenders = render.mock.calls.length;
+      render.mockRestore();
+
+      const piecesMs = medianCpu(() => roofPieces(roof.roofAlpha!, roof.width, roof.height), 5);
+      const light = { ambient: 0.1, zones: Object.values(zones) };
+      const rasterMs = medianCpu(() => ambientRaster(light, stackGrid({ width: MAP, height: MAP })), 5);
+      const figures = { roofPassMs: roofAlone, roofMs: withRoof - without, stageGmMs: gm, roofMemoryMb: memoryWith - memoryWithout, party: Number(import.meta.env.VITE_ROOF_PARTY ?? 30), covers100Ms: coversMs, idleRenders, piecesOf2048Ms: piecesMs, ambientRaster16ZonesMs: rasterMs, pieces: roofPieces(roof.roofAlpha!, roof.width, roof.height).count };
+      console.info(`levels cost (roof): ${JSON.stringify(figures)}`);
+      expect(idleRenders).toBe(0);
+      if (STRICT) {
+        expect(figures.roofPassMs).toBeLessThan(0.5);
+        expect(figures.covers100Ms).toBeLessThan(1);
+        expect(figures.piecesOf2048Ms).toBeLessThan(150);
+      }
+    } finally {
+      view.dispose();
+    }
+  });
 });

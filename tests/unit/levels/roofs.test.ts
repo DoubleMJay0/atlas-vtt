@@ -144,6 +144,19 @@ describe('where the players see a roof', () => {
     expect(roofSeenAt({ x: 0, y: 90 }, roofViewers({ all: false, regions: [region(NORMAL_SIGHT, 100)] }, {}), 'bright')).toBe(true);
   });
 
+  it('leaves out the senses another sees all of, largest first, and is seen where it was', () => {
+    const at = (x: number, sense: SenseDefinition, radius: number): SightRegion => ({ ...region(sense, radius), tokenId: `t${x}`, origin: { x, y: 0 } });
+    const regions = [at(0, NORMAL_SIGHT, 50), at(10, darkvision, 20), at(500, NORMAL_SIGHT, 5000), at(30, NORMAL_SIGHT, 10)];
+    const viewers = roofViewers({ all: false, regions }, {}) as Exclude<ReturnType<typeof roofViewers>, 'all'>;
+    expect(viewers.map((viewer) => [viewer.origin.x, viewer.radius])).toEqual([[500, 5000], [10, 20]]);
+    for (const p of [{ x: 12, y: 3 }, { x: 40, y: 0 }, { x: 6000, y: 0 }]) {
+      for (const level of ['dark', 'dim', 'bright'] as const) {
+        const all = regions.some((r) => roofSeenAt(p, roofViewers({ all: false, regions: [r] }, {}), level));
+        expect(roofSeenAt(p, viewers, level)).toBe(all);
+      }
+    }
+  });
+
   it('is seen in the dark by a sense that perceives there, never by one that shows no map', () => {
     expect(roofSeenAt({ x: 50, y: 0 }, roofViewers({ all: false, regions: [region(darkvision, 60)] }, {}), 'dark')).toBe(true);
     expect(roofSeenAt({ x: 50, y: 0 }, roofViewers({ all: false, regions: [region(tremorsense, 60)] }, {}), 'bright')).toBe(false);
