@@ -17,6 +17,7 @@ import { requestRender } from '../RenderScheduler';
 import { LevelsBelow, type BelowLevelsHost, type BelowPicture } from './levels/LevelsBelow';
 import type { TileView } from '../mapImage/levelOfDetail';
 import type { TokenPerception } from '../../vision/tokenPerception';
+import type { ArtFloors } from '../../levels/levelSurfaces';
 import { contextLost } from './engine/gpu';
 import { AttemptProgress } from './AttemptProgress';
 import { LightingEngine } from './engine/LightingEngine';
@@ -210,6 +211,10 @@ export class LightingRenderer implements SceneLightingView {
 
   releaseBelowPicture(): void {
     this.levelsBelow?.releasePicture('frame');
+  }
+
+  artFloors(): ArtFloors | undefined {
+    return this.levelsBelow?.artFloors;
   }
 
   belowTokenPerception(): TokenPerception {

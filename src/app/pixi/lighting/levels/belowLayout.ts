@@ -8,6 +8,7 @@ import type { TexelBox } from '../../../levels/surfaceRaster';
 import { levelSurfaceList } from '../../../levels/levelSurfaces';
 import { hasLevels, levelById, viewedLevelId } from '../../../levels/sceneLevels';
 import type { SceneLevel } from '../../../types/sceneLevelTypes';
+import type { Point } from '../../../types/visionTypes';
 import type { MapBounds } from '../../../vision/visibility';
 import type { LightingState } from '../LightingRenderer';
 
@@ -78,6 +79,22 @@ export class BelowLayout {
       levelObjects(state).levelSurfaces, ...below.map((level) => levelObjectsOn(state, level.id).levelSurfaces)];
     if (inputs.length === this.inputs.length && inputs.every((input, i) => input === this.inputs[i])) return this.result;
     return this.keep(inputs, this.lay(state, viewed, shown, below, viewBounds));
+  }
+
+  /**
+   * Whether level `id`'s map holds floor at `point` as the stack lays it (`artCells`): false where it
+   * is open (transparent, or outside the image), true where it holds art; null where it was not laid
+   * there (not read yet, or a level below away from the view's openings), which counts as floor.
+   */
+  artFloorAt(id: string, point: Point): boolean | null {
+    const kept = this.cells.get(id);
+    if (!kept) return null;
+    const { grid, area, cells } = kept;
+    const column = Math.floor(point.x / grid.texel);
+    const row = Math.floor(point.y / grid.texel);
+    if (!(column >= 0 && row >= 0 && column < grid.columns && row < grid.rows)) return null;
+    if (area && (column < area.x || row < area.y || column >= area.x + area.columns || row >= area.y + area.rows)) return null;
+    return cells.open[row * grid.columns + column] === 0;
   }
 
   /** Forgets every map read: another scene, or a map that changed. */

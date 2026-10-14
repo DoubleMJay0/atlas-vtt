@@ -8,6 +8,7 @@ import type { StoreApi } from 'zustand';
 import type { ViewAtlasState } from '../../storeFactory';
 import { endHistoryTransaction, runHistoryTransaction } from '../../stores/history';
 import type { TokenPlace } from '../../stores/tokenStacking';
+import type { ArtFloors } from '../../levels/levelSurfaces';
 import { showNotice } from '../../ui/notice';
 
 type ViewAtlasStore = StoreApi<ViewAtlasState>;
@@ -85,15 +86,16 @@ function choiceEntries(store: ViewAtlasStore, choice: LinkChoice, take: (level: 
  * levels (an elevator) and `menuAt` says where to ask, a menu asks the GM which; the step stays open
  * until the menu closes, so the drop and the pick are one undo step, and true is returned: the caller
  * must not close the step itself. Without `menuAt` (a pointer that was lost) those tokens stay.
+ * `art` is what the view draws of the levels' maps: a token dropped where it shows a level below falls.
  */
-export function dropTokensOnStairs(store: ViewAtlasStore, places: readonly TokenPlace[], menuAt: StairsMenuPlace | null): boolean {
+export function dropTokensOnStairs(store: ViewAtlasStore, places: readonly TokenPlace[], menuAt: StairsMenuPlace | null, art?: ArtFloors): boolean {
   const state = store.getState();
   const selected = state.selectedIds;
   const choice = menuAt ? linkChoice(linkLandings(state, places)) : null;
   const before = levelsOf(store, places.map(({ id }) => id));
   // Tokens that land in stairs leading to one level take them; any other that changes level fell through an opening.
   const viaStairs = new Set(linkLandings(state, places).filter(({ targets }) => targets.length === 1).map(({ tokenId }) => tokenId));
-  state.dropTokens(places);
+  state.dropTokens(places, art);
   followClimb(store, before, selected, new Set(places.map(({ id }) => id).filter((id) => !viaStairs.has(id))));
   if (!choice || !menuAt) return false;
 

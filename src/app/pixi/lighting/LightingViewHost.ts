@@ -8,6 +8,7 @@ import type { SceneLightingView } from './sceneLightingView';
 import type { TileView } from '../mapImage/levelOfDetail';
 import type { TokenPerception } from '../../vision/tokenPerception';
 import type { BelowPicture } from './levels/LevelsBelow';
+import type { ArtFloors } from '../../levels/levelSurfaces';
 
 export interface LightingViewHostDeps {
   store: ViewAtlasStore;
@@ -90,6 +91,7 @@ export class LightingViewHost implements SceneLightingView {
   addBelowDemandRegion(view: TileView): () => void { return this.view.addBelowDemandRegion?.(view) ?? ((): void => undefined); }
   releaseBelowPicture(): void { this.view.releaseBelowPicture?.(); }
   belowTokenPerception(): TokenPerception { return this.view.belowTokenPerception?.() ?? ((): 'unseen' => 'unseen'); }
+  artFloors(): ArtFloors | undefined { return this.view.artFloors?.(); }
 
   /** An engine that fails while it prepares the frame is replaced during the call: the picture is then the fallback's. */
   renderForFrame<T>(frame: SceneFrame, render: () => T): T {

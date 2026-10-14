@@ -32,6 +32,7 @@ import { SyncService } from './token-renderer/SyncService';
 import { TokenGlide, placedAtOnce } from './token-renderer/TokenGlide';
 import type { ShownPlaces } from '../lighting/shownPlaces';
 import type { Point } from '../types/visionTypes';
+import type { ArtFloors } from '../levels/levelSurfaces';
 import { PLAYER_SIGHT_POLICY } from '../vision/tokenSightPolicy';
 import { createSceneSource } from '../plugin/host/sceneSource';
 import { updateInstanceBadge } from './token-renderer/InstanceBadge';
@@ -1463,9 +1464,15 @@ export class TokenRenderer {
     this.glideWay = clearWay;
   }
 
+  /** The lighting lays out the levels' maps (`ArtFloors`): a token dropped where it draws a level below falls there. */
+  public setArtFloors(provider: () => ArtFloors | undefined): void {
+    this.interactionController.setArtFloors(provider);
+  }
+
   /** The view's lighting is gone: nothing takes the pointer for lights, walls and doors any more, no sight hides tokens, and tokens glide on any way. */
   public clearLighting(): void {
     delete this.glideWay;
+    this.interactionController.setArtFloors(undefined);
     delete this.lightHandlers;
     delete this.doorClickHandler;
     delete this.doorMenuHandlers;

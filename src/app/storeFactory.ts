@@ -35,6 +35,7 @@ import type { MapMove } from './grid/mapStretch';
 import { objectsMovedWithMap } from './grid/mapStretchObjects';
 import { computeNextInstanceNumber } from './stores/tokenInstanceNumbers';
 import { placeTokens, raiseTokens, type TokenPlace } from './stores/tokenStacking';
+import type { ArtFloors } from './levels/levelSurfaces';
 import type { DiceRollResult } from './types/diceTypes';
 import { isAtlasToolAvailable } from './tools/toolAvailability';
 import { readExploredMask } from './lighting/exploredMaskCodec';
@@ -184,7 +185,8 @@ export interface ViewAtlasState extends ViewState {
    * The pointer lets go of the tokens it dragged: `placeTokens` puts them at `positions`, on top
    * of every other token, and they are no longer held. One write, so sight works the drop out once.
    */
-  dropTokens: (positions: readonly TokenPlace[]) => void;
+  /** Puts dragged tokens down (`placeTokens`); `art` is what the view draws of the levels' maps, through which a token falls. */
+  dropTokens: (positions: readonly TokenPlace[], art?: ArtFloors) => void;
   deleteTokens: (ids: string[]) => void;
   /** Deletes every selected token, drawing, text and pin in one undo step. */
   deleteSelected: () => void;
@@ -841,9 +843,9 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
             draft._audioDirty = true;
           }),
 
-          dropTokens: (positions) => set((draft) => {
+          dropTokens: (positions, art) => set((draft) => {
             const levelsBefore = new Map(positions.map(({ id }) => [id, draft.objects.tokens[id]?.level]));
-            placeTokens(draft, positions);
+            placeTokens(draft, positions, art);
             if (Object.keys(draft.heldTokens).length > 0) draft.heldTokens = {};
             // Tokens that went down or up stairs leave the selection, which stays on the level shown.
             const climbed = new Set(positions.filter(({ id }) => draft.objects.tokens[id]?.level !== levelsBefore.get(id)).map(({ id }) => id));

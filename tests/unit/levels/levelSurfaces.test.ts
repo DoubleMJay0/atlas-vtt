@@ -104,6 +104,38 @@ describe('a drop over an opening', () => {
   });
 });
 
+describe('a drop over transparent art', () => {
+  // The view lays the upper level's map out transparent left of x 100, the ground's left of x 40.
+  const art = (level: string, point: { x: number; y: number }): boolean | null => {
+    if (level === 'upper') return point.x >= 100;
+    if (level === 'ground') return point.x >= 40;
+    return null;
+  };
+
+  it('lets the token fall to the first level whose map holds floor there, in the drop\'s one undo step', () => {
+    const store = sceneStore({}, { knight: token('knight') });
+    runHistoryTransaction(store, () => store.getState().dropTokens([{ id: 'knight', x: 60, y: 300 }], art));
+    expect(store.getState().objects.tokens.knight!.level).toBe('ground');
+    expect(getHistoryStore(store)!.getState().pastStates).toHaveLength(1);
+    getHistoryStore(store)!.getState().undo();
+    expect(store.getState().objects.tokens.knight!.level).toBe('upper');
+
+    runHistoryTransaction(store, () => store.getState().dropTokens([{ id: 'knight', x: 20, y: 300 }], art));
+    // The cellar's map is not known to the view: it counts as floor.
+    expect(store.getState().objects.tokens.knight!.level).toBe('cellar');
+  });
+
+  it('holds a token on its map, where the view does not know, and where a drawn floor lies over the transparent art', () => {
+    const store = sceneStore({ plank: surface('plank', 'upper', false, square(0, 0, 50)) }, { a: token('a'), b: token('b'), c: token('c', 'cellar') });
+    store.getState().dropTokens([{ id: 'a', x: 150, y: 300 }, { id: 'b', x: 25, y: 25 }], art);
+    store.getState().dropTokens([{ id: 'c', x: 20, y: 20 }], art);
+    expect(['a', 'b', 'c'].map((id) => store.getState().objects.tokens[id]!.level)).toEqual(['upper', 'upper', 'cellar']);
+    // Without the view's answer, only drawn openings let a token fall.
+    store.getState().dropTokens([{ id: 'a', x: 60, y: 300 }]);
+    expect(store.getState().objects.tokens.a!.level).toBe('upper');
+  });
+});
+
 describe('surfaces and the scene', () => {
   it('are added on the level shown and changed and deleted, each one undo step', () => {
     const store = sceneStore({}, {});

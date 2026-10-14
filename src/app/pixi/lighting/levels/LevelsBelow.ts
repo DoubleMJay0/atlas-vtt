@@ -3,6 +3,7 @@ import type { Viewport } from 'pixi-viewport';
 import type { MeasurementSettings } from '../../../grid/measurementFormat';
 import { belowQuality, type LightingQuality } from '../../../lighting/lightingQuality';
 import { showsBelow, withDrawn, type LevelStack } from '../../../levels/levelStack';
+import type { ArtFloors } from '../../../levels/levelSurfaces';
 import type { Sight } from '../../../vision/sight';
 import type { SightRules } from '../../../vision/sightRules';
 import type { FogCover } from '../../../vision/throughSight';
@@ -102,6 +103,9 @@ export class LevelsBelow {
     for (const level of this.levels.values()) if (level.engine.failed) return true;
     return false;
   }
+
+  /** Whether a level's map holds floor at a point as the view lays the levels out (`BelowLayout.artFloorAt`): a token dropped where it does not falls. */
+  readonly artFloors: ArtFloors = (id, point) => this.layout.artFloorAt(id, point);
 
   /** The level stack of the view as it draws it, or null while it shows only its own level. */
   currentStack(): LevelStack | null {

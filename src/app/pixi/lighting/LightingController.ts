@@ -168,6 +168,7 @@ export class LightingController {
     this.tokens = tokens;
     tokens.setPlayerSightProvider(() => (this.session.active ? this.playerSight() : undefined), () => this.session.active, () => this.renderer.sightIsCurrent());
     tokens.setGlideWay((from, to) => glideWayIsClear(this.deps.store.getState(), this.deps.bounds(), from, to));
+    tokens.setArtFloors(() => this.renderer.artFloors?.());
     wireLightingPointer(tokens, {
       lights: this.lights, editor: this.editor, modes: this.modes, doors: this.doors,
       wallMenu: (x, y, screenX, screenY) => showWallMenu(this.menuContext(), x, y, screenX, screenY),

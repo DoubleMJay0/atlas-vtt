@@ -1,6 +1,6 @@
 import type { TokenEntity } from '../types';
 import { linkLandings } from '../levels/levelLinks';
-import { floorBelow } from '../levels/levelSurfaces';
+import { floorBelow, type ArtFloors } from '../levels/levelSurfaces';
 import { resolveLevel, type SceneLevels } from '../levels/sceneLevels';
 import type { LevelLink, LevelSurface } from '../types/sceneLevelTypes';
 
@@ -46,13 +46,13 @@ export interface PlacedTokensState {
  * and flags the move for spatial audio. A token put down inside stairs (`linkLandings`) that lead
  * to one level goes to that level, at the same place, in the same write; where they offer several,
  * it stays and the caller may offer the choice (`linkChoice`). A token that ends where its level has
- * no floor (an opening, `floorBelow`) falls to the first level below that has, in the same write;
- * over a chasm it stays. Changes only what the scene saves and undoes (the tokens' places, order and
+ * no floor (an opening, or where the view draws its map transparent: `art`, `floorBelow`) falls to
+ * the first level below that has, in the same write; over a chasm it stays. Changes only what the scene saves and undoes (the tokens' places, order and
  * levels) and the audio flag; letting go of held tokens is pointer state, which `dropTokens` does.
  * Tokens not listed keep their objects. Changes `state` in place (a store draft); returns nothing,
  * so a recipe may hand its call on.
  */
-export function placeTokens(state: PlacedTokensState, positions: readonly TokenPlace[]): void {
+export function placeTokens(state: PlacedTokensState, positions: readonly TokenPlace[], art?: ArtFloors): void {
   const { tokens } = state.objects;
   const landings = linkLandings(state, positions);
   for (const { id, x, y } of positions) {
@@ -69,7 +69,7 @@ export function placeTokens(state: PlacedTokensState, positions: readonly TokenP
   for (const { id, x, y } of positions) {
     const token = tokens[id];
     const from = token ? resolveLevel(state.levels, token.level) : null;
-    const below = token && from !== null ? floorBelow(state, from, { x, y }) : null;
+    const below = token && from !== null ? floorBelow(state, from, { x, y }, art) : null;
     if (token && below !== null) token.level = below;
   }
   raiseTokens(tokens, positions.map(({ id }) => id));

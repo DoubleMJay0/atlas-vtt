@@ -6,6 +6,7 @@ import type { SceneFrame } from './engine/types';
 import type { TileView } from '../mapImage/levelOfDetail';
 import type { TokenPerception } from '../../vision/tokenPerception';
 import type { BelowPicture } from './levels/LevelsBelow';
+import type { ArtFloors } from '../../levels/levelSurfaces';
 
 /** Who shows the GM the explored memory while it is edited (the lighting tool's overlay, `ExploredBrush`). */
 export interface ExploredMemoryWatcher {
@@ -60,5 +61,7 @@ export interface SceneLightingView {
   releaseBelowPicture?(): void;
   /** How the players perceive the tokens of the level below drawn through the openings; none without one. */
   belowTokenPerception?(): TokenPerception;
+  /** Whether a level's map holds floor at a point as the view draws it, for a drop to fall through; none where the view lays out no levels. */
+  artFloors?(): ArtFloors | undefined;
   destroy(): void;
 }

@@ -74,14 +74,24 @@ export function surfacesOnLevel(surfaces: Record<string, LevelSurface> | undefin
   return levelSurfaceList(kept);
 }
 
-/** Whether a level with `surfaces` (its own, in order) has floor at `point`: the latest surface that holds the point decides, none is floor. */
-export function floorAt(surfaces: readonly LevelSurface[], point: Point): boolean {
+/**
+ * Whether a level with `surfaces` (its own, in order) has floor at `point`: the latest surface that
+ * holds the point decides; where none does, `art` (whether the level's map holds floor there), else floor.
+ */
+export function floorAt(surfaces: readonly LevelSurface[], point: Point, art = true): boolean {
   for (let i = surfaces.length - 1; i >= 0; i--) {
     const surface = surfaces[i]!;
     if (pointInPolygon(point, surface.polygon)) return !surface.open;
   }
-  return true;
+  return art;
 }
+
+/**
+ * Whether level `levelId`'s map holds floor at `point` as the view draws it (`artCells`: false where
+ * it is transparent or the point lies outside its image), or null where the view does not know,
+ * which counts as floor. The store has no map: a view hands this to a drop.
+ */
+export type ArtFloors = (levelId: string, point: Point) => boolean | null;
 
 /** What a drop reads of a scene to let a token fall. */
 export interface SurfacedScene {
@@ -90,19 +100,21 @@ export interface SurfacedScene {
 }
 
 /**
- * Where a token put down at `point` on level `from` lands: `from` where it has floor there, else
- * the first level below that has, whatever each level shows of the ones below it; null where
+ * Where a token put down at `point` on level `from` lands: `from` where it has floor there (its
+ * surfaces, else its map as `art` says), else the first level below that has, whatever each level
+ * shows of the ones below it; null where
  * there is floor on `from`, or none below either (a chasm: the token stays). Null in a scene
  * without levels.
  */
-export function floorBelow(scene: SurfacedScene, from: string, point: Point): string | null {
+export function floorBelow(scene: SurfacedScene, from: string, point: Point, art?: ArtFloors): string | null {
   const { levels } = scene;
   if (!hasLevels(levels)) return null;
   const at = levels.findIndex((level) => level.id === from);
-  if (at < 0 || floorAt(surfacesOnLevel(scene.objects.levelSurfaces, from, levels), point)) return null;
+  const floor = (id: string): boolean => floorAt(surfacesOnLevel(scene.objects.levelSurfaces, id, levels), point, art?.(id, point) ?? true);
+  if (at < 0 || floor(from)) return null;
   for (let index = at - 1; index >= 0; index--) {
     const id = levels[index]!.id;
-    if (floorAt(surfacesOnLevel(scene.objects.levelSurfaces, id, levels), point)) return id;
+    if (floor(id)) return id;
   }
   return null;
 }

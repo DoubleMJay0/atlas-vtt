@@ -44,6 +44,7 @@ import { conditionsSubmenu } from '../../react/components/context-menu/condition
 import { placedPlayerCharacterEntry } from '../../react/components/context-menu/playerCharacterMenu';
 import { holdTokens } from '../../lighting/sightOnDrop';
 import { dropTokensOnStairs, type StairsMenuPlace } from './stairsDrop';
+import type { ArtFloors } from '../../levels/levelSurfaces';
 import { t } from '../../i18n';
 import { levelObjects } from '../../levels/levelObjects';
 
@@ -98,6 +99,8 @@ export class InteractionController implements ITokenInteractionController {
   private getTokenSprite?: (tokenId: string) => TokenGroupContainer | null;
   private updateUIPosition?: (tokenId: string, x: number, y: number) => void;
   private settleToken?: (tokenId: string, x: number, y: number) => void;
+  /** What the view draws of the levels' maps, through which a dropped token falls; none without lighting. */
+  private artFloors: (() => ArtFloors | undefined) | undefined;
   private updateControlsPosition?: (x: number, y: number, tokenSize: number) => void;
   private onTokensHeldChange?: (tokenIds: string[]) => void;
   private updateHandlePositions?: () => void;
@@ -507,7 +510,7 @@ export class InteractionController implements ITokenInteractionController {
         tokenUpdates.push({id, x: finalPos.x, y: finalPos.y});
       }
       
-      if (tokenUpdates.length > 0) stepHeld = dropTokensOnStairs(this.store, tokenUpdates, menuAt);
+      if (tokenUpdates.length > 0) stepHeld = dropTokensOnStairs(this.store, tokenUpdates, menuAt, this.artFloors?.());
       
       // Update UI
       this.onSelectionUpdate?.();
@@ -787,6 +790,11 @@ export class InteractionController implements ITokenInteractionController {
 
   setUIPositionUpdater(updater: (tokenId: string, x: number, y: number) => void): void {
     this.updateUIPosition = updater;
+  }
+
+  /** What the view draws of the levels' maps (`ArtFloors`): a token dropped where a level below shows falls to it. */
+  setArtFloors(provider: (() => ArtFloors | undefined) | undefined): void {
+    this.artFloors = provider;
   }
 
   /** How a dropped token gets from where the pointer left it to its place. */
