@@ -170,6 +170,9 @@ export class Roof {
     this.read = null;
     this.placement = null;
     this.transform = null;
+    // A new image's pieces all show until the scene fades some.
+    this.playerFaded = NO_FADED;
+    this.gmFaded = NO_FADED;
     this.layer.setPieces(null, null);
     if (!foreground) {
       void this.image.load(null, gridSize);

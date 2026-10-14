@@ -12,8 +12,8 @@ import { paintedRgbaTexture, type FakeMap } from './levelsView';
 
 /** Pieces of the roofs' leak fuzz (`leakFuzzRoofs.gpu.test.ts`): roof images, their hues, and the rule worked out on its own. */
 
-/** The viewed level's roof: green, which nothing else in the picture is. */
-export const green = (pixels: Uint8ClampedArray, o: number): boolean => pixels[o + 1]! > pixels[o]! + 30 && pixels[o + 1]! > pixels[o + 2]! + 30;
+/** The viewed level's roof: green, which nothing else in the picture is (at night the cool grey of low light takes part of it). */
+export const green = (pixels: Uint8ClampedArray, o: number): boolean => pixels[o + 1]! > Math.max(pixels[o]!, pixels[o + 2]!) + 15;
 /** A roof of the level below: orange. */
 export const orange = (pixels: Uint8ClampedArray, o: number): boolean => pixels[o]! > pixels[o + 1]! + 30 && pixels[o + 1]! > pixels[o + 2]! + 30;
 
