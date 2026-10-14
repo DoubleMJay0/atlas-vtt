@@ -318,8 +318,11 @@ describe('the cost of levels below (budgets asserted with VITE_PERF_STRICT)', ()
       const start = performance.now();
       const read = await client.alphaRaster(opened.handle, 2048, OPEN_ALPHA_BYTE);
       const workerMs = performance.now() - start;
+      const roofStart = performance.now();
+      const pieces = await client.roofPieces(opened.handle, 2048);
+      const workerRoofMs = performance.now() - roofStart;
       client.close(opened.handle);
-      console.info(`levels cost (art): ${JSON.stringify({ artCellsMs: level, artCellsTurnedMs: turned, stackOfThreeMs: stackMs, workerAlphaMs: workerMs, overview: `${read.width}x${read.height}` })}`);
+      console.info(`levels cost (art): ${JSON.stringify({ artCellsMs: level, artCellsTurnedMs: turned, stackOfThreeMs: stackMs, workerAlphaMs: workerMs, workerRoofPiecesMs: workerRoofMs, roofPieces: pieces.count, overview: `${read.width}x${read.height}` })}`);
       expect([read.width, read.height]).toEqual([2048, 2048]);
       if (STRICT) {
         expect(workerMs).toBeLessThan(150);
