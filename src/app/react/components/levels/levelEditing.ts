@@ -1,5 +1,5 @@
 import { t } from '../../../i18n';
-import { withLevelAdded, withLevelChanged, withLevelDeleted, withLevelSight, withLevelsReordered, type LevelScene } from '../../../levels/levelEdits';
+import { withLevelAdded, withLevelChanged, withLevelDeleted, withLevelRoof, withLevelSight, withLevelsReordered, type LevelScene } from '../../../levels/levelEdits';
 import { firstLevelId, viewedLevelId } from '../../../levels/sceneLevels';
 import type { ViewAtlasStore } from '../../../storeFactory';
 import { getHistoryStore, runUntracked } from '../../../stores/history';
@@ -53,6 +53,16 @@ export function setLevelSees(store: ViewAtlasStore, id: string, below: string, s
 export function setLevelOpenArt(store: ViewAtlasStore, id: string, open: boolean): void {
   const { levels, setLevels } = store.getState();
   if (levels) runUntracked(store, () => setLevels(withLevelSight(levels, id, { openArt: open })));
+}
+
+/**
+ * Draws `foreground` as the roof of level `id` (null: the scene's only level, made where the scene has
+ * none), or none; a scene setting like a level's name, never an undo step.
+ */
+export function setLevelRoof(store: ViewAtlasStore, id: string | null, foreground: string | null): void {
+  const state = store.getState();
+  const levels = withLevelRoof(state, id, foreground, t('levels.firstName'));
+  if (levels) runUntracked(store, () => state.setLevels(levels));
 }
 
 /** Shows `background` on level `id`; the first level's is the scene's own background, an edit like any other of it. */

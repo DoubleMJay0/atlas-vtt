@@ -6,10 +6,11 @@ import { viewedLevelId } from '../../../levels/sceneLevels';
 import { levelBackground } from '../../../levels/levelEdits';
 import { collectionIdOfPath } from '../../../services/assetPaths';
 import { runInBackground } from '../../../utils/backgroundTask';
-import { addLevel, changeLevel, changeLevelBackground, deleteLevel, levelLabel, moveLevel, setLevelOpenArt, setLevelSees } from '../levels/levelEditing';
+import { addLevel, changeLevel, changeLevelBackground, deleteLevel, levelLabel, moveLevel, setLevelOpenArt, setLevelRoof, setLevelSees } from '../levels/levelEditing';
 import { pickMapImage } from '../levels/MapImagePickerModal';
 import { replaceMapImage } from '../levels/replaceMapImage';
 import { SceneLevelRow } from './SceneLevelRow';
+import { LevelRoofSettings } from './SceneLevelRoof';
 import { presentLevelInsteadOf } from '../../../services/presentedLevel';
 import { t } from '../../../i18n';
 
@@ -26,6 +27,9 @@ export function SceneLevelsPanel(): React.ReactElement {
   const background = useAtlasStore((state) => state.background);
   const collection = collectionIdOfPath(mapPath);
   const pick = (onChoose: (path: string | null) => void): void => runInBackground(pickMapImage(app, collection, onChoose), 'Picking a map image');
+  const pickRoof = (id: string | null): void => runInBackground(pickMapImage(app, collection, (path) => setLevelRoof(store, id, path), 'roof'), 'Picking a roof image');
+  // A scene of one level (or none yet) has no rows: its roof is set here, its one level made where it has none.
+  const only = levels?.length === 1 ? levels[0]! : null;
   const several = levels && levels.length > 1 ? levels : null;
 
   return (
@@ -61,12 +65,23 @@ export function SceneLevelsPanel(): React.ReactElement {
                 below={several.slice(0, index).reverse().map((entry) => ({ id: entry.id, name: levelLabel(several, entry) }))}
                 onSees={(id, seen) => setLevelSees(store, level.id, id, seen)}
                 onOpenArt={(open) => setLevelOpenArt(store, level.id, open)}
+                onPickRoof={() => pickRoof(level.id)}
+                onRemoveRoof={() => setLevelRoof(store, level.id, null)}
               />
             );
           })}
         </div>
       ) : (
-        <p className="atlas-scene-levels__hint">{t('levels.empty')}</p>
+        <>
+          <p className="atlas-scene-levels__hint">{t('levels.empty')}</p>
+          <LevelRoofSettings
+            name={only ? levelLabel([only], only) : t('levels.firstName')}
+            foreground={only?.foreground}
+            onPick={() => pickRoof(only?.id ?? null)}
+            onRemove={() => setLevelRoof(store, only?.id ?? null, null)}
+            alone
+          />
+        </>
       )}
     </div>
   );

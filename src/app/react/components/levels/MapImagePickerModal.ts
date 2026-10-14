@@ -9,22 +9,25 @@ interface MapImageChoice {
   collection: string | null;
 }
 
-/** The map images of the library, those of `collection` first, then by name; "no map image" before them. */
-async function mapImageChoices(app: App, collection: string | null): Promise<MapImageChoice[]> {
+/** What the picker is for: a level's map, or its roof. */
+export type MapImagePick = 'map' | 'roof';
+
+/** The map images of the library, those of `collection` first, then by name; "no map image" (or "no roof") before them. */
+async function mapImageChoices(app: App, collection: string | null, pick: MapImagePick): Promise<MapImageChoice[]> {
   const assets = await AssetService.getInstance(app).getAssets();
   const maps: MapImageChoice[] = [];
   for (const asset of assets) {
     if (asset.type === 'map' && app.vault.getFileByPath(asset.mapFilePath)) maps.push({ name: asset.name, path: asset.mapFilePath, collection: asset.collection });
   }
   maps.sort((a, b) => Number(b.collection === collection) - Number(a.collection === collection) || a.name.localeCompare(b.name));
-  return [{ name: t('levels.noImage'), path: null, collection: null }, ...maps];
+  return [{ name: t(pick === 'roof' ? 'levels.noRoof' : 'levels.noImage'), path: null, collection: null }, ...maps];
 }
 
 /** Picks a map image of the library for a level. */
 class MapImagePickerModal extends FuzzySuggestModal<MapImageChoice> {
-  constructor(app: App, private readonly choices: MapImageChoice[], private readonly onChoose: (path: string | null) => void) {
+  constructor(app: App, private readonly choices: MapImageChoice[], private readonly onChoose: (path: string | null) => void, pick: MapImagePick) {
     super(app);
-    this.setPlaceholder(t('levels.pickImage'));
+    this.setPlaceholder(t(pick === 'roof' ? 'levels.pickRoof' : 'levels.pickImage'));
   }
 
   getItems(): MapImageChoice[] {
@@ -50,6 +53,6 @@ class MapImagePickerModal extends FuzzySuggestModal<MapImageChoice> {
 }
 
 /** Opens the picker once the library is read; `onChoose` gets the picked image's path, or null for none. */
-export async function pickMapImage(app: App, collection: string | null, onChoose: (path: string | null) => void): Promise<void> {
-  new MapImagePickerModal(app, await mapImageChoices(app, collection), onChoose).open();
+export async function pickMapImage(app: App, collection: string | null, onChoose: (path: string | null) => void, pick: MapImagePick = 'map'): Promise<void> {
+  new MapImagePickerModal(app, await mapImageChoices(app, collection, pick), onChoose, pick).open();
 }

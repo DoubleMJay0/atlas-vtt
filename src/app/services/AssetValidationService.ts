@@ -7,8 +7,8 @@ import { showNotice } from '../ui/notice';
 /** The parts of a map that reference vault images; satisfied by a MapFile and by the live store state. */
 export interface MapAssetReferences {
     background: MapFile['background'];
-    /** The scene's levels; the first one's map is `background`. */
-    levels?: readonly Pick<SceneLevel, 'id' | 'background'>[] | undefined;
+    /** The scene's levels; the first one's map is `background`. Each may draw a roof (`foreground`). */
+    levels?: readonly Pick<SceneLevel, 'id' | 'background' | 'foreground'>[] | undefined;
     objects: Pick<MapFile['objects'], 'tokens'>;
 }
 
@@ -17,7 +17,8 @@ export const SCENE_BACKGROUND = 'background';
 
 export interface MissingAsset {
     id: string;
-    type: 'token' | 'map';
+    /** A token's art, a level's map (`objectId`: the level, or `SCENE_BACKGROUND`), or a level's roof (`objectId`: the level). */
+    type: 'token' | 'map' | 'roof';
     path: string;
     objectId: string;
     objectName?: string;
@@ -102,6 +103,18 @@ export class AssetValidationService {
             });
         }
 
+        for (const level of mapData.levels ?? []) {
+            if (typeof level.foreground !== 'string' || !level.foreground || (await this.validateAsset(level.foreground))) continue;
+            result.valid = false;
+            result.missingAssets.push({
+                id: `roof:${level.id}`,
+                type: 'roof',
+                path: level.foreground,
+                objectId: level.id,
+                objectName: t('validation.roof')
+            });
+        }
+
         for (const [tokenId, token] of Object.entries(mapData.objects.tokens)) {
             if (token.imagePath && !(await this.validateAsset(token.imagePath))) {
                 result.valid = false;
@@ -123,10 +136,12 @@ export class AssetValidationService {
 
         const tokenCount = missingAssets.filter(a => a.type === 'token').length;
         const mapCount = missingAssets.filter(a => a.type === 'map').length;
+        const roofCount = missingAssets.filter(a => a.type === 'roof').length;
 
         let message = `${t('validation.missing')}\n`;
         if (tokenCount > 0) message += `- ${t('validation.tokenImages', { count: tokenCount })}\n`;
         if (mapCount > 0) message += `- ${t('validation.backgrounds', { count: mapCount })}\n`;
+        if (roofCount > 0) message += `- ${t('validation.roofs', { count: roofCount })}\n`;
         
         message += `\n${t('validation.placeholders')}`;
 

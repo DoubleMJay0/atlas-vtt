@@ -1,11 +1,12 @@
 import React, { useEffect, useId, useState } from 'react';
-import { ArrowDown, ArrowUp, Image, Layers, Replace, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, House, Image, Layers, Replace, Trash2 } from 'lucide-react';
 import { ToggleSwitch } from '../../../packages/components/primitives/Toggle';
 import { MAX_LEVELS_SHOWN_BELOW } from '../../../levels/levelStack';
 import { cn } from '../../../../utils/cn';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import type { LevelElevation, SceneLevel } from '../../../types/sceneLevelTypes';
 import { t } from '../../../i18n';
+import { LevelRoofSettings } from './SceneLevelRoof';
 
 interface SceneLevelRowProps {
   level: SceneLevel;
@@ -29,6 +30,9 @@ interface SceneLevelRowProps {
   onSees: (id: string, seen: boolean) => void;
   /** The transparent parts of its map are openings, or floor. */
   onOpenArt: (open: boolean) => void;
+  /** Picks the image drawn as the level's roof, or none. */
+  onPickRoof: () => void;
+  onRemoveRoof: () => void;
 }
 
 /** A number field that commits a finite number on blur or Enter, and goes back to `value` otherwise. */
@@ -115,6 +119,7 @@ export function SceneLevelRow(props: SceneLevelRowProps): React.ReactElement {
   const { level, name, isViewed } = props;
   const [draft, setDraft] = useState(level.name);
   const [showsBelow, setShowsBelow] = useState(false);
+  const [showsRoof, setShowsRoof] = useState(false);
   useEffect(() => setDraft(level.name), [level.name]);
   const { bottom, top } = level.elevation;
   const hasBelow = props.below.length > 0;
@@ -150,10 +155,12 @@ export function SceneLevelRow(props: SceneLevelRowProps): React.ReactElement {
             expanded={hasBelow ? showsBelow : undefined}
             onClick={() => setShowsBelow(!showsBelow)}
           />
+          <RowButton label={t('levels.roof', { name })} icon={<House />} expanded={showsRoof || !!level.foreground} onClick={() => setShowsRoof(!showsRoof)} />
           <RowButton label={t('levels.delete', { name })} icon={<Trash2 />} destructive onClick={props.onDelete} />
         </div>
       </div>
       {hasBelow && showsBelow && <LevelBelowSettings level={level} below={props.below} onSees={props.onSees} onOpenArt={props.onOpenArt} />}
+      {showsRoof && <LevelRoofSettings name={name} foreground={level.foreground} onPick={props.onPickRoof} onRemove={props.onRemoveRoof} />}
     </div>
   );
 }

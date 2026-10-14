@@ -27,6 +27,7 @@
 - Openings between floors: draw a hole in a floor with Openings in the lighting menu, and the floor below shows through it, lit as it is down there, with its tokens and fog. Players see through an opening only what their tokens see, and remember it. A token put down over an opening falls to the floor below. A shape drawn over an opening and set to Floor in its popover makes a bridge or a balcony
 - Floors exported with transparent parts open by themselves: where a floor's map is transparent, the floors below show through it, two of them deep, with nothing to draw. A tower whose map is smaller than the ground's looks out over the ground beyond it, and a token put down where a floor shows the one below falls to it, as over an opening. In Scene levels, each floor's layers button says which floors below it sees and whether its transparent parts are open
 - Snapshots of an upper floor show the floors below through its openings
+- Roofs: give a floor a roof image in Scene levels and it is drawn above the tokens, each roof fading while a player character stands under it. Players see a roof only where their tokens can see it and never the tokens beneath; Roofs on the level switcher hides them from your own view
 
 ## Improved
 

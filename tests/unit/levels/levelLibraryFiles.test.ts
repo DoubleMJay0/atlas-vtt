@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sceneImagePaths } from '../../../src/app/levels/levelFile';
+import { withLevelRoof } from '../../../src/app/levels/levelEdits';
 import { AssetValidationService, SCENE_BACKGROUND } from '../../../src/app/services/AssetValidationService';
 import { createInMemoryApp } from '../../mocks/inMemoryVault';
 
@@ -29,5 +30,23 @@ describe('checking a scene\'s files', () => {
 
     const gone = await new AssetValidationService({ app }).validateMapAssets({ background: 'maps/gone.webp', objects: { tokens: {} } });
     expect(gone.missingAssets).toEqual([expect.objectContaining({ type: 'map', objectId: SCENE_BACKGROUND })]);
+  });
+});
+
+describe('a level\'s roof', () => {
+  it('is checked like a level\'s map, on the first level too, and reported by its level as a roof', async () => {
+    const { app } = createInMemoryApp({ files: { 'maps/ground.webp': 'BG', 'maps/upper.webm': 'UP', 'maps/eaves.png': 'R' } });
+    const roofed = [{ ...levels[0]!, foreground: 'maps/thatch.png' }, { ...levels[1]!, foreground: 'maps/eaves.png' }, levels[2]!];
+    const result = await new AssetValidationService({ app }).validateMapAssets({ background: 'maps/ground.webp', levels: roofed, objects: { tokens: {} } });
+    expect(result.missingAssets).toEqual([expect.objectContaining({ type: 'roof', path: 'maps/thatch.png', objectId: 'ground' })]);
+  });
+
+  it('is set on a level as a scene setting and removed as no field; a scene without levels gets its one level to carry it', () => {
+    const scene = { levels: undefined, background: 'maps/ground.webp' };
+    const made = withLevelRoof(scene, null, 'maps/roof.png', 'Ground floor')!;
+    expect(made).toEqual([expect.objectContaining({ name: 'Ground floor', background: 'maps/ground.webp', foreground: 'maps/roof.png' })]);
+    expect(withLevelRoof({ ...scene, levels: made }, made[0]!.id, null, 'Ground floor')![0]).not.toHaveProperty('foreground');
+    expect(withLevelRoof(scene, null, null, 'Ground floor')).toBeNull();
+    expect(withLevelRoof({ levels, background: null }, 'upper', 'maps/r.png', 'x')!.map((level) => level.foreground)).toEqual([undefined, 'maps/r.png', undefined]);
   });
 });

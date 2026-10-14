@@ -12,11 +12,14 @@ import { runInBackground } from '../../../utils/backgroundTask';
 import { LabelTooltip, TooltipProvider } from '../../../packages/components/primitives/tooltip';
 import { t } from '../../../i18n';
 import { levelLabel } from './levelEditing';
+import { levelForeground } from '../../../levels/levelEdits';
+import { RoofsToggle } from './RoofsToggle';
 import './level-switcher.scss';
 
 /**
  * The floors of a scene with more than one level, top floor first, at the map's left edge: a
- * click shows a level (never an undo step), the eye shows it to players like a scene tab's.
+ * click shows a level (never an undo step), the eye shows it to players like a scene tab's. Where
+ * the level shown has a roof, the GM's Roofs stands at its foot (alone in a scene of one level).
  */
 export function LevelSwitcher(): React.ReactElement | null {
   const { app, view } = useAtlasUI();
@@ -25,54 +28,61 @@ export function LevelSwitcher(): React.ReactElement | null {
   const setViewedLevel = useAtlasStore((state) => state.setViewedLevel);
   const activeTabId = useStore(useSceneTabStore(), (state) => state.activeTabId);
   const presented = usePresentedScene(app);
-  if (!levels || levels.length < 2) return null;
+  const roofed = useAtlasStore((state) => levelForeground(state, viewedLevelId(state)) !== null);
+  const several = !!levels && levels.length > 1;
+  if (!several && !roofed) return null;
   // The level players are shown in this tab's scene; none while another tab is presented
-  const presentedLevelId = presented && presented.tabId === activeTabId ? resolveLevel(levels, presented.levelId) : null;
+  const presentedLevelId = presented && presented.tabId === activeTabId && levels ? resolveLevel(levels, presented.levelId) : null;
   const onPresentLevel = (levelId: string): void => {
     if (view && activeTabId) runInBackground(presentTab(app, view, activeTabId, { levelId }), 'Showing a level to players');
   };
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="atlas-level-switcher" role="tablist" aria-orientation="vertical" aria-label={t('levels.switcher')}>
-        {[...levels].reverse().map((level) => {
-          const name = levelLabel(levels, level);
-          const isViewed = level.id === viewed;
-          const isPresented = level.id === presentedLevelId;
-          return (
-            <div
-              key={level.id}
-              role="tab"
-              aria-selected={isViewed}
-              tabIndex={0}
-              className={cn('atlas-level-switcher__level', isViewed && 'atlas-level-switcher__level--active')}
-              onClick={() => setViewedLevel(level.id)}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                setViewedLevel(level.id);
-              }}
-            >
-              <LabelTooltip side="right" label={t('levels.show', { name })}>
-                <span className="atlas-level-switcher__name">{name}</span>
-              </LabelTooltip>
-              <LabelTooltip side="right" label={t(isPresented ? 'levels.presented' : 'levels.present', { name })}>
-                <button
-                  type="button"
-                  className={cn('atlas-level-switcher__eye', isPresented && 'atlas-level-switcher__eye--active')}
-                  aria-pressed={isPresented}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onPresentLevel(level.id);
+      <div className={cn('atlas-level-switcher', roofed && 'atlas-level-switcher--roofs')}>
+        {several && (
+          <div className="atlas-level-switcher__levels" role="tablist" aria-orientation="vertical" aria-label={t('levels.switcher')}>
+            {[...levels].reverse().map((level) => {
+              const name = levelLabel(levels, level);
+              const isViewed = level.id === viewed;
+              const isPresented = level.id === presentedLevelId;
+              return (
+                <div
+                  key={level.id}
+                  role="tab"
+                  aria-selected={isViewed}
+                  tabIndex={0}
+                  className={cn('atlas-level-switcher__level', isViewed && 'atlas-level-switcher__level--active')}
+                  onClick={() => setViewedLevel(level.id)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    setViewedLevel(level.id);
                   }}
-                  onKeyDown={(event) => event.stopPropagation()}
                 >
-                  <Eye size={12} />
-                </button>
-              </LabelTooltip>
-            </div>
-          );
-        })}
+                  <LabelTooltip side="right" label={t('levels.show', { name })}>
+                    <span className="atlas-level-switcher__name">{name}</span>
+                  </LabelTooltip>
+                  <LabelTooltip side="right" label={t(isPresented ? 'levels.presented' : 'levels.present', { name })}>
+                    <button
+                      type="button"
+                      className={cn('atlas-level-switcher__eye', isPresented && 'atlas-level-switcher__eye--active')}
+                      aria-pressed={isPresented}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onPresentLevel(level.id);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <Eye size={12} />
+                    </button>
+                  </LabelTooltip>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {roofed && <RoofsToggle />}
       </div>
     </TooltipProvider>
   );

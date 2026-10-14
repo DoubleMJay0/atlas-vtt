@@ -78,6 +78,23 @@ export function withLevelChanged(levels: readonly SceneLevel[], id: string, chan
 }
 
 /**
+ * The scene's levels with the roof of level `id` (null: a scene without levels, whose one level is
+ * made, named `firstName`, to carry it) set to `foreground`; null removes it, written as no field.
+ * Null where nothing changes (no roof removed from a scene without levels).
+ */
+export function withLevelRoof(scene: Pick<ViewState, 'levels' | 'background'>, id: string | null, foreground: string | null, firstName: string): SceneLevel[] | null {
+  const levels = scene.levels?.length ? scene.levels : foreground ? [{ id: newLevelId(), name: firstName, elevation: { bottom: 0, top: LEVEL_HEIGHT }, background: scene.background }] : null;
+  if (!levels) return null;
+  const target = id ?? levels[0]!.id;
+  return levels.map((level) => {
+    if (level.id !== target) return level;
+    const next: SceneLevel = { ...level, foreground };
+    if (!foreground) delete next.foreground;
+    return next;
+  });
+}
+
+/**
  * The scene's levels with what level `id` shows below it changed: `sees` (undefined: every level
  * below, as when unset) and `openArt` (true: its transparent parts are openings, as when unset).
  * Unset is written as no field at all, so a level left as it was is the level as it came.
