@@ -24,7 +24,7 @@ export function levelBackground(scene: Pick<ViewState, 'levels' | 'background'>,
 }
 
 /** The roof image of level `id` (its `foreground`), drawn above its tokens; null without one. */
-export function levelForeground(scene: Pick<ViewState, 'levels'>, id: string | null): string | null {
+export function levelForeground(scene: { levels?: readonly SceneLevel[] | undefined }, id: string | null): string | null {
   const foreground = id === null ? null : scene.levels?.find((level) => level.id === id)?.foreground;
   return typeof foreground === 'string' && foreground !== '' ? foreground : null;
 }

@@ -2,6 +2,8 @@ import type { Matrix } from 'pixi.js';
 import { sameStretch, type MapStretch } from '../../../grid/mapStretch';
 import { ambientLevelOn, ambientRaster, type AmbientRaster } from '../../../lighting/ambientRaster';
 import { stackGrid } from '../../../levels/levelStack';
+import { levelImagePlacement, type AlignedScene } from '../../../levels/levelAlignment';
+import { levelForeground } from '../../../levels/levelEdits';
 import { piecesTransform, piecesUnder, roofDrawnAt, roofPlacement, type PiecesTransform, type RoofCover, type RoofPieces } from '../../../levels/roofs';
 import type { TokenEntity } from '../../../types';
 import type { SceneLighting } from '../../../types/lightingTypes';
@@ -65,6 +67,14 @@ export interface RoofDeps {
 }
 
 const NO_FADED: ReadonlySet<number> = new Set();
+
+/** What a roof reads of its scene's state. */
+export type RoofState = AlignedScene & { roofsHidden?: boolean | undefined };
+
+/** What level `levelId` of `state` gives its roof: its image, placed as the level's map, on the scene's grid; and whether the GM hides roofs. */
+export function levelRoof(state: RoofState, levelId: string | null): Pick<RoofScene, 'foreground' | 'placement' | 'gridSize' | 'gmHidden'> {
+  return { foreground: levelForeground(state, levelId), placement: levelImagePlacement(state, levelId), gridSize: state.grid?.size, gmHidden: state.roofsHidden ?? false };
+}
 
 /**
  * A level's roof (its `foreground`): its image, read once into pieces (`roofPieces`) and drawn by a

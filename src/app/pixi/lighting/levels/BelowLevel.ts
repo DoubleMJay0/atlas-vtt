@@ -1,7 +1,7 @@
 import { Matrix, type Container, type Renderer, type RenderTexture } from 'pixi.js';
 import type { MeasurementSettings } from '../../../grid/measurementFormat';
 import { levelImagePlacement } from '../../../levels/levelAlignment';
-import { levelBackground, levelForeground } from '../../../levels/levelEdits';
+import { levelBackground } from '../../../levels/levelEdits';
 import { everyLevelObjects, levelObjectsOn } from '../../../levels/levelObjects';
 import { partyPlaces } from '../../../levels/roofs';
 import { exploredMaskOf, levelMapKey } from '../../../levels/sceneLevels';
@@ -30,7 +30,7 @@ import type { LightingState, LightingStore } from '../LightingRenderer';
 import { BelowFog } from './BelowFog';
 import { BelowStage } from './BelowStage';
 import { BelowTokens, type BelowTokenLook, type TokenArt } from './BelowTokens';
-import { Roof, type RoofHost } from './Roof';
+import { levelRoof, Roof, type RoofHost } from './Roof';
 
 const DEFAULT_CELL_SIZE = 70;
 const NO_PLACES: readonly Point[] = [];
@@ -200,14 +200,8 @@ export class BelowLevel {
     this.fog.sync(objects.fog, bounds, levelMapKey(state.mapPath, seen));
     // The level's roof: faded where its party stands, seen as the players see this level from above.
     this.roof.update({
-      foreground: levelForeground(state, id),
-      placement: levelImagePlacement(state, id),
-      background: this.deps.image.imageSize,
-      gridSize: state.grid?.size,
-      party: partyPlaces(objects.tokens),
-      selected: NO_PLACES,
+      ...levelRoof(state, id), background: this.deps.image.imageSize, party: partyPlaces(objects.tokens), selected: NO_PLACES,
       lit: { lighting: state.lighting, zones: model.ambient.zones ?? NO_ZONES, bounds, sight: player, tokens: everyLevelObjects(state).tokens },
-      gmHidden: state.roofsHidden ?? false,
     });
   }
 

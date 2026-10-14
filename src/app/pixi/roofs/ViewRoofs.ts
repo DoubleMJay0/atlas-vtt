@@ -1,8 +1,6 @@
 import { Matrix, type Application } from 'pixi.js';
 import type { App } from 'obsidian';
 import type { Viewport } from 'pixi-viewport';
-import { levelForeground } from '../../levels/levelEdits';
-import { viewedImagePlacement } from '../../levels/levelAlignment';
 import { everyLevelObjects, levelObjects } from '../../levels/levelObjects';
 import { partyPlaces } from '../../levels/roofs';
 import { viewedLevelId } from '../../levels/sceneLevels';
@@ -15,7 +13,7 @@ import type { MapBounds } from '../../vision/visibility';
 import type { TileView } from '../mapImage/levelOfDetail';
 import { createRoofHost } from '../lighting/belowLevelsHost';
 import type { SceneFrame } from '../lighting/engine/types';
-import { Roof, type RoofHost, type RoofLighting, type RoofScene } from '../lighting/levels/Roof';
+import { levelRoof, Roof, type RoofHost, type RoofLighting, type RoofScene } from '../lighting/levels/Roof';
 import { PlayerView } from '../lighting/PlayerView';
 import type { SceneLightingView } from '../lighting/sceneLightingView';
 import type { HideableLayer } from '../playerSafeFrame';
@@ -146,15 +144,14 @@ export class ViewRoofs {
     const level = viewedLevelId(state);
     const tokens = levelObjects(state).tokens;
     const selected = state.selectedIds.flatMap((id) => (tokens[id] ? [{ x: tokens[id].x, y: tokens[id].y }] : []));
+    const roof = levelRoof(state, level);
     return {
-      foreground: state.isMapLoading ? null : levelForeground(state, level),
-      placement: viewedImagePlacement(state),
+      ...roof,
+      foreground: state.isMapLoading ? null : roof.foreground,
       background: this.deps.mapSize(),
-      gridSize: state.grid?.size,
       party: partyPlaces(this.sightTokens.read(state)),
       selected,
       lit: this.lighting(),
-      gmHidden: state.roofsHidden,
     };
   }
 
