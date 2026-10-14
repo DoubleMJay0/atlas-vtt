@@ -5,6 +5,7 @@ import { workerPort, type PortFactory } from './tilePorts';
 import { MapClosedError } from './tileErrors';
 import { openWithRetry, type BytesSource, type MainThreadDecode, type OpenExchange } from './tileOpenRequest';
 import type { ArtAlpha } from '../../levels/artRaster';
+import type { RoofPieces } from '../../levels/roofs';
 import {
   isTileEvent,
   type FileIdentity,
@@ -132,6 +133,15 @@ export class TileDecoderClient {
     return reply.raster;
   }
 
+  /** The pieces of the map as a roof (`roofPieces`), over its overview fit within `maxSide`, worked out in the worker; rejects as `tile` does. */
+  async roofPieces(handle: number, maxSide: number, signal?: AbortSignal): Promise<RoofPieces> {
+    const target = this.handles.get(handle);
+    if (target === undefined) throw new MapClosedError();
+    const reply = await this.answer({ type: 'roof-pieces', id: this.nextId++, handle: target, maxSide }, handle, signal);
+    if (reply.type !== 'roof-pieces') throw this.failure(reply);
+    return reply.pieces;
+  }
+
   /** Ends an open; requests still pending for it reject with `MapClosedError`. A handle of a crashed worker is ignored. */
   close(handle: number): void {
     const target = this.handles.get(handle);
@@ -208,7 +218,7 @@ export class TileDecoderClient {
 
   /** The reply to a request about an open map, which `signal` cancels in the worker too. */
   private async answer(
-    message: Extract<TileRequest, { type: 'tile' | 'overview' | 'alpha-raster' }>,
+    message: Extract<TileRequest, { type: 'tile' | 'overview' | 'alpha-raster' | 'roof-pieces' }>,
     handle: number,
     signal: AbortSignal | undefined,
   ): Promise<TileReply> {

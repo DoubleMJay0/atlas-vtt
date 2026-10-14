@@ -54,6 +54,8 @@ export interface TileGraphics {
   compose(width: number, height: number, parts: readonly ComposedPart[]): ImageBitmap;
   /** One byte per pixel of `source`, row by row: 1 where its alpha is above `threshold` (of 255). */
   opaquePixels(source: ImageBitmap, threshold: number): Uint8Array;
+  /** The alpha of each pixel of `source`, row by row. */
+  alphaBytes(source: ImageBitmap): Uint8Array;
 }
 
 function context(canvas: TileCanvas): TileContext {
@@ -84,14 +86,19 @@ export function createTileGraphics(primitives: GraphicsPrimitives): TileGraphics
       return canvas.transferToImageBitmap();
     },
     opaquePixels(source, threshold) {
+      const alpha = this.alphaBytes(source);
+      for (let i = 0; i < alpha.length; i++) alpha[i] = alpha[i]! > threshold ? 1 : 0;
+      return alpha;
+    },
+    alphaBytes(source) {
       const { width, height } = source;
       const canvas = createCanvas(width, height);
       const ctx = context(canvas);
       ctx.drawImage(source, 0, 0, width, height, 0, 0, width, height);
       const { data } = ctx.getImageData(0, 0, width, height);
-      const opaque = new Uint8Array(width * height);
-      for (let i = 0; i < opaque.length; i++) opaque[i] = data[i * 4 + 3]! > threshold ? 1 : 0;
-      return opaque;
+      const alpha = new Uint8Array(width * height);
+      for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3]!;
+      return alpha;
     },
   };
 }

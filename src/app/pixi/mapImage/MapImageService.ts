@@ -4,8 +4,9 @@ import { describeError } from '../../utils/errors';
 import { decodeImageOnMainThread, requiredMainThreadDecode } from './mainThreadDecode';
 import { TileDecoderClient, TileOpenError, type OpenedMap } from './TileDecoderClient';
 import { OVERVIEW_MAX_SIDE, type TileRef } from './pyramid';
-import { OPEN_ALPHA_BYTE, type LevelArt } from '../../levels/artRaster';
-import { RecentAlphas } from './recentAlphas';
+import { OPEN_ALPHA_BYTE, type ArtAlpha, type LevelArt } from '../../levels/artRaster';
+import type { RoofPieces } from '../../levels/roofs';
+import { RecentReads } from './recentReads';
 import { showNotice } from '../../ui/notice';
 import type { MapVideoProblem } from './video/MapVideoSlot';
 
@@ -32,7 +33,8 @@ export class MapImageService {
   }
 
   private readonly reported = new Set<string>();
-  private readonly alphas = new RecentAlphas();
+  private readonly alphas = new RecentReads<ArtAlpha>();
+  private readonly roofs = new RecentReads<RoofPieces>();
   private readonly reportedVideos = new Set<string>();
 
   constructor(private readonly app: App, readonly client: TileDecoderClient) {}
@@ -69,6 +71,20 @@ export class MapImageService {
     try {
       const { width, height } = opened.pyramid;
       return { width, height, alpha: await this.alphas.of(opened.hash, () => this.client.alphaRaster(opened.handle, OVERVIEW_MAX_SIDE, OPEN_ALPHA_BYTE)) };
+    } finally {
+      this.close(opened.handle);
+    }
+  }
+
+  /**
+   * A vault image as a level's roof: its size and its pieces (`RoofPieces`), worked out in the tile
+   * worker over its overview, kept for the last few images by their content. Rejects as `open` does.
+   */
+  async roofPieces(file: TFile): Promise<{ width: number; height: number; pieces: RoofPieces }> {
+    const opened = await this.open(file);
+    try {
+      const { width, height } = opened.pyramid;
+      return { width, height, pieces: await this.roofs.of(opened.hash, () => this.client.roofPieces(opened.handle, OVERVIEW_MAX_SIDE)) };
     } finally {
       this.close(opened.handle);
     }

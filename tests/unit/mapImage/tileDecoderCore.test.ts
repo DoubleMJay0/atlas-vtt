@@ -121,6 +121,16 @@ describe('TileDecoderCore', () => {
     expect(h.graphics.bitmaps.filter((bitmap) => bitmap.width === 600).every((bitmap) => bitmap.closed)).toBe(true);
   });
 
+  it('works out a roof\'s pieces over an overview, its faint edge joined, and lets go of the overview', async () => {
+    const h = coreHarness();
+    const map = opened(await h.core.open(identity, fakePng(3000, 2000)));
+    const pieces = await h.core.roofPieces(1, map.handle, 600);
+    expect([pieces?.width, pieces?.height, pieces?.count]).toEqual([600, 400, 1]);
+    // The fake is opaque in its left half and faint in the column beside it, which joins the piece.
+    expect([pieces?.ids[0], pieces?.ids[299], pieces?.ids[300], pieces?.ids[301]]).toEqual([1, 1, 1, 0]);
+    expect(h.graphics.bitmaps.filter((bitmap) => bitmap.width === 600).every((bitmap) => bitmap.closed)).toBe(true);
+  });
+
   it('fits an overview from the full size, not from the rounded-up size of the level it is drawn from', async () => {
     const h = coreHarness();
     const map = opened(await h.core.open(identity, fakePng(4097, 307)));

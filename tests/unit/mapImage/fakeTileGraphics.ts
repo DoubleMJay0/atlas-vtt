@@ -111,6 +111,12 @@ export class FakeTileGraphics implements TileGraphics {
     return new Uint8Array(width * height).map((_, i) => (i % width < width / 2 ? 1 : 0));
   }
 
+  /** Alpha without colour: the fake is opaque in its left half and faint in a column beside it. */
+  alphaBytes(source: ImageBitmap): Uint8Array {
+    const { width, height } = asFake(source);
+    return new Uint8Array(width * height).map((_, i) => (i % width < width / 2 ? 255 : i % width === Math.ceil(width / 2) ? 60 : 0));
+  }
+
   private make(width: number, height: number, origin: BitmapOrigin): FakeBitmap {
     const bitmap = new FakeBitmap(width, height, origin);
     this.bitmaps.push(bitmap);
