@@ -36,4 +36,6 @@ export interface ViewUIState {
   viewedLevel?: string | null | undefined;
   /** The toolbar editor is open in this view: tray, hide and show, inert tools. Never saved. */
   isToolbarEditing: boolean;
+  /** The GM hides the roofs of the GM's own picture in this view (the switcher's Roofs); players still see theirs. Never saved. */
+  roofsHidden: boolean;
 }

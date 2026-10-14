@@ -1,14 +1,5 @@
-import {
-  Color,
-  Filter,
-  Matrix,
-  Sprite,
-  Texture,
-  UniformGroup,
-  type FilterWithShader,
-  type FilterSystem,
-  type RenderSurface,
-} from 'pixi.js';
+import { Color, Matrix, Texture, UniformGroup, type Filter } from 'pixi.js';
+import { AreaAwareFilter } from './areaAwareFilter';
 import { BOUNCE, DARKNESS, EXPOSURE, PURKINJE, wallBand, wallCore } from '../../../lighting/lightingConstants';
 import { DEFAULT_AMBIENT_COLOR, DEFAULT_EXPLORED_COLOR, DEFAULT_UNEXPLORED_COLOR } from '../../../lighting/sceneLightingOptions';
 import { srgbToLinear } from '../../../lighting/srgb';
@@ -85,33 +76,6 @@ export interface CompositeFilter {
   setBelow(pictures: BelowPictures, dim: number): void;
   /** Which level of the stack this composite draws: 0 the viewed one, 1 or 2 a level below. */
   setLevelIndex(index: number): void;
-}
-
-/**
- * PIXI tells a filter where its area starts on screen (`uOutputFrame`) only when it is the last
- * of its chain. `calculateSpriteMatrix` for a sprite at the origin with a 1 px texture maps
- * input coordinates to screen pixels, so its translation is that start for any position.
- */
-class AreaAwareFilter extends Filter {
-  private readonly probe = new Sprite(Texture.WHITE);
-  private readonly probeMatrix = new Matrix();
-
-  constructor(options: FilterWithShader, private readonly origin: Float32Array, private readonly group: UniformGroup) {
-    super(options);
-  }
-
-  override apply(filterManager: FilterSystem, input: Texture, output: RenderSurface, clearMode: boolean): void {
-    const { tx, ty } = filterManager.calculateSpriteMatrix(this.probeMatrix, this.probe);
-    this.origin[0] = tx;
-    this.origin[1] = ty;
-    this.group.update();
-    filterManager.applyFilter(this, input, output, clearMode);
-  }
-
-  override destroy(destroyPrograms = false): void {
-    this.probe.destroy();
-    super.destroy(destroyPrograms);
-  }
 }
 
 export function createCompositeFilter(world: LightingWorld, explored: Texture): CompositeFilter {

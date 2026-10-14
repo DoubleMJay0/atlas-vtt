@@ -6,7 +6,9 @@
  */
 
 import { worldToImage, type MapStretch } from '../grid/mapStretch';
+import type { TokenEntity } from '../types';
 import type { Point } from '../types/visionTypes';
+import { PLAYER_SIGHT_POLICY } from '../vision/tokenSightPolicy';
 import { OPEN_ALPHA_BYTE } from './artRaster';
 
 /** A pixel of a roof at least this opaque (of 255) belongs to a piece. */
@@ -190,4 +192,18 @@ export interface RoofCover {
 export function roofDrawnAt(cover: RoofCover, point: Point): boolean {
   const id = pieceAt(cover.pieces, cover.transform, point);
   return id !== 0 && !cover.faded.has(id) && (cover.seen?.(point) ?? true);
+}
+
+/**
+ * How a roof image is drawn: as its level's map is (`levelImagePlacement`), scaled onto that map's
+ * size where it has another (a roof exported at another resolution), so both cover the same world.
+ */
+export function roofPlacement(placement: MapStretch, background: { width: number; height: number } | null, roof: { width: number; height: number }): MapStretch {
+  if (!background || (background.width === roof.width && background.height === roof.height)) return placement;
+  return { ...placement, x: (placement.x * background.width) / roof.width, y: (placement.y * background.height) / roof.height };
+}
+
+/** Where the tokens that fade the players' roofs stand: those that give the players sight. */
+export function partyPlaces(tokens: Readonly<Record<string, TokenEntity>>): Point[] {
+  return Object.values(tokens).filter((token) => PLAYER_SIGHT_POLICY.givesSight(token)).map((token) => ({ x: token.x, y: token.y }));
 }

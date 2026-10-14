@@ -13,6 +13,12 @@ import type { Point } from '../types/visionTypes';
 import type { Sight } from './sight';
 import { coneContains, visionCone, type VisionCone } from './visionCone';
 
+/**
+ * The senses that see roofs that count, the first so many: the picture reads them in a loop for
+ * each pixel of a roof, and the rule reads the same list.
+ */
+export const MAX_ROOF_VIEWERS = 1024;
+
 /** A sense that sees roofs: one that shows the map, with its reach and the cone its token looks in. */
 export interface RoofViewer {
   origin: Point;
@@ -26,8 +32,8 @@ export type RoofViewers = 'all' | readonly RoofViewer[];
 
 /**
  * The senses of `sight` that see roofs, each with the cone of its token for a sense of the eyes
- * (a region's polygon was cut to it, which roofs do not read). `tokens` holds every token whose
- * regions `sight` has, on whichever level.
+ * (a region's polygon was cut to it, which roofs do not read), the first `MAX_ROOF_VIEWERS`.
+ * `tokens` holds every token whose regions `sight` has, on whichever level.
  */
 export function roofViewers(sight: Sight, tokens: Readonly<Record<string, TokenEntity>>): RoofViewers {
   if (sight.all) return 'all';
@@ -37,7 +43,7 @@ export function roofViewers(sight: Sight, tokens: Readonly<Record<string, TokenE
     const eyes = !region.sense.worksWhileBlinded;
     const cone = region.cone ?? (eyes && token?.vision ? visionCone(token.rotation, token.vision.angle, region.apex) : undefined);
     return [{ origin: region.origin, radius: region.radius, cone, sense: region.sense }];
-  });
+  }).slice(0, MAX_ROOF_VIEWERS);
 }
 
 /** Whether `viewer` reaches `point` from above: within its radius and its cone, whatever walls stand between. */

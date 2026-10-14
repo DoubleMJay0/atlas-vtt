@@ -128,7 +128,7 @@ describe('the ambient light of a scene with zones, by texel', () => {
 
 describe('where the players see a roof', () => {
   const darkvision: SenseDefinition = { ...NORMAL_SIGHT, id: 'darkvision', name: 'Darkvision', sees: { ...NORMAL_SIGHT.sees, dark: 'as-dim' } };
-  const tremorsense: SenseDefinition = { ...NORMAL_SIGHT, id: 'tremor', name: 'Tremorsense', reveals: 'creatures', lineOfSight: false, worksWhileBlinded: true, sees: { bright: 'normal', dim: 'normal', dark: 'normal', magicalDark: 'normal' } };
+  const tremorsense: SenseDefinition = { ...NORMAL_SIGHT, id: 'tremor', name: 'Tremorsense', reveals: 'creatures', lineOfSight: false, worksWhileBlinded: true, sees: { ...NORMAL_SIGHT.sees, dark: 'as-bright', magicalDark: 'as-bright' } };
   const region = (sense: SenseDefinition, radius: number): SightRegion => ({
     tokenId: 't', sense, origin: { x: 0, y: 0 }, radius, polygon: [], apex: 0, seesInvisible: false,
   });

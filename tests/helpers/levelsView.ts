@@ -16,6 +16,9 @@ import type { App } from 'obsidian';
 import type { LightingQuality } from '../../src/app/lighting/lightingQuality';
 import type { MapBounds } from '../../src/app/vision/visibility';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
+import { roofPieces } from '../../src/app/levels/roofs';
+import type { RoofImageRead } from '../../src/app/pixi/lighting/levels/Roof';
+import { ViewRoofs } from '../../src/app/pixi/roofs/ViewRoofs';
 
 /** The scene's two floors: the view looks at the upper one and down into the ground floor. */
 export const LEVELS: SceneLevel[] = [
@@ -25,6 +28,11 @@ export const LEVELS: SceneLevel[] = [
 
 /** A canvas texture of `width` × `height` px, every pixel coloured by `paint`. */
 export function paintedTexture(width: number, height: number, paint: (x: number, y: number) => [number, number, number]): Texture {
+  return paintedRgbaTexture(width, height, (x, y) => [...paint(x, y), 255]);
+}
+
+/** A canvas texture of `width` × `height` px, every pixel coloured and made as opaque as `paint` says (straight alpha). */
+export function paintedRgbaTexture(width: number, height: number, paint: (x: number, y: number) => [number, number, number, number]): Texture {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -32,9 +40,8 @@ export function paintedTexture(width: number, height: number, paint: (x: number,
   const image = context.createImageData(width, height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const [r, g, b] = paint(x, y);
       const o = (y * width + x) * 4;
-      image.data.set([r, g, b, 255], o);
+      image.data.set(paint(x, y), o);
     }
   }
   context.putImageData(image, 0, 0);
@@ -47,6 +54,8 @@ export interface FakeMap {
   width: number;
   height: number;
   alpha?: ArtAlpha | null;
+  /** The alpha of every pixel, row by row, where the map is a roof: its pieces are worked out from it as the tile worker does. */
+  roofAlpha?: Uint8Array;
 }
 
 /** Every pixel holds art. */
@@ -86,6 +95,7 @@ export function fakeMapImage(maps: Record<string, FakeMap>, loaded: Promise<void
   return {
     layer,
     get worldRect() { return shown ? { x: 0, y: 0, ...imageWorldRect(shown, stretch) } : null; },
+    get imageSize() { return shown ? { width: shown.width, height: shown.height } : null; },
     get mapStretch() { return stretch; },
     load: async (background, _gridSize, placement) => {
       await loaded;
@@ -134,6 +144,8 @@ export interface LevelsViewOptions {
   /** The level the view shows, and how its map is drawn; the store must place it alike. */
   viewedLevel?: string;
   viewedPlacement?: MapStretch;
+  /** The viewed level's roof is drawn (`ViewRoofs`) from its `foreground`, its pieces fading at once. */
+  roofs?: boolean;
 }
 
 export interface LevelsView {
@@ -142,6 +154,8 @@ export interface LevelsView {
   viewport: Viewport;
   store: ViewAtlasStore;
   controller: LightingController;
+  /** The viewed level's roof, where the view was opened with `roofs`. */
+  roofs: ViewRoofs | null;
   /** Runs `count` display frames: the lighting's work and the renders it asks for. */
   displayFrames(count: number): void;
   /** Lets what loads on its own come in (a level's map image, a decoded memory), then runs a few display frames. */
@@ -183,7 +197,7 @@ export function belowNoise(map: number): Texture {
  * on a real renderer, as far as its lighting and its levels below go. The map images are
  * sprites, the tokens below take one art: nothing loads from the vault.
  */
-export async function openLevelsView({ map, pane, paneHeight = pane, resolution = 1, viewed, below, tokenArt, viewedFog, quality, belowRect, holdBelowImage = false, levels = LEVELS, maps: extraMaps = {}, viewedLevel = 'upper', viewedPlacement = NO_STRETCH }: LevelsViewOptions): Promise<LevelsView> {
+export async function openLevelsView({ map, pane, paneHeight = pane, resolution = 1, viewed, below, tokenArt, viewedFog, quality, belowRect, holdBelowImage = false, levels = LEVELS, maps: extraMaps = {}, viewedLevel = 'upper', viewedPlacement = NO_STRETCH, roofs: withRoofs = false }: LevelsViewOptions): Promise<LevelsView> {
   const app = new Application();
   await app.init({ width: pane, height: paneHeight, resolution, preference: 'webgl', antialias: false, autoStart: false, backgroundColor: 0x000000, useBackBuffer: true });
   const scheduler = new RenderScheduler(app);
@@ -211,8 +225,19 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
   const tokens: TokenArt = { acquire: () => Promise.resolve(art), release: () => undefined, destroyAll: () => undefined };
   let releaseBelowImage = (): void => undefined;
   const belowLoaded = holdBelowImage ? new Promise<void>((resolve) => { releaseBelowImage = resolve; }) : Promise.resolve();
+  const readRoof = (path: string): Promise<RoofImageRead> => {
+    const found = maps[path];
+    if (!found?.roofAlpha) return Promise.reject(new Error(`No roof ${path} in the fake vault`));
+    return Promise.resolve({ width: found.width, height: found.height, pieces: roofPieces(found.roofAlpha, found.width, found.height) });
+  };
+  let roofs: ViewRoofs | null = null;
   const host: BelowLevelsHost = {
     createMapImage: () => fakeMapImage(maps, belowLoaded),
+    readRoof,
+    viewedRoof: () => {
+      const shown = roofs;
+      return shown ? (point) => shown.covers(point) : null;
+    },
     createArt: () => tokens,
     levelArt: (background) => {
       const found = background === null ? undefined : maps[background];
@@ -221,20 +246,27 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
     viewedFog: viewedFog ?? ((): FogCover => undefined),
     placeEraser: (eraser) => viewport.addChildAt(eraser, viewport.getChildIndex(floor) + 1),
   };
+  const bounds = (): MapBounds => {
+    const rect = floorImage.worldRect!;
+    return { width: rect.width, height: rect.height };
+  };
+  // The controller is made after the roof, which reads its lighting.
+  const made: { controller?: LightingController } = {};
+  roofs = withRoofs ? new ViewRoofs({
+    app, viewport, store, obsApp, mapSize: () => floorImage.imageSize, bounds, lighting: () => made.controller?.renderer,
+    host: { createMapImage: () => fakeMapImage(maps, Promise.resolve(), 'roof-image'), readRoof }, fadeMs: 0,
+  }) : null;
   const controller = new LightingController({
     viewport, app, store, eventBus: new EventEmitter(), obsApp, viewId: 'levels-view',
-    bounds: () => {
-      const rect = floorImage.worldRect!;
-      return { width: rect.width, height: rect.height };
-    },
-    albedo: () => null, below: host,
+    bounds, albedo: () => null, below: host, roofFadeMs: 0, ...(roofs && { roofs }),
     ...(quality && { quality: { current: () => quality, onChange: () => () => undefined } }),
   });
+  made.controller = controller;
   const ignore = (): void => undefined;
   controller.wire({
     setLightHandlers: ignore, setWallPointerDownHandler: ignore, setWallContextMenuHandler: ignore, setWallPointerMoveHandler: ignore,
     setWallPointerUpHandler: ignore, setWallDoubleClickHandler: ignore, setWallCursorProvider: ignore, setDoorMenuHandlers: ignore,
-    setDoorClickHandler: ignore, setPlayerSightProvider: ignore, setGlideWay: ignore, refreshPlayerSight: ignore, getSensedOutlineLayer: () => ({ visible: false }),
+    setDoorClickHandler: ignore, setPlayerSightProvider: ignore, setGlideWay: ignore, setArtFloors: ignore, refreshPlayerSight: ignore, getSensedOutlineLayer: () => ({ visible: false }),
   } as unknown as TokenRenderer);
   let time = 1000;
   const renderer = app.renderer as WebGLRenderer;
@@ -246,7 +278,7 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
     viewport.position.set(x, y);
   };
   view = {
-    app, obsApp, viewport, store, controller, maps,
+    app, obsApp, viewport, store, controller, roofs, maps,
     releaseBelowImage: () => releaseBelowImage(),
     showViewedMap: async (background, placement) => {
       await floorImage.load(background, undefined, placement);
@@ -294,6 +326,7 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
     },
     dispose: () => {
       target.destroy(true);
+      roofs?.destroy();
       controller.destroy();
       scheduler.destroy();
       app.destroy(true, { children: true });

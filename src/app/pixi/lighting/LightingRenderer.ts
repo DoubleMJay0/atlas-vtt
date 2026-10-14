@@ -29,6 +29,7 @@ import { PlayerView } from './PlayerView';
 import { SceneModelBuilder, SceneSpots, type SceneModel, type SceneState } from '../../vision/sceneModel';
 import type { ExploredMemoryWatcher, SceneLightingView } from './sceneLightingView';
 import { levelExploredMask, viewedLevelId } from '../../levels/sceneLevels';
+import { MOTION_SLOW_MS, prefersReducedMotion } from '../../utils/motion';
 
 /** Above tokens, below their nameplates and bars (100): the GM keeps readable labels in the dark. */
 export const LIGHTING_Z_INDEX = 90;
@@ -43,6 +44,8 @@ export type LightingUnavailable = 'failed' | 'unfinished';
  */
 export type LightingState = SceneState & ExploredMemoryState & Pick<ViewState, 'exploredMask' | 'exploredMasks' | 'background' | 'levelAlignments'> & {
   objects: Pick<ViewState['objects'], 'fog' | 'levelSurfaces'>;
+  /** The GM hides the roofs of the GM's picture (the switcher's Roofs). */
+  roofsHidden?: boolean;
 };
 
 export type LightingStore = Pick<StoreApi<LightingState>, 'getState' | 'subscribe'>;
@@ -75,6 +78,8 @@ export interface LightingRendererDeps {
   quality?: LightingQualitySource;
   /** What the view gives the levels below it, seen through its openings; without it the openings show nothing below. */
   below?: BelowLevelsHost;
+  /** How long a piece of a roof below takes to fade; unset, the motion of the canvas's window (none where it asks for reduced motion). */
+  roofFadeMs?: number;
 }
 
 type SceneWithoutLook = Omit<EngineScene, keyof SceneLook | 'albedo'>;
@@ -152,6 +157,7 @@ export class LightingRenderer implements SceneLightingView {
       view: this.engine,
       mode: () => (this.playerView.visible ? 'player' : 'gm'),
       requestRender: () => requestRender(deps.app),
+      fadeMs: deps.roofFadeMs ?? (prefersReducedMotion(deps.app.canvas) ? 0 : MOTION_SLOW_MS),
       onReady: () => this.run(() => this.update(deps.store.getState())),
       guard: (work) => this.run(work),
     }) : null;

@@ -43,6 +43,7 @@ import { TextTool } from "./tools/TextTool"; // Import TextTool
 import type { LightingController } from './pixi/lighting/LightingController';
 import { LightingFeature } from './pixi/lighting/LightingFeature';
 import { createBelowLevelsHost } from './pixi/lighting/belowLevelsHost';
+import { ViewRoofs } from './pixi/roofs/ViewRoofs';
 import { ShownPlaces } from './lighting/shownPlaces';
 import type { SceneFrame } from './pixi/lighting/engine/types';
 import { captureSceneFrame } from './pixi/sceneFrameCapture';
@@ -97,6 +98,8 @@ export class PixiRendererOrchestrator { // Renamed class
   private textTool?: TextTool; // Add TextTool instance
   /** The view's lighting, built and removed as the GM switches dynamic lighting on and off. */
   private lightingFeature?: LightingFeature;
+  /** The roof of the level shown, above the lighting. */
+  private roofs?: ViewRoofs;
   /** Where gliding tokens are drawn: the token renderer notes them, the lighting reads its tokens there. */
   private readonly shownPlaces = new ShownPlaces();
   /** The players' frame, rendered at the player window's size; made when this view is first presented. */
@@ -430,6 +433,17 @@ export class PixiRendererOrchestrator { // Renamed class
     // Set the fog container to a high z-index to ensure it's on top when visible
     fogContainer.zIndex = 1000;
 
+    this.roofs = new ViewRoofs({
+      app: this.pixiAppManager.app,
+      viewport,
+      store: this.store,
+      obsApp: this.obsApp,
+      mapSize: () => this.mapImage?.imageSize ?? null,
+      bounds: () => this.getMapRect(),
+      lighting: () => this.lighting?.renderer,
+      onChange: () => this.tokenRenderer?.refreshPlayerSight(),
+    });
+
     if (!isPlayerView) {
       this.lightingFeature = new LightingFeature({
         viewport,
@@ -443,11 +457,16 @@ export class PixiRendererOrchestrator { // Renamed class
         grid: () => this.gridSystem ?? null,
         fogCoverage: () => this.fogRenderer!.getCommittedCoverage(),
         shown: this.shownPlaces,
+        ...(this.roofs && { roofs: this.roofs }),
         below: createBelowLevelsHost({
           obsApp: this.obsApp,
           app: this.pixiAppManager.app,
           viewport,
           viewedFog: () => this.fogRenderer?.getCommittedCoverage(),
+          viewedRoof: () => {
+            const roofs = this.roofs;
+            return roofs ? (point) => roofs.covers(point) : null;
+          },
           placeEraser: (eraser) => this.placeAboveGrid(eraser),
         }),
       });
@@ -807,9 +826,10 @@ export class PixiRendererOrchestrator { // Renamed class
     if (!app?.renderer || !viewport) return;
     const frames = this.playerFrames ??= new PlayerFrameTexture(app.renderer);
     if (!frames.canRender()) return;
-    // The map image at the players' own detail, put back before the DM's render
+    // The map image and the roof at the players' own detail, put back before the DM's render
     const tiles = frameView(frame);
     const restoreMapImage = this.mapImage?.drawFor(tiles);
+    const restoreRoof = this.roofs?.drawFor(tiles);
     const render = (): void => {
       // The levels below the openings, for this frame's camera and size: the DM's own are drawn again before the DM's render.
       this.lighting?.renderer.prepareBelow?.({ key: 'frame', width: frame.width / frame.resolution, height: frame.height / frame.resolution, resolution: frame.resolution, mode: 'player', tiles });
@@ -819,6 +839,7 @@ export class PixiRendererOrchestrator { // Renamed class
       captureBeforeRender(this.playerFrameLayers(settings), render, () => frames.copy(copy), frameCamera(viewport, frame));
     } finally {
       restoreMapImage?.();
+      restoreRoof?.();
       if (!renderFollows) {
         this.lighting?.renderer.prepareBelow?.();
         app.renderer.render(app.stage);
@@ -828,7 +849,7 @@ export class PixiRendererOrchestrator { // Renamed class
 
   /** Keeps the map's tiles of `view` (the player window's frame) loaded: the view's own, and those of the levels below its openings. */
   public addMapDemandRegion(view: TileView): () => void {
-    const releases = [this.mapImage?.addDemandRegion(view), this.lighting?.renderer.addBelowDemandRegion?.(view)];
+    const releases = [this.mapImage?.addDemandRegion(view), this.roofs?.addDemandRegion(view), this.lighting?.renderer.addBelowDemandRegion?.(view)];
     return (): void => {
       for (const release of releases) release?.();
     };
@@ -860,6 +881,7 @@ export class PixiRendererOrchestrator { // Renamed class
   private playerFrameLayers(settings: AtlasSettings['localPlayerView']): LayerVisibility[] {
     // The grid is left as the GM set it: players see it exactly as the GM does, hidden included.
     const layers = this.markerLayers();
+    if (this.roofs) layers.push({ layer: this.roofs.modeLayer, visible: true });
     // The lighting's part is the list session view holds on this canvas (`SessionLighting`).
     const sight = this.lighting?.playerSight();
     layers.push(...(this.tokenRenderer?.getPlayerViewLayers(settings, sight) ?? []));
@@ -903,12 +925,14 @@ export class PixiRendererOrchestrator { // Renamed class
    */
   public captureSceneFrame<T>(frame: SceneFrame, render: () => T, picture?: TileView | null): T {
     const restoreMapImage = picture ? this.mapImage?.drawFor(picture) : undefined;
+    const restoreRoof = picture ? this.roofs?.drawFor(picture) : undefined;
     // A picture of an animated map shows its poster, as its asset card does, not whatever frame plays now.
     const restoreVideo = this.mapImage?.hideVideoFor();
     try {
-      return captureSceneFrame({ gmViewLayers: this.gmViewLayers(), markerLayers: this.markerLayers(), lighting: this.lighting }, frame, render);
+      return captureSceneFrame({ gmViewLayers: this.gmViewLayers(), markerLayers: this.markerLayers(), lighting: this.lighting, roofs: this.roofs }, frame, render);
     } finally {
       restoreVideo?.();
+      restoreRoof?.();
       restoreMapImage?.();
     }
   }
@@ -1012,6 +1036,8 @@ export class PixiRendererOrchestrator { // Renamed class
   private wireViewportDispatchProviders(): void {
     if (!this.tokenRenderer) return;
 
+    const roofs = this.roofs;
+    if (roofs) this.tokenRenderer.setRoofProvider((point) => roofs.covers(point));
     if (this.fogRenderer) {
       this.tokenRenderer.setFogCoverageProvider(() => this.fogRenderer!.getCommittedCoverage());
       this.tokenRenderer.setFogHitTestProvider(
@@ -1182,6 +1208,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.textRenderer?.destroy(); // Destroy TextRenderer
     this.textTool?.destroy(); // Destroy TextTool
     this.lightingFeature?.destroy();
+    this.roofs?.destroy();
     this.playerFrames?.destroy();
     delete this.playerFrames;
     this.audioRenderer?.destroy();

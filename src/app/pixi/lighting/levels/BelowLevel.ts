@@ -1,8 +1,9 @@
 import { Matrix, type Container, type Renderer, type RenderTexture } from 'pixi.js';
 import type { MeasurementSettings } from '../../../grid/measurementFormat';
 import { levelImagePlacement } from '../../../levels/levelAlignment';
-import { levelBackground } from '../../../levels/levelEdits';
-import { levelObjectsOn } from '../../../levels/levelObjects';
+import { levelBackground, levelForeground } from '../../../levels/levelEdits';
+import { everyLevelObjects, levelObjectsOn } from '../../../levels/levelObjects';
+import { partyPlaces } from '../../../levels/roofs';
 import { exploredMaskOf, levelMapKey } from '../../../levels/sceneLevels';
 import type { LevelStack } from '../../../levels/levelStack';
 import { stampClip, type TexelMask } from '../../../levels/stackClip';
@@ -10,10 +11,11 @@ import { sameStretch, type MapStretch } from '../../../grid/mapStretch';
 import { sceneLook } from '../../../lighting/sceneLightingOptions';
 import { withZones } from '../../../lighting/lightZones';
 import type { TokenEntity } from '../../../types';
+import type { Point } from '../../../types/visionTypes';
 import type { LightingQuality } from '../../../lighting/lightingQuality';
 import { exploredShapes } from '../../../vision/exploredShapes';
 import { SceneModelBuilder, SceneSpots, type SceneModel } from '../../../vision/sceneModel';
-import type { Sight } from '../../../vision/sight';
+import type { AmbientZone, Sight } from '../../../vision/sight';
 import type { SightRules } from '../../../vision/sightRules';
 import { GM_SIGHT_POLICY } from '../../../vision/tokenSightPolicy';
 import { SightBelow, type BelowSight } from '../../../vision/throughSight';
@@ -28,8 +30,11 @@ import type { LightingState, LightingStore } from '../LightingRenderer';
 import { BelowFog } from './BelowFog';
 import { BelowStage } from './BelowStage';
 import { BelowTokens, type BelowTokenLook, type TokenArt } from './BelowTokens';
+import { Roof, type RoofHost } from './Roof';
 
 const DEFAULT_CELL_SIZE = 70;
+const NO_PLACES: readonly Point[] = [];
+const NO_ZONES: readonly AmbientZone[] = [];
 /** How translucent the GM sees the committed fog of a level below, as on the level itself. */
 const GM_FOG_ALPHA = 0.5;
 
@@ -37,6 +42,8 @@ const GM_FOG_ALPHA = 0.5;
 export interface BelowMapImage {
   readonly layer: Container;
   readonly worldRect: PixelRect | null;
+  /** The image's own size in pixels, once it has loaded. */
+  readonly imageSize: { width: number; height: number } | null;
   readonly mapStretch: MapStretch;
   /** Shows the level's `background` (a map file's path; null, none), placed by `stretch`. */
   load(background: string | null, gridSize: number | undefined, stretch?: MapStretch): Promise<void>;
@@ -55,6 +62,10 @@ export interface BelowLevelDeps {
   quality: LightingQuality;
   image: BelowMapImage;
   art: TokenArt;
+  /** What the level's roof is made with. */
+  roofs: RoofHost;
+  /** How long a piece of the roof takes to fade. */
+  fadeMs: number;
   requestRender: () => void;
   /** The level's picture became ready, or stopped being: the stack must be worked out again. */
   onReady: () => void;
@@ -68,6 +79,8 @@ export interface BelowFrame {
   mode: LightingMode;
   /** The map's tiles that render shows, where it is not the view's own camera (the player window's frame). */
   tiles?: TileView | undefined;
+  /** A picture of the scene (a thumbnail): the roof is drawn whole. */
+  picture?: boolean | undefined;
 }
 
 /**
@@ -82,6 +95,7 @@ export class BelowLevel {
   private readonly memory: ExploredMemory;
   private readonly tokens: BelowTokens;
   private readonly fog: BelowFog;
+  private readonly roof: Roof;
   private readonly builder = new SceneModelBuilder();
   private readonly spots = new SceneSpots();
   private readonly gmSpots = new SceneSpots(GM_SIGHT_POLICY);
@@ -115,7 +129,8 @@ export class BelowLevel {
       guard: deps.guard,
       edits: false,
     });
-    this.stage = new BelowStage({ map: deps.image.layer, tokens: this.tokens.view, lighting: this.engine.layer, fog: this.fog.view });
+    this.roof = new Roof({ host: deps.roofs, requestRender: deps.requestRender, onReady: deps.onReady, fadeMs: deps.fadeMs });
+    this.stage = new BelowStage({ map: deps.image.layer, tokens: this.tokens.view, lighting: this.engine.layer, roof: this.roof.layer.view, fog: this.fog.view });
   }
 
   get id(): string {
@@ -183,6 +198,22 @@ export class BelowLevel {
     const objects = levelObjectsOn(state, id);
     this.tokens.sync(objects.tokens, state.grid?.size ?? DEFAULT_CELL_SIZE);
     this.fog.sync(objects.fog, bounds, levelMapKey(state.mapPath, seen));
+    // The level's roof: faded where its party stands, seen as the players see this level from above.
+    this.roof.update({
+      foreground: levelForeground(state, id),
+      placement: levelImagePlacement(state, id),
+      background: this.deps.image.imageSize,
+      gridSize: state.grid?.size,
+      party: partyPlaces(objects.tokens),
+      selected: NO_PLACES,
+      lit: { lighting: state.lighting, zones: model.ambient.zones ?? NO_ZONES, bounds, sight: player, tokens: everyLevelObjects(state).tokens },
+      gmHidden: state.roofsHidden ?? false,
+    });
+  }
+
+  /** Whether the level's drawn roof covers `point` in the players' picture: a token of it there is not seen. */
+  roofCovers(point: Point): boolean {
+    return this.roof.coversForPlayers(point);
   }
 
   /** What the rules read of the level from the view above, through `stack`; null until it is built. */
@@ -207,18 +238,21 @@ export class BelowLevel {
     }
     const inverse = frame.camera.clone().invert();
     this.engine.setView(inverse, Math.hypot(frame.camera.a, frame.camera.b));
+    this.roof.setMode(frame.picture ? 'picture' : frame.mode);
+    this.roof.setView(inverse);
     this.tokens.show(look);
     this.fog.view.alpha = frame.mode === 'player' ? 1 : GM_FOG_ALPHA;
-    const restore = frame.tiles ? this.deps.image.drawFor(frame.tiles) : null;
+    const restore = frame.tiles ? [this.deps.image.drawFor(frame.tiles), this.roof.drawFor(frame.tiles)] : [];
     try {
       this.stage.render(this.deps.renderer, target, frame.camera);
     } finally {
-      restore?.();
+      for (const back of restore) back();
     }
   }
 
-  /** Flicker below: true where the level's light map changed. */
+  /** Flicker below and the roof's fading: true where the level's light map changed (the roof asks for its renders itself). */
   animate(now: number): boolean {
+    this.roof.animate(now);
     return this.engine.busy() && this.engine.animate(now);
   }
 
@@ -236,6 +270,7 @@ export class BelowLevel {
     this.destroyed = true;
     if (flush) this.deps.guard(() => this.memory.beforeMapUnload());
     this.stage.release();
+    this.roof.destroy();
     this.engine.destroy();
     this.memory.destroy();
     this.tokens.destroy();
@@ -243,9 +278,12 @@ export class BelowLevel {
     this.deps.image.destroy();
   }
 
-  /** Keeps the tiles of `view` (the player window's frame) of the level's map loaded. */
+  /** Keeps the tiles of `view` (the player window's frame) of the level's map and roof loaded. */
   addDemandRegion(view: TileView): () => void {
-    return this.deps.image.addDemandRegion(view);
+    const releases = [this.deps.image.addDemandRegion(view), this.roof.addDemandRegion(view)];
+    return (): void => {
+      for (const release of releases) release();
+    };
   }
 
   /**

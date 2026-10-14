@@ -17,6 +17,7 @@ import { rulesLookup } from '../../services/mapRules';
 import type { ViewAtlasState, ViewAtlasStore } from '../../storeFactory';
 import type { SightRules } from '../../vision/sightRules';
 import type { MapBounds } from '../../vision/visibility';
+import type { Point } from '../../types/visionTypes';
 import type { HideableLayer, LayerVisibility } from '../playerSafeFrame';
 import { requestRender } from '../RenderScheduler';
 import type { TokenRenderer } from '../TokenRenderer';
@@ -66,6 +67,10 @@ export interface LightingControllerDeps {
   shown?: ShownPlaces;
   /** What the levels below the view need of it (`createBelowLevelsHost`); without it the openings show nothing below. */
   below?: BelowLevelsHost;
+  /** The roof of the level shown (`ViewRoofs`): it shows the players' picture with the lighting's, and covers doors. */
+  roofs?: { readonly modeLayer: HideableLayer; covers(point: Point): boolean };
+  /** How long a piece of a roof below takes to fade; unset, the window's motion decides. */
+  roofFadeMs?: number;
 }
 
 /**
@@ -125,6 +130,7 @@ export class LightingController {
       ...(deps.quality && { quality: deps.quality }),
       scene,
       ...(deps.below && { below: deps.below }),
+      ...(deps.roofFadeMs !== undefined && { roofFadeMs: deps.roofFadeMs }),
     });
     this.sightAids = new GmSightAids({
       viewport, store: scene, measurement, bounds: deps.bounds,
@@ -135,7 +141,8 @@ export class LightingController {
     this.lightMarkers = new LightMarkers(viewport, store);
     this.rangeRings = new LightRangeRings(viewport, store, measurement);
     this.editor = new WallEditor(viewport, store, eventBus, (lightIds) => this.lightMarkers.setSelected(lightIds), () => mapLightPresets(obsApp, store.getState()));
-    this.doors = new DoorIcons(store, app.canvas, () => playerDoorSight(this.renderer, levelObjects(store.getState()).walls, deps.fogCoverage?.()));
+    const roofed = deps.roofs ? (point: Point): boolean => deps.roofs!.covers(point) : undefined;
+    this.doors = new DoorIcons(store, app.canvas, () => playerDoorSight(this.renderer, levelObjects(store.getState()).walls, deps.fogCoverage?.(), roofed));
     viewport.addChild(this.doors.view, this.doors.playerView);
     this.lights = new LightInteraction({
       viewport,
@@ -190,13 +197,14 @@ export class LightingController {
 
   /** What the players' view changes about the lighting: for their frame, and held in session view. */
   playerLayers(): LayerVisibility[] {
-    return playerLightingLayers({
+    const roof = this.deps.roofs ? [{ layer: this.deps.roofs.modeLayer, visible: true }] : [];
+    return [...playerLightingLayers({
       enabled: this.renderer.isEnabled(),
       modeLayer: this.renderer.modeLayer,
       gmOverlays: this.gmOverlays(),
       sensedOutlines: this.tokens?.getSensedOutlineLayer(),
       playerDoorBadges: this.doors.playerView,
-    });
+    }), ...roof];
   }
 
   /** How the players perceive each token, for their frame and for session view; sight hides nothing in an unlit scene. */
@@ -254,6 +262,7 @@ export class LightingController {
     const outlines = this.tokens?.getSensedOutlineLayer();
     return [
       { layer: this.renderer.modeLayer, visible: false },
+      ...(this.deps.roofs ? [{ layer: this.deps.roofs.modeLayer, visible: false }] : []),
       ...(outlines ? [{ layer: outlines, visible: false }] : []),
       { layer: this.editor.layer, visible: tool },
       ...this.modes.layers(tool),

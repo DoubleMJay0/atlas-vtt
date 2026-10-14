@@ -21,6 +21,8 @@ import { BelowLevel, type BelowMapImage } from './BelowLevel';
 import { BelowPictures, type BelowPicture } from './BelowPictures';
 import { tokenLook, type TokenArt } from './BelowTokens';
 import { LevelStackTexture } from './LevelStackTexture';
+import type { RoofHost } from './Roof';
+import type { Point } from '../../../types/visionTypes';
 
 export type { BelowPicture } from './BelowPictures';
 
@@ -31,8 +33,8 @@ export const BELOW_PLAYER_DIM = 0.85;
 /** How often a drag records what the view sees through the openings into the memories below. */
 const RECORD_WHILE_DRAGGING_MS = 100;
 
-/** What a view gives its levels below that the lighting cannot make itself. */
-export interface BelowLevelsHost {
+/** What a view gives its levels below that the lighting cannot make itself; their roofs are made with it too (`RoofHost`). */
+export interface BelowLevelsHost extends RoofHost {
   /** A map image for a level below, drawn with the view's camera and never changing the view's world (`belowMapImage`). */
   createMapImage(): BelowMapImage;
   /** Token art for the tokens of a level below. */
@@ -41,6 +43,8 @@ export interface BelowLevelsHost {
   levelArt: LevelArtSource;
   /** The committed fog of the level the view shows (null: unreadable, which hides all). */
   viewedFog(): FogCover;
+  /** Whether the roof of the level the view shows covers a point in the players' picture; null without one. */
+  viewedRoof(): ((point: Point) => boolean) | null;
   /** Puts the openings' eraser into the view's stage, between its grid and its tokens. */
   placeEraser(eraser: Container): void;
 }
@@ -60,6 +64,8 @@ export interface LevelsBelowDeps {
   /** Which view the canvas shows now: the players' (session view, the peek) or the GM's. */
   mode: () => LightingMode;
   requestRender: () => void;
+  /** How long a piece of a roof below takes to fade; at once without. */
+  fadeMs?: number;
   /** Something the stack depends on came in (a level's image or map): the view's lighting updates. */
   onReady: () => void;
   guard: (work: () => void) => void;
@@ -168,7 +174,7 @@ export class LevelsBelow {
 
   /** How the players perceive the tokens of the levels below drawn, from the view above; everything else unseen. */
   tokenPerception(state: LightingState): TokenPerception {
-    return this.perception.of(state, this.levels.values(), this.stack, this.deps.host.viewedFog(), this.deps.rules?.());
+    return this.perception.of(state, this.levels.values(), this.stack, { fog: this.deps.host.viewedFog(), roof: this.deps.host.viewedRoof() }, this.deps.rules?.());
   }
 
   /**
@@ -281,6 +287,8 @@ export class LevelsBelow {
       quality: belowQuality(deps.quality()),
       image: deps.host.createMapImage(),
       art: deps.host.createArt(),
+      roofs: deps.host,
+      fadeMs: deps.fadeMs ?? 0,
       requestRender: deps.requestRender,
       onReady: deps.onReady,
       guard: deps.guard,

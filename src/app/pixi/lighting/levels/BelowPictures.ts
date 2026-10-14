@@ -49,7 +49,7 @@ export class BelowPictures {
     for (const level of levels) {
       if (!level.ready() || !showsBelow(stack, level.index)) continue;
       const target = this.targetFor(picture, level.id);
-      level.draw({ camera: picture.camera, mode: picture.mode, tiles: picture.tiles }, target, look);
+      level.draw({ camera: picture.camera, mode: picture.mode, tiles: picture.tiles, picture: picture.key === 'thumbnail' }, target, look);
       shown[level.index - 1] = target;
     }
     return shown;

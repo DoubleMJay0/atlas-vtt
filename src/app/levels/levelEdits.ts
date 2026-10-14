@@ -23,6 +23,12 @@ export function levelBackground(scene: Pick<ViewState, 'levels' | 'background'>,
   return levels.find((level) => level.id === id)?.background ?? null;
 }
 
+/** The roof image of level `id` (its `foreground`), drawn above its tokens; null without one. */
+export function levelForeground(scene: Pick<ViewState, 'levels'>, id: string | null): string | null {
+  const foreground = id === null ? null : scene.levels?.find((level) => level.id === id)?.foreground;
+  return typeof foreground === 'string' && foreground !== '' ? foreground : null;
+}
+
 /** The explored memory of every level, by id; the first level's is `exploredMask`. */
 function masksByLevel(scene: LevelScene): Record<string, string | null> {
   const first = firstLevelId(scene.levels);

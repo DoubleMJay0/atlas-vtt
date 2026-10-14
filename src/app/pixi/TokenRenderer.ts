@@ -676,6 +676,12 @@ export class TokenRenderer {
     this.refreshPlayerSight();
   }
 
+  /** The roof drawn over the players' picture (`ViewRoofs.covers`): tokens under it are left out of their view. */
+  public setRoofProvider(covers: (point: Point) => boolean): void {
+    this.playerSight.setRoofProvider(covers, () => this.isInPlayerMode());
+    this.refreshPlayerSight();
+  }
+
   /**
    * Whether a move the store made may be shown as a glide. On a lit scene the players see a token by where the
    * store has it, so one that comes into their sight would be shown on its way from a place they did not see,

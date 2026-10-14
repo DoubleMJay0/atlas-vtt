@@ -60,7 +60,7 @@ export type FogCover = FogCoverage | null | undefined;
  * How the players perceive each token of a level below, at its centre: unseen where the stack does
  * not show that level, else as `tokenPerception` with the sight below and that level's light (its
  * party tokens are seen there), and unseen where the committed fog of the viewed level or of the
- * level below covers it.
+ * level below covers it, or a roof the players' picture draws there (`roofed`: the viewed level's, the level's own).
  */
 export function belowTokenPerception(
   below: BelowSight,
@@ -68,6 +68,7 @@ export function belowTokenPerception(
   fog: { viewed: FogCover; below: FogCover },
   options?: PerceptionOptions,
   memo?: PerceptionMemo,
+  roofed?: (at: Point) => boolean,
 ): TokenPerception {
   const perceived = tokenPerception(below.sight, below.ambient, below.reaches, tokens, options, memo);
   const covered = (cover: FogCover, at: Point): boolean => cover === null || (!!cover && cover.covers(at));
@@ -76,7 +77,7 @@ export function belowTokenPerception(
     if (!token) return 'unseen';
     const at = { x: token.x, y: token.y };
     if (shownAt(below.stack, at) !== below.index) return 'unseen';
-    if (covered(fog.viewed, at) || covered(fog.below, at)) return 'unseen';
+    if (covered(fog.viewed, at) || covered(fog.below, at) || roofed?.(at)) return 'unseen';
     return perceived(tokenId);
   };
 }

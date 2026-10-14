@@ -5,21 +5,24 @@ import { destroyTree } from '../../utils/destroyTree';
 /** Below the lighting, as on the view's own stage (`LIGHTING_Z_INDEX` is 90). */
 const TOKENS_Z = 50;
 const LIGHTING_Z = 90;
+/** Above the lighting, as the view's own roof (`ROOF_Z_INDEX`). */
+const ROOF_Z = 91;
 /** Above the lighting, as the view's own fog (1000). */
 const FOG_Z = 1000;
 
-/** What a level below shows, in world pixels: its map, its tokens, its lighting and its fog, bottom to top. */
+/** What a level below shows, in world pixels: its map, its tokens, its lighting, its roof and its fog, bottom to top. */
 export interface BelowParts {
   map: Container;
   tokens: Container;
   lighting: Container;
+  roof: Container;
   fog: Container;
 }
 
 /**
  * A level below the view, as a stage of its own that is never part of the view's (`LevelsBelow`
  * renders it into a texture for each picture the view draws): its map image, its tokens, its
- * lighting layer, whose composite lights them as on the level itself, and its committed fog,
+ * lighting layer, whose composite lights them as on the level itself, its roof, and its committed fog,
  * moved into the picture by the picture's camera. A render group of its own, so a change in it
  * shows as pending (`hasChanges`) though the view's stage holds nothing of it.
  */
@@ -31,8 +34,9 @@ export class BelowStage {
     parts.map.zIndex = 0;
     parts.tokens.zIndex = TOKENS_Z;
     parts.lighting.zIndex = LIGHTING_Z;
+    parts.roof.zIndex = ROOF_Z;
     parts.fog.zIndex = FOG_Z;
-    this.world.addChild(parts.map, parts.tokens, parts.lighting, parts.fog);
+    this.world.addChild(parts.map, parts.tokens, parts.lighting, parts.roof, parts.fog);
     this.root.addChild(this.world);
   }
 

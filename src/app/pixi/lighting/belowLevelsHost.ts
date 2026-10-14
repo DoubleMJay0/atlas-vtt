@@ -14,6 +14,8 @@ import { TextureCache } from '../token-renderer/TextureCache';
 import type { FogCover } from '../../vision/throughSight';
 import type { BelowMapImage } from './levels/BelowLevel';
 import type { BelowLevelsHost } from './levels/LevelsBelow';
+import type { RoofHost, RoofImageRead } from './levels/Roof';
+import type { Point } from '../../types/visionTypes';
 
 export interface BelowLevelsHostDeps {
   obsApp: App;
@@ -21,6 +23,8 @@ export interface BelowLevelsHostDeps {
   viewport: Viewport;
   /** The committed fog of the level the view shows. */
   viewedFog: () => FogCover;
+  /** Whether the roof of the level the view shows covers a point in the players' picture. */
+  viewedRoof: () => ((point: Point) => boolean) | null;
   /** Puts the openings' eraser into the view's stage, between its grid and its tokens. */
   placeEraser: (eraser: Container) => void;
 }
@@ -46,6 +50,7 @@ function belowMapImage(obsApp: App, image: MapImage): BelowMapImage {
   return {
     layer: image.layer,
     get worldRect(): PixelRect | null { return image.worldRect; },
+    get imageSize(): { width: number; height: number } | null { return image.imageSize; },
     get mapStretch(): MapStretch { return image.mapStretch; },
     load: (background, gridSize, stretch) => image.load(mapImageSourceFor(obsApp, background, gridSize), stretch),
     setStretch: (stretch) => image.setStretch(stretch),
@@ -76,16 +81,36 @@ async function readLevelArt(obsApp: App, background: string | null, gridSize: nu
   }
 }
 
-/** What a map view gives the levels below it: map images through its camera, token art, the levels' maps, its fog and a place for the eraser. */
-export function createBelowLevelsHost({ obsApp, app, viewport, viewedFog, placeEraser }: BelowLevelsHostDeps): BelowLevelsHost {
+/** A map image drawn through the view's camera, never changing the view's own (a level below's map, a roof). */
+function createViewMapImage(obsApp: App, app: Application, viewport: Viewport): BelowMapImage {
+  return belowMapImage(obsApp, new MapImage({
+    service: MapImageService.forApp(obsApp),
+    viewport: viewCamera(viewport),
+    ticker: Ticker.shared,
+    renderer: app.renderer,
+    requestRender: () => requestRender(app),
+  }));
+}
+
+/** A roof image's size and pieces (`roofPieces`), read in the tile worker; rejects where it is no image of the vault. */
+async function readRoofImage(obsApp: App, path: string): Promise<RoofImageRead> {
+  const source = mapImageSourceFor(obsApp, path, undefined);
+  if (source.kind !== 'file' && source.kind !== 'video') throw new Error(`No image at ${path}`);
+  return MapImageService.forApp(obsApp).roofPieces(source.file);
+}
+
+/** What a map view gives its roofs: map images through its camera, and the pieces of a roof image. */
+export function createRoofHost(obsApp: App, app: Application, viewport: Viewport): RoofHost {
   return {
-    createMapImage: () => belowMapImage(obsApp, new MapImage({
-      service: MapImageService.forApp(obsApp),
-      viewport: viewCamera(viewport),
-      ticker: Ticker.shared,
-      renderer: app.renderer,
-      requestRender: () => requestRender(app),
-    })),
+    createMapImage: () => createViewMapImage(obsApp, app, viewport),
+    readRoof: (path) => readRoofImage(obsApp, path),
+  };
+}
+
+/** What a map view gives the levels below it: map images through its camera, token art, the levels' maps, its fog and a place for the eraser. */
+export function createBelowLevelsHost({ obsApp, app, viewport, viewedFog, viewedRoof, placeEraser }: BelowLevelsHostDeps): BelowLevelsHost {
+  return {
+    ...createRoofHost(obsApp, app, viewport),
     createArt: () => {
       const art = new TextureCache(obsApp);
       art.setPixiApp(app);
@@ -93,6 +118,7 @@ export function createBelowLevelsHost({ obsApp, app, viewport, viewedFog, placeE
     },
     levelArt: (background, gridSize) => readLevelArt(obsApp, background, gridSize),
     viewedFog,
+    viewedRoof,
     placeEraser,
   };
 }

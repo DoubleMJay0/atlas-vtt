@@ -34,6 +34,7 @@ export interface UISlice extends ViewUIState {
   setExploredBrush: (changes: Partial<ExploredBrushOptions>) => void;
   /** Starting the toolbar editor closes the dice tray, which hangs where the tray goes. */
   setToolbarEditing: (on: boolean) => void;
+  setRoofsHidden: (hidden: boolean) => void;
 }
 
 /** Default state — all panels closed */
@@ -55,6 +56,7 @@ export function createInitialUIState(): Pick<
   | 'heldTokens'
   | 'exploredBrush'
   | 'isToolbarEditing'
+  | 'roofsHidden'
 > {
   return {
     isGridSettingsOpen: false,
@@ -73,6 +75,7 @@ export function createInitialUIState(): Pick<
     heldTokens: {},
     exploredBrush: DEFAULT_EXPLORED_BRUSH,
     isToolbarEditing: false,
+    roofsHidden: false,
   };
 }
 
@@ -101,6 +104,7 @@ export function createUIActions(
   | 'setHeldTokens'
   | 'setExploredBrush'
   | 'setToolbarEditing'
+  | 'setRoofsHidden'
 > {
   return {
     setGridSettingsOpen: (open) => set((draft) => { draft.isGridSettingsOpen = open; }),
@@ -146,5 +150,6 @@ export function createUIActions(
       draft.isToolbarEditing = on;
       if (on) draft.isDiceTrayOpen = false;
     }),
+    setRoofsHidden: (hidden) => set((draft) => { draft.roofsHidden = hidden; }),
   };
 }

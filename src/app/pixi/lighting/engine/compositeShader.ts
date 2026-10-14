@@ -1,5 +1,5 @@
 import { BOUNCE_GATHER_GLSL } from './cascadeShaders';
-import { GLSL_VERSION, SRGB_GLSL, TRACE_GLSL, fieldGlsl, traceGlsl } from './glsl';
+import { GLSL_VERSION, SRGB_GLSL, TONEMAP_GLSL, TRACE_GLSL, fieldGlsl, traceGlsl } from './glsl';
 import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
 
 /**
@@ -114,8 +114,8 @@ ${WALL_PUSH_GLSL}
 ${wallPushGlsl('uSightField', 'Sight')}
 ${BOUNCE_GATHER_GLSL}
 ${SRGB_GLSL}
+${TONEMAP_GLSL}
 
-const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 // Share of its colour an area no token sees loses in the GM view.
 const float UNSEEN_FADE = 0.4;
 // Ambient light below which a grid coloured against the map is drawn white: a bright map lies too dark there for black lines.
@@ -130,22 +130,6 @@ int stackAt(vec2 w) {
   vec2 local = cell - uStackBox.xy;
   if (any(lessThan(local, vec2(0.0))) || any(greaterThanEqual(local, uStackBox.zw))) return 0;
   return int(texelFetch(uStack, ivec2(local), 0).r * 255.0 + 0.5);
-}
-
-// Khronos PBR Neutral: colours stay as painted up to ~0.8, highlights roll off to white.
-vec3 neutral(vec3 color) {
-  const float start = 0.8 - 0.04;
-  const float desaturation = 0.15;
-  float x = min(color.r, min(color.g, color.b));
-  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
-  color -= offset;
-  float peak = max(color.r, max(color.g, color.b));
-  if (peak < start) return color;
-  const float d = 1.0 - start;
-  float newPeak = 1.0 - d * d / (peak + d - start);
-  color *= newPeak / peak;
-  float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
-  return mix(color, vec3(newPeak), g);
 }
 
 // Explored memory is stamped with hard-edged polygons: blur it over a disc of two memory texels,
@@ -215,7 +199,7 @@ vec3 litAsBright(vec3 albedo, vec4 lamps, vec3 bounce, vec3 ambient) {
   vec3 lit = neutral(albedo * light);
   float fill = 1.0 - lamps.a * uExposure / max(level, 1e-4);
   float night = (1.0 - smoothstep(0.03, 0.35, level)) * uPurkinje * fill;
-  return mix(lit, vec3(dot(lit, LUMA)) * vec3(0.86, 0.96, 1.18), night);
+  return nightShift(lit, night);
 }
 
 void main() {
@@ -287,7 +271,7 @@ void main() {
   // bounce): shifting a light's fade to black drew a pale ring around it.
   float fill = 1.0 - dot(direct, LUMA) * uExposure / max(level, 1e-4);
   float night = (1.0 - smoothstep(0.03, 0.35, level)) * uPurkinje * fill;
-  lit = mix(lit, vec3(dot(lit, LUMA)) * vec3(0.86, 0.96, 1.18), night);
+  lit = nightShift(lit, night);
 
   // Senses: dim light as bright.
   if (sight.a > 0.0) lit = mix(lit, litAsBright(albedo, lamps, bounce, ambientAsBright), sight.a);

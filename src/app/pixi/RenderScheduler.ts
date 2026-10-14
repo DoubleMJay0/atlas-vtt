@@ -7,6 +7,8 @@ const schedulers = new WeakMap<Application, RenderScheduler>();
 
 /** Where a before-render hook runs among the others: lower first. */
 export const BEFORE_RENDER_ORDER = {
+  /** The roof of the level a view shows takes in the lighting's sight before anything is drawn (`ViewRoofs`). */
+  roofs: -1,
   /** The player window's frame (`PlayerFrameMirror`), rendered on the canvas before the GM's own. */
   playerFrame: 0,
   /** The levels below the view seen through its openings, drawn for the GM's own render (`LevelsBelow`). */
