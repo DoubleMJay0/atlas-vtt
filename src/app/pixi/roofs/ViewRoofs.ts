@@ -62,13 +62,20 @@ export class ViewRoofs {
   private readonly tick = (): void => this.roof.animate(performance.now());
   /** Roofs can be drawn on this renderer. */
   private readonly drawn: boolean;
+  /** What the last sync read: nothing is built anew while the store, the sight and the map's size stay. */
+  private seen: readonly unknown[] = [];
+  /** Counts the roof images read: one arriving is something to build. */
+  private reads = 0;
 
   constructor(private readonly deps: ViewRoofsDeps) {
     const { app, viewport, store } = deps;
     this.roof = new Roof({
       host: deps.host ?? createRoofHost(deps.obsApp, app, viewport),
       requestRender: () => requestRender(app),
-      onReady: () => this.sync(),
+      onReady: () => {
+        this.reads++;
+        this.sync();
+      },
       fadeMs: deps.fadeMs ?? (prefersReducedMotion(app.canvas) ? 0 : MOTION_SLOW_MS),
     });
     this.modeLayer = new PlayerView((players) => this.roof.setMode(players ? 'player' : 'gm'));
@@ -125,7 +132,13 @@ export class ViewRoofs {
 
   /** Updates the roof where what it is drawn from changed. */
   private sync(): void {
-    if (this.drawn && this.roof.update(this.scene())) this.deps.onChange?.();
+    if (!this.drawn) return;
+    const lighting = this.deps.lighting();
+    const size = this.deps.mapSize();
+    const seen = [this.deps.store.getState(), lighting, lighting?.isEnabled(), lighting?.currentSight(), lighting?.sightIsCurrent(), lighting?.ambientLight(), size?.width, size?.height, this.reads];
+    if (seen.every((value, i) => value === this.seen[i])) return;
+    this.seen = seen;
+    if (this.roof.update(this.scene())) this.deps.onChange?.();
   }
 
   private scene(): RoofScene {
