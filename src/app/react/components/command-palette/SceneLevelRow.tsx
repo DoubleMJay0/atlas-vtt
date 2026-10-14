@@ -155,7 +155,7 @@ export function SceneLevelRow(props: SceneLevelRowProps): React.ReactElement {
             expanded={hasBelow ? showsBelow : undefined}
             onClick={() => setShowsBelow(!showsBelow)}
           />
-          <RowButton label={t('levels.roof', { name })} icon={<House />} expanded={showsRoof || !!level.foreground} onClick={() => setShowsRoof(!showsRoof)} />
+          <RowButton label={t('levels.roof', { name })} icon={<House />} expanded={showsRoof} onClick={() => setShowsRoof(!showsRoof)} />
           <RowButton label={t('levels.delete', { name })} icon={<Trash2 />} destructive onClick={props.onDelete} />
         </div>
       </div>
