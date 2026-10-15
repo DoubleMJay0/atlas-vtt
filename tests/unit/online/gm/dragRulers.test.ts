@@ -93,7 +93,7 @@ describe('the rulers of drags, as players get them', () => {
     }
   });
 
-  it('never sends the ruler of a drag the players did not see begin, though the token comes into view', async () => {
+  it('sends the ruler of a drag that began out of sight once the token comes into view, as Atlas\'s player window shows it', async () => {
     const table = await started([token('a', { x: 35, y: 35 })]);
     table.perception = () => 'unseen';
     await gmDrag(table, {
@@ -102,9 +102,11 @@ describe('the rulers of drags, as players get them', () => {
         if (step === 3) table.perception = undefined;
       },
     });
-    const sent = places(table);
-    expect(sent.some((place) => place.end !== true)).toBe(true);
-    expect(sent.every((place) => place.path === undefined)).toBe(true);
+    const sent = places(table).filter((place) => place.end !== true);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.at(-1)?.path).toEqual([[35, 35], [35 + 20 * 70, 35]]);
+    // Before the token came into view nothing of it went out, its ruler included.
+    expect(Math.min(...sent.map((place) => place.x))).toBeGreaterThanOrEqual(35 + 3 * 70);
   });
 
   it('stops sending the ruler once the token leaves the players\' sight', async () => {
