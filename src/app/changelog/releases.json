@@ -4,7 +4,7 @@
     {
       "version": "0.8.1-beta.0",
       "title": "Coming in 0.8.1",
-      "markdown": "## Fixed\n\n- Online play: the movement line of a dragged token shows for everyone at the table who sees the token, when the GM drags it and when a player does."
+      "markdown": "## Fixed\n- Online play: players keep control of their characters when you change scenes. Giving a token to a player gives them the character it was placed from, so every token of that character is theirs on every scene.\n- Online play: the movement line of a dragged token shows for everyone at the table who sees the token, when the GM drags it and when a player does."
     },
     {
       "version": "0.8.0",
