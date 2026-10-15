@@ -1,7 +1,8 @@
 import { Pacer, type PacerClock } from '../marks/index.ts';
-import { LIVE_INTERVAL_MS, MAX_COORDINATE, MAX_LIVE_TOKENS, type GmMessage, type LivePlace } from '../protocol/index.ts';
+import { LIVE_INTERVAL_MS, MAX_COORDINATE, MAX_LIVE_PATH, MAX_LIVE_TOKENS, type GmMessage, type LivePlace, type MarkPoint } from '../protocol/index.ts';
 import { sightOnDropOn } from '../../lighting/sceneLightingOptions';
 import type { PlayerTokenSource, SceneStore } from './atlasView.ts';
+import type { RulerPaths } from './dragRulers.ts';
 import { roundPlace } from './scenePicture.ts';
 
 export interface LiveSharePorts extends PacerClock {
@@ -11,6 +12,8 @@ export interface LiveSharePorts extends PacerClock {
   tokenSource(): PlayerTokenSource | null;
   /** Where the GM's canvas draws these tokens now; without it places are read from the store. */
   drawnPlaces?(tokenIds: readonly string[]): ReadonlyMap<string, Place>;
+  /** The rulers of the drags under way (`dragRulerPaths`); without it players see none. */
+  rulers?(): RulerPaths;
 }
 
 /** The token list players were last sent: its scene and the id they know a token by. */
@@ -20,8 +23,17 @@ export interface ListedTokens {
 }
 
 type Place = { readonly x: number; readonly y: number };
+/** A place as players were sent it, with its ruler written out to compare. */
+type SentPlace = Place & { readonly path?: readonly MarkPoint[]; readonly ruler: string };
 
 const onMap = (value: number): boolean => Number.isFinite(value) && Math.abs(value) <= MAX_COORDINATE;
+const NO_RULERS: RulerPaths = new Map();
+
+/** A ruler as players get it, or undefined for none, or one with a point off every map or too many points. */
+function sharedPath(points: readonly Place[] | undefined): MarkPoint[] | undefined {
+  if (points === undefined || points.length < 2 || points.length > MAX_LIVE_PATH || !points.every(({ x, y }) => onMap(x) && onMap(y))) return undefined;
+  return points.map(({ x, y }) => [roundPlace(x), roundPlace(y)]);
+}
 
 /**
  * The fast lane of a drag: while tokens are held (the GM's drag in Atlas, or a player's drag the GM
@@ -31,7 +43,10 @@ const onMap = (value: number): boolean => Number.isFinite(value) && Math.abs(val
  * lane says nothing the list would not: a token that leaves their sight or is hidden goes out once
  * more with `end` at the last place they were sent, and never again. A message holds every token it
  * may, moved or not, so the newest stands for all before it. The token list stays what the picture
- * is; the drop reaches players through it.
+ * is; the drop reaches players through it. Each token carries its drag's ruler while it measures
+ * something, as Atlas's player window shows it: only while the players see the token, and never for
+ * a drag they did not see begin, so a ruler shows no place they were not shown (measurements follow
+ * the same rule, `measureShownToPlayers`).
  */
 export class LiveShare {
   private readonly store: SceneStore;
@@ -39,7 +54,9 @@ export class LiveShare {
   private readonly listed: () => ListedTokens;
   private readonly pacer: Pacer;
   /** The places players were last sent, by the id they know each token by, while its drag lasts. */
-  private sent = new Map<string, Place>();
+  private sent = new Map<string, SentPlace>();
+  /** Whether the players saw each held token when its drag began, by GM id, for as long as it is held. */
+  private seenAtStart = new Map<string, boolean>();
   private scene: string | null = null;
   private lit = false;
   /** Messages with an end sent so far: each waits under its own key. */
@@ -58,6 +75,7 @@ export class LiveShare {
     if ((scene?.id ?? null) === this.scene) return;
     this.scene = scene?.id ?? null;
     this.sent = new Map();
+    this.seenAtStart = new Map();
     this.pacer.cancel();
   }
 
@@ -84,7 +102,8 @@ export class LiveShare {
     const drawn = state.isDragging ? this.ports.drawnPlaces?.(held) : undefined;
     // Atlas writes the GM's own drag to the store every 50 ms: its canvas is read again on the lane's own beat.
     if (drawn !== undefined && held.length > 0) this.pacer.request();
-    const places = new Map<string, Place>();
+    const rulers = this.ports.rulers?.() ?? NO_RULERS;
+    const places = new Map<string, SentPlace>();
     for (const id of held) {
       const token = state.objects.tokens[id];
       const alias = listed.alias(id);
@@ -96,22 +115,37 @@ export class LiveShare {
       const drawnCounts = !this.lit || (sightFollows && token.vision?.enabled === true);
       const place = (drawnCounts ? drawn?.get(id) : undefined) ?? token;
       if (!onMap(place.x) || !onMap(place.y)) continue;
-      places.set(alias, { x: roundPlace(place.x), y: roundPlace(place.y) });
+      const path = this.seenAtStart.get(id) === true ? sharedPath(rulers.get(id)) : undefined;
+      places.set(alias, { x: roundPlace(place.x), y: roundPlace(place.y), ...(path !== undefined && { path }), ruler: JSON.stringify(path ?? null) });
     }
+    this.noteStarts(held, (id) => {
+      const alias = listed.alias(id);
+      return alias !== undefined && places.has(alias);
+    });
     const moved = [...places].some(([id, place]) => {
       const last = this.sent.get(id);
-      return last?.x !== place.x || last.y !== place.y;
+      return last?.x !== place.x || last.y !== place.y || last.ruler !== place.ruler;
     });
     // A token let go of, or no longer shown, ends where players last saw it.
     const ends = [...this.sent].filter(([id]) => !places.has(id));
     const ending = ends.length > 0;
     if (!moved && !ending) return;
     // Every held token is in every message, so a newer one may replace a waiting one and lose nothing.
-    const tokens: LivePlace[] = [...places].map(([id, place]) => ({ id, ...place }));
-    for (const [id, place] of ends) tokens.push({ id, ...place, end: true });
+    const tokens: LivePlace[] = [...places].map(([id, { x, y, path }]) => ({ id, x, y, ...(path !== undefined && { path }) }));
+    for (const [id, { x, y }] of ends) tokens.push({ id, x, y, end: true });
     this.sent = places;
     // An end is said once: its message waits under a key of its own, which no later message replaces.
     if (ending) this.ended += 1;
     this.ports.sendLive({ t: 'live', scene, at: this.ports.now(), tokens }, ending ? `${scene}\n${this.ended}` : scene);
+  }
+
+  /**
+   * Notes for each token taken since the last message whether the players see it now (`shown`): its
+   * drag's first word to them. Forgets the tokens let go of.
+   */
+  private noteStarts(held: readonly string[], shown: (tokenId: string) => boolean): void {
+    const holding = new Set(held);
+    for (const id of this.seenAtStart.keys()) if (!holding.has(id)) this.seenAtStart.delete(id);
+    for (const id of held) if (!this.seenAtStart.has(id)) this.seenAtStart.set(id, shown(id));
   }
 }
