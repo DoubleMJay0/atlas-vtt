@@ -8,7 +8,7 @@ import { every, type Timers } from '../companionTimers.ts';
 import { MoveRate } from '../moveCheck.ts';
 import { AskedAnswer } from './askedAnswer.ts';
 import { bookAssetOf, bookPicture } from './bookAssets.ts';
-import type { KnownPlayer } from '../ownership.ts';
+import type { KnownPlayer, OwnedToken } from '../ownership.ts';
 import type { VaultImage } from '../TokenShare.ts';
 import { bookItemOf } from './bookItem.ts';
 import type { BookScene } from './bookScene.ts';
@@ -20,7 +20,7 @@ import type { QuestAsset } from './questGate.ts';
 import { QuestPlaces } from './questPlaces.ts';
 import { checkResourceEdit, type ResourceEdit } from './resourceEdit.ts';
 import type { ResourceAnswer } from './resourceWrites.ts';
-import { NO_QUESTS, sentOf, type SentBook } from './sentBook.ts';
+import { bookUpdate, NO_QUESTS, sentOf, type SentBook } from './sentBook.ts';
 import { WorldMaps, type FileStat, type WorldMapFile, type WorldMapTree } from './worldMap.ts';
 
 export interface BookSharePorts extends Timers {
@@ -33,7 +33,8 @@ export interface BookSharePorts extends Timers {
   scene(): BookScene | null;
   /** Everyone the table knows, and who of them is connected. */
   players(): readonly KnownPlayer[];
-  ownerOf(tokenId: string): string | undefined;
+  /** The owner of a token of the shared scene (`Ownership.ownerOf`). */
+  ownerOf(tokenId: string, token: OwnedToken | undefined): string | undefined;
   readImage(path: string): Promise<VaultImage | null>;
   /** The file at a vault path as it is now, or null when there is none. */
   stat(path: string): FileStat | null;
@@ -70,10 +71,12 @@ const UNNAMED = 'Unnamed character';
  * being played and its quests (the GM's quest notes, which no player writes) go to everyone at the
  * table, with a character or without; notes on a quest name it by its id. It is the table's, not a
  * scene's, so it hears players while no scene is shared. What a player writes is taken as
- * the protocol's parser cleaned it, only for a player with a character and within their rate; a
- * refused write is answered with the whole book. A player changes their own character's resources
- * through Atlas (`editResource`), and the sheet that follows tells them what was taken. A player is
- * served by hash what their book names (`bookAssetOf`), and nobody another character's artwork.
+ * the protocol's parser cleaned it, only for a player with a character and within their rate, and is
+ * not answered; a refused write is answered with the whole book. A page that reads its book in parts
+ * (`book-parts`) gets a changed world map or quests alone, any other the whole book again. A player
+ * changes their own character's resources through Atlas (`editResource`), and the sheet that follows
+ * tells them what was taken. A player is served by hash what their book names (`bookAssetOf`), and
+ * nobody another character's artwork.
  */
 export class BookShare implements LootRecipientSource {
   private readonly ports: BookSharePorts;
@@ -92,6 +95,8 @@ export class BookShare implements LootRecipientSource {
   private mapPath: string | null = null;
   /** What each connected player was last sent. */
   private readonly sent = new Map<string, SentBook>();
+  /** The players whose page reads its book in parts (`book-parts`): they get a changed world map or quests alone. */
+  private readonly parts = new Set<string>();
   /** When each player was last sent a whole book, and the timers of those who are owed one. */
   private readonly bookAt = new Map<string, number>();
   private readonly owed = new Map<string, number>();
@@ -163,6 +168,7 @@ export class BookShare implements LootRecipientSource {
   playerLeft(player: string): void {
     this.answers.forget(player);
     this.sent.delete(player);
+    this.parts.delete(player);
   }
 
   /**
@@ -172,6 +178,10 @@ export class BookShare implements LootRecipientSource {
    */
   receive(from: string, body: unknown): boolean {
     if (!isRecord(body)) return false;
+    if (body.t === 'book-parts') {
+      this.parts.add(from);
+      return true;
+    }
     if (body.t === 'asset-request') {
       const request = parsePlayerMessage(body);
       if (request?.t !== 'asset-request' || this.assetOf(request.hash, from) === undefined) return false;
@@ -210,20 +220,23 @@ export class BookShare implements LootRecipientSource {
     if (scene.mapPath !== this.mapPath) this.art.clear();
     this.mapPath = scene.mapPath;
     this.characters.update(scene, {
-      ownerOf: (tokenId) => this.ports.ownerOf(tokenId),
+      ownerOf: (tokenId) => this.ports.ownerOf(tokenId, scene.tokens[tokenId]),
       isKnown: (player) => known.has(player),
       sheet: (shown, token) => sheetOf(shown, token, scene.resources, (path) => this.art.get(path)),
     });
   }
 
+  /** Sends a player what changed of their book: the whole book for another character (or to a page that reads no parts), else each changed part alone. */
   private sync(player: string): void {
     const character = this.characters.of(player);
     const now = sentOf(character, this.worldMap, this.quests);
-    const last = this.sent.get(player);
-    if (last === undefined || last.book !== now.book || last.map !== now.map || last.quests !== now.quests) return this.sendBook(player);
-    if (last.sheet === now.sheet) return;
+    const update = bookUpdate(this.sent.get(player), now, this.parts.has(player));
+    if (update === 'whole') return this.sendBook(player);
+    if (update === null) return;
     this.sent.set(player, now);
-    this.ports.send({ t: 'book-sheet', character: character?.sheet ?? null }, player);
+    if (update.map) this.ports.send({ t: 'book-map', worldMap: this.worldMap?.map ?? null }, player);
+    if (update.quests) this.ports.send({ t: 'book-quests', quests: now.quests }, player);
+    if (update.sheet) this.ports.send({ t: 'book-sheet', character: character?.sheet ?? null }, player);
   }
 
   private sendBook(player: string): void {
@@ -267,7 +280,8 @@ export class BookShare implements LootRecipientSource {
 
   /** Hands a checked edit of the player's own resource to Atlas; they are sent their sheet with what it holds then, or their whole book when it was not taken. */
   private editResource(from: string, character: PlayedCharacter, message: BookResourceMessage): boolean {
-    const edit = checkResourceEdit(from, character, this.ports.scene(), (tokenId) => this.ports.ownerOf(tokenId), message);
+    const scene = this.ports.scene();
+    const edit = checkResourceEdit(from, character, scene, (tokenId) => this.ports.ownerOf(tokenId, scene?.tokens[tokenId]), message);
     if (edit === null) return false;
     this.ports.editResource(edit, (taken) => {
       if (taken === null) return this.owe(from);
