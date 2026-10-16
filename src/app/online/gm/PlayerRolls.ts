@@ -88,7 +88,7 @@ export interface PlayerRollsPorts {
   /** Runs a roll as `who`'s, so the roll's announcement goes to players as theirs (`RollShare.rollAs`). */
   rollAs(who: string, run: () => void, notes: RollNotes): void;
   /** A formula rolled by the shared map's rules without a throw, for a private roll; null where it does not roll. */
-  quietRoll(formula: string, set?: DiceSet): SharedRoll | null;
+  quietRoll(formula: string, set?: DiceSet, setAppearance?: true): SharedRoll | null;
   /** The roll button of the log a roll answers, as its presser may roll it; null where there is none. */
   request(from: string, answer: RollRequestAnswer): RollRequest | null;
   /** Takes a private roll into the table's log. */
@@ -135,8 +135,9 @@ export class PlayerRolls {
     const mode = message.mode ?? 'public';
     const dice = this.ports.dice();
     const set = token === undefined ? undefined : dice?.setFor?.(token);
-    const options: RollOptions | undefined = set === undefined ? undefined : { set };
-    if (mode !== 'public') return this.rollPrivately(from, message.formula, mode, tokenId, source, context, notes, request?.to, set);
+    const setAppearance = request === undefined ? message.setAppearance : undefined;
+    const options: RollOptions = { ...(set && { set }), ...(setAppearance && { setAppearance }) };
+    if (mode !== 'public') return this.rollPrivately(from, message.formula, mode, tokenId, source, context, notes, request?.to, set, setAppearance);
     if (dice === null || context.mapPath === null) return this.refuse('unavailable', from);
     const origin = tokenId === null ? undefined : { viewId: dice.viewId, mapPath: context.mapPath, tokenId };
     let rolled = false;
@@ -147,8 +148,8 @@ export class PlayerRolls {
   }
 
   /** A private roll: into the log for its audience, and thrown on the roller's page unless it is blind. */
-  private rollPrivately(from: string, formula: string, mode: Exclude<RollMode, 'public'>, tokenId: string | null, source: NonNullable<DiceRollResult['source']>, context: RollContext, notes: RollNotes, whisper?: readonly string[], set?: DiceSet): void {
-    const roll = this.ports.quietRoll(formula, set);
+  private rollPrivately(from: string, formula: string, mode: Exclude<RollMode, 'public'>, tokenId: string | null, source: NonNullable<DiceRollResult['source']>, context: RollContext, notes: RollNotes, whisper?: readonly string[], set?: DiceSet, setAppearance?: true): void {
+    const roll = this.ports.quietRoll(formula, set, setAppearance);
     if (roll === null) return this.refuse('formula', from);
     const token = tokenId === null ? null : this.ports.alias(tokenId);
     this.ports.logged({ who: from, roll, token, shared: true, mode, to: rollAudience(mode, from, whisper), ...notes, ...rollFaceOf(source, context.tokens) });

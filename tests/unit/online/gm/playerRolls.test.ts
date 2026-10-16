@@ -167,6 +167,30 @@ describe('a bonus from a player\'s sheet', () => {
     expect(parseSharedRoll(gm.logged.at(-1)?.roll)?.rolls).toMatchObject(want);
   });
 
+  it('gives explicit sheet pools the owned character appearance in public and private', async () => {
+    const gm = await table(campaign, () => 0.5);
+    Object.assign(gm.dice, { setFor: () => character });
+    const want = character.dice.map(({ sides, name, colour }) => ({ max: sides, name, colour }));
+    gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: 'd12+d12+d6+2', token: gm.alias(1), setAppearance: true });
+    expect(gm.rolled[0]?.formula).toBe('d12+d12+d6+2');
+    expect(gm.rolled[0]?.rolls.slice(0, 2)).toMatchObject(want);
+    expect(gm.rolled[0]?.rolls[2]).not.toHaveProperty('name');
+    expect(parseSharedRoll(rollsSent(gm.sent)[0]?.result)?.rolls.slice(0, 2)).toMatchObject(want);
+    gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: '2d12-1', token: gm.alias(1), mode: 'gm', setAppearance: true });
+    expect(gm.logged.at(-1)?.roll.formula).toBe('2d12-1');
+    expect(gm.logged.at(-1)?.roll.rolls).toMatchObject(want);
+  });
+
+  it('uses campaign appearance only for a matching pool, without borrowing another character’s set', async () => {
+    const gm = await table(campaign, () => 0.5);
+    Object.assign(gm.dice, { setFor: () => character });
+    gm.share.receive(BEN, { t: 'roll', scene: gm.scene, formula: 'd12+d12', token: gm.alias(1), setAppearance: true });
+    expect(gm.rolled[0]?.rolls.some((die) => die.name || die.colour)).toBe(false);
+    gm.share.receive(BEN, { t: 'roll', scene: gm.scene, formula: 'd10+d8', token: null, setAppearance: true });
+    expect(gm.rolled[1]?.rolls).toMatchObject([{ name: 'Campaign', colour: '#8844cc' }, { max: 8 }]);
+    expect(gm.rolled[1]?.rolls[1]).not.toHaveProperty('colour');
+  });
+
   it('inherits campaign defaults without a sheet override, and never borrows another player’s override', async () => {
     const gm = await table(campaign, () => 0.5);
     Object.assign(gm.dice, { setFor: () => character });

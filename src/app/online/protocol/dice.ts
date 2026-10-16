@@ -40,6 +40,8 @@ export interface PlayerRoll {
   readonly mode?: RollMode;
   readonly flavor?: string;
   readonly request?: RollRequestAnswer;
+  /** Ask for the GM’s names and colours on an explicit matching pool. */
+  readonly setAppearance?: true;
 }
 
 /**
@@ -113,6 +115,7 @@ export function parsePlayerRoll(value: Record<string, unknown>): PlayerRoll | nu
   if (!isText(scene, MAX_SCENE_ID) || scene === '' || !isText(formula, MAX_FORMULA)) return null;
   if (token !== null && (typeof token !== 'string' || !TOKEN_ID_PATTERN.test(token))) return null;
   if (mode !== undefined && !isRollMode(mode)) return null;
+  if (value.setAppearance !== undefined && value.setAppearance !== true) return null;
   const shownFlavor = flavor === undefined ? undefined : shownLine(flavor, MAX_FLAVOR);
   const request = value.request === undefined ? undefined : parseRequestAnswer(value.request);
   if (shownFlavor === null || request === null) return null;
@@ -121,6 +124,7 @@ export function parsePlayerRoll(value: Record<string, unknown>): PlayerRoll | nu
     ...(mode !== undefined && mode !== 'public' && { mode }),
     ...(shownFlavor !== undefined && { flavor: shownFlavor }),
     ...(request !== undefined && { request }),
+    ...(value.setAppearance === true && { setAppearance: true }),
   };
 }
 

@@ -56,7 +56,7 @@ export class SceneDice {
       }),
       dice: () => ports.dice?.() ?? null,
       rollAs: (who, run, notes) => this.share.rollAs(who, run, notes),
-      quietRoll: (formula, set) => this.quietRoll(formula, set),
+      quietRoll: (formula, set, setAppearance) => this.quietRoll(formula, set, setAppearance),
       request: (from, answer) => ports.rollRequest?.(from, answer) ?? null,
       logged: (roll) => ports.logRoll?.(roll),
       alias: (id) => tokens.alias(id),
@@ -91,9 +91,9 @@ export class SceneDice {
   }
 
   /** A formula rolled by the shared map's rules without a throw; null where it does not roll or the tab has no dice now. */
-  quietRoll(formula: string, set?: DiceSet): SharedRoll | null {
+  quietRoll(formula: string, set?: DiceSet, setAppearance?: true): SharedRoll | null {
     const dice = this.ports.dice?.() ?? null;
-    return dice === null ? null : quietRoll(formula, set ?? dice.rules(), this.ports.randomId(), Date.now());
+    return dice === null ? null : quietRoll(formula, set ?? dice.rules(), this.ports.randomId(), Date.now(), undefined, setAppearance);
   }
 
   /** Runs a GM's roll on the shared tab's dice, carrying `notes` into the log; false where the tab has no dice or nothing was rolled. */
