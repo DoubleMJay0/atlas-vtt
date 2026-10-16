@@ -17,6 +17,9 @@ export interface ArmedBonus {
   value: number;
 }
 
+/** Set by the card on a value that adds to rolls, around its number and its switch: its id (`bonusId`). */
+export const BONUS_ID_ATTRIBUTE = 'data-bonus-id';
+
 type Listener = () => void;
 
 const NONE: readonly string[] = Object.freeze([]);

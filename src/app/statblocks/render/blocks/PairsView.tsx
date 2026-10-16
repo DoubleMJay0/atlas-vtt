@@ -1,11 +1,12 @@
 import React from 'react';
 import type { PairsBlock } from '../../model/templateTypes';
 import { bonusId, type ArmableValues } from '../../rollBonuses/armableValues';
+import { BONUS_ID_ATTRIBUTE } from '../../rollBonuses/armedBonuses';
 import { useRollBonusTarget } from '../../rollBonuses/rollBonusContext';
-import { formatSigned, numericValue } from '../../values/numberText';
-import { normalisePairs, pairName, type Pair } from '../../values/pairValues';
+import { normalisePairs, pairText, type Pair } from '../../values/pairValues';
 import { valueText } from '../../values/valueText';
 import { ArmSwitch } from '../shared/ArmSwitch';
+import { BonusLink } from '../shared/BonusLink';
 import { InlineText } from '../shared/InlineText';
 import { useSheet } from '../sheetContext';
 import { LabelledLine } from '../values/LabelledLine';
@@ -13,38 +14,37 @@ import { StandIn, ValueText } from '../values/ValueText';
 import { ValueSlot } from '../valueSlot';
 import type { BlockViewProps } from './blockViewProps';
 
-/** One pair: "Dex +5", the name alone where it has no value ("Stealth"), or the value alone where it has no name. */
-function pairText(pair: Pair, signed: boolean): string {
-  const number = signed ? numericValue(pair.value) : null;
-  const value = (number === null ? valueText(pair.value) : formatSigned(number)).trim();
-  const name = pairName(pair.key);
-  return [name, value].filter((part) => part !== '').join(' ');
-}
-
-interface ArmablePairsProps {
+interface PairListProps {
   block: PairsBlock;
   pairs: readonly Pair[];
   signed: boolean;
-  armable: ArmableValues;
+  /** The values that add to rolls, where the block does ("Adds to rolls"). */
+  armable: ArmableValues | undefined;
 }
 
 /**
- * The pairs of a block that adds to rolls ("Survival +2, Stealth +1"), each
- * whole number followed by the switch that arms it for the next roll, named
- * after its pair (a Daggerheart Experience, a skill).
+ * The pairs one by one, each named after its pair ("Agility 2"): its number a roll of that bonus where the block
+ * rolls as a bonus, and followed by the switch that arms it for the next roll where the block adds to rolls (a
+ * Daggerheart Experience, a skill).
  */
-function ArmablePairs({ block, pairs, signed, armable }: ArmablePairsProps): React.JSX.Element {
+function PairList({ block, pairs, signed, armable }: PairListProps): React.JSX.Element {
   const { app, sourcePath } = useSheet();
   return (
     <span className="atlas-sb-value">
       {pairs.map((pair, index) => {
+        const name = pairText({ key: pair.key, value: '' }, false);
+        const value = pairText({ key: '', value: pair.value }, signed);
         const id = bonusId(block.field, pair.key);
-        const value = armable.get(id);
-        const text = <InlineText text={pairText(pair, signed)} app={app} sourcePath={sourcePath} dice />;
+        const arm = armable?.get(id);
         return (
           <React.Fragment key={index}>
             {index > 0 && ', '}
-            {value ? <span className="atlas-sb-arm-line">{text}<ArmSwitch id={id} label={value.label} /></span> : text}
+            <span data-roll-name={name || undefined} {...(arm && { className: 'atlas-sb-arm-line', [BONUS_ID_ATTRIBUTE]: id })}>
+              {name && <InlineText text={name} app={app} sourcePath={sourcePath} dice={false} />}
+              {name && value && ' '}
+              {value && <BonusLink text={value} rollable={block.rollable}><InlineText text={value} app={app} sourcePath={sourcePath} dice /></BonusLink>}
+              {arm && <ArmSwitch id={id} label={arm.label} />}
+            </span>
           </React.Fragment>
         );
       })}
@@ -61,10 +61,11 @@ export function PairsView({ block, display }: BlockViewProps<PairsBlock>): React
   const pairs = normalisePairs(value);
   // A value that holds no pairs shows as it is written.
   const text = pairs.length ? pairs.map((pair) => pairText(pair, signed)).join(', ') : valueText(value);
-  const armable = useRollBonusTarget()?.armable;
-  const arms = block.addsToRolls === true && armable !== undefined && pairs.some((pair) => armable.has(bonusId(block.field, pair.key)));
-  const shown = arms
-    ? <ArmablePairs block={block} pairs={pairs} signed={signed} armable={armable} />
+  const target = useRollBonusTarget();
+  const armable = block.addsToRolls ? target?.armable : undefined;
+  const arms = armable !== undefined && pairs.some((pair) => armable.has(bonusId(block.field, pair.key)));
+  const shown = (block.rollable && pairs.length > 0) || arms
+    ? <PairList block={block} pairs={pairs} signed={signed} armable={armable} />
     : <ValueText shown={{ text, problems: [] }} />;
 
   return (

@@ -33,6 +33,8 @@ export interface DiceRollSource {
   abilityName?: string | undefined;
   /** The statblock whose armed values ("Adds to rolls") the roll takes. Unset: none, as for rolled hit points. */
   bonuses?: StatblockBonuses | undefined;
+  /** The value whose own number is rolled (`bonusId`): armed, it is not added again, and is spent with the others. */
+  rolledBonus?: string | undefined;
 }
 
 /** A statblock's armed values as a roll reads them: its key, and the values its card shows now, by id. */
@@ -127,10 +129,11 @@ export function rollStatblockDice(
   if (!source.bonuses) return rollWithSource(app, formula, source, offMap, advantage);
   const { key, armable } = source.bonuses;
   const store = ArmedBonuses.forApp(app);
-  const armed = armedValues(store.armed(key), armable);
+  const ids = store.armed(key);
+  const armed = armedValues(ids.filter((id) => id !== source.rolledBonus), armable);
   const result = rollWithSource(app, withArmedBonuses(formula, armed), source, offMap, advantage);
   // Disarmed once the roll is out; a roll refused (a limit, no dice to roll it) leaves them armed.
-  if (result) store.spend(key, armed.map((bonus) => bonus.id));
+  if (result) store.spend(key, [...armed.map((bonus) => bonus.id), ...(source.rolledBonus === undefined ? [] : [source.rolledBonus])]);
   return result;
 }
 

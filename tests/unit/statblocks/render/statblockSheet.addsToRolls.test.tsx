@@ -114,4 +114,20 @@ describe('values that add to rolls', () => {
     act(() => { fireEvent.click(toggle); });
     expect(toggle.getAttribute('aria-checked')).toBe('false');
   });
+
+  it('roll as a bonus too, where the block does both, and are not added twice when their own number is rolled', () => {
+    const rolls: Array<{ formula: string; source: unknown }> = [];
+    const both = templateOf(FIELDS, BLOCKS.map((block) => (block.type === 'stat' || block.type === 'pairs' ? { ...block, rollable: true } : block)));
+    const { container } = renderSheet(both, VALUES, { app: fakeApp(rolls), sourcePath: 'Both.md' });
+    const proficiency = blockEl(container, 'prof0001')!;
+    const [armProficiency, , armStealth] = screen.getAllByRole('switch');
+    act(() => { fireEvent.click(armProficiency!); });
+    act(() => { fireEvent.click(armStealth!); });
+    act(() => { proficiency.querySelector<HTMLElement>('.atlas-dice-link')!.click(); });
+    expect(rolls.map((roll) => roll.formula)).toEqual(['+2+1[Stealth]']);
+    expect(screen.getAllByRole('switch').map((toggle) => toggle.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false', 'false', 'false']);
+    const survival = blockEl(container, 'exper001')!.querySelector<HTMLElement>('[data-roll-name="Survival"] .atlas-dice-link')!;
+    act(() => { survival.click(); });
+    expect(rolls.at(-1)?.formula).toBe('+2');
+  });
 });

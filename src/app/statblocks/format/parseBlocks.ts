@@ -80,6 +80,7 @@ const BODY_READERS: { [T in FileBlockType]: BodyRead<T> } = {
     ...r.opt('pattern', asString, TEXT),
     ...optionalOneOf(r, 'display', DISPLAYS),
     ...r.opt('rollFrom', asFieldRef, KEY),
+    ...r.opt('rollable', asTrue, ON),
     ...r.opt('addsToRolls', asTrue, ON),
   })),
   metric: (r) => {
@@ -87,7 +88,7 @@ const BODY_READERS: { [T in FileBlockType]: BodyRead<T> } = {
     const raw = r.rawValue('fields');
     const fields = Array.isArray(raw) && raw.length > 0 ? r.requiredList('fields', asFieldRef, 'field keys') : [];
     if (fields.length === 0) return { missing: 'fields' };
-    return { type: 'metric', ...r.opt('heading', asString, TEXT), fields, ...r.opt('addsToRolls', asTrue, ON) };
+    return { type: 'metric', ...r.opt('heading', asString, TEXT), fields, ...r.opt('rollable', asTrue, ON), ...r.opt('addsToRolls', asTrue, ON) };
   },
   scores: (r) => withField(r, (field) => ({
     type: 'scores',
@@ -96,6 +97,7 @@ const BODY_READERS: { [T in FileBlockType]: BodyRead<T> } = {
     ...r.opt('perLine', asPositiveInteger, 'a whole number above 0'),
     ...optionalOneOf(r, 'display', DISPLAYS),
     ...r.optList('columns', (item, index) => readScoreColumn(item, index, r.where, r.problems), 'columns'),
+    ...r.opt('rollable', asTrue, ON),
   })),
   tags: (r) => withField(r, (field) => ({
     type: 'tags', field, look: oneOf(r, 'look', TAG_LOOKS), ...r.opt('label', asString, TEXT),
@@ -116,6 +118,7 @@ const BODY_READERS: { [T in FileBlockType]: BodyRead<T> } = {
     field,
     ...r.opt('label', asString, TEXT),
     ...optionalOneOf(r, 'display', DISPLAYS),
+    ...r.opt('rollable', asTrue, ON),
     ...r.opt('addsToRolls', asTrue, ON),
   })),
   track: (r) => withField(r, (field) => ({
