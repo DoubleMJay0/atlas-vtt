@@ -14,6 +14,7 @@ import { LineFields } from '../inspector/LineFields';
 import type { ChromeStyle } from '../LabelEditor';
 import { readOnlyMessage } from '../sessionEdit';
 import { AbilitiesOptions } from './AbilitiesOptions';
+import { AddsToRollsSetting } from './AddsToRollsSetting';
 import { optionsKindOf } from './optionsKind';
 import { placeOptions, type OptionsPlacement, type OptionsRoom } from './optionsPlacement';
 import { TableOptions } from './TableOptions';
@@ -68,7 +69,8 @@ function focusTarget(root: HTMLElement, focusKey: string | undefined): HTMLEleme
  * A tile's Options: beside the card at the tile's height, where they show
  * whole (`optionsPlacement`), holding only what the tile's kind has: the kind
  * of value and choices of a Value, the parts and tabs of an Abilities list,
- * the columns of a Table, the values of the line under the name. Their width
+ * the columns of a Table, whether a Metric's numbers add to rolls, the values
+ * of the line under the name. Their width
  * is fixed; they scroll only where they are taller than the editor. Escape or
  * a press outside closes them; every change is one undo step as it is made.
  */
@@ -175,6 +177,7 @@ export function TileOptions({ layer, stage, blockId, revision, focusKey, onClose
           {kind === 'value' && <ValueOptions {...props} />}
           {kind === 'abilities' && <AbilitiesOptions {...props} />}
           {kind === 'table' && <TableOptions {...props} />}
+          {kind === 'metric' && <AddsToRollsSetting {...props} />}
           {kind === 'line' && block.type === 'line' && <LineFields {...props} block={block} template={template} parent={null} />}
         </section>
       </motion.div>

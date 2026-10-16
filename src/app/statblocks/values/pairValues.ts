@@ -15,6 +15,13 @@ export interface Pair {
   value: FieldValue;
 }
 
+const FIRST_LETTER = /^\p{Ll}/u;
+
+/** A pair's name as a statblock writes it: "dex" reads "Dex". */
+export function pairName(key: string): string {
+  return key.trim().replace(FIRST_LETTER, (letter) => letter.toUpperCase());
+}
+
 /** One pair as text: "Dex +5", "Perception: 4", "Str −1". */
 const PAIR_TEXT = /^(.*?\S)\s*:?\s*([+\-\u2212]?\d+(?:\.\d+)?)$/;
 const LETTER = /\p{L}/u;

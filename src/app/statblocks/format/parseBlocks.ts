@@ -14,12 +14,14 @@ import {
 import { LAYOUT_KEYS, blockKeys, isFileBlockType, type BlockKey, type FileBlockType } from './formatKeys';
 import { describeValue, isRecord, jsonRecordCopy, own } from './jsonValues';
 import { ObjectReader } from './objectReader';
-import { JSON_OBJECT, asJsonRecord, asOneOf, asPositiveInteger, asPositiveNumber, asString, choices } from './valueReads';
+import { JSON_OBJECT, asJsonRecord, asOneOf, asPositiveInteger, asPositiveNumber, asString, asTrue, choices } from './valueReads';
 
 /** Deeper blocks are kept opaque: no real layout nests this far, and the serializer recurses. */
 export const MAX_BLOCK_DEPTH = 32;
 
 const TEXT = 'text';
+/** A switch that is written only while it is on. */
+const ON = 'true';
 /** Block field references are text; '' is a block not yet bound to a field (`createBlock`), which the editor saves. */
 const KEY = 'a field key';
 const asFieldRef = asString;
@@ -78,12 +80,14 @@ const BODY_READERS: { [T in FileBlockType]: BodyRead<T> } = {
     ...r.opt('pattern', asString, TEXT),
     ...optionalOneOf(r, 'display', DISPLAYS),
     ...r.opt('rollFrom', asFieldRef, KEY),
+    ...r.opt('addsToRolls', asTrue, ON),
   })),
   metric: (r) => {
     // A Metric holds at least one number; one without any is kept as it was read.
     const raw = r.rawValue('fields');
     const fields = Array.isArray(raw) && raw.length > 0 ? r.requiredList('fields', asFieldRef, 'field keys') : [];
-    return fields.length === 0 ? { missing: 'fields' } : { type: 'metric', ...r.opt('heading', asString, TEXT), fields };
+    if (fields.length === 0) return { missing: 'fields' };
+    return { type: 'metric', ...r.opt('heading', asString, TEXT), fields, ...r.opt('addsToRolls', asTrue, ON) };
   },
   scores: (r) => withField(r, (field) => ({
     type: 'scores',
@@ -108,7 +112,11 @@ const BODY_READERS: { [T in FileBlockType]: BodyRead<T> } = {
     ...r.opt('addLabel', asString, TEXT),
   })),
   pairs: (r) => withField(r, (field) => ({
-    type: 'pairs', field, ...r.opt('label', asString, TEXT), ...optionalOneOf(r, 'display', DISPLAYS),
+    type: 'pairs',
+    field,
+    ...r.opt('label', asString, TEXT),
+    ...optionalOneOf(r, 'display', DISPLAYS),
+    ...r.opt('addsToRolls', asTrue, ON),
   })),
   track: (r) => withField(r, (field) => ({
     type: 'track',
