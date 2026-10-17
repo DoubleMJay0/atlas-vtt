@@ -1,9 +1,13 @@
-import { isResourceKey, MAX_BOOK_TITLE, MAX_SHEET_LIST, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, type SheetField, type SheetNode, type SheetPair, type SheetValue } from '../../protocol/index.ts';
+import {
+  bookLine, isResourceKey, MAX_BOOK_TITLE, MAX_COUNTER, MAX_COUNTERS, MAX_SHEET_LIST, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS,
+  type SheetCounter, type SheetField, type SheetNode, type SheetPair, type SheetValue,
+} from '../../protocol/index.ts';
 import { valuePrompt, type BlockDisplay } from '../../../statblocks/render/blockDisplay';
 import { MAX_TRACK_BOXES } from '../../../statblocks/render/values/trackBoxes';
 import { metricNumberText } from '../../../statblocks/render/values/blockText';
 import { shownTable } from '../../../statblocks/render/values/shownTable';
-import type { FieldKey, MetricBlock, ScoresBlock, TemplateBlock, TrackBlock } from '../../../statblocks/model/templateTypes';
+import type { CountersBlock, FieldKey, MetricBlock, ScoresBlock, TemplateBlock, TrackBlock } from '../../../statblocks/model/templateTypes';
+import { shownCounterRows, type CounterRow } from '../../../statblocks/values/counterValues';
 import { listItems } from '../../../statblocks/values/listText';
 import { numericValue } from '../../../statblocks/values/numberText';
 import { normalisePairs, pairText } from '../../../statblocks/values/pairValues';
@@ -152,6 +156,30 @@ function track(block: TrackBlock, label: string | null, current: number, max: nu
   return { k: 'track', label, look, counts: block.counts, current: Math.max(0, Math.min(current, max)), max, resource, field };
 }
 
+/** A row as the page takes it; null where the protocol cannot carry it as it is (a name it would change, too many uses). */
+function sheetCounter(row: CounterRow): SheetCounter | null {
+  const name = bookLine(row.name, MAX_BOOK_TITLE);
+  return name === null || name !== row.name || row.max > MAX_COUNTER ? null : { name, max: row.max, used: row.used, reset: row.reset };
+}
+
+/**
+ * A Counters block: every row as the note holds it (or the template's preset rows, where it holds
+ * none), rows without uses included, so the page writes back the whole list in the note's order.
+ * Where the protocol cannot carry the rows exactly (too many, a name it would clean), or the value
+ * is no list of counters, the value is shown as written and never changed.
+ */
+function countersNode(build: SheetBuild, block: CountersBlock, display: BlockDisplay, field: SheetField | null): SheetNode | null {
+  const label = clippedLine(labelOf(build, block), MAX_BOOK_TITLE);
+  if (display.state === 'fallback') return plainNode(build, label, display, null);
+  if (display.state !== 'value') return null;
+  const known = build.shown.fields.get(block.field);
+  const value = build.shown.reader(block.field);
+  const rows = known ? shownCounterRows(known, value) : null;
+  const counters = rows && rows.length <= MAX_COUNTERS ? rows.map(sheetCounter) : null;
+  if (!counters?.every((row): row is SheetCounter => row !== null)) return { k: 'value', value: sheetValue(build, label, valueText(value), 'plain', null, null) };
+  return { k: 'counters', label, counters, field };
+}
+
 /** What a player may change of the field a block shows: nothing where its fallback stands in for the field's value. */
 export function shownFieldOf(build: SheetBuild, key: FieldKey, block: TemplateBlock, display: BlockDisplay): SheetField | null {
   return display.state === 'fallback' ? null : sheetFieldOf(build, key, block);
@@ -175,6 +203,7 @@ export function leafNode(build: SheetBuild, block: TemplateBlock, display: Block
     case 'metric': return metricNode(build, block, display);
     case 'scores': return tableNode(build, block, display, shownFieldOf(build, block.field, block, display));
     case 'track': return trackNode(build, block, display, shownFieldOf(build, block.field, block, display));
+    case 'counters': return countersNode(build, block, display, shownFieldOf(build, block.field, block, display));
     case 'text': {
       const field = block.field === undefined ? null : shownFieldOf(build, block.field, block, display);
       const text = display.state === 'value' ? (block.field ? valueText(build.shown.reader(block.field)) : block.text ?? '') : displayText(display);

@@ -98,6 +98,16 @@ export function withCounterUsed(field: Pick<TemplateField, 'counterRows'>, value
   return changedRows(field, value, (each, at) => (at === index ? { ...each, used: next } : each));
 }
 
+/**
+ * The value with each row at the uses `uses` names for it, in the stored order; null where the value is no list
+ * of counters or `uses` names another number of rows. Uses are taken as given: the caller checks them.
+ */
+export function withCountersUsed(field: Pick<TemplateField, 'counterRows'>, value: FieldValue | undefined, uses: readonly number[]): FieldValue | null {
+  const rows = shownCounterRows(field, value);
+  if (!rows || rows.length !== uses.length) return null;
+  return changedRows(field, value, (row, index) => ({ ...row, used: uses[index] ?? row.used }));
+}
+
 /** Whether a rest gives a row's uses back: a short rest its short-rest rows, a long rest those and its long-rest rows. */
 export function restRefills(rest: CounterRest, reset: CounterReset | null): boolean {
   if (reset === null) return false;

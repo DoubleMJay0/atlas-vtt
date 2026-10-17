@@ -34,6 +34,7 @@ function ownChars(node: SheetNode): number {
     case 'metric': return node.values.reduce((sum, value) => sum + valueChars(value), 0);
     case 'heading': return node.text.length;
     case 'table': return JSON.stringify([node.columns, node.rows, node.worked]).length + (node.workedLabels ?? []).join('').length;
+    case 'counters': return node.counters.map((row) => row.name).join('').length;
     default: return 0;
   }
 }

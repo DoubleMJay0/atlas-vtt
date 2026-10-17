@@ -1,0 +1,27 @@
+import { isRecord, type SheetRaw } from '../../protocol/index.ts';
+import type { FieldValue, TemplateField } from '../../../statblocks/model/templateTypes';
+import { readCounterRow, shownCounterRows, withCountersUsed } from '../../../statblocks/values/counterValues';
+
+/** What a page's row of counters may hold. */
+const ROW_KEYS: ReadonlySet<string> = new Set(['name', 'max', 'used', 'reset']);
+
+/**
+ * The value a Counters field holds once a player's whole list is in, or null where it changes more
+ * than uses: a page sends every row back (one pip, a rest), and only `used` may differ from what the
+ * note holds now (its rows, or the template's preset rows where it holds none), as a whole number up
+ * to the row's maximum. Names, maximums, rests and their order must be the note's, and a row holds
+ * nothing else. Every other key a row of the note holds stays as it is.
+ */
+export function countersAfterEdit(field: TemplateField, stored: FieldValue | undefined, value: SheetRaw): FieldValue | null {
+  const now = shownCounterRows(field, stored);
+  if (!now || !Array.isArray(value) || value.length !== now.length) return null;
+  const uses: number[] = [];
+  for (const [index, item] of value.entries()) {
+    const was = now[index];
+    const row = readCounterRow(item);
+    if (!was || !row || !isRecord(item) || typeof item.used !== 'number' || Object.keys(item).some((key) => !ROW_KEYS.has(key))) return null;
+    if (row.name !== was.name || row.max !== was.max || row.reset !== was.reset) return null;
+    uses.push(row.used);
+  }
+  return withCountersUsed(field, stored, uses);
+}
