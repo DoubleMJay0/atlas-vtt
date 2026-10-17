@@ -342,3 +342,23 @@ describe('the rolls a sheet offers', () => {
     expect(parseBookStatblock(sheet([table({ rolls: [['+0', '+2'], ['+1', '+1']] })]))).toBeUndefined();
   });
 });
+
+describe('a Counters block', () => {
+  const sheet = (node: unknown): unknown => ({ editable: true, displayName: null, sigils: {}, blocks: [node], abilities: [] });
+  const counters = (rows: unknown[]): unknown => ({ k: 'counters', label: 'Spell slots', counters: rows, field: null });
+
+  it('carries its rows: a name, a maximum, how many are used and the rest that refills them', () => {
+    const parsed = parseBookStatblock(sheet(counters([{ name: '1st level', max: 4, used: 1, reset: 'long-rest' }, { name: 'Ki', max: 5, used: 0 }])));
+    expect(parsed?.blocks[0]).toEqual({ k: 'counters', label: 'Spell slots', field: null, counters: [
+      { name: '1st level', max: 4, used: 1, reset: 'long-rest' }, { name: 'Ki', max: 5, used: 0, reset: null },
+    ] });
+  });
+
+  it('refuses a row that uses more than it has, a maximum that is no whole number in range, an unknown rest or too many rows', () => {
+    expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 2, used: 3 }])))).toBeUndefined();
+    expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 1.5, used: 0 }])))).toBeUndefined();
+    expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 1001, used: 0 }])))).toBeUndefined();
+    expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 2, used: 0, reset: 'dawn' }])))).toBeUndefined();
+    expect(parseBookStatblock(sheet(counters(Array.from({ length: 25 }, (_, i) => ({ name: `R${i}`, max: 1, used: 0 })))))).toBeUndefined();
+  });
+});

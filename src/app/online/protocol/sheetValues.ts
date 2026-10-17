@@ -28,7 +28,7 @@ export interface SheetText {
   readonly whole?: AssetRef;
 }
 
-export const SHEET_FIELD_TYPES = ['text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'scores', 'pairs'] as const;
+export const SHEET_FIELD_TYPES = ['text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'scores', 'pairs', 'counters'] as const;
 export type SheetFieldType = (typeof SHEET_FIELD_TYPES)[number];
 
 /** What a player may change of a value: present only where they may. `base` names the value the note holds, which an edit must name back. */
