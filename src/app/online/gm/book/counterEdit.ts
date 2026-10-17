@@ -1,9 +1,6 @@
 import { isRecord, type SheetRaw } from '../../protocol/index.ts';
 import type { FieldValue, TemplateField } from '../../../statblocks/model/templateTypes';
-import { readCounterRow, shownCounterRows, withCountersUsed } from '../../../statblocks/values/counterValues';
-
-/** What a page's row of counters may hold. */
-const ROW_KEYS: ReadonlySet<string> = new Set(['name', 'max', 'used', 'reset']);
+import { COUNTER_ROW_KEYS, readCounterRow, shownCounterRows, withCountersUsed } from '../../../statblocks/values/counterValues';
 
 /**
  * The value a Counters field holds once a player's whole list is in, or null where it changes more
@@ -19,7 +16,7 @@ export function countersAfterEdit(field: TemplateField, stored: FieldValue | und
   for (const [index, item] of value.entries()) {
     const was = now[index];
     const row = readCounterRow(item);
-    if (!was || !row || !isRecord(item) || typeof item.used !== 'number' || Object.keys(item).some((key) => !ROW_KEYS.has(key))) return null;
+    if (!was || !row || !isRecord(item) || typeof item.used !== 'number' || Object.keys(item).some((key) => !COUNTER_ROW_KEYS.has(key))) return null;
     if (row.name !== was.name || row.max !== was.max || row.reset !== was.reset) return null;
     uses.push(row.used);
   }

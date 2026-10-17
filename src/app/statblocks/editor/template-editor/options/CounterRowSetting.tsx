@@ -10,11 +10,13 @@ import type { EditorSession } from '../sessionTypes';
 /** The rest a row's Select offers; `none` stands for a row no rest refills, stored as no `reset`. */
 type ResetChoice = CounterReset | 'none';
 
-const RESET_CHOICES = (): Array<{ value: ResetChoice; label: string }> => [
-  { value: 'none', label: t('statblock.counterNoRest') },
-  { value: 'short-rest', label: t('statblock.shortRest') },
-  { value: 'long-rest', label: t('statblock.longRest') },
-];
+function resetChoices(): Array<{ value: ResetChoice; label: string }> {
+  return [
+    { value: 'none', label: t('statblock.counterNoRest') },
+    { value: 'short-rest', label: t('statblock.shortRest') },
+    { value: 'long-rest', label: t('statblock.longRest') },
+  ];
+}
 
 /** The row refilled by `reset`, or by no rest. */
 function withReset(row: CounterPreset, reset: ResetChoice): CounterPreset {
@@ -65,7 +67,7 @@ export function CounterRowSetting({ row, index, count, session, disabled, onEdit
         <ToolButton icon={X} label={t('statblock.counterRemove', { name: named })} isActive={false} disabled={disabled} onClick={onRemove} />
       </div>
       <div className="atlas-te-setting__inline">
-        <Select<ResetChoice> value={row.reset ?? 'none'} options={RESET_CHOICES()} labelledBy={resetId} disabled={disabled}
+        <Select<ResetChoice> value={row.reset ?? 'none'} options={resetChoices()} labelledBy={resetId} disabled={disabled}
           onChange={(reset) => onEdit((current) => withReset(current, reset))} />
         <ToolButton icon={ArrowUp} label={t('statblock.counterMoveUp', { name: named })} isActive={false} disabled={disabled || index === 0} onClick={() => onMove(index - 1)} />
         <ToolButton icon={ArrowDown} label={t('statblock.counterMoveDown', { name: named })} isActive={false} disabled={disabled || index === count - 1} onClick={() => onMove(index + 1)} />

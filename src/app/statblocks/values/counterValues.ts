@@ -68,14 +68,14 @@ export function isDrawnCounter(row: CounterRow): boolean {
   return row.max > 0;
 }
 
-const ROW_KEYS: ReadonlySet<string> = new Set(['name', 'max', 'used', 'reset']);
+/** The keys a stored row's counter is read from; any other key of a row is the note's own. */
+export const COUNTER_ROW_KEYS: ReadonlySet<string> = new Set(['name', 'max', 'used', 'reset']);
 
 /** A row as it is stored: name, maximum, used and its rest, in that order, then whatever else the note's row held. */
 function storedRow(row: CounterRow, kept: Record<string, FieldValue> = {}): FieldValue {
-  const rest = Object.entries(kept).filter(([key]) => !ROW_KEYS.has(key));
+  const rest = Object.entries(kept).filter(([key]) => !COUNTER_ROW_KEYS.has(key));
   return { name: row.name, max: row.max, used: row.used, ...(row.reset !== null && { reset: row.reset }), ...Object.fromEntries(rest) };
 }
-
 
 /** The stored list with each row passed through `change`; the note's own rows where it has them, else the preset rows. */
 function changedRows(field: Pick<TemplateField, 'counterRows'>, value: FieldValue | undefined, change: (row: CounterRow, index: number) => CounterRow): FieldValue | null {

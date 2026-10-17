@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import type { CountersBlock } from '../../model/templateTypes';
-import { countersRests, isDrawnCounter, shownCounterRows } from '../../values/counterValues';
+import { countersRests, isDrawnCounter, shownCounterRows, type CounterRest } from '../../values/counterValues';
 import { valueText } from '../../values/valueText';
 import { CountersGrid, type ShownCounter } from '../shared/CountersGrid';
 import { useSheet } from '../sheetContext';
@@ -12,7 +12,7 @@ import type { BlockViewProps } from './blockViewProps';
 /** What a Counters block draws: its rows with uses (one with none, a spell level not reached, is left out), and the rests that refill them. */
 export interface ShownCounters {
   counters: ShownCounter[];
-  rests: ReturnType<typeof countersRests>;
+  rests: CounterRest[];
 }
 
 /**

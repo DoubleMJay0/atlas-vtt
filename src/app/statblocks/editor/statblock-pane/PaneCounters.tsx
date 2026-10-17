@@ -6,7 +6,7 @@ import { afterCounterRest, withCounterUsed, type CounterRest } from '../../value
 import { usePaneEdit, type PaneEditController } from './paneEditContext';
 import { fieldPatches } from './valuePatches';
 
-/** Writes a Counters field as `next` of what it holds now: one patch of the whole value, with the old value as its base. */
+/** Writes a Counters field as `change` makes it of what it holds now (nothing where it gives null): one patch of the whole value, with the old value as its base. */
 async function writeCounters(pane: PaneEditController, field: TemplateField, change: (value: FieldValue | undefined) => FieldValue | null): Promise<void> {
   const read = pane.readFresh(field);
   const next = change(read.value);
