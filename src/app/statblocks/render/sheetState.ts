@@ -2,7 +2,8 @@ import type { PatternContext } from '../expressions/pattern';
 import type { Lookups } from '../expressions/filters';
 import { scriptReads, type ScriptRead } from '../model/scriptReads';
 import { withHeaderFields } from '../model/templateHeader';
-import type { FieldKey, StatblockTemplate, TemplateField } from '../model/templateTypes';
+import type { FieldKey, FieldValue, StatblockTemplate, TemplateField } from '../model/templateTypes';
+import { startCountersValue } from '../values/counterValues';
 import { fieldLabels, readField, readerFor, type FieldRecord, type ValueReader } from '../values/fieldValues';
 import { startTableValue } from '../values/tableValues';
 import type { SheetMode, StatblockTokenContext } from './sheetTypes';
@@ -38,16 +39,22 @@ export interface SheetStateInput {
 
 const NONE_FOLDED: ReadonlySet<string> = new Set();
 
+/** What a field of a statblock that holds no value of it starts with: a Table's starting table, a Counters field's preset rows. */
+function startValue(field: TemplateField): FieldValue | undefined {
+  if (field.type === 'scores') return startTableValue(field);
+  return field.type === 'counters' ? startCountersValue(field) : undefined;
+}
+
 /**
- * The record with every Table that holds no value holding its template's starting table, as a new statblock
- * shows it until its first edit writes its own (`tableValues`). The same record where none is filled.
+ * The record with every Table and Counters field that holds no value holding what its template starts it with, as
+ * a new statblock shows it until its first edit writes its own. The same record where none is filled.
  */
 function withStartingTables(record: FieldRecord, fields: readonly TemplateField[]): FieldRecord {
   const filled: [string, unknown][] = [];
   for (const field of fields) {
     const value = readField(record, field).value;
-    if (field.type !== 'scores' || (value !== undefined && value !== null)) continue;
-    const start = startTableValue(field);
+    if (value !== undefined && value !== null) continue;
+    const start = startValue(field);
     if (start !== undefined) filled.push([field.key, start]);
   }
   return filled.length > 0 ? { ...record, ...Object.fromEntries(filled) } : record;

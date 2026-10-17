@@ -15,6 +15,7 @@ import { tableCell } from './tableWrites';
 import { entryList, moveEntryToPatch } from './entryPatches';
 import type { EditTarget, FieldConflict, ListMover, PaneEditController } from './paneEditContext';
 import { paneChrome } from './paneChrome';
+import { renderPaneCounters } from './PaneCounters';
 import { renderPaneAddEntry, renderPaneEntry } from './PaneEntry';
 import { renderPaneSlot } from './PaneSlot';
 import { renderPaneTable } from './PaneTable';
@@ -68,7 +69,9 @@ interface OwnWrite {
 }
 
 /** Rendering a value's slot never changes: what it shows comes from the controller's context. */
-const VALUE_EDITING: ValueEditing = { slot: renderPaneSlot, entry: renderPaneEntry, addEntry: renderPaneAddEntry, table: renderPaneTable };
+const VALUE_EDITING: ValueEditing = {
+  slot: renderPaneSlot, entry: renderPaneEntry, addEntry: renderPaneAddEntry, table: renderPaneTable, counters: renderPaneCounters,
+};
 
 /**
  * The pane's editing state (§7.6, §8.5, §8.6): which value is being edited,

@@ -48,6 +48,12 @@ export function presetCounterRows(field: Pick<TemplateField, 'counterRows'>): Co
   return (field.counterRows ?? []).map((row) => ({ name: row.name, max: row.max, used: 0, reset: row.reset ?? null }));
 }
 
+/** The preset rows as a statblock that holds none stores them once it changes one; undefined where the template gives none. */
+export function startCountersValue(field: Pick<TemplateField, 'counterRows'>): FieldValue | undefined {
+  const rows = presetCounterRows(field);
+  return rows.length > 0 ? rows.map((row) => storedRow(row)) : undefined;
+}
+
 function isUnset(value: FieldValue | undefined): boolean {
   return value === undefined || value === null || (Array.isArray(value) && value.length === 0);
 }

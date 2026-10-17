@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react';
-import type { EntriesBlock, FieldKey, FieldValue, ScoresBlock, TemplateBlock } from '../model/templateTypes';
+import type { CountersBlock, EntriesBlock, FieldKey, FieldValue, ScoresBlock, TemplateBlock } from '../model/templateTypes';
+import type { ShownCounters } from './blocks/CountersView';
 import type { TableLook } from './blocks/ScoresView';
 import type { ShownTable } from './values/shownTable';
 import { useSheet } from './sheetContext';
@@ -34,6 +35,11 @@ export interface ValueEditing {
    * the list's heading (`iconOnly`), or for a list without heading a line under it.
    */
   addEntry?(block: EntriesBlock, label: string, iconOnly: boolean): React.ReactNode;
+  /**
+   * What stands where a Counters block's rows are drawn: the pane's pressable pips and rest buttons, the template
+   * editor's the same drawn inert. Unset: the rows as a read-only card draws them, without buttons.
+   */
+  counters?(block: CountersBlock, shown: ShownCounters): React.ReactNode;
   /**
    * A tile not named yet is drawn as it will be once named (`provisionalSheet`): the template editor's tiles while
    * their name is asked for. Unset (a statblock's pane): such a block shows only its prompt, and no value of it is edited.

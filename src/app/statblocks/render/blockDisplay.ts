@@ -9,7 +9,8 @@ import { patternRefs } from '../expressions/patternRefs';
 import { blockSpec } from '../model/blockCatalogue';
 import { kindName } from '../model/templateGrid';
 import { boundField, fieldsShownBy } from '../model/treeQueries';
-import { isContainerBlock, type ContainerBlock, type FieldKey, type TemplateBlock, type TemplateField } from '../model/templateTypes';
+import { isContainerBlock, type ContainerBlock, type CountersBlock, type FieldKey, type TemplateBlock, type TemplateField } from '../model/templateTypes';
+import { isDrawnCounter, shownCounterRows } from '../values/counterValues';
 import type { SheetState } from './sheetState';
 import { blockText, isPatternBlock } from './values/blockText';
 import { hasText, shownPattern, type ShownText } from './values/shownText';
@@ -89,6 +90,13 @@ function tokenHolds(block: TemplateBlock, sheet: SheetState): boolean {
   return false;
 }
 
+/** Whether a Counters block draws anything: a row with uses, or a value that is no list of counters, which shows as written. */
+function countersShowSomething(block: CountersBlock, sheet: SheetState): boolean {
+  const field = sheet.fields.get(block.field);
+  const rows = field ? shownCounterRows(field, sheet.reader(block.field)) : null;
+  return rows === null || rows.some(isDrawnCounter);
+}
+
 const VIEWED = new WeakMap<SheetState, SheetState>();
 
 /** The sheet as a reading view shows it: what a script reads shows only where it holds a value, also while the statblock is edited. */
@@ -125,6 +133,7 @@ function decide(block: TemplateBlock, sheet: SheetState): BlockDisplay | null {
   if (block.type === 'text' && !block.field) return VALUE;
 
   if (blockVisibility(block, sheet.reader, visibilityFields(block)) !== 'show') return emptyDisplay(block, sheet);
+  if (block.type === 'counters' && !countersShowSomething(block, sheet)) return emptyDisplay(block, sheet);
   if (!isPatternBlock(block)) return VALUE;
 
   const text = blockText(block, sheet);
