@@ -10,6 +10,7 @@ import type {
   BlockBase,
   BlockType,
   Condition,
+  CounterPreset,
   EntryShape,
   HeaderTrack,
   ScoreColumn,
@@ -57,8 +58,11 @@ export const HEADER_TRACK_KEYS = keyOrder<keyof HeaderTrack>({ look: true, count
 export const FIELD_KEYS = keyOrder<keyof TemplateField>({
   key: true, label: true, type: true, meaning: true, formerKeys: true, unit: true, options: true, open: true,
   several: true, numbered: true,
-  slots: true, slotKeys: true, header: true, rows: true, align: true, addRows: true, addColumns: true, entry: true, prompt: true,
+  slots: true, slotKeys: true, header: true, rows: true, align: true, addRows: true, addColumns: true, entry: true,
+  counterRows: true, prompt: true,
 });
+
+export const COUNTER_PRESET_KEYS = keyOrder<keyof CounterPreset>({ name: true, max: true, reset: true });
 
 export const ENTRY_SHAPE_KEYS = keyOrder<keyof EntryShape>({ nameKey: true, textKey: true, extras: true });
 export const ENTRY_EXTRA_KEYS = keyOrder<keyof EntryExtra>({ key: true, label: true, type: true, options: true, several: true });
@@ -90,6 +94,7 @@ const BLOCK_PROPS: { [T in FileBlockType]: Record<OwnBlockKeys<T>, true> } = {
   entries: { field: true, heading: true, introField: true, nameStyle: true, addLabel: true },
   pairs: { field: true, label: true, display: true, rollable: true, addsToRolls: true },
   track: { field: true, label: true, resource: true, look: true, counts: true },
+  counters: { field: true, label: true },
   image: { field: true, shape: true },
   spells: { field: true, heading: true, look: true },
   heading: { text: true, level: true },

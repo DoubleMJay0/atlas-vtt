@@ -62,10 +62,11 @@ export type FieldType =
   | 'entries'   // list of { name, desc, ...extras }
   | 'pairs'     // { dex: 5 } or [{ dex: 5 }]
   | 'image'     // vault path
-  | 'spells';   // FS spell shape: strings or { level: spells }
+  | 'spells'    // FS spell shape: strings or { level: spells }
+  | 'counters'; // rows of limited uses: [{ name, max, used, reset }]
 
 export const FIELD_TYPES: readonly FieldType[] = [
-  'text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'scores', 'entries', 'pairs', 'image', 'spells',
+  'text', 'markdown', 'number', 'rating', 'dice', 'choice', 'list', 'scores', 'entries', 'pairs', 'image', 'spells', 'counters',
 ];
 
 /**
@@ -146,8 +147,22 @@ export interface TemplateField {
   addColumns?: false;
   /** entries: the keys inside an entry. */
   entry?: EntryShape;
+  /** counters: the rows every statblock starts with, each with its default maximum. Unset: none. */
+  counterRows?: CounterPreset[];
   /** Prompt for an empty value in the statblock pane ("Add speed"). */
   prompt?: string;
+}
+
+/** When a counter's uses come back: on a short or a long rest (a long rest also refills what a short one does). */
+export type CounterReset = 'short-rest' | 'long-rest';
+
+export const COUNTER_RESETS: readonly CounterReset[] = ['short-rest', 'long-rest'];
+
+/** A row a Counters field starts with: its name, its default maximum, and the rest that refills it (unset: none). */
+export interface CounterPreset {
+  name: string;
+  max: number;
+  reset?: CounterReset;
 }
 
 /** One cell of a Table: a number, text, or nothing. */
@@ -271,6 +286,8 @@ export interface TextBlock extends BlockBase { type: 'text'; field?: FieldKey; t
 export interface EntriesBlock extends BlockBase { type: 'entries'; field: FieldKey; heading?: string; introField?: FieldKey; nameStyle?: 'run-in' | 'heading'; addLabel?: string }
 export interface PairsBlock extends BlockBase, Rollable, AddsToRolls { type: 'pairs'; field: FieldKey; label?: string; display?: 'plain' | 'signed' }
 export interface TrackBlock extends BlockBase { type: 'track'; field: FieldKey; label?: string; resource?: string; look: 'boxes' | 'gauge'; counts: 'down' | 'up' }
+/** Rows of limited uses (spell slots per level, ki, a feature's uses per day), each a cell of pips, with rest buttons under them. */
+export interface CountersBlock extends BlockBase { type: 'counters'; field: FieldKey; label?: string }
 export interface ImageBlock extends BlockBase { type: 'image'; field: FieldKey; shape: 'token' | 'portrait' }
 /** `look: 'tabs'` shows each group as a tab, loose lines above the strip; unset is 'lines'. */
 export interface SpellsBlock extends BlockBase { type: 'spells'; field: FieldKey; heading?: string; look?: 'lines' | 'tabs' }
@@ -283,7 +300,7 @@ export interface OpaqueBlock extends BlockBase { type: 'opaque'; raw: Record<str
 
 export type TemplateBlock =
   | SectionBlock | RowBlock | TabsBlock | TitleBlock | LineBlock | StatBlock | MetricBlock | ScoresBlock | TagsBlock | TextBlock
-  | EntriesBlock | PairsBlock | TrackBlock | ImageBlock | SpellsBlock | HeadingBlock | DividerBlock | ScriptBlock | OpaqueBlock;
+  | EntriesBlock | PairsBlock | TrackBlock | CountersBlock | ImageBlock | SpellsBlock | HeadingBlock | DividerBlock | ScriptBlock | OpaqueBlock;
 
 export type BlockType = TemplateBlock['type'];
 export type ContainerBlock = SectionBlock | RowBlock | TabsBlock;

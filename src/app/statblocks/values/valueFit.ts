@@ -9,6 +9,7 @@ import type { FieldType, FieldValue, TemplateField } from '../model/templateType
 import { picksChoice } from './choicePicks';
 import { isEmptyValue } from './emptyValue';
 import { isPlainRecord } from './fieldValueOf';
+import { readCounterRows } from './counterValues';
 import { coerce } from './valueCoercion';
 import { quoted, valueText } from './valueText';
 
@@ -35,6 +36,7 @@ const TYPE_NOUNS: Readonly<Record<FieldType, { noun: string; label: string }>> =
   pairs: { noun: 'names with numbers', label: 'Not pairs' },
   image: { noun: 'an image path', label: 'Not an image' },
   spells: { noun: 'a spell list', label: 'Not spells' },
+  counters: { noun: 'rows of counters, each with a name and as many used as its maximum at most', label: 'Not counters' },
 };
 
 /** Types whose text is checked by coercion; the others keep any text as it is written. */
@@ -68,6 +70,7 @@ const SHAPE_FITS: Readonly<Record<FieldType, (value: FieldValue) => boolean>> = 
   pairs: (value) => !isCount(value),
   image: (value) => typeof value === 'string',
   spells: (value) => !isCount(value),
+  counters: (value) => readCounterRows(value) !== null,
 };
 
 function shortQuote(value: FieldValue): string {
