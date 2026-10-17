@@ -69,7 +69,7 @@ const EMPTY_RECORD: FieldRecord = {};
  * The template editor (§2): the note view with its statblock, the template's
  * note (the text new statblocks start with, in Obsidian's own editor) on the
  * left and the card on the right at the width the user's notes give it, with
- * the dock of the six kinds over the note column. The card is the grid
+ * the dock of the seven kinds over the note column. The card is the grid
  * (`templateGrid`), drawn empty and unfolded: its tiles are selected, renamed
  * in place, configured through the toolbar under them and dragged by their
  * handle. Every change edits the session's draft, one undo step per action;
