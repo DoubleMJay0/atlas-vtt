@@ -1,5 +1,7 @@
 import { showNotice } from '../../ui/notice';
+import type { WorkspaceLeaf } from 'obsidian';
 import { obsidianHttp } from './account/obsidianHttp.ts';
+import { sceneStoreOf } from './atlasView.ts';
 import { campaignLink, linkRefusal, NO_CAMPAIGN_TEXT, type TableSeats } from './campaignSeats.ts';
 import type { CreatedTable } from './createdTable.ts';
 import { createTable } from './createTable.ts';
@@ -22,6 +24,13 @@ export const NO_ACCOUNT: HostAccount = { token: () => null, signedOutByServer: (
 export function refused(text: string): null {
   showNotice(text);
   return null;
+}
+
+/** Why no table can start from the Atlas tab `leaf` for the campaign `campaignId` (null: none is played), or null where one can. */
+export function startBlock(leaf: WorkspaceLeaf | null, campaignId: string | null, account: HostAccount): string | null {
+  if (leaf === null || sceneStoreOf(leaf) === null) return 'Open an Atlas map tab first.';
+  if (campaignId === null) return NO_CAMPAIGN_TEXT;
+  return account.token() === null ? 'Sign in to host first.' : null;
 }
 
 /** A table the relay made on a campaign's link, with that campaign's players. */

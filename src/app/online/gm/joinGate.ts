@@ -31,6 +31,9 @@ export const PAUSED_TEXT = 'Joins paused: too many wrong codes';
 /** A new table's gates: a fresh code that is none of `taken` (the players' own codes), and both switches on. */
 export const newGate = (random?: () => number, taken?: ReadonlySet<string>): GateSettings => ({ code: newJoinCode(random, taken), requireCode: true, askToJoin: true });
 
+/** The gates with a new code where theirs is one of `taken` (a player's own code now: they share the page's one field); else these very gates. */
+export const freeGate = (gate: GateSettings, taken: ReadonlySet<string>, random?: () => number): GateSettings => (taken.has(gate.code) ? { ...gate, code: newJoinCode(random, taken) } : gate);
+
 /** The gates from the plugin's data, each field checked; a table saved before it had gates gets new ones. */
 export function readGate(data: unknown, random?: () => number): GateSettings {
   const fresh = newGate(random);

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { JOIN_CODE_PATTERN, shownJoinCode } from '../../../../src/app/online/protocol/index.ts';
 import { describe, expect, it } from 'vitest';
-import { ARM_MS, FULL_NOTE_MS, gateFrame, newGate, newJoinCode, readGate, TableGate, type GateFrame, type GateSettings } from '../../../../src/app/online/gm/joinGate.ts';
+import { ARM_MS, freeGate, FULL_NOTE_MS, gateFrame, newGate, newJoinCode, readGate, TableGate, type GateFrame, type GateSettings } from '../../../../src/app/online/gm/joinGate.ts';
 import { readSavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 
 const MIRA = { id: 'm'.repeat(20), name: 'Mira' };
@@ -72,6 +72,12 @@ describe('a join code', () => {
     const seq = (...draws: number[]): (() => number) => () => draws.shift() ?? 0;
     expect(newJoinCode(seq(5, 7), new Set(['000005']))).toBe('000007');
     expect(newGate(seq(5, 7), new Set(['000005'])).code).toBe('000007');
+  });
+
+  it('of a table that comes back is made anew only where a player\'s own code is now the same', () => {
+    const seq = (...draws: number[]): (() => number) => () => draws.shift() ?? 0;
+    expect(freeGate(SETTINGS, new Set(['111111']))).toBe(SETTINGS);
+    expect(freeGate(SETTINGS, new Set(['483912', '000005']), seq(483_912, 5, 7))).toEqual({ ...SETTINGS, code: '000007' });
   });
 
   it('is shown in two groups', () => {

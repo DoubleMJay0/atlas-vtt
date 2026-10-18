@@ -208,6 +208,7 @@ export class OnlineTable {
 
   /** Removes a player: their key stops working, their browser leaves the table and their tokens are nobody's. */
   kick(player: string): void {
+    this.roster.kicked(player);
     this.connection.kick(player);
     this.ownership.remove(player);
   }

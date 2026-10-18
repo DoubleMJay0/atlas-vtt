@@ -4,7 +4,7 @@ import { activeAtlasLeaf, activeStore, sceneStoreOf, selectedTokenIds, workScene
 import type { CampaignPlayer } from '../../campaigns/players/playersFile';
 import { BookShelf } from './book/BookShelf.ts';
 import { linkRefusal, NO_CAMPAIGN_TEXT, renewLink, type TableSeats } from './campaignSeats.ts';
-import { newGate } from './joinGate.ts';
+import { freeGate, newGate } from './joinGate.ts';
 import { LogKeeper, type LogStore } from './log/logStore.ts';
 import { OnlineTable } from './OnlineTable.ts';
 import type { KnownPlayer, Ownership } from './ownership.ts';
@@ -13,7 +13,7 @@ import { presentOnPlayerView, presentedSceneSource, showPresentedElsewhere, type
 import type { SavedTable } from './savedTable.ts';
 import { RELAY_ORIGIN } from './servers.ts';
 import type { TableCampaigns } from './tableCampaigns.ts';
-import { createCampaignTable, NO_ACCOUNT, refused, type HostAccount } from './tableStart.ts';
+import { createCampaignTable, NO_ACCOUNT, refused, startBlock, type HostAccount } from './tableStart.ts';
 import type { TableStatus } from './TableConnection.ts';
 import type { LostTable } from './tableEnd.ts';
 
@@ -168,13 +168,18 @@ export class OnlineControl {
     this.current?.roster.remove(playerId);
   }
 
-  /** Gives the campaign a new link, so the old one stops working; a running table starts again on it. */
+  /**
+   * Gives the campaign a new link, so the old one stops working; a running table starts again on it.
+   * Where it could not start again (no Atlas tab, signed out) nothing changes and the GM is told why.
+   */
   async newLink(): Promise<void> {
     const campaignId = this.saved?.campaignId ?? this.campaigns.playing();
+    const leaf = this.current?.sharedTab ?? activeAtlasLeaf(this.app);
+    const blocked = this.current === null ? null : startBlock(leaf, campaignId, this.account);
+    if (blocked !== null) return void showNotice(blocked);
     const seats = campaignId === null ? null : await this.campaigns.open(campaignId).catch(() => null);
     if (seats === null || !renewLink(seats)) return void showNotice(seats === null ? NO_CAMPAIGN_TEXT : linkRefusal(seats));
     if (this.current === null) return;
-    const leaf = this.current.sharedTab ?? activeAtlasLeaf(this.app);
     this.stop();
     await this.startFor(leaf, campaignId);
   }
@@ -219,10 +224,9 @@ export class OnlineControl {
 
   private async startFor(leaf: WorkspaceLeaf | null, campaignId: string | null): Promise<OnlineTable | null> {
     if (this.current !== null || this.starting) return this.current;
-    if (leaf === null || sceneStoreOf(leaf) === null) return refused('Open an Atlas map tab first.');
-    if (campaignId === null) return refused(NO_CAMPAIGN_TEXT);
+    const blocked = startBlock(leaf, campaignId, this.account);
     const token = this.account.token();
-    if (token === null) return refused('Sign in to host first.');
+    if (blocked !== null || leaf === null || campaignId === null || token === null) return refused(blocked ?? NO_CAMPAIGN_TEXT);
     this.starting = true;
     this.changed();
     const closings = this.closings;
@@ -236,7 +240,9 @@ export class OnlineControl {
   }
 
   /** Runs the table on its campaign: its players and books are the campaign's from before anyone can join until it ends. */
-  private run(saved: SavedTable, seats: TableSeats, savedLog?: unknown): OnlineTable {
+  private run(given: SavedTable, seats: TableSeats, savedLog?: unknown): OnlineTable {
+    // A join code that is now a player's own (made on another device since) is made anew: the page's one field takes both.
+    const saved = { ...given, gate: freeGate(given.gate, seats.codes()) };
     this.ended = null;
     this.keep(saved);
     this.ownership.bind(seats);
