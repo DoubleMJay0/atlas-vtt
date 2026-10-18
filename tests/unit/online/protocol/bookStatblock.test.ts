@@ -16,7 +16,7 @@ const plain = (opening: string, extra: Partial<SheetValue> = {}): SheetValue => 
 const value = (shown: SheetValue): SheetNode => ({ k: 'value', value: shown });
 const entry = (name: string, extra: Partial<AbilityEntry> = {}): AbilityEntry => ({ key: sheetBase(name), name, text: { opening: '' }, parts: {}, ...extra });
 const component = (extra: Partial<AbilityComponent> = {}): AbilityComponent => ({ id: 'blk1', name: 'Actions', access: 'edit', parts: [], tabs: [{ label: null, list: 'actions', entries: [] }], ...extra });
-const sheet = (extra: Partial<BookStatblock> = {}): BookStatblock => ({ editable: true, displayName: null, sigils: {}, blocks: [], abilities: [], ...extra });
+const sheet = (extra: Partial<BookStatblock> = {}): BookStatblock => ({ editable: true, displayName: null, sigils: {}, blocks: [], abilities: [], refills: [], ...extra });
 const nodes = (count: number, make: (index: number) => SheetNode = () => ({ k: 'divider' })): SheetNode[] => Array.from({ length: count }, (_, index) => make(index));
 const nested = (depth: number): SheetNode => (depth <= 1 ? { k: 'section', heading: null, nodes: [] } : { k: 'section', heading: null, nodes: [nested(depth - 1)] });
 const range = (count: number, prefix = 'o'): string[] => Array.from({ length: count }, (_, index) => `${prefix}${index}`);
