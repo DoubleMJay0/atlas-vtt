@@ -78,6 +78,11 @@ export class SceneDice {
     this.rolls.receive(from, message);
   }
 
+  /** A roll for a player's own character, in the open as theirs (`PlayerRolls.rollFor`); its total, or null where it was not made. */
+  rollFor(who: string, formula: string, flavor: string, tokenId: string): number | null {
+    return this.rolls.rollFor(who, formula, flavor, tokenId);
+  }
+
   /** The token `who` may speak as in the log by `key`, or null (`LogSpeakers`). */
   speaker(who: string, key: string): Promise<SpokenAs | null> {
     const { tokens } = this.parts;

@@ -147,6 +147,28 @@ export class PlayerRolls {
     if (!rolled) this.refuse('unavailable', from);
   }
 
+  /**
+   * A roll the GM's Atlas makes for a player's own character (the uses a refill gives back), in the
+   * open as theirs, named `flavor` and made for their token where it is in the list players see, not
+   * hidden and theirs. Their roll rate is not spent: what asked for it was checked under its own.
+   * The total, or null where the shared tab has no dice or nothing was rolled.
+   */
+  rollFor(from: string, formula: string, flavor: string, tokenId: string): number | null {
+    const context = this.ports.context();
+    const dice = this.ports.dice();
+    if (dice === null || context.mapPath === null || !rollableFormula(formula)) return null;
+    const token = context.tokens[tokenId];
+    const named = token !== undefined && token.isHidden !== true && context.ownerOf(tokenId) === from;
+    const source: NonNullable<DiceRollResult['source']> = named ? { type: 'toolbar', tokenId, tokenName: tokenLabel(token) } : { type: 'toolbar' };
+    const origin = named ? { viewId: dice.viewId, mapPath: context.mapPath, tokenId } : undefined;
+    const set = named ? dice.setFor?.(token) : undefined;
+    let total: number | null = null;
+    this.ports.rollAs(from, () => {
+      total = dice.rollDice(formula, source, origin, set ? { set } : undefined)?.total ?? null;
+    }, { flavor });
+    return total;
+  }
+
   /** A private roll: into the log for its audience, and thrown on the roller's page unless it is blind. */
   private rollPrivately(from: string, formula: string, mode: Exclude<RollMode, 'public'>, tokenId: string | null, source: NonNullable<DiceRollResult['source']>, context: RollContext, notes: RollNotes, whisper?: readonly string[], set?: DiceSet, setAppearance?: true): void {
     const roll = this.ports.quietRoll(formula, set, setAppearance);

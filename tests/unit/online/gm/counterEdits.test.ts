@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { checkFieldEdit } from '../../../../src/app/online/gm/book/fieldEdit.ts';
+import { checkRefill } from '../../../../src/app/online/gm/book/refillEdit.ts';
 import type { CheckedEdit, EditInputs } from '../../../../src/app/online/gm/book/statblockChecks.ts';
 import { statblockSheet } from '../../../../src/app/online/gm/book/statblockSheet.ts';
 import { storedRead } from '../../../../src/app/online/gm/book/statblockSheets.ts';
@@ -124,3 +125,34 @@ describe('a player\'s change of their Counters', () => {
   });
 });
 
+describe('a player\'s refill of their sheet', () => {
+  const inputs = inputsOf(NOTE);
+  const rolled: string[] = [];
+  const roll = (total: number | null) => (formula: string, flavor: string): number | null => {
+    rolled.push(`${formula} ${flavor}`);
+    return total;
+  };
+  const refill = (name: string): { readonly t: 'book-refill'; readonly refill: string } => ({ t: 'book-refill', refill: name });
+
+  it('gives back what the refill and those it brings along name, rolling what a row regains', () => {
+    rolled.length = 0;
+    expect(slotsAfter(NOTE, checkRefill(inputs, refill('Long rest'), roll(2)))).toEqual([{ ...ROWS[0], used: 0 }, { ...ROWS[1], used: 1 }]);
+    expect(rolled).toEqual(['1d4 Ki (Long rest)']);
+    expect(slotsAfter(NOTE, checkRefill(inputs, refill('Short rest'), roll(9)))).toEqual([ROWS[0], { ...ROWS[1], used: 0 }]);
+  });
+
+  it('refuses a refill the template does not define or the sheet did not offer, and one whose roll was not made', () => {
+    expect(checkRefill(inputs, refill('Dawn'), roll(1))).toBeNull();
+    expect(checkRefill(inputs, refill('long rest'), roll(1))).toBeNull();
+    expect(checkRefill(inputs, refill('Short rest'), roll(null))).toBeNull();
+    const offeredNone = { ...inputs, sent: inputs.sent && { ...inputs.sent, refills: [] } };
+    expect(checkRefill(offeredNone, refill('Long rest'), roll(1))).toBeNull();
+  });
+
+  it('changes no value players may only read, and writes nothing where nothing comes back', () => {
+    const readOnly = inputsOf(NOTE, { ...TEMPLATE, players: { slots: 'read' } });
+    expect(checkRefill(readOnly, refill('Long rest'), roll(1))).toBeNull();
+    const rested = NOTE.replace('used: 1', 'used: 0').replace('used: 3', 'used: 0');
+    expect(checkRefill(inputsOf(rested), refill('Long rest'), roll(1))).toEqual({ patches: [], written: [] });
+  });
+});

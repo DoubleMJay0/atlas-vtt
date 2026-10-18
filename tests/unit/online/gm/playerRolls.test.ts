@@ -115,6 +115,29 @@ describe('players\' rolls', () => {
   });
 });
 
+describe('a roll for a player\'s character', () => {
+  it('is rolled in the open as theirs, named by its flavor, for their own token, without spending their roll rate', async () => {
+    const gm = await table({ defaultRoll: '1d20', crit: 'natural' }, () => face(4, 6));
+    for (let i = 0; i < 5; i++) expect(gm.share.dice.rollFor(ANA, '1d6+1', 'Wand (Dawn)', 'hero')).toBe(5);
+    expect(gm.rolled).toHaveLength(5);
+    expect(gm.rolled[0]?.source).toEqual({ type: 'toolbar', tokenId: 'hero', tokenName: 'Hero' });
+    expect(rollsSent(gm.sent).map(({ who, token: named }) => [who, named])[0]).toEqual([ANA, gm.alias(1)]);
+    expect(gm.logged[0]).toMatchObject({ who: ANA, flavor: 'Wand (Dawn)' });
+    expect(refusals(gm.sent)).toEqual([]);
+  });
+
+  it('names no token that is not theirs, and is not made without dice or for a formula without a die', async () => {
+    const gm = await table({ defaultRoll: '1d20', crit: 'natural' }, () => 0.5);
+    expect(gm.share.dice.rollFor(BEN, '1d6', 'Wand (Dawn)', 'hero')).not.toBeNull();
+    expect(gm.rolled[0]?.source).toEqual({ type: 'toolbar' });
+    expect(gm.share.dice.rollFor(ANA, '3', 'Wand (Dawn)', 'hero')).toBeNull();
+    const harness: ShareHarness = gm;
+    harness.dice = null;
+    expect(gm.share.dice.rollFor(ANA, '1d6', 'Wand (Dawn)', 'hero')).toBeNull();
+    expect(gm.rolled).toHaveLength(1);
+  });
+});
+
 describe('players\' private rolls and roll buttons', () => {
   it('a private roll is rolled quietly by the map\'s rules, logged for its audience and thrown only on the roller\'s page', async () => {
     const gm = await table({ defaultRoll: '1d20', crit: 'natural' }, () => 0.5);
