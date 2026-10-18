@@ -13,6 +13,7 @@ import { gateRowActions } from './gateRows.ts';
 import { InviteQr } from './inviteQr.ts';
 import { KNOCK_ROOM, KnockStack } from './knockStack.ts';
 import { DockSurface } from './dockSurface.ts';
+import { playerCodeCopier } from './playerCodes.ts';
 import { PANEL_WIDTH, panelView, renderPanel, type PanelActions } from './OnlinePanel.ts';
 import { badgeOf, isRunning, menuModel, tooltipOf, type OnlineSnapshot, type SceneFacts } from './panelModel.ts';
 
@@ -257,6 +258,8 @@ export class Dock {
       copy: () => copyText(this.root, this.deps.api.snapshot().link ?? ''),
       toggleQr: () => this.qr.toggle(),
       hideImage: () => this.deps.api.hideImage(),
+      addPlayer: (name) => this.deps.api.addPlayer(name),
+      newLink: () => void this.deps.api.newLink(),
     };
   }
 
@@ -276,6 +279,10 @@ export class Dock {
       assign: (ids, playerId) => api.assign(ids, playerId),
       release: (ids) => api.release(ids),
       kick: (playerId) => api.kick(playerId),
+      copyPlayerCode: playerCodeCopier(api, this.root),
+      newPlayerCode: (playerId) => api.newPlayerCode(playerId),
+      renamePlayer: (playerId, name) => api.renamePlayer(playerId, name),
+      removeFromCampaign: (playerId) => api.removeFromCampaign(playerId),
       selected: () => (scene.isShared ? selectedTokenIds(this.store.getState()) : []),
       imageSrc: (path) => this.deps.imageSrc(path),
       ...this.feedback.actions,

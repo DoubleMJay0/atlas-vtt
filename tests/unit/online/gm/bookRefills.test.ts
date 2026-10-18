@@ -6,7 +6,7 @@ import { BookShelf } from '../../../../src/app/online/gm/book/BookShelf.ts';
 import { setStatblockGate } from '../../../../src/app/online/gm/book/statblockGate.ts';
 import type { StatblockTemplate } from '../../../../src/app/statblocks/model/templateTypes';
 import { FakeSocket, workspace } from './fakeTable.ts';
-import { ANA, BEN, CAL, cave, delivered, ofType, openTable, type Delivered } from './bookTableHarness.ts';
+import { ANA, BEN, CAL, cave, delivered, keptBooks, ofType, openTable, type Delivered } from './bookTableHarness.ts';
 import { advanceSettled as advance } from './settled.ts';
 import { propertiesOf, StatblockNotes, templateOf } from './statblockNotes.ts';
 
@@ -137,18 +137,18 @@ describe('a player taking a refill of their own character\'s sheet at a running 
   });
 
   it('changes neither the shelf nor any note for an unknown refill, a player whose character has no statblock, or one without a character', async () => {
-    let saves = 0;
-    const shelf = new BookShelf({}, () => { saves += 1; });
+    const source = keptBooks();
+    const shelf = new BookShelf(source);
     const { online, from } = await table(shelf);
-    const books = JSON.stringify(shelf.toData());
+    const books = source.dump();
     for (const [player, refill] of [[ANA, 'Session'], [ANA, 'long rest'], [BEN, 'Long rest'], [CAL, 'Long rest']] as const) {
       from(player, { t: 'book-refill', refill });
       await advance(REFUSAL_BOOK_MS);
     }
     expect(notes.writes).toEqual([]);
     expect(notes.text(PATH)).toBe(NOTE);
-    expect(JSON.stringify(shelf.toData())).toBe(books);
-    expect(saves).toBe(0);
+    expect(source.dump()).toBe(books);
+    expect(source.writes).toBe(0);
     online.stop();
   });
 });

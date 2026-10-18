@@ -18,8 +18,9 @@ export interface StoredBook {
 }
 
 /**
- * The books as kept in the companion's data: by collection id (`NO_COLLECTION` for a scene outside
- * every collection), then by character, which is its token's artwork path.
+ * The books as an older Atlas kept them in the companion's data: by collection id (`NO_COLLECTION`
+ * for a scene outside every collection), then by character, which was its token's artwork path.
+ * They are carried over into the campaign's books file (`bookMigration.ts`).
  */
 export type BookData = Readonly<Record<string, Readonly<Record<string, StoredBook>>>>;
 
@@ -117,7 +118,8 @@ function readNote(value: unknown): BookNote | null {
   return draft === null || typeof at !== 'number' || !Number.isFinite(at) || at < 0 ? null : { ...draft, at };
 }
 
-function readBook(value: unknown): StoredBook | null {
+/** A stored book, each part read through the protocol's parsers; null for a value that is no book. */
+export function readStoredBook(value: unknown): StoredBook | null {
   if (!isRecord(value)) return null;
   const items = readList(value.items, MAX_BOOK_ITEMS, parseBookItem);
   const slots = parseBookSlots(value.slots) ?? DEFAULT_BOOK_SLOTS;
@@ -142,7 +144,7 @@ export function readBooks(data: unknown): BookData {
   for (const [collection, characters] of Object.entries(isRecord(data) ? data : {})) {
     if (collection.length > MAX_KEY || !isRecord(characters)) continue;
     const books = Object.entries(characters).flatMap(([key, value]): [string, StoredBook][] => {
-      const book = key === '' || key.length > MAX_KEY ? null : readBook(value);
+      const book = key === '' || key.length > MAX_KEY ? null : readStoredBook(value);
       return book === null || isEmptyBook(book) ? [] : [[key, book]];
     });
     if (books.length > 0) collections.push([collection, Object.fromEntries(books)]);

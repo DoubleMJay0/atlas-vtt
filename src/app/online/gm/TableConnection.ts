@@ -1,5 +1,5 @@
 import {
-  ALL_PLAYERS, FINAL_CLOSE_CODES, KEEPALIVE_PONG, PROTOCOL_VERSION, parseRelayFrame, type ConnectionStats, type GmMessage, type PlayerInfo,
+  ALL_PLAYERS, FINAL_CLOSE_CODES, KEEPALIVE_PONG, PROTOCOL_VERSION, parseRelayFrame, type CampaignSeat, type ConnectionStats, type GmMessage, type PlayerInfo, type YourCodeMessage,
 } from '../protocol/index.ts';
 import { randomHex } from '../../utils/randomHex';
 import { messageParts } from './assetServe.ts';
@@ -87,6 +87,8 @@ export class TableConnection {
   private reconnects = 0;
   /** The players connected now, as the relay last told. */
   private readonly players = new Set<string>();
+  /** The campaign's players the relay is told on every welcome, as JSON; null while the table names none. */
+  private roster: string | null = null;
 
   constructor(origin: string, code: string, secret: string, events: TableEvents, gate: GateEvents | null = null, timers: Timers = companionTimers()) {
     this.url = socketUrl(origin, code);
@@ -171,6 +173,24 @@ export class TableConnection {
     if (this.status === 'online') this.queue.push(JSON.stringify({ v: PROTOCOL_VERSION, t: 'gate', ...frame }));
   }
 
+  /**
+   * Tells the relay the campaign's players and their own codes, now while online (unless they are
+   * what it was last told) and on every welcome.
+   */
+  setPlayers(players: readonly CampaignSeat[]): void {
+    const roster = JSON.stringify(players);
+    if (roster === this.roster) return;
+    this.roster = roster;
+    if (this.status === 'online') this.queue.push(this.playersFrame(roster));
+  }
+
+  /** Tells one player their own code. Small, so never in parts. */
+  sendCode(message: YourCodeMessage, to: string): void {
+    if (this.isGone(to)) return;
+    const entry = JSON.stringify({ to, body: message });
+    this.queue.push(sendFrame(entry), to, entry);
+  }
+
   /** Lets a waiting newcomer in, or turns them away. */
   answer(id: string, admit: boolean): void {
     this.queue.push(JSON.stringify({ v: PROTOCOL_VERSION, t: admit ? 'admit' : 'decline', id }));
@@ -225,8 +245,9 @@ export class TableConnection {
       this.limit.clear();
       this.attempts = 0;
       for (const player of frame.players) this.players.add(player.id);
-      // The gates first, ahead of whatever waits in the queue: the relay keeps them, and a restarted companion's are the same.
+      // The gates and the players first, ahead of whatever waits in the queue: the relay keeps them, and a restarted companion's are the same.
       if (this.gate !== null) socket.send(JSON.stringify({ v: PROTOCOL_VERSION, t: 'gate', ...this.gate.frame() }));
+      if (this.roster !== null) socket.send(this.playersFrame(this.roster));
       this.queue.attach(this.pulse.start(socket), frame.batch === true);
       this.setStatus('online');
       // A table that still closes for want of access says so again after its welcome.
@@ -245,6 +266,10 @@ export class TableConnection {
       this.dropUnreachable();
       this.events.left(frame.id);
     } else if (frame.t === 'game' && frame.from !== undefined) this.events.message(frame.from, frame.body);
+  }
+
+  private playersFrame(roster: string): string {
+    return `{"v":${PROTOCOL_VERSION},"t":"players","players":${roster}}`;
   }
 
   private setStatus(status: TableStatus): void {

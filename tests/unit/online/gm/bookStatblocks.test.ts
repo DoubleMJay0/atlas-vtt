@@ -25,6 +25,8 @@ vi.mock('../../../../src/app/online/gm/gmMarks.ts', () => ({
 vi.mock('../../../../src/app/online/gm/atlasLighting.ts', async (original) => ({ ...(await original<typeof import('../../../../src/app/online/gm/atlasLighting.ts')>()), accentColour: () => '#112233' }));
 
 const PLAYERS = [{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }];
+/** The campaign also has Cal, who joins the table later. */
+const WITH_CAL = [...PLAYERS, { id: CAL, name: 'Cal' }];
 const BRANNOCH_NOTE = 'Characters/Brannoch.md';
 const MIRA_NOTE = 'Characters/Mira.md';
 const SECRET = 'The idol lies under the altar';
@@ -171,7 +173,7 @@ describe('a player\'s own character\'s statblock at a running table', () => {
   it('is the library token\'s note where the token links none, and nothing while a player has no character', async () => {
     notes.library.set(MIRA_ART, MIRA_NOTE);
     notes.put(MIRA_NOTE, TEMPLATE, note('Mira', '25 ft.'));
-    const { online, socket } = await openTable(new BookShelf(), PLAYERS);
+    const { online, socket } = await openTable(new BookShelf(), PLAYERS, undefined, WITH_CAL);
     socket.relay({ t: 'player-joined', id: CAL, name: 'Cal' });
     await advance(1_000);
     const all = delivered(socket);

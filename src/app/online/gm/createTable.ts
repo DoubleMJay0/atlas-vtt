@@ -7,10 +7,13 @@ export interface CreateFailure {
   readonly message: string;
 }
 
-/** Asks the relay for a new table for the account signed in with `token`; the relay asks the account service whether it may host. */
-export async function createTable(http: Http, origin: string, token: string): Promise<CreatedTable | CreateFailure> {
+/**
+ * Asks the relay for a new table on the campaign's lasting `link`, for the account signed in with
+ * `token`; the relay asks the account service whether it may host.
+ */
+export async function createTable(http: Http, origin: string, token: string, link: string): Promise<CreatedTable | CreateFailure> {
   try {
-    const response = await http({ url: `${origin}/api/tables`, method: 'POST', authorization: `Bearer ${token}` });
+    const response = await http({ url: `${origin}/api/tables`, method: 'POST', authorization: `Bearer ${token}`, json: { code: link } });
     const created = readCreated(response.status, response.json);
     return typeof created === 'string' ? { status: response.status, message: created } : created;
   } catch {

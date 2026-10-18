@@ -56,6 +56,8 @@ import { HeaderAutocompleteSuggest } from './src/app/plugin/HeaderAutocompleteSu
 import { registerAtlasLinks } from './src/app/links/registerAtlasLinks';
 import { registerCommands } from './src/app/plugin/registerCommands';
 import { CampaignFiles } from './src/app/campaigns/CampaignFiles';
+import { CampaignBooks } from './src/app/campaigns/players/CampaignBooks';
+import { CampaignPlayers } from './src/app/campaigns/players/CampaignPlayers';
 import { releaseMapPictures } from './src/app/react/components/dashboard/mapPicture';
 import { PlayedRules } from './src/app/campaigns/playedRules';
 import { QuestIndex } from './src/app/campaigns/quests/QuestIndex';
@@ -128,6 +130,12 @@ export default class AtlasVTTPlugin extends Plugin {
     this.register(nameQuestCampaigns(this.app, campaignFiles, QuestIndex.open(this.app)));
     const campaignsRead = storageReady.catch(() => undefined).then(() => campaignFiles.load());
     void campaignsRead.catch((error: unknown) => console.error('[Atlas] Reading the campaigns failed:', error));
+    // Who plays a campaign online is its players file, read once the campaigns are.
+    const campaignPlayers = CampaignPlayers.open(this.app);
+    void campaignsRead.then(() => campaignPlayers.whenLoaded()).catch((error: unknown) => console.error('[Atlas] Reading the campaigns\' players failed:', error));
+    // The books of their characters are a campaign file too.
+    const campaignBooks = CampaignBooks.open(this.app);
+    void campaignsRead.then(() => campaignBooks.whenLoaded()).catch((error: unknown) => console.error('[Atlas] Reading the campaigns\' books failed:', error));
     // The campaign this device plays records the scenes its map views open.
     this.register(recordCampaignPlay(this.app, campaignFiles, campaignsRead));
     // And keeps one set of values for each of its player characters, shared by every map view.
@@ -233,6 +241,8 @@ export default class AtlasVTTPlugin extends Plugin {
     void this.settingsService?.saveSettingsNow();
     SystemPresetFiles.release(this.app);
     PlayedRules.release(this.app);
+    CampaignBooks.release(this.app);
+    CampaignPlayers.release(this.app);
     CampaignFiles.release(this.app);
     QuestIndex.release(this.app);
     DiceSetFiles.release(this.app);
