@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SceneState } from '../../../../src/app/online/gm/atlasView.ts';
 import { ARM_MS } from '../../../../src/app/online/gm/joinGate.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
-import { Ownership, readOwnership } from '../../../../src/app/online/gm/ownership.ts';
+import { boundOwnership } from './fakeSeats.ts';
 import { readSavedTable, type SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { closingText } from '../../../../src/app/online/gm/tableEnd.ts';
 import { app, atlasTab, FakeSocket, png, present, switchScene, workspace } from './fakeTable.ts';
@@ -75,7 +75,7 @@ describe('the online table', () => {
   let saves: (SavedTable | null)[] = [];
   /** A signed-in GM: tables are asked for with the account's token, and nothing else. */
   const signedIn = { token: (): string | null => 'account-token', signedOutByServer: vi.fn(), refresh: vi.fn(() => Promise.resolve()) };
-  const control = (ownership = new Ownership(readOwnership(undefined), () => undefined)): OnlineControl =>
+  const control = (ownership = boundOwnership([])): OnlineControl =>
     new OnlineControl(app, ownership, (table) => saves.push(table), signedIn);
 
   beforeEach(() => {
@@ -167,7 +167,7 @@ describe('the online table', () => {
     const tab = atlasTab(caveScene());
     workspace.leaves = [tab.leaf];
     present(tab);
-    const ownership = new Ownership(readOwnership(undefined), () => undefined);
+    const ownership = boundOwnership([{ id: ANA, name: 'Ana' }]);
     const online = control(ownership);
     await online.start(tab.leaf);
     await advance(0);
@@ -200,7 +200,7 @@ describe('the online table', () => {
     const record = data as { ownership: unknown; table: unknown };
     const restored = readSavedTable(record.table);
     if (restored === null) throw new Error('the saved table was not read');
-    const kept = new Ownership(readOwnership(record.ownership), () => undefined);
+    const kept = boundOwnership([{ id: ANA, name: 'Ana' }], record.ownership);
     const again = control(kept);
     again.resume(restored);
     await advance(0);
@@ -316,7 +316,7 @@ describe('the online table', () => {
     workspace.leaves = [tab.leaf];
     let token: string | null = 'account-token';
     const account = { token: () => token, signedOutByServer: vi.fn(() => (token = null)), refresh: vi.fn(() => Promise.resolve()) };
-    const online = new OnlineControl(app, new Ownership(readOwnership(undefined), () => undefined), (table) => saves.push(table), account);
+    const online = new OnlineControl(app, boundOwnership([]), (table) => saves.push(table), account);
 
     seen.created = { status: 403, json: { error: 'no-access' } };
     expect(await online.start(tab.leaf)).toBeNull();
@@ -342,7 +342,7 @@ describe('the online table', () => {
 
   it('comes back to a saved table on Atlas\'s table server, with its secret alone', async () => {
     workspace.leaves = [atlasTab(caveScene()).leaf];
-    const online = new OnlineControl(app, new Ownership(readOwnership(undefined), () => undefined), (table) => saves.push(table), signedIn);
+    const online = new OnlineControl(app, boundOwnership([]), (table) => saves.push(table), signedIn);
     online.resume(SAVED);
     await advance(0);
     expect(FakeSocket.all.map((socket) => socket.url)).toEqual([`wss://play.atlas-vtt.dev/api/tables/${SAVED.code}/socket`]);
@@ -355,7 +355,7 @@ describe('the online table', () => {
   it('makes tables on Atlas\'s table server', async () => {
     const tab = atlasTab(caveScene());
     workspace.leaves = [tab.leaf];
-    const online = new OnlineControl(app, new Ownership(readOwnership(undefined), () => undefined), (table) => saves.push(table), signedIn);
+    const online = new OnlineControl(app, boundOwnership([]), (table) => saves.push(table), signedIn);
     await online.start(tab.leaf);
     expect(seen.requests[0]?.url).toBe('https://play.atlas-vtt.dev/api/tables');
     expect(online.link()).toBe(`https://play.atlas-vtt.dev/#${'b'.repeat(26)}`);

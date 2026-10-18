@@ -5,7 +5,8 @@ import { parseSharedRoll } from '../../../../src/app/online/protocol/index.ts';
 import type { DiceRules } from '../../../../src/app/types/diceRulesTypes';
 import type { TokenEntity } from '../../../../src/app/types';
 import { describe, expect, it } from 'vitest';
-import { Ownership, readOwnership } from '../../../../src/app/online/gm/ownership.ts';
+import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
+import { boundOwnership } from './fakeSeats.ts';
 import { playerFormula, rollableFormula } from '../../../../src/app/online/gm/PlayerRolls.ts';
 import { TOKEN_INTERVAL_MS } from '../../../../src/app/online/gm/TokenShare.ts';
 import { DICE_TOOL, realDice, type DiceToolClass, type RealDice } from './realDice.ts';
@@ -23,7 +24,7 @@ const TOKENS: TokenEntity[] = [
 
 /** A shared scene with the hero (Ana's) and the ogre, whose dice are Atlas's real tool. */
 async function table(rules: DiceRules | RollingDice, random: () => number): Promise<ShareHarness & RealDice & { readonly scene: string; readonly alias: (x: number) => string }> {
-  const owners = new Ownership(readOwnership(undefined), () => undefined);
+  const owners = boundOwnership([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]);
   owners.welcome([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]);
   const state = sceneState({ objects: { ...sceneState().objects, tokens: Object.fromEntries(TOKENS.map((entry) => [entry.id, entry])) } });
   const share = shareHarness(state, ART, owners);

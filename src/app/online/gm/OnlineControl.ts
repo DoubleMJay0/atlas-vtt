@@ -128,7 +128,6 @@ export class OnlineControl {
       else if (created.status === 403) void this.account.refresh(true);
       return created.status === 401 ? null : refused(created.message);
     }
-    this.ownership.reset();
     // A new table's log is empty: the last table's goes.
     this.logs.forget();
     const mapPath = sceneStoreOf(leaf)?.getState().mapPath ?? null;

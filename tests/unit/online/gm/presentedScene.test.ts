@@ -7,7 +7,8 @@ import type { App, WorkspaceLeaf } from 'obsidian';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SceneState } from '../../../../src/app/online/gm/atlasView.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
-import { Ownership, readOwnership } from '../../../../src/app/online/gm/ownership.ts';
+import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
+import { boundOwnership } from './fakeSeats.ts';
 import { findPresentedTab, PRESENT_COMMAND, presentedScene, readPresented, showPresentedElsewhere } from '../../../../src/app/online/gm/presentedScene.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { app, atlasTab, FakeSocket, FakeTabs, png, present, switchScene, workspace } from './fakeTable.ts';
@@ -60,7 +61,7 @@ const scenes = (socket: FakeSocket, to?: string): unknown[] => bodies(socket, to
 const mapHash = (scene: unknown): unknown => (scene as { map?: { hash?: string } } | null)?.map?.hash;
 
 /** A running table restored from `SAVED`, welcomed by the relay with Ana at it. */
-async function running(ownership = new Ownership(readOwnership(undefined), () => undefined)): Promise<{ online: OnlineControl; socket: FakeSocket }> {
+async function running(ownership = boundOwnership([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }])): Promise<{ online: OnlineControl; socket: FakeSocket }> {
   const online = new OnlineControl(app, ownership);
   online.resume(SAVED);
   await advance(0);

@@ -3,7 +3,8 @@ import { ALL_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
-import { Ownership, readOwnership } from '../../../../src/app/online/gm/ownership.ts';
+import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
+import { boundOwnership } from './fakeSeats.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { app, FakeSocket, png, workspace } from './fakeTable.ts';
 import { advanceSettled as advance } from './settled.ts';
@@ -45,7 +46,7 @@ describe('the running table\'s shown image', () => {
 
   it('is the table\'s: shown, served, sent to who joins and again after a reconnect while no scene is shared at all', async () => {
     const changes: number[] = [];
-    const online = new OnlineControl(app, new Ownership(readOwnership(undefined), () => undefined));
+    const online = new OnlineControl(app, boundOwnership([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]));
     online.onChange(() => changes.push(changes.length));
     const table = online.resume(SAVED);
     if (table === null) throw new Error('no table');

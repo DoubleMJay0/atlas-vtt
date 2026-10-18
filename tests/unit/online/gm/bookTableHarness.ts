@@ -4,7 +4,7 @@ import type { TokenEntity } from '../../../../src/app/types';
 import type { SceneState } from '../../../../src/app/online/gm/atlasView.ts';
 import type { BookShelf } from '../../../../src/app/online/gm/book/BookShelf.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
-import { Ownership, readOwnership } from '../../../../src/app/online/gm/ownership.ts';
+import { boundOwnership } from './fakeSeats.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { app, atlasTab, FakeSocket, png, present, workspace, type FakeTab } from './fakeTable.ts';
 import { fakeTokenSource } from './fakeTokenSource.ts';
@@ -132,9 +132,10 @@ export interface OpenTable {
 
 /**
  * A table that came back with the cave presented, welcomed with these players: Ana plays Brannoch
- * and Ben plays Mira unless `owners` says otherwise. The campaign being played names the world map.
+ * and Ben plays Mira unless `owners` says otherwise. The campaign being played names the world map
+ * and has these players unless `campaign` names others (a player may join who it has not met).
  */
-export async function openTable(shelf: BookShelf, players: readonly PlayerInfo[], owners: Readonly<Record<string, string>> = { [BRANNOCH]: ANA, [MIRA]: BEN }): Promise<OpenTable> {
+export async function openTable(shelf: BookShelf, players: readonly PlayerInfo[], owners: Readonly<Record<string, string>> = { [BRANNOCH]: ANA, [MIRA]: BEN }, campaign: readonly PlayerInfo[] = players): Promise<OpenTable> {
   workspace.files = vaultFiles();
   named = WORLD_MAP;
   tree = null;
@@ -156,7 +157,7 @@ export async function openTable(shelf: BookShelf, players: readonly PlayerInfo[]
   };
   workspace.leaves = [tab.leaf];
   present(tab);
-  const ownership = new Ownership(readOwnership({ players: Object.fromEntries(players.map(({ id, name }) => [id, { name }])), owners }), () => undefined);
+  const ownership = boundOwnership(campaign, { owners });
   const online = new OnlineControl(app, ownership, undefined, undefined, undefined, shelf);
   online.resume(SAVED);
   await advanceSettled(0);

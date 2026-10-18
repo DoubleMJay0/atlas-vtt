@@ -167,7 +167,6 @@ describe('the players\' books at a running table', () => {
     first.from(ANA, { t: 'book-note', note: { id: NOTE, title: 'Kept', body: SECRET_NOTE } });
     expect(giveLoot(ANA, DRAW)).toBe(true);
     await advance(100);
-    first.ownership.reset();
     first.online.stop();
 
     // The data file is all that is left; Cal joins a new table and is given Brannoch.

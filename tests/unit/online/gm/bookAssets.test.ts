@@ -25,6 +25,8 @@ vi.mock('../../../../src/app/online/gm/gmMarks.ts', () => ({
 vi.mock('../../../../src/app/online/gm/atlasLighting.ts', async (original) => ({ ...(await original<typeof import('../../../../src/app/online/gm/atlasLighting.ts')>()), accentColour: () => '#112233' }));
 
 const PLAYERS = [{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }];
+/** The campaign also has Cal, who joins the table later. */
+const WITH_CAL = [...PLAYERS, { id: CAL, name: 'Cal' }];
 const id = (count: number): string => count.toString(16).padStart(24, '0');
 const hashOf = (path: string): Promise<string> => sha256Hex(vaultFiles().get(path) as Uint8Array<ArrayBuffer>);
 
@@ -51,7 +53,7 @@ describe('what a player\'s book lets them ask for and write', () => {
   });
 
   it('serves a character\'s artwork to its own player while the scene hides it, the world map to everyone, and nobody another character\'s', async () => {
-    const { online, socket, tab, from } = await openTable(new BookShelf(), PLAYERS);
+    const { online, socket, tab, from } = await openTable(new BookShelf(), PLAYERS, undefined, WITH_CAL);
     const [brannoch, mira, world] = await Promise.all([hashOf(BRANNOCH_ART), hashOf(MIRA_ART), hashOf(WORLD_MAP)]);
 
     // The GM hides Brannoch: no picture shows the token any more, and its sheet stays Ana's.
@@ -97,7 +99,7 @@ describe('what a player\'s book lets them ask for and write', () => {
 
   it('refuses a flood of writes, a write that is malformed and one of a player without a character, each answered with the whole book', async () => {
     const shelf = new BookShelf();
-    const { online, socket, from } = await openTable(shelf, PLAYERS);
+    const { online, socket, from } = await openTable(shelf, PLAYERS, undefined, WITH_CAL);
     socket.relay({ t: 'player-joined', id: CAL, name: 'Cal' });
     await advance(REFUSAL_BOOK_MS);
 
