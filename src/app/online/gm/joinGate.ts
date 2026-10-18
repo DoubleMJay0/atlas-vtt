@@ -1,8 +1,10 @@
+import { newJoinCode } from '../../utils/joinCode.ts';
 import { JOIN_CODE_PATTERN, type PlayerInfo } from '../protocol/index.ts';
 import type { Timers } from './companionTimers.ts';
 import { ARM_MS, WaitingKnocks, type WaitingPlayer } from './waitingKnocks.ts';
 
 export { ARM_MS, FULL_NOTE_MS, type WaitingPlayer } from './waitingKnocks.ts';
+export { newJoinCode };
 
 /**
  * A table's gates as the companion keeps them with the table: the join code players are told apart
@@ -25,19 +27,6 @@ export interface GateFrame {
 const MAX_PAUSE_MS = 10 * 60_000;
 /** What the GM reads while too many wrong codes keep newcomers out. */
 export const PAUSED_TEXT = 'Joins paused: too many wrong codes';
-
-function randomUint32(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
-}
-
-/** A join code: six digits, each code as likely as any other (numbers past the last whole million are drawn again). */
-export function newJoinCode(random: () => number = randomUint32): string {
-  const span = 1_000_000;
-  const limit = Math.floor(2 ** 32 / span) * span;
-  let value = random();
-  while (value >= limit) value = random();
-  return String(value % span).padStart(6, '0');
-}
 
 /** A new table's gates: a fresh code, and both switches on. */
 export const newGate = (random?: () => number): GateSettings => ({ code: newJoinCode(random), requireCode: true, askToJoin: true });
