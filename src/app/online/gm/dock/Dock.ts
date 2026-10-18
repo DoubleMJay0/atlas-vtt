@@ -1,7 +1,5 @@
 import type { WorkspaceLeaf } from 'obsidian';
 import { handledByAnotherControl } from '../../../keyboard/tooltipEscape';
-import { showNotice } from '../../../ui/notice';
-import { shownJoinCode } from '../../protocol/index.ts';
 import { sceneStoreOf, selectedTokenIds, type SceneStore } from '../atlasView.ts';
 import { accountActions, MENU_WIDTH, renderMenu, type MenuActions } from './ConnectionMenu.ts';
 import { DockButton } from './dockButton.ts';
@@ -15,6 +13,7 @@ import { gateRowActions } from './gateRows.ts';
 import { InviteQr } from './inviteQr.ts';
 import { KNOCK_ROOM, KnockStack } from './knockStack.ts';
 import { DockSurface } from './dockSurface.ts';
+import { playerCodeCopier } from './playerCodes.ts';
 import { PANEL_WIDTH, panelView, renderPanel, type PanelActions } from './OnlinePanel.ts';
 import { badgeOf, isRunning, menuModel, tooltipOf, type OnlineSnapshot, type SceneFacts } from './panelModel.ts';
 
@@ -259,6 +258,7 @@ export class Dock {
       copy: () => copyText(this.root, this.deps.api.snapshot().link ?? ''),
       toggleQr: () => this.qr.toggle(),
       hideImage: () => this.deps.api.hideImage(),
+      addPlayer: (name) => this.deps.api.addPlayer(name),
       newLink: () => void this.deps.api.newLink(),
     };
   }
@@ -279,16 +279,10 @@ export class Dock {
       assign: (ids, playerId) => api.assign(ids, playerId),
       release: (ids) => api.release(ids),
       kick: (playerId) => api.kick(playerId),
-      copyPlayerCode: async (playerId) => {
-        const code = api.playerCode(playerId);
-        const copied = code !== null && (await copyText(this.root, shownJoinCode(code)));
-        showNotice(copied ? 'Code copied' : 'The code could not be copied.');
-        return copied;
-      },
+      copyPlayerCode: playerCodeCopier(api, this.root),
       newPlayerCode: (playerId) => api.newPlayerCode(playerId),
       renamePlayer: (playerId, name) => api.renamePlayer(playerId, name),
       removeFromCampaign: (playerId) => api.removeFromCampaign(playerId),
-      addPlayer: (name) => api.addPlayer(name),
       selected: () => (scene.isShared ? selectedTokenIds(this.store.getState()) : []),
       imageSrc: (path) => this.deps.imageSrc(path),
       ...this.feedback.actions,

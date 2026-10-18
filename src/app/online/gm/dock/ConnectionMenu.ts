@@ -6,10 +6,10 @@ import { inviteRow, surfaceHeader, textButton } from './controls.ts';
 import { gateEntries, renderCodeRow, renderPausedRow, type GateRowActions } from './gateRows.ts';
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
 import type { MenuModel } from './panelModel.ts';
-import { linkEntries, renderPrompt, type LinkActions } from './prompts.ts';
+import { addPlayerRow, linkEntries, renderPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
 
 /** What the menu's buttons do. */
-export interface MenuActions extends AccountActions, GateRowActions, ImageRowActions, LinkActions {
+export interface MenuActions extends AccountActions, GateRowActions, ImageRowActions, AddPlayerActions, LinkActions {
   stop(): void;
   /** Shows this map on Atlas's player view, which players online see too. */
   share(): void;
@@ -36,7 +36,7 @@ export const MENU_WIDTH = 300;
 /**
  * The short-lived menu of a control without players: start a table, or, once it runs, its header
  * (status, "…" with the gates and Stop), the line of a table that closes for want of access, the line of a pause, the line of a shown image, Copy invite link, the join
- * code, and Show this map to players while players see another. Nobody is at the table yet, so Stop asks nothing. It turns into the panel when the
+ * code, Add player, and Show this map to players while players see another. Nobody is at the table yet, so Stop asks nothing. It turns into the panel when the
  * first player joins.
  */
 export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuActions): void {
@@ -57,6 +57,7 @@ export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuAc
   renderImageRow(layer, model.imageShown, actions);
   if (model.link !== null) inviteRow(layer, () => actions.copy(), { open: model.qr, toggle: () => actions.toggleQr() }, linkEntries(layer, actions, redraw));
   renderCodeRow(layer, model.gate, actions);
+  addPlayerRow(layer, actions, redraw);
   if (!model.isShared) {
     const share = textButton(layer, 'Show this map to players', () => actions.share());
     share.dataset.focusKey = 'share';

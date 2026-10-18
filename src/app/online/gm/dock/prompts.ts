@@ -40,6 +40,11 @@ interface CodePrompt {
 
 const prompts = new WeakMap<HTMLElement, Prompt>();
 
+export interface AddPlayerActions {
+  /** Adds a player to the campaign; null where it could not (the GM is told why). */
+  addPlayer(name: string): AddedPlayer | null;
+}
+
 export interface LinkActions {
   /** Gives the campaign a new link. */
   newLink(): void;
@@ -64,6 +69,17 @@ export function namePrompt(key: string, label: string, confirm: string, draft: s
 }
 
 export const codePrompt = (player: AddedPlayer): Prompt => ({ kind: 'code', player });
+
+/** "Add player": a name, then the new player's code, shown once. */
+export function addPlayerRow(layer: HTMLElement, actions: AddPlayerActions, redraw: () => void): void {
+  const ask = (): void => openPrompt(layer, namePrompt('add-player', 'Add a player', 'Add', '', (name) => {
+    const added = actions.addPlayer(name);
+    if (added !== null) openPrompt(layer, codePrompt(added), redraw);
+    return false;
+  }), redraw);
+  const row = layer.createDiv({ cls: 'atlas-online-add-player' });
+  textButton(row, 'Add player', ask, 'ghost').dataset.focusKey = 'add-player';
+}
 
 /** The "New link" row of a link's menu: it asks first, since the old link stops working. */
 export function linkEntries(layer: HTMLElement, actions: LinkActions, redraw: () => void): MenuEntry[] {

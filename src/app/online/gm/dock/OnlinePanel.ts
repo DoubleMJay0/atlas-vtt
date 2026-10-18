@@ -1,12 +1,12 @@
 import { renderClosingRow, type ClosingRowActions } from './closingRow.ts';
-import { inviteRow, surfaceHeader, textButton } from './controls.ts';
+import { inviteRow, surfaceHeader } from './controls.ts';
 import type { MenuEntry } from './dockMenu.ts';
 import { renderFeedback, type FeedbackActions, type FeedbackView } from './feedbackForm.ts';
 import { gateEntries, gateRowsOf, renderCodeRow, renderPausedRow, type GateRowActions, type GateRows } from './gateRows.ts';
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
-import { closingOf, groupsOf, seatsNoteOf, selectionBarOf, statusOf, type AddedPlayer, type OnlinePlayer, type OnlineSnapshot, type PlayerGroup, type SceneFacts, type SelectionBar, type Tone } from './panelModel.ts';
+import { closingOf, groupsOf, seatsNoteOf, selectionBarOf, statusOf, type OnlinePlayer, type OnlineSnapshot, type PlayerGroup, type SceneFacts, type SelectionBar, type Tone } from './panelModel.ts';
 import { renderPlayerList, type ListActions } from './playerList.ts';
-import { codePrompt, confirmPrompt, linkEntries, namePrompt, openPrompt, renderPrompt, type LinkActions } from './prompts.ts';
+import { addPlayerRow, confirmPrompt, linkEntries, namePrompt, openPrompt, renderPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
 import { renderSelectionBar, type SelectionActions } from './selectionBar.ts';
 
 /** The panel's width; it never grows wider than the row it hangs from. */
@@ -43,11 +43,9 @@ export function panelView(snapshot: OnlineSnapshot, scene: SceneFacts, feedback:
 export interface CampaignActions {
   renamePlayer(playerId: string, name: string): void;
   removeFromCampaign(playerId: string): void;
-  /** Adds a player; null where it could not (the GM is told why). */
-  addPlayer(name: string): AddedPlayer | null;
 }
 
-export interface PanelActions extends Omit<ListActions, 'askRename' | 'askRemoveFromCampaign'>, CampaignActions, LinkActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions {
+export interface PanelActions extends Omit<ListActions, 'askRename' | 'askRemoveFromCampaign'>, CampaignActions, AddPlayerActions, LinkActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions {
   close(): void;
   stop(): void;
   copy(): Promise<boolean>;
@@ -88,17 +86,6 @@ function listActions(layer: HTMLElement, actions: PanelActions, redraw: () => vo
     }), redraw),
     askRemoveFromCampaign: (player) => openPrompt(layer, confirmPrompt('remove-player', `Remove ${player.name} from the campaign`, ' can no longer join. Their characters keep their books.', 'Remove', () => actions.removeFromCampaign(player.id), { name: player.name, warning: true }), redraw),
   };
-}
-
-/** "Add player": a name, then the new player's code, shown once. */
-function addPlayerRow(layer: HTMLElement, actions: PanelActions, redraw: () => void): void {
-  const ask = (): void => openPrompt(layer, namePrompt('add-player', 'Add a player', 'Add', '', (name) => {
-    const added = actions.addPlayer(name);
-    if (added !== null) openPrompt(layer, codePrompt(added), redraw);
-    return false;
-  }), redraw);
-  const row = layer.createDiv({ cls: 'atlas-online-add-player' });
-  textButton(row, 'Add player', ask, 'ghost').dataset.focusKey = 'add-player';
 }
 
 /**

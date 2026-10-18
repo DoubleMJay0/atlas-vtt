@@ -134,6 +134,24 @@ describe('adding a player', () => {
   });
 });
 
+describe('adding the first player', () => {
+  it('can be done from the menu a campaign without players opens to, with the code shown once', () => {
+    const layer = document.body.createDiv();
+    const does = actions() as unknown as MenuActions;
+    renderMenu(layer, menuModel(snapshot({ players: [] }), SCENE, { kind: 'signed-out', notice: null }), does);
+    expect(layer.querySelector('.atlas-online-list')).toBeNull();
+    press(layer, 'Add player');
+    const field = layer.querySelector<HTMLInputElement>('input.atlas-online-prompt__input')!;
+    field.value = 'Dora';
+    field.dispatchEvent(new Event('input'));
+    press(layer, 'Add');
+    expect(does.addPlayer).toHaveBeenCalledWith('Dora');
+    expect(layer.querySelector('.atlas-online-code-row')?.textContent).toContain('731 904');
+    press(layer, 'Done');
+    expect(layer.textContent).not.toContain('731');
+  });
+});
+
 describe('the link', () => {
   it('has a menu with New link that asks first in the panel', () => {
     const { layer, does } = panel();
