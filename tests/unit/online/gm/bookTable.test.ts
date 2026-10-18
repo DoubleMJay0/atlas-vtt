@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { giveLoot, lootRecipients } from '../../../../src/app/loot/lootRecipients';
 import type { LootDraw } from '../../../../src/app/loot/lootRoller';
 import { BookShelf } from '../../../../src/app/online/gm/book/BookShelf.ts';
-import { readBooks } from '../../../../src/app/online/gm/book/bookStore.ts';
 import { FakeSocket, workspace } from './fakeTable.ts';
-import { ANA, BEN, BRANNOCH, BRANNOCH_ART, CAL, cave, delivered, DOOM, MAP, MIRA_ART, MIRA_DOOM, ofType, openTable, traffic, WORLD_MAP, type Delivered } from './bookTableHarness.ts';
+import { ANA, BEN, BRANNOCH, BRANNOCH_BOOK, BRANNOCH_ART, CAL, cave, delivered, DOOM, keptBooks, MAP, MIRA_BOOK, MIRA_ART, MIRA_DOOM, ofType, openTable, traffic, WORLD_MAP, type Delivered } from './bookTableHarness.ts';
 import { advanceSettled as advance } from './settled.ts';
 
 vi.mock('obsidian', () => ({ Notice: class {}, normalizePath: (path: string) => path, requestUrl: () => Promise.resolve({ status: 201, json: null }), PluginSettingTab: class {}, Setting: class {} }));
@@ -51,6 +50,9 @@ function held(messages: readonly Delivered[], player: string): PlayerBook | null
   }, null);
 }
 
+/** Heroes placed from library tokens, whose books the campaign's file can keep. */
+const LIBRARY_HEROES = { brannoch: { assetId: 'lib-brannoch' }, mira: { assetId: 'lib-mira' } };
+
 describe('the players\' books at a running table', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] });
@@ -94,8 +96,8 @@ describe('the players\' books at a running table', () => {
     const item = parseGmMessage(JSON.parse(JSON.stringify(items[0]?.body)));
     expect(item).toMatchObject({ t: 'book-item', item: { name: 'Moon Blade', tone: 'rare', price: '500 thorns', properties: [{ label: 'Damage', value: '1d8' }] } });
     expect([...((item as { item: BookItem }).item.description ?? '')]).toHaveLength(MAX_ITEM_TEXT);
-    expect(shelf.of('Cairn', BRANNOCH_ART)).toMatchObject({ notes: [{ id: NOTE, body: SECRET_NOTE, at: Date.now() - 1_000 }], pins: [{ kind: 'treasure' }], purse: [{ name: 'Thorns', amount: 40 }], items: [{ name: 'Moon Blade' }] });
-    expect(shelf.of('Cairn', MIRA_ART).notes).toEqual([]);
+    expect(shelf.of(BRANNOCH_BOOK)).toMatchObject({ notes: [{ id: NOTE, body: SECRET_NOTE, at: Date.now() - 1_000 }], pins: [{ kind: 'treasure' }], purse: [{ name: 'Thorns', amount: 40 }], items: [{ name: 'Moon Blade' }] });
+    expect(shelf.of(MIRA_BOOK).notes).toEqual([]);
 
     // Ana leaves and comes back: her book holds what she wrote and was given.
     socket.relay({ t: 'player-left', id: ANA });
@@ -123,7 +125,8 @@ describe('the players\' books at a running table', () => {
   });
 
   it('follows the token with the sheet alone, and takes a book away at once when the GM gives its character to someone else', async () => {
-    const shelf = new BookShelf();
+    const source = keptBooks();
+    const shelf = new BookShelf(source);
     const { online, ownership, socket, tab, from } = await openTable(shelf, PLAYERS);
     from(ANA, { t: 'book-note', note: { id: NOTE, title: '', body: SECRET_NOTE } });
     await advance(100);
@@ -155,23 +158,23 @@ describe('the players\' books at a running table', () => {
     expect(books(delivered(socket).slice(since), BEN)).toMatchObject([{ character: { name: 'Brannoch' }, notes: [{ body: SECRET_NOTE }] }]);
     from(ANA, { t: 'book-purse', purse: [{ name: 'Stolen', amount: 9 }] });
     await advance(3_000);
-    expect(JSON.stringify(shelf.toData())).not.toContain('Stolen');
+    expect(source.dump()).not.toContain('Stolen');
     expect(giveLoot(ANA, DRAW)).toBe(false);
     expect(lootRecipients()).toEqual([{ id: ANA, name: 'Ana', character: null }, { id: BEN, name: 'Ben', character: 'Brannoch' }]);
     online.stop();
   });
 
   it('finds a character\'s book again at a new table with new players, from what was kept', async () => {
-    const shelf = new BookShelf();
-    const first = await openTable(shelf, PLAYERS);
+    const source = keptBooks();
+    const first = await openTable(new BookShelf(source), PLAYERS, undefined, undefined, LIBRARY_HEROES);
     first.from(ANA, { t: 'book-note', note: { id: NOTE, title: 'Kept', body: SECRET_NOTE } });
     expect(giveLoot(ANA, DRAW)).toBe(true);
     await advance(100);
     first.online.stop();
 
-    // The data file is all that is left; Cal joins a new table and is given Brannoch.
-    const kept = new BookShelf(readBooks(JSON.parse(JSON.stringify(shelf.toData()))));
-    const second = await openTable(kept, [{ id: CAL, name: 'Cal' }], {});
+    // The campaign's file is all that is left; Cal joins a new table and is given Brannoch.
+    const kept = new BookShelf(source);
+    const second = await openTable(kept, [{ id: CAL, name: 'Cal' }], {}, undefined, LIBRARY_HEROES);
     expect(books(delivered(second.socket), CAL).at(-1)).toMatchObject({ character: null, notes: [], items: [] });
     second.ownership.give([BRANNOCH], {}, CAL);
     await advance(100);

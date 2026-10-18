@@ -190,7 +190,7 @@ export class BookShare implements LootRecipientSource {
     const character = this.isOnline(recipientId) ? this.characters.of(recipientId) : null;
     const item = character === null ? null : bookItemOf(draw, this.ports.randomId(), this.ports.clock());
     if (character === null || item === null) return false;
-    this.shelf.keep(character.collection, character.key, withItem(this.shelf.of(character.collection, character.key), item));
+    this.shelf.keep(character.key, withItem(this.shelf.of(character.key), item));
     this.ports.send({ t: 'book-item', item }, recipientId);
     return true;
   }
@@ -254,7 +254,7 @@ export class BookShare implements LootRecipientSource {
     this.owed.paying(player);
     if (!this.isOnline(player)) return;
     const character = this.characters.of(player);
-    const { items, notes, pins, purse, slots, equipped } = character === null ? EMPTY_BOOK : this.shelf.of(character.collection, character.key);
+    const { items, notes, pins, purse, slots, equipped } = character === null ? EMPTY_BOOK : this.shelf.of(character.key);
     const drawn = this.statblocks.of(character);
     const sent = sentOf(character, this.worldMap, this.quests, drawn);
     const book: PlayerBook = { character: character?.sheet ?? null, worldMap: this.worldMap?.map ?? null, items, notes, pins, quests: sent.quests, purse, slots, equipped };
@@ -275,9 +275,9 @@ export class BookShare implements LootRecipientSource {
     if (message.t === 'book-resource') return this.editResource(from, character, message);
     if (message.t === 'book-field' || message.t === 'book-ability' || message.t === 'book-refill') return this.statblocks.write(from, character, message);
     const quests = new Set(this.quests.map((quest) => quest.id));
-    const written = applyBookMessage(this.shelf.of(character.collection, character.key), message, this.ports.clock(), quests);
+    const written = applyBookMessage(this.shelf.of(character.key), message, this.ports.clock(), quests);
     if (written === null) return false;
-    this.shelf.keep(character.collection, character.key, written);
+    this.shelf.keep(character.key, written);
     return true;
   }
 
