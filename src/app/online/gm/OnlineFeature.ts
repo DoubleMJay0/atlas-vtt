@@ -244,7 +244,7 @@ export class OnlineFeature extends Component {
 
   /**
    * Carries the books an older Atlas kept in this device's data into the campaign's books file,
-   * once: the data file loses them only after the campaign's file was written.
+   * once: the data file loses the books it carried over only after the campaign's file was read back with them, and keeps those no library token takes over.
    */
   async migrateBooksInto(campaignId: string): Promise<void> {
     const books = CampaignBooks.forApp(this.app);
@@ -252,8 +252,9 @@ export class OnlineFeature extends Component {
     await books.whenLoaded();
     const assets = await AssetService.getInstance(this.app).getTokenAssets();
     const tokens = assets.map(({ id, collection, imagePath }) => ({ id, collection, imagePath }));
-    if (!await carryBooksOver(this.legacyBooks, tokens, books, campaignId)) return;
-    this.legacyBooks = {};
+    const left = await carryBooksOver(this.legacyBooks, tokens, books, campaignId);
+    if (left === null) return;
+    this.legacyBooks = left;
     await this.saveSettings();
   }
 

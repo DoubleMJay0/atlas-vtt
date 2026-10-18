@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CampaignFiles } from '../../../../src/app/campaigns/CampaignFiles';
 import { CAMPAIGNS_FOLDER } from '../../../../src/app/campaigns/campaignPaths';
 import { CampaignBooks } from '../../../../src/app/campaigns/players/CampaignBooks';
@@ -52,6 +52,7 @@ async function device(files: Record<string, string> = { [`${FOLDER}/campaign.jso
 const fileBooks = (vault: ReturnType<typeof createInMemoryApp>): Record<string, { notes: { id: string }[] }> => (JSON.parse(vault.files.get(PATH) ?? '{"books":{}}') as { books: Record<string, { notes: { id: string }[] }> }).books;
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const vault of opened.splice(0)) {
     CampaignBooks.release(vault.app);
     CampaignFiles.release(vault.app);
@@ -110,15 +111,38 @@ describe('the books of the campaign being played', () => {
     expect(shelf.of('lib-b').notes).toHaveLength(1);
   });
 
-  it('carry an older Atlas\'s books over, a book the file holds staying the file\'s, and say when the file cannot take them', async () => {
+  it('carry an older Atlas\'s books over, a book the file holds staying the file\'s, and leave behind what no token takes over', async () => {
     const { vault, books } = await device({ [`${FOLDER}/campaign.json`]: campaignText, [PATH]: `${JSON.stringify({ format: 1, campaignId: 'c1', books: { 'lib-a': bookWith(1) } })}\n` });
     const tokens = [{ id: 'lib-a', collection: 'Cairn', imagePath: 'art/a.webp' }, { id: 'lib-b', collection: 'Cairn', imagePath: 'art/b.webp' }];
-    const old = { Cairn: { 'art/a.webp': bookWith(2), 'art/b.webp': bookWith(3) } };
-    expect(await carryBooksOver(old, tokens, books, 'c1')).toBe(true);
+    const stray = bookWith(4);
+    const old = { Cairn: { 'art/a.webp': bookWith(2), 'art/b.webp': bookWith(3), 'art/gone.webp': stray } };
+    expect(await carryBooksOver(old, tokens, books, 'c1')).toEqual({ Cairn: { 'art/gone.webp': stray } });
     const carried = fileBooks(vault);
     expect(carried['lib-a']?.notes.map((note) => note.id)).toEqual([id(1), id(2)]);
     expect(carried['lib-b']?.notes.map((note) => note.id)).toEqual([id(3)]);
-    expect(await carryBooksOver(old, tokens, books, 'nowhere')).toBe(false);
-    expect(await carryBooksOver({}, tokens, books, 'nowhere')).toBe(true);
+    expect(Object.keys(carried).sort()).toEqual(['lib-a', 'lib-b']);
+  });
+
+  it('carry nothing over, and keep everything, when the campaign\'s file cannot take them', async () => {
+    const { books } = await device();
+    const tokens = [{ id: 'lib-a', collection: 'Cairn', imagePath: 'art/a.webp' }];
+    const old = { Cairn: { 'art/a.webp': bookWith(2) } };
+    expect(await carryBooksOver(old, tokens, books, 'nowhere')).toBeNull();
+    expect(await carryBooksOver({}, tokens, books, 'nowhere')).toEqual({});
+  });
+
+  it('keep everything when the write fails or the file is of a later format', async () => {
+    const tokens = [{ id: 'lib-a', collection: 'Cairn', imagePath: 'art/a.webp' }];
+    const old = { Cairn: { 'art/a.webp': bookWith(2) } };
+    const failing = await device();
+    vi.spyOn(failing.vault.app.vault, 'create').mockRejectedValue(new Error('disk full'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await carryBooksOver(old, tokens, failing.books, 'c1')).toBeNull();
+    expect(failing.vault.files.has(PATH)).toBe(false);
+
+    const later = `${JSON.stringify({ format: 2, campaignId: 'c1', books: {} })}\n`;
+    const locked = await device({ [`${FOLDER}/campaign.json`]: campaignText, [PATH]: later });
+    expect(await carryBooksOver(old, tokens, locked.books, 'c1')).toBeNull();
+    expect(locked.vault.files.get(PATH)).toBe(later);
   });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { BookItem, BookNote, BookPin } from '../../../../src/app/online/protocol/index.ts';
-import { mergeBooks, migrateBooks } from '../../../../src/app/online/gm/book/bookMigration.ts';
+import { mergeBooks, migrateBooks, unmigratedBooks } from '../../../../src/app/online/gm/book/bookMigration.ts';
 import { EMPTY_BOOK, type StoredBook } from '../../../../src/app/online/gm/book/bookStore.ts';
 
 const id = (count: number): string => count.toString(16).padStart(24, '0');
@@ -33,6 +33,18 @@ describe('carrying the books of an older Atlas over', () => {
       Elsewhere: { 'art/x.webp': book({ notes: [note(3, 10)] }) },
     }, TOKENS, (characterId) => handed.push(characterId));
     expect(handed).toEqual([]);
+  });
+});
+
+describe('what stays behind in the old data', () => {
+  it('is exactly the books no library token takes over', () => {
+    const kept = book({ notes: [note(1, 10)] });
+    const stray = book({ notes: [note(2, 10)] });
+    const left = unmigratedBooks({
+      Cairn: { 'art/x.webp': kept, 'art/gone.webp': stray, 'art/y.webp': EMPTY_BOOK },
+      Elsewhere: { 'art/x.webp': stray },
+    }, TOKENS);
+    expect(left).toEqual({ Cairn: { 'art/gone.webp': stray }, Elsewhere: { 'art/x.webp': stray } });
   });
 });
 

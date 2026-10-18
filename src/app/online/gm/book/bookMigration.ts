@@ -54,3 +54,15 @@ export function migrateBooks(old: BookData, tokens: readonly LibraryToken[], int
     }
   }
 }
+
+/** The books no library token takes over: those whose artwork no token of their collection wears. Empty ones are nothing to keep. */
+export function unmigratedBooks(old: BookData, tokens: readonly LibraryToken[]): BookData {
+  const left: Record<string, Record<string, StoredBook>> = {};
+  for (const [collection, characters] of Object.entries(old)) {
+    for (const [artwork, book] of Object.entries(characters)) {
+      if (isEmptyBook(book) || tokens.some((token) => token.collection === collection && token.imagePath === artwork)) continue;
+      left[collection] = { ...left[collection], [artwork]: book };
+    }
+  }
+  return left;
+}
