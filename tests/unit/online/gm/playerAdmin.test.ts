@@ -180,6 +180,6 @@ describe('a newcomer\'s card', () => {
   it('admits them as a new player', () => {
     const parent = document.body.createDiv();
     renderKnocks(parent, [{ id: 'm'.repeat(20), name: 'Mira', answered: false, full: false, armed: true }], { admit: vi.fn(), decline: vi.fn() });
-    expect([...parent.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Decline', 'Admit as new player']);
+    expect([...parent.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Decline', 'Admit']);
   });
 });
