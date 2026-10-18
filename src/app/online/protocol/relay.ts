@@ -1,4 +1,8 @@
+import { JOIN_CODE_PATTERN, PLAYER_ID_PATTERN, playerName } from './identity.ts';
+import { type CampaignSeat, parseSeats } from './seat.ts';
 import { isRecord } from './shape.ts';
+
+export * from './identity.ts';
 
 /** The version every frame carries. A hello of another version is closed with `CLOSE.version`. */
 export const PROTOCOL_VERSION = 1;
@@ -25,14 +29,6 @@ export const MAX_BATCH_SENDS = 64;
 export const MAX_PLAYER_FRAME = 4 * 1024;
 /** Players connected at once. */
 export const MAX_PLAYERS = 12;
-/** The longest player name, in characters. */
-export const MAX_PLAYER_NAME = 32;
-/** A player id: 96 random bits in lowercase base32 (20 characters). */
-export const PLAYER_ID_PATTERN = /^[a-z2-7]{20}$/;
-/** A join code: six digits, which the GM hands out apart from the link. */
-export const JOIN_CODE_PATTERN = /^\d{6}$/;
-/** A join code as people read and say it: `483 912`. */
-export const shownJoinCode = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`;
 /** Players who wait for the GM's answer at once. */
 export const MAX_WAITING = 8;
 
@@ -77,6 +73,7 @@ export interface PlayerInfo {
  * A player's hello: `key` for a player the table knows, `code` (the join code) for one it does not.
  * `waits`: the page keeps the token of a wait for the GM, so the relay hands it one; `wait`: the
  * token it holds, which takes that wait up again. A page from before tokens sends neither.
+ * `newcomer`: the page holds no code and is new here.
  */
 export interface PlayerHello {
   readonly v: 1;
@@ -87,6 +84,7 @@ export interface PlayerHello {
   readonly code?: string;
   readonly waits?: true;
   readonly wait?: string;
+  readonly newcomer?: true;
 }
 
 export type Hello = { readonly v: 1; readonly t: 'hello'; readonly role: 'gm'; readonly secret: string } | PlayerHello;
@@ -100,7 +98,8 @@ export interface BatchedSend {
 /**
  * What a client sends the relay. A player's `send` has no `to`: it always reaches the GM. `kick`,
  * `gate` (the join code, or null for none, and whether newcomers wait for the GM), `admit` and
- * `decline` (a waiting player, by the id of their knock) are the GM's.
+ * `decline` (a waiting player, by the id of their knock) are the GM's, and so is `players`, the
+ * campaign's whole roster.
  */
 export type ClientFrame =
   | Hello
@@ -109,6 +108,7 @@ export type ClientFrame =
   | { readonly v: 1; readonly t: 'sends'; readonly sends: readonly BatchedSend[] }
   | { readonly v: 1; readonly t: 'kick'; readonly id: string }
   | { readonly v: 1; readonly t: 'gate'; readonly code: string | null; readonly ask: boolean }
+  | { readonly v: 1; readonly t: 'players'; readonly players: readonly CampaignSeat[] }
   | { readonly v: 1; readonly t: 'admit'; readonly id: string }
   | { readonly v: 1; readonly t: 'decline'; readonly id: string }
   | { readonly v: 1; readonly t: 'end' };
@@ -148,28 +148,6 @@ export const SEAT_PATH = '/__atlas-online-seat';
 
 /** A host secret or player key: base64url, 16 to 128 characters. */
 export const SECRET_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
-/**
- * Characters a name never keeps: controls, line and paragraph separators, the marks and overrides
- * that set a text's direction (the Arabic letter mark among them), and letters that show as nothing
- * (the Hangul fillers, the blank Braille pattern). A name stands in other people's sentences ("Mira
- * wants to join"), where it must neither reorder the words around it nor stand there as a gap.
- */
-export const UNSHOWN = /[\p{Cc}\p{Zl}\p{Zp}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\u115f\u1160\u3164\uffa0\u2800]/gu;
-/** Zero-width characters no name needs: the zero-width space, the word joiner, the byte order mark, the soft hyphen, the Mongolian vowel separator. The joiners scripts and emoji are written with stay. */
-export const UNSEEN = /[\u00ad\u180e\u200b\u2060\ufeff]/gu;
-/** Something of a name that shows: a letter, a digit, a mark of punctuation or a symbol. */
-export const SHOWN = /[\p{L}\p{N}\p{P}\p{S}]/u;
-
-/**
- * A player name as shown: unshown characters removed, white space collapsed; null when nothing that
- * shows or too much is left.
- */
-export function playerName(value: unknown): string | null {
-  if (typeof value !== 'string' || value.length > MAX_PLAYER_NAME * 4) return null;
-  const name = value.replace(UNSHOWN, ' ').replace(UNSEEN, '').replace(/\s+/g, ' ').trim();
-  return SHOWN.test(name) && [...name].length <= MAX_PLAYER_NAME ? name : null;
-}
-
 function playerInfo(value: unknown): PlayerInfo | null {
   if (!isRecord(value) || typeof value.id !== 'string' || !PLAYER_ID_PATTERN.test(value.id)) return null;
   const name = playerName(value.name);
@@ -185,6 +163,10 @@ export function parseClientFrame(text: string): ClientFrame | null {
   if (value.t === 'gate') {
     const code = value.code === null ? null : joinCode(value.code);
     return code !== undefined && typeof value.ask === 'boolean' ? { v: 1, t: 'gate', code, ask: value.ask } : null;
+  }
+  if (value.t === 'players') {
+    const players = parseSeats(value.players);
+    return players === null ? null : { v: 1, t: 'players', players };
   }
   if (value.t === 'send') {
     if (!('body' in value)) return null;
@@ -206,6 +188,7 @@ export function parseClientFrame(text: string): ClientFrame | null {
     v: 1, t: 'hello', role: 'player', name,
     ...(value.key === undefined ? {} : { key: value.key }), ...(code === null ? {} : { code }),
     ...(value.waits === true ? { waits: true as const } : {}), ...(value.wait === undefined ? {} : { wait: value.wait }),
+    ...(value.newcomer === true ? { newcomer: true as const } : {}),
   };
 }
 

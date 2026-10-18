@@ -25,6 +25,7 @@ export * from './moves.ts';
 export * from './redact.ts';
 export * from './relay.ts';
 export * from './rules.ts';
+export * from './seat.ts';
 export { isRecord } from './shape.ts';
 export * from './stream.ts';
 export * from './tokens.ts';
