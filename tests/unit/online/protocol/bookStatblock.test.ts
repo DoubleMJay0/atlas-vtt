@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
-  parseSheetRaw,
+  parseSheetRaw, refilledBy,
   fitsPlayerFrame, MAX_ABILITIES, MAX_ABILITY_COMPONENTS, MAX_ABILITY_PARTS, MAX_ABILITY_TABS, MAX_FIELD_KEY, MAX_FIELD_TEXT, MAX_SHEET_CHARS, MAX_SHEET_DEPTH,
   MAX_SHEET_KEYS, MAX_SHEET_LIST, MAX_SHEET_NODES, MAX_SHEET_OPTIONS, MAX_SHEET_TEXT, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, MAX_TOKEN_VALUE, parseBookMessage,
   parseBookStatblock, parseGmMessage, parsePlayerBookMessage, parsePlayerMessage, sheetBase, sheetItemKeys,
@@ -347,18 +347,22 @@ describe('a Counters block', () => {
   const sheet = (node: unknown): unknown => ({ editable: true, displayName: null, sigils: {}, blocks: [node], abilities: [] });
   const counters = (rows: unknown[]): unknown => ({ k: 'counters', label: 'Spell slots', counters: rows, field: null });
 
-  it('carries its rows: a name, a maximum, how many are used and the rest that refills them', () => {
-    const parsed = parseBookStatblock(sheet(counters([{ name: '1st level', max: 4, used: 1, reset: 'long-rest' }, { name: 'Ki', max: 5, used: 0 }])));
+  it('carries its rows and the refills the template names, each refill with those it brings along', () => {
+    const parsed = parseBookStatblock(sheet({ ...(counters([{ name: '1st level', max: 4, used: 1, reset: 'Long rest' }, { name: 'Ki', max: 5, used: 0 }]) as object),
+      refills: [{ name: 'Short rest', includes: [] }, { name: 'Long rest', includes: ['Short rest'] }] }));
     expect(parsed?.blocks[0]).toEqual({ k: 'counters', label: 'Spell slots', field: null, counters: [
-      { name: '1st level', max: 4, used: 1, reset: 'long-rest' }, { name: 'Ki', max: 5, used: 0, reset: null },
-    ] });
+      { name: '1st level', max: 4, used: 1, reset: 'Long rest' }, { name: 'Ki', max: 5, used: 0, reset: null },
+    ], refills: [{ name: 'Short rest', includes: [] }, { name: 'Long rest', includes: ['Short rest'] }] });
+    expect(refilledBy({ name: 'Long rest', includes: ['Short rest'] }, { name: 'Ki', max: 5, used: 2, reset: 'Short rest' })).toBe(true);
+    expect(refilledBy({ name: 'Short rest', includes: [] }, { name: '1st level', max: 4, used: 1, reset: 'Long rest' })).toBe(false);
   });
 
   it('refuses a row that uses more than it has, a maximum that is no whole number in range, an unknown rest or too many rows', () => {
     expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 2, used: 3 }])))).toBeUndefined();
     expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 1.5, used: 0 }])))).toBeUndefined();
     expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 1001, used: 0 }])))).toBeUndefined();
-    expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 2, used: 0, reset: 'dawn' }])))).toBeUndefined();
+    expect(parseBookStatblock(sheet(counters([{ name: 'Ki', max: 2, used: 0, reset: 3 }])))).toBeUndefined();
+    expect(parseBookStatblock(sheet({ ...(counters([]) as object), refills: [{ name: 'Dawn', includes: [] }, { name: 'Dawn', includes: [] }] }))).toBeUndefined();
     expect(parseBookStatblock(sheet(counters(Array.from({ length: 25 }, (_, i) => ({ name: `R${i}`, max: 1, used: 0 })))))).toBeUndefined();
   });
 });

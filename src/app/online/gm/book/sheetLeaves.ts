@@ -177,7 +177,7 @@ function countersNode(build: SheetBuild, block: CountersBlock, display: BlockDis
   const rows = known ? shownCounterRows(known, value) : null;
   const counters = rows && rows.length <= MAX_COUNTERS ? rows.map(sheetCounter) : null;
   if (!counters?.every((row): row is SheetCounter => row !== null)) return { k: 'value', value: sheetValue(build, label, valueText(value), 'plain', null, null) };
-  return { k: 'counters', label, counters, field };
+  return { k: 'counters', label, counters, refills: [], field };
 }
 
 /** What a player may change of the field a block shows: nothing where its fallback stands in for the field's value. */

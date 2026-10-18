@@ -1,7 +1,7 @@
 import { MAX_ABILITY_COMPONENTS, MAX_ABILITY_TABS, parseComponent, type AbilityComponent } from './bookAbilities.ts';
 import { isResourceKey } from './bookCharacter.ts';
 import { MAX_FORMULA } from './dice.ts';
-import { MAX_COUNTERS, parseCounter, type SheetCounter } from './sheetCounters.ts';
+import { MAX_COUNTERS, MAX_REFILLS, parseCounter, parseRefill, type CounterRefill, type SheetCounter } from './sheetCounters.ts';
 import { bookLine, MAX_BOOK_TITLE } from './bookText.ts';
 import { isRecord } from './shape.ts';
 import {
@@ -55,7 +55,7 @@ export type SheetNode =
   /** `worked`: a table's worked-out rows (a modifier under each score), each labelled by `workedLabels` where the GM names them. */
   | { readonly k: 'table'; readonly label: string | null; readonly columns: readonly string[]; readonly rows: readonly (readonly (string | null)[])[]; readonly worked: readonly (readonly (string | null)[])[]; readonly workedLabels?: readonly string[]; readonly rolls?: readonly (readonly (string | null)[])[]; readonly workedRolls?: readonly (readonly (string | null)[])[]; readonly field: SheetField | null }
   | { readonly k: 'track'; readonly label: string | null; readonly look: 'boxes' | 'gauge'; readonly counts: 'down' | 'up'; readonly current: number; readonly max: number; readonly resource: string | null; readonly field: SheetField | null }
-  | { readonly k: 'counters'; readonly label: string | null; readonly counters: readonly SheetCounter[]; readonly field: SheetField | null }
+  | { readonly k: 'counters'; readonly label: string | null; readonly counters: readonly SheetCounter[]; readonly refills: readonly CounterRefill[]; readonly field: SheetField | null }
   | { readonly k: 'divider' };
 
 /** The parts of the header the sheet draws as sigils and plates beside the portrait. */
@@ -236,9 +236,13 @@ function parseNode(value: unknown, depth: number, budget: SheetBudget): SheetNod
       const label = optionalSheetLine(value.label);
       const field = parseSheetField(value.field);
       const counters = Array.isArray(value.counters) && value.counters.length <= MAX_COUNTERS ? value.counters.map(parseCounter) : null;
-      if (label === undefined || field === undefined || counters === null || counters.some((row) => row === null)) return null;
+      const refills = value.refills === undefined ? [] : Array.isArray(value.refills) && value.refills.length <= MAX_REFILLS ? value.refills.map(parseRefill) : null;
+      if (label === undefined || field === undefined || counters === null || refills === null || counters.some((row) => row === null) || refills.some((refill) => refill === null)) return null;
       const rows = counters as SheetCounter[];
-      return spendText(budget, rows.map((row) => row.name).join('')) ? { k: 'counters', label, counters: rows, field } : null;
+      const named = refills as CounterRefill[];
+      if (new Set(named.map((refill) => refill.name)).size !== named.length) return null;
+      const words = [...rows.map((row) => row.name + (row.reset ?? '')), ...named.map((refill) => refill.name + refill.includes.join(''))].join('');
+      return spendText(budget, words) ? { k: 'counters', label, counters: rows, refills: named, field } : null;
     }
     case 'divider':
       return { k: 'divider' };

@@ -1,22 +1,31 @@
 import { bookLine, MAX_BOOK_TITLE } from './bookText.ts';
 import { isRecord } from './shape.ts';
 
-/** The most rows one Counters block holds, and the largest maximum of a row. */
+/** The most rows one Counters block holds, the largest maximum of a row, and the most refills a block names. */
 export const MAX_COUNTERS = 24;
 export const MAX_COUNTER = 1000;
-/** When a counter's uses come back: on a short or a long rest (a long rest also refills what a short one does). */
-export const COUNTER_RESETS = ['short-rest', 'long-rest'] as const;
-export type CounterReset = (typeof COUNTER_RESETS)[number];
+export const MAX_REFILLS = 8;
 
 /**
  * One row of a Counters block: something with limited uses (a level's spell slots, ki, a feature's uses
- * per day). `used` of `max` are spent; `reset` says which rest gives them back. As the note stores it.
+ * per day). `used` of `max` are spent; `reset` names the refill that gives them back (one of the block's
+ * `refills`, as the template names it: "Long rest", "Dawn", "Session"), null for none. As the note stores it.
  */
 export interface SheetCounter {
   readonly name: string;
   readonly max: number;
   readonly used: number;
-  readonly reset: CounterReset | null;
+  readonly reset: string | null;
+}
+
+/**
+ * A moment that gives uses back, as the template names it, and the other refills it brings along
+ * ("Long rest" also does what "Short rest" does). A row whose `reset` is the refill's name or one of
+ * those it includes is refilled by it.
+ */
+export interface CounterRefill {
+  readonly name: string;
+  readonly includes: readonly string[];
 }
 
 const isWhole = (value: unknown, max: number): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max;
@@ -25,6 +34,19 @@ const isWhole = (value: unknown, max: number): value is number => typeof value =
 export function parseCounter(value: unknown): SheetCounter | null {
   if (!isRecord(value) || !isWhole(value.max, MAX_COUNTER) || !isWhole(value.used, value.max)) return null;
   const name = bookLine(value.name, MAX_BOOK_TITLE);
-  const reset = value.reset === undefined || value.reset === null ? null : (COUNTER_RESETS as readonly unknown[]).includes(value.reset) ? (value.reset as CounterReset) : undefined;
+  const reset = value.reset === undefined || value.reset === null ? null : bookLine(value.reset, MAX_BOOK_TITLE) ?? undefined;
   return name === null || reset === undefined ? null : { name, max: value.max, used: value.used, reset };
+}
+
+/** A refill of a Counters block, or null when it is malformed. */
+export function parseRefill(value: unknown): CounterRefill | null {
+  if (!isRecord(value) || !Array.isArray(value.includes) || value.includes.length > MAX_REFILLS) return null;
+  const name = bookLine(value.name, MAX_BOOK_TITLE);
+  const includes = value.includes.map((other) => bookLine(other, MAX_BOOK_TITLE));
+  return name === null || includes.some((other) => other === null) ? null : { name, includes: includes as string[] };
+}
+
+/** The rows a refill gives uses back to: those whose `reset` is its name or one it includes. */
+export function refilledBy(refill: CounterRefill, row: SheetCounter): boolean {
+  return row.reset !== null && (row.reset === refill.name || refill.includes.includes(row.reset));
 }
