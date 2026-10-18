@@ -1,4 +1,5 @@
 import { bookLine, MAX_BOOK_TITLE } from './bookText.ts';
+import { MAX_FORMULA } from './dice.ts';
 import { isRecord } from './shape.ts';
 
 /** The most rows one Counters block holds, the largest maximum of a row, and the most refills a block names. */
@@ -8,20 +9,22 @@ export const MAX_REFILLS = 8;
 
 /**
  * One row of a Counters block: something with limited uses (a level's spell slots, ki, a feature's uses
- * per day). `used` of `max` are spent; `reset` names the refill that gives them back (one of the block's
- * `refills`, as the template names it: "Long rest", "Dawn", "Session"), null for none. As the note stores it.
+ * per day). `used` of `max` are spent; `reset` names the refill that gives them back (one of the
+ * statblock's `refills`, as the template names it: "Long rest", "Dawn", "Session"), null for none;
+ * `regain` is the dice formula of how many come back then ("1d6+1"), null for all of them. As the note stores it.
  */
 export interface SheetCounter {
   readonly name: string;
   readonly max: number;
   readonly used: number;
   readonly reset: string | null;
+  readonly regain: string | null;
 }
 
 /**
- * A moment that gives uses back, as the template names it, and the other refills it brings along
- * ("Long rest" also does what "Short rest" does). A row whose `reset` is the refill's name or one of
- * those it includes is refilled by it.
+ * A moment that gives uses back, as the template names it once for the whole sheet, and the other
+ * refills it brings along ("Long rest" also does what "Short rest" does). A row anywhere on the sheet
+ * whose `reset` is the refill's name or one of those it includes is refilled by it.
  */
 export interface CounterRefill {
   readonly name: string;
@@ -35,7 +38,9 @@ export function parseCounter(value: unknown): SheetCounter | null {
   if (!isRecord(value) || !isWhole(value.max, MAX_COUNTER) || !isWhole(value.used, value.max)) return null;
   const name = bookLine(value.name, MAX_BOOK_TITLE);
   const reset = value.reset === undefined || value.reset === null ? null : bookLine(value.reset, MAX_BOOK_TITLE) ?? undefined;
-  return name === null || reset === undefined ? null : { name, max: value.max, used: value.used, reset };
+  const regain = value.regain === undefined || value.regain === null ? null : bookLine(value.regain, MAX_FORMULA) ?? undefined;
+  if (name === null || reset === undefined || regain === undefined) return null;
+  return { name, max: value.max, used: value.used, reset, regain };
 }
 
 /** A refill of a Counters block, or null when it is malformed. */

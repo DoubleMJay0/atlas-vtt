@@ -3,7 +3,7 @@ import { MAX_BOOK_PINS, parseBookPin, type BookPin, type BookQuest } from './boo
 import { isBookPartType, parseBookPart, parseQuests, parseWorldMap, type BookPartMessage, type BookWorldMap } from './bookParts.ts';
 import { DEFAULT_BOOK_SLOTS, parseBookSlots, parseEquipped, parseSlotMessage, settledEquipped, type BookSlots, type Equipped, type SlotMessage } from './bookSlots.ts';
 import { parseBookStatblock, type BookStatblockMessage } from './bookStatblock.ts';
-import { parseBookAbilityMessage, parseBookFieldMessage, type BookAbilityMessage, type BookFieldMessage } from './bookStatblockEdits.ts';
+import { parseBookAbilityMessage, parseBookFieldMessage, parseBookRefillMessage, type BookAbilityMessage, type BookFieldMessage, type BookRefillMessage } from './bookStatblockEdits.ts';
 import { bookLine, bookText, MAX_BOOK_TITLE } from './bookText.ts';
 import { MAX_SCENE_ID } from './moves.ts';
 import { isRecord } from './shape.ts';
@@ -102,6 +102,7 @@ export type PlayerBookMessage =
   | BookResourceMessage
   | BookFieldMessage
   | BookAbilityMessage
+  | BookRefillMessage
   | SlotMessage;
 
 /**
@@ -117,7 +118,7 @@ export interface BookTokenMessage {
 }
 
 const GM_TYPES: readonly unknown[] = ['book', 'book-sheet', 'book-item', 'book-statblock', 'book-map', 'book-quests'];
-const PLAYER_TYPES: readonly unknown[] = ['book-note', 'book-note-delete', 'book-pin', 'book-pin-delete', 'book-purse', 'book-resource', 'book-field', 'book-ability', 'book-equip', 'book-slots'];
+const PLAYER_TYPES: readonly unknown[] = ['book-note', 'book-note-delete', 'book-pin', 'book-pin-delete', 'book-purse', 'book-resource', 'book-field', 'book-ability', 'book-refill', 'book-equip', 'book-slots'];
 
 export const isBookType = (t: unknown): t is BookMessage['t'] => GM_TYPES.includes(t);
 export const isPlayerBookType = (t: unknown): t is PlayerBookMessage['t'] => PLAYER_TYPES.includes(t);
@@ -257,6 +258,8 @@ export function parsePlayerBookMessage(value: Record<string, unknown>): PlayerBo
       return parseBookFieldMessage(value);
     case 'book-ability':
       return parseBookAbilityMessage(value);
+    case 'book-refill':
+      return parseBookRefillMessage(value);
     case 'book-equip':
     case 'book-slots':
       return parseSlotMessage(value);

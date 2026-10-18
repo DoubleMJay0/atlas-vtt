@@ -55,7 +55,7 @@ export type SheetNode =
   /** `worked`: a table's worked-out rows (a modifier under each score), each labelled by `workedLabels` where the GM names them. */
   | { readonly k: 'table'; readonly label: string | null; readonly columns: readonly string[]; readonly rows: readonly (readonly (string | null)[])[]; readonly worked: readonly (readonly (string | null)[])[]; readonly workedLabels?: readonly string[]; readonly rolls?: readonly (readonly (string | null)[])[]; readonly workedRolls?: readonly (readonly (string | null)[])[]; readonly field: SheetField | null }
   | { readonly k: 'track'; readonly label: string | null; readonly look: 'boxes' | 'gauge'; readonly counts: 'down' | 'up'; readonly current: number; readonly max: number; readonly resource: string | null; readonly field: SheetField | null }
-  | { readonly k: 'counters'; readonly label: string | null; readonly counters: readonly SheetCounter[]; readonly refills: readonly CounterRefill[]; readonly field: SheetField | null }
+  | { readonly k: 'counters'; readonly label: string | null; readonly counters: readonly SheetCounter[]; readonly field: SheetField | null }
   | { readonly k: 'divider' };
 
 /** The parts of the header the sheet draws as sigils and plates beside the portrait. */
@@ -77,6 +77,22 @@ export interface BookStatblock {
   readonly sigils: SheetSigils;
   readonly blocks: readonly SheetNode[];
   readonly abilities: readonly AbilityComponent[];
+  /**
+   * The refills the template names for the whole sheet ("Short rest", "Long rest", "Dawn"), each a
+   * button that gives back the uses of every counter on the sheet naming it (`book-refill`). Only a
+   * statblock the player may change has any.
+   */
+  readonly refills: readonly CounterRefill[];
+}
+
+/** The refills of a statblock, each name once; null when they are malformed. */
+function parseRefills(value: unknown, budget: SheetBudget): CounterRefill[] | null {
+  if (value === undefined) return [];
+  const refills = Array.isArray(value) && value.length <= MAX_REFILLS ? value.map(parseRefill) : null;
+  if (refills === null || refills.some((refill) => refill === null)) return null;
+  const named = refills as CounterRefill[];
+  if (new Set(named.map((refill) => refill.name)).size !== named.length) return null;
+  return spendText(budget, named.map((refill) => refill.name + refill.includes.join('')).join('')) ? named : null;
 }
 
 /** Sent to one player after every `book` and whenever it changes; null: their character has no statblock they get. */
@@ -236,13 +252,9 @@ function parseNode(value: unknown, depth: number, budget: SheetBudget): SheetNod
       const label = optionalSheetLine(value.label);
       const field = parseSheetField(value.field);
       const counters = Array.isArray(value.counters) && value.counters.length <= MAX_COUNTERS ? value.counters.map(parseCounter) : null;
-      const refills = value.refills === undefined ? [] : Array.isArray(value.refills) && value.refills.length <= MAX_REFILLS ? value.refills.map(parseRefill) : null;
-      if (label === undefined || field === undefined || counters === null || refills === null || counters.some((row) => row === null) || refills.some((refill) => refill === null)) return null;
+      if (label === undefined || field === undefined || counters === null || counters.some((row) => row === null)) return null;
       const rows = counters as SheetCounter[];
-      const named = refills as CounterRefill[];
-      if (new Set(named.map((refill) => refill.name)).size !== named.length) return null;
-      const words = [...rows.map((row) => row.name + (row.reset ?? '')), ...named.map((refill) => refill.name + refill.includes.join(''))].join('');
-      return spendText(budget, words) ? { k: 'counters', label, counters: rows, refills: named, field } : null;
+      return spendText(budget, rows.map((row) => row.name + (row.reset ?? '') + (row.regain ?? '')).join('')) ? { k: 'counters', label, counters: rows, field } : null;
     }
     case 'divider':
       return { k: 'divider' };
@@ -275,6 +287,8 @@ export function parseBookStatblock(value: unknown): BookStatblock | null | undef
   if (displayName === undefined || sigils === null || blocks === null || components === null || components.some((entry) => entry === null)) return undefined;
   const abilities = components as AbilityComponent[];
   if (new Set(abilities.map((entry) => entry.id)).size !== abilities.length) return undefined;
-  return { editable: value.editable, displayName, sigils, blocks, abilities };
+  const refills = parseRefills(value.refills, budget);
+  if (refills === null) return undefined;
+  return { editable: value.editable, displayName, sigils, blocks, abilities, refills };
 }
 
