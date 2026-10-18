@@ -3,7 +3,7 @@ import { showNotice } from '../../ui/notice';
 import { activeAtlasLeaf, activeStore, sceneStoreOf, selectedTokenIds, workScene, type WorkScene } from './atlasView.ts';
 import type { CampaignPlayer } from '../../campaigns/players/playersFile';
 import { BookShelf } from './book/BookShelf.ts';
-import { linkRefusal, NO_CAMPAIGN_TEXT, renewLink, type TableSeats } from './campaignSeats.ts';
+import { CAMPAIGNS_LOADING_TEXT, linkRefusal, NO_CAMPAIGN_TEXT, renewLink, type TableSeats } from './campaignSeats.ts';
 import { freeGate, newGate } from './joinGate.ts';
 import { LogKeeper, type LogStore } from './log/logStore.ts';
 import { OnlineTable } from './OnlineTable.ts';
@@ -144,9 +144,11 @@ export class OnlineControl {
     this.current?.kick(playerId);
   }
 
-  /** A player's own code, or null while no table runs or for anyone its campaign does not know. */
+  /** A player's own code in the running table's campaign, else in the played one; null for anyone it does not know. */
   playerCode(playerId: string): string | null {
-    return this.current?.roster.seats.codeOf(playerId) ?? null;
+    const playing = this.campaigns.playing();
+    const seats = this.current?.roster.seats ?? (playing === null ? null : this.campaigns.known(playing));
+    return seats?.codeOf(playerId) ?? null;
   }
 
   /** Gives a player a new code: the old one stops working at once, and a connected player stays. */
@@ -177,8 +179,9 @@ export class OnlineControl {
     const leaf = this.current?.sharedTab ?? activeAtlasLeaf(this.app);
     const blocked = this.current === null ? null : startBlock(leaf, campaignId, this.account);
     if (blocked !== null) return void showNotice(blocked);
-    const seats = campaignId === null ? null : await this.campaigns.open(campaignId).catch(() => null);
-    if (seats === null || !renewLink(seats)) return void showNotice(seats === null ? NO_CAMPAIGN_TEXT : linkRefusal(seats));
+    if (campaignId === null) return void showNotice(NO_CAMPAIGN_TEXT);
+    const seats = await this.campaigns.open(campaignId).catch(() => null);
+    if (seats === null || !renewLink(seats)) return void showNotice(seats === null ? CAMPAIGNS_LOADING_TEXT : linkRefusal(seats));
     if (this.current === null) return;
     this.stop();
     await this.startFor(leaf, campaignId);

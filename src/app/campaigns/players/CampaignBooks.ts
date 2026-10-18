@@ -66,7 +66,9 @@ export class CampaignBooks extends RecordFiles<StoredBooks> {
 
   /**
    * Changes the campaign's books file, creating it in the campaign's folder when it has none.
-   * False when the campaign has no folder or its file is of a later format.
+   * False when the campaign has no folder or its file is of a later format. `change` must be a pure
+   * function of the file it is given: it runs more than once, on the copy in memory now and on what
+   * the disk holds once the write lands, so anything random or timed is drawn before and passed in.
    */
   change(campaignId: string, change: (stored: StoredBooks) => StoredBooks): boolean {
     const stored = this.entries().find((entry) => entry.id === campaignId);

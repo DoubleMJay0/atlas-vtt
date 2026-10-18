@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CampaignFiles } from '../../../../src/app/campaigns/CampaignFiles';
 import { CAMPAIGNS_FOLDER } from '../../../../src/app/campaigns/campaignPaths';
 import { CampaignBooks } from '../../../../src/app/campaigns/players/CampaignBooks';
+import { CampaignPlayers } from '../../../../src/app/campaigns/players/CampaignPlayers';
+import type { TableCampaigns } from '../../../../src/app/online/gm/tableCampaigns.ts';
 import { EMPTY_BOOK, type StoredBook } from '../../../../src/app/online/gm/book/bookStore.ts';
 import { OnlineFeature } from '../../../../src/app/online/gm/OnlineFeature.ts';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
@@ -37,6 +39,7 @@ async function feature(old: unknown): Promise<{ feature: OnlineFeature; vault: R
 afterEach(() => {
   for (const vault of opened.splice(0)) {
     CampaignBooks.release(vault.app);
+    CampaignPlayers.release(vault.app);
     CampaignFiles.release(vault.app);
   }
   vi.restoreAllMocks();
@@ -78,5 +81,14 @@ describe('carrying the old books into a campaign when its table starts', () => {
     await online.migrateBooksInto('c1');
     expect(saved).toEqual([]);
     expect(Object.keys((online as unknown as { legacyBooks: Record<string, object> }).legacyBooks.Cairn ?? {})).toEqual(['art/a.webp', 'art/gone.webp']);
+  });
+
+  it('are in the campaign\'s file before a table of it runs, so no book a player writes there meets the old one', async () => {
+    assets.tokens = [{ id: 'lib-a', collection: 'Cairn', imagePath: 'art/a.webp' }];
+    const { feature: online, vault } = await feature(OLD);
+    CampaignPlayers.open(vault.app);
+    const campaigns = (online as unknown as { campaigns(): TableCampaigns }).campaigns();
+    expect(await campaigns.open('c1')).not.toBeNull();
+    expect(Object.keys(JSON.parse(vault.files.get(`${FOLDER}/books.json`) ?? '{"books":{}}').books)).toEqual(['lib-a']);
   });
 });

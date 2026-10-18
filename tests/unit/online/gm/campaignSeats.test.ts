@@ -1,12 +1,22 @@
 import { TFile } from 'obsidian';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CampaignFiles } from '../../../../src/app/campaigns/CampaignFiles';
 import { CAMPAIGNS_FOLDER } from '../../../../src/app/campaigns/campaignPaths';
 import { CampaignPlayers } from '../../../../src/app/campaigns/players/CampaignPlayers';
 import { withPlayer, type CampaignPlayer } from '../../../../src/app/campaigns/players/playersFile';
 import { MAX_CAMPAIGN_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
-import { admitNewcomer, refusalText, TableSeats } from '../../../../src/app/online/gm/campaignSeats.ts';
+import { admitNewcomer, campaignLink, linkRefusal, refusalText, renewLink, TableSeats } from '../../../../src/app/online/gm/campaignSeats.ts';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
+
+const notices = vi.hoisted(() => [] as string[]);
+vi.mock('obsidian', async (original) => ({
+  ...(await original<object>()),
+  Notice: class {
+    constructor(text: string) {
+      notices.push(text);
+    }
+  },
+}));
 
 const FOLDER = `${CAMPAIGNS_FOLDER}/Witherwild`;
 const campaignText = `${JSON.stringify({ format: 1, id: 'c1', name: 'Witherwild', createdAt: 1 })}\n`;
@@ -29,7 +39,17 @@ async function campaign(files: Record<string, string> = {}): Promise<{ vault: Re
   return { vault, players, seats: new TableSeats(players, 'c1') };
 }
 
+/** What the campaign's players file holds on disk once every write landed. */
+async function onDisk(vault: ReturnType<typeof createInMemoryApp>, players: CampaignPlayers): Promise<{ link?: string; players?: Record<string, { addedAt?: number }> }> {
+  await players.flush();
+  return JSON.parse(vault.files.get(`${FOLDER}/players.json`) ?? '{}') as { link?: string; players?: Record<string, { addedAt?: number }> };
+}
+
+const LATER = `${JSON.stringify({ format: 2, campaignId: 'c1', players: {} })}\n`;
+
 afterEach(() => {
+  notices.length = 0;
+  vi.restoreAllMocks();
   for (const vault of opened.splice(0)) {
     CampaignPlayers.release(vault.app);
     CampaignFiles.release(vault.app);
@@ -99,5 +119,65 @@ describe('a newcomer admitted into the campaign', () => {
     await players.flush();
     expect(vault.files.get(`${FOLDER}/players.json`)).toBe(later);
     expect(refusalText(seats, 'Noor')).toBe('This campaign\'s players file is from a newer Atlas.');
+  });
+});
+
+describe('the campaign\'s link', () => {
+  const withLinkText = `${JSON.stringify({ format: 1, campaignId: 'c1', link: 'k'.repeat(26), players: {} })}\n`;
+
+  it('made anew is the same in memory and on disk', async () => {
+    const { vault, players, seats } = await campaign({ [`${FOLDER}/players.json`]: withLinkText });
+    expect(renewLink(seats)).toBe(true);
+    const shown = seats.link();
+    expect(shown).not.toBe('k'.repeat(26));
+    expect((await onDisk(vault, players)).link).toBe(shown);
+    expect(seats.link()).toBe(shown);
+  });
+
+  it('made for a players file that has none is the one kept on disk', async () => {
+    const { vault, players, seats } = await campaign({ [`${FOLDER}/players.json`]: `${JSON.stringify({ format: 1, campaignId: 'c1', players: {} })}\n` });
+    const link = campaignLink(seats);
+    expect(link).toMatch(/^[a-z2-7]{26}$/);
+    expect((await onDisk(vault, players)).link).toBe(link);
+    expect(seats.link()).toBe(link);
+  });
+
+  it('is refused with the reason: a campaign without a folder, campaigns not read yet, a newer file', async () => {
+    const { seats: none } = await campaign();
+    const elsewhere = new TableSeats(CampaignPlayers.forApp(opened[0]?.app) as CampaignPlayers, 'c9');
+    expect(none.link()).toBeNull();
+    expect(campaignLink(elsewhere)).toBeNull();
+    expect(linkRefusal(elsewhere)).toBe('This campaign has no folder in the vault.');
+    expect(refusalText(elsewhere, 'Noor')).toBe('This campaign has no folder in the vault.');
+
+    const early = createInMemoryApp({ files: { [`${FOLDER}/campaign.json`]: campaignText } });
+    opened.push(early);
+    const players = CampaignPlayers.open(early.app);
+    await players.whenLoaded();
+    const loading = new TableSeats(players, 'c1');
+    expect(campaignLink(loading)).toBeNull();
+    expect(linkRefusal(loading)).toBe('The campaigns are still loading. Try again in a moment.');
+    expect(refusalText(loading, 'Noor')).toBe('The campaigns are still loading. Try again in a moment.');
+
+    const { seats: later } = await campaign({ [`${FOLDER}/players.json`]: LATER });
+    expect(campaignLink(later)).toBeNull();
+    expect(linkRefusal(later)).toBe('This campaign\'s players file is from a newer Atlas.');
+  });
+});
+
+describe('what the seats write', () => {
+  it('gives a newcomer the same added time in memory and on disk', async () => {
+    const { vault, players, seats } = await campaign({ [`${FOLDER}/players.json`]: `${JSON.stringify({ format: 1, campaignId: 'c1', players: {} })}\n` });
+    let clock = 1_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => (clock += 1));
+    admitNewcomer(seats, NEW, '999999');
+    const inMemory = (players.entries()[0]?.players as Record<string, { addedAt?: number }>)[NEW.id]?.addedAt;
+    expect((await onDisk(vault, players)).players?.[NEW.id]?.addedAt).toBe(inMemory);
+  });
+
+  it('tell the GM when a character cannot be given in a players file from a newer Atlas', async () => {
+    const { seats } = await campaign({ [`${FOLDER}/players.json`]: LATER });
+    seats.setOwner('lib-bear', ANA.id);
+    expect(notices).toEqual(['This campaign\'s players file is from a newer Atlas.']);
   });
 });

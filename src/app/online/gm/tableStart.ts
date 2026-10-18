@@ -2,10 +2,11 @@ import { showNotice } from '../../ui/notice';
 import type { WorkspaceLeaf } from 'obsidian';
 import { obsidianHttp } from './account/obsidianHttp.ts';
 import { sceneStoreOf } from './atlasView.ts';
-import { campaignLink, linkRefusal, NO_CAMPAIGN_TEXT, type TableSeats } from './campaignSeats.ts';
+import { CAMPAIGNS_LOADING_TEXT, campaignLink, linkRefusal, NO_CAMPAIGN_TEXT, type TableSeats } from './campaignSeats.ts';
 import type { CreatedTable } from './createdTable.ts';
 import { createTable } from './createTable.ts';
 import { RELAY_ORIGIN } from './servers.ts';
+import { endStrayTable } from './strayTable.ts';
 import type { TableCampaigns } from './tableCampaigns.ts';
 
 /** The GM's account as starting a table needs it. */
@@ -39,17 +40,25 @@ export interface CampaignTable {
   readonly seats: TableSeats;
 }
 
+/** What the GM reads where the relay opened a table on another link than the campaign's (a relay from before lasting links). */
+export const OTHER_LINK_TEXT = 'The server could not open this campaign\'s link. Try again later.';
+
 /**
  * Asks the relay for a table on the lasting link of the campaign `campaignId` once its players file
  * was read, making the link first where it has none; null where no table was made, the GM told why
- * (a relay that signed the account out says so on the account instead).
+ * (a relay that signed the account out says so on the account instead). A table the relay opened on
+ * another link is ended, never run: its players would not find it at the campaign's link.
  */
 export async function createCampaignTable(campaigns: TableCampaigns, campaignId: string, token: string, account: HostAccount): Promise<CampaignTable | null> {
   const seats = await campaigns.open(campaignId).catch(() => null);
   const link = seats === null ? null : campaignLink(seats);
-  if (seats === null || link === null) return refused(seats === null ? NO_CAMPAIGN_TEXT : linkRefusal(seats));
+  if (seats === null || link === null) return refused(seats === null ? CAMPAIGNS_LOADING_TEXT : linkRefusal(seats));
   // Whether this account may host is the relay's answer alone: nothing here looks at what the account was last said to hold.
   const created = await createTable(obsidianHttp, RELAY_ORIGIN, token, link);
+  if (!('message' in created) && created.code !== link) {
+    endStrayTable(RELAY_ORIGIN, created);
+    return refused(OTHER_LINK_TEXT);
+  }
   if (!('message' in created)) return { created, seats };
   if (created.status === 401) account.signedOutByServer();
   else if (created.status === 403) void account.refresh(true);

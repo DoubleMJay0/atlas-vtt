@@ -30,7 +30,10 @@ vi.mock('obsidian', async (original) => ({
   },
   requestUrl: (request: { readonly url?: string; readonly body?: string }) => {
     seen.requests.push(request);
-    return Promise.resolve(seen.created);
+    // The relay opens the link it was asked for, unless a test makes it answer with another.
+    const asked = (JSON.parse(request.body ?? '{}') as { code?: string }).code;
+    const json = seen.created.json as Record<string, unknown> | null;
+    return Promise.resolve({ ...seen.created, json: json === null ? null : { code: asked, ...json } });
   },
 }));
 
@@ -101,7 +104,7 @@ beforeEach(() => {
   FakeSocket.all = [];
   seen.notices.length = 0;
   seen.requests.length = 0;
-  seen.created = { status: 201, json: { code: LINK, secret: 's'.repeat(43), maxPlayers: 12 } };
+  seen.created = { status: 201, json: { secret: 's'.repeat(43), maxPlayers: 12 } };
   workspace.presented = null;
   account.signedIn = true;
 });
@@ -155,6 +158,24 @@ describe('a table of the played campaign', () => {
     expect(seen.notices).toEqual(['This campaign\'s link belongs to another account. Make a new link.']);
   });
 
+  it('is not run where the relay opened another link than the campaign\'s, and the table it opened is ended', async () => {
+    const { online, leaf, bound } = await gm();
+    const stray = 'z'.repeat(26);
+    seen.created = { status: 201, json: { code: stray, secret: 'x'.repeat(43), maxPlayers: 12 } };
+    expect(await online.start(leaf)).toBeNull();
+    expect(online.table).toBeNull();
+    expect(bound).toEqual([]);
+    expect(seen.notices).toEqual(['The server could not open this campaign\'s link. Try again later.']);
+    await advance(0);
+    const socket = FakeSocket.all.at(-1);
+    expect(FakeSocket.all).toHaveLength(1);
+    expect(socket?.url).toContain(`/api/tables/${stray}/socket`);
+    expect(socket?.frames()).toEqual([{ v: 1, t: 'hello', role: 'gm', secret: 'x'.repeat(43) }]);
+    socket?.relay({ t: 'welcome', role: 'gm', players: [] });
+    await advance(100);
+    expect(socket?.frames().map((frame) => frame.t)).toEqual(['hello', 'end']);
+  });
+
   it('tells the relay the campaign\'s players right after the gates', async () => {
     const { frames, online } = await hosting();
     const after = frames().slice(frames().findIndex((frame) => frame.t === 'gate') + 1);
@@ -190,6 +211,21 @@ describe('who joins the campaign\'s table', () => {
     expect(frames().at(-1)).toEqual({ v: 1, t: 'kick', id: NOOR });
     expect(seen.notices).toContain('The campaign has no room for Noor.');
     expect(files.of('c1').players).toHaveLength(MAX_CAMPAIGN_PLAYERS);
+    online.stop();
+  });
+
+  it('turned away for want of room is let in at their next knock once the GM made room', async () => {
+    const full = Object.fromEntries(Array.from({ length: MAX_CAMPAIGN_PLAYERS }, (_, index) => [seatId(index), { name: `P${index}`, code: String(index + 1).padStart(6, '0'), characters: [] }]));
+    const { socket, frames, online, files } = await hosting(playersText(full));
+    socket.relay({ t: 'player-joined', id: NOOR, name: 'Noor' });
+    await advance(100);
+    expect(frames().at(-1)).toEqual({ v: 1, t: 'kick', id: NOOR });
+    online.removeFromCampaign(seatId(0));
+    socket.relay({ t: 'player-joined', id: NOOR, name: 'Noor' });
+    await advance(100);
+    const noor = files.of('c1').players.find((player) => player.id === NOOR);
+    expect(noor).toMatchObject({ name: 'Noor', characters: [] });
+    expect(frames().find((frame) => frame.to === NOOR && frame.body?.t === 'your-code')?.body).toEqual({ t: 'your-code', code: noor?.code, first: true });
     online.stop();
   });
 
@@ -251,6 +287,16 @@ describe('the GM\'s players', () => {
     online.stop();
     expect(online.players()).toEqual([]);
     expect(online.playerCode(ANA)).toBeNull();
+  });
+});
+
+describe('a player\'s code', () => {
+  it('is looked up while no table runs, from the played campaign\'s players file', async () => {
+    const { online, files } = await gm();
+    await files.whenLoaded();
+    expect(online.table).toBeNull();
+    expect(online.playerCode(ANA)).toBe('000001');
+    expect(online.playerCode(NOOR)).toBeNull();
   });
 });
 

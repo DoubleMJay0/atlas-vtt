@@ -13,8 +13,10 @@ export interface RosterLink {
 
 /** What else the roster needs of its table. */
 export interface RosterPorts {
-  /** Takes a player off the table. */
+  /** Takes a player off the table, for good while it runs. */
   kick(playerId: string): void;
+  /** Takes a newcomer off the table without barring them: they may knock again. */
+  turnAway(playerId: string): void;
   /** The table's join code, which no player's own code may be. */
   joinCode(): string;
   /** Where new codes are drawn from; the cryptographic source by default. */
@@ -72,8 +74,9 @@ export class TableRoster {
     }
     const admitted = admitNewcomer(this.seats, player, this.ports.joinCode(), this.ports.random);
     if (admitted === null) {
+      // Turned away, not barred: once the GM made room their next knock lets them in.
       showNotice(refusalText(this.seats, player.name));
-      this.ports.kick(player.id);
+      this.ports.turnAway(player.id);
       return false;
     }
     // The relay knows the new code before the player is told it.
@@ -115,7 +118,7 @@ export class TableRoster {
   /** Writes the players file, or tells the GM it cannot be written. */
   private write(change: (stored: StoredPlayers) => StoredPlayers): boolean {
     const written = this.seats.change(change);
-    if (!written) showNotice(NEWER_PLAYERS_TEXT);
+    if (!written) showNotice(this.seats.refusal() ?? NEWER_PLAYERS_TEXT);
     return written;
   }
 }

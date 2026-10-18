@@ -6,6 +6,9 @@ import {
   emptyPlayers, isWritable, linkOf, PLAYERS_LAYOUT, playersPathIn, readPlayers, type CampaignPlayer, type StoredPlayers,
 } from './playersFile';
 
+/** Why a campaign's players file cannot be changed: the campaigns are not read yet, it has no folder, or its file is of a later format. */
+export type PlayersBlock = 'loading' | 'no-folder' | 'newer';
+
 /** What a campaign's players file holds, as Atlas reads it. */
 export interface CampaignRoster {
   /** The campaign's table code, once it has one. */
@@ -57,13 +60,27 @@ export class CampaignPlayers extends RecordFiles<StoredPlayers> {
   }
 
   /**
+   * Why the campaign's players file cannot be changed now, or null where it can: the campaigns are
+   * not read yet, the campaign has no folder, or its file is of a later format.
+   */
+  blocked(campaignId: string): PlayersBlock | null {
+    const stored = this.entries().find((entry) => entry.id === campaignId);
+    if (stored) return isWritable(stored) ? null : 'newer';
+    const campaigns = CampaignFiles.forApp(this.app);
+    if (campaigns?.pathOf(campaignId) != null) return null;
+    return campaigns?.isLoaded() === true ? 'no-folder' : 'loading';
+  }
+
+  /**
    * Changes the campaign's players file, creating it in the campaign's folder when it has none.
-   * False when the campaign has no folder or its file is of a later format.
+   * False where it cannot be changed (`blocked`). `change` must be a pure function of the file it is
+   * given: it runs more than once, on the copy in memory now and on what the disk holds once the
+   * write lands, so anything random or timed is drawn before and passed in.
    */
   change(campaignId: string, change: (stored: StoredPlayers) => StoredPlayers): boolean {
+    if (this.blocked(campaignId) !== null) return false;
     const stored = this.entries().find((entry) => entry.id === campaignId);
     if (stored) {
-      if (!isWritable(stored)) return false;
       this.update(campaignId, change);
       return true;
     }

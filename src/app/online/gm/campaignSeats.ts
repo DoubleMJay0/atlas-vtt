@@ -1,16 +1,27 @@
-import type { CampaignPlayers } from '../../campaigns/players/CampaignPlayers';
+import type { CampaignPlayers, PlayersBlock } from '../../campaigns/players/CampaignPlayers';
 import { newLinkCode, newPlayerCode, withCharacterOwner, withLink, withPlayer, type CampaignPlayer, type StoredPlayers } from '../../campaigns/players/playersFile';
 import { MAX_CAMPAIGN_PLAYERS, type CampaignSeat, type PlayerInfo } from '../protocol/index.ts';
+import { showNotice } from '../../ui/notice';
 import type { CampaignSeats } from './ownership.ts';
 
 /** What a table needs of the campaigns' players files: `CampaignPlayers`, or memory in tests. */
-export type PlayersFiles = Pick<CampaignPlayers, 'of' | 'change' | 'onChange'>;
+export type PlayersFiles = Pick<CampaignPlayers, 'of' | 'change' | 'blocked' | 'onChange'>;
 
 /** What the GM reads where a table needs a played campaign. */
 export const NO_CAMPAIGN_TEXT = 'Play a campaign first.';
 
 /** What the GM reads where a campaign's players file cannot be written. */
 export const NEWER_PLAYERS_TEXT = 'This campaign\'s players file is from a newer Atlas.';
+
+/** What the GM reads where the campaigns or their players files are not read yet. */
+export const CAMPAIGNS_LOADING_TEXT = 'The campaigns are still loading. Try again in a moment.';
+
+/** What the GM reads, by why a campaign's players file cannot be changed. */
+const BLOCKED_TEXTS: Readonly<Record<PlayersBlock, string>> = {
+  loading: CAMPAIGNS_LOADING_TEXT,
+  'no-folder': 'This campaign has no folder in the vault.',
+  newer: NEWER_PLAYERS_TEXT,
+};
 
 /**
  * The players of the campaign a table runs on, as its players file holds them: who plays which
@@ -29,9 +40,10 @@ export class TableSeats implements CampaignSeats {
     return this.files.of(this.campaignId).link;
   }
 
-  /** False for a players file of a later format, which is only read. */
-  writable(): boolean {
-    return this.files.of(this.campaignId).writable;
+  /** Why the players file cannot be changed now, for the GM to read; null where it can. */
+  refusal(): string | null {
+    const blocked = this.files.blocked(this.campaignId);
+    return blocked === null ? null : BLOCKED_TEXTS[blocked];
   }
 
   /** The players as the relay is told them: id, name and own code. */
@@ -49,13 +61,17 @@ export class TableSeats implements CampaignSeats {
     return this.players().find((player) => player.id === playerId)?.code ?? null;
   }
 
-  /** Changes the players file; false where it cannot be written (a later format, no campaign folder). */
+  /**
+   * Changes the players file; false where it cannot be written (`refusal`). `change` must be a pure
+   * function of the file: it runs again on what the disk holds once the write lands.
+   */
   change(change: (stored: StoredPlayers) => StoredPlayers): boolean {
     return this.files.change(this.campaignId, change);
   }
 
+  /** Gives the character to the player, or to nobody (null); tells the GM where the file cannot be written. */
   setOwner(characterId: string, playerId: string | null): void {
-    this.change((stored) => withCharacterOwner(stored, characterId, playerId));
+    if (!this.change((stored) => withCharacterOwner(stored, characterId, playerId))) showNotice(this.refusal() ?? NEWER_PLAYERS_TEXT);
   }
 
   /** Calls the listener after every change of this campaign's players file; returns the way to stop. */
@@ -76,22 +92,26 @@ export class TableSeats implements CampaignSeats {
  * where the campaign has no room for them or its file cannot be written, and nothing is changed.
  */
 export function admitNewcomer(seats: TableSeats, player: PlayerInfo, joinCode: string, random?: () => number): CampaignPlayer | null {
-  if (seats.players().length >= MAX_CAMPAIGN_PLAYERS || !seats.writable()) return null;
+  if (seats.players().length >= MAX_CAMPAIGN_PLAYERS || seats.refusal() !== null) return null;
   const taken = seats.codes().add(joinCode);
   const admitted: CampaignPlayer = { id: player.id, name: player.name, code: newPlayerCode(taken, random), characters: [] };
-  return seats.change((stored) => withPlayer(stored, admitted)) ? admitted : null;
+  const now = Date.now();
+  return seats.change((stored) => withPlayer(stored, admitted, now)) ? admitted : null;
 }
 
 /** What the GM reads when `name` could not be made a player of the campaign. */
 export function refusalText(seats: TableSeats, name: string): string {
-  return seats.writable() ? `The campaign has no room for ${name}.` : NEWER_PLAYERS_TEXT;
+  return seats.refusal() ?? `The campaign has no room for ${name}.`;
 }
 
 /** Gives the campaign a new link in its players file; false where the file cannot be written. */
-export const renewLink = (seats: TableSeats): boolean => seats.change((stored) => withLink(stored, newLinkCode()));
+export function renewLink(seats: TableSeats): boolean {
+  const link = newLinkCode();
+  return seats.change((stored) => withLink(stored, link));
+}
 
 /** The campaign's link, made and kept in its players file where it has none yet; null where it cannot be kept. */
 export const campaignLink = (seats: TableSeats): string | null => seats.link() ?? (renewLink(seats) ? seats.link() : null);
 
-/** What the GM reads where the campaign's link cannot be kept: a later format, else a campaign that has no folder (any more). */
-export const linkRefusal = (seats: TableSeats): string => (seats.writable() ? NO_CAMPAIGN_TEXT : NEWER_PLAYERS_TEXT);
+/** What the GM reads where the campaign's link cannot be kept. */
+export const linkRefusal = (seats: TableSeats): string => seats.refusal() ?? NO_CAMPAIGN_TEXT;

@@ -264,12 +264,13 @@ export class OnlineFeature extends Component {
     await this.saveSettings();
   }
 
-  /** The campaigns tables run on: a table binds its campaign's books, and carries the old books into them. */
+  /**
+   * The campaigns tables run on: the old books are carried into a campaign before a table of it runs
+   * (a player's book written meanwhile would otherwise replace the carried one), and a table binds its
+   * campaign's books.
+   */
   private campaigns(): TableCampaigns {
-    return appCampaigns(this.app, (campaignId) => {
-      this.bindBooks(campaignId);
-      if (campaignId !== null) void this.migrateBooksInto(campaignId).catch((error: unknown) => console.error('[Atlas] Carrying the old books into the campaign failed:', error));
-    });
+    return appCampaigns(this.app, (campaignId) => this.bindBooks(campaignId), (campaignId) => this.migrateBooksInto(campaignId));
   }
 
   /** What one of online play's commands does; the plugin registers the commands once (`registerOnlinePlay`). */

@@ -166,7 +166,7 @@ export class OnlineTable {
       message: (from, body) => void (this.log.receive(from, body) || this.image.receive(from, body) || this.found.receive(from, body) || this.books.share.receive(from, body) || this.bound()?.share.receive(from, body)),
       access: (closesAt) => this.setClosing(closesAt),
     }, this.gate);
-    this.roster = new TableRoster(seats, this.connection, { kick: (player) => this.kick(player), joinCode: () => this.gate.settings.code });
+    this.roster = new TableRoster(seats, this.connection, { kick: (player) => this.kick(player), turnAway: (player) => this.connection.kick(player), joinCode: () => this.gate.settings.code });
     this.stopOwnership = ownership.onChange(() => this.bound()?.share.ownersChanged());
   }
 

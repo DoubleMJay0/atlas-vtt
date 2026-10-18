@@ -19,7 +19,7 @@ function roster(...draws: number[]): { roster: TableRoster; seats: ReturnType<ty
   const made = new TableRoster(seats, {
     setPlayers: (players) => void rosters.push([...players]),
     sendCode: (message, to) => void codes.push([to, message]),
-  }, { kick: (id) => void kicked.push(id), joinCode: () => '100001', random: seq(...draws) });
+  }, { kick: (id) => void kicked.push(id), turnAway: (id) => void kicked.push(id), joinCode: () => '100001', random: seq(...draws) });
   made.start();
   return { roster: made, seats, codes, rosters, kicked };
 }

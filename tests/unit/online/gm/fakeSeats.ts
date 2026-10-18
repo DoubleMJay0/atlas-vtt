@@ -1,5 +1,5 @@
-import type { CampaignRoster } from '../../../../src/app/campaigns/players/CampaignPlayers.ts';
-import { emptyPlayers, isWritable, linkOf, readPlayers, withPlayer, type CampaignPlayer, type StoredPlayers } from '../../../../src/app/campaigns/players/playersFile.ts';
+import type { CampaignRoster, PlayersBlock } from '../../../../src/app/campaigns/players/CampaignPlayers.ts';
+import { emptyPlayers, isWritable, linkOf, readPlayers, withLink, withPlayer, type CampaignPlayer, type StoredPlayers } from '../../../../src/app/campaigns/players/playersFile.ts';
 import { TableSeats, type PlayersFiles } from '../../../../src/app/online/gm/campaignSeats.ts';
 import type { TableCampaigns } from '../../../../src/app/online/gm/tableCampaigns.ts';
 import { Ownership, readOwnership, type CampaignSeats, type OwnershipData } from '../../../../src/app/online/gm/ownership.ts';
@@ -50,9 +50,16 @@ export function boundOwnership(players: ConstructorParameters<typeof FakeSeats>[
   return ownership;
 }
 
-/** One campaign's players file in memory, read and written as `CampaignPlayers` does. */
+/**
+ * One campaign's players file in memory, read and written as `CampaignPlayers` does: a change is
+ * applied to the copy in memory now and, as `RecordFiles` does inside `vault.process`, applied again
+ * to what the disk holds once the write lands (the next timer turn, or `flush`), whose result then
+ * stands in memory too. A change that is no pure function of the file shows here as it does in Atlas.
+ */
 export class MemoryPlayers implements PlayersFiles {
   private stored: StoredPlayers | undefined;
+  private disk: StoredPlayers | undefined;
+  private waiting: ((stored: StoredPlayers) => StoredPlayers)[] = [];
   private readonly listeners = new Set<() => void>();
 
   of(): CampaignRoster {
@@ -61,26 +68,57 @@ export class MemoryPlayers implements PlayersFiles {
   }
 
   change(campaignId: string, change: (stored: StoredPlayers) => StoredPlayers): boolean {
+    if (this.blocked() !== null) return false;
     const stored = this.stored ?? emptyPlayers(campaignId);
-    if (!isWritable(stored)) return false;
     this.stored = change(stored);
-    for (const listener of [...this.listeners]) listener();
+    // A new file is written as memory holds it; a file on disk takes the change again.
+    if (this.disk === undefined) this.disk = this.stored;
+    else {
+      if (this.waiting.length === 0) setTimeout(() => this.land(), 0);
+      this.waiting.push(change);
+    }
+    this.changed();
     return true;
+  }
+
+  blocked(): PlayersBlock | null {
+    return this.stored !== undefined && !isWritable(this.stored) ? 'newer' : null;
+  }
+
+  /** Lands every write that still waits. */
+  flush(): void {
+    this.land();
   }
 
   onChange(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
+
+  private land(): void {
+    const waiting = this.waiting.splice(0);
+    if (waiting.length === 0 || this.disk === undefined) return;
+    this.disk = waiting.reduce((disk, change) => change(disk), this.disk);
+    if (JSON.stringify(this.disk) === JSON.stringify(this.stored)) return;
+    this.stored = this.disk;
+    this.changed();
+  }
+
+  private changed(): void {
+    for (const listener of [...this.listeners]) listener();
+  }
 }
 
+/** The link of the campaign `fakeCampaigns` plays. */
+export const FAKE_LINK = 'b'.repeat(26);
+
 /**
- * The campaign `c1` played, its players file in memory with these players (codes 100000, 100001, …),
- * for tables run by `OnlineControl`.
+ * The campaign `c1` played, its players file in memory with these players (codes 100000, 100001, …) and its
+ * link `FAKE_LINK`, for tables run by `OnlineControl`.
  */
-export function fakeCampaigns(players: ConstructorParameters<typeof FakeSeats>[0] = []): TableCampaigns & { readonly seats: TableSeats } {
+export function fakeCampaigns(players: ConstructorParameters<typeof FakeSeats>[0] = []): TableCampaigns & { readonly seats: TableSeats; readonly files: MemoryPlayers } {
   const files = new MemoryPlayers();
-  files.change('c1', (stored) => players.reduce((file, player, index) => withPlayer(file, { id: player.id, name: player.name, code: String(100000 + index), characters: player.characters ?? [] }, 0), stored));
+  files.change('c1', (stored) => players.reduce((file, player, index) => withPlayer(file, { id: player.id, name: player.name, code: String(100000 + index), characters: player.characters ?? [] }, 0), withLink(stored, FAKE_LINK)));
   const seats = new TableSeats(files, 'c1');
-  return { seats, playing: () => 'c1', open: () => Promise.resolve(seats), bound: () => undefined };
+  return { seats, files, playing: () => 'c1', open: () => Promise.resolve(seats), known: () => seats, bound: () => undefined };
 }
