@@ -40,6 +40,8 @@ export interface StatblockTemplate {
   players?: Record<FieldKey, PlayerAccess | (string & NonNullable<unknown>)>;
   /** Tables patterns read with `{cr|lookup:xp}`. */
   lookups?: Record<string, Record<string, string>>;
+  /** The moments the uses of the sheet's counters come back, in the order their buttons stand, each named once. Unset: none. */
+  refills?: CounterRefillDefinition[];
   /** Values the template editor previews with when no statblock is picked. Never creature content in built-ins. */
   sample?: Record<FieldKey, FieldValue>;
   /** The template it was copied from, with the built-in's revision at the time. */
@@ -153,16 +155,26 @@ export interface TemplateField {
   prompt?: string;
 }
 
-/** When a counter's uses come back: on a short or a long rest (a long rest also refills what a short one does). */
-export type CounterReset = 'short-rest' | 'long-rest';
+/**
+ * A moment the uses of a sheet's counters come back, as the template names it once for the whole sheet
+ * ("Long rest", "Dawn", "Session"), and the other refills it brings along ("Long rest" also does what
+ * "Short rest" does).
+ */
+export interface CounterRefillDefinition {
+  name: string;
+  includes?: string[];
+}
 
-export const COUNTER_RESETS: readonly CounterReset[] = ['short-rest', 'long-rest'];
-
-/** A row a Counters field starts with: its name, its default maximum, and the rest that refills it (unset: none). */
+/**
+ * A row a Counters field starts with: its name, its default maximum, the name of the template's refill
+ * that gives its uses back (unset: none), and the dice formula of how many come back then ("1d6+1";
+ * unset: all of them).
+ */
 export interface CounterPreset {
   name: string;
   max: number;
-  reset?: CounterReset;
+  reset?: string;
+  regain?: string;
 }
 
 /** One cell of a Table: a number, text, or nothing. */
@@ -286,7 +298,7 @@ export interface TextBlock extends BlockBase { type: 'text'; field?: FieldKey; t
 export interface EntriesBlock extends BlockBase { type: 'entries'; field: FieldKey; heading?: string; introField?: FieldKey; nameStyle?: 'run-in' | 'heading'; addLabel?: string }
 export interface PairsBlock extends BlockBase, Rollable, AddsToRolls { type: 'pairs'; field: FieldKey; label?: string; display?: 'plain' | 'signed' }
 export interface TrackBlock extends BlockBase { type: 'track'; field: FieldKey; label?: string; resource?: string; look: 'boxes' | 'gauge'; counts: 'down' | 'up' }
-/** Rows of limited uses (spell slots per level, ki, a feature's uses per day), each a cell of pips, with rest buttons under them. */
+/** Rows of limited uses (spell slots per level, ki, a feature's uses per day), each a cell of pips, with a button under them for each refill the field names. */
 export interface CountersBlock extends BlockBase { type: 'counters'; field: FieldKey; label?: string }
 export interface ImageBlock extends BlockBase { type: 'image'; field: FieldKey; shape: 'token' | 'portrait' }
 /** `look: 'tabs'` shows each group as a tab, loose lines above the strip; unset is 'lines'. */

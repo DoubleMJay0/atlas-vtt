@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import type { CountersBlock } from '../../model/templateTypes';
-import { countersRests, isDrawnCounter, shownCounterRows, type CounterRest } from '../../values/counterValues';
+import { isDrawnCounter, shownCounterRows } from '../../values/counterValues';
 import { valueText } from '../../values/valueText';
 import { CountersGrid, type ShownCounter } from '../shared/CountersGrid';
 import { useSheet } from '../sheetContext';
@@ -9,15 +9,15 @@ import { StandIn, ValueText } from '../values/ValueText';
 import { ValueEditingContext, ValueSlot } from '../valueSlot';
 import type { BlockViewProps } from './blockViewProps';
 
-/** What a Counters block draws: its rows with uses (one with none, a spell level not reached, is left out), and the rests that refill them. */
+/** What a Counters block draws: its rows with uses (one with none, a spell level not reached, is left out). */
 export interface ShownCounters {
   counters: ShownCounter[];
-  rests: CounterRest[];
 }
 
 /**
  * Rows of limited uses under the block's label, each a small cell of pips.
- * The statblock pane makes them pressable and adds the rest buttons
+ * The statblock pane makes them pressable; its refill buttons stand once for
+ * the whole sheet (`SheetRefills`)
  * (`ValueEditing.counters`); a value that is no list of counters shows as it
  * is written, with its chip.
  */
@@ -27,9 +27,9 @@ export function CountersView({ block, display }: BlockViewProps<CountersBlock>):
   const field = state.fields.get(block.field);
   const label = block.label ?? field?.label ?? block.field;
   const value = state.reader(block.field);
-  const rows = field && display.state === 'value' ? shownCounterRows(field, value) : null;
+  const rows = field && display.state === 'value' ? shownCounterRows(field, value, state.refillNames) : null;
   const counters = (rows ?? []).flatMap((row, index) => (isDrawnCounter(row) ? [{ row, index }] : []));
-  const shown: ShownCounters = { counters, rests: countersRests(rows ?? []) };
+  const shown: ShownCounters = { counters };
 
   return (
     <LabelledLine label={label} look="stacked" className="atlas-sb-counters">

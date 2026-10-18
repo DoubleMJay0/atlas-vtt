@@ -273,6 +273,8 @@ export class BookShare implements LootRecipientSource {
     if (character === null || message === null || !this.isOnline(from)) return false;
     if (message.t === 'book-resource') return this.editResource(from, character, message);
     if (message.t === 'book-field' || message.t === 'book-ability') return this.statblocks.write(from, character, message);
+    // Refills are not taken from a page yet.
+    if (message.t === 'book-refill') return false;
     const quests = new Set(this.quests.map((quest) => quest.id));
     const written = applyBookMessage(this.shelf.of(character.collection, character.key), message, this.ports.clock(), quests);
     if (written === null) return false;

@@ -79,7 +79,7 @@ $options-width: 320px;
     margin-inline-start: $spacing-m;
   }
 
-  // One row a Counters tile starts with: its name and uses over the rest that refills it, with Move.
+  // One row a Counters tile starts with: its name and uses over the refill that gives them back, with Move; a refill likewise.
   .atlas-te-counter-row {
     @include atlas-flex-col($spacing-xs);
     align-items: stretch;
@@ -94,6 +94,13 @@ $options-width: 320px;
       flex: 1;
       min-width: 0;
     }
+  }
+
+  // A refill's checks: the other refills it brings along.
+  .atlas-te-counter-row__note {
+    align-self: center;
+    color: var(--text-muted);
+    font-size: $font-ui-smaller;
   }
 
   // Parts many abilities have, one click each.
@@ -117,6 +124,22 @@ $options-width: 320px;
     &:hover:not(:disabled) {
       background: var(--background-modifier-hover);
       color: var(--text-normal);
+    }
+
+    &[aria-pressed] {
+      display: inline-flex;
+      align-items: center;
+      gap: $spacing-xs;
+    }
+
+    &[aria-pressed='true'] {
+      border-color: var(--interactive-accent);
+      color: var(--text-normal);
+    }
+
+    svg {
+      width: $icon-xs;
+      height: $icon-xs;
     }
   }
 }

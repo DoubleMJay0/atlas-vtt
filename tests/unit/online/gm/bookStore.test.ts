@@ -50,6 +50,16 @@ describe('a book as the GM keeps it', () => {
     expect(applyBookMessage(pinned, { t: 'book-pin-delete', id: id(0) }, 1, new Set())?.pins).toHaveLength(MAX_BOOK_PINS - 1);
   });
 
+  it('refuses, and never writes, a message that belongs elsewhere or that it does not know', () => {
+    const book = written([note(1)]);
+    const elsewhere = [
+      { t: 'book-refill', refill: 'Long rest' },
+      { t: 'book-field', key: 'speed', base: '', value: '40 ft.' },
+      { t: 'book-unknown' },
+    ] as unknown as Parameters<typeof applyBookMessage>[1][];
+    for (const message of elsewhere) expect(applyBookMessage(book, message, 1000, new Set())).toBeNull();
+  });
+
   it('replaces the purse whole and leaves the rest alone', () => {
     const book = written([note(1), { t: 'book-purse', purse: [{ name: 'Gold', amount: 12 }] }, { t: 'book-purse', purse: [{ name: 'Silver', amount: 3 }] }]);
     expect(book.purse).toEqual([{ name: 'Silver', amount: 3 }]);

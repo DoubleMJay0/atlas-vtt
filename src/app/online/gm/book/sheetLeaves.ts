@@ -1,5 +1,5 @@
 import {
-  bookLine, isResourceKey, MAX_BOOK_TITLE, MAX_COUNTER, MAX_COUNTERS, MAX_SHEET_LIST, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS,
+  bookLine, isResourceKey, MAX_BOOK_TITLE, MAX_COUNTER, MAX_COUNTERS, MAX_FORMULA, MAX_SHEET_LIST, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS,
   type SheetCounter, type SheetField, type SheetNode, type SheetPair, type SheetValue,
 } from '../../protocol/index.ts';
 import { valuePrompt, type BlockDisplay } from '../../../statblocks/render/blockDisplay';
@@ -67,7 +67,7 @@ export function labelOf(build: SheetBuild, block: { label?: string | undefined; 
 function misfitText(build: SheetBuild, key: string): string | null {
   const field = build.shown.fields.get(key);
   const value = build.shown.reader(key);
-  return field && valueMisfit(field, value) ? valueText(value) : null;
+  return field && valueMisfit(field, value, build.shown.refillNames) ? valueText(value) : null;
 }
 
 function wordsNode(build: SheetBuild, block: Extract<TemplateBlock, { type: 'tags' }>, display: BlockDisplay, field: SheetField | null): SheetNode {
@@ -156,10 +156,13 @@ function track(block: TrackBlock, label: string | null, current: number, max: nu
   return { k: 'track', label, look, counts: block.counts, current: Math.max(0, Math.min(current, max)), max, resource, field };
 }
 
-/** A row as the page takes it; null where the protocol cannot carry it as it is (a name it would change, too many uses). */
+/** Whether the protocol carries a line exactly as it is written. */
+export const carriedLine = (text: string, max: number = MAX_BOOK_TITLE): boolean => bookLine(text, max) === text;
+
+/** A row as the page takes it; null where the protocol cannot carry it as it is (a name, refill or formula it would change, too many uses). */
 function sheetCounter(row: CounterRow): SheetCounter | null {
-  const name = bookLine(row.name, MAX_BOOK_TITLE);
-  return name === null || name !== row.name || row.max > MAX_COUNTER ? null : { name, max: row.max, used: row.used, reset: row.reset };
+  if (!carriedLine(row.name) || (row.reset !== null && !carriedLine(row.reset)) || (row.regain !== null && !carriedLine(row.regain, MAX_FORMULA)) || row.max > MAX_COUNTER) return null;
+  return { name: row.name, max: row.max, used: row.used, reset: row.reset, regain: row.regain };
 }
 
 /**
@@ -174,10 +177,10 @@ function countersNode(build: SheetBuild, block: CountersBlock, display: BlockDis
   if (display.state !== 'value') return null;
   const known = build.shown.fields.get(block.field);
   const value = build.shown.reader(block.field);
-  const rows = known ? shownCounterRows(known, value) : null;
+  const rows = known ? shownCounterRows(known, value, build.shown.refillNames) : null;
   const counters = rows && rows.length <= MAX_COUNTERS ? rows.map(sheetCounter) : null;
   if (!counters?.every((row): row is SheetCounter => row !== null)) return { k: 'value', value: sheetValue(build, label, valueText(value), 'plain', null, null) };
-  return { k: 'counters', label, counters, refills: [], field };
+  return { k: 'counters', label, counters, field };
 }
 
 /** What a player may change of the field a block shows: nothing where its fallback stands in for the field's value. */

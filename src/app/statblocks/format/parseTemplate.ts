@@ -21,6 +21,7 @@ import { describeValue, isRecord, own, parseJsonText } from './jsonValues';
 import { ObjectReader } from './objectReader';
 import { parseLayout, type BlockContext } from './parseBlocks';
 import { parseField } from './parseFields';
+import { readRefills, refillProblems } from './parseRefills';
 import { readDerivedFrom, readHeader, readImportedFrom, readLookups, readPlayers, readSource } from './parseTemplateMeta';
 import { JSON_OBJECT, asJsonRecord, asKey, asPositiveInteger, asString } from './valueReads';
 
@@ -111,10 +112,11 @@ function readBody(file: Record<string, unknown>, version: number, id: string, pr
     fields,
     ...r.opt('header', (value) => readHeader(value, problems), 'an object'),
     layout,
+    ...readRefills(r),
     ...readPlayers(r),
     ...readLookups(r),
     ...r.opt('sample', asJsonRecord, JSON_OBJECT),
   });
-  problems.push(...danglingFieldProblems(template));
+  problems.push(...danglingFieldProblems(template), ...refillProblems(template));
   return template;
 }

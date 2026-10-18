@@ -18,7 +18,7 @@ export function blockMisfits(block: TemplateBlock, sheet: SheetState): FieldMisf
   const keys = new Set(visibilityFields(block).map((ref) => (sheet.fields.has(ref) ? ref : splitRef(ref).key)));
   return [...keys].flatMap((key) => {
     const field = sheet.fields.get(key);
-    const misfit = field ? valueMisfit(field, readField(sheet.record, field).value) : null;
+    const misfit = field ? valueMisfit(field, readField(sheet.record, field).value, sheet.refillNames) : null;
     return misfit ? [{ key, ...misfit }] : [];
   });
 }

@@ -36,10 +36,15 @@ export interface ValueEditing {
    */
   addEntry?(block: EntriesBlock, label: string, iconOnly: boolean): React.ReactNode;
   /**
-   * What stands where a Counters block's rows are drawn: the pane's pressable pips and rest buttons, the template
-   * editor's the same drawn inert. Unset: the rows as a read-only card draws them, without buttons.
+   * What stands where a Counters block's rows are drawn: the pane's pressable pips, the template editor's the
+   * same drawn inert. Unset: the rows as a read-only card draws them, without buttons.
    */
   counters?(block: CountersBlock, shown: ShownCounters): React.ReactNode;
+  /**
+   * What stands under the header once for the whole sheet: the pane's refill buttons, the template editor's the
+   * same drawn inert. Unset: nothing, as a card that is only read (a hover preview, the DM screen) shows.
+   */
+  refills?(): React.ReactNode;
   /**
    * A tile not named yet is drawn as it will be once named (`provisionalSheet`): the template editor's tiles while
    * their name is asked for. Unset (a statblock's pane): such a block shows only its prompt, and no value of it is edited.

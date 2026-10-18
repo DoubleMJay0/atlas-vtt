@@ -2,7 +2,8 @@
 
 // Counters in the native card: a small cell per row of limited uses, its name
 // over its pips (filled: left, hollow: used), cells wrapping three or four to
-// a line of a column, and under them the rest buttons the pane offers.
+// a line of a column; and under the header, once for the whole sheet, the
+// refill buttons the pane offers.
 
 $pip: 9px;
 $pip-hit: 18px;
@@ -74,11 +75,12 @@ $cell-min: 5.5em;
     min-height: $pip-hit;
   }
 
-  // The buttons' padding reaches past the line, so their words stand on the cells' edge, $spacing-s apart.
-  .atlas-sb-counters__rests {
+  // The buttons' padding reaches past the line, so their words stand on the card's text edge, $spacing-s apart.
+  .atlas-sb-refills {
     display: flex;
     flex-wrap: wrap;
     gap: $spacing-s + 2 * $spacing-xs;
+    margin-block-end: $spacing-s;
   }
 }
 
@@ -86,7 +88,7 @@ $cell-min: 5.5em;
 .atlas-vtt-plugin .atlas-sb-sheet {
   button.atlas-sb-counter__pip-button,
   button.atlas-sb-counter__step,
-  button.atlas-sb-counters__rest {
+  button.atlas-sb-refill {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -142,7 +144,7 @@ $cell-min: 5.5em;
     height: $step;
   }
 
-  button.atlas-sb-counters__rest {
+  button.atlas-sb-refill {
     gap: $spacing-xs;
     margin: (-$spacing-xs);
     padding: $spacing-xs;

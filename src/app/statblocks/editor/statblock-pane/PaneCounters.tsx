@@ -2,7 +2,7 @@ import React from 'react';
 import type { CountersBlock, FieldValue, TemplateField } from '../../model/templateTypes';
 import type { ShownCounters } from '../../render/blocks/CountersView';
 import { CountersGrid } from '../../render/shared/CountersGrid';
-import { afterCounterRest, withCounterUsed, type CounterRest } from '../../values/counterValues';
+import { withCounterUsed } from '../../values/counterValues';
 import { usePaneEdit, type PaneEditController } from './paneEditContext';
 import { fieldPatches } from './valuePatches';
 
@@ -16,17 +16,17 @@ async function writeCounters(pane: PaneEditController, field: TemplateField, cha
 
 /**
  * A Counters block in the statblock pane: a press on a pip, − or + sets that
- * row's uses, and a rest button gives back what the rest refills, each one
- * write of the field. A statblock that showed its template's preset rows gets
- * them as its own with the first change.
+ * row's uses, one write of the field. A statblock that showed its template's
+ * preset rows gets them as its own with the first change. The refills stand
+ * once for the whole sheet (`PaneRefills`).
  */
 function PaneCounters({ block, shown }: { block: CountersBlock; shown: ShownCounters }): React.JSX.Element {
   const pane = usePaneEdit();
   const field = pane.sheet.fields.get(block.field);
   if (!field || !pane.writable) return <CountersGrid {...shown} />;
+  const refills = pane.sheet.refillNames;
   const controls = {
-    use: (index: number, used: number): void => void writeCounters(pane, field, (value) => withCounterUsed(field, value, index, used)),
-    rest: (rest: CounterRest): void => void writeCounters(pane, field, (value) => afterCounterRest(field, value, rest)),
+    use: (index: number, used: number): void => void writeCounters(pane, field, (value) => withCounterUsed(field, value, refills, index, used)),
   };
   return <CountersGrid {...shown} controls={controls} />;
 }

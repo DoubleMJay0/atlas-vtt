@@ -10,13 +10,16 @@ import type { StatblockTemplate } from '../../../../src/app/statblocks/model/tem
 import { applyFrontmatterPatches } from '../../../../src/app/statblocks/notes/frontmatterPatch';
 import { propertiesOf, templateOf } from './statblockNotes.ts';
 
-const TEMPLATE: StatblockTemplate = templateOf(
-  [
-    { key: 'name', label: 'Name', type: 'text' },
-    { key: 'slots', label: 'Spell slots', type: 'counters', counterRows: [{ name: '1st level', max: 2, reset: 'long-rest' }] },
-  ],
-  [{ id: 'slots001', type: 'counters', field: 'slots' }],
-);
+const TEMPLATE: StatblockTemplate = {
+  ...templateOf(
+    [
+      { key: 'name', label: 'Name', type: 'text' },
+      { key: 'slots', label: 'Spell slots', type: 'counters', counterRows: [{ name: '1st level', max: 2, reset: 'Long rest' }] },
+    ],
+    [{ id: 'slots001', type: 'counters', field: 'slots' }],
+  ),
+  refills: [{ name: 'Short rest' }, { name: 'Long rest', includes: ['Short rest'] }],
+};
 
 const NOTE = `---
 statblock: true
@@ -26,24 +29,25 @@ slots:
   - name: 1st level
     max: 4
     used: 1
-    reset: long-rest
+    reset: Long rest
   - name: Ki
     max: 3
     used: 3
-    reset: short-rest
+    reset: Short rest
+    regain: 1d4
     colour: red
 ---
 # Ana
 `;
 
 const ROWS = [
-  { name: '1st level', max: 4, used: 1, reset: 'long-rest' },
-  { name: 'Ki', max: 3, used: 3, reset: 'short-rest', colour: 'red' },
+  { name: '1st level', max: 4, used: 1, reset: 'Long rest' },
+  { name: 'Ki', max: 3, used: 3, reset: 'Short rest', regain: '1d4', colour: 'red' },
 ];
-/** The rows as a page sends them back: the protocol's four keys, no rest as null. */
+/** The rows as a page sends them back: the protocol's keys, no refill or formula as null. */
 const SENT = [
-  { name: '1st level', max: 4, used: 1, reset: 'long-rest' },
-  { name: 'Ki', max: 3, used: 3, reset: 'short-rest' },
+  { name: '1st level', max: 4, used: 1, reset: 'Long rest', regain: null },
+  { name: 'Ki', max: 3, used: 3, reset: 'Short rest', regain: '1d4' },
 ];
 
 function inputsOf(text: string, template = TEMPLATE): EditInputs {
@@ -71,30 +75,34 @@ describe('a player\'s change of their Counters', () => {
     expect(slotsAfter(NOTE, checkFieldEdit(inputs, edit(withUsed([2, 3]))))).toEqual([{ ...ROWS[0], used: 2 }, ROWS[1]]);
   });
 
-  it('writes a rest: the whole list with its rows refilled', () => {
+  it('writes the whole list with several rows changed at once', () => {
     expect(slotsAfter(NOTE, checkFieldEdit(inputs, edit(withUsed([0, 0]))))).toEqual([{ ...ROWS[0], used: 0 }, { ...ROWS[1], used: 0 }]);
   });
 
   it('gives a note that showed its preset rows rows of its own', () => {
     const bare = NOTE.replace(/slots:[\s\S]*?(?=---\n# Ana)/, '');
     const fresh = inputsOf(bare);
-    expect(slotsAfter(bare, checkFieldEdit(fresh, edit([{ name: '1st level', max: 2, used: 1, reset: 'long-rest' }], { was: undefined }))))
-      .toEqual([{ name: '1st level', max: 2, used: 1, reset: 'long-rest' }]);
+    expect(slotsAfter(bare, checkFieldEdit(fresh, edit([{ name: '1st level', max: 2, used: 1, reset: 'Long rest' }], { was: undefined }))))
+      .toEqual([{ name: '1st level', max: 2, used: 1, reset: 'Long rest' }]);
   });
 
-  it('refuses a changed maximum, name or rest, another order or number of rows, and uses that are no whole number up to the maximum', () => {
+  it('refuses a changed maximum, name, refill or formula, another order or number of rows, and uses that are no whole number up to the maximum', () => {
     const refused: SheetRaw[] = [
       [{ ...SENT[0]!, max: 5 }, SENT[1]!],
       [{ ...SENT[0]!, name: '1st' }, SENT[1]!],
-      [{ ...SENT[0]!, reset: 'short-rest' }, SENT[1]!],
+      [{ ...SENT[0]!, reset: 'Short rest' }, SENT[1]!],
+      [{ ...SENT[0]!, reset: 'long rest' }, SENT[1]!],
+      [{ ...SENT[0]!, reset: 'Long rest ' }, SENT[1]!],
       [{ ...SENT[0]!, reset: null }, SENT[1]!],
+      [SENT[0]!, { ...SENT[1]!, regain: '1d6' }],
+      [SENT[0]!, { ...SENT[1]!, regain: null }],
       [SENT[1]!, SENT[0]!],
       [SENT[0]!],
       withUsed([5, 3]),
       withUsed([1.5, 3]),
       withUsed([-1, 3]),
       [{ ...SENT[0]!, used: '1' }, SENT[1]!],
-      [{ name: '1st level', max: 4, reset: 'long-rest' }, SENT[1]!],
+      [{ name: '1st level', max: 4, reset: 'Long rest' }, SENT[1]!],
       [{ ...SENT[0]!, colour: 'blue' }, SENT[1]!],
       [],
       null,
@@ -104,9 +112,15 @@ describe('a player\'s change of their Counters', () => {
     expect(checkFieldEdit(inputs, edit(1, { was: ROWS }, [0, 0]))).toBeNull();
   });
 
+  it('never changes a note whose rows name a refill the template does not define', () => {
+    const old = NOTE.replace('reset: Long rest', 'reset: long-rest');
+    expect(checkFieldEdit(inputsOf(old), edit([{ ...SENT[0]!, reset: 'long-rest', used: 2 }, SENT[1]!], { was: [{ ...ROWS[0], reset: 'long-rest' }, ROWS[1]] }))).toBeNull();
+  });
+
   it('refuses an edit made against an older value, and one of a field players may only read', () => {
     expect(checkFieldEdit(inputs, edit(withUsed([2, 3]), { was: [{ ...ROWS[0], used: 0 }, ROWS[1]] }))).toBeNull();
     const readOnly = inputsOf(NOTE, { ...TEMPLATE, players: { slots: 'read' } });
     expect(checkFieldEdit(readOnly, edit(withUsed([2, 3])))).toBeNull();
   });
 });
+

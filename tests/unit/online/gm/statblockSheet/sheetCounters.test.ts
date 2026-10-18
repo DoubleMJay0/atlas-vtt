@@ -8,16 +8,17 @@ import { resolvedOf } from './sheetKit';
 
 const SLOTS: TemplateField = {
   key: 'slots', label: 'Spell slots', type: 'counters',
-  counterRows: [{ name: '1st level', max: 2, reset: 'long-rest' }, { name: '2nd level', max: 0, reset: 'long-rest' }],
+  counterRows: [{ name: '1st level', max: 2, reset: 'Long rest' }, { name: '2nd level', max: 0, reset: 'Long rest' }],
 };
-const TEMPLATE: StatblockTemplate = templateOf(
-  [{ key: 'name', label: 'Name', type: 'text' }, SLOTS],
-  [{ id: 'slots001', type: 'counters', field: 'slots' }],
-);
+const REFILLS = [{ name: 'Short rest' }, { name: 'Long rest', includes: ['Short rest', 'Nap'] }];
+const TEMPLATE: StatblockTemplate = {
+  ...templateOf([{ key: 'name', label: 'Name', type: 'text' }, SLOTS], [{ id: 'slots001', type: 'counters', field: 'slots' }]),
+  refills: REFILLS,
+};
 const ROWS = [
-  { name: '1st level', max: 4, used: 1, reset: 'long-rest' },
-  { name: '2nd level', max: 0, used: 0, reset: 'long-rest' },
-  { name: 'Ki', max: 3, used: 0, reset: 'short-rest', colour: 'red' },
+  { name: '1st level', max: 4, used: 1, reset: 'Long rest' },
+  { name: '2nd level', max: 0, used: 0, reset: 'Long rest' },
+  { name: 'Ki', max: 3, used: 0, reset: 'Short rest', regain: '1d4', colour: 'red' },
 ];
 
 const drawn = (note: Record<string, unknown>, template = TEMPLATE): BookStatblock =>
@@ -34,17 +35,26 @@ describe('Counters on a player\'s sheet', () => {
     expect(node).toMatchObject({
       label: 'Spell slots',
       counters: [
-        { name: '1st level', max: 4, used: 1, reset: 'long-rest' },
-        { name: '2nd level', max: 0, used: 0, reset: 'long-rest' },
-        { name: 'Ki', max: 3, used: 0, reset: 'short-rest' },
+        { name: '1st level', max: 4, used: 1, reset: 'Long rest', regain: null },
+        { name: '2nd level', max: 0, used: 0, reset: 'Long rest', regain: null },
+        { name: 'Ki', max: 3, used: 0, reset: 'Short rest', regain: '1d4' },
       ],
     });
     expect(node?.field).toMatchObject({ key: 'slots', type: 'counters', base: sheetBase(ROWS) });
   });
 
+  it('sends the template\'s refills, each bringing along only others it is sent, where the player may change a Counters value', () => {
+    const statblock = drawn({ slots: ROWS });
+    expect(statblock.refills).toEqual([{ name: 'Short rest', includes: [] }, { name: 'Long rest', includes: ['Short rest'] }]);
+    expect(parseBookStatblock(statblock)?.refills).toEqual(statblock.refills);
+    expect(drawn({ slots: ROWS }, { ...TEMPLATE, players: { slots: 'read' } }).refills).toEqual([]);
+    const many = { ...TEMPLATE, refills: Array.from({ length: 10 }, (_, at) => ({ name: `Refill ${at}` })) };
+    expect(drawn({ slots: [{ name: 'Ki', max: 3, used: 1 }] }, many).refills).toHaveLength(8);
+  });
+
   it('carries the template\'s preset rows where the note holds none', () => {
     const node = countersOf(drawn({}));
-    expect(node?.counters).toEqual([{ name: '1st level', max: 2, used: 0, reset: 'long-rest' }, { name: '2nd level', max: 0, used: 0, reset: 'long-rest' }]);
+    expect(node?.counters).toEqual([{ name: '1st level', max: 2, used: 0, reset: 'Long rest', regain: null }, { name: '2nd level', max: 0, used: 0, reset: 'Long rest', regain: null }]);
     expect(node?.field?.base).toBe(sheetBase(undefined));
   });
 
@@ -56,7 +66,7 @@ describe('Counters on a player\'s sheet', () => {
   });
 
   it('shows a value that is no list of counters, or one the page cannot carry as it is, as written and never changed', () => {
-    for (const slots of [[{ name: 'Ki', max: 2, used: 5 }], [{ name: '  Ki  ', max: 2, used: 0 }], Array.from({ length: 30 }, (_, at) => ({ name: `Row ${at}`, max: 1, used: 0 }))]) {
+    for (const slots of [[{ name: 'Ki', max: 2, used: 5 }], [{ name: '  Ki  ', max: 2, used: 0 }], [{ name: 'Ki', max: 2, used: 0, reset: 'Dawn' }], Array.from({ length: 30 }, (_, at) => ({ name: `Row ${at}`, max: 1, used: 0 }))]) {
       const statblock = drawn({ slots });
       expect(parseBookStatblock(statblock)).toEqual(statblock);
       expect(countersOf(statblock)).toBeUndefined();

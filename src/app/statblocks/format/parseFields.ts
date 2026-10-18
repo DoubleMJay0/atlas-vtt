@@ -6,7 +6,7 @@
 
 import { isReservedKey } from '../model/reservedKeys';
 import {
-  COUNTER_RESETS, FIELD_MEANINGS, FIELD_TYPES, TABLE_ALIGNS, type CounterPreset, type EntryShape, type TableAlign, type TableCell,
+  FIELD_MEANINGS, FIELD_TYPES, TABLE_ALIGNS, type CounterPreset, type EntryShape, type TableAlign, type TableCell,
   type TemplateField,
 } from '../model/templateTypes';
 import { COUNTER_PRESET_KEYS, ENTRY_EXTRA_KEYS, ENTRY_SHAPE_KEYS, FIELD_KEYS } from './formatKeys';
@@ -100,7 +100,8 @@ function readCounterPreset(raw: unknown, index: number, where: string, problems:
   return r.finish({
     name,
     max: r.withDefault('max', asNonNegativeInteger, 0, 'a whole number of 0 or more'),
-    ...r.opt('reset', asOneOf(COUNTER_RESETS), choices(COUNTER_RESETS)),
+    ...r.opt('reset', asString, TEXT),
+    ...r.opt('regain', asString, TEXT),
   });
 }
 

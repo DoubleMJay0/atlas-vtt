@@ -1,8 +1,8 @@
 import React from 'react';
-import { Hourglass, Minus, Moon, Plus } from 'lucide-react';
-import { t, type MessageKey } from '../../../i18n';
+import { Minus, Plus } from 'lucide-react';
+import { t } from '../../../i18n';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
-import type { CounterRest, CounterRow } from '../../values/counterValues';
+import type { CounterRow } from '../../values/counterValues';
 
 /** Above this many uses a cell shows its count with − and + instead of a pip per use. */
 export const MAX_COUNTER_PIPS = 6;
@@ -16,21 +16,13 @@ export interface ShownCounter {
 export interface CounterControls {
   /** Sets the row at `index` of the stored list to `used` uses. Unset: the controls are drawn inert (the template editor). */
   use?: ((index: number, used: number) => void) | undefined;
-  /** Gives back what `rest` refills. */
-  rest?: ((rest: CounterRest) => void) | undefined;
 }
 
 interface CountersGridProps {
   counters: readonly ShownCounter[];
-  rests: readonly CounterRest[];
   /** Unset: the counts are only shown, without buttons. */
   controls?: CounterControls | undefined;
 }
-
-const REST_LABELS: Readonly<Record<CounterRest, MessageKey>> = {
-  'short-rest': 'statblock.shortRest',
-  'long-rest': 'statblock.longRest',
-};
 
 /** What a press on the pip at `position` (left ones first) leaves: down to it where it is still left, else up to it. */
 function usedAfterPip(row: CounterRow, position: number): number {
@@ -38,7 +30,7 @@ function usedAfterPip(row: CounterRow, position: number): number {
   return row.max - (position < left ? position : position + 1);
 }
 
-function buttonProps(action: (() => void) | undefined): Pick<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'disabled' | 'tabIndex' | 'onClick'> {
+export function buttonProps(action: (() => void) | undefined): Pick<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'disabled' | 'tabIndex' | 'onClick'> {
   return { type: 'button', disabled: !action, tabIndex: action ? undefined : -1, onClick: action };
 }
 
@@ -90,11 +82,10 @@ function Count({ row, index, controls }: ShownCounter & { controls: CounterContr
 
 /**
  * A Counters block's rows: a small cell each, its name over its pips (◆ left,
- * ◇ used), or over its count with − and + where it has more uses than pips fit;
- * with controls, the rest buttons under them. A read-only card draws the
- * counts alone.
+ * ◇ used), or over its count with − and + where it has more uses than pips fit.
+ * A read-only card draws the counts alone.
  */
-export function CountersGrid({ counters, rests, controls }: CountersGridProps): React.JSX.Element {
+export function CountersGrid({ counters, controls }: CountersGridProps): React.JSX.Element {
   return (
     <span className="atlas-sb-counters__body">
       <span className="atlas-sb-counters__cells">
@@ -105,20 +96,6 @@ export function CountersGrid({ counters, rests, controls }: CountersGridProps): 
           </span>
         ))}
       </span>
-      {controls && rests.length > 0 && (
-        <span className="atlas-sb-counters__rests">
-          {rests.map((rest) => {
-            const Icon = rest === 'short-rest' ? Hourglass : Moon;
-            const { rest: refill } = controls;
-            return (
-              <button key={rest} className="atlas-sb-counters__rest" {...buttonProps(refill && (() => refill(rest)))}>
-                <Icon aria-hidden="true" />
-                {t(REST_LABELS[rest])}
-              </button>
-            );
-          })}
-        </span>
-      )}
     </span>
   );
 }

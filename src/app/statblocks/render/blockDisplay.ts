@@ -93,7 +93,7 @@ function tokenHolds(block: TemplateBlock, sheet: SheetState): boolean {
 /** Whether a Counters block draws anything: a row with uses, or a value that is no list of counters, which shows as written. */
 function countersShowSomething(block: CountersBlock, sheet: SheetState): boolean {
   const field = sheet.fields.get(block.field);
-  const rows = field ? shownCounterRows(field, sheet.reader(block.field)) : null;
+  const rows = field ? shownCounterRows(field, sheet.reader(block.field), sheet.refillNames) : null;
   return rows === null || rows.some(isDrawnCounter);
 }
 

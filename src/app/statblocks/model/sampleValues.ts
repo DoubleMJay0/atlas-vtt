@@ -88,12 +88,13 @@ const SAMPLE_COUNTER_MAXES = [4, 3, 2];
 /** A Counters sample: its preset rows, each that has no uses yet given a few, else two rows of its own. */
 function sampleCounters(field: TemplateField): FieldValue {
   const presets = field.counterRows ?? [];
-  if (presets.length === 0) return [{ name: 'First', max: 3, used: 1 }, { name: 'Second', max: 2, used: 0, reset: 'long-rest' }];
+  if (presets.length === 0) return [{ name: 'First', max: 3, used: 1 }, { name: 'Second', max: 2, used: 0 }];
   return presets.slice(0, SAMPLE_COUNTER_MAXES.length).map((row, index) => ({
     name: row.name,
     max: row.max > 0 ? row.max : SAMPLE_COUNTER_MAXES[index] ?? 1,
     used: index === 0 ? 1 : 0,
     ...(row.reset && { reset: row.reset }),
+    ...(row.regain && { regain: row.regain }),
   }));
 }
 
