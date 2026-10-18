@@ -6,9 +6,10 @@ import { inviteRow, surfaceHeader, textButton } from './controls.ts';
 import { gateEntries, renderCodeRow, renderPausedRow, type GateRowActions } from './gateRows.ts';
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
 import type { MenuModel } from './panelModel.ts';
+import { linkEntries, renderPrompt, type LinkActions } from './prompts.ts';
 
 /** What the menu's buttons do. */
-export interface MenuActions extends AccountActions, GateRowActions, ImageRowActions {
+export interface MenuActions extends AccountActions, GateRowActions, ImageRowActions, LinkActions {
   stop(): void;
   /** Shows this map on Atlas's player view, which players online see too. */
   share(): void;
@@ -40,6 +41,7 @@ export const MENU_WIDTH = 300;
  */
 export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuActions): void {
   const restore = keep(layer);
+  const redraw = (): void => renderMenu(layer, model, actions);
   layer.empty();
   layer.addClass('atlas-online-menu');
   if (model.kind === 'start') {
@@ -53,12 +55,13 @@ export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuAc
   renderClosingRow(layer, model.closing, actions);
   renderPausedRow(layer, model.gate, actions);
   renderImageRow(layer, model.imageShown, actions);
-  if (model.link !== null) inviteRow(layer, () => actions.copy(), { open: model.qr, toggle: () => actions.toggleQr() });
+  if (model.link !== null) inviteRow(layer, () => actions.copy(), { open: model.qr, toggle: () => actions.toggleQr() }, linkEntries(layer, actions, redraw));
   renderCodeRow(layer, model.gate, actions);
   if (!model.isShared) {
     const share = textButton(layer, 'Show this map to players', () => actions.share());
     share.dataset.focusKey = 'share';
     share.addClass('atlas-online-corner-button');
   }
+  renderPrompt(layer, redraw);
   restore();
 }

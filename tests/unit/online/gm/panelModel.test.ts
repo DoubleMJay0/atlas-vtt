@@ -196,6 +196,18 @@ describe('the view of OnlineControl', () => {
       playerTokens: () => [{ tokenId: 'ogre', label: 'Ogre', owner: ANA }, { tokenId: 'bear', label: 'Bear', owner: null }],
       markPlayerTokens: (ids, player) => void calls.push(['mark', ids, player]),
       give: (ids, player) => void calls.push(['give', ids, player]),
+      playerCode: (id) => (id === ANA.id ? '482193' : null),
+      newPlayerCode: (id) => void calls.push(['newPlayerCode', id]),
+      addPlayer: (name) => {
+        calls.push(['addPlayer', name]);
+        return name === 'Dora' ? { id: 'd'.repeat(20), name, code: '731904', characters: [] } : null;
+      },
+      renamePlayer: (id, name) => void calls.push(['renamePlayer', id, name]),
+      removeFromCampaign: (id) => void calls.push(['removeFromCampaign', id]),
+      newLink: () => {
+        calls.push(['newLink']);
+        return Promise.resolve();
+      },
     };
   }
 
@@ -253,6 +265,20 @@ describe('the view of OnlineControl', () => {
     expect(api.snapshot()).toMatchObject({ sharedLeaf: null, sharedName: 'Kings Inn', sharedTokens: tokens });
     table.sharedStore = null;
     expect(api.snapshot()).toMatchObject({ sharedName: null, sharedTokens: {} });
+  });
+
+  it('passes the campaign\'s player choices on: codes, adding, renaming, removing and a new link', async () => {
+    const source = control();
+    const api = onlineApi(source, hideNothing);
+    expect(api.playerCode(ANA.id)).toBe('482193');
+    expect(api.playerCode(BEN.id)).toBeNull();
+    api.newPlayerCode(BEN.id);
+    expect(api.addPlayer('Dora')).toEqual({ id: 'd'.repeat(20), name: 'Dora', code: '731904' });
+    expect(api.addPlayer('Nobody')).toBeNull();
+    api.renamePlayer(BEN.id, 'Benno');
+    api.removeFromCampaign(BEN.id);
+    await api.newLink();
+    expect(source.calls).toEqual([['newPlayerCode', BEN.id], ['addPlayer', 'Dora'], ['addPlayer', 'Nobody'], ['renamePlayer', BEN.id, 'Benno'], ['removeFromCampaign', BEN.id], ['newLink']]);
   });
 
   it('reads the running table\'s gates and passes the GM\'s choices on; without a table there are none and nothing happens', () => {

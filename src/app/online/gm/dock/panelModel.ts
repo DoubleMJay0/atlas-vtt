@@ -52,6 +52,13 @@ export interface OnlineSnapshot {
   readonly closesAt?: number;
 }
 
+/** A player the GM added to the campaign, with the code they join by. */
+export interface AddedPlayer {
+  readonly id: string;
+  readonly name: string;
+  readonly code: string;
+}
+
 export interface OnlineApi {
   snapshot(): OnlineSnapshot;
   start(leaf: WorkspaceLeaf): void;
@@ -62,7 +69,19 @@ export interface OnlineApi {
   /** Gives tokens to a player, and makes them player tokens. */
   assign(tokenIds: readonly string[], playerId: string): void;
   release(tokenIds: readonly string[]): void;
+  /** Takes a player off the running table; they come back with their own code. */
   kick(playerId: string): void;
+  /** A player's own code, or null while no table runs. */
+  playerCode(playerId: string): string | null;
+  /** Gives a player a new code; the old one stops working. */
+  newPlayerCode(playerId: string): void;
+  /** Adds a player to the campaign; null where it cannot (the GM is told why). */
+  addPlayer(name: string): AddedPlayer | null;
+  renamePlayer(playerId: string, name: string): void;
+  /** Removes a player from the campaign: they can no longer join. */
+  removeFromCampaign(playerId: string): void;
+  /** Gives the campaign a new link, so the old one stops working. */
+  newLink(): Promise<void>;
   /** Takes the shown image away from every player, online and at Atlas's own player window. */
   hideImage(): void;
   /** The running table's gates; nothing happens while none runs. */
@@ -71,7 +90,7 @@ export interface OnlineApi {
 }
 
 /** The part of `OnlineControl` the control uses. */
-export type ControlSource = Pick<OnlineControl, 'onChange' | 'status' | 'link' | 'seats' | 'isStarting' | 'lost' | 'start' | 'stop' | 'share' | 'players' | 'kick' | 'playerTokens' | 'markPlayerTokens' | 'give'> & {
+export type ControlSource = Pick<OnlineControl, 'onChange' | 'status' | 'link' | 'seats' | 'isStarting' | 'lost' | 'start' | 'stop' | 'share' | 'players' | 'kick' | 'playerCode' | 'newPlayerCode' | 'addPlayer' | 'renamePlayer' | 'removeFromCampaign' | 'newLink' | 'playerTokens' | 'markPlayerTokens' | 'give'> & {
   readonly table: {
     readonly sharedTab: WorkspaceLeaf | null;
     readonly sharedStore: { getState(): { readonly objects: { readonly tokens: Readonly<Record<string, SceneToken>> } } } | null;
@@ -121,6 +140,15 @@ export function onlineApi(control: ControlSource, hideImage: () => void): Online
     },
     release: (ids) => control.give(ids, null),
     kick: (playerId) => control.kick(playerId),
+    playerCode: (playerId) => control.playerCode(playerId),
+    newPlayerCode: (playerId) => control.newPlayerCode(playerId),
+    addPlayer: (name) => {
+      const added = control.addPlayer(name);
+      return added === null ? null : { id: added.id, name: added.name, code: added.code };
+    },
+    renamePlayer: (playerId, name) => control.renamePlayer(playerId, name),
+    removeFromCampaign: (playerId) => control.removeFromCampaign(playerId),
+    newLink: () => control.newLink(),
     hideImage,
     gate: {
       newCode: () => control.table?.gate.newCode(),

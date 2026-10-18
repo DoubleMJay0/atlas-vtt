@@ -74,15 +74,18 @@ const QR_LABEL = 'QR code';
 
 /**
  * "Copy invite link": the link itself is never shown. At the row's end a ghost button opens the link
- * as a QR code; it shows with the row's hover or focus, while its card is open, and always where
- * nothing hovers. Returns the row's element.
+ * as a QR code, and beside it "…" opens the link's menu (`linkEntries`); the menu's button shows with
+ * the row's hover or focus, while its menu is open, and always where nothing hovers. Returns the row's element.
  */
-export function inviteRow(parent: HTMLElement, copy: () => Promise<boolean>, qr: QrToggle): HTMLElement {
+export function inviteRow(parent: HTMLElement, copy: () => Promise<boolean>, qr: QrToggle, linkEntries: readonly MenuEntry[]): HTMLElement {
   const row = parent.createDiv({ cls: 'atlas-online-invite-row' });
   copyRow(row, { icon: 'link', text: 'Copy invite link', copied: 'Link copied', focusKey: 'copy' }, copy);
   const button = row.createEl('button', { cls: ['atlas-online-icon-button', 'atlas-online-invite__qr', ...(qr.open ? ['is-open'] : [])], attr: { type: 'button', 'aria-label': QR_LABEL, 'aria-expanded': String(qr.open), 'data-focus-key': 'qr' } });
   setIcon(button, 'qr-code');
   button.addEventListener('click', () => qr.toggle());
+  const more = row.createEl('button', { cls: 'atlas-online-icon-button atlas-online-invite__more', attr: { type: 'button', 'aria-label': 'Link options', 'aria-haspopup': 'menu', 'data-focus-key': 'link-more' } });
+  setIcon(more, 'more-horizontal');
+  more.addEventListener('click', () => openMenuBelow(linkEntries, more));
   return row;
 }
 

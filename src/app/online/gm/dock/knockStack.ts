@@ -16,7 +16,7 @@ export type KnockActions = Pick<GateActions, 'admit' | 'decline' | 'moved'>;
  */
 function answerButton(row: HTMLElement, player: WaitingPlayer, kind: 'admit' | 'decline', run: (id: string) => void): void {
   const live = player.armed && !player.answered;
-  const button = textButton(row, kind === 'admit' ? 'Admit' : 'Decline', () => live && run(player.id), kind === 'admit' ? 'cta' : 'ghost');
+  const button = textButton(row, kind === 'admit' ? 'Admit as new player' : 'Decline', () => live && run(player.id), kind === 'admit' ? 'cta' : 'ghost');
   button.dataset.focusKey = `${kind}:${player.id}`;
   // Not `disabled`: the button keeps its place in the Tab order, and the one the GM pressed the focus.
   if (!live) button.setAttribute('aria-disabled', 'true');

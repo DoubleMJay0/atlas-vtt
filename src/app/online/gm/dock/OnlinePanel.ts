@@ -4,8 +4,9 @@ import type { MenuEntry } from './dockMenu.ts';
 import { renderFeedback, type FeedbackActions, type FeedbackView } from './feedbackForm.ts';
 import { gateEntries, gateRowsOf, renderCodeRow, renderPausedRow, type GateRowActions, type GateRows } from './gateRows.ts';
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
-import { closingOf, groupsOf, seatsNoteOf, selectionBarOf, statusOf, type OnlinePlayer, type OnlineSnapshot, type PlayerGroup, type SceneFacts, type SelectionBar, type Tone } from './panelModel.ts';
+import { closingOf, groupsOf, seatsNoteOf, selectionBarOf, statusOf, type AddedPlayer, type OnlinePlayer, type OnlineSnapshot, type PlayerGroup, type SceneFacts, type SelectionBar, type Tone } from './panelModel.ts';
 import { renderPlayerList, type ListActions } from './playerList.ts';
+import { codePrompt, confirmPrompt, linkEntries, namePrompt, openPrompt, renderPrompt, type LinkActions } from './prompts.ts';
 import { renderSelectionBar, type SelectionActions } from './selectionBar.ts';
 
 /** The panel's width; it never grows wider than the row it hangs from. */
@@ -38,15 +39,20 @@ export function panelView(snapshot: OnlineSnapshot, scene: SceneFacts, feedback:
   return { status: statusOf(snapshot), seatsNote: seatsNoteOf(snapshot), link: snapshot.link, qr, gate: gateRowsOf(snapshot.gate), imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), groups, players, bar: selectionBarOf(snapshot, scene), feedback };
 }
 
-export interface PanelActions extends ListActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions {
+/** The campaign's players as the panel changes them, once the GM has answered. */
+export interface CampaignActions {
+  renamePlayer(playerId: string, name: string): void;
+  removeFromCampaign(playerId: string): void;
+  /** Adds a player; null where it could not (the GM is told why). */
+  addPlayer(name: string): AddedPlayer | null;
+}
+
+export interface PanelActions extends Omit<ListActions, 'askRename' | 'askRemoveFromCampaign'>, CampaignActions, LinkActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions {
   close(): void;
   stop(): void;
   copy(): Promise<boolean>;
   toggleQr(): void;
 }
-
-/** Panels whose Stop waits for its confirmation; kept apart from the DOM, which every redraw replaces. */
-const confirmingStop = new WeakSet<HTMLElement>();
 
 /** The control focused before a redraw, by its `data-focus-key`, and the list's scroll position. */
 interface Kept {
@@ -72,28 +78,35 @@ function statusInWords(view: PanelView): string | null {
   return view.status.tone === 'green' ? null : view.status.text;
 }
 
-/** "Stop the table for everyone?" with Cancel and Stop, at the panel's foot. */
-function stopConfirm(layer: HTMLElement, actions: PanelActions, redraw: () => void): void {
-  const row = layer.createDiv({ cls: 'atlas-online-confirm', attr: { role: 'group', 'aria-label': 'Stop the table' } });
-  row.createSpan({ cls: 'atlas-online-confirm__text', text: 'Stop for everyone?' });
-  const cancel = textButton(row, 'Cancel', () => {
-    confirmingStop.delete(layer);
-    redraw();
-  }, 'ghost');
-  cancel.dataset.focusKey = 'stop-cancel';
-  const stop = textButton(row, 'Stop table', () => {
-    confirmingStop.delete(layer);
-    actions.stop();
-  }, 'warning');
-  stop.dataset.focusKey = 'stop-confirm';
-  stop.addClass('atlas-online-corner-button');
+/** The list's questions: renaming a player and removing one from the campaign. */
+function listActions(layer: HTMLElement, actions: PanelActions, redraw: () => void): ListActions {
+  return {
+    ...actions,
+    askRename: (player) => openPrompt(layer, namePrompt('rename', `Rename ${player.name}`, 'Rename', player.name, (name) => {
+      actions.renamePlayer(player.id, name);
+      return true;
+    }), redraw),
+    askRemoveFromCampaign: (player) => openPrompt(layer, confirmPrompt('remove-player', `Remove ${player.name} from the campaign`, ' can no longer join. Their characters keep their books.', 'Remove', () => actions.removeFromCampaign(player.id), { name: player.name, warning: true }), redraw),
+  };
+}
+
+/** "Add player": a name, then the new player's code, shown once. */
+function addPlayerRow(layer: HTMLElement, actions: PanelActions, redraw: () => void): void {
+  const ask = (): void => openPrompt(layer, namePrompt('add-player', 'Add a player', 'Add', '', (name) => {
+    const added = actions.addPlayer(name);
+    if (added !== null) openPrompt(layer, codePrompt(added), redraw);
+    return false;
+  }), redraw);
+  const row = layer.createDiv({ cls: 'atlas-online-add-player' });
+  textButton(row, 'Add player', ask, 'ghost').dataset.focusKey = 'add-player';
 }
 
 /**
  * The online panel: the working surface while players are at the table. A header with the title, the
  * status as a dot, "…" (Send feedback, the gates' New code and two switches, Stop table) and
- * Close; the line of a table that closes for want of access; the line of a pause; the line of a shown image; Copy invite link and the join code; the players with their tokens; the bar for the selected tokens or to show this map; the feedback form and Stop's
- * confirmation while open. Redrawn whole on every change, keeping focus and the list's scroll position.
+ * Close; the line of a table that closes for want of access; the line of a pause; the line of a shown image; Copy invite link (with
+ * its menu) and the join code; the players with their tokens and Add player; the bar for the selected tokens or to show this map; the
+ * feedback form and the question or field the GM is answering (Stop, a new link, renaming, removing, a new player's code) while open. Redrawn whole on every change, keeping focus and the list's scroll position.
  */
 export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelActions): void {
   const kept = keep(layer);
@@ -104,21 +117,18 @@ export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelA
   const entries: MenuEntry[] = [
     { title: view.feedback.open ? 'Close feedback' : 'Send feedback', icon: 'message-square', run: () => actions.toggleFeedback() },
     ...gateEntries(view.gate, actions),
-    { title: 'Stop table', icon: 'power', warning: true, apart: true, run: () => {
-      confirmingStop.add(layer);
-      redraw();
-      layer.querySelector<HTMLElement>('[data-focus-key="stop-confirm"]')?.focus();
-    } },
+    { title: 'Stop table', icon: 'power', warning: true, apart: true, run: () => openPrompt(layer, confirmPrompt('stop', 'Stop the table', 'Stop for everyone?', 'Stop table', () => actions.stop(), { warning: true }), redraw) },
   ];
   surfaceHeader(layer, 'Online table', view.status, statusInWords(view), entries, () => actions.close());
   renderClosingRow(layer, view.closing, actions);
   renderPausedRow(layer, view.gate, actions);
   renderImageRow(layer, view.imageShown, actions);
-  if (view.link !== null) inviteRow(layer, () => actions.copy(), { open: view.qr, toggle: () => actions.toggleQr() });
+  if (view.link !== null) inviteRow(layer, () => actions.copy(), { open: view.qr, toggle: () => actions.toggleQr() }, linkEntries(layer, actions, redraw));
   renderCodeRow(layer, view.gate, actions);
-  renderPlayerList(layer, view.groups, view.players, actions);
+  renderPlayerList(layer, view.groups, view.players, listActions(layer, actions, redraw));
+  addPlayerRow(layer, actions, redraw);
   if (view.bar !== null) renderSelectionBar(layer, view.bar, view.players, actions, !hadBar);
   if (view.feedback.open) renderFeedback(layer, view.feedback, actions);
-  if (confirmingStop.has(layer)) stopConfirm(layer, actions, redraw);
+  renderPrompt(layer, redraw);
   restore(layer, kept);
 }
