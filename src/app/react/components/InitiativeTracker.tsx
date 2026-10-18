@@ -73,7 +73,7 @@ export const InitiativeTracker: React.FC = () => {
 
   const sideLabelId = useId();
 
-  // The turn stays in view in a list longer than the panel: the combatant's card, or the top of its side
+  // Keep the turn and the next two combatants in view, or the top of the active side.
   const contentRef = useRef<HTMLDivElement>(null);
   const turnOf = initiative.sides?.active ?? initiative.entries.find((entry) => entry.isActive)?.id;
   useEffect(() => {
@@ -82,7 +82,7 @@ export const InitiativeTracker: React.FC = () => {
     const side = content.querySelector('.atlas-initiative-side--active');
     const card = content.querySelector('.atlas-initiative-card--active');
     if (side) scrollWithin(content, side, 'start');
-    else if (card) scrollWithin(content, card, 'nearest');
+    else if (card) scrollWithin(content, card, 'nearest', 2);
   }, [initiative.isActive, turnOf, initiative.round]);
 
   // Refs for turn navigation buttons

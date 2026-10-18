@@ -99,12 +99,12 @@ export function renderPlayerInitiative(container: HTMLElement, list: PlayerIniti
   }
   if (list.isActive) {
     panel.createDiv({ cls: 'atlas-player-initiative__round', text: t('playerInit.round', { round: list.round }) });
-    // The list is drawn anew on every change, scrolled to its top: bring the turn back into view
+    // The list is drawn anew on every change: show the turn and the next two visible combatants.
     const entries = panel.querySelector<HTMLElement>('.atlas-player-initiative__list');
     const side = panel.querySelector('.atlas-player-initiative__side--active');
     const card = panel.querySelector('.atlas-player-initiative__card--active');
     if (entries && side) scrollWithin(entries, side, 'start');
-    else if (entries && card) scrollWithin(entries, card, 'nearest');
+    else if (entries && card) scrollWithin(entries, card, 'nearest', 2);
   }
 }
 

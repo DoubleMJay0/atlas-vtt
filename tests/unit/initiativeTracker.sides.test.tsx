@@ -216,7 +216,7 @@ describe('the initiative tracker keeps the turn in view', () => {
     state.initiative = { ...state.initiative, currentIndex: 2, entries: state.initiative.entries.map((entry, index) => ({ ...entry, isActive: index === 2 })) };
     rerender(<InitiativeTracker />);
 
-    expect(scrolls.calls).toEqual([[list(container), container.querySelectorAll('.atlas-initiative-card')[2], 'nearest']]);
+    expect(scrolls.calls).toEqual([[list(container), container.querySelectorAll('.atlas-initiative-card')[2], 'nearest', 2]]);
   });
 
   it('scrolls its list to the top of the side whose turn it is', () => {
