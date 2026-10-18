@@ -9,7 +9,7 @@
 import type { RecordLayout, StoredRecord } from '../../services/recordFiles/recordLayout';
 import { JOIN_CODE_PATTERN, MAX_CAMPAIGN_PLAYERS, PLAYER_ID_PATTERN, playerName, TABLE_CODE_PATTERN } from '../../online/protocol/index';
 import { newJoinCode } from '../../utils/joinCode';
-import { CAMPAIGNS_FOLDER } from '../campaignPaths';
+import { campaignFileLayout } from '../campaignFileLayout';
 import { isRecord } from '../campaignValues';
 
 export const PLAYERS_FILE = 'players.json';
@@ -32,52 +32,19 @@ export interface CampaignPlayer {
   readonly characters: readonly string[];
 }
 
+const FILE = campaignFileLayout({ file: PLAYERS_FILE, format: PLAYERS_FORMAT, kind: 'campaign players' });
+
 /** Whether `path` is a players file: `players.json` directly in a campaign's folder. */
-export function isPlayersPath(path: string): boolean {
-  const rest = path.startsWith(`${CAMPAIGNS_FOLDER}/`) ? path.slice(CAMPAIGNS_FOLDER.length + 1) : '';
-  const parts = rest.split('/');
-  return parts.length === 2 && parts[0] !== '' && parts[1] === PLAYERS_FILE;
-}
-
-function readStored(text: string): StoredPlayers | null {
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (!isRecord(parsed) || typeof parsed.campaignId !== 'string' || parsed.campaignId === '') return null;
-    return { ...parsed, id: parsed.campaignId };
-  } catch {
-    return null;
-  }
-}
-
-function storedText(record: StoredPlayers): string {
-  const { id, format, campaignId: _campaignId, ...rest } = record;
-  const kept = typeof format === 'number' && format > PLAYERS_FORMAT ? format : PLAYERS_FORMAT;
-  return `${JSON.stringify({ format: kept, campaignId: id, ...rest }, null, 2)}\n`;
-}
+export const isPlayersPath = FILE.isPath;
 
 /** The players file of the campaign whose folder is `folder`. */
-export const playersPathIn = (folder: string): string => `${folder}/${PLAYERS_FILE}`;
+export const playersPathIn = FILE.pathIn;
 
-/**
- * A players file lies in its campaign's folder and is never named after anything: it is created
- * there (`RecordFiles.createAt`), follows the folder when it is renamed and goes with it.
- */
-export const PLAYERS_LAYOUT: RecordLayout<StoredPlayers> = {
-  root: CAMPAIGNS_FOLDER,
-  kind: 'campaign players',
-  isRecordPath: isPlayersPath,
-  read: readStored,
-  text: storedText,
-  namedPath: (path) => path,
-  recordPathIn: (path) => path,
-  freeNamedPath: () => {
-    throw new Error('A players file is created in its campaign\'s folder.');
-  },
-  isNamedAfter: () => true,
-};
+/** A players file lies in its campaign's folder (see `campaignFileLayout`). */
+export const PLAYERS_LAYOUT: RecordLayout<StoredPlayers> = FILE.layout;
 
 /** Whether this Atlas may write the file: one of a later format is only read. */
-export const isWritable = (stored: StoredPlayers): boolean => !(typeof stored.format === 'number' && stored.format > PLAYERS_FORMAT);
+export const isWritable: (stored: StoredPlayers) => boolean = FILE.isWritable;
 
 /** An empty players file for a campaign. */
 export const emptyPlayers = (campaignId: string): StoredPlayers => ({ id: campaignId, campaignId, players: {} });
