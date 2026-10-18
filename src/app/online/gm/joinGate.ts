@@ -28,8 +28,8 @@ const MAX_PAUSE_MS = 10 * 60_000;
 /** What the GM reads while too many wrong codes keep newcomers out. */
 export const PAUSED_TEXT = 'Joins paused: too many wrong codes';
 
-/** A new table's gates: a fresh code, and both switches on. */
-export const newGate = (random?: () => number): GateSettings => ({ code: newJoinCode(random), requireCode: true, askToJoin: true });
+/** A new table's gates: a fresh code that is none of `taken` (the players' own codes), and both switches on. */
+export const newGate = (random?: () => number, taken?: ReadonlySet<string>): GateSettings => ({ code: newJoinCode(random, taken), requireCode: true, askToJoin: true });
 
 /** The gates from the plugin's data, each field checked; a table saved before it had gates gets new ones. */
 export function readGate(data: unknown, random?: () => number): GateSettings {
@@ -87,6 +87,8 @@ export interface GatePorts {
   paused?(): void;
   readonly timers: Timers;
   readonly random?: () => number;
+  /** The campaign's players' own codes, which a new join code never is: they share the page's one field. */
+  taken?(): ReadonlySet<string>;
 }
 
 /**
@@ -124,7 +126,7 @@ export class TableGate implements GateActions {
 
   /** A new code, at once: the old one stops working, and a pause is over. */
   newCode(): void {
-    this.set({ ...this.current, code: newJoinCode(this.ports.random) });
+    this.set({ ...this.current, code: newJoinCode(this.ports.random, this.ports.taken?.()) });
   }
 
   setRequireCode(on: boolean): void {

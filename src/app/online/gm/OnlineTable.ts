@@ -5,6 +5,7 @@ import { randomHex } from '../../utils/randomHex';
 import { scaleInWindow } from './assetVariants.ts';
 import { ATLAS_VIEW_TYPE, type SceneStore } from './atlasView.ts';
 import type { BookShelf } from './book/BookShelf.ts';
+import type { TableSeats } from './campaignSeats.ts';
 import { tableBook, type TableBook } from './book/tableBook.ts';
 import { companionTimers, every } from './companionTimers.ts';
 import type { CreatedTable } from './createdTable.ts';
@@ -17,6 +18,7 @@ import { presentedScene, presentedSceneSource } from './presentedScene.ts';
 import { bindScene, type SceneBinding } from './sceneBinding.ts';
 import { TabWatch } from './sharedTab.ts';
 import { TableConnection, type TableStatus } from './TableConnection.ts';
+import { TableRoster } from './tableRoster.ts';
 import { closingText, tableEndOf, tableEndText, type TableEnd } from './tableEnd.ts';
 import { readVaultImage } from './vaultImage.ts';
 import { LOST_NOTICES, type OnlineTableEvents } from './tableEvents.ts';
@@ -48,6 +50,8 @@ export class OnlineTable {
   readonly ownership: Ownership;
   /** The table's gates: the join code, the two switches, and who waits for an answer. */
   readonly gate: TableGate;
+  /** The players of the campaign the table runs on. */
+  readonly roster: TableRoster;
   /** The table's log: chat, rolls, who came and went. */
   readonly log: TableLog;
   /** The image the GM shows every player over the map, while one is shown. */
@@ -60,7 +64,7 @@ export class OnlineTable {
   readonly link: string;
   private readonly stopOwnership: () => void;
 
-  constructor(app: App, origin: string, table: CreatedTable, mapPath: string | null, ownership: Ownership, gate: GateSettings, events: OnlineTableEvents, shelf: BookShelf, savedLog?: unknown) {
+  constructor(app: App, origin: string, table: CreatedTable, mapPath: string | null, ownership: Ownership, seats: TableSeats, gate: GateSettings, events: OnlineTableEvents, shelf: BookShelf, savedLog?: unknown) {
     this.app = app;
     this.ownership = ownership;
     this.events = events;
@@ -72,6 +76,7 @@ export class OnlineTable {
       changed: () => events.changed(),
       paused: () => showNotice(PAUSED_TEXT),
       timers: companionTimers(),
+      taken: () => seats.codes(),
     });
     const timers = companionTimers();
     this.log = new TableLog({
@@ -135,13 +140,15 @@ export class OnlineTable {
     this.connection = new TableConnection(origin, table.code, table.secret, {
       status: (status) => this.setStatus(status),
       // The scene and tokens first: the players' mine messages follow from the ownership change.
-      welcome: (players) => {
-        // Who came or went while the GM was away is in the log before it goes out again.
+      welcome: (connected) => {
+        // Who joined while the GM was away is seated as one who joins now; who came or went is in the log before it goes out again.
+        const players = connected.filter((player) => this.roster.joined(player));
         this.log.welcome(players);
         this.resend();
         ownership.welcome(players);
       },
       joined: (player) => {
+        if (!this.roster.joined(player)) return;
         // The log as it was, then the line that they joined, which everyone gets.
         this.resend(player.id);
         ownership.joined(player);
@@ -159,6 +166,7 @@ export class OnlineTable {
       message: (from, body) => void (this.log.receive(from, body) || this.image.receive(from, body) || this.found.receive(from, body) || this.books.share.receive(from, body) || this.bound()?.share.receive(from, body)),
       access: (closesAt) => this.setClosing(closesAt),
     }, this.gate);
+    this.roster = new TableRoster(seats, this.connection, { kick: (player) => this.kick(player), joinCode: () => this.gate.settings.code });
     this.stopOwnership = ownership.onChange(() => this.bound()?.share.ownersChanged());
   }
 
@@ -205,6 +213,7 @@ export class OnlineTable {
   }
 
   start(): void {
+    this.roster.start();
     this.connection.start();
     this.books.start();
     this.found.start();
@@ -245,6 +254,7 @@ export class OnlineTable {
   private finish(end: 'stopped' | TableEnd): void {
     this.stopWatch();
     this.stopOwnership();
+    this.roster.dispose();
     this.gate.dispose();
     this.log.dispose();
     this.books.stop();

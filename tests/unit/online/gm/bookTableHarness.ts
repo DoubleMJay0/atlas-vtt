@@ -5,7 +5,7 @@ import type { SceneState } from '../../../../src/app/online/gm/atlasView.ts';
 import type { BookShelf, BookSource } from '../../../../src/app/online/gm/book/BookShelf.ts';
 import { isEmptyBook, type StoredBook } from '../../../../src/app/online/gm/book/bookStore.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
-import { boundOwnership } from './fakeSeats.ts';
+import { boundOwnership, fakeCampaigns } from './fakeSeats.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { app, atlasTab, FakeSocket, png, present, workspace, type FakeTab } from './fakeTable.ts';
 import { fakeTokenSource } from './fakeTokenSource.ts';
@@ -93,7 +93,7 @@ export function keptBooks(): KeptBooks {
 export const DOOM = 31337;
 export const MIRA_DOOM = 27182;
 
-const SAVED: SavedTable = { code: 'a'.repeat(26), secret: 's'.repeat(43), maxPlayers: 12, mapPath: MAP, gate: { code: '483912', requireCode: false, askToJoin: false } };
+const SAVED: SavedTable = { code: 'a'.repeat(26), secret: 's'.repeat(43), maxPlayers: 12, campaignId: 'c1', mapPath: MAP, gate: { code: '483912', requireCode: false, askToJoin: false } };
 
 /** The collection's resources: hit points players see, and a doom track hidden from players: only a character's own player sees theirs. */
 const RESOURCES: readonly ResourceDefinition[] = [
@@ -185,8 +185,8 @@ export async function openTable(shelf: BookShelf, players: readonly PlayerInfo[]
   workspace.leaves = [tab.leaf];
   present(tab);
   const ownership = boundOwnership(campaign, { owners });
-  const online = new OnlineControl(app, ownership, undefined, undefined, undefined, shelf);
-  online.resume(SAVED);
+  const online = new OnlineControl(app, ownership, fakeCampaigns(campaign), undefined, undefined, undefined, shelf);
+  void online.resume(SAVED);
   await advanceSettled(0);
   const socket = FakeSocket.all.at(-1);
   if (socket === undefined) throw new Error('no socket');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { App } from 'obsidian';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
 import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
-import { boundOwnership } from './fakeSeats.ts';
+import { boundOwnership, fakeCampaigns } from './fakeSeats.ts';
 import { ATLAS_VIEW_TYPE, type SceneStore } from '../../../../src/app/online/gm/atlasView.ts';
 import { createViewAtlasStore } from '../../../../src/app/storeFactory';
 import { getHistoryStore } from '../../../../src/app/stores/history';
@@ -24,7 +24,7 @@ function table(): { readonly online: OnlineControl; readonly owners: Ownership; 
   app.workspace.getMostRecentLeaf = (() => leaf) as unknown as typeof app.workspace.getMostRecentLeaf;
   const owners = boundOwnership([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]);
   owners.welcome([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]);
-  const online = new OnlineControl(app as unknown as App, owners);
+  const online = new OnlineControl(app as unknown as App, owners, fakeCampaigns());
   const history = getHistoryStore(store)!;
   return {
     online, owners,

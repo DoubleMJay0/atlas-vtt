@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   emptyPlayers, isPlayersPath, newLinkCode, newPlayerCode, newPlayerId, PLAYERS_LAYOUT, readPlayers,
-  withCharacterOwner, withLink, withoutPlayer, withPlayer, type StoredPlayers,
+  withCharacterOwner, withLink, withoutPlayer, withPlayer, withPlayerFields, type StoredPlayers,
 } from '../../../src/app/campaigns/players/playersFile';
 import { CAMPAIGNS_FOLDER } from '../../../src/app/campaigns/campaignPaths';
 import { JOIN_CODE_PATTERN, MAX_CAMPAIGN_PLAYERS, PLAYER_ID_PATTERN, TABLE_CODE_PATTERN } from '../../../src/app/online/protocol/index';
@@ -96,6 +96,14 @@ describe('changing a players file', () => {
   it('withCharacterOwner changes nothing for a player the file does not have', () => {
     const file = stored({ A: entry(1, { characters: ['tok1'] }) });
     expect(withCharacterOwner(file, 'tok1', 'GONE')).toBe(file);
+  });
+
+  it('withPlayerFields changes a player\'s name or code and nothing else of theirs, and nothing for a player the file does not have', () => {
+    const file = stored({ [idOf(1)]: entry(1, { characters: ['tok1'], colour: 'red' }), [idOf(2)]: entry(2) });
+    expect(withPlayerFields(file, idOf(1), { code: codeOf(9) }).players).toEqual({ [idOf(1)]: { ...entry(1, { characters: ['tok1'], colour: 'red' }), code: codeOf(9) }, [idOf(2)]: entry(2) });
+    expect(withPlayerFields(file, idOf(1), { name: 'Mira' }).players).toMatchObject({ [idOf(1)]: { name: 'Mira', code: codeOf(1) } });
+    expect(withPlayerFields(file, idOf(3), { name: 'Mira' })).toBe(file);
+    expect(withPlayerFields({ ...file, format: 2 }, idOf(1), { name: 'Mira' }).players).toBe(file.players);
   });
 
   it('withLink sets the table code', () => {

@@ -29,6 +29,7 @@ import type { OnlineDataFile } from './onlineData.ts';
 import type { OnlineTable } from './OnlineTable.ts';
 import { Ownership, readOwnership } from './ownership.ts';
 import { readSavedTable, type SavedTable } from './savedTable.ts';
+import { appCampaigns, type TableCampaigns } from './tableCampaigns.ts';
 import { DEFAULT_SETTINGS, onlineSettingsSections, readSettings, type OnlineSettings } from './settings.ts';
 
 /** How long a change of the table's log waits before the data file is written. */
@@ -73,7 +74,7 @@ export class OnlineFeature extends Component {
   constructor(private readonly plugin: Plugin, private readonly data: OnlineDataFile) {
     super();
     this.app = plugin.app;
-    this.online = new OnlineControl(this.app, new Ownership(readOwnership(undefined), () => undefined));
+    this.online = new OnlineControl(this.app, new Ownership(readOwnership(undefined), () => undefined), this.campaigns());
     this.account = new AccountControl({
       http: obsidianHttp,
       timers: companionTimers(),
@@ -127,7 +128,7 @@ export class OnlineFeature extends Component {
     this.savedTable = readSavedTable(record.table);
     this.savedLog = this.savedTable === null ? undefined : record.tableLog;
     this.legacyBooks = readBooks(record.books);
-    this.online = new OnlineControl(this.app, ownership, (table) => {
+    this.online = new OnlineControl(this.app, ownership, this.campaigns(), (table) => {
       this.savedTable = table;
       void this.saveSettings();
     }, this.account, { read: () => this.savedLog, write: (entries) => this.keepLog(entries) }, this.books);
@@ -173,7 +174,7 @@ export class OnlineFeature extends Component {
     this.app.workspace.onLayoutReady(() => {
       if (!this.live) return;
       // A table that ran when Obsidian or Atlas was last unloaded comes back with the same link.
-      if (this.savedTable !== null) this.online.resume(this.savedTable);
+      if (this.savedTable !== null) void this.online.resume(this.savedTable);
       // A signed-in GM's session is renewed, and the dock learns what it may host.
       void this.account.refresh(true);
       docks.sync();
@@ -236,10 +237,14 @@ export class OnlineFeature extends Component {
     await this.data.write({ ...this.settings, ownership: this.online.ownership.toData(), table: this.savedTable, ...(this.savedLog !== undefined && { tableLog: this.savedLog }), ...(Object.keys(this.legacyBooks).length > 0 && { books: this.legacyBooks }) });
   }
 
-  /** From now on the players' books are kept in the books file of this campaign, or in memory only for null. */
+  /**
+   * From now on the players' books are kept in the books file of this campaign, or in memory only for
+   * null; what the shelf held in memory of library tokens' books is forgotten, so it never hides the file's.
+   */
   bindBooks(campaignId: string | null): void {
     const books = CampaignBooks.forApp(this.app);
     this.bookSource.bind(campaignId === null || books === undefined ? null : campaignBookSource(books, campaignId));
+    if (campaignId !== null) this.books.forgetKept();
   }
 
   /**
@@ -253,9 +258,18 @@ export class OnlineFeature extends Component {
     const assets = await AssetService.getInstance(this.app).getTokenAssets();
     const tokens = assets.map(({ id, collection, imagePath }) => ({ id, collection, imagePath }));
     const left = await carryBooksOver(this.legacyBooks, tokens, books, campaignId);
-    if (left === null) return;
+    // Nothing was carried over: the data file stays as it is.
+    if (left === null || JSON.stringify(left) === JSON.stringify(this.legacyBooks)) return;
     this.legacyBooks = left;
     await this.saveSettings();
+  }
+
+  /** The campaigns tables run on: a table binds its campaign's books, and carries the old books into them. */
+  private campaigns(): TableCampaigns {
+    return appCampaigns(this.app, (campaignId) => {
+      this.bindBooks(campaignId);
+      if (campaignId !== null) void this.migrateBooksInto(campaignId).catch((error: unknown) => console.error('[Atlas] Carrying the old books into the campaign failed:', error));
+    });
   }
 
   /** What one of online play's commands does; the plugin registers the commands once (`registerOnlinePlay`). */

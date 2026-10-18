@@ -27,6 +27,14 @@ export class BookShelf {
     return this.memory.get(characterId) ?? this.source.read(characterId) ?? EMPTY_BOOK;
   }
 
+  /**
+   * Forgets the books held in memory for want of a source, but those of tokens that are no library
+   * token's: from now on the source (a campaign's books file just bound) holds each character's.
+   */
+  forgetKept(): void {
+    for (const characterId of [...this.memory.keys()]) if (!characterId.startsWith(UNPLACED_PREFIX)) this.memory.delete(characterId);
+  }
+
   /** Keeps a character's book as it is now. */
   keep(characterId: string, book: StoredBook): void {
     if (!characterId.startsWith(UNPLACED_PREFIX) && this.source.write(characterId, book)) {

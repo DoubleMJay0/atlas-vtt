@@ -1,0 +1,48 @@
+import { showNotice } from '../../ui/notice';
+import { obsidianHttp } from './account/obsidianHttp.ts';
+import { campaignLink, linkRefusal, NO_CAMPAIGN_TEXT, type TableSeats } from './campaignSeats.ts';
+import type { CreatedTable } from './createdTable.ts';
+import { createTable } from './createTable.ts';
+import { RELAY_ORIGIN } from './servers.ts';
+import type { TableCampaigns } from './tableCampaigns.ts';
+
+/** The GM's account as starting a table needs it. */
+export interface HostAccount {
+  /** The account's token, or null while signed out. */
+  token(): string | null;
+  /** The relay refused the token. */
+  signedOutByServer(): void;
+  /** Asks the relay again what the account may host. */
+  refresh(force: boolean): Promise<void>;
+}
+
+export const NO_ACCOUNT: HostAccount = { token: () => null, signedOutByServer: () => undefined, refresh: () => Promise.resolve() };
+
+/** Tells the GM why something cannot be done; null, for the caller to answer. */
+export function refused(text: string): null {
+  showNotice(text);
+  return null;
+}
+
+/** A table the relay made on a campaign's link, with that campaign's players. */
+export interface CampaignTable {
+  readonly created: CreatedTable;
+  readonly seats: TableSeats;
+}
+
+/**
+ * Asks the relay for a table on the lasting link of the campaign `campaignId` once its players file
+ * was read, making the link first where it has none; null where no table was made, the GM told why
+ * (a relay that signed the account out says so on the account instead).
+ */
+export async function createCampaignTable(campaigns: TableCampaigns, campaignId: string, token: string, account: HostAccount): Promise<CampaignTable | null> {
+  const seats = await campaigns.open(campaignId).catch(() => null);
+  const link = seats === null ? null : campaignLink(seats);
+  if (seats === null || link === null) return refused(seats === null ? NO_CAMPAIGN_TEXT : linkRefusal(seats));
+  // Whether this account may host is the relay's answer alone: nothing here looks at what the account was last said to hold.
+  const created = await createTable(obsidianHttp, RELAY_ORIGIN, token, link);
+  if (!('message' in created)) return { created, seats };
+  if (created.status === 401) account.signedOutByServer();
+  else if (created.status === 403) void account.refresh(true);
+  return created.status === 401 ? null : refused(created.message);
+}

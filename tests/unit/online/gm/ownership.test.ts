@@ -148,6 +148,15 @@ describe('characters', () => {
     expect(next.ownerOf('crypt-hero', hero('crypt-hero'))).toBe(ANA);
   });
 
+  it('are written once however many of their tokens are given or taken back together', () => {
+    const { owners, seats } = ownership();
+    const tokens = { a: hero('a'), b: hero('b'), c: hero('c'), goblin: token('goblin', { assetId: 'library-goblin' }) };
+    owners.give(['a', 'b', 'c', 'goblin'], tokens, ANA);
+    expect(seats.gave).toEqual([['library-hero', ANA], ['library-goblin', ANA]]);
+    owners.markPlayerTokens('Scenes/Cave.atlasmap', ['a', 'b', 'c'], tokens, false);
+    expect(seats.gave.slice(2)).toEqual([['library-hero', null]]);
+  });
+
   it('change hands, and go back to nobody, with any of their tokens; an owner a token had by its own id goes with it', () => {
     const { owners, seats } = ownership({ owners: { 'cave-hero': ANA } });
     owners.give(['cave-hero'], { 'cave-hero': hero('cave-hero') }, ANA);

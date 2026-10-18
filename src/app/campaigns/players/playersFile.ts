@@ -91,6 +91,12 @@ export function withPlayer(stored: StoredPlayers, player: CampaignPlayer, now: n
   return { ...stored, players };
 }
 
+/** The file with the name or code of the player `id` changed, everything else of theirs kept; a player the file does not have changes nothing. */
+export function withPlayerFields(stored: StoredPlayers, id: string, fields: Partial<Pick<CampaignPlayer, 'name' | 'code'>>): StoredPlayers {
+  if (!isWritable(stored) || !isRecord(stored.players) || !isRecord(stored.players[id])) return stored;
+  return { ...stored, players: { ...stored.players, [id]: { ...stored.players[id], ...fields } } };
+}
+
 /** The file without the player `id`. */
 export function withoutPlayer(stored: StoredPlayers, id: string): StoredPlayers {
   if (!isWritable(stored) || !isRecord(stored.players) || !(id in stored.players)) return stored;
@@ -122,11 +128,7 @@ export function withLink(stored: StoredPlayers, link: string): StoredPlayers {
 }
 
 /** A join code no player of the campaign has yet. */
-export function newPlayerCode(taken: ReadonlySet<string>, random?: () => number): string {
-  let code = newJoinCode(random);
-  while (taken.has(code)) code = newJoinCode(random);
-  return code;
-}
+export const newPlayerCode = (taken: ReadonlySet<string>, random?: () => number): string => newJoinCode(random, taken);
 
 const BASE32 = 'abcdefghijklmnopqrstuvwxyz234567';
 

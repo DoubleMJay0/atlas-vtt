@@ -63,6 +63,13 @@ describe('carrying the old books into a campaign when its table starts', () => {
     expect(saved[0]).not.toHaveProperty('books');
   });
 
+  it('leaves the data file alone when no library token takes any of its books over', async () => {
+    assets.tokens = [];
+    const { feature: online, saved } = await feature(OLD);
+    await online.migrateBooksInto('c1');
+    expect(saved).toEqual([]);
+  });
+
   it('leaves the data file alone, and the books in it, when the campaign\'s file was not written', async () => {
     assets.tokens = [{ id: 'lib-a', collection: 'Cairn', imagePath: 'art/a.webp' }];
     const { feature: online, vault, saved } = await feature(OLD);

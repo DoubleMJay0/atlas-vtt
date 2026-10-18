@@ -157,6 +157,16 @@ describe('a book as the GM keeps it', () => {
     expect(alone.of('lib-a')).toBe(book);
     expect(alone.of('lib-b')).toBe(EMPTY_BOOK);
   });
+
+  it('forgets what it held in memory of library tokens once a campaign\'s file keeps their books, and keeps the rest', () => {
+    const book = written([note(1)]);
+    const shelf = new BookShelf();
+    shelf.keep('lib-a', book);
+    shelf.keep('token:tok-1', book);
+    shelf.forgetKept();
+    expect(shelf.of('lib-a')).toBe(EMPTY_BOOK);
+    expect(shelf.of('token:tok-1')).toBe(book);
+  });
 });
 
 describe('a rolled item as a book holds it', () => {

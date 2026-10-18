@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
 import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
-import { boundOwnership } from './fakeSeats.ts';
+import { boundOwnership, fakeCampaigns } from './fakeSeats.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { app, FakeSocket, png, workspace } from './fakeTable.ts';
 import { advanceSettled as advance } from './settled.ts';
@@ -19,7 +19,7 @@ vi.mock('obsidian', () => ({
 
 const ANA = 'anaanaanaanaanaanaan';
 const BEN = 'benbenbenbenbenbenbe';
-const SAVED: SavedTable = { code: 'a'.repeat(26), secret: 's'.repeat(43), maxPlayers: 12, mapPath: null, gate: { code: '483912', requireCode: false, askToJoin: false } };
+const SAVED: SavedTable = { code: 'a'.repeat(26), secret: 's'.repeat(43), maxPlayers: 12, campaignId: 'c1', mapPath: null, gate: { code: '483912', requireCode: false, askToJoin: false } };
 
 interface Sent {
   readonly to: string | undefined;
@@ -46,9 +46,10 @@ describe('the running table\'s shown image', () => {
 
   it('is the table\'s: shown, served, sent to who joins and again after a reconnect while no scene is shared at all', async () => {
     const changes: number[] = [];
-    const online = new OnlineControl(app, boundOwnership([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]));
+    const players = [{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }];
+    const online = new OnlineControl(app, boundOwnership(players), fakeCampaigns(players));
     online.onChange(() => changes.push(changes.length));
-    const table = online.resume(SAVED);
+    const table = await online.resume(SAVED);
     if (table === null) throw new Error('no table');
     await advance(0);
     const socket = FakeSocket.all[0];

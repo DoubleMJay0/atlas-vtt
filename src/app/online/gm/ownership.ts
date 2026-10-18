@@ -84,6 +84,8 @@ export class Ownership {
   private stopSeats: () => void = () => undefined;
   /** The campaign's characters by library token id with their owner, read from the seats until they change. */
   private characters: ReadonlyMap<string, string> | null = null;
+  /** The campaign's players' names by id, read from the seats until they change. */
+  private names: ReadonlyMap<string, string> | null = null;
   /** Owners of tokens placed from no library token, by token id. */
   private readonly owners = new Map<string, string>();
   /** The GM's marks by map path, then token id: true for a player token, false for the GM's own. */
@@ -115,7 +117,7 @@ export class Ownership {
   bind(seats: CampaignSeats | null): void {
     this.stopSeats();
     this.campaign = seats;
-    this.characters = null;
+    this.forgetSeats();
     this.stopSeats = seats?.onChange(() => this.seatsChanged()) ?? ((): void => undefined);
     this.changed(false);
   }
@@ -148,7 +150,7 @@ export class Ownership {
    */
   give(tokenIds: readonly string[], tokens: Readonly<Record<string, OwnedToken>>, playerId: string | null): void {
     if (this.campaign === null || (playerId !== null && this.nameOf(playerId) === null)) return;
-    for (const tokenId of tokenIds) this.setOwner(tokenId, tokens[tokenId], playerId);
+    this.setOwners(tokenIds, tokens, playerId);
     this.changed(true);
   }
 
@@ -168,11 +170,9 @@ export class Ownership {
   markPlayerTokens(mapPath: string, tokenIds: readonly string[], tokens: Readonly<Record<string, OwnedToken>>, player: boolean): void {
     if (mapPath.length > MAX_MAP_PATH) return;
     const marks = this.marks.get(mapPath) ?? new Map<string, boolean>();
-    for (const tokenId of tokenIds) {
-      if (tokenId.length > MAX_TOKEN_ID) continue;
-      marks.set(tokenId, player);
-      if (!player) this.setOwner(tokenId, tokens[tokenId], null);
-    }
+    const marked = tokenIds.filter((tokenId) => tokenId.length <= MAX_TOKEN_ID);
+    for (const tokenId of marked) marks.set(tokenId, player);
+    if (!player) this.setOwners(marked, tokens, null);
     if (marks.size > 0) this.marks.set(mapPath, marks);
     this.changed(true);
   }
@@ -202,7 +202,8 @@ export class Ownership {
 
   /** The name a player of the campaign goes by, or null for anyone else. */
   nameOf(playerId: string): string | null {
-    return this.campaign?.players().find((player) => player.id === playerId)?.name ?? null;
+    this.names ??= new Map((this.campaign?.players() ?? []).map((player) => [player.id, player.name]));
+    return this.names.get(playerId) ?? null;
   }
 
   /** Every player of the campaign: those online first, then by name. */
@@ -218,20 +219,31 @@ export class Ownership {
   }
 
   private seatsChanged(): void {
-    this.characters = null;
+    this.forgetSeats();
     this.changed(false);
   }
 
-  /** Sets or (null) clears the owner of one token: its character's, else its own; an owner the token had by its own id goes. */
-  private setOwner(tokenId: string, token: OwnedToken | undefined, playerId: string | null): void {
-    const assetId = token?.assetId;
-    if (assetId === undefined) {
-      setIn(this.owners, tokenId, playerId);
-      return;
-    }
-    this.owners.delete(tokenId);
-    this.campaign?.setOwner(assetId, playerId);
+  private forgetSeats(): void {
     this.characters = null;
+    this.names = null;
+  }
+
+  /**
+   * Sets or (null) clears the owner of tokens: their character's, else their own; an owner a token
+   * had by its own id goes. Each character is written once, however many of the tokens it placed.
+   */
+  private setOwners(tokenIds: readonly string[], tokens: Readonly<Record<string, OwnedToken>>, playerId: string | null): void {
+    const characters = new Set<string>();
+    for (const tokenId of tokenIds) {
+      const assetId = tokens[tokenId]?.assetId;
+      if (assetId === undefined) setIn(this.owners, tokenId, playerId);
+      else {
+        this.owners.delete(tokenId);
+        characters.add(assetId);
+      }
+    }
+    for (const assetId of characters) this.campaign?.setOwner(assetId, playerId);
+    if (characters.size > 0) this.characters = null;
   }
 
   private changed(persist: boolean): void {
