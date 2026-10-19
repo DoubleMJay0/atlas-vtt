@@ -1,12 +1,14 @@
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
+import { fileURLToPath } from 'node:url';
 
 const alias = {
   '@': '/src',
   src: '/src',
   obsidian: '/tests/mocks/obsidian.ts',
   // Its `main` is a UMD bundle that Node loads with a second, CommonJS copy of pixi.js; the ESM build shares the app's.
-  'pixi-viewport': '/node_modules/pixi-viewport/dist/pixi_viewport.js',
+  // A path on disk: the browser project's dependency optimizer reads it as one, and finds no `/node_modules` at the disk's root.
+  'pixi-viewport': fileURLToPath(new URL('./node_modules/pixi-viewport/dist/pixi_viewport.js', import.meta.url)),
 };
 
 export default defineConfig({
