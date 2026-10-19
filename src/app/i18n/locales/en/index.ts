@@ -71,6 +71,7 @@ import { playerInit } from './playerInit';
 import { present } from './present';
 import { preview } from './preview';
 import { recovery } from './recovery';
+import { rest } from './rest';
 import { review } from './review';
 import { sbCandidate } from './sbCandidate';
 import { sbToken } from './sbToken';
@@ -162,6 +163,7 @@ export const en = {
   ...present,
   ...preview,
   ...recovery,
+  ...rest,
   ...review,
   ...sbCandidate,
   ...sbToken,

@@ -21,3 +21,14 @@ export function libraryTokenOf(token: PlacedTokenSource, tokens: readonly TokenA
   }
   return tokens.find((asset) => asset.imagePath === token.imagePath) ?? null;
 }
+
+/**
+ * The player character whose statblock is the note at `notePath`: the library token marked as one
+ * of the players' characters that links the note. Where several do, the first by name (then id),
+ * so every caller names the same one. Null where none does.
+ */
+export function playerCharacterLinking(tokens: readonly TokenAsset[], notePath: string): TokenAsset | null {
+  const linked = tokens.filter((asset) => isPlayerCharacter(asset) && asset.statblockPath === notePath);
+  linked.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  return linked[0] ?? null;
+}
