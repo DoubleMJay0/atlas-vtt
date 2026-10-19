@@ -4,8 +4,11 @@ import type { DragRulerView } from '../../src/app/pixi/token-renderer/DragRulerV
 import type { GridSystem } from '../../src/app/grid/GridSystem';
 import type { MeasurementSettings } from '../../src/app/grid/measurementFormat';
 import type { ViewAtlasState } from '../../src/app/storeFactory';
+import { computeTokenPixelSize } from '../../src/app/pixi/token-renderer/tokenSizing';
 
 const CELL = 70;
+/** The ruler stops at the rim of the dragged size-1 token. */
+const RIM = computeTokenPixelSize(CELL, 1) / 2;
 const center = (col: number, row: number): { x: number; y: number } => ({ x: CELL / 2 + col * CELL, y: CELL / 2 + row * CELL });
 
 function makeRuler(token: { isHidden?: boolean } = {}): { ruler: DragRuler; view: { draw: ReturnType<typeof vi.fn>; clear: ReturnType<typeof vi.fn>; layers: object[] } } {
@@ -36,7 +39,7 @@ describe('DragRuler', () => {
     const { ruler, view } = makeRuler();
     ruler.begin('t1', { x: 40, y: 30 });
     ruler.update({ x: 3 * CELL + 50, y: 20 });
-    expect(view.draw).toHaveBeenLastCalledWith([center(0, 0), center(3, 0)], '15ft');
+    expect(view.draw).toHaveBeenLastCalledWith([center(0, 0), center(3, 0)], '15ft', RIM);
     ruler.end();
   });
 
@@ -75,7 +78,7 @@ describe('DragRuler', () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(hotkeyListener).not.toHaveBeenCalled();
-    expect(view.draw).toHaveBeenLastCalledWith([center(0, 0), center(2, 0), center(2, 3)], '25ft');
+    expect(view.draw).toHaveBeenLastCalledWith([center(0, 0), center(2, 0), center(2, 3)], '25ft', RIM);
     window.removeEventListener('keydown', hotkeyListener);
     ruler.end();
   });
@@ -88,7 +91,7 @@ describe('DragRuler', () => {
     pressSpace();
     pressSpace({ repeat: true });
     ruler.update(center(2, 0));
-    expect(view.draw).toHaveBeenLastCalledWith([center(0, 0), center(1, 0), center(2, 0)], '10ft');
+    expect(view.draw).toHaveBeenLastCalledWith([center(0, 0), center(1, 0), center(2, 0)], '10ft', RIM);
     ruler.end();
   });
 
