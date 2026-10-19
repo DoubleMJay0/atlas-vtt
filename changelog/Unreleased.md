@@ -4,6 +4,7 @@
 - Statblock templates: a Counters tile tracks anything with limited uses, such as spell slots per level, ki or a feature's uses per day. Each row shows its uses as pips. The template names its own refills, such as a rest, dawn or a new session, and a row can get back all of its uses or a rolled number, such as 1d6+1. Beside the note, one button for each refill gives the uses back across the whole sheet.
 
 ## Improved
+- Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
 - Online play: busy tables send far fewer messages. Cursors, lasers and measurements go out ten times a second and still move smoothly, and a changed quest or world map reaches players without their whole book being sent again.
 - Random tables: rename a table or remove it from the list from its menu (⋯ or right-click) in the Random tables window, and undo a removal from the message that follows. A new name shows only in Atlas and leaves the note as it is; you can also set it in the collection settings. A table whose note was deleted can now be removed too.

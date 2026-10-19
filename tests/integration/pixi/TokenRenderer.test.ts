@@ -58,6 +58,8 @@ type TokenInput = Parameters<ReturnType<ViewStore['getState']>['addToken']>[0];
 /** Records ticker callbacks so a test can advance animations frame by frame. */
 class FakeTicker {
   private callbacks = new Set<TickerCallback>();
+  /** Read by Motion's ticker driver as the frame time. */
+  lastTime = 0;
   add(callback: TickerCallback): void {
     this.callbacks.add(callback);
   }
@@ -65,6 +67,7 @@ class FakeTicker {
     this.callbacks.delete(callback);
   }
   advance(deltaMS: number): void {
+    this.lastTime += deltaMS;
     for (const callback of Array.from(this.callbacks)) callback({ deltaMS });
   }
   get size(): number {
@@ -258,7 +261,15 @@ describe('TokenRenderer Integration Tests', () => {
 
       store.getState().deleteToken('token-1');
 
+      // Gone from the renderer at once, still on the canvas while it fades out
       await vi.waitFor(() => expect(tokenRenderer.getTokenSprites()['token-1']).toBeUndefined());
+      expect(group.destroyed).toBe(false);
+      ticker.advance(0);
+      ticker.advance(150);
+      expect(group.alpha).toBeLessThan(1);
+      expect(group.scale.x).toBeLessThan(1);
+
+      ticker.advance(400);
       expect(group.destroyed).toBe(true);
       expect(tokenRenderer.getTokenContainer().children).not.toContain(group);
     });
