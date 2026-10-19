@@ -24,10 +24,10 @@ function actions(): PanelActions {
   } as unknown as PanelActions;
 }
 
-function panel(): { layer: HTMLElement; does: PanelActions; redraw(): void } {
+function panel(): { layer: HTMLElement; does: PanelActions; redraw(players?: OnlineSnapshot['players']): void } {
   const layer = document.body.createDiv();
   const does = actions();
-  const redraw = (): void => renderPanel(layer, panelView(snapshot(), SCENE, feedback), does);
+  const redraw = (players: OnlineSnapshot['players'] = [ANA]): void => renderPanel(layer, panelView(snapshot({ players }), SCENE, feedback), does);
   redraw();
   return { layer, does, redraw };
 }
@@ -57,7 +57,7 @@ describe('removing a player from the campaign', () => {
     layer.querySelector<HTMLButtonElement>('.atlas-online-player__more')?.click();
     rowOf(menus.opened.at(-1)!, 'Remove from campaign').run();
     expect(does.removeFromCampaign).not.toHaveBeenCalled();
-    expect(layer.querySelector('.atlas-online-confirm__text')?.textContent).toBe('Ana can no longer join. Their characters keep their books.');
+    expect(layer.querySelector('.atlas-online-confirm__text')?.textContent).toBe('Remove Ana from the campaign?');
     press(layer, 'Cancel');
     expect(layer.querySelector('.atlas-online-confirm')).toBeNull();
     expect(does.removeFromCampaign).not.toHaveBeenCalled();
@@ -74,6 +74,29 @@ describe('removing a player from the campaign', () => {
     redraw();
     expect(layer.querySelectorAll('.atlas-online-confirm')).toHaveLength(1);
   });
+
+  it('asks in place of the player\'s row, where the GM clicked', () => {
+    const { layer } = panel();
+    layer.querySelector<HTMLButtonElement>('.atlas-online-player__more')?.click();
+    rowOf(menus.opened.at(-1)!, 'Remove from campaign').run();
+    const question = layer.querySelector('.atlas-online-confirm');
+    expect(question?.closest('.atlas-online-group')).not.toBeNull();
+    expect(question?.classList.contains('atlas-online-player-prompt')).toBe(true);
+    expect(layer.querySelector('.atlas-online-player')).toBeNull();
+    press(layer, 'Cancel');
+    expect(layer.querySelector('.atlas-online-player')).not.toBeNull();
+  });
+
+  it('goes with a player who leaves while it is open', () => {
+    const { layer, redraw } = panel();
+    layer.querySelector<HTMLButtonElement>('.atlas-online-player__more')?.click();
+    rowOf(menus.opened.at(-1)!, 'Remove from campaign').run();
+    redraw([]);
+    expect(layer.querySelector('.atlas-online-confirm')).toBeNull();
+    redraw();
+    expect(layer.querySelector('.atlas-online-confirm')).toBeNull();
+    expect(layer.querySelector('.atlas-online-player')).not.toBeNull();
+  });
 });
 
 describe('renaming a player', () => {
@@ -83,6 +106,7 @@ describe('renaming a player', () => {
     rowOf(menus.opened.at(-1)!, 'Rename…').run();
     const field = layer.querySelector<HTMLInputElement>('input.atlas-online-prompt__input');
     expect(field?.value).toBe('Ana');
+    expect(field?.closest('.atlas-online-group')).not.toBeNull();
     field!.value = '  Anna ';
     field!.dispatchEvent(new Event('input'));
     press(layer, 'Rename');

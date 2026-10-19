@@ -1,5 +1,5 @@
 // The panel's foot: the bar for the tokens selected on the map (or Show this map to players), and
-// Stop's confirmation.
+// the questions (Stop's confirmation; a player's stand in their row).
 @use '../../../../../styles/tokens' as *;
 @use '../../../../../styles/mixins' as *;
 @use 'online' as *;
@@ -86,6 +86,13 @@
     > .atlas-online-corner-button:last-child {
       @include atlas-panel-inset-radius($spacing-s, bottom-right);
     }
+  }
+
+  // A question about a player stands in their row, as tall as the row it replaces.
+  .atlas-online-player-prompt {
+    flex: none;
+    box-sizing: border-box;
+    min-height: $online-row;
   }
 
   .atlas-online-prompt__input {

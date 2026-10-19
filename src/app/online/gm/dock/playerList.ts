@@ -19,6 +19,8 @@ export interface ListActions {
   askRename(player: OnlinePlayer): void;
   /** Asks the GM whether the player leaves the campaign. */
   askRemoveFromCampaign(player: OnlinePlayer): void;
+  /** Draws the open question about the player into `parent`, where their row would be; false while there is none. */
+  playerPrompt(parent: HTMLElement, playerId: string): boolean;
   /** The tokens selected on the shared map, for "Assign selected tokens here". */
   selected(): readonly string[];
   /** The URL the vault serves an image path at. */
@@ -60,6 +62,7 @@ function releaseEntries(face: TokenRow | null, tokens: readonly TokenRow[], acti
  * name selects that token on the map, as its own row did, and their menu releases it alone.
  */
 function playerRow(list: HTMLElement, player: GroupPlayer, face: TokenRow | null, tokens: readonly TokenRow[], actions: ListActions): void {
+  if (actions.playerPrompt(list, player.id)) return;
   const row = list.createDiv({ cls: ['atlas-online-player', ...(player.online ? [] : ['is-away'])] });
   const main = face === null
     ? row.createDiv({ cls: 'atlas-online-player__main' })

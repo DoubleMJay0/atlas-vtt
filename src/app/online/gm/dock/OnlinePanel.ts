@@ -6,7 +6,7 @@ import { gateEntries, gateRowsOf, renderCodeRow, renderPausedRow, type GateRowAc
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
 import { closingOf, groupsOf, seatsNoteOf, selectionBarOf, statusOf, type OnlinePlayer, type OnlineSnapshot, type PlayerGroup, type SceneFacts, type SelectionBar, type Tone } from './panelModel.ts';
 import { renderPlayerList, type ListActions } from './playerList.ts';
-import { addPlayerRow, confirmPrompt, linkEntries, namePrompt, openPrompt, renderPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
+import { addPlayerRow, confirmPrompt, forgetGonePlayerPrompt, linkEntries, namePrompt, openPrompt, renderPlayerPrompt, renderPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
 import { renderSelectionBar, type SelectionActions } from './selectionBar.ts';
 
 /** The panel's width; it never grows wider than the row it hangs from. */
@@ -45,7 +45,7 @@ export interface CampaignActions {
   removeFromCampaign(playerId: string): void;
 }
 
-export interface PanelActions extends Omit<ListActions, 'askRename' | 'askRemoveFromCampaign'>, CampaignActions, AddPlayerActions, LinkActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions {
+export interface PanelActions extends Omit<ListActions, 'askRename' | 'askRemoveFromCampaign' | 'playerPrompt'>, CampaignActions, AddPlayerActions, LinkActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions {
   close(): void;
   stop(): void;
   copy(): Promise<boolean>;
@@ -76,15 +76,16 @@ function statusInWords(view: PanelView): string | null {
   return view.status.tone === 'green' ? null : view.status.text;
 }
 
-/** The list's questions: renaming a player and removing one from the campaign. */
+/** The list's questions, each in place of the player's row: renaming a player and removing one from the campaign. */
 function listActions(layer: HTMLElement, actions: PanelActions, redraw: () => void): ListActions {
   return {
     ...actions,
     askRename: (player) => openPrompt(layer, namePrompt('rename', `Rename ${player.name}`, 'Rename', player.name, (name) => {
       actions.renamePlayer(player.id, name);
       return true;
-    }), redraw),
-    askRemoveFromCampaign: (player) => openPrompt(layer, confirmPrompt('remove-player', `Remove ${player.name} from the campaign`, ' can no longer join. Their characters keep their books.', 'Remove', () => actions.removeFromCampaign(player.id), { name: player.name, warning: true }), redraw),
+    }, player.id), redraw),
+    askRemoveFromCampaign: (player) => openPrompt(layer, confirmPrompt('remove-player', `Remove ${player.name} from the campaign`, 'Remove {name} from the campaign?', 'Remove', () => actions.removeFromCampaign(player.id), { player, warning: true }), redraw),
+    playerPrompt: (parent, playerId) => renderPlayerPrompt(parent, layer, playerId, redraw),
   };
 }
 
@@ -101,6 +102,7 @@ export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelA
   const redraw = (): void => renderPanel(layer, view, actions);
   layer.empty();
   layer.addClass('atlas-online-panel');
+  forgetGonePlayerPrompt(layer, view.players.map((player) => player.id));
   const entries: MenuEntry[] = [
     { title: view.feedback.open ? 'Close feedback' : 'Send feedback', icon: 'message-square', run: () => actions.toggleFeedback() },
     ...gateEntries(view.gate, actions),

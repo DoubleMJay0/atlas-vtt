@@ -5,17 +5,18 @@ import type { MenuEntry } from './dockMenu.ts';
 import type { AddedPlayer } from './panelModel.ts';
 
 /**
- * A question or a field at the foot of the panel or the menu: the GM answers it before anything
- * happens. Kept apart from the DOM, which every redraw replaces, so a change at the table never
- * takes it away.
+ * A question or a field the GM answers before anything happens: in place of the player's row where it
+ * is about one (`playerId`), else at the foot of the panel or the menu. Kept apart from the DOM, which
+ * every redraw replaces, so a change at the table never takes it away; only the player leaving does.
  */
 export type Prompt = ConfirmPrompt | NamePrompt | CodePrompt;
 
-/** `name` is a player's own text; it stands first in the question, in a box of its own. */
+/** `name` is a player's own text; it stands where `text` says `{name}`, in a box of its own. */
 interface ConfirmPrompt {
   readonly kind: 'confirm';
   readonly key: string;
   readonly label: string;
+  readonly playerId: string | null;
   readonly name: string | null;
   readonly text: string;
   readonly confirm: string;
@@ -28,6 +29,7 @@ interface NamePrompt {
   readonly kind: 'name';
   readonly key: string;
   readonly label: string;
+  readonly playerId: string | null;
   readonly confirm: string;
   draft: string;
   readonly run: (name: string) => boolean;
@@ -60,12 +62,13 @@ export function openPrompt(layer: HTMLElement, prompt: Prompt, redraw: () => voi
   Array.from(layer.querySelectorAll<HTMLElement>('[data-focus-key]')).find((el) => el.dataset.focusKey === key)?.focus({ preventScroll: true });
 }
 
-export function confirmPrompt(key: string, label: string, text: string, confirm: string, run: () => void, options: { readonly name?: string; readonly warning?: boolean } = {}): Prompt {
-  return { kind: 'confirm', key, label, name: options.name ?? null, text, confirm, warning: options.warning === true, run };
+/** `options.player` is the player the question is about: it then stands in their row, and goes with them. */
+export function confirmPrompt(key: string, label: string, text: string, confirm: string, run: () => void, options: { readonly player?: { readonly id: string; readonly name: string }; readonly warning?: boolean } = {}): Prompt {
+  return { kind: 'confirm', key, label, playerId: options.player?.id ?? null, name: options.player?.name ?? null, text, confirm, warning: options.warning === true, run };
 }
 
-export function namePrompt(key: string, label: string, confirm: string, draft: string, run: (name: string) => boolean): Prompt {
-  return { kind: 'name', key, label, confirm, draft, run };
+export function namePrompt(key: string, label: string, confirm: string, draft: string, run: (name: string) => boolean, playerId: string | null = null): Prompt {
+  return { kind: 'name', key, label, playerId, confirm, draft, run };
 }
 
 export const codePrompt = (player: AddedPlayer): Prompt => ({ kind: 'code', player });
@@ -87,35 +90,63 @@ export function linkEntries(layer: HTMLElement, actions: LinkActions, redraw: ()
   return [{ title: 'New link', icon: 'link', run: ask }];
 }
 
-/** The prompt `layer` shows, if any, at its foot. */
+const playerOf = (prompt: Prompt): string | null => (prompt.kind === 'code' ? null : prompt.playerId);
+
+const closer = (layer: HTMLElement, redraw: () => void) => (): void => {
+  prompts.delete(layer);
+  redraw();
+};
+
+/** The prompt `layer` shows at its foot, if any: one about a player stands in their row instead. */
 export function renderPrompt(layer: HTMLElement, redraw: () => void): void {
   const prompt = prompts.get(layer);
-  if (prompt === undefined) return;
-  const close = (): void => {
-    prompts.delete(layer);
-    redraw();
-  };
-  if (prompt.kind === 'confirm') confirmRow(layer, prompt, close);
-  else if (prompt.kind === 'name') nameRow(layer, prompt, close);
+  if (prompt === undefined || playerOf(prompt) !== null) return;
+  const close = closer(layer, redraw);
+  if (prompt.kind === 'confirm') confirmRow(layer, prompt, close, false);
+  else if (prompt.kind === 'name') nameRow(layer, prompt, close, false);
   else codeRows(layer, prompt.player, close);
 }
 
-function confirmRow(layer: HTMLElement, prompt: ConfirmPrompt, close: () => void): void {
-  const row = layer.createDiv({ cls: 'atlas-online-confirm', attr: { role: 'group', 'aria-label': prompt.label } });
+/** Draws the prompt about `playerId` into `parent`, in place of their row; false where `layer` has none about them. */
+export function renderPlayerPrompt(parent: HTMLElement, layer: HTMLElement, playerId: string, redraw: () => void): boolean {
+  const prompt = prompts.get(layer);
+  if (prompt === undefined || prompt.kind === 'code' || prompt.playerId !== playerId) return false;
+  const close = closer(layer, redraw);
+  if (prompt.kind === 'confirm') confirmRow(parent, prompt, close, true);
+  else nameRow(parent, prompt, close, true);
+  return true;
+}
+
+/** Drops a prompt about a player who is no longer in the list: there is nobody left to ask about. */
+export function forgetGonePlayerPrompt(layer: HTMLElement, playerIds: readonly string[]): void {
+  const prompt = prompts.get(layer);
+  const playerId = prompt === undefined ? null : playerOf(prompt);
+  if (playerId !== null && !playerIds.includes(playerId)) prompts.delete(layer);
+}
+
+/** A prompt in a player's row keeps the row's height and stays clear of the panel's corner. */
+function promptRow(parent: HTMLElement, cls: string, label: string, inRow: boolean): HTMLElement {
+  return parent.createDiv({ cls: inRow ? [cls, 'atlas-online-player-prompt'] : cls, attr: { role: 'group', 'aria-label': label } });
+}
+
+function confirmRow(parent: HTMLElement, prompt: ConfirmPrompt, close: () => void, inRow: boolean): void {
+  const row = promptRow(parent, 'atlas-online-confirm', prompt.label, inRow);
   const text = row.createSpan({ cls: 'atlas-online-confirm__text' });
+  const [before, after] = prompt.name === null ? [prompt.text, ''] : prompt.text.split('{name}');
+  text.appendText(before ?? '');
   if (prompt.name !== null) text.createEl('bdi', { text: prompt.name });
-  text.appendText(prompt.text);
+  text.appendText(after ?? '');
   textButton(row, 'Cancel', close, 'ghost').dataset.focusKey = `${prompt.key}-cancel`;
   const answer = textButton(row, prompt.confirm, () => {
     close();
     prompt.run();
   }, prompt.warning ? 'warning' : 'plain');
   answer.dataset.focusKey = `${prompt.key}-confirm`;
-  answer.addClass('atlas-online-corner-button');
+  if (!inRow) answer.addClass('atlas-online-corner-button');
 }
 
-function nameRow(layer: HTMLElement, prompt: NamePrompt, close: () => void): void {
-  const row = layer.createDiv({ cls: 'atlas-online-prompt', attr: { role: 'group', 'aria-label': prompt.label } });
+function nameRow(parent: HTMLElement, prompt: NamePrompt, close: () => void, inRow: boolean): void {
+  const row = promptRow(parent, 'atlas-online-prompt', prompt.label, inRow);
   const field = row.createEl('input', { cls: 'atlas-online-prompt__input', attr: { type: 'text', 'aria-label': 'Name', 'data-focus-key': `${prompt.key}-name` } });
   field.value = prompt.draft;
   textButton(row, 'Cancel', close, 'ghost').dataset.focusKey = `${prompt.key}-cancel`;
@@ -125,7 +156,7 @@ function nameRow(layer: HTMLElement, prompt: NamePrompt, close: () => void): voi
   };
   const answer = textButton(row, prompt.confirm, submit, 'cta');
   answer.dataset.focusKey = `${prompt.key}-confirm`;
-  answer.addClass('atlas-online-corner-button');
+  if (!inRow) answer.addClass('atlas-online-corner-button');
   answer.disabled = playerName(field.value) === null;
   field.addEventListener('input', () => {
     prompt.draft = field.value;
