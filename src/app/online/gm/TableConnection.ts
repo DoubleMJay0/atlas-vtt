@@ -1,5 +1,5 @@
 import {
-  ALL_PLAYERS, FINAL_CLOSE_CODES, KEEPALIVE_PONG, PROTOCOL_VERSION, parseRelayFrame, type CampaignSeat, type ConnectionStats, type GmMessage, type PlayerInfo, type YourCodeMessage,
+  ALL_PLAYERS, FINAL_CLOSE_CODES, GM_LEVEL, KEEPALIVE_PONG, PROTOCOL_VERSION, parseRelayFrame, type CampaignSeat, type ConnectionStats, type GmMessage, type PlayerInfo, type YourCodeMessage,
 } from '../protocol/index.ts';
 import { randomHex } from '../../utils/randomHex';
 import { messageParts } from './assetServe.ts';
@@ -83,6 +83,8 @@ export class TableConnection {
   private readonly limit: Deadline;
   private readonly pulse: Pulse;
   private lastClose: number | null = null;
+  /** The least GM level the relay's player page needs, as its last welcome said; null before one or from a relay that names none. */
+  private needed: number | null = null;
   private status: TableStatus = 'connecting';
   private reconnects = 0;
   /** The players connected now, as the relay last told. */
@@ -118,7 +120,7 @@ export class TableConnection {
     this.limit.set(OPEN_TIMEOUT_MS, () => this.giveUp());
     socket.addEventListener('open', () => {
       if (socket !== this.socket) return;
-      socket.send(JSON.stringify({ v: PROTOCOL_VERSION, t: 'hello', role: 'gm', secret: this.secret }));
+      socket.send(JSON.stringify({ v: PROTOCOL_VERSION, t: 'hello', role: 'gm', secret: this.secret, level: GM_LEVEL }));
       this.limit.set(WELCOME_TIMEOUT_MS, () => this.giveUp());
     });
     socket.addEventListener('message', (event) => {
@@ -132,6 +134,11 @@ export class TableConnection {
   /** How the connection went, for feedback's diagnostics: no address, code or secret. */
   stats(): ConnectionStats {
     return { status: this.status, reconnects: this.reconnects, lastClose: this.lastClose, latencyMs: this.pulse.latencyMs(), players: this.players.size };
+  }
+
+  /** The least GM level the relay's player page needs, as its last welcome said; null while it said none. */
+  get minLevel(): number | null {
+    return this.needed;
   }
 
   /** The code the relay last closed the socket with, or null before it closed one. */
@@ -244,6 +251,7 @@ export class TableConnection {
     if (frame.t === 'welcome' && frame.role === 'gm') {
       this.limit.clear();
       this.attempts = 0;
+      this.needed = frame.minLevel ?? null;
       for (const player of frame.players) this.players.add(player.id);
       // The gates and the players first, ahead of whatever waits in the queue: the relay keeps them, and a restarted companion's are the same.
       if (this.gate !== null) socket.send(JSON.stringify({ v: PROTOCOL_VERSION, t: 'gate', ...this.gate.frame() }));

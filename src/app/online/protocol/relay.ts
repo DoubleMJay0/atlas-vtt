@@ -1,4 +1,5 @@
 import { JOIN_CODE_PATTERN, PLAYER_ID_PATTERN, playerName } from './identity.ts';
+import { levelIn } from './level.ts';
 import { type CampaignSeat, parseSeats } from './seat.ts';
 import { isRecord } from './shape.ts';
 
@@ -87,7 +88,16 @@ export interface PlayerHello {
   readonly newcomer?: true;
 }
 
-export type Hello = { readonly v: 1; readonly t: 'hello'; readonly role: 'gm'; readonly secret: string } | PlayerHello;
+/** A GM's hello; `level`: what its Atlas serves (`GM_LEVEL`), a GM from before levels names none and serves level 1. */
+export interface GmHello {
+  readonly v: 1;
+  readonly t: 'hello';
+  readonly role: 'gm';
+  readonly secret: string;
+  readonly level: number;
+}
+
+export type Hello = GmHello | PlayerHello;
 
 /** One game message of a GM's `sends` frame: to one player, or to all (`ALL_PLAYERS`). */
 export interface BatchedSend {
@@ -115,8 +125,12 @@ export type ClientFrame =
 
 /** What the relay sends a client. */
 export type RelayFrame =
-  /** `waiting`: the newcomers who wait for the GM's answer, left out while there are none. `batch`: the relay takes `sends` frames; an older one says nothing. */
-  | { readonly v: 1; readonly t: 'welcome'; readonly role: 'gm'; readonly players: readonly PlayerInfo[]; readonly waiting?: readonly PlayerInfo[]; readonly batch?: true }
+  /**
+   * `waiting`: the newcomers who wait for the GM's answer, left out while there are none. `batch`: the
+   * relay takes `sends` frames; an older one says nothing. `minLevel`: the least GM level the relay's
+   * player page needs; a GM below it was let in because players sit at the table, and should update.
+   */
+  | { readonly v: 1; readonly t: 'welcome'; readonly role: 'gm'; readonly players: readonly PlayerInfo[]; readonly waiting?: readonly PlayerInfo[]; readonly batch?: true; readonly minLevel?: number }
   /** A newcomer waits for the GM's answer; `knock-gone` once they do not (left, timed out, answered; `full`: admitted into a table without a seat). */
   | { readonly v: 1; readonly t: 'knock'; readonly id: string; readonly name: string }
   | { readonly v: 1; readonly t: 'knock-gone'; readonly id: string; readonly full?: true }
@@ -127,10 +141,12 @@ export type RelayFrame =
    * that keeps it (in memory only): a later hello with it takes the same wait up again.
    */
   | { readonly v: 1; readonly t: 'waiting'; readonly wait?: string }
-  | { readonly v: 1; readonly t: 'welcome'; readonly role: 'player'; readonly id: string; readonly key: string; readonly gmOnline: boolean }
+  /** `gmLevel`: what the table's GM serves (`GM_LEVEL`) while one is there; an older relay names none. */
+  | { readonly v: 1; readonly t: 'welcome'; readonly role: 'player'; readonly id: string; readonly key: string; readonly gmOnline: boolean; readonly gmLevel?: number }
   | { readonly v: 1; readonly t: 'player-joined'; readonly id: string; readonly name: string }
   | { readonly v: 1; readonly t: 'player-left'; readonly id: string }
-  | { readonly v: 1; readonly t: 'gm'; readonly online: boolean }
+  /** The GM came or went; `level`: what the GM who came serves, named by a relay that knows it. */
+  | { readonly v: 1; readonly t: 'gm'; readonly online: boolean; readonly level?: number }
   /**
    * To the GM: the table's account may no longer host, and the table closes at `closesAt` (the relay's
    * clock, in milliseconds) unless the account may host again by then; null once it may.
@@ -175,7 +191,7 @@ export function parseClientFrame(text: string): ClientFrame | null {
   }
   if (value.t === 'sends') return parseSends(value.sends);
   if (value.t !== 'hello') return null;
-  if (value.role === 'gm') return typeof value.secret === 'string' && SECRET_PATTERN.test(value.secret) ? { v: 1, t: 'hello', role: 'gm', secret: value.secret } : null;
+  if (value.role === 'gm') return typeof value.secret === 'string' && SECRET_PATTERN.test(value.secret) ? { v: 1, t: 'hello', role: 'gm', secret: value.secret, level: levelIn(value, 'level') } : null;
   if (value.role !== 'player') return null;
   const name = playerName(value.name);
   if (name === null) return null;
@@ -232,10 +248,13 @@ export function parseRelayFrame(text: string): RelayFrame | null {
         const players = value.players === undefined ? null : playerList(value.players);
         const waiting = playerList(value.waiting);
         if (players === null || waiting === null) return null;
-        return { v: 1, t: 'welcome', role: 'gm', players, ...(waiting.length > 0 && { waiting }), ...(value.batch === true && { batch: true as const }) };
+        return {
+          v: 1, t: 'welcome', role: 'gm', players, ...(waiting.length > 0 && { waiting }), ...(value.batch === true && { batch: true as const }),
+          ...(value.minLevel !== undefined && { minLevel: levelIn(value, 'minLevel') }),
+        };
       }
       if (value.role === 'player' && typeof value.id === 'string' && typeof value.key === 'string' && typeof value.gmOnline === 'boolean') {
-        return { v: 1, t: 'welcome', role: 'player', id: value.id, key: value.key, gmOnline: value.gmOnline };
+        return { v: 1, t: 'welcome', role: 'player', id: value.id, key: value.key, gmOnline: value.gmOnline, ...(value.gmLevel !== undefined && { gmLevel: levelIn(value, 'gmLevel') }) };
       }
       return null;
     case 'player-joined': {
@@ -256,7 +275,8 @@ export function parseRelayFrame(text: string): RelayFrame | null {
     case 'waiting':
       return typeof value.wait === 'string' && SECRET_PATTERN.test(value.wait) ? { v: 1, t: 'waiting', wait: value.wait } : { v: 1, t: 'waiting' };
     case 'gm':
-      return typeof value.online === 'boolean' ? { v: 1, t: 'gm', online: value.online } : null;
+      if (typeof value.online !== 'boolean') return null;
+      return value.level === undefined ? { v: 1, t: 'gm', online: value.online } : { v: 1, t: 'gm', online: value.online, level: levelIn(value, 'level') };
     case 'access':
       if (value.closesAt === null) return { v: 1, t: 'access', closesAt: null };
       return typeof value.closesAt === 'number' && Number.isFinite(value.closesAt) ? { v: 1, t: 'access', closesAt: value.closesAt } : null;

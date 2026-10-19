@@ -4,6 +4,8 @@ import { activeAtlasLeaf, activeStore, sceneStoreOf, selectedTokenIds, workScene
 import type { CampaignPlayer } from '../../campaigns/players/playersFile';
 import { BookShelf } from './book/BookShelf.ts';
 import { CAMPAIGNS_LOADING_TEXT, linkRefusal, NO_CAMPAIGN_TEXT, renewLink, type TableSeats } from './campaignSeats.ts';
+import { GM_LEVEL } from '../protocol/index.ts';
+import { isOutdated, rememberMinLevel } from './gmLevel.ts';
 import { freeGate, newGate } from './joinGate.ts';
 import { LogKeeper, type LogStore } from './log/logStore.ts';
 import { OnlineTable } from './OnlineTable.ts';
@@ -84,6 +86,16 @@ export class OnlineControl {
   /** How the last table ended, if the server ended it and not the GM; null otherwise. Cleared by the next start. */
   lost(): LostTable | null {
     return this.ended;
+  }
+
+  /** Whether the relay asked for a newer Atlas than this one, the last time it said. */
+  outdated(): boolean {
+    return isOutdated(this.app);
+  }
+
+  /** Whether the running table's relay needs a newer Atlas than this one: it let it in because players sit at the table. */
+  updateAfterSession(): boolean {
+    return (this.current?.minLevel ?? 0) > GM_LEVEL;
   }
 
   /** Whether a table can be started now: none runs or is starting, and an Atlas tab is active. */
@@ -233,7 +245,7 @@ export class OnlineControl {
     this.starting = true;
     this.changed();
     const closings = this.closings;
-    const made = await createCampaignTable(this.campaigns, campaignId, token, this.account).finally(() => (this.starting = false));
+    const made = await createCampaignTable(this.campaigns, campaignId, token, this.account, (level) => rememberMinLevel(this.app, level)).finally(() => (this.starting = false));
     this.changed();
     if (made === null || closings !== this.closings) return null;
     // A new table's log is empty: the last table's goes.
@@ -251,7 +263,11 @@ export class OnlineControl {
     this.ownership.bind(seats);
     this.campaigns.bound(saved.campaignId);
     const table = new OnlineTable(this.app, RELAY_ORIGIN, saved, saved.mapPath, this.ownership, seats, saved.gate, {
-      status: () => this.changed(),
+      status: () => {
+        // A welcome says what the relay needs now; an older relay names nothing and needs nothing.
+        if (table.status === 'online') rememberMinLevel(this.app, table.minLevel ?? 0);
+        this.changed();
+      },
       gate: (gate) => {
         if (this.current === table && this.saved !== null) this.keep({ ...this.saved, gate });
       },
@@ -265,8 +281,9 @@ export class OnlineControl {
         this.current = null;
         this.unbind();
         this.syncShown();
-        // A table the server ended is gone; one the GM stopped was dropped by `stop`, and one another Obsidian took over lives on there.
-        this.ended = end === 'stopped' || end === 'replaced' ? null : end;
+        // A table the server ended is gone; one the GM stopped was dropped by `stop`, one another Obsidian took over lives on there, and one that waits for an updated Atlas stays.
+        this.ended = end === 'stopped' || end === 'replaced' || end === 'outdated' ? null : end;
+        if (end === 'outdated') rememberMinLevel(this.app, GM_LEVEL + 1);
         if (this.ended !== null) this.keep(null);
         // The account page says why; the dock shows what the relay says of the account now.
         if (end === 'no-access') void this.account.refresh(true);

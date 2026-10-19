@@ -50,6 +50,10 @@ export interface OnlineSnapshot {
   readonly lost?: LostTable;
   /** When the relay closes the running table because its account may no longer host; absent while it does not. */
   readonly closesAt?: number;
+  /** The relay needs a newer Atlas: no table starts until Atlas is updated. */
+  readonly outdated?: true;
+  /** The running table's relay needs a newer Atlas, and let this one in because players sit at the table. */
+  readonly updateAfter?: true;
 }
 
 /** A player the GM added to the campaign, with the code they join by. */
@@ -90,7 +94,7 @@ export interface OnlineApi {
 }
 
 /** The part of `OnlineControl` the control uses. */
-export type ControlSource = Pick<OnlineControl, 'onChange' | 'status' | 'link' | 'seats' | 'isStarting' | 'lost' | 'start' | 'stop' | 'share' | 'players' | 'kick' | 'playerCode' | 'newPlayerCode' | 'addPlayer' | 'renamePlayer' | 'removeFromCampaign' | 'newLink' | 'playerTokens' | 'markPlayerTokens' | 'give'> & {
+export type ControlSource = Pick<OnlineControl, 'onChange' | 'status' | 'link' | 'seats' | 'isStarting' | 'lost' | 'outdated' | 'updateAfterSession' | 'start' | 'stop' | 'share' | 'players' | 'kick' | 'playerCode' | 'newPlayerCode' | 'addPlayer' | 'renamePlayer' | 'removeFromCampaign' | 'newLink' | 'playerTokens' | 'markPlayerTokens' | 'give'> & {
   readonly table: {
     readonly sharedTab: WorkspaceLeaf | null;
     readonly sharedStore: { getState(): { readonly objects: { readonly tokens: Readonly<Record<string, SceneToken>> } } } | null;
@@ -162,11 +166,14 @@ export function onlineApi(control: ControlSource, hideImage: () => void): Online
   };
 }
 
-/** How the last table ended and when the running one closes, as the snapshot carries them: only what there is. */
-function lostOf(control: ControlSource): Pick<OnlineSnapshot, 'lost' | 'closesAt'> {
+/** How the last table ended, when the running one closes and whether Atlas needs an update, as the snapshot carries them: only what there is. */
+function lostOf(control: ControlSource): Pick<OnlineSnapshot, 'lost' | 'closesAt' | 'outdated' | 'updateAfter'> {
   const lost = control.lost();
   const closesAt = control.table?.closesAt ?? null;
-  return { ...(lost !== null && { lost }), ...(closesAt !== null && { closesAt }) };
+  return {
+    ...(lost !== null && { lost }), ...(closesAt !== null && { closesAt }),
+    ...(control.outdated() && { outdated: true as const }), ...(control.updateAfterSession() && { updateAfter: true as const }),
+  };
 }
 
 /** Whether a table runs or is being created. */
@@ -241,13 +248,15 @@ export interface SceneFacts {
 }
 
 export type MenuModel =
-  | { readonly kind: 'start'; readonly account: AccountView; readonly starting: boolean; readonly lost: LostTable | null }
-  | { readonly kind: 'waiting'; readonly link: string | null; readonly status: { readonly text: string; readonly tone: Tone }; readonly isShared: boolean; readonly gate: GateRows | null; readonly qr: boolean; readonly imageShown: boolean; readonly closing: string | null };
+  | { readonly kind: 'start'; readonly account: AccountView; readonly starting: boolean; readonly lost: LostTable | null; readonly outdated: boolean }
+  | { readonly kind: 'waiting'; readonly link: string | null; readonly status: { readonly text: string; readonly tone: Tone }; readonly isShared: boolean; readonly gate: GateRows | null; readonly qr: boolean; readonly imageShown: boolean; readonly closing: string | null; readonly updateAfter: boolean };
 
 /** The connection menu: sign in and start a table (after one the server ended: how it ended), or the running table's link while players are awaited (`qr`: its QR card is open). */
 export function menuModel(snapshot: OnlineSnapshot, scene: SceneFacts, account: AccountView, qr = false): MenuModel {
-  if (!isRunning(snapshot.status) || snapshot.status === 'starting') return { kind: 'start', account, starting: snapshot.status === 'starting', lost: snapshot.status === 'refused' ? snapshot.lost ?? 'refused' : null };
-  return { kind: 'waiting', link: snapshot.link, status: statusOf(snapshot), isShared: scene.isShared, gate: gateRowsOf(snapshot.gate), qr, imageShown: snapshot.imageShown === true, closing: closingOf(snapshot) };
+  if (!isRunning(snapshot.status) || snapshot.status === 'starting') {
+    return { kind: 'start', account, starting: snapshot.status === 'starting', lost: snapshot.status === 'refused' ? snapshot.lost ?? 'refused' : null, outdated: snapshot.outdated === true };
+  }
+  return { kind: 'waiting', link: snapshot.link, status: statusOf(snapshot), isShared: scene.isShared, gate: gateRowsOf(snapshot.gate), qr, imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true };
 }
 
 export interface GroupPlayer extends OnlinePlayer {

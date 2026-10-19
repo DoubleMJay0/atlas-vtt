@@ -382,7 +382,7 @@ describe('the online table', () => {
     socket.relay({ t: 'welcome', role: 'gm', players: [], waiting: [{ id: ANA, name: 'Ana' }] });
     await advance(0);
     // Hello, then the gates, ahead of every game message.
-    expect(socket.frames().slice(0, 2)).toEqual([{ v: 1, t: 'hello', role: 'gm', secret: 'n'.repeat(43) }, { v: 1, t: 'gate', code, ask: true }]);
+    expect(socket.frames().slice(0, 2)).toEqual([{ v: 1, t: 'hello', role: 'gm', secret: 'n'.repeat(43), level: 1 }, { v: 1, t: 'gate', code, ask: true }]);
     expect(online.table?.gate.view().waiting).toEqual([{ id: ANA, name: 'Ana', answered: false, full: false, armed: false }]);
 
     const before = changes;

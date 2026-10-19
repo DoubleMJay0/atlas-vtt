@@ -60,13 +60,13 @@ describe('the badge', () => {
 
 describe('the menu', () => {
   it('offers Start without a table, with what the account may do', () => {
-    expect(menuModel(snapshot({ status: 'idle' }), scene(), SIGNED_OUT)).toEqual({ kind: 'start', account: SIGNED_OUT, starting: false, lost: null });
-    expect(menuModel(snapshot({ status: 'starting' }), scene(), CAN_HOST)).toEqual({ kind: 'start', account: CAN_HOST, starting: true, lost: null });
+    expect(menuModel(snapshot({ status: 'idle' }), scene(), SIGNED_OUT)).toEqual({ kind: 'start', account: SIGNED_OUT, starting: false, lost: null, outdated: false });
+    expect(menuModel(snapshot({ status: 'starting' }), scene(), CAN_HOST)).toEqual({ kind: 'start', account: CAN_HOST, starting: true, lost: null, outdated: false });
   });
 
   it('says how the last table ended when the server ended it, until the next one starts', () => {
     for (const lost of ['refused', 'no-access', 'superseded'] as const) {
-      expect(menuModel(snapshot({ status: 'refused', lost }), scene(), CAN_HOST)).toEqual({ kind: 'start', account: CAN_HOST, starting: false, lost });
+      expect(menuModel(snapshot({ status: 'refused', lost }), scene(), CAN_HOST)).toEqual({ kind: 'start', account: CAN_HOST, starting: false, lost, outdated: false });
     }
     // A table that is starting, or one the GM stopped, was lost by nothing.
     expect(menuModel(snapshot({ status: 'starting', lost: 'no-access' }), scene(), CAN_HOST)).toMatchObject({ lost: null });
@@ -92,13 +92,13 @@ describe('the menu', () => {
 
   it('shows the link, the status and the shared map while players are awaited', () => {
     expect(menuModel(snapshot({ status: 'connecting' }), scene({ isShared: false }), CAN_HOST)).toEqual({
-      kind: 'waiting', link: 'https://play.atlas-vtt.dev/#code', status: { text: 'Connecting…', tone: 'amber' }, isShared: false, gate: null, qr: false, imageShown: false, closing: null,
+      kind: 'waiting', link: 'https://play.atlas-vtt.dev/#code', status: { text: 'Connecting…', tone: 'amber' }, isShared: false, gate: null, qr: false, imageShown: false, closing: null, updateAfter: false,
     });
     // The gates come along: the GM needs the code before the first player can join.
     // Who waits is not among it: a knock must not draw the menu anew under the GM's pointer.
     const gate = { code: '483912', requireCode: true, askToJoin: true, paused: false, pauseArmed: false };
     const waiting = [{ id: 'm'.repeat(20), name: 'Mira', answered: false, full: false, armed: false }];
-    expect(menuModel(snapshot({ gate: { ...gate, waiting } }), scene(), CAN_HOST)).toEqual({ kind: 'waiting', link: 'https://play.atlas-vtt.dev/#code', status: { text: 'Online, waiting for players', tone: 'green' }, isShared: true, gate, qr: false, imageShown: false, closing: null });
+    expect(menuModel(snapshot({ gate: { ...gate, waiting } }), scene(), CAN_HOST)).toEqual({ kind: 'waiting', link: 'https://play.atlas-vtt.dev/#code', status: { text: 'Online, waiting for players', tone: 'green' }, isShared: true, gate, qr: false, imageShown: false, closing: null, updateAfter: false });
     // The QR card's state is part of the menu, whose button says whether it is open.
     expect(menuModel(snapshot(), scene(), CAN_HOST, true)).toMatchObject({ kind: 'waiting', qr: true });
     // An image shown before anyone joined has its line here too.
@@ -185,6 +185,8 @@ describe('the view of OnlineControl', () => {
       seats: () => null,
       isStarting: () => state.starting,
       lost: () => state.lost,
+      outdated: () => false,
+      updateAfterSession: () => false,
       start: (leaf) => {
         calls.push(['start', leaf]);
         return Promise.resolve(null);
