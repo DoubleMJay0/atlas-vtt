@@ -73,3 +73,28 @@ describe('a new link', () => {
     online.stop();
   });
 });
+
+describe('the campaign a table starts on', () => {
+  it('is the one the GM chose, and this device plays it once the table runs', async () => {
+    const tab = atlasTab(sceneState({ mapPath: 'Scenes/Cave.atlasmap' }));
+    workspace.leaves = [tab.leaf];
+    const play = vi.fn();
+    const campaigns = { ...fakeCampaigns(), playing: (): string | null => null, play };
+    const online = new OnlineControl(app, boundOwnership([]), campaigns, () => undefined, signedIn);
+    await online.start(tab.leaf, 'c2');
+    expect(play).toHaveBeenCalledWith('c2');
+    expect(online.campaignId()).toBe('c2');
+    online.stop();
+    expect(online.campaignId()).toBeNull();
+  });
+
+  it('is not played when no table could start', async () => {
+    const tab = atlasTab(sceneState({ mapPath: 'Scenes/Cave.atlasmap' }));
+    workspace.leaves = [tab.leaf];
+    const play = vi.fn();
+    const signedOut = { ...signedIn, token: (): string | null => null };
+    const online = new OnlineControl(app, boundOwnership([]), { ...fakeCampaigns(), play }, () => undefined, signedOut);
+    expect(await online.start(tab.leaf, 'c2')).toBeNull();
+    expect(play).not.toHaveBeenCalled();
+  });
+});

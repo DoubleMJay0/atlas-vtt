@@ -30,6 +30,8 @@ import type { OnlineTable } from './OnlineTable.ts';
 import { Ownership, readOwnership } from './ownership.ts';
 import { readSavedTable, type SavedTable } from './savedTable.ts';
 import { appCampaigns, type TableCampaigns } from './tableCampaigns.ts';
+import { appCampaignChoices } from './campaignChoices.ts';
+import { DASHBOARD_VIEW_TYPE } from '../../dashboard-view';
 import { DEFAULT_SETTINGS, onlineSettingsSections, readSettings, type OnlineSettings } from './settings.ts';
 
 /** How long a change of the table's log waits before the data file is written. */
@@ -153,6 +155,8 @@ export class OnlineFeature extends Component {
     const docks = new DockMounts(this.app.workspace, {
       api: onlineApi(this.online, () => images.hide()),
       account: this.account,
+      campaigns: appCampaignChoices(this.app),
+      openCampaigns: () => void this.app.workspace.getLeaf(true).setViewState({ type: DASHBOARD_VIEW_TYPE, active: true }),
       imageSrc: (path) => this.app.vault.adapter.getResourcePath(path),
       feedback: diagnostics,
       opened: (leaf) => logs.close(leaf),
@@ -183,10 +187,8 @@ export class OnlineFeature extends Component {
     this.command('start-online-table', (checking) => {
       const leaf = activeAtlasLeaf(this.app);
       if (!this.online.canStart() || leaf === null) return false;
-      if (!checking) {
-        docks.dockOf(leaf)?.open();
-        void this.online.start(leaf);
-      }
+      // Opens the start menu, where the GM picks the campaign the table plays.
+      if (!checking) docks.dockOf(leaf)?.open();
       return true;
     });
     this.command('toggle-online-panel', (checking) => {

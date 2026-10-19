@@ -14,6 +14,8 @@ export const PANEL_WIDTH = 340;
 
 /** What the panel shows. */
 export interface PanelView {
+  /** The name of the table's campaign, else "Online table". */
+  readonly title: string;
   readonly status: { readonly text: string; readonly tone: Tone };
   /** Said in the header while the table is full. */
   readonly seatsNote: string | null;
@@ -35,10 +37,10 @@ export interface PanelView {
 }
 
 /** What the panel shows of a snapshot, the map views, the feedback form and whether the QR card is open. */
-export function panelView(snapshot: OnlineSnapshot, scene: SceneFacts, feedback: FeedbackView, qr = false): PanelView {
+export function panelView(snapshot: OnlineSnapshot, scene: SceneFacts, feedback: FeedbackView, qr = false, title = 'Online table'): PanelView {
   const groups = groupsOf(snapshot, scene);
   const players = groups.flatMap((group) => (group.player === null ? [] : [group.player]));
-  return { status: statusOf(snapshot), seatsNote: seatsNoteOf(snapshot), link: snapshot.link, qr, gate: gateRowsOf(snapshot.gate), imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true, groups, players, bar: selectionBarOf(snapshot, scene), feedback };
+  return { title, status: statusOf(snapshot), seatsNote: seatsNoteOf(snapshot), link: snapshot.link, qr, gate: gateRowsOf(snapshot.gate), imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true, groups, players, bar: selectionBarOf(snapshot, scene), feedback };
 }
 
 /** The campaign's players as the panel changes them, once the GM has answered. */
@@ -110,7 +112,7 @@ export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelA
     ...gateEntries(view.gate, actions),
     { title: 'Stop table', icon: 'power', warning: true, apart: true, run: () => openPrompt(layer, confirmPrompt('stop', 'Stop the table', 'Stop for everyone?', 'Stop table', () => actions.stop(), { warning: true }), redraw) },
   ];
-  surfaceHeader(layer, 'Online table', view.status, statusInWords(view), entries, () => actions.close());
+  surfaceHeader(layer, view.title, view.status, statusInWords(view), entries, () => actions.close());
   renderClosingRow(layer, view.closing, actions);
   renderUpdateRow(layer, view.updateAfter, actions);
   renderPausedRow(layer, view.gate, actions);

@@ -1,0 +1,189 @@
+// The campaign a table starts on, in the start menu: one row per campaign with its world map, its
+// name, when it was played and its players. Rows share the panel's rhythm (`_online.scss`); the
+// chosen one is ringed in the accent and ticked, as every chosen control in Atlas is.
+@use '../../../../../styles/tokens' as *;
+@use '../../../../../styles/mixins' as *;
+@use 'online' as *;
+
+$campaign-art-width: 64px;
+$campaign-art-height: 40px;
+$campaign-row: calc(#{$campaign-art-height} + 2 * #{$online-inset});
+
+.atlas-online-dock {
+  .atlas-online-campaigns {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    min-height: 0;
+  }
+
+  .atlas-online-campaigns__label {
+    padding: 0 $online-text-inset;
+    color: var(--text-muted);
+    font-size: $font-ui-smaller;
+    font-weight: $font-weight-semibold;
+  }
+
+  .atlas-online-campaigns__note {
+    padding: 0 $online-text-inset;
+  }
+
+  .atlas-online-campaigns > .atlas-online-button {
+    width: 100%;
+  }
+
+  // Four campaigns show at once; more scroll inside the list, never the menu.
+  .atlas-online-campaigns__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: calc(4 * #{$campaign-row} + 3 * 2px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .atlas-online-campaign {
+    &,
+    &:hover,
+    &:active,
+    &:focus-visible {
+      display: flex;
+      flex: none;
+      align-items: center;
+      justify-content: flex-start;
+      gap: $spacing-s;
+      width: 100%;
+      height: $campaign-row;
+      padding: $online-inset;
+      border: none;
+      border-radius: $online-row-radius;
+      background: transparent;
+      box-shadow: none;
+      color: var(--text-normal);
+      text-align: start;
+      cursor: pointer;
+      transition: background-color $transition-fast $transition-ease, box-shadow $transition-fast $transition-ease;
+      @include atlas-corner-shape;
+    }
+
+    &:hover {
+      background: var(--background-modifier-hover);
+    }
+
+    &:focus-visible {
+      box-shadow: $online-focus-ring;
+    }
+
+    &.is-chosen,
+    &.is-chosen:hover {
+      background: color-mix(in oklch, var(--interactive-accent) 10%, transparent);
+      box-shadow: inset 0 0 0 $border-width-m var(--interactive-accent);
+    }
+
+    &.is-chosen:focus-visible {
+      box-shadow: inset 0 0 0 $border-width-m var(--interactive-accent), $online-focus-ring;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+  }
+
+  // The world map, cropped to the row; a campaign without one shows its own tint and a d20.
+  .atlas-online-campaign__art {
+    position: relative;
+    flex: none;
+    width: $campaign-art-width;
+    height: $campaign-art-height;
+    overflow: hidden;
+    border-radius: $radius-l;
+    background: var(--background-secondary-alt);
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+    @include atlas-corner-shape;
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity $transition-normal $transition-ease;
+
+      &.is-loaded {
+        opacity: 1;
+      }
+    }
+
+    .campaign-emblem__icon {
+      width: 22px;
+      height: 22px;
+    }
+  }
+
+  .atlas-online-campaign__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .atlas-online-campaign__name {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    min-width: 0;
+    font-size: $font-ui-small;
+    font-weight: $font-weight-semibold;
+
+    > bdi {
+      min-width: 0;
+      @include atlas-truncate;
+    }
+  }
+
+  // This device plays it: a small tag beside the name.
+  .atlas-online-campaign__playing {
+    flex: none;
+    padding: 0 $spacing-xs;
+    border-radius: $radius-full;
+    background: color-mix(in oklch, var(--interactive-accent) 16%, transparent);
+    color: var(--text-accent);
+    font-size: $font-ui-smaller;
+    font-weight: $font-weight-medium;
+    line-height: 1.5;
+  }
+
+  .atlas-online-campaign__meta {
+    color: var(--text-muted);
+    font-size: $font-ui-smaller;
+    font-variant-numeric: tabular-nums;
+    @include atlas-truncate;
+  }
+
+  .atlas-online-campaign__tick {
+    display: flex;
+    flex: none;
+    color: var(--interactive-accent);
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity $transition-fast $transition-ease, transform $transition-fast $transition-ease-out;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .is-chosen .atlas-online-campaign__tick {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-online-dock :is(.atlas-online-campaign__art img, .atlas-online-campaign__tick) {
+    transition: none;
+  }
+}

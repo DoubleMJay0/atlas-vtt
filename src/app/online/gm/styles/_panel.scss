@@ -16,8 +16,12 @@
     min-height: $close-button-size;
     padding-left: $online-text-inset;
 
+    // The table's campaign: its name gives way to the status dot and the buttons, cut with an ellipsis.
     .atlas-online-title {
-      flex: none;
+      flex: 0 1 auto;
+      min-width: 0;
+      unicode-bidi: isolate;
+      @include atlas-truncate;
     }
   }
 

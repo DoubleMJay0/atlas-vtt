@@ -4,10 +4,12 @@ import type { AccountInfo } from '../account/relayAccount.ts';
 import { openUpdate } from '../../../updates/updateNotice';
 import { OUTDATED_TEXT } from '../gmLevel.ts';
 import { tableEndText, type LostTable } from '../tableEnd.ts';
+import { renderCampaignPicker, type CampaignPick, type CampaignPickerActions } from './campaignPicker.ts';
 import { statusLine, textButton } from './controls.ts';
+import { NO_CAMPAIGNS } from './panelModel.ts';
 
-/** What the menu's sign-in parts do. */
-export interface AccountActions {
+/** What the menu's sign-in parts do, and the choice of the table's campaign. */
+export interface AccountActions extends CampaignPickerActions {
   start(): void;
   signIn(): void;
   cancelSignIn(): void;
@@ -21,8 +23,8 @@ export interface AccountActions {
   update(): void;
 }
 
-/** The sign-in actions over the account control; `start` is the dock's own. */
-export function accountActions(account: AccountApi): Omit<AccountActions, 'start'> {
+/** The sign-in actions over the account control; starting and the campaign's choice are the dock's own. */
+export function accountActions(account: AccountApi): Omit<AccountActions, 'start' | keyof CampaignPickerActions> {
   return {
     signIn: () => void account.signIn(),
     cancelSignIn: () => account.cancelSignIn(),
@@ -88,10 +90,10 @@ function startButton(layer: HTMLElement, starting: boolean, enabled: boolean, ac
 /**
  * The menu before a table runs: signed out, waiting for the browser,
  * checking the account, unreachable, signed in without access (the relay's reason, and the way to the
- * account page), or able to host, where Update stands in for Start while the relay needs a newer Atlas (`outdated`). `lost` says how the last table ended when the server ended it; a
+ * account page), or able to host: the campaign the table plays (`campaigns`), and Start, where Update stands in while the relay needs a newer Atlas (`outdated`). `lost` says how the last table ended when the server ended it; a
  * table closed because the account may not host comes with the way to the account page in every state.
  */
-export function renderAccountMenu(layer: HTMLElement, account: AccountView, starting: boolean, lost: LostTable | null, actions: AccountActions, outdated = false): void {
+export function renderAccountMenu(layer: HTMLElement, account: AccountView, starting: boolean, lost: LostTable | null, actions: AccountActions, outdated = false, campaigns: CampaignPick = NO_CAMPAIGNS): void {
   const signedIn = account.kind === 'can-host' || account.kind === 'no-access' ? account.account : null;
   const head = intro(layer, lost, account.kind === 'waiting' ? 'Sign in to host' : undefined, signedIn);
   if (lost === 'no-access' && account.kind !== 'no-access') accountPageButton(layer, actions);
@@ -129,6 +131,7 @@ export function renderAccountMenu(layer: HTMLElement, account: AccountView, star
       return accountPageButton(signedInFoot(layer, actions), actions, 'cta', true);
     case 'can-host':
       if (outdated) return updateFoot(signedInFoot(layer, actions), head, actions);
-      return startButton(signedInFoot(layer, actions), starting, true, actions);
+      renderCampaignPicker(layer, campaigns, actions, starting);
+      return startButton(signedInFoot(layer, actions), starting, campaigns.chosen !== null, actions);
   }
 }

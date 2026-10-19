@@ -19,7 +19,7 @@ const SCENE: SceneFacts = {
   } as unknown as SceneFacts['tokens'],
 };
 
-const snapshot = (over: Partial<OnlineSnapshot>): OnlineSnapshot => ({ status: 'online', link: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: null, ...over });
+const snapshot = (over: Partial<OnlineSnapshot>): OnlineSnapshot => ({ status: 'online', link: null, campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: null, ...over });
 
 function actions(): ListActions & { selectToken: ReturnType<typeof vi.fn<(id: string) => void>> } {
   return { selectToken: vi.fn<(id: string) => void>(), assign: vi.fn(), release: vi.fn(), unmark: vi.fn(), kick: vi.fn(), copyPlayerCode: vi.fn(() => Promise.resolve(true)), newPlayerCode: vi.fn(), askRename: vi.fn(), askRemoveFromCampaign: vi.fn(), playerPrompt: () => false, selected: () => [], imageSrc: (path) => `app://vault/${path}` };

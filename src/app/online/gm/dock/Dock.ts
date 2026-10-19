@@ -2,6 +2,7 @@ import type { WorkspaceLeaf } from 'obsidian';
 import { handledByAnotherControl } from '../../../keyboard/tooltipEscape';
 import { sceneStoreOf, selectedTokenIds, type SceneStore } from '../atlasView.ts';
 import { accountActions, MENU_WIDTH, renderMenu, type MenuActions } from './ConnectionMenu.ts';
+import { campaignPick, type CampaignPick } from './campaignPicker.ts';
 import { DockButton } from './dockButton.ts';
 import type { DockDeps } from './dockDeps.ts';
 import { copyText, detached, isInsideControl, isPlaced, place, roomAbove, rowOf, BAR_GAP } from './dockDom.ts';
@@ -15,7 +16,7 @@ import { KNOCK_ROOM, KnockStack } from './knockStack.ts';
 import { DockSurface } from './dockSurface.ts';
 import { playerCodeCopier } from './playerCodes.ts';
 import { PANEL_WIDTH, panelView, renderPanel, type PanelActions } from './OnlinePanel.ts';
-import { badgeOf, isRunning, menuModel, tooltipOf, type OnlineSnapshot, type SceneFacts } from './panelModel.ts';
+import { badgeOf, isRunning, menuModel, tableTitle, tooltipOf, type OnlineSnapshot, type SceneFacts } from './panelModel.ts';
 
 export type { DockDeps } from './dockDeps.ts';
 
@@ -41,6 +42,8 @@ export class Dock {
   private readonly surface: DockSurface;
   private readonly surfaceId = `atlas-online-surface-${++nextSurface}`;
   private state: DockState = CLOSED;
+  /** The campaign the GM picked for the next table; null until they pick one. */
+  private picked: string | null = null;
   private table: TableFacts;
   private view: ViewFacts;
   private layer: HTMLElement | null = null;
@@ -78,9 +81,9 @@ export class Dock {
     return this.container.win;
   }
 
-  /** Opens the control on its menu or panel (the Start command). */
+  /** Opens the control on its menu or panel, focus in it (the Start command). */
   open(): void {
-    this.go(open(this.state, this.table), false);
+    this.go(open(this.state, this.table), true);
   }
 
   /** Opens or closes the control (the button, and the toggle command). */
@@ -121,7 +124,7 @@ export class Dock {
     add<KeyboardEvent>(this.root, 'keydown', (event) => {
       if (keyStaysInControl(event)) event.stopPropagation();
     }, false);
-    this.cleanups.push(this.deps.api.onChange(() => this.update()), this.deps.account.onChange(() => this.update()));
+    this.cleanups.push(this.deps.api.onChange(() => this.update()), this.deps.account.onChange(() => this.update()), this.deps.campaigns.onChange(() => this.update()));
     this.cleanups.push(this.store.subscribe((state) => {
       const view = viewFactsOf(state);
       if (makesWay(this.state.surface, this.view, view)) this.go(close(this.state), false);
@@ -170,7 +173,11 @@ export class Dock {
     if (before === 'closed' && next.surface !== 'closed') this.deps.opened?.(this.leaf);
     this.update();
     if (before !== 'closed' && next.surface === 'closed' && this.root.contains(this.root.doc.activeElement)) this.button.button.focus({ preventScroll: true });
-    if (byKeyboard && before === 'closed' && this.layer !== null) this.layer.querySelector<HTMLElement>('button:not([disabled]), input')?.focus({ preventScroll: true });
+    if (byKeyboard && before === 'closed' && this.layer !== null) {
+      // The chosen campaign takes focus first, as a radio group's checked radio does.
+      const first = this.layer.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]') ?? this.layer.querySelector<HTMLElement>('button:not([disabled]), input');
+      first?.focus({ preventScroll: true });
+    }
   }
 
   private schedule(): void {
@@ -217,14 +224,14 @@ export class Dock {
   }
 
   private drawMenu(layer: HTMLElement, snapshot: OnlineSnapshot, scene: SceneFacts, fresh: boolean): string {
-    const model = menuModel(snapshot, scene, this.deps.account.view(), this.qr.isOpen);
+    const model = menuModel(snapshot, scene, this.deps.account.view(), this.qr.isOpen, this.pick());
     const key = JSON.stringify(model);
     if (fresh || key !== this.shownKey) renderMenu(layer, model, this.menuActions());
     return key;
   }
 
   private drawPanel(layer: HTMLElement, snapshot: OnlineSnapshot, scene: SceneFacts, fresh: boolean): string {
-    const view = panelView(snapshot, scene, this.feedback.view(), this.qr.isOpen);
+    const view = panelView(snapshot, scene, this.feedback.view(), this.qr.isOpen, tableTitle(snapshot, this.pick()));
     const key = JSON.stringify(view);
     if (fresh || key !== this.shownKey) renderPanel(layer, view, this.panelActions(scene));
     return key;
@@ -248,11 +255,27 @@ export class Dock {
     };
   }
 
+  /** The campaigns, and the one the next table would play. */
+  private pick(): CampaignPick {
+    return campaignPick(this.deps.campaigns.list(), this.picked);
+  }
+
   private menuActions(): MenuActions {
     return {
       ...accountActions(this.deps.account),
       ...gateRowActions(this.deps.api, this.root),
-      start: () => this.deps.api.start(this.leaf),
+      start: () => {
+        const chosen = this.pick().chosen;
+        if (chosen !== null) this.deps.api.start(this.leaf, chosen);
+      },
+      choose: (campaignId) => {
+        this.picked = campaignId;
+        this.update();
+      },
+      openCampaigns: () => {
+        this.go(close(this.state), false);
+        this.deps.openCampaigns();
+      },
       stop: () => this.deps.api.stop(),
       share: () => this.deps.api.share(this.leaf),
       copy: () => copyText(this.root, this.deps.api.snapshot().link ?? ''),

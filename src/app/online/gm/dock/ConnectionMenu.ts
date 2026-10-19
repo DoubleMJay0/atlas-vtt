@@ -45,10 +45,10 @@ export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuAc
   layer.empty();
   layer.addClass('atlas-online-menu');
   if (model.kind === 'start') {
-    renderAccountMenu(layer, model.account, model.starting, model.lost, actions, model.outdated);
+    renderAccountMenu(layer, model.account, model.starting, model.lost, actions, model.outdated, model.campaigns);
     return restore();
   }
-  surfaceHeader(layer, 'Online table', model.status, model.status.tone === 'green' ? null : model.status.text, [
+  surfaceHeader(layer, model.title, model.status, model.status.tone === 'green' ? null : model.status.text, [
     ...gateEntries(model.gate, actions),
     { title: 'Stop table', icon: 'power', warning: true, apart: true, run: () => actions.stop() },
   ], null);

@@ -73,6 +73,11 @@ export class OnlineControl {
     return this.current?.link ?? null;
   }
 
+  /** The id of the campaign the running table plays; null while none runs. */
+  campaignId(): string | null {
+    return this.current === null ? null : this.saved?.campaignId ?? null;
+  }
+
   /** The players the running table seats, or null while none runs. */
   seats(): number | null {
     return this.current === null ? null : this.saved?.maxPlayers ?? null;
@@ -104,12 +109,13 @@ export class OnlineControl {
   }
 
   /**
-   * Starts a table of the played campaign from the Atlas tab `leaf` (the active one by default), on
-   * the campaign's lasting link; tells the GM with a notice why it cannot. Players see the scene
-   * Atlas presents to its player view.
+   * Starts a table of the campaign `campaignId` (the played one by default) from the Atlas tab `leaf`
+   * (the active one by default), on the campaign's lasting link; tells the GM with a notice why it
+   * cannot. Once it runs, this device plays that campaign. Players see the scene Atlas presents to its
+   * player view.
    */
-  start(leaf: WorkspaceLeaf | null = activeAtlasLeaf(this.app)): Promise<OnlineTable | null> {
-    return this.startFor(leaf, this.campaigns.playing());
+  start(leaf: WorkspaceLeaf | null = activeAtlasLeaf(this.app), campaignId: string | null = this.campaigns.playing()): Promise<OnlineTable | null> {
+    return this.startFor(leaf, campaignId);
   }
 
   /**
@@ -248,6 +254,8 @@ export class OnlineControl {
     const made = await createCampaignTable(this.campaigns, campaignId, token, this.account, (level) => rememberMinLevel(this.app, level)).finally(() => (this.starting = false));
     this.changed();
     if (made === null || closings !== this.closings) return null;
+    // The table's campaign is the one played: its rules, quests and world map are what players get.
+    this.campaigns.play(campaignId);
     // A new table's log is empty: the last table's goes.
     this.logs.forget();
     const mapPath = sceneStoreOf(leaf)?.getState().mapPath ?? null;

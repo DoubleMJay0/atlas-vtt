@@ -5,6 +5,7 @@ import type { GateActions, GateView } from '../joinGate.ts';
 import { gateRowsOf, type GateRows } from './gateRows.ts';
 import type { OnlineControl } from '../OnlineControl.ts';
 import { closingText, type LostTable } from '../tableEnd.ts';
+import type { CampaignPick } from './campaignPicker.ts';
 
 /**
  * What the control on the map reads of online play, and what it shows from that. The control reads
@@ -31,6 +32,8 @@ export interface PlayerTokenClaim {
 export interface OnlineSnapshot {
   readonly status: OnlineStatus;
   readonly link: string | null;
+  /** The id of the campaign the running table plays; null while none runs. */
+  readonly campaignId: string | null;
   /** The Atlas tab players see live: it shows the scene Atlas presents to its player view now. */
   readonly sharedLeaf: WorkspaceLeaf | null;
   /** The name of the scene players see, or null while they see none. */
@@ -65,7 +68,8 @@ export interface AddedPlayer {
 
 export interface OnlineApi {
   snapshot(): OnlineSnapshot;
-  start(leaf: WorkspaceLeaf): void;
+  /** Starts a table of the campaign `campaignId` (the played one where it is null) from the tab `leaf`. */
+  start(leaf: WorkspaceLeaf, campaignId: string | null): void;
   stop(): void;
   share(leaf: WorkspaceLeaf): void;
   mark(tokenIds: readonly string[]): void;
@@ -94,7 +98,7 @@ export interface OnlineApi {
 }
 
 /** The part of `OnlineControl` the control uses. */
-export type ControlSource = Pick<OnlineControl, 'onChange' | 'status' | 'link' | 'seats' | 'isStarting' | 'lost' | 'outdated' | 'updateAfterSession' | 'start' | 'stop' | 'share' | 'players' | 'kick' | 'playerCode' | 'newPlayerCode' | 'addPlayer' | 'renamePlayer' | 'removeFromCampaign' | 'newLink' | 'playerTokens' | 'markPlayerTokens' | 'give'> & {
+export type ControlSource = Pick<OnlineControl, 'onChange' | 'status' | 'link' | 'campaignId' | 'seats' | 'isStarting' | 'lost' | 'outdated' | 'updateAfterSession' | 'start' | 'stop' | 'share' | 'players' | 'kick' | 'playerCode' | 'newPlayerCode' | 'addPlayer' | 'renamePlayer' | 'removeFromCampaign' | 'newLink' | 'playerTokens' | 'markPlayerTokens' | 'give'> & {
   readonly table: {
     readonly sharedTab: WorkspaceLeaf | null;
     readonly sharedStore: { getState(): { readonly objects: { readonly tokens: Readonly<Record<string, SceneToken>> } } } | null;
@@ -124,6 +128,7 @@ export function onlineApi(control: ControlSource, hideImage: () => void): Online
       ...lostOf(control),
       status: status(),
       link: control.link(),
+      campaignId: control.campaignId(),
       sharedLeaf: control.table?.sharedTab ?? null,
       sharedName: control.table?.sharedStore === null ? null : control.table?.presentedName ?? null,
       sharedTokens: control.table?.sharedStore?.getState().objects.tokens ?? {},
@@ -133,7 +138,7 @@ export function onlineApi(control: ControlSource, hideImage: () => void): Online
       gate: control.table?.gate.view() ?? null,
       ...(control.table?.image.isShown === true && { imageShown: true }),
     }),
-    start: (leaf) => void control.start(leaf),
+    start: (leaf, campaignId) => void control.start(leaf, campaignId ?? undefined),
     stop: () => control.stop(),
     share: (leaf) => control.share(leaf),
     mark: (ids) => control.markPlayerTokens(ids, true),
@@ -248,15 +253,26 @@ export interface SceneFacts {
 }
 
 export type MenuModel =
-  | { readonly kind: 'start'; readonly account: AccountView; readonly starting: boolean; readonly lost: LostTable | null; readonly outdated: boolean }
-  | { readonly kind: 'waiting'; readonly link: string | null; readonly status: { readonly text: string; readonly tone: Tone }; readonly isShared: boolean; readonly gate: GateRows | null; readonly qr: boolean; readonly imageShown: boolean; readonly closing: string | null; readonly updateAfter: boolean };
+  | { readonly kind: 'start'; readonly account: AccountView; readonly starting: boolean; readonly lost: LostTable | null; readonly outdated: boolean; readonly campaigns: CampaignPick }
+  | { readonly kind: 'waiting'; readonly title: string; readonly link: string | null; readonly status: { readonly text: string; readonly tone: Tone }; readonly isShared: boolean; readonly gate: GateRows | null; readonly qr: boolean; readonly imageShown: boolean; readonly closing: string | null; readonly updateAfter: boolean };
 
-/** The connection menu: sign in and start a table (after one the server ended: how it ended), or the running table's link while players are awaited (`qr`: its QR card is open). */
-export function menuModel(snapshot: OnlineSnapshot, scene: SceneFacts, account: AccountView, qr = false): MenuModel {
+/** No campaigns read yet. */
+export const NO_CAMPAIGNS: CampaignPick = { list: null, chosen: null };
+
+/** What a running table's surface is titled: the name of the campaign it plays, where it is known. */
+export function tableTitle(snapshot: OnlineSnapshot, campaigns: CampaignPick): string {
+  return campaigns.list?.find((campaign) => campaign.id === snapshot.campaignId)?.name ?? 'Online table';
+}
+
+/**
+ * The connection menu: sign in, choose a campaign and start a table (after one the server ended: how
+ * it ended), or the running table's link while players are awaited (`qr`: its QR card is open).
+ */
+export function menuModel(snapshot: OnlineSnapshot, scene: SceneFacts, account: AccountView, qr = false, campaigns: CampaignPick = NO_CAMPAIGNS): MenuModel {
   if (!isRunning(snapshot.status) || snapshot.status === 'starting') {
-    return { kind: 'start', account, starting: snapshot.status === 'starting', lost: snapshot.status === 'refused' ? snapshot.lost ?? 'refused' : null, outdated: snapshot.outdated === true };
+    return { kind: 'start', account, starting: snapshot.status === 'starting', lost: snapshot.status === 'refused' ? snapshot.lost ?? 'refused' : null, outdated: snapshot.outdated === true, campaigns };
   }
-  return { kind: 'waiting', link: snapshot.link, status: statusOf(snapshot), isShared: scene.isShared, gate: gateRowsOf(snapshot.gate), qr, imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true };
+  return { kind: 'waiting', title: tableTitle(snapshot, campaigns), link: snapshot.link, status: statusOf(snapshot), isShared: scene.isShared, gate: gateRowsOf(snapshot.gate), qr, imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true };
 }
 
 export interface GroupPlayer extends OnlinePlayer {
