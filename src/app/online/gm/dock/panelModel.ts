@@ -257,7 +257,7 @@ export type MenuModel =
   | { readonly kind: 'waiting'; readonly title: string; readonly link: string | null; readonly status: { readonly text: string; readonly tone: Tone }; readonly isShared: boolean; readonly gate: GateRows | null; readonly qr: boolean; readonly imageShown: boolean; readonly closing: string | null; readonly updateAfter: boolean };
 
 /** No campaigns read yet. */
-export const NO_CAMPAIGNS: CampaignPick = { list: null, chosen: null };
+export const NO_CAMPAIGNS: CampaignPick = { list: null, chosen: null, query: '' };
 
 /** What a running table's surface is titled: the name of the campaign it plays, where it is known. */
 export function tableTitle(snapshot: OnlineSnapshot, campaigns: CampaignPick): string {

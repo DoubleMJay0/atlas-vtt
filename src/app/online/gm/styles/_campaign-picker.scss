@@ -8,6 +8,8 @@
 $campaign-art-width: 64px;
 $campaign-art-height: 40px;
 $campaign-row: calc(#{$campaign-art-height} + 2 * #{$online-inset});
+$campaign-gap: 2px;
+$campaigns-shown: 5;
 
 .atlas-online-dock {
   .atlas-online-campaigns {
@@ -32,14 +34,113 @@ $campaign-row: calc(#{$campaign-art-height} + 2 * #{$online-inset});
     width: 100%;
   }
 
-  // Four campaigns show at once; more scroll inside the list, never the menu.
+  // The search, framed as a field: a magnifier, the text and a button that clears it.
+  .atlas-online-campaigns__search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    height: $online-control;
+    padding: 0 $spacing-xs 0 $spacing-s;
+    border: $border-width-s solid var(--background-modifier-border);
+    border-radius: $radius-l;
+    background: var(--background-modifier-form-field);
+    transition: border-color $transition-fast $transition-ease, box-shadow $transition-fast $transition-ease;
+    @include atlas-corner-shape;
+
+    &:hover {
+      border-color: var(--background-modifier-border-hover);
+    }
+
+    // As `atlas-input-focus` draws a focused field.
+    &:focus-within {
+      border-color: var(--interactive-accent);
+      box-shadow: 0 0 0 2px color-mix(in oklch, var(--interactive-accent) 20%, transparent);
+    }
+  }
+
+  .atlas-online-campaigns__search-icon {
+    display: flex;
+    flex: none;
+    color: var(--text-faint);
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  .atlas-online-campaigns__search-field {
+    @include atlas-flush-input;
+
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
+
+  .atlas-online-campaigns__search-clear {
+    &,
+    &:hover,
+    &:active {
+      display: flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      border: none;
+      border-radius: $radius-full;
+      background: transparent;
+      box-shadow: none;
+      color: var(--text-faint);
+      cursor: pointer;
+    }
+
+    &:hover {
+      background: var(--background-modifier-hover);
+      color: var(--text-normal);
+    }
+
+    &[hidden] {
+      display: none;
+    }
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  // Room for five campaigns whatever the vault holds, so the menu keeps its size; more scroll inside
+  // the list, never the menu.
+  .atlas-online-campaigns__box {
+    position: relative;
+    flex: none;
+    height: calc(#{$campaigns-shown} * #{$campaign-row} + #{$campaigns-shown - 1} * #{$campaign-gap});
+  }
+
   .atlas-online-campaigns__list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    max-height: calc(4 * #{$campaign-row} + 3 * 2px);
+    gap: $campaign-gap;
+    height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  .atlas-online-campaigns__none {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $online-inset;
+    text-align: center;
+
+    &[hidden] {
+      display: none;
+    }
   }
 
   .atlas-online-campaign {
@@ -87,6 +188,10 @@ $campaign-row: calc(#{$campaign-art-height} + 2 * #{$online-inset});
     &:disabled {
       cursor: default;
       opacity: 0.6;
+    }
+
+    &[hidden] {
+      display: none;
     }
   }
 

@@ -25,12 +25,16 @@ const CHOICES: CampaignChoice[] = [
 ];
 
 const actions = (): MenuActions => ({
-  start: vi.fn(), choose: vi.fn(), openCampaigns: vi.fn(), signIn: vi.fn(), cancelSignIn: vi.fn(), reopenSignIn: vi.fn(), signOut: vi.fn(), retry: vi.fn(), openAccountPage: vi.fn(), update: vi.fn(),
+  start: vi.fn(), choose: vi.fn(), search: vi.fn(), openCampaigns: vi.fn(), signIn: vi.fn(), cancelSignIn: vi.fn(), reopenSignIn: vi.fn(), signOut: vi.fn(), retry: vi.fn(), openAccountPage: vi.fn(), update: vi.fn(),
   newCode: vi.fn(), setRequireCode: vi.fn(), setAskToJoin: vi.fn(), copyCode: () => Promise.resolve(true), hideImage: vi.fn(), addPlayer: vi.fn(), newLink: vi.fn(),
   stop: vi.fn(), share: vi.fn(), copy: () => Promise.resolve(true), toggleQr: vi.fn(),
 });
 
-function mount(theme: 'dark' | 'light', list: readonly CampaignChoice[], picked: string | null = null): HTMLElement {
+const MANY: CampaignChoice[] = [...CHOICES, ...['Tomb of Annihilation', 'Curse of Strahd', 'The Waking of Willowby Hall', 'Sunless Citadel', 'Barrowmaze'].map((name, index) => ({
+  id: `m${index}`, name, activity: `Played ${index + 2}w ago`, players: index, art: index % 2 === 0 ? paintedMap(60 * index, 320, 200) : null, hue: 60 * index, playing: false,
+}))];
+
+function mount(theme: 'dark' | 'light', list: readonly CampaignChoice[], picked: string | null = null, query = ''): HTMLElement {
   document.body.className = `theme-${theme}`;
   const plugin = document.body.createDiv({ cls: 'atlas-vtt-plugin' });
   plugin.style.cssText = 'position: absolute; inset: 0; padding: 40px; background: var(--background-primary);';
@@ -39,7 +43,7 @@ function mount(theme: 'dark' | 'light', list: readonly CampaignChoice[], picked:
   const surface = dock.createDiv({ cls: 'atlas-online-surface' });
   surface.style.cssText = 'position: static; width: 300px;';
   const layer = surface.createDiv({ cls: 'atlas-online-layer', attr: { id: 'surface' } });
-  renderMenu(layer, menuModel(SNAPSHOT, { isShared: true, tokens: {}, selected: [] }, { kind: 'can-host', account: MARA, access: { plan: 'beta', maxPlayers: 12, endsAt: null } }, false, campaignPick(list, picked)), actions());
+  renderMenu(layer, menuModel(SNAPSHOT, { isShared: true, tokens: {}, selected: [] }, { kind: 'can-host', account: MARA, access: { plan: 'beta', maxPlayers: 12, endsAt: null } }, false, campaignPick(list, picked, query)), actions());
   return surface;
 }
 
@@ -70,6 +74,35 @@ describe('the start menu\'s campaign step', () => {
       await page.screenshot({ path: `__screenshots__/atlas-online-campaign-picker-${theme}.png`, element: surface });
     });
   }
+
+  it('keeps its size for two campaigns or eight, and scrolls the list past five', async () => {
+    const few = mount('dark', CHOICES.slice(0, 2)).getBoundingClientRect().height;
+    document.body.empty();
+    const surface = mount('dark', MANY);
+    expect(surface.getBoundingClientRect().height).toBe(few);
+    const list = surface.querySelector<HTMLElement>('.atlas-online-campaigns__list')!;
+    const rows = [...list.querySelectorAll<HTMLElement>('.atlas-online-campaign')];
+    // Five rows fill the list exactly; the sixth starts below its edge.
+    expect(rows[4]!.getBoundingClientRect().bottom).toBeCloseTo(list.getBoundingClientRect().bottom, 0);
+    expect(list.scrollHeight).toBeGreaterThan(list.clientHeight);
+    const search = surface.querySelector<HTMLElement>('.atlas-online-campaigns__search')!.getBoundingClientRect();
+    expect(search.width).toBeCloseTo(list.getBoundingClientRect().width, 0);
+    await page.screenshot({ path: '__screenshots__/atlas-online-campaign-picker-many.png', element: surface });
+  });
+
+  it('shows what the search finds, or says it found none, at the same size', async () => {
+    const full = mount('light', MANY).getBoundingClientRect().height;
+    document.body.empty();
+    const found = mount('light', MANY, null, 'the');
+    expect(found.getBoundingClientRect().height).toBe(full);
+    expect([...found.querySelectorAll<HTMLElement>('.atlas-online-campaign')].filter((row) => !row.hidden)).toHaveLength(3);
+    await page.screenshot({ path: '__screenshots__/atlas-online-campaign-picker-search.png', element: found });
+    document.body.empty();
+    const none = mount('light', MANY, null, 'xyz');
+    expect(none.getBoundingClientRect().height).toBe(full);
+    expect(none.querySelector<HTMLElement>('.atlas-online-campaigns__none')!.getBoundingClientRect().height).toBeGreaterThan(0);
+    await page.screenshot({ path: '__screenshots__/atlas-online-campaign-picker-none.png', element: none });
+  });
 
   it('offers the dashboard where the vault has no campaigns', async () => {
     const surface = mount('dark', []);

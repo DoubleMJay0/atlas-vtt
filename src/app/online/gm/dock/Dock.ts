@@ -44,6 +44,8 @@ export class Dock {
   private state: DockState = CLOSED;
   /** The campaign the GM picked for the next table; null until they pick one. */
   private picked: string | null = null;
+  /** What the GM typed into the campaign search; empty again whenever the menu closes. */
+  private query = '';
   private table: TableFacts;
   private view: ViewFacts;
   private layer: HTMLElement | null = null;
@@ -243,6 +245,7 @@ export class Dock {
     this.layer = null;
     this.layerKind = 'closed';
     this.shownKey = '';
+    this.query = '';
     this.surface.close();
   }
 
@@ -257,7 +260,7 @@ export class Dock {
 
   /** The campaigns, and the one the next table would play. */
   private pick(): CampaignPick {
-    return campaignPick(this.deps.campaigns.list(), this.picked);
+    return campaignPick(this.deps.campaigns.list(), this.picked, this.query);
   }
 
   private menuActions(): MenuActions {
@@ -271,6 +274,9 @@ export class Dock {
       choose: (campaignId) => {
         this.picked = campaignId;
         this.update();
+      },
+      search: (query) => {
+        this.query = query;
       },
       openCampaigns: () => {
         this.go(close(this.state), false);
