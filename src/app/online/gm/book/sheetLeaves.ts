@@ -67,7 +67,7 @@ export function labelOf(build: SheetBuild, block: { label?: string | undefined; 
 function misfitText(build: SheetBuild, key: string): string | null {
   const field = build.shown.fields.get(key);
   const value = build.shown.reader(key);
-  return field && valueMisfit(field, value, build.shown.refillNames) ? valueText(value) : null;
+  return field && valueMisfit(field, value) ? valueText(value) : null;
 }
 
 function wordsNode(build: SheetBuild, block: Extract<TemplateBlock, { type: 'tags' }>, display: BlockDisplay, field: SheetField | null): SheetNode {
@@ -159,7 +159,7 @@ function track(block: TrackBlock, label: string | null, current: number, max: nu
 /** Whether the protocol carries a line exactly as it is written. */
 export const carriedLine = (text: string, max: number = MAX_BOOK_TITLE): boolean => bookLine(text, max) === text;
 
-/** A row as the page takes it; null where the protocol cannot carry it as it is (a name, refill or formula it would change, too many uses). */
+/** A row as the page takes it; null where the protocol cannot carry it as it is (a name, recovery button or formula it would change, too many uses). */
 function sheetCounter(row: CounterRow): SheetCounter | null {
   if (!carriedLine(row.name) || (row.reset !== null && !carriedLine(row.reset)) || (row.regain !== null && !carriedLine(row.regain, MAX_FORMULA)) || row.max > MAX_COUNTER) return null;
   return { name: row.name, max: row.max, used: row.used, reset: row.reset, regain: row.regain };
@@ -177,7 +177,7 @@ function countersNode(build: SheetBuild, block: CountersBlock, display: BlockDis
   if (display.state !== 'value') return null;
   const known = build.shown.fields.get(block.field);
   const value = build.shown.reader(block.field);
-  const rows = known ? shownCounterRows(known, value, build.shown.refillNames) : null;
+  const rows = known ? shownCounterRows(known, value) : null;
   const counters = rows && rows.length <= MAX_COUNTERS ? rows.map(sheetCounter) : null;
   if (!counters?.every((row): row is SheetCounter => row !== null)) return { k: 'value', value: sheetValue(build, label, valueText(value), 'plain', null, null) };
   return { k: 'counters', label, counters, field };

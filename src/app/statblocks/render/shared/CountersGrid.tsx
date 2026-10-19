@@ -30,7 +30,7 @@ function usedAfterPip(row: CounterRow, position: number): number {
   return row.max - (position < left ? position : position + 1);
 }
 
-export function buttonProps(action: (() => void) | undefined): Pick<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'disabled' | 'tabIndex' | 'onClick'> {
+function buttonProps(action: (() => void) | undefined): Pick<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'disabled' | 'tabIndex' | 'onClick'> {
   return { type: 'button', disabled: !action, tabIndex: action ? undefined : -1, onClick: action };
 }
 

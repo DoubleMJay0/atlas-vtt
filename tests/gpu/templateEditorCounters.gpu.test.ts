@@ -21,34 +21,29 @@ function withCounters(): StatblockTemplate {
   const sample = sampleTemplate();
   return {
     ...sample,
-    refills: [{ name: 'Short rest' }, { name: 'Long rest', includes: ['Short rest'] }],
     fields: [...sample.fields, {
       key: 'slots', label: 'Spell slots', type: 'counters',
-      counterRows: [{ name: '1st level', max: 4, reset: 'Long rest', regain: '1d4' }, { name: 'Arcane Recovery', max: 1, reset: 'Long rest' }],
+      counterRows: [{ name: '1st level', max: 4, regain: '1d4' }, { name: 'Arcane Recovery', max: 1 }],
     }],
     layout: { ...sample.layout, blocks: [...sample.layout.blocks, { id: 'slots001', type: 'counters', field: 'slots' }] },
   };
 }
 
 /**
- * A Counters tile in the template editor: drawn as beside a note, its pips and
- * the sheet's refill buttons there but inert, and its Options listing its rows
- * and the template's refills inside the popover's one width.
+ * A Counters tile in the template editor: drawn as beside a note, its pips
+ * there but inert, and its Options listing its rows inside the popover's one width.
  */
 describe('a Counters tile in the template editor', () => {
   useEditorStyles();
   afterEach(cleanup);
 
-  it('draws its preset rows with inert pips and the sheet\'s inert refill buttons, and its Options hold every row and refill within their width', async () => {
+  it('draws its preset rows with inert pips, and its Options hold every row within their width', async () => {
     mount(new FakeSession(withCounters()), 1180);
     await frames(3);
     const tile = frame('slots001');
     const buttons = [...tile.querySelectorAll<HTMLButtonElement>('button')];
     expect(buttons.length).toBe(5);
     expect(buttons.every((button) => button.disabled)).toBe(true);
-    const refills = [...document.querySelectorAll<HTMLButtonElement>('.atlas-sb-refill')];
-    expect(refills.map((button) => button.textContent)).toEqual(['Long rest']);
-    expect(refills.every((button) => button.disabled)).toBe(true);
     await act(async () => { tile.click(); });
     await act(async () => {
       document.querySelector<HTMLElement>('.atlas-te-toolbar [data-options] button')!.click();
@@ -56,7 +51,7 @@ describe('a Counters tile in the template editor', () => {
     });
     const panel = document.querySelector<HTMLElement>('.atlas-te-options__panel')!.getBoundingClientRect();
     const rows = [...document.querySelectorAll<HTMLElement>('.atlas-te-counter-row')];
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(2);
     for (const control of rows.flatMap((row) => [...row.querySelectorAll<HTMLElement>('input, button')])) {
       const box = control.getBoundingClientRect();
       expect(box.left).toBeGreaterThanOrEqual(panel.left);

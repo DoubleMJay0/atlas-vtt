@@ -43,11 +43,6 @@ export interface BookSharePorts extends Timers {
   readStatblock(path: string): Promise<ResolvedStatblock | null>;
   /** Writes a checked edit of a player's own statblock into its note, through Atlas's note writer. */
   writeStatblock(path: string, patches: readonly NotePatch[]): Promise<StatblockWriteOutcome>;
-  /**
-   * Rolls a formula for a player's own character in the open, as a roll of theirs named `flavor`, for
-   * their token where it is in the shared scene; the total, or null where no scene's dice could roll it.
-   */
-  rollFor(player: string, formula: string, flavor: string, tokenId: string): number | null;
   /** Scales an image for a player who asks for a longest side; without it players get originals only. */
   scaleImage?: ScaleImage | undefined;
 }

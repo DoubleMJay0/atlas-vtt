@@ -26,8 +26,6 @@ export interface TableBookPorts {
   randomId(): string;
   /** Where players' edits of their tokens in the shared scene are written; null while no scene is shared. */
   tokenWrites(): ResourceWrites | null;
-  /** Rolls a formula for a player's character on the shared scene's dice, as theirs (`SceneDice.rollFor`); null while no scene is shared. */
-  rollFor(player: string, formula: string, flavor: string, tokenId: string): number | null;
 }
 
 /** A running table's books, and what they hang on while it runs. */
@@ -75,7 +73,6 @@ export function tableBook(ports: TableBookPorts): TableBook {
     libraryStatblock: (placed) => gatedStatblocks.libraryStatblock(placed),
     readStatblock: (path) => gatedStatblocks.read(path),
     writeStatblock: (path, patches) => gatedStatblocks.write(path, patches),
-    rollFor: (player, formula, flavor, tokenId) => ports.rollFor(player, formula, flavor, tokenId),
     scaleImage: scaleInWindow,
   }, ports.shelf);
   let stops: (() => void)[] = [];

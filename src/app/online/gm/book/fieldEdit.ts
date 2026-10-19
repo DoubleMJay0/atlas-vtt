@@ -2,9 +2,8 @@ import { MAX_FIELD_TEXT, sheetBase, type BookFieldMessage, type SheetRaw } from 
 import { fieldPatches } from '../../../statblocks/editor/statblock-pane/valuePatches';
 import { fieldByKey } from '../../../statblocks/model/fieldKeys';
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
-import type { FieldValue, StatblockTemplate, TemplateField } from '../../../statblocks/model/templateTypes';
+import type { FieldValue, TemplateField } from '../../../statblocks/model/templateTypes';
 import { picksChoice } from '../../../statblocks/values/choicePicks';
-import { knownRefills } from '../../../statblocks/values/counterValues';
 import { textProblem, valueMisfit } from '../../../statblocks/values/valueFit';
 import { countersAfterEdit } from './counterEdit.ts';
 import { playerAccess } from './playerAccess.ts';
@@ -55,10 +54,10 @@ function withCell(stored: FieldValue | undefined, [row, column]: readonly [numbe
 }
 
 /** The value a field holds once the edit is in (undefined: its key is deleted), or null where the edit does not fit it. */
-function newValue(template: StatblockTemplate, field: TemplateField, stored: FieldValue | undefined, message: BookFieldMessage): { readonly value: FieldValue | undefined } | null {
+function newValue(field: TemplateField, stored: FieldValue | undefined, message: BookFieldMessage): { readonly value: FieldValue | undefined } | null {
   // Counters change only their uses, the whole list at once; they are never cleared or edited cell by cell.
   if (field.type === 'counters') {
-    const value = message.cell === undefined ? countersAfterEdit(field, stored, message.value, knownRefills(template)) : null;
+    const value = message.cell === undefined ? countersAfterEdit(field, stored, message.value) : null;
     return value === null ? null : { value };
   }
   if (message.cell !== undefined) {
@@ -88,7 +87,7 @@ export function checkFieldEdit(inputs: EditInputs, message: BookFieldMessage): C
   const read = field === undefined ? undefined : inputs.read(field);
   if (field === undefined || read === undefined || !EDITED.has(field.type)) return null;
   if (sheetBase(read.value) !== message.base) return null;
-  const next = newValue(template, field, read.value, message);
+  const next = newValue(field, read.value, message);
   if (next === null) return null;
   return {
     patches: fieldPatches(field.key, read, next.value),

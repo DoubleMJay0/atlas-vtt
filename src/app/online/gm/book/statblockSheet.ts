@@ -1,11 +1,10 @@
-import { MAX_REFILLS, type AbilityComponent, type BookStatblock, type CounterRefill, type SheetSigils, type SheetValue } from '../../protocol/index.ts';
+import type { AbilityComponent, BookStatblock, SheetSigils, SheetValue } from '../../protocol/index.ts';
 import type { ResourceDefinition, ResourceValue } from '../../../resources/resourceTypes';
 import { evaluateCondition } from '../../../statblocks/expressions/conditions';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
 import type { StatblockTemplate, TemplateField } from '../../../statblocks/model/templateTypes';
 import { sheetState } from '../../../statblocks/render/sheetState';
-import { templateRefills } from '../../../statblocks/values/counterValues';
 import { readerFor, type FieldRecord } from '../../../statblocks/values/fieldValues';
 import { playerAccess } from './playerAccess.ts';
 import { SheetBudget } from './sheetBudget.ts';
@@ -13,8 +12,6 @@ import type { SheetBuild } from './sheetFields.ts';
 import { fittedNodes, sheetNodes, type SheetWalk } from './sheetNodes.ts';
 import { sheetHead } from './sheetSigils.ts';
 import { SheetTexts, type SheetTextAsset } from './sheetTexts.ts';
-import { carriedLine } from './sheetLeaves.ts';
-import { sentFields } from './statblockChecks.ts';
 
 /** What a player's own character's statblock is drawn from. */
 export interface StatblockSheetInput {
@@ -60,25 +57,11 @@ function fittedAbilities(budget: SheetBudget, components: readonly AbilityCompon
 }
 
 /**
- * The template's refills as a player's page offers them: only on a sheet whose Counters they may change,
- * the first `MAX_REFILLS` whose names the protocol carries as written, each bringing along only others
- * it is sent, and none where they do not fit the budget.
- */
-function sheetRefills(build: SheetBuild, statblock: BookStatblock): CounterRefill[] {
-  if (!build.editable || !sentFields(statblock).some((field) => field.type === 'counters')) return [];
-  const sent = templateRefills(build.template).filter((refill) => carriedLine(refill.name)).slice(0, MAX_REFILLS);
-  const names = new Set(sent.map((refill) => refill.name));
-  const refills = sent.map((refill) => ({ name: refill.name, includes: refill.includes.filter((other) => names.has(other)) }));
-  return build.budget.takeRefills(refills) ? refills : [];
-}
-
-/**
  * A player's own character's statblock as their page draws it (`BookStatblock`): only a native
  * Atlas statblock gets one, read-only where its template is missing or of a newer Atlas. It shows
  * what the Atlas card shows a reader, through the card's own rules, of what the template lets
  * players see (`playerAccess`): the header's parts as sigils, the layout's blocks as the sheet,
- * every Abilities component and spell list in the Abilities tab, and the template's refills where
- * the player may change a Counters value. A value the player may change
+ * every Abilities component and spell list in the Abilities tab. A value the player may change
  * carries what they may change it to and the base an edit names; an empty one carries its prompt.
  * Within the protocol's limits: what does not fit is left out, never sent for the page to refuse.
  * Texts longer than an opening carry their whole text by hash where `texts` knows it.
@@ -105,15 +88,13 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
   const nodes = sheetNodes(build, template.layout.blocks, 0, { section: null }, walk);
   const sigils: { -readonly [K in keyof SheetSigils]: SheetValue } = {};
   for (const [id, sigil] of head.sigils) if (build.budget.takeValue(sigil)) sigils[id] = sigil;
-  const statblock: BookStatblock = {
+  return {
     editable,
     displayName: head.displayName,
     sigils,
     blocks: fittedNodes(build.budget, head.description ? [head.description, ...nodes] : nodes),
     abilities: fittedAbilities(build.budget, walk.abilities),
-    refills: [],
   };
-  return { ...statblock, refills: sheetRefills(build, statblock) };
 }
 
 /** The statblock drawn with every whole text it names by hash (drawn twice: hashing takes a promise), and those texts to serve. */

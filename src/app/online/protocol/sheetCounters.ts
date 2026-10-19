@@ -9,9 +9,10 @@ export const MAX_REFILLS = 8;
 
 /**
  * One row of a Counters block: something with limited uses (a level's spell slots, ki, a feature's uses
- * per day). `used` of `max` are spent; `reset` names the refill that gives them back (one of the
- * statblock's `refills`, as the template names it: "Long rest", "Dawn", "Session"), null for none;
- * `regain` is the dice formula of how many come back then ("1d6+1"), null for all of them. As the note stores it.
+ * per day). `used` of `max` are spent; `reset` names what gives them back: the id of one of the
+ * character's recovery buttons, or for a GM's Atlas of earlier builds one of the statblock's `refills`
+ * ("Long rest", "Dawn", "Session"); null for none. `regain` is the dice formula of how many come back
+ * then ("1d6+1"), null for all of them. As the note stores it.
  */
 export interface SheetCounter {
   readonly name: string;

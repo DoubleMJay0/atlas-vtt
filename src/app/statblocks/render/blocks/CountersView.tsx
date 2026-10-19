@@ -16,10 +16,8 @@ export interface ShownCounters {
 
 /**
  * Rows of limited uses under the block's label, each a small cell of pips.
- * The statblock pane makes them pressable; its refill buttons stand once for
- * the whole sheet (`SheetRefills`)
- * (`ValueEditing.counters`); a value that is no list of counters shows as it
- * is written, with its chip.
+ * The statblock pane makes them pressable (`ValueEditing.counters`); a value
+ * that is no list of counters shows as it is written, with its chip.
  */
 export function CountersView({ block, display }: BlockViewProps<CountersBlock>): React.JSX.Element {
   const { state } = useSheet();
@@ -27,7 +25,7 @@ export function CountersView({ block, display }: BlockViewProps<CountersBlock>):
   const field = state.fields.get(block.field);
   const label = block.label ?? field?.label ?? block.field;
   const value = state.reader(block.field);
-  const rows = field && display.state === 'value' ? shownCounterRows(field, value, state.refillNames) : null;
+  const rows = field && display.state === 'value' ? shownCounterRows(field, value) : null;
   const counters = (rows ?? []).flatMap((row, index) => (isDrawnCounter(row) ? [{ row, index }] : []));
   const shown: ShownCounters = { counters };
 

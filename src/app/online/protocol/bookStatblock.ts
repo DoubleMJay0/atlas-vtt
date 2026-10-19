@@ -80,9 +80,9 @@ export interface BookStatblock {
   /**
    * The refills the template names for the whole sheet ("Short rest", "Long rest", "Dawn"), each a
    * button that gives back the uses of every counter on the sheet naming it (`book-refill`). Only a
-   * statblock the player may change has any.
+   * statblock the player may change has any. A GM's Atlas that has recovery buttons sends none.
    */
-  readonly refills: readonly CounterRefill[];
+  readonly refills?: readonly CounterRefill[];
 }
 
 /** The refills of a statblock, each name once; null when they are malformed. */
@@ -289,6 +289,6 @@ export function parseBookStatblock(value: unknown): BookStatblock | null | undef
   if (new Set(abilities.map((entry) => entry.id)).size !== abilities.length) return undefined;
   const refills = parseRefills(value.refills, budget);
   if (refills === null) return undefined;
-  return { editable: value.editable, displayName, sigils, blocks, abilities, refills };
+  return { editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }) };
 }
 

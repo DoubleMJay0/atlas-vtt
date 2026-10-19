@@ -1,11 +1,10 @@
-import type { BookAbilityMessage, BookFieldMessage, BookRefillMessage } from '../../protocol/index.ts';
+import type { BookAbilityMessage, BookFieldMessage } from '../../protocol/index.ts';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import type { NotePatch } from '../../../statblocks/notes/patchTypes';
 import { checkAbilityEdit } from './abilityEdit.ts';
 import type { PlayedCharacter } from './characters.ts';
 import { checkFieldEdit } from './fieldEdit.ts';
-import { checkRefill } from './refillEdit.ts';
-import type { CheckedEdit, EditInputs } from './statblockChecks.ts';
+import type { EditInputs } from './statblockChecks.ts';
 import type { StatblockWriteOutcome } from './statblockGate.ts';
 import type { DrawnStatblock } from './statblockSheet.ts';
 import { NO_STATBLOCK, StatblockSheets } from './statblockSheets.ts';
@@ -20,11 +19,6 @@ export interface StatblockSharePorts {
   answered(player: string): void;
   /** A player's edit was refused once it was written: they are owed their whole book. */
   owe(player: string): void;
-  /**
-   * Rolls a formula for a player's own character in the open, as theirs and named `flavor` (the uses a
-   * refill gives back); the total, or null where it could not be rolled.
-   */
-  roll(player: string, character: PlayedCharacter, formula: string, flavor: string): number | null;
 }
 
 /**
@@ -75,18 +69,15 @@ export class StatblockShare {
     this.sheets.retain(paths);
   }
 
-  /**
-   * A player's edit of their own character's statblock, or a refill of its counters: false when it is
-   * refused at once. A refill's formulas are rolled once it is checked, before it is written.
-   */
-  write(from: string, character: PlayedCharacter, message: BookFieldMessage | BookAbilityMessage | BookRefillMessage): boolean {
+  /** A player's edit of their own character's statblock: false when it is refused at once. */
+  write(from: string, character: PlayedCharacter, message: BookFieldMessage | BookAbilityMessage): boolean {
     const path = character.statblockPath;
     // While the note may have changed (a template restricting a field) it is read again first: nothing is checked against the old one.
     if (path === null || !this.sheets.checkable(path)) return false;
     const sent = this.sentTo.get(from);
     // What the player was sent counts only while it is of this note (the GM may have linked another since).
     const inputs: EditInputs = { resolved: this.sheets.resolved(path), sent: sent?.path === path ? sent.drawn.statblock : null, read: (field) => this.sheets.read(path, field) };
-    const checked = this.check(from, character, inputs, message);
+    const checked = message.t === 'book-field' ? checkFieldEdit(inputs, message) : checkAbilityEdit(inputs, message);
     if (checked === null) return false;
     if (checked.patches.length === 0) {
       this.ports.answered(from);
@@ -104,13 +95,5 @@ export class StatblockShare {
     }, refused);
     this.ports.changed();
     return true;
-  }
-
-  private check(from: string, character: PlayedCharacter, inputs: EditInputs, message: BookFieldMessage | BookAbilityMessage | BookRefillMessage): CheckedEdit | null {
-    switch (message.t) {
-      case 'book-field': return checkFieldEdit(inputs, message);
-      case 'book-ability': return checkAbilityEdit(inputs, message);
-      case 'book-refill': return checkRefill(inputs, message, (formula, flavor) => this.ports.roll(from, character, formula, flavor));
-    }
   }
 }

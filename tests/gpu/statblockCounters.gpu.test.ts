@@ -6,7 +6,6 @@ import { page } from 'vitest/browser';
 import css from '../../styles/main.scss?inline';
 import { StatblockSheet } from '../../src/app/statblocks/render/StatblockSheet';
 import { CountersGrid } from '../../src/app/statblocks/render/shared/CountersGrid';
-import { RefillButtons } from '../../src/app/statblocks/render/shared/RefillButtons';
 import { ValueEditingContext, type ValueEditing } from '../../src/app/statblocks/render/valueSlot';
 import { TEMPLATE_FORMAT, type StatblockTemplate } from '../../src/app/statblocks/model/templateTypes';
 
@@ -28,23 +27,21 @@ const TEMPLATE: StatblockTemplate = {
   id: 'counters-abc123',
   fields: [{ key: 'slots', label: 'Spell slots', type: 'counters' }],
   layout: { maxColumns: 1, blocks: [{ id: 'slots001', type: 'counters', field: 'slots' }] },
-  refills: [{ name: 'Short rest' }, { name: 'Long rest', includes: ['Short rest'] }],
 };
 
 const SLOTS = [
-  { name: '1st level', max: 4, used: 1, reset: 'Long rest' },
-  { name: '2nd level', max: 3, used: 0, reset: 'Long rest' },
-  { name: '3rd level', max: 3, used: 0, reset: 'Long rest' },
-  { name: '4th level', max: 3, used: 0, reset: 'Long rest' },
-  { name: '5th level', max: 1, used: 0, reset: 'Long rest' },
-  { name: 'Arcane Recovery', max: 1, used: 0, reset: 'Long rest' },
+  { name: '1st level', max: 4, used: 1, reset: 'long' },
+  { name: '2nd level', max: 3, used: 0, reset: 'long' },
+  { name: '3rd level', max: 3, used: 0, reset: 'long' },
+  { name: '4th level', max: 3, used: 0, reset: 'long' },
+  { name: '5th level', max: 1, used: 0, reset: 'long' },
+  { name: 'Arcane Recovery', max: 1, used: 0, reset: 'short' },
 ];
 
 /** The pane's controls, which press nothing here: the buttons are drawn as the pane draws them. */
 const LIVE: ValueEditing = {
   slot: (_block, values) => values,
   counters: (_block, shown) => React.createElement(CountersGrid, { ...shown, controls: { use: () => undefined } }),
-  refills: () => React.createElement(RefillButtons, { refills: TEMPLATE.refills!.map((refill) => ({ name: refill.name, includes: refill.includes ?? [] })), onRefill: () => undefined }),
 };
 
 const cells = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('.atlas-sb-counter')];
@@ -87,7 +84,7 @@ describe('Counters in the real stylesheet', () => {
     }
   });
 
-  it('stands its pressable pips where a read-only card draws them, with the sheet\'s refill buttons once above the blocks', () => {
+  it('stands its pressable pips where a read-only card draws them', () => {
     mount(null);
     const drawn = cells().map(pipRects);
     cleanup();
@@ -96,15 +93,5 @@ describe('Counters in the real stylesheet', () => {
     pressable.forEach((rects, cell) => rects.forEach((rect, pip) => {
       expect(rect.left, `cell ${cell} pip ${pip}`).toBeCloseTo(drawn[cell]![pip]!.left, 0);
     }));
-    expect(document.querySelectorAll('.atlas-sb-refills')).toHaveLength(1);
-    const refill = document.querySelector<HTMLElement>('.atlas-sb-refill')!.getBoundingClientRect();
-    expect(refill.bottom).toBeLessThan(document.querySelector<HTMLElement>('.atlas-sb-columns')!.getBoundingClientRect().top);
-    // The button's text starts on the card's text edge; its padding reaches past it.
-    expect(refill.left).toBeCloseTo(cells()[0]!.getBoundingClientRect().left - 4, 0);
-  });
-
-  it('draws no refill buttons on a card that is only read', () => {
-    mount(null);
-    expect(document.querySelector('.atlas-sb-refills')).toBeNull();
   });
 });

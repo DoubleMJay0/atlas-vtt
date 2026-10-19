@@ -100,7 +100,6 @@ function readCounterPreset(raw: unknown, index: number, where: string, problems:
   return r.finish({
     name,
     max: r.withDefault('max', asNonNegativeInteger, 0, 'a whole number of 0 or more'),
-    ...r.opt('reset', asString, TEXT),
     ...r.opt('regain', asString, TEXT),
   });
 }

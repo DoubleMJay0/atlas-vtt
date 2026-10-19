@@ -21,14 +21,13 @@ afterEach(async () => {
 
 const SLOTS: TemplateField = {
   key: 'slots', label: 'Spell slots', type: 'counters',
-  counterRows: [{ name: '1st level', max: 4, reset: 'Long rest' }, { name: '2nd level', max: 3, reset: 'Long rest' }],
+  counterRows: [{ name: '1st level', max: 4 }, { name: '2nd level', max: 3 }],
 };
 
 function withCounters(): StatblockTemplate {
   const sample = sampleTemplate();
   return {
     ...sample,
-    refills: [{ name: 'Short rest' }, { name: 'Long rest', includes: ['Short rest'] }],
     fields: [...sample.fields, SLOTS],
     layout: { ...sample.layout, blocks: [...sample.layout.blocks, { id: 'slots001', type: 'counters', field: 'slots' }] },
   };
@@ -71,7 +70,7 @@ describe('a Counters tile in the template editor', () => {
     expect(session.steps).toBe(2);
   });
 
-  it('renames a row and sets its uses, its refill and what it regains, typing being one step', () => {
+  it('renames a row and sets its uses and what it regains, typing being one step, and asks for no recovery button', () => {
     const { session, options } = open();
     typeAndLeave(within(options).getByRole('textbox', { name: 'Row 1' }), '1', '1s', '1st');
     expect(rows(session)?.[0]?.name).toBe('1st');
@@ -80,54 +79,12 @@ describe('a Counters tile in the template editor', () => {
     expect(rows(session)?.[0]?.max).toBe(2);
     expect(session.steps).toBe(2);
     typeAndLeave(within(tileOptions()).getByRole('textbox', { name: 'Uses 1st regains' }), '1d', '1d4');
-    expect(rows(session)?.[0]).toEqual({ name: '1st', max: 2, reset: 'Long rest', regain: '1d4' });
-    expect(session.steps).toBe(3);
-    fireEvent.click(within(tileOptions()).getByRole('combobox', { name: 'Refill of 1st' }));
-    expect(within(document.body).getAllByRole('option').map((option) => option.textContent)).toEqual(['None', 'Short rest', 'Long rest']);
-    fireEvent.click(within(document.body).getByRole('option', { name: 'Short rest' }));
-    expect(rows(session)?.[0]).toEqual({ name: '1st', max: 2, reset: 'Short rest', regain: '1d4' });
-    fireEvent.click(within(tileOptions()).getByRole('combobox', { name: 'Refill of 1st' }));
-    fireEvent.click(within(document.body).getByRole('option', { name: 'None' }));
     expect(rows(session)?.[0]).toEqual({ name: '1st', max: 2, regain: '1d4' });
-    expect(session.steps).toBe(5);
-  });
-
-  it('lists the refills the whole sheet shares, and adds one, one step', () => {
-    const { session, options } = open();
-    expect(within(options).getByText(/Refills belong to the whole sheet/)).toBeTruthy();
-    const add = within(options).getByPlaceholderText('Add a refill, like Dawn');
-    fireEvent.change(add, { target: { value: 'Dawn' } });
-    fireEvent.keyDown(add, { key: 'Enter' });
-    expect(session.template.refills).toEqual([{ name: 'Short rest' }, { name: 'Long rest', includes: ['Short rest'] }, { name: 'Dawn' }]);
-    expect(session.steps).toBe(1);
-    fireEvent.change(within(tileOptions()).getByPlaceholderText('Add a refill, like Dawn'), { target: { value: 'Dawn' } });
-    fireEvent.keyDown(within(tileOptions()).getByPlaceholderText('Add a refill, like Dawn'), { key: 'Enter' });
-    expect(session.steps).toBe(1);
-  });
-
-  it('renames a refill and carries the rows it refills and the refills bringing it along with it, one step', () => {
-    const { session, options } = open();
-    typeAndLeave(within(options).getByRole('textbox', { name: 'Refill 1' }), 'Breather');
-    expect(session.template.refills).toEqual([{ name: 'Breather' }, { name: 'Long rest', includes: ['Breather'] }]);
-    expect(session.steps).toBe(1);
-    typeAndLeave(within(tileOptions()).getByRole('textbox', { name: 'Refill 2' }), 'Night');
-    expect(rows(session)?.map((row) => row.reset)).toEqual(['Night', 'Night']);
-    expect(session.steps).toBe(2);
-    typeAndLeave(within(tileOptions()).getByRole('textbox', { name: 'Refill 2' }), 'Breather');
-    expect(session.template.refills?.map((refill) => refill.name)).toEqual(['Breather', 'Night']);
-    expect(session.steps).toBe(2);
-  });
-
-  it('sets which refills one brings along, moves one and removes one, one step each', () => {
-    const { session, options } = open();
-    fireEvent.click(within(options).getByRole('button', { name: 'Short rest', pressed: true }));
-    expect(session.template.refills?.[1]).toEqual({ name: 'Long rest' });
-    fireEvent.click(within(tileOptions()).getByRole('button', { name: 'Move Long rest up' }));
-    expect(session.template.refills?.map((refill) => refill.name)).toEqual(['Long rest', 'Short rest']);
-    fireEvent.click(within(tileOptions()).getByRole('button', { name: 'Remove Long rest' }));
-    expect(session.template.refills).toEqual([{ name: 'Short rest' }]);
-    expect(rows(session)?.map((row) => row.reset)).toEqual([undefined, undefined]);
     expect(session.steps).toBe(3);
+    typeAndLeave(within(tileOptions()).getByRole('textbox', { name: 'Uses 1st regains' }), '');
+    expect(rows(session)?.[0]).toEqual({ name: '1st', max: 2 });
+    expect(session.steps).toBe(4);
+    expect(within(tileOptions()).queryByRole('combobox')).toBeNull();
   });
 
   it('offers no Roll as a bonus', () => {

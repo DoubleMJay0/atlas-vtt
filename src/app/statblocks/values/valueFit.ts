@@ -9,7 +9,7 @@ import type { FieldType, FieldValue, TemplateField } from '../model/templateType
 import { picksChoice } from './choicePicks';
 import { isEmptyValue } from './emptyValue';
 import { isPlainRecord } from './fieldValueOf';
-import { readCounterRows, type KnownRefills } from './counterValues';
+import { readCounterRows } from './counterValues';
 import { coerce } from './valueCoercion';
 import { quoted, valueText } from './valueText';
 
@@ -36,7 +36,7 @@ const TYPE_NOUNS: Readonly<Record<FieldType, { noun: string; label: string }>> =
   pairs: { noun: 'names with numbers', label: 'Not pairs' },
   image: { noun: 'an image path', label: 'Not an image' },
   spells: { noun: 'a spell list', label: 'Not spells' },
-  counters: { noun: 'rows of counters, each with a name, as many used as its maximum at most, a refill the template names and a dice formula of what it regains', label: 'Not counters' },
+  counters: { noun: 'rows of counters, each with a name, as many used as its maximum at most and a dice formula of what it regains', label: 'Not counters' },
 };
 
 /** Types whose text is checked by coercion; the others keep any text as it is written. */
@@ -49,14 +49,13 @@ const isScalar = (value: FieldValue): boolean => value === null || typeof value 
 const holdsRecords = (value: FieldValue): boolean => Array.isArray(value) && value.some((item) => isPlainRecord(item));
 const isCount = (value: FieldValue): boolean => typeof value === 'number' || typeof value === 'boolean';
 const never = (): boolean => false;
-const NO_REFILLS: KnownRefills = new Set();
 
 /**
  * Whether a value has the shape a field of the type shows. Numbers, ratings,
  * dice and choices read a single value as text first, so they see only lists
  * and records here.
  */
-const SHAPE_FITS: Readonly<Record<FieldType, (value: FieldValue, refills: KnownRefills) => boolean>> = {
+const SHAPE_FITS: Readonly<Record<FieldType, (value: FieldValue) => boolean>> = {
   text: (value) => !isPlainRecord(value) && !holdsRecords(value),
   markdown: (value) => !isPlainRecord(value) && !holdsRecords(value),
   number: never,
@@ -71,7 +70,7 @@ const SHAPE_FITS: Readonly<Record<FieldType, (value: FieldValue, refills: KnownR
   pairs: (value) => !isCount(value),
   image: (value) => typeof value === 'string',
   spells: (value) => !isCount(value),
-  counters: (value, refills) => readCounterRows(value, refills) !== null,
+  counters: (value) => readCounterRows(value) !== null,
 };
 
 function shortQuote(value: FieldValue): string {
@@ -93,18 +92,17 @@ export function textProblem(field: FitField, text: string): string | null {
  * Why a stored value does not fit its field's type, or null where it fits or
  * is empty. A single value in a number, rating, dice or choice field is read
  * as the text a statblock writes for it; other values by their shape. Types of
- * a newer template are taken as they come. Counters are read against the
- * template's `refills` (unset: it defines none).
+ * a newer template are taken as they come.
  */
-export function valueMisfit(field: FitField, value: FieldValue | undefined, refills: KnownRefills = NO_REFILLS): ValueMisfit | null {
+export function valueMisfit(field: FitField, value: FieldValue | undefined): ValueMisfit | null {
   if (value === undefined || isEmptyValue(value) || !Object.hasOwn(TYPE_NOUNS, field.type)) return null;
-  const problem = misfitProblem(field, value, refills);
+  const problem = misfitProblem(field, value);
   return problem === null ? null : { label: TYPE_NOUNS[field.type].label, problem };
 }
 
-function misfitProblem(field: FitField, value: FieldValue, refills: KnownRefills): string | null {
+function misfitProblem(field: FitField, value: FieldValue): string | null {
   if (CHECKED_TEXT.has(field.type) && isScalar(value)) return textProblem(field, valueText(value));
   // Several picks may be stored as a list, or as a record of options and numbers.
   if (picksChoice(field) && !holdsRecords(value)) return textProblem(field, valueText(value));
-  return SHAPE_FITS[field.type](value, refills) ? null : `${shortQuote(value)} isn't ${TYPE_NOUNS[field.type].noun}.`;
+  return SHAPE_FITS[field.type](value) ? null : `${shortQuote(value)} isn't ${TYPE_NOUNS[field.type].noun}.`;
 }

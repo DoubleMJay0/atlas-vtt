@@ -11,7 +11,6 @@ import type {
   BlockType,
   Condition,
   CounterPreset,
-  CounterRefillDefinition,
   EntryShape,
   HeaderTrack,
   ScoreColumn,
@@ -49,7 +48,7 @@ function keyOrder<K extends string>(order: Record<K, true>): KeyOrder<K> {
 
 export const TEMPLATE_KEYS = keyOrder<keyof StatblockTemplate>({
   format: true, version: true, id: true, description: true, suits: true, diceSetId: true, derivedFrom: true, source: true,
-  importedFrom: true, fields: true, header: true, layout: true, refills: true, players: true, lookups: true, sample: true,
+  importedFrom: true, fields: true, header: true, layout: true, players: true, lookups: true, sample: true,
 });
 
 export const HEADER_KEYS = keyOrder<keyof TemplateHeader>({ hidden: true, hitPoints: true });
@@ -63,8 +62,7 @@ export const FIELD_KEYS = keyOrder<keyof TemplateField>({
   counterRows: true, prompt: true,
 });
 
-export const COUNTER_PRESET_KEYS = keyOrder<keyof CounterPreset>({ name: true, max: true, reset: true, regain: true });
-export const COUNTER_REFILL_KEYS = keyOrder<keyof CounterRefillDefinition>({ name: true, includes: true });
+export const COUNTER_PRESET_KEYS = keyOrder<keyof CounterPreset>({ name: true, max: true, regain: true });
 
 export const ENTRY_SHAPE_KEYS = keyOrder<keyof EntryShape>({ nameKey: true, textKey: true, extras: true });
 export const ENTRY_EXTRA_KEYS = keyOrder<keyof EntryExtra>({ key: true, label: true, type: true, options: true, several: true });

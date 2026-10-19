@@ -41,10 +41,10 @@ export interface ValueEditing {
    */
   counters?(block: CountersBlock, shown: ShownCounters): React.ReactNode;
   /**
-   * What stands under the header once for the whole sheet: the pane's refill buttons, the template editor's the
-   * same drawn inert. Unset: nothing, as a card that is only read (a hover preview, the DM screen) shows.
+   * What stands under the header once for the whole sheet: the note panel's recovery buttons of a player
+   * character. Unset: nothing, as a card that is only read (a hover preview, the DM screen) shows.
    */
-  refills?(): React.ReactNode;
+  recovery?(): React.ReactNode;
   /**
    * A tile not named yet is drawn as it will be once named (`provisionalSheet`): the template editor's tiles while
    * their name is asked for. Unset (a statblock's pane): such a block shows only its prompt, and no value of it is edited.

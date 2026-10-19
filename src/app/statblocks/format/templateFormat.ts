@@ -11,7 +11,6 @@ import type { StatblockTemplate } from '../model/templateTypes';
 import {
   CONDITION_KEYS,
   COUNTER_PRESET_KEYS,
-  COUNTER_REFILL_KEYS,
   DERIVED_FROM_KEYS,
   ENTRY_EXTRA_KEYS,
   ENTRY_SHAPE_KEYS,
@@ -88,7 +87,6 @@ const TEMPLATE_NESTED: NestedWriters = new Map([
   ['fields', listWriter(writeField)],
   ['header', objectWriter(HEADER_KEYS, new Map([['hitPoints', objectWriter(HEADER_TRACK_KEYS)]]))],
   ['layout', objectWriter(LAYOUT_KEYS, new Map([['blocks', listWriter(writeBlock)]]))],
-  ['refills', listWriter(objectWriter(COUNTER_REFILL_KEYS))],
   ['players', writeSortedRecord],
 ]);
 

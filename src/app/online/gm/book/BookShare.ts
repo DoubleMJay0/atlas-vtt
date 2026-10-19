@@ -91,7 +91,6 @@ export class BookShare implements LootRecipientSource {
       changed: () => this.whileRunning(() => this.update()),
       answered: (player) => this.whileRunning(() => this.resendStatblock(player)),
       owe: (player) => this.whileRunning(() => this.owed.owe(player)),
-      roll: (player, character, formula, flavor) => ports.rollFor(player, formula, flavor, character.tokenId),
     });
     this.assets = new BookAssetDesk(ports, (player) => this.namedAssets(player));
   }
@@ -273,7 +272,9 @@ export class BookShare implements LootRecipientSource {
     const message = parsePlayerBookMessage(body);
     if (character === null || message === null || !this.isOnline(from)) return false;
     if (message.t === 'book-resource') return this.editResource(from, character, message);
-    if (message.t === 'book-field' || message.t === 'book-ability' || message.t === 'book-refill') return this.statblocks.write(from, character, message);
+    // Recovery buttons replaced refills; a page of an older Atlas may still ask for one.
+    if (message.t === 'book-refill') return false;
+    if (message.t === 'book-field' || message.t === 'book-ability') return this.statblocks.write(from, character, message);
     const quests = new Set(this.quests.map((quest) => quest.id));
     const written = applyBookMessage(this.shelf.of(character.key), message, this.ports.clock(), quests);
     if (written === null) return false;

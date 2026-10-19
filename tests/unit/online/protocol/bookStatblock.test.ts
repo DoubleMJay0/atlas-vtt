@@ -354,7 +354,9 @@ describe('a Counters block and the sheet\'s refills', () => {
       { name: '1st level', max: 4, used: 1, reset: 'Long rest', regain: null }, { name: 'Wand', max: 7, used: 3, reset: 'Dawn', regain: '1d6+1' }, { name: 'Ki', max: 5, used: 0, reset: null, regain: null },
     ] });
     expect(parsed?.refills).toEqual([{ name: 'Short rest', includes: [] }, { name: 'Long rest', includes: ['Short rest'] }, { name: 'Dawn', includes: [] }]);
-    expect(parseBookStatblock(sheet(counters([])))?.refills).toEqual([]);
+    // A GM's Atlas with recovery buttons sends none: the sheet then has none
+    expect(parseBookStatblock(sheet(counters([])))).not.toHaveProperty('refills');
+    expect(parseBookStatblock(sheet(counters([]), { refills: [] }))?.refills).toEqual([]);
     expect(refilledBy({ name: 'Long rest', includes: ['Short rest'] }, { name: 'Ki', max: 5, used: 2, reset: 'Short rest', regain: null })).toBe(true);
     expect(refilledBy({ name: 'Short rest', includes: [] }, { name: '1st level', max: 4, used: 1, reset: 'Long rest', regain: null })).toBe(false);
   });

@@ -1,5 +1,5 @@
 import {
-  MAX_ABILITIES, MAX_GM_FRAME, MAX_SHEET_CHARS, MAX_SHEET_NODES, type AbilityComponent, type AbilityEntry, type CounterRefill, type SheetNode, type SheetText,
+  MAX_ABILITIES, MAX_GM_FRAME, MAX_SHEET_CHARS, MAX_SHEET_NODES, type AbilityComponent, type AbilityEntry, type SheetNode, type SheetText,
   type SheetValue,
 } from '../../protocol/index.ts';
 
@@ -79,11 +79,6 @@ export class SheetBudget {
   takeFrame(frame: AbilityComponent): boolean {
     const chars = frame.tabs.reduce((sum, tab) => sum + (tab.intro ? textChars(tab.intro) : 0), 0);
     return this.take({ nodes: 0, chars, abilities: 0, bytes: jsonBytes(frame) });
-  }
-
-  /** The sheet's refills, all or none: their names and those each brings along, as the parser counts them. */
-  takeRefills(refills: readonly CounterRefill[]): boolean {
-    return this.take({ nodes: 0, chars: refills.map((refill) => refill.name + refill.includes.join('')).join('').length, abilities: 0, bytes: jsonBytes(refills) });
   }
 
   /** One ability: its name, text and parts, as the parser counts them. */

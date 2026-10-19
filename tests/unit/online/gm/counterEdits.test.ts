@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { checkFieldEdit } from '../../../../src/app/online/gm/book/fieldEdit.ts';
-import { checkRefill } from '../../../../src/app/online/gm/book/refillEdit.ts';
 import type { CheckedEdit, EditInputs } from '../../../../src/app/online/gm/book/statblockChecks.ts';
 import { statblockSheet } from '../../../../src/app/online/gm/book/statblockSheet.ts';
 import { storedRead } from '../../../../src/app/online/gm/book/statblockSheets.ts';
@@ -10,16 +9,13 @@ import type { StatblockTemplate } from '../../../../src/app/statblocks/model/tem
 import { applyFrontmatterPatches } from '../../../../src/app/statblocks/notes/frontmatterPatch';
 import { propertiesOf, templateOf } from './statblockNotes.ts';
 
-const TEMPLATE: StatblockTemplate = {
-  ...templateOf(
-    [
-      { key: 'name', label: 'Name', type: 'text' },
-      { key: 'slots', label: 'Spell slots', type: 'counters', counterRows: [{ name: '1st level', max: 2, reset: 'Long rest' }] },
-    ],
-    [{ id: 'slots001', type: 'counters', field: 'slots' }],
-  ),
-  refills: [{ name: 'Short rest' }, { name: 'Long rest', includes: ['Short rest'] }],
-};
+const TEMPLATE: StatblockTemplate = templateOf(
+  [
+    { key: 'name', label: 'Name', type: 'text' },
+    { key: 'slots', label: 'Spell slots', type: 'counters', counterRows: [{ name: '1st level', max: 2 }] },
+  ],
+  [{ id: 'slots001', type: 'counters', field: 'slots' }],
+);
 
 const NOTE = `---
 statblock: true
@@ -44,7 +40,7 @@ const ROWS = [
   { name: '1st level', max: 4, used: 1, reset: 'Long rest' },
   { name: 'Ki', max: 3, used: 3, reset: 'Short rest', regain: '1d4', colour: 'red' },
 ];
-/** The rows as a page sends them back: the protocol's keys, no refill or formula as null. */
+/** The rows as a page sends them back: the protocol's keys, no recovery button or formula as null. */
 const SENT = [
   { name: '1st level', max: 4, used: 1, reset: 'Long rest', regain: null },
   { name: 'Ki', max: 3, used: 3, reset: 'Short rest', regain: '1d4' },
@@ -82,11 +78,11 @@ describe('a player\'s change of their Counters', () => {
   it('gives a note that showed its preset rows rows of its own', () => {
     const bare = NOTE.replace(/slots:[\s\S]*?(?=---\n# Ana)/, '');
     const fresh = inputsOf(bare);
-    expect(slotsAfter(bare, checkFieldEdit(fresh, edit([{ name: '1st level', max: 2, used: 1, reset: 'Long rest' }], { was: undefined }))))
-      .toEqual([{ name: '1st level', max: 2, used: 1, reset: 'Long rest' }]);
+    expect(slotsAfter(bare, checkFieldEdit(fresh, edit([{ name: '1st level', max: 2, used: 1, reset: null, regain: null }], { was: undefined }))))
+      .toEqual([{ name: '1st level', max: 2, used: 1 }]);
   });
 
-  it('refuses a changed maximum, name, refill or formula, another order or number of rows, and uses that are no whole number up to the maximum', () => {
+  it('refuses a changed maximum, name, recovery button or formula, another order or number of rows, and uses that are no whole number up to the maximum', () => {
     const refused: SheetRaw[] = [
       [{ ...SENT[0]!, max: 5 }, SENT[1]!],
       [{ ...SENT[0]!, name: '1st' }, SENT[1]!],
@@ -112,46 +108,17 @@ describe('a player\'s change of their Counters', () => {
     expect(checkFieldEdit(inputs, edit(1, { was: ROWS }, [0, 0]))).toBeNull();
   });
 
-  it('never changes a note whose rows name a refill the template does not define', () => {
-    const old = NOTE.replace('reset: Long rest', 'reset: long-rest');
-    expect(checkFieldEdit(inputsOf(old), edit([{ ...SENT[0]!, reset: 'long-rest', used: 2 }, SENT[1]!], { was: [{ ...ROWS[0], reset: 'long-rest' }, ROWS[1]] }))).toBeNull();
+  it('takes rows whatever recovery button they name, and never changes a note whose rows regain what Atlas does not roll', () => {
+    const other = NOTE.replace('reset: Long rest', 'reset: dawn');
+    expect(slotsAfter(other, checkFieldEdit(inputsOf(other), edit([{ ...SENT[0]!, reset: 'dawn', used: 2 }, SENT[1]!], { was: [{ ...ROWS[0], reset: 'dawn' }, ROWS[1]] }))))
+      .toEqual([{ ...ROWS[0], reset: 'dawn', used: 2 }, ROWS[1]]);
+    const unrolled = NOTE.replace('regain: 1d4', 'regain: some');
+    expect(checkFieldEdit(inputsOf(unrolled), edit([{ ...SENT[0]!, used: 2 }, { ...SENT[1]!, regain: 'some' }], { was: [ROWS[0], { ...ROWS[1], regain: 'some' }] }))).toBeNull();
   });
 
   it('refuses an edit made against an older value, and one of a field players may only read', () => {
     expect(checkFieldEdit(inputs, edit(withUsed([2, 3]), { was: [{ ...ROWS[0], used: 0 }, ROWS[1]] }))).toBeNull();
     const readOnly = inputsOf(NOTE, { ...TEMPLATE, players: { slots: 'read' } });
     expect(checkFieldEdit(readOnly, edit(withUsed([2, 3])))).toBeNull();
-  });
-});
-
-describe('a player\'s refill of their sheet', () => {
-  const inputs = inputsOf(NOTE);
-  const rolled: string[] = [];
-  const roll = (total: number | null) => (formula: string, flavor: string): number | null => {
-    rolled.push(`${formula} ${flavor}`);
-    return total;
-  };
-  const refill = (name: string): { readonly t: 'book-refill'; readonly refill: string } => ({ t: 'book-refill', refill: name });
-
-  it('gives back what the refill and those it brings along name, rolling what a row regains', () => {
-    rolled.length = 0;
-    expect(slotsAfter(NOTE, checkRefill(inputs, refill('Long rest'), roll(2)))).toEqual([{ ...ROWS[0], used: 0 }, { ...ROWS[1], used: 1 }]);
-    expect(rolled).toEqual(['1d4 Ki (Long rest)']);
-    expect(slotsAfter(NOTE, checkRefill(inputs, refill('Short rest'), roll(9)))).toEqual([ROWS[0], { ...ROWS[1], used: 0 }]);
-  });
-
-  it('refuses a refill the template does not define or the sheet did not offer, and one whose roll was not made', () => {
-    expect(checkRefill(inputs, refill('Dawn'), roll(1))).toBeNull();
-    expect(checkRefill(inputs, refill('long rest'), roll(1))).toBeNull();
-    expect(checkRefill(inputs, refill('Short rest'), roll(null))).toBeNull();
-    const offeredNone = { ...inputs, sent: inputs.sent && { ...inputs.sent, refills: [] } };
-    expect(checkRefill(offeredNone, refill('Long rest'), roll(1))).toBeNull();
-  });
-
-  it('changes no value players may only read, and writes nothing where nothing comes back', () => {
-    const readOnly = inputsOf(NOTE, { ...TEMPLATE, players: { slots: 'read' } });
-    expect(checkRefill(readOnly, refill('Long rest'), roll(1))).toBeNull();
-    const rested = NOTE.replace('used: 1', 'used: 0').replace('used: 3', 'used: 0');
-    expect(checkRefill(inputsOf(rested), refill('Long rest'), roll(1))).toEqual({ patches: [], written: [] });
   });
 });

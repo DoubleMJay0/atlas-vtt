@@ -111,7 +111,6 @@ export class OnlineTable {
       scene: () => this.bound()?.book() ?? null,
       readImage: (path) => readVaultImage(app, path),
       tokenWrites: () => this.bound()?.resources ?? null,
-      rollFor: (player, formula, flavor, tokenId) => this.bound()?.share.dice.rollFor(player, formula, flavor, tokenId) ?? null,
     });
     this.watch = new TabWatch<SceneBinding>({
       leaves: () => app.workspace.getLeavesOfType(ATLAS_VIEW_TYPE),

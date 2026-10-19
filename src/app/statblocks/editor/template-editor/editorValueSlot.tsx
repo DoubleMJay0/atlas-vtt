@@ -5,7 +5,6 @@ import type { ShownCounters } from '../../render/blocks/CountersView';
 import { CountersGrid } from '../../render/shared/CountersGrid';
 import { useSheet } from '../../render/sheetContext';
 import { AddEntryRow } from '../../render/shared/AddEntryRow';
-import { RefillButtons, sheetOfferedRefills, sheetRefillTargets } from '../../render/shared/RefillButtons';
 import { statblockImageSrc } from '../../render/shared/statblockImage';
 import type { ValueEditing } from '../../render/valueSlot';
 import { valueText } from '../../values/valueText';
@@ -35,24 +34,14 @@ function counters(_block: CountersBlock, shown: ShownCounters): React.ReactNode 
   return <CountersGrid {...shown} controls={{}} />;
 }
 
-/** The sheet's refill buttons as the note view draws them under the header, inert. */
-function InertRefills(): React.JSX.Element | null {
-  const { state } = useSheet();
-  return <RefillButtons refills={sheetOfferedRefills(state, sheetRefillTargets(state, (field) => state.reader(field.key)))} />;
-}
-
-function refills(): React.ReactNode {
-  return <InertRefills />;
-}
-
 /**
  * The template editor's values (§2.1): drawn as the note view draws them, so
  * the card is the same; the Image block shows the note view's token socket,
- * a list of abilities the note view's "Add ability" control, Counters their pips and the sheet its refill buttons, inert, and a
+ * a list of abilities the note view's "Add ability" control, Counters their pips, inert, and a
  * Table its starting table, typed and shaped in place (`TemplateTable`). A
  * tile just placed is drawn as it will be once named.
  */
-export const EDITOR_VALUE_EDITING: ValueEditing = { slot, addEntry, counters, refills, table: renderTemplateTable, drawsUnnamed: true };
+export const EDITOR_VALUE_EDITING: ValueEditing = { slot, addEntry, counters, table: renderTemplateTable, drawsUnnamed: true };
 
 /** A tile drawn beside the card (a drag's copy, the insert menu's preview): as on the card, its table drawn and never typed. */
 export const PREVIEW_VALUE_EDITING: ValueEditing = { slot, addEntry, counters, drawsUnnamed: true };

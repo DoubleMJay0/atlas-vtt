@@ -93,7 +93,6 @@ function sampleCounters(field: TemplateField): FieldValue {
     name: row.name,
     max: row.max > 0 ? row.max : SAMPLE_COUNTER_MAXES[index] ?? 1,
     used: index === 0 ? 1 : 0,
-    ...(row.reset && { reset: row.reset }),
     ...(row.regain && { regain: row.regain }),
   }));
 }
