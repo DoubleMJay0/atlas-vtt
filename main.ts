@@ -76,6 +76,7 @@ import { DiceSetFiles } from './src/app/services/diceSets/DiceSetFiles';
 import { registerStatusBarVisibility } from './src/app/plugin/statusBarVisibility';
 import { registerVaultSync } from './src/app/plugin/vaultSync';
 import { ChangelogService } from './src/app/changelog/ChangelogService';
+import { registerUpdateWatch } from './src/app/updates/registerUpdateWatch';
 import { AtlasErrorLog } from './src/app/support/errorLog';
 import { IssueReporter } from './src/app/support/IssueReporter';
 import { runInBackground } from './src/app/utils/backgroundTask';
@@ -179,6 +180,7 @@ export default class AtlasVTTPlugin extends Plugin {
     });
     this.changelogService = changelogService;
     this.addCommand({ id: 'view-changelog', name: t('command.viewChangelog'), callback: () => changelogService.open() });
+    const updateWatch = registerUpdateWatch(this, this.settingsService);
 
     this.globalAssetManager = new GlobalAssetManagerService(this.app);
     this.imageDisplayService = new ImageDisplayService(this.app);
@@ -192,7 +194,7 @@ export default class AtlasVTTPlugin extends Plugin {
       mapImageCacheSettingsSection(() => TileDecoderClient.forApp(this.app)),
       hotkeySettingsSection(this.settingsService),
       onboardingSettingsSection(this.settingsService),
-      changelogSettingsSection(this.settingsService, changelogService, this.manifest.version),
+      changelogSettingsSection(this.settingsService, changelogService, this.manifest.version, updateWatch),
       ...onlinePlay.settingsSections(),
       supportSettingsSection(issueReporter),
     ]));

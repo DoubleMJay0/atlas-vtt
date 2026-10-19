@@ -24,6 +24,8 @@ export type TutorialId = typeof TUTORIAL_IDS[number];
 export interface AtlasSettings {
   showChangelogOnUpdate: boolean;
   changelogMajorUpdatesOnly: boolean;
+  /** Whether Atlas looks for a newer version of itself at start and hourly (`registerUpdateWatch`). */
+  checkForUpdates: boolean;
   /** Only the bindings the user changed; read the effective ones with `getHotkeys`. */
   hotkeys: HotkeyOverrides;
   onboarding: { enabled: boolean; completed: Partial<Record<TutorialId, boolean>>; tokenImported: boolean };
@@ -65,6 +67,7 @@ export const defaultInputMode = (): NavigationInputMode => (Platform.isMacOS ? '
 export const DEFAULT_SETTINGS: AtlasSettings = {
   showChangelogOnUpdate: true,
   changelogMajorUpdatesOnly: false,
+  checkForUpdates: true,
   hotkeys: {},
   onboarding: { enabled: true, completed: {}, tokenImported: false },
   starterTokensAdded: false,

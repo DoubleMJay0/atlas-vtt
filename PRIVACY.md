@@ -1,12 +1,14 @@
 # Privacy and network use
 
-Atlas VTT works offline. Maps, tokens, notes, audio and settings stay in your vault. Atlas connects to the internet only when you choose to: to host online play, to submit an issue report, or to load an image from a web address.
+Atlas VTT works offline. Maps, tokens, notes, audio and settings stay in your vault. Atlas connects to the internet only to look for a newer version of itself (which you can switch off) and when you choose to: to host online play, to submit an issue report, or to load an image from a web address.
 
 - No telemetry, no analytics, no ads.
 - You need no account to use Atlas. Only hosting online play needs an Atlas account.
 - No code is downloaded or executed from the internet, and the plugin does not update itself.
 
 ## Network access
+
+**Update check.** Once when Obsidian starts and then every hour, Atlas reads `manifest.json` from `https://raw.githubusercontent.com/atlas-vtt/atlas-vtt/HEAD/manifest.json`, the file Obsidian itself installs Atlas from, and compares its version number with yours. The request carries nothing about you or your vault; GitHub sees your IP address, as with any web request. Atlas never downloads or installs the update: **Update** opens the plugin's page in Obsidian, where Obsidian installs it. Switch the check off in **Settings → Atlas VTT → Updates → Check for updates**; while it is off, Atlas makes no such request unless you press **Check now**.
 
 If you set a token or map background to an `http://` or `https://` image URL, or copy an image that a note embeds from an external URL, that image is downloaded from the address in question. Images stored in your vault cause no network traffic.
 
