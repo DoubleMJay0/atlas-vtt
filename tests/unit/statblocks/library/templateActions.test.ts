@@ -142,6 +142,23 @@ describe('deleteTemplate', () => {
     expect(updateCollectionSettings).not.toHaveBeenCalled();
   });
 
+  it('moves its recovery buttons to the replacement, or lets them go without one', async () => {
+    const rest = { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'full' }] } as const;
+    const rested = (): CollectionMetadata => ({ ...collection('rested'), settings: { conditions: [], recovery: { [MARSH_ID]: [rest] } } });
+    const presets = new SystemPresetService(settings);
+    const homebrew = presets.list().find((preset) => preset.name === 'Homebrew')!;
+    presets.update(homebrew.id, { ...homebrew.rules, recovery: { [MARSH_ID]: [rest] } });
+    collections = [rested()];
+    await deleteTemplate(vault.app, MARSH_ID, REPLACEMENT);
+    expect(updateCollectionSettings).toHaveBeenCalledWith('rested', { recovery: { [REPLACEMENT]: [rest] } });
+    expect(presets.list().find((preset) => preset.id === homebrew.id)?.rules.recovery).toEqual({ [REPLACEMENT]: [rest] });
+
+    updateCollectionSettings.mockClear();
+    collections = [{ ...rested(), settings: { conditions: [], recovery: { [MARSH_ID]: [rest], [REPLACEMENT]: [rest] } } }];
+    await deleteTemplate(vault.app, MARSH_ID, null);
+    expect(updateCollectionSettings).toHaveBeenCalledWith('rested', { recovery: { [REPLACEMENT]: [rest] } });
+  });
+
   it('never deletes a built-in', async () => {
     await expect(deleteTemplate(vault.app, REPLACEMENT, null)).rejects.toThrow('Built-in templates can\'t be deleted.');
   });

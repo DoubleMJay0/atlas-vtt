@@ -11,6 +11,8 @@ import type { App } from 'obsidian';
 import { AssetService } from '../../services/AssetService';
 import { SystemPresetFiles } from '../../services/systemPresets/SystemPresetFiles';
 import { SystemPresetService } from '../../services/SystemPresetService';
+import { editedRecovery, presetRecovery, recoveryMoved, recoveryTemplateIds } from '../../recovery/collectionRecovery';
+import { parseRecovery } from '../../recovery/parseRecovery';
 import type { StatblockRole } from '../model/roleTypes';
 import { isBuiltInTemplateId, type StatblockTemplate, type TemplateId } from '../model/templateTypes';
 import { switchTemplates } from '../notes/templateSwitch';
@@ -58,7 +60,9 @@ export async function copyTemplate(app: App, id: TemplateId, name?: string): Pro
  * With a `replacement`, every statblock that names the template switches to
  * it (one batch, notes changed meanwhile keep theirs) and every role that
  * starts from it, a collection's own or a saved system's, starts from the
- * replacement. Without one, notes and roles are left as they are.
+ * replacement. Without one, notes and roles are left as they are. Its recovery
+ * buttons, a collection's own or a saved system's, move to the replacement, or
+ * go with the template where there is none.
  */
 export async function deleteTemplate(app: App, id: TemplateId, replacement: TemplateId | null): Promise<void> {
   if (isBuiltInTemplateId(id)) throw new Error('Built-in templates can\'t be deleted.');
@@ -67,6 +71,7 @@ export async function deleteTemplate(app: App, id: TemplateId, replacement: Temp
     await switchTemplates(app, usage.notes.map((path) => ({ path, from: id })), replacement);
     await replaceRoleTemplates(app, id, replacement);
   }
+  await moveRecoveryButtons(app, id, replacement === id ? null : replacement);
   const path = TemplateLibrary.forApp(app).get(id)?.path;
   const file = path ? app.vault.getFileByPath(path) : null;
   if (!path || !file) return;
@@ -92,5 +97,25 @@ async function replaceRoleTemplates(app: App, from: TemplateId, to: TemplateId):
   for (const preset of presets.list()) {
     const statblockRoles = preset.builtIn ? null : rolesWith(preset.rules.statblockRoles, from, to);
     if (statblockRoles) presets.update(preset.id, { ...preset.rules, statblockRoles });
+  }
+}
+
+/** Recovery buttons of the template `from` move to `to` (go, without one): the collections' own and those of saved systems. */
+async function moveRecoveryButtons(app: App, from: TemplateId, to: TemplateId | null): Promise<void> {
+  const assets = AssetService.getInstance(app);
+  const files = SystemPresetFiles.forApp(app);
+  const presets = files ? new SystemPresetService(files) : null;
+  const known = presets?.list() ?? [];
+  for (const collection of assets.loadedCollections()) {
+    const settings = collection.settings;
+    const own = parseRecovery(settings?.recovery);
+    const moved = own && recoveryMoved(own, from, to);
+    if (moved) await assets.updateCollectionSettings(collection.id, { recovery: editedRecovery(moved, presetRecovery(settings?.systemPresetId, known)) });
+  }
+  for (const preset of known) {
+    const moved = preset.builtIn ? undefined : recoveryMoved(preset.rules.recovery, from, to);
+    if (!moved || !presets) continue;
+    const { recovery: _recovery, ...rules } = preset.rules;
+    presets.update(preset.id, recoveryTemplateIds(moved).length > 0 ? { ...rules, recovery: moved } : rules);
   }
 }

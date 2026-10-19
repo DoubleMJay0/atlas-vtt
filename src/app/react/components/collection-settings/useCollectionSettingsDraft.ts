@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { parseCreatureFilters, parseHiddenCreatureFilters } from '../../../creatures/creatureFilterDefinitions';
+import { parseRecovery } from '../../../recovery/parseRecovery';
+import type { RecoveryRecord } from '../../../recovery/recoveryTypes';
 import type { AssetService } from '../../../services/AssetService';
 import type { StatblockRole, StatblockRoleFolders } from '../../../statblocks/model/roleTypes';
 import {
@@ -37,6 +39,10 @@ export interface CollectionSettingsDraft extends Omit<RulesDraft, 'toSettings'> 
   /** The collection's own folder per role id; a preset neither sets nor clears them. */
   statblockRoleFolders: StatblockRoleFolders;
   setStatblockRoleFolders: (folders: StatblockRoleFolders) => void;
+  /** Unset while the collection takes the recovery buttons of its preset; read with `collectionRecovery`. */
+  recovery: RecoveryRecord | undefined;
+  /** Set only once the GM edits the buttons (`editedRecovery`), so an untouched collection keeps following its preset. */
+  setRecovery: (recovery: RecoveryRecord | undefined) => void;
   /** The draft as the settings to save. */
   toSettings: () => Partial<CollectionSettings>;
 }
@@ -56,6 +62,7 @@ export function useCollectionSettingsDraft(
   const [hiddenCreatureFilters, setHiddenCreatureFilters] = useState<string[]>([]);
   const [statblockRoles, setStatblockRoles] = useState<readonly StatblockRole[] | undefined>(undefined);
   const [statblockRoleFolders, setStatblockRoleFolders] = useState<StatblockRoleFolders>({});
+  const [recovery, setRecovery] = useState<RecoveryRecord | undefined>(undefined);
   const { load } = rules;
 
   useEffect(() => {
@@ -73,20 +80,23 @@ export function useCollectionSettingsDraft(
     const ownRoles = parseStatblockRoles(settings.statblockRoles);
     setStatblockRoles(ownRoles?.length ? ownRoles : undefined);
     setStatblockRoleFolders(parseStatblockRoleFolders(settings.statblockRoleFolders) ?? {});
+    setRecovery(parseRecovery(settings.recovery));
   }, [isOpen, collectionId, assetService, load]);
 
   return {
     ...rules,
-    // The collection reads its preset's roles until they are edited.
+    // The collection reads its preset's roles and recovery buttons until they are edited.
     applyPreset: (preset: SystemPreset): void => {
       rules.applyPreset(preset);
       setStatblockRoles(undefined);
       setItemRarities(undefined);
+      setRecovery(undefined);
     },
     clearSystem: (): void => {
       rules.clearSystem();
       setStatblockRoles(undefined);
       setItemRarities(undefined);
+      setRecovery(undefined);
     },
     customCreatureFilters, setCustomCreatureFilters,
     hiddenCreatureFilters, setHiddenCreatureFilters,
@@ -96,6 +106,7 @@ export function useCollectionSettingsDraft(
     itemRarities, setItemRarities,
     statblockRoles, setStatblockRoles,
     statblockRoleFolders, setStatblockRoleFolders,
+    recovery, setRecovery,
     toSettings: () => ({
       ...rules.toSettings(),
       // Trimmed, with the field as label where none was typed.
@@ -107,6 +118,7 @@ export function useCollectionSettingsDraft(
       itemRarities,
       statblockRoles: statblockRoles?.length ? savedStatblockRoles(statblockRoles) : undefined,
       statblockRoleFolders: savedRoleFolders(statblockRoleFolders, statblockRoles),
+      recovery,
     }),
   };
 }
