@@ -14,7 +14,6 @@ import {
   type PlayerDiceHarness,
 } from '../helpers/playerDiceRolls';
 
-vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class {}, ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 // jsdom has no WebGL; the 3D panel's case is about what it names, not about the device.
 vi.mock('../../src/app/dice3d/stagePool', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../src/app/dice3d/stagePool')>(),

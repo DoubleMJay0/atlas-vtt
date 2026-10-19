@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TemplateBlock, TemplateField } from '../../../../src/app/statblocks/model/templateTypes';
 import { blockEl, fakeApp, renderSheet, templateOf } from './sheetTestKit';
 
-vi.mock('../../../../src/app/atlas-view', () => ({ ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 vi.mock('../../../../src/app/atlasViewType', () => ({ ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 
 /** Obsidian's renderer for the inline Markdown a value holds: `**bold**` and `[[Note]]`, in a paragraph. */

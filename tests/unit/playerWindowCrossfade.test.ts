@@ -17,7 +17,6 @@ vi.mock('../../src/app/pixi/sceneTransition', () => ({
     return transition;
   }),
 }));
-vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class {}, ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 
 import type { PlayerFrameSource } from '../../src/app/services/PlayerFrameMirror';
 import { PlayerWindowService } from '../../src/app/services/PlayerWindowService';

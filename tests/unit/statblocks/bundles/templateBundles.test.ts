@@ -12,10 +12,6 @@ import { findCode } from '../../../../src/app/statblocks/model/fsCodeKeys';
 import { MARSH_CREATURE_JSON } from '../../../fixtures/statblockTemplateFixtures';
 import { createInMemoryApp, parseFrontmatter, type InMemoryApp } from '../../../mocks/inMemoryVault';
 
-vi.mock('../../../../src/app/atlas-view', () => ({
-  ATLAS_VIEW_TYPE: 'atlas-vtt',
-  AtlasView: class { async saveMap(): Promise<void> {} },
-}));
 
 const MARSH = 'marsh-creature-k7m2qa';
 const LIBRARY = 'atlas-vtt/statblock-templates';

@@ -16,10 +16,6 @@ import { SystemPresetFiles } from '../../../src/app/services/systemPresets/Syste
 import { MARSH_CREATURE_JSON } from '../../fixtures/statblockTemplateFixtures';
 import { createInMemoryApp, parseFrontmatter, type InMemoryApp } from '../../mocks/inMemoryVault';
 
-vi.mock('../../../src/app/atlas-view', () => ({
-  ATLAS_VIEW_TYPE: 'atlas-vtt',
-  AtlasView: class { async saveMap(): Promise<void> {} },
-}));
 
 const MARSH = 'marsh-creature-k7m2qa';
 const MARSH_PATH = 'atlas-vtt/statblock-templates/Marsh creature.atlastemplate';

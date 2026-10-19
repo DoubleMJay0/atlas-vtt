@@ -6,10 +6,6 @@ import { assetFolderId, isTabAsset } from '../../src/app/packages/components/ass
 import { folderMoveProblem, moveAssetsIntoFolder } from '../../src/app/packages/components/asset-manager/utils/assetFolderMove';
 import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
 
-vi.mock('../../src/app/atlas-view', () => ({
-  ATLAS_VIEW_TYPE: 'atlas-vtt',
-  AtlasView: class { async saveMap(): Promise<void> {} },
-}));
 
 const MAPS = tabFolderPath('camp', 'maps');
 const SCENES = tabFolderPath('camp', 'scenes');

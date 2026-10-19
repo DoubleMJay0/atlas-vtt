@@ -8,10 +8,6 @@ import { createSnapshot } from '../../src/app/snapshots/sceneSnapshotFormat';
 import { sceneSnapshotFolder } from '../../src/app/snapshots/snapshotPaths';
 import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
 
-vi.mock('../../src/app/atlas-view', () => ({
-  ATLAS_VIEW_TYPE: 'atlas-vtt',
-  AtlasView: class { async saveMap(): Promise<void> {} },
-}));
 
 const SOURCE = 'atlas-vtt/collections/source';
 const TARGET = 'atlas-vtt/collections/target';

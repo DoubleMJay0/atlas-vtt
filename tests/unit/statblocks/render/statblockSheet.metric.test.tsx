@@ -2,7 +2,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
-vi.mock('../../../../src/app/atlas-view', () => ({ ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 
 import type { MetricBlock, TemplateBlock, TemplateField } from '../../../../src/app/statblocks/model/templateTypes';
 import { blockEl, renderSheet, templateOf } from './sheetTestKit';

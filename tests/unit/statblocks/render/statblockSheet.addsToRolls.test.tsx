@@ -6,7 +6,6 @@ import type { TemplateBlock, TemplateField } from '../../../../src/app/statblock
 import { StatblockSheet } from '../../../../src/app/statblocks/render/StatblockSheet';
 import { blockEl, fakeApp, renderSheet, templateOf } from './sheetTestKit';
 
-vi.mock('../../../../src/app/atlas-view', () => ({ ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 vi.mock('../../../../src/app/atlasViewType', () => ({ ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 
 afterEach(cleanup);
