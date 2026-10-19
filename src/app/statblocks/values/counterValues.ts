@@ -135,3 +135,10 @@ export function withCountersUsed(field: Pick<TemplateField, 'counterRows'>, valu
   if (!rows || rows.length !== uses.length) return null;
   return changedRows(field, value, (row, index) => ({ ...row, used: uses[index] ?? row.used }));
 }
+
+/** The value with row `index` given back its uses by the recovery button `reset` (null: by none); null where nothing changes. */
+export function withCounterReset(field: Pick<TemplateField, 'counterRows'>, value: FieldValue | undefined, index: number, reset: string | null): FieldValue | null {
+  const row = shownCounterRows(field, value)?.[index];
+  if (!row || row.reset === reset) return null;
+  return changedRows(field, value, (each, at) => (at === index ? { ...each, reset } : each));
+}

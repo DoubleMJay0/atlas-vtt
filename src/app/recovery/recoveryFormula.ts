@@ -31,7 +31,7 @@ export type FormulaFill = FilledFormula | { readonly ok: false; readonly problem
 export type FieldLookup = (path: string) => unknown;
 
 /** The largest constant and dice count the parser reads (`\d{1,4}` and `\d{0,3}`). */
-const MAX_CONSTANT = 9999;
+export const MAX_CONSTANT = 9999;
 const MAX_DICE_COUNT = 999;
 const LIMIT_CODES: ReadonlySet<FormulaErrorCode> = new Set(['length', 'terms', 'dice', 'faces', 'depth', 'total', 'modifier']);
 
@@ -132,4 +132,11 @@ export function fillFormula(formula: string, lookup: FieldLookup): FormulaFill {
 /** What a formula without dice comes to, worked out exactly and cut towards zero, as a roll of it would. */
 export function computeFormula(parsed: ParsedFormula): number {
   return evaluateFormula(parsed.expression, (term) => (term.kind === 'constant' ? term.value : 0));
+}
+
+/** A formula as people write it: the parentheses a number was put in dropped where its sign can stand alone (`1d8+(-1)` reads `1d8-1`). */
+export function readableFormula(formula: string): string {
+  return formula
+    .replace(/([+-])\((-?)(\d+)\)/g, (_, sign: string, minus: string, digits: string) => `${(sign === '-') !== (minus === '-') ? '-' : '+'}${digits}`)
+    .replace(/^\((-?\d+)\)/, '$1');
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TemplateField } from '../../../../src/app/statblocks/model/templateTypes';
 import { restoreCounters, restoresRow, type RegainRoll } from '../../../../src/app/statblocks/values/counterRestore';
-import { readCounterRows, shownCounterRows, withCounterUsed } from '../../../../src/app/statblocks/values/counterValues';
+import { readCounterRows, shownCounterRows, withCounterReset, withCounterUsed } from '../../../../src/app/statblocks/values/counterValues';
 import { valueMisfit } from '../../../../src/app/statblocks/values/valueFit';
 
 const FIELD: TemplateField = {
@@ -50,6 +50,13 @@ describe('a Counters value', () => {
     ]);
     expect(withCounterUsed(FIELD, [{ name: 'Ki', max: 3, used: 3 }], 0, 3)).toBeNull();
     expect(withCounterUsed(FIELD, [{ name: 'Ki', max: 3, used: 3 }], 1, 0)).toBeNull();
+  });
+
+  it('names or clears the recovery button that gives a row its uses back, keeping the rest of the row', () => {
+    expect(withCounterReset(FIELD, [{ name: 'Ki', max: 3, used: 1, colour: 'red' }], 0, 'short')).toEqual([{ name: 'Ki', max: 3, used: 1, reset: 'short', colour: 'red' }]);
+    expect(withCounterReset(FIELD, [{ name: 'Ki', max: 3, reset: 'short' }], 0, null)).toEqual([{ name: 'Ki', max: 3, used: 0 }]);
+    expect(withCounterReset(FIELD, [{ name: 'Ki', max: 3, reset: 'short' }], 0, 'short')).toBeNull();
+    expect(withCounterReset(FIELD, [{ name: 'Ki', max: 3 }], 4, 'short')).toBeNull();
   });
 });
 

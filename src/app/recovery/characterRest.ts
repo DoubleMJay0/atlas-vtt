@@ -102,22 +102,22 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
   const meanings = meaningsOf(note.template.fields);
   const fields = new Map(note.template.fields.map((field) => [field.key, field]));
 
+  const partyValue = (key: string): ResourceValue | undefined => {
+    const party = sync && campaignId !== null ? sync.value(campaignId, asset.id, key) : undefined;
+    return party && { current: party.current, max: party.max };
+  };
+
   const resourcePlace = (key: string): ResourcePlace | null => {
     const token = tokenHolding(holds, key);
     if (token) return { kind: 'token', store: token.store, tokenId: token.tokenId };
-    return sync && campaignId !== null && sync.value(campaignId, asset.id, key) ? { kind: 'party', campaignId } : null;
+    return campaignId !== null && partyValue(key) ? { kind: 'party', campaignId } : null;
   };
 
   const character: RestCharacter = {
     resources: collectionResources(settings),
     conditions: settings.conditions ?? [],
     fields,
-    resourceValue: (key) => {
-      const token = tokenHolding(holds, key);
-      if (token) return token.value;
-      const party = sync && campaignId !== null ? sync.value(campaignId, asset.id, key) : undefined;
-      return party && { current: party.current, max: party.max };
-    },
+    resourceValue: (key) => tokenHolding(holds, key)?.value ?? partyValue(key),
     conditionValue: (id) => {
       const first = holds[0];
       const token = first && first.store.getState().objects.tokens[first.tokenIds[0]!];

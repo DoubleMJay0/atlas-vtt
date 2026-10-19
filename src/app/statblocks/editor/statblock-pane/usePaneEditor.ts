@@ -17,6 +17,7 @@ import type { EditTarget, FieldConflict, ListMover, PaneEditController } from '.
 import { paneChrome } from './paneChrome';
 import { renderPaneCounters } from './PaneCounters';
 import { renderPaneAddEntry, renderPaneEntry } from './PaneEntry';
+import { renderPaneRecovery } from './PaneRecovery';
 import { renderPaneSlot } from './PaneSlot';
 import { renderPaneTable } from './PaneTable';
 import type { PendingCommit } from './paneTypes';
@@ -71,6 +72,7 @@ interface OwnWrite {
 /** Rendering a value's slot never changes: what it shows comes from the controller's context. */
 const VALUE_EDITING: ValueEditing = {
   slot: renderPaneSlot, entry: renderPaneEntry, addEntry: renderPaneAddEntry, table: renderPaneTable, counters: renderPaneCounters,
+  recovery: renderPaneRecovery,
 };
 
 /**

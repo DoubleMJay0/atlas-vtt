@@ -27,7 +27,6 @@ export const rest = {
   'rest.skipSyntax': '{label} (its formula does not read)',
   'rest.skipRoll': '{label} (could not be rolled)',
   'rest.failed': 'The rest could not be written: {problem}',
-  'rest.resetBy': 'Restored by',
   'rest.resetLabel': 'Which rest gives {name} its uses back',
   'rest.resetNone': 'None',
 } as const satisfies Record<string, Message>;

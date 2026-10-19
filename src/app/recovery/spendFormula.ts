@@ -7,9 +7,8 @@
 
 import { readTerm } from '../tools/formulaTerms';
 import type { FormulaTerm } from '../tools/formulaTypes';
-import { checkedFormula, type FilledFormula, type FormulaFill } from './recoveryFormula';
+import { checkedFormula, MAX_CONSTANT, type FilledFormula, type FormulaFill } from './recoveryFormula';
 
-const MAX_CONSTANT = 9999;
 /** Signs, parentheses and spaces between the terms of a formula that is a plain sum. */
 const BETWEEN_TERMS = /[ \t+\-()]/;
 

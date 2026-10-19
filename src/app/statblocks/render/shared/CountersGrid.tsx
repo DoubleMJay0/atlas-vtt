@@ -16,6 +16,8 @@ export interface ShownCounter {
 export interface CounterControls {
   /** Sets the row at `index` of the stored list to `used` uses. Unset: the controls are drawn inert (the template editor). */
   use?: ((index: number, used: number) => void) | undefined;
+  /** What stands under a row's uses: the statblock pane's choice of the rest that gives them back. */
+  after?: ((shown: ShownCounter) => React.ReactNode) | undefined;
 }
 
 interface CountersGridProps {
@@ -93,6 +95,7 @@ export function CountersGrid({ counters, controls }: CountersGridProps): React.J
           <span key={shown.index} className="atlas-sb-counter">
             <span className="atlas-sb-counter__name">{shown.row.name}</span>
             {shown.row.max > MAX_COUNTER_PIPS ? <Count {...shown} controls={controls} /> : <Pips {...shown} controls={controls} />}
+            {controls?.after?.(shown)}
           </span>
         ))}
       </span>

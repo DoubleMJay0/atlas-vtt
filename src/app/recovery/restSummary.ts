@@ -4,6 +4,7 @@
  */
 
 import { formatList, t } from '../i18n';
+import { readableFormula } from './recoveryFormula';
 import type { RestChange, RestSkip, SkippedRule } from './restTypes';
 
 const SEPARATOR = ' · ';
@@ -12,7 +13,7 @@ const SEPARATOR = ' · ';
 export function changeText(change: RestChange): string {
   const values = { label: change.label, from: change.from, to: change.to };
   if (change.rolls.length === 0) return t('rest.change', values);
-  return t('rest.changeRolled', { ...values, rolls: change.rolls.map((roll) => roll.formula).join(', ') });
+  return t('rest.changeRolled', { ...values, rolls: change.rolls.map((roll) => readableFormula(roll.formula)).join(', ') });
 }
 
 function skipText(label: string, reason: RestSkip): string {

@@ -23,12 +23,11 @@ export function libraryTokenOf(token: PlacedTokenSource, tokens: readonly TokenA
 }
 
 /**
- * The player character whose statblock is the note at `notePath`: the library token marked as one
- * of the players' characters that links the note. Where several do, the first by name (then id),
- * so every caller names the same one. Null where none does.
+ * The player characters whose statblock is the note at `notePath`: the library tokens marked as the
+ * players' characters that link the note, by name (then id), so every caller names them in one order.
  */
-export function playerCharacterLinking(tokens: readonly TokenAsset[], notePath: string): TokenAsset | null {
-  const linked = tokens.filter((asset) => isPlayerCharacter(asset) && asset.statblockPath === notePath);
-  linked.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-  return linked[0] ?? null;
+export function playerCharactersLinking(tokens: readonly TokenAsset[], notePath: string): TokenAsset[] {
+  return tokens
+    .filter((asset) => isPlayerCharacter(asset) && asset.statblockPath === notePath)
+    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }

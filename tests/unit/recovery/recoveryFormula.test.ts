@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeFormula, fillFormula, wholeNumber, type FormulaFill } from '../../../src/app/recovery/recoveryFormula';
+import { computeFormula, fillFormula, readableFormula, wholeNumber, type FormulaFill } from '../../../src/app/recovery/recoveryFormula';
 import { spendFormula } from '../../../src/app/recovery/spendFormula';
 
 const NOTE: Record<string, unknown> = { level: 3, tier: '2', con: -1, big: 12000, many: 1200, half: 2.5, name: 'Mira', abilities: { con: 2 } };
@@ -110,5 +110,15 @@ describe('spendFormula', () => {
   it('refuses units that do not fit one roll', () => {
     expect(spendFormula(unit('1d8'), 101)).toEqual({ ok: false, problem: { kind: 'limits', field: null } });
     expect(spendFormula(unit('4d6kh3'), 30)).toEqual({ ok: false, problem: { kind: 'limits', field: null } });
+  });
+});
+
+describe('readableFormula', () => {
+  it('drops the parentheses a number was put in where its sign can stand alone', () => {
+    expect(readableFormula('1d8+(-1)')).toBe('1d8-1');
+    expect(readableFormula('1d8+(2)')).toBe('1d8+2');
+    expect(readableFormula('1d8-(-2)')).toBe('1d8+2');
+    expect(readableFormula('(3)')).toBe('3');
+    expect(readableFormula('2*(3)')).toBe('2*(3)');
   });
 });
