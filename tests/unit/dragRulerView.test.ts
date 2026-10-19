@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';

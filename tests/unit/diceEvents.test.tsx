@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import React from 'react';
 import { EventEmitter } from 'events';
 import { act, cleanup, render, renderHook } from '@testing-library/react';

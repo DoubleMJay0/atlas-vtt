@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import type { CampaignSeat, YourCodeMessage } from '../../../../src/app/online/protocol/index.ts';
 import { TableRoster } from '../../../../src/app/online/gm/tableRoster.ts';

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { selectedTokenIds, tokenLabel } from '../../../../src/app/online/gm/atlasView.ts';
 import { Ownership, readOwnership, type OwnershipData } from '../../../../src/app/online/gm/ownership.ts';

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { App } from 'obsidian';
 import { DEFAULT_MAP_HOTKEYS } from '../../src/app/keyboard/mapHotkeys';

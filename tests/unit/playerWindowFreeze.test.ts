@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Notice } from 'obsidian';
 import { createStore, type StoreApi } from 'zustand/vanilla';

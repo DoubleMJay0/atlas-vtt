@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { checkFieldEdit } from '../../../../src/app/online/gm/book/fieldEdit.ts';
 import { checkRefill } from '../../../../src/app/online/gm/book/refillEdit.ts';

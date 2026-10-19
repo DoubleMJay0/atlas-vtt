@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetService } from '../../src/app/services/AssetService';
 import { transferAssets } from '../../src/app/services/assetTransfer/assetTransfer';

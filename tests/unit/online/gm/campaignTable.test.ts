@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { TFile, type App } from 'obsidian';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CampaignFiles } from '../../../../src/app/campaigns/CampaignFiles';

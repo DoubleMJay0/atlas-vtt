@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import type { CountersBlock, TemplateField } from '../../../../src/app/statblocks/model/templateTypes';

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { EventEmitter } from 'events';
 import type { App } from 'obsidian';
 import type { LocalPlayerView } from '../../src/app/local-player-view';

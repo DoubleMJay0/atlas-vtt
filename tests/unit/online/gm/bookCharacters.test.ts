@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { BookCharacter } from '../../../../src/app/online/protocol/index.ts';
 import { describe, expect, it } from 'vitest';
 import type { ShownRollToken } from '../../../../src/app/services/playerRollSource';

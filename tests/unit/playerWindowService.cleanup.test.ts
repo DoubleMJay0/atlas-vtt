@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 
 vi.mock('../../src/app/atlas-view', () => ({

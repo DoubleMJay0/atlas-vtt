@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TFile } from 'obsidian';
 import { AssetService, type Asset, type EncounterAsset, type SceneAsset, type TokenAsset } from '../../src/app/services/AssetService';

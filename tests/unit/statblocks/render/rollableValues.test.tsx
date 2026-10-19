@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { act, cleanup } from '@testing-library/react';
 import { MarkdownRenderer } from 'obsidian';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

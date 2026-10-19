@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { CLOSE, KEEPALIVE_MS, KEEPALIVE_PING, KEEPALIVE_PONG } from '../../../../src/app/online/protocol/index.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Timers } from '../../../../src/app/online/gm/companionTimers.ts';

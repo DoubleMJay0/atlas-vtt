@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { BookCharacter } from '../../../../src/app/online/protocol/index.ts';
 import type { BookScene } from '../../../../src/app/online/gm/book/bookScene.ts';

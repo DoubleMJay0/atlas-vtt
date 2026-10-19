@@ -1,4 +1,3 @@
-// @vitest-environment node
 // JSZip needs Node's ArrayBuffer realm; jsdom's differs and its Blob support is absent.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TFile } from 'obsidian';

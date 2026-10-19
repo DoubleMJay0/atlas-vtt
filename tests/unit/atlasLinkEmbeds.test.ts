@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TFile, type EmbedContext } from 'obsidian';
 import { AssetService, type EncounterAsset } from '../../src/app/services/AssetService';

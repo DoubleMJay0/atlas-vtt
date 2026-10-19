@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { parseYourCode } from '../../../../src/app/online/protocol/index.ts';
 

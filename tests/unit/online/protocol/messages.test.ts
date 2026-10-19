@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
   ASSET_CHUNK_BYTES, CLOSE, MAX_CAMPAIGN_PLAYERS, FINAL_CLOSE_CODES, GATE_CLOSE_CODES, MAX_ASSET_BYTES, MAX_CURSOR_NUMBERS, MAX_LASER_SPAN_MS, MAX_LIVE_PATH, MAX_LIVE_TOKENS, MAX_BATCH_SENDS, MAX_PLAYER_NAME, MAX_PLAYERS, MAX_TOKEN_CONDITIONS, MAX_TOKENS, parseClientFrame, parseGmMessage, parsePlayerMessage, parseRelayFrame,

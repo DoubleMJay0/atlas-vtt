@@ -5,6 +5,8 @@ const alias = {
   '@': '/src',
   src: '/src',
   obsidian: '/tests/mocks/obsidian.ts',
+  // Its `main` is a UMD bundle that Node loads with a second, CommonJS copy of pixi.js; the ESM build shares the app's.
+  'pixi-viewport': '/node_modules/pixi-viewport/dist/pixi_viewport.js',
 };
 
 export default defineConfig({
@@ -19,10 +21,14 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
-          environment: 'jsdom',
+          // A test that needs a DOM says so on its first line: `// @vitest-environment jsdom`. jsdom costs a file about 0.4 s.
+          environment: 'node',
+          // Threads hand modules to the workers over a MessagePort, much cheaper than forks' IPC; most of a run is imports.
+          pool: 'threads',
           globals: true,
           setupFiles: ['./tests/setup/obsidianDom.ts', './tests/setup/domHost.ts'],
-          exclude: ['**/node_modules/**', '**/*.gpu.test.ts'],
+          // Agents' worktrees in `.claude/` hold whole copies of the repository.
+          exclude: ['**/node_modules/**', '**/.claude/**', '**/*.gpu.test.ts'],
         },
       },
       {

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { Plugin } from 'obsidian';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CampaignFiles } from '../../../../src/app/campaigns/CampaignFiles';

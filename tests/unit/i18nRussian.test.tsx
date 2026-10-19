@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import React from 'react';
 import type { Command, Plugin } from 'obsidian';
 import { cleanup, render, screen } from '@testing-library/react';
