@@ -218,15 +218,23 @@ export class OnlineControl {
 
   /** Makes tokens of the shared scene player tokens, or the GM's own (which takes them back from their players). */
   markPlayerTokens(tokenIds: readonly string[], player: boolean): void {
-    markTokens(this.ownership, this.sharedScene(), tokenIds, player);
+    if (this.canMark()) markTokens(this.ownership, this.sharedScene(), tokenIds, player);
   }
 
-  /** Makes the tokens selected on the active Atlas tab player tokens, or the GM's own; the number of tokens changed. */
-  markSelected(player: boolean): number {
+  /** Makes the tokens selected on the active Atlas tab player tokens, or the GM's own; the number of tokens changed, null where no campaign keeps them. */
+  markSelected(player: boolean): number | null {
     const scene = this.activeScene();
     const selected = scene === null ? [] : selectedTokenIds(scene.store.getState());
+    if (selected.length > 0 && !this.canMark()) return null;
     markTokens(this.ownership, scene, selected, player);
     return selected.length;
+  }
+
+  /** Whether player tokens can be kept now; where not, the GM is told why. Player tokens are the campaign's, so none are kept while no campaign is played. */
+  private canMark(): boolean {
+    if (this.ownership.canMark()) return true;
+    showNotice(this.campaigns.playing() === null ? NO_CAMPAIGN_TEXT : CAMPAIGNS_LOADING_TEXT);
+    return false;
   }
 
   /** Gives tokens to a player, or takes them back from whoever has them (null). A token nobody had sees from then on (`seeAsPlayers`). */

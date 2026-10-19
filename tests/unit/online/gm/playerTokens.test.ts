@@ -53,7 +53,7 @@ describe('player tokens', () => {
     const before = share.sent.length;
     await send(ANA, 'claim', hero);
     await send(BEN, 'claim', listed(share, 'ogre')?.id);
-    expect(owners.toData().owners).toEqual({});
+    expect([owners.ownerOf('hero', undefined), owners.ownerOf('ogre', undefined)]).toEqual([undefined, undefined]);
     expect(share.sent.slice(before)).toEqual([]);
     owners.give(['hero'], {}, ANA);
     await share.advance(TOKEN_INTERVAL_MS);

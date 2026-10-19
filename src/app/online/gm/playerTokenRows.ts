@@ -23,7 +23,7 @@ export function playerTokenRows(ownership: Ownership, scene: WorkScene | null): 
 
 /** Makes tokens of a scene player tokens, or the GM's own; a token that becomes a player token sees from then on (`seeAsPlayers`). */
 export function markTokens(ownership: Ownership, scene: WorkScene | null, tokenIds: readonly string[], player: boolean): void {
-  if (scene === null || tokenIds.length === 0) return;
+  if (scene === null || tokenIds.length === 0 || !ownership.canMark()) return;
   if (player) seeAsPlayers(scene.store, tokenIds, (id, token) => !ownership.isPlayerToken(scene.mapPath, id, token));
   ownership.markPlayerTokens(scene.mapPath, tokenIds, scene.store.getState().objects.tokens, player);
 }

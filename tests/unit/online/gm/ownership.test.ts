@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { selectedTokenIds, tokenLabel } from '../../../../src/app/online/gm/atlasView.ts';
-import { Ownership, readOwnership, type OwnershipData } from '../../../../src/app/online/gm/ownership.ts';
+import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
+import type { TokenAssignments } from '../../../../src/app/campaigns/players/tokenAssignments.ts';
 import { FakeSeats } from './fakeSeats.ts';
 import { sceneState, token } from './shareHarness.ts';
 
@@ -11,45 +12,43 @@ const MAP = 'Scenes/Cave.atlasmap';
 const seeing = token('seeing', { vision: { enabled: true } });
 const blind = token('blind');
 
-/** Ownership whose saves land in `saved`, bound to a campaign of Ana and Ben unless `players` say otherwise. */
-function ownership(data: unknown = undefined, players: ConstructorParameters<typeof FakeSeats>[0] = [{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]): { readonly owners: Ownership; readonly saved: OwnershipData[]; readonly seats: FakeSeats } {
-  const saved: OwnershipData[] = [];
-  const owners = new Ownership(readOwnership(data), (next) => saved.push(JSON.parse(JSON.stringify(next)) as OwnershipData));
-  const seats = new FakeSeats(players);
+/** Ownership bound to a campaign of Ana and Ben unless `players` say otherwise, which assigns `assignments`. */
+function ownership(assignments?: TokenAssignments, players: ConstructorParameters<typeof FakeSeats>[0] = [{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]): { readonly owners: Ownership; readonly seats: FakeSeats } {
+  const owners = new Ownership();
+  const seats = new FakeSeats(players, assignments);
   owners.bind(seats);
-  return { owners, saved, seats };
+  return { owners, seats };
+}
+
+/** Ownership bound to the same campaign, as on another device or after a reload. */
+function boundTo(seats: FakeSeats): Ownership {
+  const owners = new Ownership();
+  owners.bind(seats);
+  return owners;
 }
 
 describe('token ownership', () => {
-  it('saves the owners of tokens placed from no library token and reads them back the same', () => {
-    const { owners, saved } = ownership();
+  it('keeps the owners of tokens placed from no library token in the campaign, where another table finds them', () => {
+    const { owners, seats } = ownership();
     owners.give(['gm-fighter', 'gm-rogue'], {}, ANA);
     owners.give(['gm-rogue'], {}, BEN);
-    const data = saved.at(-1);
-    expect(data).toEqual({ owners: { 'gm-fighter': ANA, 'gm-rogue': BEN }, playerTokens: {} });
-    const again = ownership(data).owners;
+    expect(seats.assignments()).toEqual({ owners: { 'gm-fighter': ANA, 'gm-rogue': BEN }, playerTokens: {} });
+    const again = boundTo(seats);
     expect(again.ownerOf('gm-fighter', undefined)).toBe(ANA);
     expect(again.ownerOf('gm-rogue', undefined)).toBe(BEN);
   });
 
-  it('keeps nothing it cannot trust from saved data, and ignores the players and characters older versions saved here', () => {
-    const owners = ownership({
-      players: { [ANA]: { name: 'Ana' } },
-      characters: { 'library-hero': ANA },
-      owners: { 'gm-1': ANA, 'gm-2': 'nobody', 'gm-3': 7, ['x'.repeat(300)]: ANA },
-      playerTokens: { 'Scenes/Cave.atlasmap': { 'gm-1': true, 'gm-2': 'yes', ['x'.repeat(300)]: true }, 'Scenes/Empty.atlasmap': { 'gm-3': 1 }, ['p'.repeat(1001)]: { 'gm-4': true }, 'Scenes/Bad.atlasmap': [] },
-    }).owners;
-    expect(owners.toData()).toEqual({ owners: { 'gm-1': ANA }, playerTokens: { 'Scenes/Cave.atlasmap': { 'gm-1': true } } });
-    expect(owners.ownerOf('x', { assetId: 'library-hero' })).toBeUndefined();
-    expect(ownership('garbage').owners.toData()).toEqual({ owners: {}, playerTokens: {} });
-  });
-
   it('gives tokens back to nobody, and only to players of the campaign', () => {
-    const { owners } = ownership();
+    const { owners, seats } = ownership();
     owners.give(['gm-1', 'gm-2'], {}, ANA);
     owners.give(['gm-1'], {}, null);
     owners.give(['gm-2'], {}, 'c'.repeat(20));
-    expect(owners.toData().owners).toEqual({ 'gm-2': ANA });
+    expect(seats.assignments().owners).toEqual({ 'gm-2': ANA });
+  });
+
+  it('reads an owner who is no player of the campaign as nobody', () => {
+    const { owners } = ownership({ owners: { 'gm-1': CAL }, playerTokens: {} });
+    expect(owners.ownerOf('gm-1', undefined)).toBeUndefined();
   });
 
   it('lists every campaign player, those online first, with the campaign\'s names; a joiner the campaign does not know is not listed', () => {
@@ -61,17 +60,17 @@ describe('token ownership', () => {
     expect(owners.onlinePlayers()).toEqual([CAL, 'e'.repeat(20)]);
   });
 
-  it('follows the campaign when its players change, and tells listeners without saving', () => {
-    const { owners, saved, seats } = ownership();
+  it('follows the campaign when its players change, and tells listeners', () => {
+    const { owners, seats } = ownership();
     let changes = 0;
     owners.onChange(() => (changes += 1));
     seats.set([{ id: CAL, name: 'Cal', code: '123456', characters: [] }]);
     expect(owners.list().map(({ name }) => name)).toEqual(['Cal']);
-    expect([changes, saved.length]).toEqual([1, 0]);
+    expect(changes).toBe(1);
   });
 
-  it('follows who is online without saving, and a kick only forgets that the player is online', () => {
-    const { owners, saved } = ownership();
+  it('follows who is online without writing the campaign, and a kick only forgets that the player is online', () => {
+    const { owners, seats } = ownership();
     let changes = 0;
     owners.onChange(() => (changes += 1));
     owners.joined({ id: ANA, name: 'Ana' });
@@ -82,29 +81,45 @@ describe('token ownership', () => {
     expect(owners.onlinePlayers()).toEqual([]);
     expect(owners.nameOf(ANA)).toBe('Ana');
     expect(owners.ownerOf('gm-1', undefined)).toBe(ANA);
-    expect(changes).toBe(5);
-    expect(saved).toHaveLength(1);
+    // Four for who is online, two for the gift: the campaign's file changed, and so did the owners.
+    expect(changes).toBe(6);
+    expect(seats.assignments().owners).toEqual({ 'gm-1': ANA });
   });
 
   it('gives nothing and lists nobody while no campaign is bound', () => {
-    const { owners, saved } = ownership();
+    const { owners, seats } = ownership();
     owners.bind(null);
     owners.give(['gm-1'], {}, ANA);
-    expect([owners.list(), owners.nameOf(ANA), owners.ownerOf('gm-1', undefined), saved]).toEqual([[], null, undefined, []]);
+    expect([owners.list(), owners.nameOf(ANA), owners.ownerOf('gm-1', undefined), seats.assignments().owners]).toEqual([[], null, undefined, {}]);
   });
 });
 
 describe('player tokens', () => {
   it('are the tokens on the players\' side until the GM marks them, per scene, and outlive a table', () => {
-    const { owners, saved } = ownership();
+    const { owners, seats } = ownership();
     expect([owners.isPlayerToken(MAP, 'seeing', seeing), owners.isPlayerToken(MAP, 'blind', blind)]).toEqual([true, false]);
     expect(owners.isPlayerToken(MAP, 'blind', { ...blind, side: 'players' })).toBe(true);
     owners.markPlayerTokens(MAP, ['seeing'], {}, false);
     owners.markPlayerTokens(MAP, ['blind'], {}, true);
     expect([owners.isPlayerToken(MAP, 'seeing', seeing), owners.isPlayerToken(MAP, 'blind', blind)]).toEqual([false, true]);
     expect(owners.isPlayerToken('Scenes/Other.atlasmap', 'seeing', seeing)).toBe(true);
-    const again = ownership(saved.at(-1)).owners;
-    expect(again.isPlayerToken(MAP, 'blind', blind)).toBe(true);
+    expect(seats.assignments().playerTokens).toEqual({ [MAP]: { seeing: false, blind: true } });
+    expect(boundTo(seats).isPlayerToken(MAP, 'blind', blind)).toBe(true);
+  });
+
+  it('are marked on the played campaign while no table runs, and the table of that campaign finds them', () => {
+    const played = new FakeSeats([{ id: ANA, name: 'Ana' }]);
+    const owners = new Ownership(() => played);
+    expect(owners.canMark()).toBe(true);
+    expect(owners.markPlayerTokens(MAP, ['blind'], {}, true)).toBe(true);
+    expect(owners.isPlayerToken(MAP, 'blind', blind)).toBe(true);
+    owners.bind(played);
+    expect(owners.isPlayerToken(MAP, 'blind', blind)).toBe(true);
+  });
+
+  it('are kept nowhere while no campaign is played', () => {
+    const owners = new Ownership(() => null);
+    expect([owners.canMark(), owners.markPlayerTokens(MAP, ['blind'], {}, true), owners.isPlayerToken(MAP, 'blind', blind)]).toEqual([false, false, false]);
   });
 
   it('are player tokens to players whether or not the GM gave them to anyone, and making a token the GM\'s takes it back', () => {
@@ -141,10 +156,8 @@ describe('characters', () => {
     expect(owners.ownerOf('hall-hero', hero('hall-hero'))).toBe(ANA);
     expect(owners.ownerOf('hall-goblin', token('hall-goblin', { assetId: 'library-goblin' }))).toBeUndefined();
     expect(owners.seats('Scenes/Hall.atlasmap', { 'hall-hero': hero('hall-hero'), other: token('other') }).map(({ tokenId, owner }) => [tokenId, owner?.name])).toEqual([['hall-hero', 'Ana']]);
-    expect(owners.toData().owners).toEqual({});
-    const next = new Ownership(readOwnership(owners.toData()), () => undefined);
-    next.bind(seats);
-    expect(next.ownerOf('crypt-hero', hero('crypt-hero'))).toBe(ANA);
+    expect(seats.assignments().owners).toEqual({});
+    expect(boundTo(seats).ownerOf('crypt-hero', hero('crypt-hero'))).toBe(ANA);
   });
 
   it('are written once however many of their tokens are given or taken back together', () => {
@@ -157,11 +170,11 @@ describe('characters', () => {
   });
 
   it('change hands, and go back to nobody, with any of their tokens; an owner a token had by its own id goes with it', () => {
-    const { owners, seats } = ownership({ owners: { 'cave-hero': ANA } });
+    const { owners, seats } = ownership({ owners: { 'cave-hero': ANA }, playerTokens: {} });
     owners.give(['cave-hero'], { 'cave-hero': hero('cave-hero') }, ANA);
     owners.give(['cave-hero'], { 'cave-hero': hero('cave-hero') }, BEN);
     expect(seats.gave).toEqual([['library-hero', ANA], ['library-hero', BEN]]);
-    expect([owners.ownerOf('hall-hero', hero('hall-hero')), owners.toData().owners]).toEqual([BEN, {}]);
+    expect([owners.ownerOf('hall-hero', hero('hall-hero')), seats.assignments().owners]).toEqual([BEN, {}]);
     owners.give(['hall-hero'], { 'hall-hero': hero('hall-hero') }, null);
     expect(owners.ownerOf('cave-hero', hero('cave-hero'))).toBeUndefined();
   });

@@ -184,8 +184,8 @@ export async function openTable(shelf: BookShelf, players: readonly PlayerInfo[]
   };
   workspace.leaves = [tab.leaf];
   present(tab);
-  const ownership = boundOwnership(campaign, { owners });
-  const online = new OnlineControl(app, ownership, fakeCampaigns(campaign), undefined, undefined, undefined, shelf);
+  const ownership = boundOwnership(campaign, { owners, playerTokens: {} });
+  const online = new OnlineControl(app, ownership, fakeCampaigns(campaign, { owners, playerTokens: {} }), undefined, undefined, undefined, shelf);
   void online.resume(SAVED);
   await advanceSettled(0);
   const socket = FakeSocket.all.at(-1);

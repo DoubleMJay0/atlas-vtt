@@ -20,6 +20,14 @@ export interface TableCampaigns {
   bound(campaignId: string | null): void;
 }
 
+/** The players of the campaign this device plays, as read so far; null while none is played or none can be read yet. */
+export function playedSeats(campaigns: TableCampaigns): () => TableSeats | null {
+  return () => {
+    const playing = campaigns.playing();
+    return playing === null ? null : campaigns.known(playing);
+  };
+}
+
 /**
  * The vault's campaigns: the one this device plays, and their players files (`CampaignPlayers`).
  * `prepare` readies a campaign before a table of it runs (its failure is logged, and the table runs).

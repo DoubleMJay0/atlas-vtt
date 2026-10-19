@@ -8,6 +8,7 @@ import { secretTokenStore } from './account/tokenStore.ts';
 import { activeAtlasLeaf } from './atlasView.ts';
 import { AssetService } from '../../services/AssetService';
 import { CampaignBooks } from '../../campaigns/players/CampaignBooks';
+import { CampaignPlayers } from '../../campaigns/players/CampaignPlayers';
 import { BookShelf } from './book/BookShelf.ts';
 import { BoundBookSource, campaignBookSource } from './book/campaignBookSource.ts';
 import { readBooks, type BookData } from './book/bookStore.ts';
@@ -27,9 +28,11 @@ import type { OnlineCommandId } from './onlineCommands.ts';
 import { OnlineControl } from './OnlineControl.ts';
 import type { OnlineDataFile } from './onlineData.ts';
 import type { OnlineTable } from './OnlineTable.ts';
-import { Ownership, readOwnership } from './ownership.ts';
+import { Ownership } from './ownership.ts';
 import { readSavedTable, type SavedTable } from './savedTable.ts';
-import { appCampaigns, type TableCampaigns } from './tableCampaigns.ts';
+import { appCampaigns, playedSeats, type TableCampaigns } from './tableCampaigns.ts';
+import { carryAssignmentsOver, readLegacyAssignments } from './legacyAssignments.ts';
+import { NO_ASSIGNMENTS, type TokenAssignments } from '../../campaigns/players/tokenAssignments';
 import { appCampaignChoices } from './campaignChoices.ts';
 import { DASHBOARD_VIEW_TYPE } from '../../dashboard-view';
 import { DEFAULT_SETTINGS, onlineSettingsSections, readSettings, type OnlineSettings } from './settings.ts';
@@ -63,6 +66,8 @@ export class OnlineFeature extends Component {
   private readonly books = new BookShelf(this.bookSource);
   /** The books an older Atlas kept in this device's data, until a campaign's file has taken them over. */
   private legacyBooks: BookData = {};
+  /** The token owners and player tokens an older Atlas kept in this device's data, until a campaign's players file has taken them over. */
+  private legacyAssignments: TokenAssignments = NO_ASSIGNMENTS;
   private docks: DockMounts | null = null;
   private logs: LogMounts | null = null;
   /** The table's log for other plugins (`TableChat`). */
@@ -76,7 +81,8 @@ export class OnlineFeature extends Component {
   constructor(private readonly plugin: Plugin, private readonly data: OnlineDataFile) {
     super();
     this.app = plugin.app;
-    this.online = new OnlineControl(this.app, new Ownership(readOwnership(undefined), () => undefined), this.campaigns());
+    const campaigns = this.campaigns();
+    this.online = new OnlineControl(this.app, new Ownership(playedSeats(campaigns)), campaigns);
     this.account = new AccountControl({
       http: obsidianHttp,
       timers: companionTimers(),
@@ -126,11 +132,16 @@ export class OnlineFeature extends Component {
     this.settings = readSettings(data);
     this.ready = true;
     const record = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
-    const ownership = new Ownership(readOwnership(record.ownership), () => void this.saveSettings());
+    const campaigns = this.campaigns();
+    const ownership = new Ownership(playedSeats(campaigns));
+    this.legacyAssignments = readLegacyAssignments(record.ownership);
     this.savedTable = readSavedTable(record.table);
     this.savedLog = this.savedTable === null ? undefined : record.tableLog;
     this.legacyBooks = readBooks(record.books);
-    this.online = new OnlineControl(this.app, ownership, this.campaigns(), (table) => {
+    // Player tokens are marked on the played campaign while no table runs, so it takes over the old ones now.
+    const played = campaigns.playing();
+    if (played !== null) void this.migrateAssignmentsInto(played).catch((error: unknown) => console.error('[Atlas] Carrying the player tokens into the campaign failed:', error));
+    this.online = new OnlineControl(this.app, ownership, campaigns, (table) => {
       this.savedTable = table;
       void this.saveSettings();
     }, this.account, { read: () => this.savedLog, write: (entries) => this.keepLog(entries) }, this.books);
@@ -232,11 +243,17 @@ export class OnlineFeature extends Component {
     stopCompanionTimers();
   }
 
-  /** Saves the settings with the table's players, token owners and player tokens, its log and the books not carried over yet. */
+  /** Saves the settings with the running table, its log, and the books, token owners and player tokens not carried over yet. */
   async saveSettings(): Promise<void> {
     if (this.logSave !== null) companionTimers().clearTimer(this.logSave);
     this.logSave = null;
-    await this.data.write({ ...this.settings, ownership: this.online.ownership.toData(), table: this.savedTable, ...(this.savedLog !== undefined && { tableLog: this.savedLog }), ...(Object.keys(this.legacyBooks).length > 0 && { books: this.legacyBooks }) });
+    await this.data.write({
+      ...this.settings,
+      table: this.savedTable,
+      ...(this.savedLog !== undefined && { tableLog: this.savedLog }),
+      ...(Object.keys(this.legacyBooks).length > 0 && { books: this.legacyBooks }),
+      ...(this.legacyAssignments !== NO_ASSIGNMENTS && { ownership: this.legacyAssignments }),
+    });
   }
 
   /**
@@ -267,12 +284,28 @@ export class OnlineFeature extends Component {
   }
 
   /**
-   * The campaigns tables run on: the old books are carried into a campaign before a table of it runs
-   * (a player's book written meanwhile would otherwise replace the carried one), and a table binds its
-   * campaign's books.
+   * Carries the token owners and player tokens an older Atlas kept in this device's data into the
+   * campaign's players file, once: the data file loses them only after the campaign's file was read back with them.
+   */
+  async migrateAssignmentsInto(campaignId: string): Promise<void> {
+    const players = CampaignPlayers.forApp(this.app);
+    if (players === undefined || this.legacyAssignments === NO_ASSIGNMENTS) return;
+    await players.whenLoaded();
+    if (!(await carryAssignmentsOver(this.legacyAssignments, players, campaignId))) return;
+    this.legacyAssignments = NO_ASSIGNMENTS;
+    await this.saveSettings();
+  }
+
+  /**
+   * The campaigns tables run on: what an older Atlas kept in this device's data (books, token owners,
+   * player tokens) is carried into a campaign before a table of it runs (a player's book written
+   * meanwhile would otherwise replace the carried one), and a table binds its campaign's books.
    */
   private campaigns(): TableCampaigns {
-    return appCampaigns(this.app, (campaignId) => this.bindBooks(campaignId), (campaignId) => this.migrateBooksInto(campaignId));
+    return appCampaigns(this.app, (campaignId) => this.bindBooks(campaignId), async (campaignId) => {
+      await this.migrateBooksInto(campaignId);
+      await this.migrateAssignmentsInto(campaignId);
+    });
   }
 
   /** What one of online play's commands does; the plugin registers the commands once (`registerOnlinePlay`). */
@@ -299,6 +332,7 @@ export class OnlineFeature extends Component {
     if (activeAtlasLeaf(this.app) === null) return false;
     if (checking) return true;
     const count = this.online.markSelected(player);
+    if (count === null) return true;
     if (count === 0) showNotice('Select tokens on the map first.');
     else showNotice(player ? `Player tokens: ${tokensText(count)}. Assign each to a player in the online panel.` : `${tokensText(count)} now belong to the GM.`);
     return true;

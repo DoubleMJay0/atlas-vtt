@@ -5,6 +5,7 @@ import { campaignFolderOf } from '../campaignPaths';
 import {
   emptyPlayers, isWritable, linkOf, PLAYERS_LAYOUT, playersPathIn, readPlayers, type CampaignPlayer, type StoredPlayers,
 } from './playersFile';
+import { NO_ASSIGNMENTS, readTokenAssignments, type TokenAssignments } from './tokenAssignments';
 
 /** Why a campaign's players file cannot be changed: the campaigns are not read yet, it has no folder, or its file is of a later format. */
 export type PlayersBlock = 'loading' | 'no-folder' | 'newer';
@@ -57,6 +58,12 @@ export class CampaignPlayers extends RecordFiles<StoredPlayers> {
   of(campaignId: string): CampaignRoster {
     const stored = this.entries().find((entry) => entry.id === campaignId);
     return stored ? { link: linkOf(stored), players: readPlayers(stored), writable: isWritable(stored) } : { link: null, players: [], writable: true };
+  }
+
+  /** The tokens the campaign's players file assigns (`tokenAssignments.ts`); none while it has no file. */
+  assignments(campaignId: string): TokenAssignments {
+    const stored = this.entries().find((entry) => entry.id === campaignId);
+    return stored ? readTokenAssignments(stored) : NO_ASSIGNMENTS;
   }
 
   /**

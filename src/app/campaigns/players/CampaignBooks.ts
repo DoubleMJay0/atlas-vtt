@@ -46,18 +46,6 @@ export class CampaignBooks extends RecordFiles<StoredBooks> {
     return stored ? bookIn(stored, characterId) : undefined;
   }
 
-  /** The campaign's books file as the disk holds it now, read back through the adapter; null when it is not there or cannot be read. */
-  async onDisk(campaignId: string): Promise<StoredBooks | null> {
-    const path = this.pathOf(campaignId);
-    if (path === null) return null;
-    try {
-      const read = BOOKS_LAYOUT.read(await this.app.vault.adapter.read(path));
-      return read?.id === campaignId ? read : null;
-    } catch {
-      return null;
-    }
-  }
-
   /** Whether `change` can be made: the campaign has a books file of a format this Atlas writes, or a folder to create one in. */
   canChange(campaignId: string): boolean {
     const stored = this.entries().find((entry) => entry.id === campaignId);

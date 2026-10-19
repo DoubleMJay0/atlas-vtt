@@ -6,7 +6,7 @@ import { CAMPAIGNS_FOLDER } from '../../../../src/app/campaigns/campaignPaths';
 import { CampaignPlayers } from '../../../../src/app/campaigns/players/CampaignPlayers';
 import { MAX_CAMPAIGN_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
-import { Ownership, readOwnership } from '../../../../src/app/online/gm/ownership.ts';
+import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { appCampaigns } from '../../../../src/app/online/gm/tableCampaigns.ts';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
@@ -80,7 +80,7 @@ async function gm(players: string | null = playersText(), play = true): Promise<
   // Which campaign the books were bound to, and how many sockets were open by then.
   const bound: [string | null, number][] = [];
   const saves: (SavedTable | null)[] = [];
-  const online = new OnlineControl(app, new Ownership(readOwnership(undefined), () => undefined), appCampaigns(app, (campaignId) => void bound.push([campaignId, FakeSocket.all.length])), (table) => void saves.push(table), signedIn);
+  const online = new OnlineControl(app, new Ownership(), appCampaigns(app, (campaignId) => void bound.push([campaignId, FakeSocket.all.length])), (table) => void saves.push(table), signedIn);
   return { online, vault, app, files, leaf: tab.leaf, bound, saves };
 }
 

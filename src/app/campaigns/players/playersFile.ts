@@ -2,8 +2,9 @@
  * `players.json` in a campaign's folder: who plays the campaign online. `{ format, campaignId,
  * link?, players: { <player id>: { name, code, characters, addedAt } } }`, where `link` is the
  * campaign's table code, `code` the player's own six digits and `characters` the library tokens
- * they play. It lies beside `campaign.json` so a sync conflict over players never costs the
- * campaign itself; fields Atlas does not know are kept.
+ * they play, and beside them the tokens it assigns (`tokenOwners`, `playerTokens`; see
+ * `tokenAssignments.ts`). It lies beside `campaign.json` so a sync conflict over players never costs
+ * the campaign itself; fields Atlas does not know are kept.
  */
 
 import type { RecordLayout, StoredRecord } from '../../services/recordFiles/recordLayout';

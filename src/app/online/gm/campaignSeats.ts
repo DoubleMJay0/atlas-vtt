@@ -1,11 +1,12 @@
 import type { CampaignPlayers, PlayersBlock } from '../../campaigns/players/CampaignPlayers';
 import { newLinkCode, newPlayerCode, withCharacterOwner, withLink, withPlayer, type CampaignPlayer, type StoredPlayers } from '../../campaigns/players/playersFile';
+import { withPlayerTokens, withTokenOwners, type TokenAssignments } from '../../campaigns/players/tokenAssignments';
 import { MAX_CAMPAIGN_PLAYERS, type CampaignSeat, type PlayerInfo } from '../protocol/index.ts';
 import { showNotice } from '../../ui/notice';
 import type { CampaignSeats } from './ownership.ts';
 
 /** What a table needs of the campaigns' players files: `CampaignPlayers`, or memory in tests. */
-export type PlayersFiles = Pick<CampaignPlayers, 'of' | 'change' | 'blocked' | 'onChange'>;
+export type PlayersFiles = Pick<CampaignPlayers, 'of' | 'assignments' | 'change' | 'blocked' | 'onChange'>;
 
 /** What the GM reads where a table needs a played campaign. */
 export const NO_CAMPAIGN_TEXT = 'Play a campaign first.';
@@ -24,9 +25,9 @@ const BLOCKED_TEXTS: Readonly<Record<PlayersBlock, string>> = {
 };
 
 /**
- * The players of the campaign a table runs on, as its players file holds them: who plays which
- * character (for `Ownership`), the players and their own codes the relay is told, and the file's
- * link. Every change of that file, another device's too, is told to the listeners.
+ * The players of a campaign, as its players file holds them: who plays which character and the
+ * tokens it assigns (for `Ownership`), the players and their own codes the relay is told, and the
+ * file's link. Every change of that file, another device's too, is told to the listeners.
  */
 export class TableSeats implements CampaignSeats {
   constructor(private readonly files: PlayersFiles, readonly campaignId: string) {}
@@ -71,18 +72,41 @@ export class TableSeats implements CampaignSeats {
 
   /** Gives the character to the player, or to nobody (null); tells the GM where the file cannot be written. */
   setOwner(characterId: string, playerId: string | null): void {
-    if (!this.change((stored) => withCharacterOwner(stored, characterId, playerId))) showNotice(this.refusal() ?? NEWER_PLAYERS_TEXT);
+    this.write((stored) => withCharacterOwner(stored, characterId, playerId));
+  }
+
+  /** The tokens the campaign assigns: owners of tokens placed from no library token, and the GM's player tokens per scene. */
+  assignments(): TokenAssignments {
+    return this.files.assignments(this.campaignId);
+  }
+
+  /** Gives tokens placed from no library token to the player, or to nobody (null); tells the GM where the file cannot be written. */
+  setTokenOwners(tokenIds: readonly string[], playerId: string | null): void {
+    this.write((stored) => withTokenOwners(stored, tokenIds, playerId));
+  }
+
+  /** Makes tokens of the scene at `mapPath` player tokens, or the GM's own; false, and the GM is told, where the file cannot be written. */
+  markPlayerTokens(mapPath: string, tokenIds: readonly string[], player: boolean): boolean {
+    return this.write((stored) => withPlayerTokens(stored, mapPath, tokenIds, player));
   }
 
   /** Calls the listener after every change of this campaign's players file; returns the way to stop. */
   onChange(listener: () => void): () => void {
-    let last = JSON.stringify(this.files.of(this.campaignId));
+    const read = (): string => JSON.stringify([this.files.of(this.campaignId), this.assignments()]);
+    let last = read();
     return this.files.onChange(() => {
-      const now = JSON.stringify(this.files.of(this.campaignId));
+      const now = read();
       if (now === last) return;
       last = now;
       listener();
     });
+  }
+
+  /** Changes the players file; where it cannot be written the GM is told why. */
+  private write(change: (stored: StoredPlayers) => StoredPlayers): boolean {
+    const written = this.change(change);
+    if (!written) showNotice(this.refusal() ?? NEWER_PLAYERS_TEXT);
+    return written;
   }
 }
 

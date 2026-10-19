@@ -74,8 +74,8 @@ describe('the online table', () => {
   let saves: (SavedTable | null)[] = [];
   /** A signed-in GM: tables are asked for with the account's token, and nothing else. */
   const signedIn = { token: (): string | null => 'account-token', signedOutByServer: vi.fn(), refresh: vi.fn(() => Promise.resolve()) };
-  const control = (ownership = boundOwnership([]), players: Parameters<typeof fakeCampaigns>[0] = []): OnlineControl =>
-    new OnlineControl(app, ownership, fakeCampaigns(players), (table) => saves.push(table), signedIn);
+  const control = (ownership = boundOwnership([]), players: Parameters<typeof fakeCampaigns>[0] = [], campaigns = fakeCampaigns(players)): OnlineControl =>
+    new OnlineControl(app, ownership, campaigns, (table) => saves.push(table), signedIn);
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] });
@@ -167,7 +167,9 @@ describe('the online table', () => {
     workspace.leaves = [tab.leaf];
     present(tab);
     const ownership = boundOwnership([{ id: ANA, name: 'Ana' }]);
-    const online = control(ownership, [{ id: ANA, name: 'Ana' }]);
+    // The campaign's players file, which the token owners live in, is the same before and after the reload.
+    const campaigns = fakeCampaigns([{ id: ANA, name: 'Ana' }]);
+    const online = control(ownership, [{ id: ANA, name: 'Ana' }], campaigns);
     await online.start(tab.leaf);
     await advance(0);
     const created = saves.at(-1);
@@ -193,14 +195,14 @@ describe('the online table', () => {
     expect(socket.readyState).toBe(3);
     expect(socket.frames().some((frame) => frame.t === 'end')).toBe(false);
     expect(saves.length).toBe(savesBefore);
-    const data: unknown = JSON.parse(JSON.stringify({ ownership: ownership.toData(), table: saves.at(-1) }));
+    const data: unknown = JSON.parse(JSON.stringify({ table: saves.at(-1) }));
 
-    // It loads again from that data: same link and secret, Ana keeps her id and her ogre.
-    const record = data as { ownership: unknown; table: unknown };
+    // It loads again from that data and the campaign: same link and secret, Ana keeps her id and her ogre.
+    const record = data as { table: unknown };
     const restored = readSavedTable(record.table);
     if (restored === null) throw new Error('the saved table was not read');
-    const kept = boundOwnership([{ id: ANA, name: 'Ana' }], record.ownership);
-    const again = control(kept, [{ id: ANA, name: 'Ana' }]);
+    const kept = boundOwnership([{ id: ANA, name: 'Ana' }]);
+    const again = control(kept, [{ id: ANA, name: 'Ana' }], campaigns);
     void again.resume(restored);
     await advance(0);
     expect(again.link()).toBe(link);
