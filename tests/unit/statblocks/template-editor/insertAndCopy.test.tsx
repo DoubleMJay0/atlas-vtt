@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { cleanup } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bestMatch, findItems, insertItems, previewTemplate } from '../../../../src/app/statblocks/editor/template-editor/insertItems';

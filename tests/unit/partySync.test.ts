@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { TFolder } from 'obsidian';
 import { getHistoryStore } from '../../src/app/stores/history';

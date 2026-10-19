@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { SharedToken } from '../../../../src/app/online/protocol/index.ts';
 import type { TokenEntity } from '../../../../src/app/types';
 import { describe, expect, it } from 'vitest';

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { GmMessage } from '../../../../src/app/online/protocol/index.ts';
 import { describe, expect, it } from 'vitest';
 import { Ownership } from '../../../../src/app/online/gm/ownership.ts';

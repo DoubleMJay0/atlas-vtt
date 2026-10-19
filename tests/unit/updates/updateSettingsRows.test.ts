@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { updateSettingsRows } from '../../../src/app/updates/updateSettingsRows';
 import type { UpdateWatch } from '../../../src/app/updates/UpdateWatch';

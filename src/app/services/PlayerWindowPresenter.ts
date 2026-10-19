@@ -1,7 +1,8 @@
-import { App } from 'obsidian';
+import { App, View } from 'obsidian';
 import type { StoreApi } from 'zustand';
 import type { LocalPlayerView } from '../local-player-view';
-import { AtlasView, ATLAS_VIEW_TYPE } from '../atlas-view';
+import type { AtlasView } from '../atlas-view';
+import { ATLAS_VIEW_TYPE, isAtlasView } from '../atlasViewType';
 import type { ViewAtlasState } from '../storeFactory';
 import { playerWindowStore } from '../stores/playerWindowStore';
 import type { SceneTab } from '../types/sceneTabTypes';
@@ -26,7 +27,8 @@ export interface PresentOptions {
 
 /** Present the active view's current scene tab to players. */
 export async function presentActiveTab(app: App, options: PresentOptions = {}): Promise<void> {
-  const view = app.workspace.getActiveViewOfType(AtlasView);
+  const active = app.workspace.getActiveViewOfType(View);
+  const view = isAtlasView(active) ? active : null;
   const activeTabId = view?.tabMetaStore.getState().activeTabId ?? null;
   if (!view || !activeTabId) {
     showNotice(t('present.noMap'));
@@ -158,8 +160,8 @@ async function findOpenTab(app: App, scene: PresentedScene): Promise<{ view: Atl
   let byFile: { view: AtlasView; tab: SceneTab } | null = null;
   for (const leaf of app.workspace.getLeavesOfType(ATLAS_VIEW_TYPE)) {
     // revealLeaf also loads deferred views on supported Obsidian versions.
-    if (!(leaf.view instanceof AtlasView)) await app.workspace.revealLeaf(leaf);
-    if (!(leaf.view instanceof AtlasView)) continue;
+    if (!isAtlasView(leaf.view)) await app.workspace.revealLeaf(leaf);
+    if (!isAtlasView(leaf.view)) continue;
     for (const tab of leaf.view.tabMetaStore.getState().tabs) {
       if (tab.id === scene.tabId) return { view: leaf.view, tab };
       if (!byFile && tab.filePath === scene.filePath) byFile = { view: leaf.view, tab };

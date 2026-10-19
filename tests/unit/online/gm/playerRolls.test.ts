@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { GmMessage } from '../../../../src/app/online/protocol/index.ts';
 import type { DiceSet, RollingDice } from '../../../../src/app/types/diceSetTypes';
 import { parseSharedRoll } from '../../../../src/app/online/protocol/index.ts';

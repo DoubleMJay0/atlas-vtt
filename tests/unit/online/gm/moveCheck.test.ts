@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { GmMessage, PlayerMove } from '../../../../src/app/online/protocol/index.ts';
 import { describe, expect, it } from 'vitest';
 import { checkMove, MOVE_BURST, MOVES_PER_SECOND, MoveRate, type MoveContext } from '../../../../src/app/online/gm/moveCheck.ts';

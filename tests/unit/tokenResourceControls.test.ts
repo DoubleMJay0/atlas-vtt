@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Container, EventBoundary, FederatedPointerEvent, Rectangle, Text, loadEnvironmentExtensions, updateRenderGroupTransforms } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';

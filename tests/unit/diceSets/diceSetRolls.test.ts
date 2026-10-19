@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../src/app/atlas-view', () => ({ ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 const templateSet = vi.hoisted(() => ({ set: undefined as unknown }));
 vi.mock('../../../src/app/statblocks/resolve/templateDiceSet', () => ({ templateDiceSet: () => templateSet.set }));
 

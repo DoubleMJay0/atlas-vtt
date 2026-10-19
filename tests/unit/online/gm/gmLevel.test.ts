@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLOSE, GM_LEVEL } from '../../../../src/app/online/protocol/index.ts';
 import { isOutdated, knownMinLevel, OUTDATED_TEXT } from '../../../../src/app/online/gm/gmLevel.ts';

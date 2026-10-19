@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { waitFor } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { MarkdownRenderer, MarkdownView, TFile, WorkspaceLeaf } from 'obsidian';

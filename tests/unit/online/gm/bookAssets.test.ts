@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { MAX_BOOK_ITEMS, MAX_ITEM_TEXT, parseGmMessage, type BookItem } from '../../../../src/app/online/protocol/index.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';

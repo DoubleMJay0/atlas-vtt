@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { DragRuler } from '../../src/app/pixi/token-renderer/DragRuler';
 import type { DragRulerView } from '../../src/app/pixi/token-renderer/DragRulerView';
