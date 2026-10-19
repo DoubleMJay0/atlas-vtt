@@ -35,7 +35,7 @@ export const MENU_WIDTH = 300;
 
 /**
  * The short-lived menu of a control without players: start a table, or, once it runs, its header
- * (status, "…" with the gates and Stop), the line of a table that closes for want of access, the line of a pause, the line of a shown image, Copy invite link, the join
+ * (status, "…" with the gates, and Stop), the line of a table that closes for want of access, the line of a pause, the line of a shown image, Copy invite link, the join
  * code, Add player, and Show this map to players while players see another. Nobody is at the table yet, so Stop asks nothing. It turns into the panel when the
  * first player joins.
  */
@@ -48,10 +48,7 @@ export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuAc
     renderAccountMenu(layer, model.account, model.starting, model.lost, actions, model.outdated, model.campaigns);
     return restore();
   }
-  surfaceHeader(layer, model.title, model.status, model.status.tone === 'green' ? null : model.status.text, [
-    ...gateEntries(model.gate, actions),
-    { title: 'Stop table', icon: 'power', warning: true, apart: true, run: () => actions.stop() },
-  ], null);
+  surfaceHeader(layer, model.title, model.status, model.status.tone === 'green' ? null : model.status.text, gateEntries(model.gate, actions), () => actions.stop(), null);
   renderClosingRow(layer, model.closing, actions);
   renderUpdateRow(layer, model.updateAfter, actions);
   renderPausedRow(layer, model.gate, actions);

@@ -89,16 +89,21 @@ export function inviteRow(parent: HTMLElement, copy: () => Promise<boolean>, qr:
   return row;
 }
 
-/** The surface's header: its title, the status as a dot (in words only while it needs attention), "…" and, where given, Close. */
-export function surfaceHeader(layer: HTMLElement, title: string, status: { readonly text: string; readonly tone: Tone }, statusInWords: string | null, entries: readonly MenuEntry[], close: (() => void) | null): HTMLElement {
+/** The surface's header: its title, the status as a dot (in words only while it needs attention), "…" where it holds something, Stop and, where given, Close. */
+export function surfaceHeader(layer: HTMLElement, title: string, status: { readonly text: string; readonly tone: Tone }, statusInWords: string | null, entries: readonly MenuEntry[], stop: () => void, close: (() => void) | null): HTMLElement {
   const header = layer.createDiv({ cls: 'atlas-online-header' });
   header.createDiv({ cls: 'atlas-online-title', text: title, attr: { id: `${layer.id}-title` } });
   const line = header.createDiv({ cls: `atlas-online-header__status atlas-online-tone--${status.tone}` });
   line.createSpan({ cls: 'atlas-online-status__dot', attr: { 'aria-hidden': 'true' } });
   line.createSpan({ cls: statusInWords === null ? 'atlas-online-sr-only' : 'atlas-online-status__text', text: statusInWords ?? status.text });
-  const more = header.createEl('button', { cls: 'atlas-online-icon-button atlas-online-header__more', attr: { type: 'button', 'aria-label': 'More', 'aria-haspopup': 'menu', 'data-focus-key': 'more' } });
-  setIcon(more, 'more-horizontal');
-  more.addEventListener('click', () => openMenuBelow(entries, more));
+  if (entries.length > 0) {
+    const more = header.createEl('button', { cls: 'atlas-online-icon-button atlas-online-header__more', attr: { type: 'button', 'aria-label': 'More', 'aria-haspopup': 'menu', 'data-focus-key': 'more' } });
+    setIcon(more, 'more-horizontal');
+    more.addEventListener('click', () => openMenuBelow(entries, more));
+  }
+  const stopButton = header.createEl('button', { cls: 'atlas-online-icon-button atlas-online-header__stop', attr: { type: 'button', 'aria-label': 'Stop table', 'data-focus-key': 'stop' } });
+  setIcon(stopButton, 'power');
+  stopButton.addEventListener('click', stop);
   if (close !== null) {
     const button = header.createEl('button', { cls: 'atlas-online-close', attr: { type: 'button', 'aria-label': 'Close', 'data-focus-key': 'close' } });
     setIcon(button, 'x');

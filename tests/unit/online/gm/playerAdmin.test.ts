@@ -208,3 +208,26 @@ describe('a newcomer\'s card', () => {
     expect([...parent.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Decline', 'Admit']);
   });
 });
+
+describe('stopping the table', () => {
+  const header = (layer: HTMLElement): (string | null)[] => [...layer.querySelectorAll('.atlas-online-header button')].map((button) => button.getAttribute('aria-label'));
+
+  it('is a button of its own between "…" and Close, and asks first while players are at the table', () => {
+    const { layer, does } = panel();
+    expect(header(layer)).toEqual(['More', 'Stop table', 'Close']);
+    expect(menus.opened).toHaveLength(0);
+    layer.querySelector<HTMLButtonElement>('.atlas-online-header__stop')?.click();
+    expect(does.stop).not.toHaveBeenCalled();
+    press(layer, 'Stop table');
+    expect(does.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at once from the menu, where nobody is at the table yet; "…" shows only with something in it', () => {
+    const layer = document.body.createDiv();
+    const does = actions();
+    renderMenu(layer, menuModel(snapshot({ players: [] }), SCENE, { kind: 'signed-out' }), does as unknown as MenuActions);
+    expect(header(layer)).toEqual(['Stop table']);
+    layer.querySelector<HTMLButtonElement>('.atlas-online-header__stop')?.click();
+    expect(does.stop).toHaveBeenCalledTimes(1);
+  });
+});

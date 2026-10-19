@@ -35,16 +35,19 @@
     }
   }
 
-  // "…" sits against Close, or in the corner where the surface has none.
-  .atlas-online-header__more {
-    margin-left: auto;
+  .atlas-online-header__more.is-open {
+    background: var(--background-modifier-hover);
+  }
+
+  // Stops the table for everyone, so it warns as the pointer comes to it; it takes the corner where the surface has no Close.
+  .atlas-online-header__stop {
+    &:hover {
+      background: color-mix(in oklch, var(--text-error) 12%, transparent);
+      color: var(--text-error);
+    }
 
     &:last-child {
       @include atlas-panel-inset-radius($spacing-s, top-right);
-    }
-
-    &.is-open {
-      background: var(--background-modifier-hover);
     }
   }
 

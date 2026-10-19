@@ -95,7 +95,7 @@ function listActions(layer: HTMLElement, actions: PanelActions, redraw: () => vo
 
 /**
  * The online panel: the working surface while players are at the table. A header with the title, the
- * status as a dot, "…" (Send feedback, the gates' New code and two switches, Stop table) and
+ * status as a dot, "…" (Send feedback, the gates' New code and two switches), Stop and
  * Close; the line of a table that closes for want of access; the line of a pause; the line of a shown image; Copy invite link (with
  * its menu) and the join code; the players with their tokens and Add player; the bar for the selected tokens or to show this map; the
  * feedback form and the question or field the GM is answering (Stop, a new link, renaming, removing, a new player's code) while open. Redrawn whole on every change, keeping focus and the list's scroll position.
@@ -110,9 +110,9 @@ export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelA
   const entries: MenuEntry[] = [
     { title: view.feedback.open ? 'Close feedback' : 'Send feedback', icon: 'message-square', run: () => actions.toggleFeedback() },
     ...gateEntries(view.gate, actions),
-    { title: 'Stop table', icon: 'power', warning: true, apart: true, run: () => openPrompt(layer, confirmPrompt('stop', 'Stop the table', 'Stop for everyone?', 'Stop table', () => actions.stop(), { warning: true }), redraw) },
   ];
-  surfaceHeader(layer, view.title, view.status, statusInWords(view), entries, () => actions.close());
+  const stop = (): void => openPrompt(layer, confirmPrompt('stop', 'Stop the table', 'Stop for everyone?', 'Stop table', () => actions.stop(), { warning: true }), redraw);
+  surfaceHeader(layer, view.title, view.status, statusInWords(view), entries, stop, () => actions.close());
   renderClosingRow(layer, view.closing, actions);
   renderUpdateRow(layer, view.updateAfter, actions);
   renderPausedRow(layer, view.gate, actions);
