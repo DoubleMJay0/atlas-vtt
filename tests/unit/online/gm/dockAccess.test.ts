@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import type { AccountView } from '../../../../src/app/online/gm/account/accountView.ts';
 import { ACCESS_REFUSALS } from '../../../../src/app/online/gm/account/relayAccount.ts';

@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { BookItem, BookNote, BookPin } from '../../../../src/app/online/protocol/index.ts';
 import { mergeBooks, migrateBooks, unmigratedBooks } from '../../../../src/app/online/gm/book/bookMigration.ts';

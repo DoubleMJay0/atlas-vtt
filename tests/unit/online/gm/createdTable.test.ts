@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { createTable } from '../../../../src/app/online/gm/createTable.ts';
 import { readCreated } from '../../../../src/app/online/gm/createdTable.ts';

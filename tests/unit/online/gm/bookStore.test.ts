@@ -1,4 +1,3 @@
-// @vitest-environment node
 import {
   MAX_BOOK_ITEMS, MAX_BOOK_NOTES, MAX_BOOK_PINS, MAX_ITEM_PROPERTIES, MAX_ITEM_TEXT, MAX_BOOK_TITLE, parseBookItem, parsePlayerBook, type BookItem, type BookPin, type PlayerBookMessage,
 } from '../../../../src/app/online/protocol/index.ts';

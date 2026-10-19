@@ -1,8 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 
-vi.mock('../../src/app/atlas-view', () => ({
-  AtlasView: class AtlasView {},
-}));
 
 import { PlayerWindowService } from '../../src/app/services/PlayerWindowService';
 import { attachFakePlayerWindow } from '../mocks/playerPopout';

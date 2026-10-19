@@ -1,8 +1,10 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';
 import { DragRulerView } from '../../src/app/pixi/token-renderer/DragRulerView';
-import { pathMidpoint } from '../../src/app/pixi/utils/measureDrawing';
+import { LIGHTING_Z_INDEX } from '../../src/app/pixi/lighting/LightingRenderer';
+import { pathMidpoint, shortenPathEnd } from '../../src/app/pixi/utils/measureDrawing';
 
 function makeScene(): { viewport: Container; background: Graphics; tokens: Container; view: DragRulerView } {
   const viewport = new Container();
@@ -10,24 +12,32 @@ function makeScene(): { viewport: Container; background: Graphics; tokens: Conta
   const background = new Graphics();
   const tokens = new Container();
   viewport.addChild(background, tokens);
-  const view = new DragRulerView(viewport as unknown as Viewport, tokens);
+  const view = new DragRulerView(viewport as unknown as Viewport);
   return { viewport, background, tokens, view };
 }
 
 describe('DragRulerView', () => {
-  it('draws the path between the map and the tokens and the label above them', () => {
-    const { viewport, background, tokens, view } = makeScene();
+  it('draws the path and the label above the lighting, so the dark never covers them', () => {
+    const { view } = makeScene();
     const [path, label] = view.layers as Container[];
-    viewport.sortChildren();
 
-    expect(viewport.getChildIndex(path!)).toBeGreaterThan(viewport.getChildIndex(background));
-    expect(viewport.getChildIndex(path!)).toBeLessThan(viewport.getChildIndex(tokens));
-    expect(label!.zIndex).toBeGreaterThan(tokens.zIndex);
+    expect(path!.zIndex).toBeGreaterThan(LIGHTING_Z_INDEX);
+    expect(label!.zIndex).toBeGreaterThan(path!.zIndex);
   });
 
   it('stays hidden until a drag draws it', () => {
     const { view } = makeScene();
     expect(view.layers.every(layer => !layer.visible)).toBe(true);
+  });
+});
+
+describe('shortenPathEnd', () => {
+  it('ends the last segment that far before its end', () => {
+    expect(shortenPathEnd([{ x: 0, y: 0 }, { x: 0, y: 100 }, { x: 100, y: 100 }], 35)).toEqual([{ x: 0, y: 0 }, { x: 0, y: 100 }, { x: 65, y: 100 }]);
+  });
+
+  it('drops a last segment shorter than the gap', () => {
+    expect(shortenPathEnd([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 120, y: 0 }], 35)).toEqual([{ x: 0, y: 0 }, { x: 100, y: 0 }]);
   });
 });
 

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Bounds, Text } from 'pixi.js';
 import { dragPathCells, RemoteDrags, type RemoteDrag } from '../../../../src/app/online/marks/RemoteDrags.ts';

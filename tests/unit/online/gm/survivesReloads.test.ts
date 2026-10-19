@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { CLOSE } from '../../../../src/app/online/protocol/index.ts';
 import type { TokenEntity } from '../../../../src/app/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

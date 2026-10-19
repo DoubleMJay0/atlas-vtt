@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { parseGmMessage, type BookQuest, type PlayerBook } from '../../../../src/app/online/protocol/index.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookShelf } from '../../../../src/app/online/gm/book/BookShelf.ts';

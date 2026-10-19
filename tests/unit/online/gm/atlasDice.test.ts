@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { EventEmitter } from 'node:events';
 import type { WorkspaceLeaf } from 'obsidian';
 import { afterEach, describe, expect, it, vi } from 'vitest';

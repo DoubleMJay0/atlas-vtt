@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
 import { boundOwnership, FAKE_LINK, fakeCampaigns } from './fakeSeats.ts';

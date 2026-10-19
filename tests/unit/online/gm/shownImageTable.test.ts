@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { ALL_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';

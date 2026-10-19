@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { JOIN_CODE_PATTERN, shownJoinCode } from '../../../../src/app/online/protocol/index.ts';
 import { describe, expect, it } from 'vitest';
 import { ARM_MS, freeGate, FULL_NOTE_MS, gateFrame, newGate, newJoinCode, readGate, TableGate, type GateFrame, type GateSettings } from '../../../../src/app/online/gm/joinGate.ts';
