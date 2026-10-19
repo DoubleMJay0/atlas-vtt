@@ -56,8 +56,8 @@ function optionalWhole(raw: Record<string, unknown>, key: string, least: number)
 function rowIds(value: unknown): readonly string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const ids = value.map(name);
-  if (ids.some((id) => id === undefined)) return undefined;
-  const unique = [...new Set(ids as string[])];
+  if (!ids.every((id): id is string => id !== undefined)) return undefined;
+  const unique = [...new Set(ids)];
   return unique.length <= MAX_RECOVERY_BUTTONS ? unique : undefined;
 }
 
@@ -90,7 +90,8 @@ function metricRule(raw: Record<string, unknown>, target: ResourceOrCounters): R
     case 'amount': {
       const text = formula(own(raw, 'formula'));
       const min = optionalWhole(raw, 'min', 0);
-      return text === undefined || min === null ? undefined : { target, does: 'amount', formula: text, ...(min.value !== undefined && { min: min.value }) };
+      if (text === undefined || min === null) return undefined;
+      return { target, does: 'amount', formula: text, ...(min.value !== undefined && { min: min.value }) };
     }
     case 'share': {
       const share = own(raw, 'share');

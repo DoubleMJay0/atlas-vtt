@@ -67,7 +67,8 @@ export function restoreCounters(targets: readonly CounterTarget[], rows: Counter
     if (shown === null) continue;
     const uses = restoredUses(shown, rows, roll, restName);
     if (uses === undefined) return null;
-    const next = uses === null ? null : withCountersUsed(field, value, uses);
+    if (uses === null) continue;
+    const next = withCountersUsed(field, value, uses);
     if (next !== null) restored.push({ field, base: value, next });
   }
   return restored;

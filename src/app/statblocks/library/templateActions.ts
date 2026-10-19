@@ -112,9 +112,10 @@ async function moveRecoveryButtons(app: App, from: TemplateId, to: TemplateId | 
     const moved = own && recoveryMoved(own, from, to);
     if (moved) await assets.updateCollectionSettings(collection.id, { recovery: editedRecovery(moved, presetRecovery(settings?.systemPresetId, known)) });
   }
+  if (!presets) return;
   for (const preset of known) {
     const moved = preset.builtIn ? undefined : recoveryMoved(preset.rules.recovery, from, to);
-    if (!moved || !presets) continue;
+    if (!moved) continue;
     const { recovery: _recovery, ...rules } = preset.rules;
     presets.update(preset.id, recoveryTemplateIds(moved).length > 0 ? { ...rules, recovery: moved } : rules);
   }

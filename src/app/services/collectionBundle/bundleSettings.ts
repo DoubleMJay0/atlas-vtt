@@ -71,7 +71,7 @@ export function withPresetRoles(settings: CollectionSettings, presets: readonly 
 export function withPresetRecovery(settings: CollectionSettings, presets: readonly SystemPreset[]): CollectionSettings {
   if (settings.recovery !== undefined) return settings;
   const preset = presets.find((candidate) => candidate.id === settings.systemPresetId);
-  const recovery = preset && !preset.builtIn ? presetRecovery(preset.id, presets) : undefined;
+  const recovery = preset && !preset.builtIn ? parseRecovery(preset.rules.recovery) : undefined;
   return recovery && recoveryTemplateIds(recovery).length > 0 ? { ...settings, recovery: structuredClone(recovery) } : settings;
 }
 
