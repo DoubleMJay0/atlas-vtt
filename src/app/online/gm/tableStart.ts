@@ -46,10 +46,11 @@ export const OTHER_LINK_TEXT = 'The server could not open this campaign\'s link.
 /**
  * Asks the relay for a table on the lasting link of the campaign `campaignId` once its players file
  * was read, making the link first where it has none; null where no table was made, the GM told why
- * (a relay that signed the account out says so on the account instead). A table the relay opened on
+ * (a relay that signed the account out says so on the account instead; one that needs a newer Atlas
+ * names its least GM level to `outdated`). A table the relay opened on
  * another link is ended, never run: its players would not find it at the campaign's link.
  */
-export async function createCampaignTable(campaigns: TableCampaigns, campaignId: string, token: string, account: HostAccount): Promise<CampaignTable | null> {
+export async function createCampaignTable(campaigns: TableCampaigns, campaignId: string, token: string, account: HostAccount, outdated: (minLevel: number) => void = () => undefined): Promise<CampaignTable | null> {
   const seats = await campaigns.open(campaignId).catch(() => null);
   const link = seats === null ? null : campaignLink(seats);
   if (seats === null || link === null) return refused(seats === null ? CAMPAIGNS_LOADING_TEXT : linkRefusal(seats));
@@ -60,6 +61,7 @@ export async function createCampaignTable(campaigns: TableCampaigns, campaignId:
     return refused(OTHER_LINK_TEXT);
   }
   if (!('message' in created)) return { created, seats };
+  if (created.minLevel !== undefined) outdated(created.minLevel);
   if (created.status === 401) account.signedOutByServer();
   else if (created.status === 403) void account.refresh(true);
   return created.status === 401 ? null : refused(created.message);

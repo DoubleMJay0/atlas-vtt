@@ -195,6 +195,11 @@ export class OnlineTable {
     return this.closing;
   }
 
+  /** The least GM level the relay's player page needs, as its last welcome said; null while it said none. */
+  get minLevel(): number | null {
+    return this.connection.minLevel;
+  }
+
   /** How the table's connection went, for feedback's diagnostics. */
   connectionStats(): ConnectionStats {
     return this.connection.stats();

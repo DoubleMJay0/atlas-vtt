@@ -1,7 +1,7 @@
 import { renderAccountMenu, type AccountActions } from './accountMenu.ts';
 
 export { accountActions } from './accountMenu.ts';
-import { renderClosingRow } from './closingRow.ts';
+import { renderClosingRow, renderUpdateRow } from './closingRow.ts';
 import { inviteRow, surfaceHeader, textButton } from './controls.ts';
 import { gateEntries, renderCodeRow, renderPausedRow, type GateRowActions } from './gateRows.ts';
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
@@ -45,7 +45,7 @@ export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuAc
   layer.empty();
   layer.addClass('atlas-online-menu');
   if (model.kind === 'start') {
-    renderAccountMenu(layer, model.account, model.starting, model.lost, actions);
+    renderAccountMenu(layer, model.account, model.starting, model.lost, actions, model.outdated);
     return restore();
   }
   surfaceHeader(layer, 'Online table', model.status, model.status.tone === 'green' ? null : model.status.text, [
@@ -53,6 +53,7 @@ export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuAc
     { title: 'Stop table', icon: 'power', warning: true, apart: true, run: () => actions.stop() },
   ], null);
   renderClosingRow(layer, model.closing, actions);
+  renderUpdateRow(layer, model.updateAfter, actions);
   renderPausedRow(layer, model.gate, actions);
   renderImageRow(layer, model.imageShown, actions);
   if (model.link !== null) inviteRow(layer, () => actions.copy(), { open: model.qr, toggle: () => actions.toggleQr() }, linkEntries(layer, actions, redraw));

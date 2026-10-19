@@ -1,4 +1,4 @@
-import { renderClosingRow, type ClosingRowActions } from './closingRow.ts';
+import { renderClosingRow, renderUpdateRow, type ClosingRowActions } from './closingRow.ts';
 import { inviteRow, surfaceHeader } from './controls.ts';
 import type { MenuEntry } from './dockMenu.ts';
 import { renderFeedback, type FeedbackActions, type FeedbackView } from './feedbackForm.ts';
@@ -26,6 +26,8 @@ export interface PanelView {
   readonly imageShown: boolean;
   /** The table closes because its account may no longer host: the line that says when; null otherwise. */
   readonly closing: string | null;
+  /** The relay let this Atlas in although it needs a newer one. */
+  readonly updateAfter: boolean;
   readonly groups: readonly PlayerGroup[];
   readonly players: readonly OnlinePlayer[];
   readonly bar: SelectionBar | null;
@@ -36,7 +38,7 @@ export interface PanelView {
 export function panelView(snapshot: OnlineSnapshot, scene: SceneFacts, feedback: FeedbackView, qr = false): PanelView {
   const groups = groupsOf(snapshot, scene);
   const players = groups.flatMap((group) => (group.player === null ? [] : [group.player]));
-  return { status: statusOf(snapshot), seatsNote: seatsNoteOf(snapshot), link: snapshot.link, qr, gate: gateRowsOf(snapshot.gate), imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), groups, players, bar: selectionBarOf(snapshot, scene), feedback };
+  return { status: statusOf(snapshot), seatsNote: seatsNoteOf(snapshot), link: snapshot.link, qr, gate: gateRowsOf(snapshot.gate), imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true, groups, players, bar: selectionBarOf(snapshot, scene), feedback };
 }
 
 /** The campaign's players as the panel changes them, once the GM has answered. */
@@ -108,6 +110,7 @@ export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelA
   ];
   surfaceHeader(layer, 'Online table', view.status, statusInWords(view), entries, () => actions.close());
   renderClosingRow(layer, view.closing, actions);
+  renderUpdateRow(layer, view.updateAfter, actions);
   renderPausedRow(layer, view.gate, actions);
   renderImageRow(layer, view.imageShown, actions);
   if (view.link !== null) inviteRow(layer, () => actions.copy(), { open: view.qr, toggle: () => actions.toggleQr() }, linkEntries(layer, actions, redraw));

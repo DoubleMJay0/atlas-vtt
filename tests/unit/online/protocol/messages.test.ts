@@ -9,7 +9,7 @@ const HASH = 'a'.repeat(64);
 
 describe('client frames', () => {
   it('read a GM hello, a player hello with and without key, a send, a kick and an end', () => {
-    expect(parseClientFrame('{"v":1,"t":"hello","role":"gm","secret":"0123456789abcdef"}')).toEqual({ v: 1, t: 'hello', role: 'gm', secret: '0123456789abcdef' });
+    expect(parseClientFrame('{"v":1,"t":"hello","role":"gm","secret":"0123456789abcdef"}')).toEqual({ v: 1, t: 'hello', role: 'gm', secret: '0123456789abcdef', level: 1 });
     expect(parseClientFrame('{"v":1,"t":"hello","role":"player","name":"Ana"}')).toEqual({ v: 1, t: 'hello', role: 'player', name: 'Ana' });
     expect(parseClientFrame('{"v":1,"t":"hello","role":"player","name":"Ana","key":"0123456789abcdef"}')).toEqual({ v: 1, t: 'hello', role: 'player', name: 'Ana', key: '0123456789abcdef' });
     expect(parseClientFrame(`{"v":1,"t":"kick","id":"${'a'.repeat(20)}"}`)).toEqual({ v: 1, t: 'kick', id: 'a'.repeat(20) });

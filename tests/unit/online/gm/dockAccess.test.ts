@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AccountView } from '../../../../src/app/online/gm/account/accountView.ts';
 import { ACCESS_REFUSALS } from '../../../../src/app/online/gm/account/relayAccount.ts';
-import { renderClosingRow } from '../../../../src/app/online/gm/dock/closingRow.ts';
+import { renderClosingRow, renderUpdateRow } from '../../../../src/app/online/gm/dock/closingRow.ts';
 import { renderMenu, type MenuActions } from '../../../../src/app/online/gm/dock/ConnectionMenu.ts';
 import { panelView } from '../../../../src/app/online/gm/dock/OnlinePanel.ts';
 import { menuModel, type OnlineSnapshot, type SceneFacts } from '../../../../src/app/online/gm/dock/panelModel.ts';
@@ -16,7 +16,7 @@ const snapshot = (over: Partial<OnlineSnapshot> = {}): OnlineSnapshot => ({ stat
 
 function actions(): MenuActions & { openAccountPage: ReturnType<typeof vi.fn<() => void>> } {
   return {
-    start: vi.fn(), signIn: vi.fn(), cancelSignIn: vi.fn(), reopenSignIn: vi.fn(), signOut: vi.fn(), retry: vi.fn(), openAccountPage: vi.fn<() => void>(),
+    start: vi.fn(), signIn: vi.fn(), cancelSignIn: vi.fn(), reopenSignIn: vi.fn(), signOut: vi.fn(), retry: vi.fn(), openAccountPage: vi.fn<() => void>(), update: vi.fn(),
     newCode: vi.fn(), setRequireCode: vi.fn(), setAskToJoin: vi.fn(), copyCode: () => Promise.resolve(true), hideImage: vi.fn(),
     stop: vi.fn(), share: vi.fn(), copy: () => Promise.resolve(true), toggleQr: vi.fn(),
   };
@@ -131,12 +131,37 @@ describe('a running table whose account may no longer host', () => {
     expect(panelView(snapshot(RUNNING), SCENE, feedback).closing).toBeNull();
     const layer = document.body.createDiv();
     const open = vi.fn();
-    renderClosingRow(layer, closingText(CLOSES_AT, 'en-GB', 'UTC'), { openAccountPage: open });
+    renderClosingRow(layer, closingText(CLOSES_AT, 'en-GB', 'UTC'), { openAccountPage: open, update: vi.fn() });
     expect(layer.textContent).toBe('This table closes on 12 October 2026 at 14:30. Your account’s access to online play ended.Account page');
     layer.querySelector('button')?.click();
     expect(open).toHaveBeenCalledTimes(1);
     layer.empty();
-    renderClosingRow(layer, null, { openAccountPage: open });
+    renderClosingRow(layer, null, { openAccountPage: open, update: vi.fn() });
     expect(layer.childElementCount).toBe(0);
+  });
+});
+
+describe('the online menu while the relay needs a newer Atlas', () => {
+  it('stands Update in for Start, with the reason, and Update opens Atlas\'s page', () => {
+    const shown = menu({ outdated: true }, CAN_HOST);
+    expect(shown.lines).toContain('Online play needs a newer Atlas.');
+    expect(shown.buttons).toContain('Update');
+    expect(shown.buttons).not.toContain('Start online table');
+    shown.press('Update');
+    expect(shown.does.update).toHaveBeenCalledTimes(1);
+    expect(menu({}, CAN_HOST).buttons).toContain('Start online table');
+  });
+
+  it('asks a GM let in where players sit to update after the session, in the menu and the panel', () => {
+    const running = { status: 'online', link: 'https://play.atlas-vtt.dev/#code' } as const;
+    expect(menu({ ...running, updateAfter: true }, CAN_HOST).lines).toContain('Update Atlas after this session');
+    expect(menu(running, CAN_HOST).lines).not.toContain('Update Atlas after this session');
+    const feedback = { open: false, diagnostics: false, state: 'idle', errorReports: false } as const;
+    expect(panelView(snapshot({ ...running, updateAfter: true }), SCENE, feedback).updateAfter).toBe(true);
+    const layer = document.body.createDiv();
+    const update = vi.fn();
+    renderUpdateRow(layer, true, { openAccountPage: vi.fn(), update });
+    layer.querySelector('button')?.click();
+    expect(update).toHaveBeenCalledTimes(1);
   });
 });
