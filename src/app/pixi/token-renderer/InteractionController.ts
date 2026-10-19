@@ -83,7 +83,6 @@ export class InteractionController implements ITokenInteractionController {
     pendingUpdate: false,
     hasMoved: false
   };
-  private lastDragStreamSentAt = 0;
   
   // Hover handlers
   private hoverHandlers: Record<string, { over: (e?: FederatedPointerEvent) => void; out: () => void }> = {};
@@ -322,7 +321,6 @@ export class InteractionController implements ITokenInteractionController {
     this.dragState.lastPointer = { x: worldPos.x, y: worldPos.y };
     const dx = worldPos.x - this.dragState.dragStartPointer.x;
     const dy = worldPos.y - this.dragState.dragStartPointer.y;
-    const currentTime = Date.now();
     
     // Check if we've moved enough to consider it a drag (5 pixel threshold)
     const moveDistance = Math.sqrt(dx * dx + dy * dy);
@@ -359,22 +357,19 @@ export class InteractionController implements ITokenInteractionController {
     const rulerStart = this.dragState.rulerTokenId ? this.dragState.initialPositions[this.dragState.rulerTokenId] : undefined;
     if (rulerStart) this.dragRuler?.update({ x: rulerStart.x + dx, y: rulerStart.y + dy });
 
-    // Push live positions to the store at a bounded cadence.
-    if (currentTime - this.lastDragStreamSentAt >= 50) {
-      // Positions come from the pointer, not the sprites: an Alt-drag copy may still be loading its sprite.
-      const updates = this.dragState.dragIds.flatMap((id) => {
-        const initPos = this.dragState.initialPositions[id];
-        return initPos ? [{ id, x: initPos.x + dx, y: initPos.y + dy }] : [];
-      });
-
-      if (updates.length > 0) {
-        // The store follows the drag, so everything that reads positions does. Sight waits for
-        // the drop unless the scene has sight on drop off (`SightTokens`).
-        // Persistence is debounced (1000ms) so these intermediate updates won't save,
-        // and the open history transaction keeps them out of the undo stack.
-        this.store.getState().setTokenPositions(updates);
-        this.lastDragStreamSentAt = currentTime;
-      }
+    // The store follows the sprites on every move, so sight and a token's footprint in the dark
+    // move with the token in the same frame (as Foundry ties a token's vision to where it is drawn);
+    // a throttled store left the footprint trailing the sprite. Chromium sends one pointermove per
+    // frame, so this is one write per frame.
+    // Positions come from the pointer, not the sprites: an Alt-drag copy may still be loading its sprite.
+    const updates = this.dragState.dragIds.flatMap((id) => {
+      const initPos = this.dragState.initialPositions[id];
+      return initPos ? [{ id, x: initPos.x + dx, y: initPos.y + dy }] : [];
+    });
+    if (updates.length > 0) {
+      // Sight waits for the drop when the scene has sight on drop on (`SightTokens`). Persistence
+      // is debounced, and the open history transaction keeps these writes out of the undo stack.
+      this.store.getState().setTokenPositions(updates);
     }
     
     // Schedule UI update
@@ -523,7 +518,6 @@ export class InteractionController implements ITokenInteractionController {
       // Reset drag state
       this.dragState.pendingUpdate = false;
       this.dragState.hasMoved = false;
-      this.lastDragStreamSentAt = 0;
       delete this.dragState.clickToken;
       this.reportHeld([]);
     }
