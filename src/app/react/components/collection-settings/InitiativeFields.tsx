@@ -7,6 +7,7 @@ import { ObsidianMenuDropdown } from '../ObsidianMenuDropdown';
 import { isValidDefaultRoll } from '../../../gameSystems/diceRules';
 import { SIDE_LABELS } from '../../../initiative/sides';
 import type { FieldSuggestion } from '../../../resources/resourceFieldSuggestions';
+import type { NamedModifierStatblock } from '../../../initiative/modifierPreview';
 import type { InitiativeMode, InitiativeRules, InitiativeSide } from '../../../types/initiativeRulesTypes';
 import { InitiativeModifierFields } from './InitiativeModifierFields';
 
@@ -15,6 +16,8 @@ interface InitiativeFieldsProps {
   onChange: (initiative: InitiativeRules) => void;
   /** The statblock fields offered for the modifier (`initiativeFieldSuggestions`). */
   fieldSuggestions: readonly FieldSuggestion[];
+  /** The collection's statblocks, for what the chosen field reads in them (`modifierPreview`). */
+  modifierStatblocks?: readonly NamedModifierStatblock[] | undefined;
 }
 
 const MODE_OPTIONS: Record<InitiativeMode, string> = {
@@ -27,7 +30,7 @@ const MODE_DESCRIPTIONS: Record<InitiativeMode, string> = {
   sides: 'The players and their opponents take turns as two sides, in any order within a side. Nothing is rolled.',
 };
 
-export function InitiativeFields({ initiative, onChange, fieldSuggestions }: InitiativeFieldsProps): React.ReactElement {
+export function InitiativeFields({ initiative, onChange, fieldSuggestions, modifierStatblocks }: InitiativeFieldsProps): React.ReactElement {
   const rollValid = isValidDefaultRoll(initiative.roll);
 
   return (
@@ -65,7 +68,7 @@ export function InitiativeFields({ initiative, onChange, fieldSuggestions }: Ini
               </p>
             )}
           </div>
-          <InitiativeModifierFields initiative={initiative} onChange={onChange} fieldSuggestions={fieldSuggestions} />
+          <InitiativeModifierFields initiative={initiative} onChange={onChange} fieldSuggestions={fieldSuggestions} statblocks={modifierStatblocks} />
         </>
       ) : (
         <div className="atlas-csm-field">

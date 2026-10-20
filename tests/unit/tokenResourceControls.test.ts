@@ -81,6 +81,21 @@ describe('resource bar controls', () => {
     } finally { controls.destroy(); viewport.destroy(); }
   });
 
+  it('takes damage typed as a sum, halved damage rounded down (issues #495, #396)', () => {
+    const { controls, viewport, hits, press, commit, stored } = mount({ hp: { current: 30, max: 30 } });
+    try {
+      press(hits[0]!);
+      commit('-10-5');
+      expect(stored().resources?.hp).toEqual({ current: 15, max: 30 });
+      press(hits[0]!);
+      commit('-9/2');
+      expect(stored().resources?.hp).toEqual({ current: 11, max: 30 });
+      press(hits[0]!);
+      commit('-2*3');
+      expect(stored().resources?.hp).toEqual({ current: 5, max: 30 });
+    } finally { controls.destroy(); viewport.destroy(); }
+  });
+
   it('changes only its own resource when another one changed since the controls were shown', () => {
     const { controls, viewport, hits, press, minus, stored, store } = mount({ hp: { current: 10, max: 10 }, stress: { current: 0, max: 6 } });
     try {

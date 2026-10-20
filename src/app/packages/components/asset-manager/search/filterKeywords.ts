@@ -71,7 +71,7 @@ export function filterKeywords(tab: Tab, definitions: readonly CreatureFilterDef
   keywords.push({ kind: 'statblock', prefix: 'statblock', aliases: ['sb'], numeric: false, description: t('filters.keyword.statblock'), accepts: (value) => statblockValue(value) !== null });
   // Last, so a typed "t" offers the type before them; `layout:` is the template's name from before native templates
   const template: FilterKeyword = { kind: 'template', prefix: 'template', aliases: ['layout'], numeric: false, negatable: true, description: t('filters.keyword.template') };
-  const text: FilterKeyword = { kind: 'text', prefix: 'text', aliases: ['has'], numeric: false, negatable: true, description: t('filters.keyword.text') };
+  const text: FilterKeyword = { kind: 'text', prefix: 'text', aliases: ['has'], numeric: false, negatable: true, phrase: true, description: t('filters.keyword.text') };
   const taken = new Set([...keywords, template, text].flatMap((keyword) => [keyword.prefix, ...keyword.aliases]));
   for (const definition of definitions) {
     const keyword = creatureKeyword(definition, taken);
