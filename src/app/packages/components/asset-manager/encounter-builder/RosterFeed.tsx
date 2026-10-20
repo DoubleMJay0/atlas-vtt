@@ -1,14 +1,9 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import type { App } from 'obsidian';
-import { Plus } from 'lucide-react';
-import { Button } from '../../primitives/button';
-import { LabelTooltip } from '../../primitives/tooltip';
-import { LinkedStatblock } from '../../../../statblocks/render/LinkedStatblock';
 import { StatblockFeeds } from '../../../../react/components/dm-screen/StatblockFeeds';
 import { observeResize } from '../../../../utils/observeResize';
-import { t } from '../../../../i18n';
 import type { TokenAsset } from '../types';
-import { CountStepper } from './CountStepper';
+import { CreatureCard } from './CreatureCard';
 
 interface RosterFeedProps {
   app: App;
@@ -26,7 +21,7 @@ const AHEAD = 1200;
 
 /**
  * The collection's creatures as the DM screen shows statblocks: full cards in feeds side by side,
- * as many as the width holds, each with the control that adds it to the encounter.
+ * as many as the width holds.
  */
 export function RosterFeed({ app, creatures, refinement, countOf, onCountChange }: RosterFeedProps): React.JSX.Element {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -59,26 +54,9 @@ export function RosterFeed({ app, creatures, refinement, countOf, onCountChange 
   return (
     <div ref={scrollerRef} className="atlas-encounter-builder__feed">
       <StatblockFeeds>
-        {shown.map((token) => {
-          const count = countOf(token.id);
-          return (
-            <article key={token.id} className="atlas-encounter-card" data-picked={count > 0}>
-              <div className="atlas-encounter-card__actions">
-                {count > 0 ? (
-                  <CountStepper name={token.name} count={count} onChange={(next) => onCountChange(token, next)} />
-                ) : (
-                  <LabelTooltip label={t('encounter.builder.addNamed', { name: token.name })} describe>
-                    <Button variant="default" className="atlas-encounter-card__add" onClick={() => onCountChange(token, 1)}>
-                      <Plus />
-                      {t('encounter.builder.add')}
-                    </Button>
-                  </LabelTooltip>
-                )}
-              </div>
-              {token.statblockPath && <LinkedStatblock app={app} path={token.statblockPath} variant="feed" />}
-            </article>
-          );
-        })}
+        {shown.map((token) => (
+          <CreatureCard key={token.id} app={app} token={token} count={countOf(token.id)} onCountChange={onCountChange} />
+        ))}
       </StatblockFeeds>
     </div>
   );

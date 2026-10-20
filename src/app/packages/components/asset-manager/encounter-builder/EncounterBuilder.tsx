@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { App } from 'obsidian';
 import type { AssetService } from '../../../../services/AssetService';
 import { saveEncounter } from '../../../../encounters/encounterSaveService';
@@ -134,7 +134,12 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
       >
         <PaneDiceRolls app={app} collectionId={collectionId} coversMaps>
           <header className="atlas-encounter-builder__bar">
-            <h2 id={titleId} className="atlas-encounter-builder__title">{t('encounter.builder.title')}</h2>
+            <h2 className="atlas-encounter-builder__title">
+              <span id={titleId}>{t('encounter.builder.title')}</span>
+              {!roster.loading && roster.total > 0 && (
+                <span className="atlas-encounter-builder__total">{t('encounter.builder.count', { count: roster.total })}</span>
+              )}
+            </h2>
             <HeaderSearch
               app={app}
               search={roster.search}
@@ -146,14 +151,18 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
           </header>
           <ActiveFilterBar groups={roster.query.chips} onReset={roster.query.reset} />
           {renderFeed()}
-          <EncounterTray
-            picks={picks}
-            metrics={metrics}
-            saving={saving}
-            onCountChange={changeCount}
-            onClear={() => setPicks([])}
-            onSave={() => { void save(); }}
-          />
+          <AnimatePresence>
+            {picks.length > 0 && (
+              <EncounterTray
+                picks={picks}
+                metrics={metrics}
+                saving={saving}
+                onCountChange={changeCount}
+                onClear={() => setPicks([])}
+                onSave={() => { void save(); }}
+              />
+            )}
+          </AnimatePresence>
         </PaneDiceRolls>
       </motion.div>
     </motion.div>

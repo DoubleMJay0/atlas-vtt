@@ -19,7 +19,6 @@ export const encounter = {
   'encounter.builder.fewer': 'One {name} fewer',
   'encounter.builder.more': 'One {name} more',
   'encounter.builder.countOf': '{name}: {count}',
-  'encounter.builder.empty': 'Add creatures from their statblocks to build an encounter.',
   'encounter.builder.noCreatures': 'No creature of this collection has a statblock yet. Link a statblock to a token to build encounters with it.',
   'encounter.builder.noMatches': 'No creature matches the search and filters.',
   'encounter.builder.clear': 'Clear',
