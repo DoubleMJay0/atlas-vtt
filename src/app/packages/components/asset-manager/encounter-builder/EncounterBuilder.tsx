@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { App } from 'obsidian';
 import type { AssetService } from '../../../../services/AssetService';
 import { saveEncounter } from '../../../../encounters/encounterSaveService';
@@ -144,16 +144,32 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
             />
             <CloseButton onClick={onClose} />
           </header>
-          <ActiveFilterBar groups={roster.query.chips} onReset={roster.query.reset} />
+          {/* Its height is kept whether filters are active or not, so applying one never moves the feed. */}
+          <div className="atlas-encounter-builder__status">
+            <div className="atlas-encounter-builder__status-row">
+              {!roster.loading && roster.total > 0 && (
+                <span className="atlas-encounter-builder__total">
+                  {roster.shown.length === roster.total
+                    ? t('encounter.builder.count', { count: roster.total })
+                    : t('encounter.builder.shown', { shown: roster.shown.length, count: roster.total })}
+                </span>
+              )}
+              <ActiveFilterBar groups={roster.query.chips} onReset={roster.query.reset} />
+            </div>
+          </div>
           {renderFeed()}
-          <EncounterTray
-            picks={picks}
-            metrics={metrics}
-            saving={saving}
-            onCountChange={changeCount}
-            onClear={() => setPicks([])}
-            onSave={() => { void save(); }}
-          />
+          <AnimatePresence>
+            {picks.length > 0 && (
+              <EncounterTray
+                picks={picks}
+                metrics={metrics}
+                saving={saving}
+                onCountChange={changeCount}
+                onClear={() => setPicks([])}
+                onSave={() => { void save(); }}
+              />
+            )}
+          </AnimatePresence>
         </PaneDiceRolls>
       </motion.div>
     </motion.div>

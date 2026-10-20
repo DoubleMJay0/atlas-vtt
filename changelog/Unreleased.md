@@ -1,4 +1,5 @@
 ## New
+- Search statblock text: type `text:` in the asset manager's search or the encounter builder's, such as `text:fire` or `text:"pack tactics"`, to find creatures whose statblock says it anywhere. `-text:` leaves them out.
 - Encounter builder: in the asset manager, + → Create Encounter shows every creature of the collection as its full statblock, side by side, with the Characters tab's search and filters above them. Dice in the statblocks roll as they do on the map. Add creatures and set how many of each, and the bar below shows how many there are, the span of their ratings and their hit points together. Save keeps it as an encounter of the collection.
 - Statblock templates: a Value, Metric, Table or Labels and values tile can roll its numbers. Switch on Roll as a bonus in its Options, and a click on a number, such as a trait's 2, rolls +2 with the game's own dice.
 - Statblocks: a number value can add to the next roll. Switch on Add to next roll in a value's Options, and the card shows a small switch after the number. Turn it on, and the next roll from that statblock adds the value under its own name, such as "d20 + 3 + 2 Proficiency", then the switch turns off. This works for a list of labels and values, so each Daggerheart Experience can have its own switch.
@@ -11,6 +12,7 @@
 ## Improved
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
+- Atlas' messages slide in at the top right with a light spring and lift away when they close, and the messages below them move up smoothly. They sit as far from the top as from the right edge, like the dice rolls.
 - Online play: busy tables send far fewer messages. Cursors, lasers and measurements go out ten times a second and still move smoothly, and a changed quest or world map reaches players without their whole book being sent again.
 - Random tables: rename a table or remove it from the list from its menu (⋯ or right-click) in the Random tables window, and undo a removal from the message that follows. A new name shows only in Atlas and leaves the note as it is; you can also set it in the collection settings. A table whose note was deleted can now be removed too.
 - Type sums into a token's HP: -10-5 takes 15, -9/2 takes half of 9 rounded down, and -9*2 takes 18 (#495, #396).
@@ -19,6 +21,8 @@
 
 ## Fixed
 
+- Right-click menus on the map stay inside the map's pane and scroll when they are long, instead of running past its edge or moving while you point at their options. Submenus of a map in its own window open in that window. A menu closes when the window or pane is resized. Contributed by aecorn.
+- The token art panel no longer flickers in a short window or while the window is resized. Contributed by aecorn.
 - The line that measures a dragged token's path is no longer darkened by dynamic lighting, and it now stops at the token's edge.
 - A player character dragged through the dark is shown exactly where it is drawn. Before, the lit circle around it trailed behind the token.
 - Dynamic lighting only gives the graphics card as much work as it keeps up with. On laptops with integrated graphics, placing or carrying a light or opening a scene with many lights could make the graphics driver reset, turning the map white until Obsidian was restarted. There, a scene's lights now appear over a few frames. The Balanced and Saver lighting qualities also make each light cheaper, with rougher soft shadow edges.

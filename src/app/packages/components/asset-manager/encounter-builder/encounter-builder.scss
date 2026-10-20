@@ -14,7 +14,7 @@
 .atlas-encounter-builder__window {
   // Anchors the dice rolls (`.atlas-sb-pane-rolls`), which hang from its top right.
   position: relative;
-  @include atlas-flex-col($spacing-m);
+  @include atlas-flex-col($spacing-s);
   width: 100%;
   height: 100%;
   // Four feeds at their widest (dm-screen/feedLayout.ts).
@@ -22,7 +22,7 @@
   outline: none;
 }
 
-// The bar and the tray are the floating surfaces; the space between them is the backdrop's.
+// The bar and the tray are the floating surfaces; the feed scrolls between and under them.
 .atlas-encounter-builder__bar,
 .atlas-encounter-tray {
   @include atlas-elevated-surface;
@@ -45,17 +45,70 @@
 
 .atlas-encounter-builder__title {
   flex: 1;
+  min-width: 0;
   margin: 0;
   padding-inline-start: $spacing-s;
+  color: var(--text-normal);
   font-size: $font-ui-medium;
   font-weight: var(--font-semibold);
 }
 
+// ── Status: how many creatures show, and the active filters ─────────────────
+// One chip row tall whether filters are active or not; chips that need more rows
+// wrap over the top of the feed instead of pushing it down.
+
+$chip-height: 24px;
+
+.atlas-encounter-builder__status {
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  height: $chip-height;
+}
+
+.atlas-encounter-builder__status-row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-s;
+  min-height: $chip-height;
+  padding-inline: $spacing-l;
+
+  .atlas-active-filters {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+  }
+
+  // Over the feed's cards the chips need a ground of their own.
+  .atlas-active-filters .atlas-active-filter.btn {
+    background: var(--background-primary);
+  }
+}
+
+.atlas-encounter-builder__total {
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+  font-variant-numeric: tabular-nums;
+  line-height: $chip-height;
+  white-space: nowrap;
+}
+
+// Room above the first row for the cards' notches, and below the last for the tray floating over it.
+$notch-height: 28px;
+$tray-room: 72px;
+
 .atlas-encounter-builder__feed {
   flex: 1;
   min-height: 0;
+  padding: calc(#{$notch-height} / 2) 0 $tray-room;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .atlas-encounter-builder__notice {
@@ -68,39 +121,94 @@
   text-align: center;
 }
 
-// ── A creature in the feed: its control above its statblock ──────────────────
+// ── A creature in the feed ───────────────────────────────────────────────────
+// Clicked like a card in a deck builder. Its notch rides on the middle of its top
+// edge, in the gap between feeds' cards: Add while the pointer is on the card,
+// the count once picked, with − and + while the pointer is on it.
 
 .atlas-encounter-card {
-  @include atlas-flex-col($spacing-xs);
+  position: relative;
+  cursor: pointer;
+
+  .atlas-statblock {
+    transition: border-color $transition-fast $transition-ease, box-shadow $transition-fast $transition-ease;
+  }
+
+  &:hover .atlas-statblock {
+    border-color: color-mix(in oklch, var(--interactive-accent) 35%, var(--background-modifier-border));
+  }
+
+  &[data-picked='true'] .atlas-statblock {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 1px var(--interactive-accent), 0 0 24px -6px color-mix(in oklch, var(--interactive-accent) 60%, transparent);
+  }
 }
 
-.atlas-encounter-card__actions {
+.atlas-encounter-card__notch {
+  position: absolute;
+  top: calc(-#{$notch-height} / 2);
+  left: 50%;
+  z-index: 1;
   display: flex;
-  justify-content: flex-end;
-}
-
-.atlas-encounter-card__add svg {
-  width: $icon-s;
-  height: $icon-s;
-}
-
-.atlas-encounter-card[data-picked='true'] .atlas-encounter-stepper {
+  height: $notch-height;
+  translate: -50% 0;
   @include atlas-elevated-surface;
+  border-radius: $radius-full;
+  cursor: default;
+  opacity: 0;
+  scale: 0.96;
+  transition: opacity $transition-fast $transition-ease, scale $transition-fast $transition-ease;
+}
+
+// Touch has no hover: the notch always shows there.
+.atlas-encounter-card:is(:hover, :focus-within, [data-picked='true']) .atlas-encounter-card__notch {
+  opacity: 1;
+  scale: 1;
+}
+
+@media (hover: none) {
+  .atlas-encounter-card .atlas-encounter-card__notch {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.atlas-encounter-card[data-picked='true'] .atlas-encounter-card__notch {
+  border-color: var(--interactive-accent);
+}
+
+.atlas-encounter-card__add.btn {
+  gap: $spacing-xs;
+  height: 100%;
+  padding: 0 $spacing-m 0 $spacing-s;
+  border-radius: $radius-full;
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    color: var(--text-normal);
+  }
 }
 
 // ── Count stepper ──────────────────────────────────────────────────────────
+// On a card it shows the count alone until the pointer is on the card.
 
 .atlas-encounter-stepper {
   display: inline-flex;
   align-items: center;
-  gap: $spacing-xs;
-  padding: $spacing-xs;
-  border-radius: $radius-full;
+  height: 100%;
+  padding: 2px;
 }
 
 .atlas-encounter-stepper__count {
-  min-width: 2ch;
-  font-size: $font-ui-small;
+  min-width: 3ch;
+  font-size: $font-ui-smaller;
+  font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -108,40 +216,63 @@
 .atlas-encounter-stepper__button.btn {
   width: 24px;
   height: 24px;
+  padding: 0;
   border-radius: $radius-full;
+  color: var(--text-muted);
 
   svg {
-    width: $icon-s;
-    height: $icon-s;
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    color: var(--text-normal);
+  }
+}
+
+.atlas-encounter-card .atlas-encounter-stepper__button.btn {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width $transition-fast $transition-ease, opacity $transition-fast $transition-ease;
+}
+
+.atlas-encounter-card:is(:hover, :focus-within) .atlas-encounter-stepper__button.btn {
+  width: 24px;
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .atlas-encounter-card .atlas-encounter-stepper__button.btn {
+    width: 24px;
+    opacity: 1;
   }
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────
+// Floats over the bottom of the feed once a creature is picked, as wide as the bar above it
+// whatever it holds: its picks scroll and its numbers keep their room.
 
 .atlas-encounter-tray {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
-.atlas-encounter-tray__empty {
-  flex: 1;
-  margin: 0;
-  padding-inline-start: $spacing-s;
-  color: var(--text-muted);
-  font-size: $font-ui-small;
 }
 
 .atlas-encounter-tray__picks {
   display: flex;
   flex: 1;
-  gap: $spacing-s;
+  gap: $spacing-xs;
   min-width: 0;
   margin: 0;
   padding: 0;
   overflow-x: auto;
   list-style: none;
+  scrollbar-width: none;
 }
 
 .atlas-encounter-tray__pick {
@@ -149,8 +280,10 @@
   align-items: center;
   flex-shrink: 0;
   gap: $spacing-xs;
-  padding: $spacing-xs;
-  border-radius: $radius-full;
+  height: 32px;
+  padding: 2px;
+  padding-inline-end: 0;
+  @include atlas-panel-inset-radius($spacing-s);
   background: var(--background-modifier-hover);
 }
 
@@ -160,7 +293,7 @@
 }
 
 .atlas-encounter-tray__name {
-  max-width: 14em;
+  max-width: 12em;
   overflow: hidden;
   font-size: $font-ui-small;
   text-overflow: ellipsis;
@@ -168,8 +301,10 @@
 }
 
 .atlas-encounter-tray__summary {
-  @include atlas-flex-row($spacing-s);
-  margin-inline-start: auto;
+  @include atlas-flex-row($spacing-m);
+  flex-shrink: 0;
+  padding-inline-start: $spacing-s;
+  border-inline-start: $border-width-s solid var(--background-modifier-border);
 }
 
 .atlas-encounter-tray__count,
@@ -185,10 +320,24 @@
   border-radius: $radius-s;
 }
 
+.atlas-encounter-tray__count {
+  min-width: 11ch;
+  text-align: end;
+}
+
 .atlas-encounter-tray__metric-label {
   color: var(--text-muted);
 }
 
+.atlas-encounter-tray__metric-value {
+  min-width: 4ch;
+}
+
 .atlas-encounter-tray__actions {
-  @include atlas-flex-row($spacing-s);
+  @include atlas-flex-row($spacing-xs);
+
+  // Its end control sits in the tray's corner, concentric with it.
+  .btn {
+    @include atlas-panel-inset-radius($spacing-s);
+  }
 }
