@@ -241,7 +241,9 @@ describe('placing spawned tokens by hand', () => {
     await shot('cycled');
     down(300, 300, true);
     drag(420, 330);
-    run(300);
+    run(20);
+    await shot('turning-start');
+    run(280);
     await shot('turning');
     up(420, 330);
     run(100);
