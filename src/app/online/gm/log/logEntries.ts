@@ -92,7 +92,8 @@ export function viewOf(entry: GmLogEntry, viewer: string): LogEntry | null {
   const shared = sharedEntry(entry);
   if (shared.kind === 'rest' && !seesRestChanges(entry, viewer)) {
     const { changes, skipped: _skipped, ...title } = shared;
-    const theirs = changesFor(entry, changes, viewer);
+    // Their character's changes without the rolls, which carry the resting character's numbers
+    const theirs = changesFor(entry, changes, viewer).map(({ roll: _roll, ...change }) => change);
     return theirs.length > 0 ? { ...title, changes: theirs } : title;
   }
   if (seesWhole(entry, viewer)) return shared;

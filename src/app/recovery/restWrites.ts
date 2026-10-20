@@ -8,6 +8,7 @@
 
 import type { App } from 'obsidian';
 import { PartySync } from '../campaigns/partyValues/PartySync';
+import type { ResourceHolder } from '../resources/resourceTypes';
 import { resourceUpdate } from '../resources/resourceValues';
 import { runHistoryTransaction } from '../stores/history';
 import type { ViewAtlasStore } from '../storeFactory';
@@ -40,7 +41,8 @@ export function noteCounterWriter(app: App, notePath: string): CounterWriter {
 }
 
 interface StoreWrites {
-  resources: Array<{ id: string; changes: TokenUpdates }>;
+  /** Each token's resources as the rest leaves them, every changed key of it in one record. */
+  resources: Map<string, ResourceHolder>;
   conditions: Array<{ tokenIds: string[]; id: string; value: number }>;
 }
 
@@ -55,7 +57,7 @@ function writeScene(app: App, parts: readonly CharacterWrite[]): void {
   const byStore = new Map<ViewAtlasStore, StoreWrites>();
   const writesOf = (store: ViewAtlasStore): StoreWrites => {
     let writes = byStore.get(store);
-    if (!writes) byStore.set(store, writes = { resources: [], conditions: [] });
+    if (!writes) byStore.set(store, writes = { resources: new Map(), conditions: [] });
     return writes;
   };
   for (const { rest, changes } of parts) {
@@ -66,7 +68,11 @@ function writeScene(app: App, parts: readonly CharacterWrite[]): void {
         sync?.setValue(place.campaignId, rest.asset.id, key, { ...sync.value(place.campaignId, rest.asset.id, key), ...value });
       } else if (place?.kind === 'token') {
         const token = place.store.getState().objects.tokens[place.tokenId];
-        if (token) writesOf(place.store).resources.push({ id: place.tokenId, changes: resourceUpdate(token, key, value, false) });
+        if (!token) continue;
+        // Several resources of one token: each update starts from what the ones before it left
+        const writes = writesOf(place.store);
+        const held = writes.resources.get(place.tokenId) ?? token;
+        writes.resources.set(place.tokenId, { ...held, ...resourceUpdate(held, key, value, false) });
       }
     }
     for (const [id, value] of changes.conditions) {
@@ -76,7 +82,8 @@ function writeScene(app: App, parts: readonly CharacterWrite[]): void {
   for (const [store, writes] of byStore) {
     runHistoryTransaction(store, () => {
       const state = store.getState();
-      if (writes.resources.length > 0) state.updateTokens(writes.resources);
+      const updates = [...writes.resources].map(([id, held]): { id: string; changes: TokenUpdates } => ({ id, changes: { resources: held.resources ?? {} } }));
+      if (updates.length > 0) state.updateTokens(updates);
       for (const { tokenIds, id, value } of writes.conditions) state.setTokensConditionValue(tokenIds, id, value > 0 ? value : null);
     });
   }

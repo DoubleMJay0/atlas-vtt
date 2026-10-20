@@ -71,8 +71,15 @@ function bookRecovery(offers: readonly RestOffer[]): BookRecoveryButton[] {
   return offers.flatMap((offer) => bookButton(offer) ?? []).filter((button) => !ids.has(button.id) && ids.add(button.id)).slice(0, MAX_RECOVERY_BUTTONS);
 }
 
-/** Whether a statblock still reads as the page reads it and fits its message. */
-const fits = (statblock: BookStatblock): boolean => parseBookStatblock(statblock) !== undefined && jsonBytes(statblock) <= MAX_STATBLOCK_BYTES;
+/**
+ * Whether a statblock still reads as the page reads it, its rests whole, and fits its message: a
+ * sheet over its budget reads without its rests, which must not be sent as if they were there.
+ */
+function fits(statblock: BookStatblock): boolean {
+  const read = parseBookStatblock(statblock);
+  return read !== undefined && read !== null && read.recovery?.length === statblock.recovery?.length && (read.allies?.length ?? 0) === (statblock.allies?.length ?? 0)
+    && jsonBytes(statblock) <= MAX_STATBLOCK_BYTES;
+}
 
 /**
  * The recovery buttons of the characters players play, on the statblock each player is sent of their
@@ -105,8 +112,12 @@ export class CharacterRests {
     const offers = this.ports.offers(character.statblockPath, character.key);
     const recovery = offers === null ? [] : bookRecovery(offers);
     const shown = recovery.some(forOthers) ? others : [];
-    const statblock = recovery.length === 0 ? null : { ...drawn.statblock, characterId: this.idOf(character.key), recovery, ...(shown.length > 0 && { allies: shown }) };
-    const decorated = statblock !== null && fits(statblock) ? { ...drawn, statblock } : drawn;
+    const base = drawn.statblock;
+    const withRest = (allyList: readonly BookRestAlly[]): BookStatblock => ({ ...base, characterId: this.idOf(character.key), recovery, ...(allyList.length > 0 && { allies: allyList }) });
+    // Without its allies a sheet may still fit; without its rests it is sent as it was drawn, and the GM is told
+    const statblock = recovery.length === 0 ? null : [withRest(shown), withRest([])].find(fits) ?? null;
+    if (recovery.length > 0 && statblock === null) console.warn(`[Atlas] ${character.sheet.name}'s rests do not fit their player's sheet and are left out.`);
+    const decorated = statblock !== null ? { ...drawn, statblock } : drawn;
     this.decorated.set(character.key, { drawn, allies: alliesKey, with: decorated });
     return decorated;
   }

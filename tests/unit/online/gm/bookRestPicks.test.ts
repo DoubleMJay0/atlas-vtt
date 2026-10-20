@@ -207,7 +207,10 @@ describe('rests whose steps a player picks actions in, for themselves or another
     const mine = { label: 'Stress', from: 3, to: 2 };
     const hers = { label: 'Hit Points', from: 2, to: 6, roll: '1d4 = 4', character: 'Mira' };
     expect(rested(ANA)).toMatchObject({ character: 'Brannoch', button: 'Short rest', picks: ['Tend to Wounds', 'Clear Stress'], changes: [mine, hers] });
-    expect(rested(BEN)).toMatchObject({ picks: ['Tend to Wounds', 'Clear Stress'], changes: [hers] });
+    // The ally's player sees their character's change, without the roll that carries the resting character's numbers
+    const { roll: _roll, ...hersWithoutRoll } = hers;
+    expect(rested(BEN)).toMatchObject({ picks: ['Tend to Wounds', 'Clear Stress'], changes: [hersWithoutRoll] });
+    expect((rested(BEN)?.changes as Array<Record<string, unknown>>)[0]).not.toHaveProperty('roll');
     expect(rested(CAL)).toMatchObject({ picks: ['Tend to Wounds', 'Clear Stress'] });
     expect(rested(CAL)).not.toHaveProperty('changes');
     expect(JSON.stringify(delivered(socket))).not.toContain('changePlayers');

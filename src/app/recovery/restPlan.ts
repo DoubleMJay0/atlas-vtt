@@ -143,7 +143,8 @@ export function restPlan(button: RecoveryButton, character: RestCharacter, picks
   for (const unit of ruleUnits(button, character, picks, allies)) {
     const skip = (label: string, reason: RestSkip): void => { skipped.push({ index: unit.index, ref: unit.ref, rule: unit.rule, label, reason }); };
     if (unit.character === null) {
-      skip(unit.forId ?? '', { kind: 'unknown-ally', id: unit.forId ?? '' });
+      // No label: the id is Atlas's own, never something to show anyone
+      skip('', { kind: 'unknown-ally', id: unit.forId ?? '' });
       continue;
     }
     const target = restMetric(unit.rule.target, unit.character);

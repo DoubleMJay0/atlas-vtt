@@ -34,7 +34,7 @@ function setUp() {
     buttons: [],
     character: restCharacter(),
     holds: [{ store, tokenIds: ['a', 'b'] }],
-    resourcePlace: (key) => (key === 'hp' ? { kind: 'token', store, tokenId: 'a' } : key === 'stress' ? { kind: 'party', campaignId: 'camp' } : null),
+    resourcePlace: (key) => (key === 'hp' || key === 'hitDice' ? { kind: 'token', store, tokenId: 'a' } : key === 'stress' ? { kind: 'party', campaignId: 'camp' } : null),
   };
   return { app, store, rest, record };
 }
@@ -54,6 +54,12 @@ describe('writeRest', () => {
     expect(a?.conditionValues).toEqual({ exhaustion: 1 });
     expect(b?.conditionValues).toEqual({ exhaustion: 1 });
     expect(getHistoryStore(store)?.getState().pastStates.length ?? 0).toBe(before + 1);
+  });
+
+  it('writes every resource it changed of one token, not only the last', async () => {
+    const { app, store, rest } = setUp();
+    await writeRest(app, rest, outcome({ resources: new Map([['hp', { current: 20, max: 20 }], ['hitDice', { current: 3, max: 4 }]]) }), async () => null);
+    expect(store.getState().objects.tokens.a?.resources).toEqual({ hp: { current: 20, max: 20 }, hitDice: { current: 3, max: 4 } });
   });
 
   it('takes a condition at 0 off every token', async () => {
