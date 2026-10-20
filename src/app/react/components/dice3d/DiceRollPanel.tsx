@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../../../utils/cn';
-import { t } from '../../../i18n';
 import { CloseButton } from '../../../packages/components/primitives/CloseButton';
 import { chainDepth, layoutDice, restingFrame, type DiceScene } from '../../../dice3d/diceScene';
 import type { ThrowStyle } from '../../../dice3d/diceDisplay';

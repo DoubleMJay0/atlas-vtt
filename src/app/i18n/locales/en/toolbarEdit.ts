@@ -19,8 +19,6 @@ export const toolbarEdit = {
   'toolbarEdit.audio.description': 'Place sounds on the map that grow louder as tokens come near.',
   'toolbarEdit.dice.label': 'Dice',
   'toolbarEdit.dice.description': 'Roll any mix of dice and show the result to everyone at the table.',
-  'toolbarEdit.loot.label': 'Loot roller',
-  'toolbarEdit.loot.description': 'Roll random loot from the item notes in your collection.',
   'toolbarEdit.assets.label': 'Asset manager',
   'toolbarEdit.assets.description': 'Find and place your maps, tokens, scenes and encounters.',
   'toolbarEdit.palette.label': 'Command palette',

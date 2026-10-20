@@ -7,7 +7,6 @@ import { useDicePreviews } from '../../hooks/useDicePreviews';
 import { useShareRolls } from '../../hooks/useShareRolls';
 import { DICE_DISPLAY_HINTS, DICE_DISPLAY_OPTIONS } from '../../../dice3d/diceDisplay';
 import { DICE_FONT_OPTIONS } from '../../../dice3d/diceLook';
-import { t } from '../../../i18n';
 import { SettingsService } from '../../../services/SettingsService';
 import { DiceColourStrip } from './DiceColourStrip';
 import { SettingRow, SettingToggleRow } from './SettingRows';

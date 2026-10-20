@@ -17,6 +17,7 @@ import { creator } from './creator';
 import { csm } from './csm';
 import { dashboard } from './dashboard';
 import { dice } from './dice';
+import { diceLab } from './diceLab';
 import { diceRoll } from './diceRoll';
 import { diceSettings } from './diceSettings';
 import { exportDialog } from './exportDialog';
@@ -105,6 +106,7 @@ export const ru: Translation = {
   ...csm,
   ...dashboard,
   ...dice,
+  ...diceLab,
   ...diceRoll,
   ...diceSettings,
   ...exportDialog,

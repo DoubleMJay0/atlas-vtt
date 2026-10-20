@@ -27,16 +27,11 @@
 - Type sums into a token's HP: -10-5 takes 15, -9/2 takes half of 9 rounded down, and -9*2 takes 18 (#495, #396).
 - Initiative modifiers are found more easily. The modifier field matches statblock fields in any capitalisation and by their name in the template, reads numbers written as +3, +3 (13), 16 (+3) or Perception +12, and reads statblocks from Fantasy Statblocks too: its own initiative modifier, a Pathfinder import's Perception and the six 5e scores (type dex). The field's suggestions show what a statblock holds, and the settings say how many statblocks the field reads a modifier from.
 - When a roll finds no modifier for some combatants, a notice says how many, which field was looked for and where to choose it.
-
 - The initiative tracker's buttons, card menu and sides, and the collection's initiative settings are now available in Russian.
-
-- The collection settings' Resources tab and the resource switches of a scene are now available in Russian.
-
+- The collection settings' Resources tab is now available in Russian.
 - Senses are now available in Russian: the sense editors in Edit Token and the collection settings' Vision tab, and the conditions' effect on sight.
-
-- Dice settings, the dice tray and the roll panel are now available in Russian.
-
-- The toolbar editor, links to scenes and encounters in notes, and the dice formula messages are now available in Russian.
+- The dice settings, the dice tray, the roll panel and part of the dice lab are now available in Russian.
+- The toolbar editor and links to scenes and encounters in notes are now available in Russian.
 
 ## Fixed
 
