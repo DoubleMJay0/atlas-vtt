@@ -248,7 +248,7 @@ describe('placing spawned tokens by hand', () => {
     up(420, 330);
     run(100);
     const [first] = Object.values(store.getState().objects.tokens);
-    expect(first).toMatchObject({ imagePath: 'tokens/t1.png', x: 315, y: 315, rotation: 105 });
+    expect(first).toMatchObject({ imagePath: 'tokens/t1.png', x: 315, y: 315, rotation: 285 });
     placer.cancel();
     expect(await placing).toHaveLength(1);
   });

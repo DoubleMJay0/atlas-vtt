@@ -137,11 +137,11 @@ export function queueCountOffset(headRadius: number): Point {
 const FACING_STEP = 15;
 
 /**
- * The way a token at `from` faces when it is turned towards `to`: degrees from up, clockwise, as a
- * token's `rotation` counts them, in steps of 15° unless `free`.
+ * The `rotation` of a token at `from` turned to look towards `to` (it looks towards its art's
+ * bottom, `tokenFacing`): degrees from up, clockwise, in steps of 15° unless `free`.
  */
 export function facingTowards(from: Point, to: Point, free: boolean): number {
-  const degrees = (Math.atan2(to.x - from.x, from.y - to.y) * 180) / Math.PI;
+  const degrees = (Math.atan2(to.x - from.x, from.y - to.y) * 180) / Math.PI - 180;
   const turned = free ? degrees : Math.round(degrees / FACING_STEP) * FACING_STEP;
   return ((turned % 360) + 360) % 360;
 }

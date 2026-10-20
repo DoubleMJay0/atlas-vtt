@@ -54,12 +54,13 @@ describe('laying held tokens out', () => {
 });
 
 describe('turning a token', () => {
-  it('faces the pointer in 15° steps from up, clockwise, or freely with Alt', () => {
-    expect(facingTowards({ x: 0, y: 0 }, { x: 0, y: -10 }, false)).toBe(0);
-    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 0 }, false)).toBe(90);
-    expect(facingTowards({ x: 0, y: 0 }, { x: -10, y: 0 }, false)).toBe(270);
-    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 1 }, false)).toBe(90);
-    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 1 }, true)).toBeCloseTo(95.71, 1);
+  it('turns the art\'s bottom to the pointer in 15° steps from up, clockwise, or freely with Alt', () => {
+    expect(facingTowards({ x: 0, y: 0 }, { x: 0, y: 10 }, false)).toBe(0);
+    expect(facingTowards({ x: 0, y: 0 }, { x: 0, y: -10 }, false)).toBe(180);
+    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 0 }, false)).toBe(270);
+    expect(facingTowards({ x: 0, y: 0 }, { x: -10, y: 0 }, false)).toBe(90);
+    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 1 }, false)).toBe(270);
+    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 1 }, true)).toBeCloseTo(275.71, 1);
   });
 });
 
@@ -176,10 +177,10 @@ describe('placing held tokens', () => {
     session.turn({ x: 103, y: 102 }, false);
     expect(ghosts[0]!.facing).toBe(0);
     session.turn({ x: 300, y: 105 }, false);
-    expect(ghosts[0]!.facing).toBe(90);
+    expect(ghosts[0]!.facing).toBe(270);
     session.moveTo({ x: 400, y: 400 }, true);
     session.release();
-    expect(committed[0]).toEqual([expect.objectContaining({ imagePath: 't0.png', x: 105, y: 105, rotation: 90 })]);
+    expect(committed[0]).toEqual([expect.objectContaining({ imagePath: 't0.png', x: 105, y: 105, rotation: 270 })]);
     expect(ghosts[1]!.facing).toBe(0);
   });
 
