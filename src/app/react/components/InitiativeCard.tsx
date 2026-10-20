@@ -1,5 +1,5 @@
 import { useMapResources } from '../../resources/useMapResources';
-import { isDefeated } from '../../resources/resourceValues';
+import { combatantDefeated } from '../../initiative/defeated';
 import { resourceColor } from '../../resources/resourceColors';
 import { visibleResources } from '../../resources/visibleResources';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -64,7 +64,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   const definitions = useMapResources();
   const token = tokens[entry.tokenId];
   const bars = token ? visibleResources(token, definitions, 'dm').filter(({ definition }) => definition.defeatedWhenSpent) : [];
-  const defeated = token !== undefined && isDefeated(token, definitions);
+  const defeated = combatantDefeated(token, definitions);
   // A hidden token's entry is left out of the players' list (`PlayerInitiativePanel`)
   const hiddenFromPlayers = token?.isHidden === true;
 
@@ -205,6 +205,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
     defeated && 'atlas-initiative-card--defeated',
     hiddenFromPlayers && 'atlas-initiative-card--hidden',
     entry.sitsOut && 'atlas-initiative-card--sitting-out',
+    entry.delayed && 'atlas-initiative-card--delayed',
     isHoveredForPreview && 'atlas-initiative-card--preview-hover',
     dropPosition === 'above' && 'atlas-initiative-card--drop-above',
     dropPosition === 'below' && 'atlas-initiative-card--drop-below',

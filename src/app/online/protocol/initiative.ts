@@ -15,6 +15,10 @@ export interface SharedCombatant {
   /** The combatant has the turn (in turn order, while a fight runs). */
   readonly turn: boolean;
   readonly sitsOut: boolean;
+  /** Delayed its turn: waits outside the order until it acts. Absent from older GMs. */
+  readonly delayed?: true;
+  /** Defeated, as the GM's card shows it: drawn dimmed and marked. Absent from older GMs. */
+  readonly defeated?: true;
   /** The portrait's artwork, asked for by hash like the map. */
   readonly art: AssetRef | null;
   /** The ring around the portrait (`#rrggbb`, or null untinted); absent for an unframed token. */
@@ -49,6 +53,9 @@ function parseCombatant(value: unknown): SharedCombatant | null {
     initiative: value.initiative, name, turn: value.turn, sitsOut: value.sitsOut, art, side: value.side,
     ring: ring === null ? null : { colour: ring.colour as string | null },
     hp: hp === null ? null : { current: hp.current as number, max: hp.max as number },
+    // Optional flags: anything but `true` reads as unset, so a page never fails on them
+    ...(value.delayed === true ? { delayed: true as const } : {}),
+    ...(value.defeated === true ? { defeated: true as const } : {}),
   };
 }
 

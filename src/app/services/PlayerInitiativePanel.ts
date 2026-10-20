@@ -32,11 +32,13 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
   protected select({ initiative, initiativeTrackerOpen, objects, mapPath }: ViewAtlasState): InitiativeScene {
     const tokens = objects?.tokens;
     const entries = initiative?.entries ?? [];
+    // Who is defeated follows the map's resources, as on the GM's cards
+    const definitions = entries.length > 0 ? mapResources(rulesLookup(this.app), mapPath) : [];
     const visibleTokenIds = entries
       .filter((entry) => listedForPlayers(tokens?.[entry.tokenId]))
       .map((entry) => entry.tokenId)
       .join(TOKEN_ID_SEPARATOR);
-    const entryTokens = JSON.stringify(entries.map((entry): EntryToken => entryTokenOf(tokens?.[entry.tokenId])));
+    const entryTokens = JSON.stringify(entries.map((entry): EntryToken => entryTokenOf(tokens?.[entry.tokenId], definitions)));
     return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, tokens: entryTokens };
   }
 
@@ -49,7 +51,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
     const hpVisible = mapResources(rulesLookup(this.app), scene.mapPath).some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
     const list = playerInitiativeList(
       initiative,
-      (entry, index) => (visibleTokenIds.has(entry.tokenId) ? tokenOf[index] ?? { hp: null, showRing: true, side: 'opponents' } : null),
+      (entry, index) => (visibleTokenIds.has(entry.tokenId) ? tokenOf[index] ?? { hp: null, showRing: true, side: 'opponents', defeated: false } : null),
       mapInitiativeRules(this.app, scene.mapPath),
       hpVisible,
     );

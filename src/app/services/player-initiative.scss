@@ -81,6 +81,41 @@
     &--sitting-out {
       opacity: 0.45;
     }
+
+    // Delayed its turn: waits below the order, without the card's fill until it acts
+    &--delayed {
+      background: transparent;
+    }
+
+    // Defeated, as the GM's card shows it: dimmed, with the skull over the portrait
+    &--defeated {
+      position: relative;
+      opacity: 0.45;
+      filter: grayscale(70%);
+    }
+  }
+
+  &__defeated {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+
+    svg {
+      width: $icon-l;
+      height: $icon-l;
+    }
+
+    // Over the portrait, which fills the card's width inside its padding
+    &--over {
+      position: absolute;
+      top: $spacing-s;
+      left: $spacing-s;
+      right: $spacing-s;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.6);
+    }
   }
 
   // A token portrait (`createTokenPortrait`): square, with the token's ring
