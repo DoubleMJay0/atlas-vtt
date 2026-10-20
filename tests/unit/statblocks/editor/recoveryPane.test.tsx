@@ -47,7 +47,7 @@ vi.mock('../../../../src/app/recovery/takeRest', () => ({ takeRest }));
 vi.mock('../../../../src/app/recovery/characterRest', async () => {
   const { character } = await import('../../recovery/restFixtures');
   const resting = character({ resources: { hp: { current: 3, max: 20 }, hitDice: { current: 2, max: 4 } }, note: { con: 1 } });
-  return { characterRestOf: () => ({ character: resting }) };
+  return { characterRestOf: () => ({ character: resting, holds: [] }) };
 });
 vi.mock('../../../../src/app/ui/notice', () => ({ showNotice }));
 

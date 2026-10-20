@@ -3,7 +3,9 @@
  * statblocks of its note's template, its collection's resources and conditions, and where each of
  * its values is held now. A resource is read from the character's token on an open map (one on
  * screen first), else from the values the played campaign keeps of it; a condition from its token
- * on an open map; counters and `@field` numbers from the note.
+ * on an open map; counters and `@field` numbers from the note. The template's tracked numbers are
+ * resources too (`trackedResources`), whose maximum is always the note's and which start full or
+ * empty where nothing holds them yet.
  */
 
 import type { App } from 'obsidian';
@@ -13,6 +15,7 @@ import { libraryTokenOf } from '../characters/playerCharacters';
 import { playerCharacterOfNote } from '../characters/noteCharacter';
 import { collectionResources } from '../resources/collectionResources';
 import { resolveField } from '../resources/resourceFields';
+import { trackedResources } from '../resources/trackedResources';
 import type { ResourceValue } from '../resources/resourceTypes';
 import { AssetService, type TokenAsset } from '../services/AssetService';
 import { openMapViews } from '../services/collectionScenes';
@@ -25,6 +28,7 @@ import { meaningsOf, withFormerKeysAliased } from '../statblocks/resolve/fieldMe
 import { libraryTemplates } from '../statblocks/resolve/readStatblock';
 import { resolveNative } from '../statblocks/resolve/resolveStatblock';
 import { readField, type FieldRecord } from '../statblocks/values/fieldValues';
+import { trackedMax, trackedValue } from '../statblocks/values/trackedNumbers';
 import { conditionValue } from '../utils/conditionValues';
 import { collectionRecovery } from './collectionRecovery';
 import type { RecoveryButton } from './recoveryTypes';
@@ -102,32 +106,50 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
   const meanings = meaningsOf(note.template.fields);
   const fields = new Map(note.template.fields.map((field) => [field.key, field]));
 
+  const collection = collectionResources(settings);
+  const tracked = new Map(trackedResources(note.template, collection).map((each) => [each.definition.key, each]));
+  const read = (key: string): ReturnType<typeof readField>['value'] => {
+    const field = fields.get(key);
+    return field ? readField(note.record, field).value : undefined;
+  };
+
   const partyValue = (key: string): ResourceValue | undefined => {
     const party = sync && campaignId !== null ? sync.value(campaignId, asset.id, key) : undefined;
     return party && { current: party.current, max: party.max };
   };
 
+  const heldValue = (key: string): ResourceValue | undefined => tokenHolding(holds, key)?.value ?? partyValue(key);
+
   const resourcePlace = (key: string): ResourcePlace | null => {
     const token = tokenHolding(holds, key);
     if (token) return { kind: 'token', store: token.store, tokenId: token.tokenId };
-    return campaignId !== null && partyValue(key) ? { kind: 'party', campaignId } : null;
+    if (campaignId !== null && partyValue(key)) return { kind: 'party', campaignId };
+    if (!tracked.has(key)) return null;
+    // A tracked number nothing holds yet goes where the character's resources are kept
+    const first = holds[0];
+    if (first) return { kind: 'token', store: first.store, tokenId: first.tokenIds[0]! };
+    return campaignId !== null && sync ? { kind: 'party', campaignId } : null;
+  };
+
+  const resourceValue = (key: string): ResourceValue | undefined => {
+    const number = tracked.get(key)?.tracked;
+    if (!number) return heldValue(key);
+    const max = trackedMax(number, read);
+    return max === null ? undefined : trackedValue(number, max, heldValue(key));
   };
 
   const character: RestCharacter = {
-    resources: collectionResources(settings),
+    resources: [...collection, ...[...tracked.values()].map((each) => each.definition)],
     conditions: settings.conditions ?? [],
     fields,
-    resourceValue: (key) => tokenHolding(holds, key)?.value ?? partyValue(key),
+    resourceValue,
     conditionValue: (id) => {
       const first = holds[0];
       const token = first && first.store.getState().objects.tokens[first.tokenIds[0]!];
       if (!token) return null;
       return (token.conditions ?? []).includes(id) ? conditionValue(token, id) : 0;
     },
-    fieldValue: (key) => {
-      const field = fields.get(key);
-      return field ? readField(note.record, field).value : undefined;
-    },
+    fieldValue: read,
     lookup: (path) => resolveField(aliased, path, meanings),
   };
   return { asset, ...note, buttons, character, holds, resourcePlace };

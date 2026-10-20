@@ -6,10 +6,10 @@
 
 import { isReservedKey } from '../model/reservedKeys';
 import {
-  FIELD_MEANINGS, FIELD_TYPES, TABLE_ALIGNS, type CounterPreset, type EntryShape, type TableAlign, type TableCell,
+  FIELD_MEANINGS, FIELD_TYPES, TABLE_ALIGNS, type CounterPreset, type EntryShape, type FieldTracking, type TableAlign, type TableCell,
   type TemplateField,
 } from '../model/templateTypes';
-import { COUNTER_PRESET_KEYS, ENTRY_EXTRA_KEYS, ENTRY_SHAPE_KEYS, FIELD_KEYS } from './formatKeys';
+import { COUNTER_PRESET_KEYS, ENTRY_EXTRA_KEYS, ENTRY_SHAPE_KEYS, FIELD_KEYS, FIELD_TRACKING_KEYS } from './formatKeys';
 import { describeValue, isRecord, own } from './jsonValues';
 import { ObjectReader } from './objectReader';
 import { asBoolean, asKey, asNonNegativeInteger, asOneOf, asString, choices } from './valueReads';
@@ -70,6 +70,17 @@ export function parseField(raw: unknown, index: number, ctx: FieldContext): Temp
     ...r.opt('entry', (value) => readEntryShape(value, r.where, ctx.problems), 'an object'),
     ...r.optList('counterRows', (item, at) => readCounterPreset(item, at, r.where, ctx.problems), 'rows with a name'),
     ...r.opt('prompt', asString, TEXT),
+    ...r.opt('tracks', (value) => readTracking(value, r.where, ctx.problems), 'an object'),
+  });
+}
+
+/** How a number is tracked; a direction this version does not know reads as counting down. */
+function readTracking(raw: unknown, where: string, problems: string[]): FieldTracking | undefined {
+  if (!isRecord(raw)) return undefined;
+  const r = new ObjectReader(raw, `${where} › tracks`, problems, FIELD_TRACKING_KEYS);
+  return r.finish({
+    counts: r.withDefault('counts', asOneOf(['down', 'up'] as const), 'down', 'down or up'),
+    ...r.opt('max', asKey, 'a field key'),
   });
 }
 

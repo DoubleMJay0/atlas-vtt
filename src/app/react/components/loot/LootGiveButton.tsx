@@ -38,7 +38,6 @@ function giveMenuEntries(recipients: readonly LootRecipient[], draw: LootDraw, c
   const resetCount = (): void => { count.value = 1; };
   return [
     { type: 'custom', render: () => <GiveQuantity count={count} /> },
-    MENU_SEPARATOR,
     {
       type: 'item',
       label: t('loot.give.all'),

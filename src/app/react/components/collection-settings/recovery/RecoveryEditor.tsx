@@ -58,7 +58,7 @@ export function RecoveryEditor({ template, name, buttons, onButtonsChange, resou
   const editing = useRuleEditing(button, (next) => onButtonsChange(buttons.map((each) => (each.id === next.id ? next : each))));
 
   const targets = useMemo(() => new Map<string, RecoveryTarget>([
-    ...metrics.metrics.map((metric): [string, RecoveryTarget] => [metric.blockId, metric.target]),
+    ...metrics.metrics.map((metric): [string, RecoveryTarget] => [metric.spotId, metric.target]),
     ...chips.map((chip): [string, RecoveryTarget] => [chipSpotId(chip), chip.target]),
   ]), [metrics, chips]);
   const [activeSpot, setActive] = useState<string | null>(null);

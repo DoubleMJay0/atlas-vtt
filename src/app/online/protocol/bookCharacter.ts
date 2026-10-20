@@ -4,8 +4,8 @@ import { isRecord } from './shape.ts';
 import { isPlainKey } from './sheetValues.ts';
 import { MAX_TOKEN_VALUE } from './tokenUI.ts';
 
-/** What a sheet holds at most: as many resources as a token shows. */
-export const MAX_SHEET_RESOURCES = 6;
+/** What a sheet holds at most: the six resources a token shows, and the numbers its statblock tracks. */
+export const MAX_SHEET_RESOURCES = 32;
 /** The longest key a sheet names a resource by. */
 export const MAX_RESOURCE_KEY = 64;
 

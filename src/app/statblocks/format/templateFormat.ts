@@ -14,6 +14,7 @@ import {
   DERIVED_FROM_KEYS,
   ENTRY_EXTRA_KEYS,
   ENTRY_SHAPE_KEYS,
+  FIELD_TRACKING_KEYS,
   FIELD_KEYS,
   HEADER_KEYS,
   HEADER_TRACK_KEYS,
@@ -73,6 +74,7 @@ const writeEntryShape = objectWriter(ENTRY_SHAPE_KEYS, new Map([['extras', listW
 const writeField = objectWriter(FIELD_KEYS, new Map([
   ['entry', writeEntryShape],
   ['counterRows', listWriter(objectWriter(COUNTER_PRESET_KEYS))],
+  ['tracks', objectWriter(FIELD_TRACKING_KEYS)],
 ]));
 
 /** A record written with its keys in order, so the same settings always write the same file. */

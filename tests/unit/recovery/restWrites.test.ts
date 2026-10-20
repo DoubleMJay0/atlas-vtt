@@ -9,8 +9,8 @@ import type { TokenAsset } from '../../../src/app/services/AssetService';
 import { createInMemoryApp } from '../../mocks/inMemoryVault';
 import { FIELDS, character as restCharacter, row } from './restFixtures';
 
-const writeCharacterValue = vi.hoisted(() => vi.fn(() => 7));
-vi.mock('../../../src/app/online/gm/book/characterValues', () => ({ writeCharacterValue }));
+const party = vi.hoisted(() => ({ value: vi.fn(() => ({ current: 4, max: 6, maxByHand: true })), setValue: vi.fn(() => true) }));
+vi.mock('../../../src/app/campaigns/partyValues/PartySync', () => ({ PartySync: { forApp: () => party } }));
 
 const placed = (id: string, extra: Partial<Character> = {}): Character => ({ id, kind: 'character', name: 'Mira', imagePath: 'mira.png', x: 0, y: 0, ...extra });
 const ASSET = { id: 'mira', name: 'Mira', imagePath: 'mira.png', collection: 'c' } as TokenAsset;
@@ -65,7 +65,7 @@ describe('writeRest', () => {
   it('writes a resource no token holds into the played campaign\'s values', async () => {
     const { app, rest } = setUp();
     await writeRest(app, rest, outcome({ resources: new Map([['stress', { current: 0, max: 6 }]]) }), async () => null);
-    expect(writeCharacterValue).toHaveBeenCalledWith(app, { kind: 'character', from: '', placed: { assetId: 'mira', imagePath: 'mira.png' }, key: 'stress', current: 0 });
+    expect(party.setValue).toHaveBeenCalledWith('camp', 'mira', 'stress', { current: 0, max: 6, maxByHand: true });
   });
 
   it('writes counters as one patch per field, based on what the rest read', async () => {
