@@ -31,4 +31,13 @@ describe('the Atlas settings an online table follows', () => {
     expect(atlasPlayerSettings(app)).toMatchObject({ turnBanner: false, movesOnTurn: true });
     expect(atlasPlayerSettings({} as App)).toMatchObject({ turnBanner: true, movesOnTurn: false });
   });
+
+  it('reads the edge the GM docked the initiative lists at, and the right one when it cannot', () => {
+    const settingsService = new SettingsService({ loadLocalStorage: () => null, saveLocalStorage: () => undefined } as never);
+    const app = { plugins: { plugins: { 'atlas-vtt': { settingsService } } } } as unknown as App;
+    expect(atlasPlayerSettings(app).initiativeDock).toBe('right');
+    settingsService.setInitiativeLayout({ dock: 'left' });
+    expect(atlasPlayerSettings(app).initiativeDock).toBe('left');
+    expect(atlasPlayerSettings({} as App).initiativeDock).toBe('right');
+  });
 });
