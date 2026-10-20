@@ -6,6 +6,7 @@ import { useSystemPresets } from '../../../react/hooks/useSystemPresets';
 import { collectionRecovery } from '../../../recovery/collectionRecovery';
 import type { RecoveryButton } from '../../../recovery/recoveryTypes';
 import { AssetService, type TokenAsset } from '../../../services/AssetService';
+import { SettingsService } from '../../../services/SettingsService';
 import type { StatblockTemplate, TemplateId } from '../../model/templateTypes';
 
 /** The recovery buttons the pane offers its note's player character. */
@@ -34,7 +35,8 @@ export function usePaneRecoveryContext(): PaneRecovery | null {
  * collection's settings are saved.
  */
 export function usePaneRecovery(app: App, notePath: string, template: StatblockTemplate): PaneRecovery | null {
-  const on = useExperimentalFeature('statblockEditor');
+  // The note's panel draws outside Atlas's UI context: the switch is read from the app's settings
+  const on = useExperimentalFeature('statblockEditor', SettingsService.forApp(app));
   const { presets } = useSystemPresets(app);
   const [revision, refresh] = useReducer((count: number): number => count + 1, 0);
 
