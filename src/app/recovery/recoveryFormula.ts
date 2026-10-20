@@ -1,15 +1,13 @@
 /**
  * A recovery formula with the statblock's numbers put in (`1d4+@tier`, `@level d6`), checked as
- * Atlas's dice parser reads it, and worked out where it holds no dice. `@field` names a dotted path
- * of the note (`@level`, `@abilities.con`, `@hit-dice`: a key holds letters, digits, `_` and `-`, as
- * field keys do, and never ends in `-`). Where the note holds no field of the whole path, the
- * longest that it holds and that ends before a `-` or a dice term is read, so `@con-1` is `con`
- * minus 1 unless the note has a field `con-1`. It takes only a whole number: bare where it stands as a
+ * Atlas's dice parser reads it, and worked out where it holds no dice. References are the
+ * statblock's (`statblocks/values/references.ts`). It takes only a whole number: bare where it stands as a
  * dice count (`@level d6`, `@leveld6` become `3d6`), in parentheses everywhere else so a negative
  * number parses (`1d8+@con` becomes `1d8+(-1)`). Nothing inside a `[label]` is read. The limits of
  * a formula are checked again once the numbers are in. Pure.
  */
 
+import { DICE_AFTER, readReference, wholeNumber, type FieldLookup } from '../statblocks/values/references';
 import { evaluateFormula } from '../tools/evaluateFormula';
 import { parseFormula, type FormulaErrorCode, type ParsedFormula } from '../tools/parseFormula';
 
@@ -30,57 +28,12 @@ export interface FilledFormula {
 
 export type FormulaFill = FilledFormula | { readonly ok: false; readonly problem: FormulaProblem };
 
-/** Reads the note's value at a dotted path; undefined where it holds none. */
-export type FieldLookup = (path: string) => unknown;
-
 /** The largest constant and dice count the parser reads (`\d{1,4}` and `\d{0,3}`). */
 export const MAX_CONSTANT = 9999;
 const MAX_DICE_COUNT = 999;
 const LIMIT_CODES: ReadonlySet<FormulaErrorCode> = new Set(['length', 'terms', 'dice', 'faces', 'depth', 'total', 'modifier']);
 
-/** A dotted path whose parts hold letters, digits, `_` and `-` (as field keys do) and never end in `-`. */
-const REFERENCE = /@([A-Za-z_](?:[\w-]*\w)?(?:\.\w(?:[\w-]*\w)?)*)/y;
-/** What makes the text after a number a dice term: `d6`, `d%`, `dF`, after spaces or none. */
-const DICE_AFTER = /^[ \t]*[dD](?:\d|%|[fF])/;
 const SPACES = /^[ \t]*/;
-
-/** A whole number a field holds: a whole number, or a text that writes one (`+2`, `-1`); undefined otherwise. */
-export function wholeNumber(value: unknown): number | undefined {
-  if (typeof value === 'number') return Number.isSafeInteger(value) ? value : undefined;
-  if (typeof value !== 'string' || !/^\s*[+-]?\d{1,15}\s*$/.test(value)) return undefined;
-  return Number(value.trim());
-}
-
-interface Reference {
-  /** The path read, as written up to where its number stands. */
-  field: string;
-  value: unknown;
-  /** Where the text goes on after the reference. */
-  end: number;
-}
-
-/**
- * The reference at `at` (just past the `@`): the whole path where the note holds it, else the
- * longest part of it the note holds that ends before a `-` (`con-1` is `con` minus 1) or before a
- * `d` that starts a dice term (`leveld6` is `level` before `d6`).
- */
-function readReference(text: string, at: number, lookup: FieldLookup): Reference | { missing: string } {
-  REFERENCE.lastIndex = at - 1;
-  const path = REFERENCE.exec(text)![1]!;
-  const end = at + path.length;
-  const whole = lookup(path);
-  if (whole !== undefined) return { field: path, value: whole, end };
-  for (let split = path.length - 1; split > 0; split -= 1) {
-    const field = path.slice(0, split);
-    if (field.endsWith('.') || field.endsWith('-')) continue;
-    const after = path[split];
-    const boundary = after === '-' || ((after === 'd' || after === 'D') && DICE_AFTER.test(text.slice(at + split)));
-    if (!boundary) continue;
-    const value = lookup(field);
-    if (value !== undefined) return { field, value, end: at + split };
-  }
-  return { missing: path };
-}
 
 type Substitution = { ok: true; text: string; fields: string[] } | { ok: false; problem: FormulaProblem };
 
@@ -98,13 +51,12 @@ function substitute(formula: string, lookup: FieldLookup): Substitution {
       cursor = end;
       continue;
     }
-    REFERENCE.lastIndex = cursor;
-    if (character !== '@' || !REFERENCE.test(formula)) {
+    const reference = readReference(formula, cursor, lookup);
+    if (reference === null) {
       text += character;
       cursor += 1;
       continue;
     }
-    const reference = readReference(formula, cursor + 1, lookup);
     if ('missing' in reference) return { ok: false, problem: { kind: 'missing', field: reference.missing } };
     const value = wholeNumber(reference.value);
     if (value === undefined) return { ok: false, problem: { kind: 'not-whole', field: reference.field } };

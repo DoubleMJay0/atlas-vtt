@@ -5,6 +5,7 @@
  * label ("Not a number") and a sentence saying why. Pure: no React, no Obsidian.
  */
 
+import { formulaReferences, namedReferences } from './fillReferences';
 import type { FieldType, FieldValue, TemplateField } from '../model/templateTypes';
 import { picksChoice } from './choicePicks';
 import { isEmptyValue } from './emptyValue';
@@ -86,6 +87,20 @@ export function textProblem(field: FitField, text: string): string | null {
   if (!CHECKED_TEXT.has(field.type) || isEmptyValue(text)) return null;
   const result = coerce(field.type, text, field);
   return result.ok ? null : result.problem;
+}
+
+/**
+ * A shown value that still names references (`@int`): they name no number of the statblock, so it
+ * shows them as written and rolls nothing. Every one counts in a Number or Dice field; in any other
+ * only those that stand in a formula (`1d8 + @int`), never prose that names someone (`Ask @DM`).
+ * Null where it names none.
+ */
+export function referenceMisfit(field: Pick<FitField, 'type'>, shown: FieldValue | undefined): ValueMisfit | null {
+  const formula = field.type === 'number' || field.type === 'dice';
+  const names = [...new Set(formula ? namedReferences(shown) : formulaReferences(shown))];
+  if (names.length === 0) return null;
+  const listed = names.map((name) => `@${name}`).join(', ');
+  return { label: 'Unknown reference', problem: `${listed} ${names.length === 1 ? 'names' : 'name'} no number of this statblock.` };
 }
 
 /**

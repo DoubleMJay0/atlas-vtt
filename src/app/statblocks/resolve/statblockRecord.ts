@@ -10,6 +10,7 @@ import { labelsOf, type FieldLabels } from '../../initiative/modifierFields';
 import { isBestiaryResolved } from '../../services/FantasyStatblocksService';
 import { statblockSourceOf } from '../notes/statblockSource';
 import { NO_MEANINGS, type FieldMeanings } from './fieldMeanings';
+import { shownFieldsOf } from '../model/resolvedTypes';
 import { readStatblock } from './readStatblock';
 
 export interface StatblockRecord {
@@ -54,8 +55,10 @@ export async function readStatblockRecord(app: App, statblockPath: string, whole
   if (wholeOnly && parsing && (!statblock || statblock.fields.extends !== undefined)) return null;
   // The resolver names a creature found by the note's name a fence too: only the note itself says whether it holds one
   const inFence = statblock?.source.kind === 'fs-fence' && (await statblockSourceOf(app, file))?.kind === 'fs-fence';
+  const native = statblock?.source.kind === 'atlas';
   return {
-    record: recordOf(statblock?.fields, frontmatter, inFence),
+    // A native statblock's numbers as its card shows them (`hp: 10 + @con.mod` is a number), its note's frontmatter being its fields
+    record: native ? { ...frontmatter, ...shownFieldsOf(statblock) } : recordOf(statblock?.fields, frontmatter, inFence),
     meanings: statblock?.meanings ?? NO_MEANINGS,
     labels: statblock?.template && statblock.source.kind === 'atlas' ? labelsOf(statblock.template.fields) : NO_LABELS,
     fantasy: statblock !== null && statblock.source.kind !== 'atlas',

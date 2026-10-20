@@ -2,6 +2,7 @@ import type { App as ObsidianApp } from 'obsidian';
 import { difficultyLabel, statblockDisplayName } from '../../../../creatures/statblockRating';
 import type { ResourceDefinition, ResourceValue } from '../../../../resources/resourceTypes';
 import { startingResources } from '../../../../resources/statblockResourceValues';
+import { shownFieldsOf } from '../../../../statblocks/model/resolvedTypes';
 import { readStatblock } from '../../../../statblocks/resolve/readStatblock';
 
 export interface StatblockOverrides {
@@ -26,7 +27,8 @@ export async function loadStatblockOverrides(
   try {
     const statblock = await readStatblock(app, statblockPath);
     if (!statblock) return overrides;
-    const { fields, meanings } = statblock;
+    const { meanings } = statblock;
+    const fields = shownFieldsOf(statblock);
 
     const resources = startingResources(fields, definitions, meanings);
     if (Object.keys(resources).length > 0) overrides.resources = resources;
