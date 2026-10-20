@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseGmMessage, type BookStatblock } from '../../../../src/app/online/protocol/index.ts';
 import { ARM_MS } from '../../../../src/app/online/gm/armedCards.ts';
-import { BOOK_POLL_MS } from '../../../../src/app/online/gm/book/BookShare.ts';
+import { BOOK_BURST, BOOK_POLL_MS } from '../../../../src/app/online/gm/book/BookShare.ts';
 import { BookShelf } from '../../../../src/app/online/gm/book/BookShelf.ts';
 import { setRestGate, type CheckedRest, type RestGate, type TakenRest } from '../../../../src/app/online/gm/book/restGate.ts';
 import { restKey } from '../../../../src/app/online/gm/book/restRequests.ts';
@@ -172,11 +172,14 @@ describe('rests a player asks the GM for at a running table', () => {
   it('waits for the GM with one request per character, and the GM\'s approval takes it, answers and logs it', async () => {
     const { online, socket, from, characterId } = await restingTable();
     let since = delivered(socket).length;
-    from(ANA, { t: 'book-rest', request: REQUEST, character: characterId, button: 'short', spends: [2] });
-    from(ANA, { t: 'book-rest', request: SECOND, character: characterId, button: 'long', spends: [] });
-    await advance(100);
-    expect(answers(delivered(socket).slice(since), ANA)).toEqual([`${SECOND}: refused`]);
+    from(ANA, { t: 'book-rest', request: REQUEST, character: characterId, button: 'long', spends: [] });
+    await advance(ARM_MS);
     const key = restKey(characterId);
+    expect(online.table?.rests.cards()).toMatchObject([{ key, button: 'Long rest', armed: true }]);
+    // The page asks again only once it let its request go: the new one takes the card, checked again, and the old one is not answered.
+    from(ANA, { t: 'book-rest', request: SECOND, character: characterId, button: 'short', spends: [2] });
+    await advance(100);
+    expect(answers(delivered(socket).slice(since), ANA)).toEqual([]);
     expect(online.table?.rests.cards()).toEqual([{ key, character: 'Brannoch', button: 'Short rest', rules: ['Hit Points to full', '2 Hit Dice'], armed: false, answered: false }]);
 
     // A press before the card has stood long enough is not meant.
@@ -189,9 +192,11 @@ describe('rests a player asks the GM for at a running table', () => {
     await advance(BOOK_POLL_MS);
     expect(rests.taken).toEqual([{ path: BRANNOCH_NOTE, character: BRANNOCH_PC, request: { button: 'short', spends: [2] } }]);
     const after = delivered(socket).slice(since);
-    expect(answers(after, ANA)).toEqual([`${REQUEST}: done`]);
-    // Ana is sent her statblock again, with what she may spend now.
+    expect(answers(after, ANA)).toEqual([`${SECOND}: done`]);
+    // Ana is sent her statblock again, with what she may spend now, before the answer that ends her wait.
     expect(statblocks(after, ANA)).toHaveLength(1);
+    const order = after.filter(({ to, body }) => to === ANA && (body.t === 'book-statblock' || body.t === 'book-rest-answer')).map(({ body }) => body.t);
+    expect(order).toEqual(['book-statblock', 'book-rest-answer']);
     expect(online.table?.rests.cards()).toEqual([]);
     const logged = online.table?.log.entries().filter((entry) => entry.kind === 'rest');
     expect(logged).toEqual([expect.objectContaining({
@@ -200,6 +205,15 @@ describe('rests a player asks the GM for at a running table', () => {
     })]);
     // Every player is sent it.
     expect(ofType(after, 'log-entry').map(({ body }) => (body.entry as { kind?: string }).kind)).toContain('rest');
+    online.stop();
+  });
+
+  it('answers nothing past a player\'s rate of writes, a request it cannot read included', async () => {
+    const { online, socket, from } = await restingTable();
+    const since = delivered(socket).length;
+    for (let sent = 0; sent < BOOK_BURST + 5; sent += 1) from(ANA, { t: 'book-rest', request: REQUEST, character: 'not an id', button: 'short', spends: [] });
+    await advance(100);
+    expect(answers(delivered(socket).slice(since), ANA)).toHaveLength(BOOK_BURST);
     online.stop();
   });
 

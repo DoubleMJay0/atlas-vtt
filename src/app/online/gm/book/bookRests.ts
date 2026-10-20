@@ -30,7 +30,8 @@ export interface BookRestsHost {
  * Rests at a running table: the recovery buttons on each player's own character's statblock
  * (`CharacterRests`), and the requests they send (`book-rest`), which wait for the GM as cards
  * (`RestRequests`). A request is taken only from a connected player within their rate, for the
- * character they play now, by the id this table gave it; anything else is refused at once.
+ * character they play now, by the id this table gave it; anything else is refused at once, except
+ * past the player's rate, which is answered with nothing.
  */
 export class BookRests {
   private readonly sheets: CharacterRests;
@@ -69,15 +70,17 @@ export class BookRests {
     this.requests.decline(key);
   }
 
-  /** A player's rest request: waits for the GM, or is refused at once. */
+  /** A player's rest request: waits for the GM, or is refused at once; one past the player's rate of writes gets no answer. */
   receive(from: string, body: Record<string, unknown>): void {
+    // Checked first, so a flood of requests, readable or not, draws no answers.
+    if (!this.host.mayWrite(from)) return;
     const message = parseBookRestMessage(body);
     if (message === null) {
       // A request the page named can be refused; one it did not name cannot be answered.
       if (isRestId(body.request)) this.host.answer(from, body.request, 'refused');
       return;
     }
-    const character = this.host.mayWrite(from) ? this.host.character(from) : null;
+    const character = this.host.character(from);
     const key = this.sheets.characterOf(message.character);
     const path = character?.statblockPath ?? null;
     const asked = character !== null && key === character.key && path !== null && this.requests.ask({

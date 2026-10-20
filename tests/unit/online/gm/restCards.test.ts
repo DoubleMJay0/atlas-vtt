@@ -37,7 +37,7 @@ const MIRA = { id: 'm'.repeat(20), name: 'Mira' };
 const CHARACTER = 'c'.repeat(24);
 const ASKED: AskedRest = { player: 'a'.repeat(20), request: 'r'.repeat(24), character: 'pc-brannoch', characterId: CHARACTER, name: 'Brannoch', path: 'Brannoch.md', ask: { button: 'long', spends: [] } };
 
-function requests(timers: Timers, cards: ArmedCards): { rests: RestRequests; answers: string[]; changes: { count: number } } {
+function requests(timers: Timers, cards: ArmedCards, overrides: Partial<RestRequestPorts> = {}): { rests: RestRequests; answers: string[]; changes: { count: number } } {
   const answers: string[] = [];
   const changes = { count: 0 };
   const ports: RestRequestPorts = {
@@ -47,9 +47,14 @@ function requests(timers: Timers, cards: ArmedCards): { rests: RestRequests; ans
     answer: (_player, answer) => void answers.push(answer.outcome),
     rested: () => undefined,
     changed: () => void (changes.count += 1),
+    ...overrides,
   };
   return { rests: new RestRequests(ports, cards), answers, changes };
 }
+
+/** The checks of a test: a request for a button named `nap` fits nothing, any other its button's name. */
+const byButton = (_path: string, _character: string, request: { button: string }): { button: string; rules: string[] } | null =>
+  (request.button === 'nap' ? null : { button: request.button === 'short' ? 'Short rest' : 'Long rest', rules: ['Hit Points to full'] });
 
 describe('the cards over the online control', () => {
   it('share one arming clock: a rest request that goes starts a newcomer\'s card again, and the other way round', () => {
@@ -116,7 +121,8 @@ describe('the cards over the online control', () => {
     const timers = clock();
     const { rests } = requests(timers, new ArmedCards(timers));
     expect(rests.ask(ASKED)).toBe(true);
-    expect(rests.ask({ ...ASKED, request: 's'.repeat(24) })).toBe(false);
+    // Another player's request for the character is refused while one waits.
+    expect(rests.ask({ ...ASKED, player: 'b'.repeat(20), request: 's'.repeat(24) })).toBe(false);
     rests.approve(restKey(CHARACTER));
     expect(rests.view()[0]?.answered).toBe(false);
     timers.advance(ARM_MS);
@@ -124,5 +130,106 @@ describe('the cards over the online control', () => {
     expect(rests.view()[0]?.answered).toBe(true);
     rests.decline(restKey(CHARACTER));
     expect(rests.view()).toHaveLength(1);
+  });
+});
+
+describe('a request that comes while one of its player waits for the character', () => {
+  const NEWER = { ...ASKED, request: 's'.repeat(24) };
+
+  it("takes the waiting one's place on its card, armed still where the card reads the same", () => {
+    const timers = clock();
+    const cards = new ArmedCards(timers);
+    const { rests, answers } = requests(timers, cards, { check: byButton });
+    expect(rests.ask(ASKED)).toBe(true);
+    timers.advance(ARM_MS);
+    expect(rests.ask(NEWER)).toBe(true);
+    expect(rests.view()).toMatchObject([{ key: restKey(CHARACTER), button: 'Long rest', armed: true }]);
+    expect(cards.keys()).toEqual([restKey(CHARACTER)]);
+    rests.decline(restKey(CHARACTER));
+    // The page let the first go: only the newer is answered.
+    expect(answers).toEqual(['declined']);
+    rests.dispose();
+  });
+
+  it("arms its card anew where it asks for something else, in the card's place", () => {
+    const timers = clock();
+    const cards = new ArmedCards(timers);
+    const knocks = new WaitingKnocks(timers, () => undefined, cards);
+    const { rests, answers } = requests(timers, cards, { check: byButton });
+    expect(rests.ask(ASKED)).toBe(true);
+    knocks.knocked(MIRA);
+    timers.advance(ARM_MS);
+    expect(rests.ask({ ...NEWER, ask: { button: 'short', spends: [1] } })).toBe(true);
+    expect(rests.view()).toMatchObject([{ button: 'Short rest', armed: false }]);
+    expect(cards.keys()).toEqual([restKey(CHARACTER), knockKey(MIRA.id)]);
+    // The newcomer's card did not move: it keeps its time.
+    expect(knocks.players[0]?.armed).toBe(true);
+    rests.approve(restKey(CHARACTER));
+    expect(rests.view()[0]?.answered).toBe(false);
+    timers.advance(ARM_MS);
+    expect(rests.view()[0]?.armed).toBe(true);
+    expect(answers).toEqual([]);
+    rests.dispose();
+    knocks.dispose();
+  });
+
+  it('goes with the waiting one where it no longer fits, and is refused while the waiting one is being taken', () => {
+    const timers = clock();
+    const { rests, answers } = requests(timers, new ArmedCards(timers), { check: byButton, take: () => new Promise(() => undefined) });
+    expect(rests.ask(ASKED)).toBe(true);
+    expect(rests.ask({ ...NEWER, ask: { button: 'nap', spends: [] } })).toBe(false);
+    expect(rests.view()).toEqual([]);
+
+    expect(rests.ask(ASKED)).toBe(true);
+    timers.advance(ARM_MS);
+    rests.approve(restKey(CHARACTER));
+    expect(rests.ask(NEWER)).toBe(false);
+    expect(rests.view()).toMatchObject([{ answered: true }]);
+    expect(answers).toEqual([]);
+    rests.dispose();
+  });
+});
+
+describe('a slow approval', () => {
+  it('answers and removes its own request alone, never one that came for the character since', async () => {
+    const timers = clock();
+    let finish: (outcome: 'done') => void = () => undefined;
+    const order: string[] = [];
+    const { rests, answers } = requests(timers, new ArmedCards(timers), {
+      take: () => new Promise((resolve) => { finish = resolve; }),
+      rested: () => void order.push('statblock'),
+      answer: (_player, answer) => void order.push(`${answer.request}: ${answer.outcome}`),
+    });
+    expect(rests.ask(ASKED)).toBe(true);
+    timers.advance(ARM_MS);
+    rests.approve(restKey(CHARACTER));
+    // The player leaves and comes back, and asks again while the first rest is still being taken.
+    rests.playerLeft(ASKED.player);
+    expect(rests.ask({ ...ASKED, request: 's'.repeat(24) })).toBe(true);
+    finish('done');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(rests.view()).toMatchObject([{ key: restKey(CHARACTER), answered: false }]);
+    // What the rest changed still goes out; the request the page let go gets no answer.
+    expect(order).toEqual(['statblock']);
+    expect(answers).toEqual([]);
+    rests.dispose();
+  });
+
+  it('sends the statblock before the answer that ends the wait', async () => {
+    const timers = clock();
+    const order: string[] = [];
+    const { rests } = requests(timers, new ArmedCards(timers), {
+      rested: () => void order.push('statblock'),
+      answer: (_player, answer) => void order.push(answer.outcome),
+    });
+    expect(rests.ask(ASKED)).toBe(true);
+    timers.advance(ARM_MS);
+    rests.approve(restKey(CHARACTER));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual(['statblock', 'done']);
+    expect(rests.view()).toEqual([]);
+    rests.dispose();
   });
 });

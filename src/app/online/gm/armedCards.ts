@@ -55,6 +55,13 @@ export class ArmedCards {
     this.settle(by);
   }
 
+  /** A card shown already says something else now: it takes no answer again until it has stood for `ARM_MS`, in its place. */
+  rearm(key: string, by?: Listener): void {
+    if (!this.since.has(key)) return;
+    this.since.set(key, this.timers.now());
+    this.settle(by);
+  }
+
   /** A card is taken away without moving the others (a list told anew, where each card says whether it kept its place). */
   drop(key: string, by?: Listener): void {
     if (this.since.delete(key)) this.settle(by);

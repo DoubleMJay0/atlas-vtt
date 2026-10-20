@@ -49,6 +49,12 @@ interface Pending extends AskedRest {
   readonly card: RestCard;
 }
 
+/** Whether two cards read the same: who asks, for what, doing what. */
+function sameCardText(a: RestCard, b: RestCard): boolean {
+  return a.character === b.character && a.button === b.button
+    && a.rules.length === b.rules.length && a.rules.every((rule, index) => rule === b.rules[index]);
+}
+
 /** A rest request's card among the cards over the control (`ArmedCards`). */
 export const restKey = (characterId: string): string => `rest:${characterId}`;
 
@@ -56,10 +62,14 @@ export const restKey = (characterId: string): string => `rest:${characterId}`;
  * Players' rest requests while the GM decides: each a card over the online control, in the order
  * they came, at most one per character. A request is checked against what its character offers when
  * it comes (`check`), and its card takes no answer until it has stood for the cards' arming time.
+ * A page asks again only once it let its request go (the table was cut off), so a new request of
+ * the player whose request waits for the character takes its place on the same card, checked again
+ * (the card arms anew where it says something else now), and the one it replaces gets no answer;
+ * another player's is refused, as is any while the GM's approval is being taken.
  * Approve takes the rest (checked again, rolled, written and logged by Atlas) and tells the player
- * it was done, or refused where it no longer fits; Decline tells them no. A request whose player
- * left goes without an answer, as do all when the table ends; while the player is there and the
- * table runs, every request is answered.
+ * it was done, after their statblock went out again, or refused where it no longer fits; Decline
+ * tells them no. A request whose player left goes without an answer, as do all when the table ends;
+ * while the player is there and the table runs, every request is answered.
  */
 export class RestRequests {
   private list: readonly Pending[] = [];
@@ -78,11 +88,24 @@ export class RestRequests {
     return this.list.map((pending) => pending.card);
   }
 
-  /** A request came: it waits for the GM where it fits what the character offers and no other of the character's waits. False where it is refused. */
+  /**
+   * A request came: it waits for the GM where it fits what the character offers and no other
+   * player's request waits for the character. False where it is refused.
+   */
   ask(asked: AskedRest): boolean {
-    if (this.disposed || this.list.some((pending) => pending.character === asked.character)) return false;
+    if (this.disposed) return false;
+    const waiting = this.list.find((pending) => pending.character === asked.character);
+    if (waiting !== undefined && (waiting.player !== asked.player || waiting.card.answered)) return false;
     const checked = this.ports.check(asked.path, asked.character, asked.ask);
-    if (checked === null) return false;
+    if (checked === null) {
+      // The page let the waiting request go when it sent this one: it goes too, unanswered.
+      if (waiting !== undefined) this.remove(waiting.card.key);
+      return false;
+    }
+    if (waiting !== undefined) {
+      this.replace(waiting, asked, checked);
+      return true;
+    }
     const key = restKey(asked.characterId);
     this.cards.show(key, this.heard);
     const card: RestCard = { key, character: asked.name, button: checked.button, rules: checked.rules, armed: false, answered: false };
@@ -103,10 +126,14 @@ export class RestRequests {
       console.error('[Atlas] Taking a player\'s rest failed:', error);
       return 'refused';
     }).then((outcome) => {
-      if (this.disposed || !this.list.some((other) => other.card.key === pending.card.key)) return;
-      this.remove(pending.card.key);
-      this.ports.answer(pending.player, { t: 'book-rest-answer', request: pending.request, outcome });
+      if (this.disposed) return;
+      // The statblock with what the rest changed goes out before the answer that ends the player's wait.
       if (outcome === 'done') this.ports.rested(pending.player, pending.character);
+      // This request alone: its player may have left meanwhile, and another request come for the character.
+      const answered = this.list.find((other) => other.request === pending.request && other.player === pending.player);
+      if (answered === undefined) return;
+      this.remove(answered.card.key);
+      this.ports.answer(pending.player, { t: 'book-rest-answer', request: pending.request, outcome });
     });
   }
 
@@ -129,6 +156,15 @@ export class RestRequests {
     this.stopListening();
     for (const pending of this.list) this.cards.drop(pending.card.key, this.heard);
     this.list = [];
+  }
+
+  /** A waiting request's place is taken by a newer one of its player: same card, which arms anew where it says something else now. */
+  private replace(waiting: Pending, asked: AskedRest, checked: CheckedRest): void {
+    const card: RestCard = { ...waiting.card, character: asked.name, button: checked.button, rules: checked.rules };
+    this.list = this.list.map((other) => (other === waiting ? { ...asked, card } : other));
+    if (!sameCardText(waiting.card, card)) this.cards.rearm(card.key, this.heard);
+    this.refresh();
+    this.ports.changed();
   }
 
   private answerable(key: string): Pending | null {
