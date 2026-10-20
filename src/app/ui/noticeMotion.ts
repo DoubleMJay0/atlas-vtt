@@ -57,8 +57,20 @@ export function animateNotice(notice: Notice): void {
 function remove(el: HTMLElement): void {
   const container = el.parentElement;
   el.detach();
-  // The container keeps Atlas' place until it empties, so Obsidian's notices still in it never jump.
-  if (container?.childElementCount !== 0) return;
-  container.removeClass(HOST_CLASS);
-  container.detach();
+  if (!container) return;
+  if (container.childElementCount === 0) {
+    container.removeClass(HOST_CLASS);
+    container.detach();
+    return;
+  }
+  // The notices still there keep Atlas' place, so they never jump; the class goes once they have
+  // gone too, however they go (Obsidian detaches the emptied container itself).
+  if (container.querySelector(':scope > .atlas-notice')) return;
+  const watch = new MutationObserver(() => {
+    if (container.querySelector(':scope > .atlas-notice')) return watch.disconnect();
+    if (container.childElementCount > 0) return;
+    container.removeClass(HOST_CLASS);
+    watch.disconnect();
+  });
+  watch.observe(container, { childList: true });
 }
