@@ -40,22 +40,20 @@ function addToMap(store: ViewAtlasStore, tokens: TokenInput[], placement: SpawnP
 /**
  * Brings the tokens into the target's scene. Beside the map they go straight into the tracker. On
  * it the GM places them by hand where the map can (`TokenPlacer`): they wait in the GM's hand,
- * laid out as given, and each is added as it is put down; elsewhere they are added as laid out.
- * Resolves with the ids of the tokens added, which end up selected.
+ * laid out as given, and each is added as it is put down, the selection left as it was; elsewhere
+ * they are added as laid out and selected, so the GM finds them. Resolves with the ids of the tokens added.
  */
 async function addSpawnedTokens(ctx: SpawnContext, target: SpawnTarget, tokens: TokenInput[], placement: SpawnPlacement): Promise<string[]> {
   const store = target.view.getStore();
   if (placement === 'beside') return addOffMapCombatants(store, tokens);
   if (tokens.length === 0) return [];
-  let ids: string[];
   if (target.placer) {
     const placing = target.placer.place({ tokens, commit: (placed) => addToMap(store, placed, placement) });
     ctx.onPlacing?.();
     ctx.app.workspace.setActiveLeaf(target.view.leaf, { focus: true });
-    ids = await placing;
-  } else {
-    ids = addToMap(store, tokens, placement);
+    return placing;
   }
+  const ids = addToMap(store, tokens, placement);
   if (ids.length > 0) store.getState().setSelection(ids);
   return ids;
 }

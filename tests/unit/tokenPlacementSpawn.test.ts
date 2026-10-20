@@ -38,7 +38,7 @@ function scene(play: (request: PlacementRequest) => string[]) {
 }
 
 describe('spawned tokens are placed by hand', () => {
-  it('adds nothing until the GM puts the tokens down, then selects them', async () => {
+  it('adds nothing until the GM puts the tokens down, and selects none of them', async () => {
     const { ctx, app, leaf, added, setSelection, requests, onPlacing } = scene((request) => {
       expect(added).toHaveLength(0);
       return request.commit([...request.tokens]);
@@ -50,15 +50,15 @@ describe('spawned tokens are placed by hand', () => {
     expect(app.workspace.setActiveLeaf).toHaveBeenCalledWith(leaf, { focus: true });
     expect(added).toHaveLength(1);
     expect(ids).toEqual(['tok_1_0', 'tok_1_1', 'tok_1_2']);
-    expect(setSelection).toHaveBeenCalledWith(ids);
+    expect(setSelection).not.toHaveBeenCalled();
   });
 
-  it('adds each token put down from the queue on its own, and selects them all at the end', async () => {
+  it('adds each token put down from the queue on its own, and selects none of them', async () => {
     const { ctx, added, setSelection } = scene((request) => request.tokens.flatMap((token) => request.commit([{ ...token, x: 5, y: 5 }])));
     const ids = await spawnTokenAsset(ctx, goblin, 2);
     expect(added.map((batch) => batch.length)).toEqual([1, 1]);
     expect(added.flat().map(({ x, y }) => [x, y])).toEqual([[5, 5], [5, 5]]);
-    expect(setSelection).toHaveBeenCalledWith(ids);
+    expect(setSelection).not.toHaveBeenCalled();
     expect(ids).toHaveLength(2);
   });
 
