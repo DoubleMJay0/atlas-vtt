@@ -79,6 +79,15 @@ describe('a statblock\'s values as its card shows them', () => {
     expect(fillReferences('1 + @loop', chained).unresolved).toEqual(['loop']);
   });
 
+  it('works out a value that names many others once each, whatever a note piles up', () => {
+    const keys = ['a', 'b', 'c', 'd', 'e'];
+    const pile = Object.fromEntries(keys.map((key, at) => [key, at === keys.length - 1 ? 1 : Array.from({ length: 40 }, () => `@${keys[at + 1]!}`).join(' + ')]));
+    const piled = statblockLookup({ ...TEMPLATE, fields: [...FIELDS, ...keys.map((key): TemplateField => ({ key, label: key, type: 'number' }))] }, pile);
+    const started = performance.now();
+    expect(fillReferences('@a', piled).text).toBe(String(40 ** 4));
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it('leaves a reference that names no number as written, and a word\'s @ alone', () => {
     expect(fill('1d4 + @luck')).toEqual({ text: '1d4 + @luck', unresolved: ['luck'] });
     expect(fill('write to mira@example.org').text).toBe('write to mira@example.org');

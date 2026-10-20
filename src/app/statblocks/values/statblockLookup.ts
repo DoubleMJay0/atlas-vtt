@@ -29,6 +29,8 @@ interface Slot {
 
 /** How many references deep one value may name others. */
 const MAX_CHAIN = 4;
+/** How many values that name references one lookup works out at most. */
+const MAX_EXPANSIONS = 256;
 const NOTHING_READ: ReadonlySet<string> = new Set();
 
 const isSingle = (value: unknown): value is string | number | boolean => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
@@ -113,12 +115,21 @@ export function statblockLookup(template: StatblockTemplate, record: FieldRecord
     return isSingle(found) ? found : undefined;
   };
 
-  // A value that names references itself (`ac: 10 + @dex.mod`) reads as what it comes to, a few steps deep and never in a circle
+  // A value that names references itself (`ac: 10 + @dex.mod`) reads as what it comes to, a few steps
+  // deep and never in a circle. Each path is worked out once per lookup and the work is capped, so
+  // a note whose values name each other many times over (one a player wrote online) costs little.
+  const worked = new Map<string, unknown>();
+  let budget = MAX_EXPANSIONS;
   const chained = (path: string, reading: ReadonlySet<string>): unknown => {
+    if (worked.has(path)) return worked.get(path);
     const value = read(path);
-    if (typeof value !== 'string' || !namesReference(value) || reading.size >= MAX_CHAIN || reading.has(path)) return value;
+    if (typeof value !== 'string' || !namesReference(value)) return value;
+    if (reading.size >= MAX_CHAIN || reading.has(path) || budget <= 0) return value;
+    budget -= 1;
     const inner = new Set(reading).add(path);
-    return numberValue(fillReferences(value, (next) => chained(next, inner)).text);
+    const result = numberValue(fillReferences(value, (next) => chained(next, inner)).text);
+    worked.set(path, result);
+    return result;
   };
   return (path) => chained(path, NOTHING_READ);
 }
