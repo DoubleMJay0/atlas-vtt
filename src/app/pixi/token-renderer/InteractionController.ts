@@ -40,6 +40,8 @@ import { tokenSizeSubmenu } from '../../react/components/context-menu/tokenSizeM
 import { tokenLightingEntries } from '../../react/components/context-menu/tokenLightingMenu';
 import { mapLightPresets } from '../../services/mapCollectionRules';
 import { conditionsSubmenu } from '../../react/components/context-menu/conditionsMenu';
+import { selectionResourceEntry } from '../../react/components/context-menu/selectionResourceMenu';
+import { openSelectionResourceEditor } from '../selectionResourceEditor';
 import { placedPlayerCharacterEntry } from '../../react/components/context-menu/playerCharacterMenu';
 import { holdTokens } from '../../lighting/sightOnDrop';
 import { t } from '../../i18n';
@@ -719,6 +721,18 @@ export class InteractionController implements ITokenInteractionController {
         ),
       })),
     });
+
+    // One change of a resource for every selected token that holds it (an area's damage), DM only
+    const selectionChange = this.isPlayerView ? null : selectionResourceEntry(
+      this.store, this.contextMenuTargets(token.id), this.resourceDefsProvider(),
+      (definition, count, apply) => {
+        openSelectionResourceEditor({
+          anchorEl: this.viewport.options.events.domElement, at: { x: e.clientX, y: e.clientY },
+          resourceName: definition.name, count, onCommit: apply,
+        });
+      },
+    );
+    if (selectionChange) entries.push(selectionChange);
 
     // Reset (only if the token tracks resources)
     if (this.hasResources(character)) {
