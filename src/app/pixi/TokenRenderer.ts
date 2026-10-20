@@ -315,7 +315,7 @@ export class TokenRenderer {
     this.playersView.listen(() => this.playerSight.whenSettled(() => this.syncCanvasBadges()));
 
     this.dragRuler = new DragRuler(
-      new DragRulerView(this.viewport),
+      new DragRulerView(this.viewport, this.tokenContainer),
       this.gridSystem,
       this.store,
       this.collectionSync.measurement,
