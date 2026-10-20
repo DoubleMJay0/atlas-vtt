@@ -11,6 +11,7 @@ import { createFromPick } from '../editor/gallery/galleryActions';
 import { TemplateGallery } from '../editor/gallery/TemplateGallery';
 import type { TemplateLibrarySnapshot } from '../library/TemplateLibrary';
 import { copyTemplate, deleteTemplate } from '../library/templateActions';
+import { recoveryButtonsLost } from '../library/templateRecovery';
 import { templateUsage, type TemplateUsage } from '../library/templateUsage';
 import type { LibraryTemplate } from '../model/resolvedTypes';
 import type { StatblockRole } from '../model/roleTypes';
@@ -132,6 +133,7 @@ export function TemplateList(props: TemplateListProps): React.JSX.Element {
           templateId={deleting.entry.template.id}
           usage={deleting.usage}
           templates={library?.templates ?? []}
+          lostButtons={(replacement) => recoveryButtonsLost(app, deleting.entry.template.id, replacement)}
           onDelete={remove}
           onClose={() => setDeleting(null)}
         />

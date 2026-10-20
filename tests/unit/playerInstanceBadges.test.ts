@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { Container, Text } from 'pixi.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PlayerInstanceBadges } from '../../src/app/pixi/token-renderer/PlayerInstanceBadges';

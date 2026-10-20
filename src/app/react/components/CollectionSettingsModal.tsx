@@ -16,12 +16,12 @@ import { syncCollectionSystem } from '../../services/collectionSystemSync';
 import { useSystemPresets } from '../hooks/useSystemPresets';
 import { useDiceSets } from '../hooks/useDiceSets';
 import { useCollectionSettingsDraft } from './collection-settings/useCollectionSettingsDraft';
+import { collectionRulesView } from './collection-settings/collectionRulesView';
 import { useExperimentalFeature } from '../hooks/useExperimentalFeature';
 import { DefaultWidgetsTab } from './collection-settings/DefaultWidgetsTab';
 import { resourceFieldSuggestions } from '../../resources/resourceFieldSuggestions';
 import { initiativeFieldSuggestions } from '../../initiative/initiativeFieldSuggestions';
 import { RandomTablesTab } from './collection-settings/RandomTablesTab';
-import { viewOfRules, type RulesView } from '../../gameSystems/rulesView';
 import { CreatureFiltersTab } from './collection-settings/CreatureFiltersTab';
 import { useCollectionCreatures } from './collection-settings/useCollectionCreatures';
 import { useRoleTemplates } from './collection-settings/useRoleTemplates';
@@ -32,6 +32,10 @@ import { statblockRolesAreValid } from '../../statblocks/roles/roleValidation';
 import { StatblocksTab } from '../../statblocks/settings/StatblocksTab';
 import { initiativeEdit, RulesSettingsTabs, type SettingsTab } from './collection-settings/RulesSettingsTabs';
 import { SettingsDialog } from './collection-settings/SettingsDialog';
+import { PlayedCampaignNotice } from './collection-settings/PlayedCampaignNotice';
+import { CampaignRulesDialog } from './dashboard/CampaignRulesDialog';
+import { CollectionRecoveryPane } from './collection-settings/recovery/CollectionRecoveryPane';
+import { usePlayedSystemCampaign } from '../../campaigns/usePlayedSystemCampaign';
 import { t } from '../../i18n';
 
 interface CollectionSettingsModalProps {
@@ -73,6 +77,12 @@ export function CollectionSettingsModal({
   const diceSets = useDiceSets(app);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  // While a played campaign has a game system, every map plays by it: its rules open in place of these.
+  const played = usePlayedSystemCampaign(app);
+  const playedId = played?.campaign.id ?? null;
+  const [campaignOpen, setCampaignOpen] = useState(false);
+  // Another campaign played, or none: the dialog of the one before is gone for good.
+  useEffect(() => setCampaignOpen(false), [playedId]);
   const [collectionName, setCollectionName] = useState('');
   const [releaseLine, setReleaseLine] = useState('');
 
@@ -102,12 +112,7 @@ export function CollectionSettingsModal({
     return () => { cancelled = true; };
   }, [isOpen, collectionId, assetService]);
 
-  const rulesView = viewOfRules(draft, systemPresets.presets, diceSets.sets);
-  // A collection's statblock roles are part of its game system, as a preset holds them.
-  const view: RulesView = {
-    ...rulesView,
-    systemRules: { ...rulesView.systemRules, statblockRoles: collectionStatblockRoles(draft, systemPresets.presets) },
-  };
+  const view = collectionRulesView(draft, systemPresets.presets, diceSets.sets);
   const canSave = view.isValid
     && draft.customCreatureFilters.every(isCompleteCreatureFilter)
     && statblockRolesAreValid(draft.statblockRoles ?? []);
@@ -138,6 +143,8 @@ export function CollectionSettingsModal({
     await deleteSystemPreset(app, systemPresets.service, preset.id);
   };
 
+  const playedNotice = played && <PlayedCampaignNotice campaignName={played.campaign.name} onEdit={() => setCampaignOpen(true)} />;
+
   const renderOther = (tab: SettingsTab): React.ReactNode => {
     switch (tab) {
       case 'widgets':
@@ -148,6 +155,7 @@ export function CollectionSettingsModal({
             initiative={view.initiative}
             onInitiativeChange={initiativeEdit(draft, view)}
             initiativeFieldSuggestions={initiativeFields}
+            initiativeNotice={playedNotice}
           />
         );
       case 'statblocks':
@@ -200,6 +208,10 @@ export function CollectionSettingsModal({
 
   if (!isOpen) return null;
 
+  if (app && played && campaignOpen) {
+    return <CampaignRulesDialog app={app} campaign={played.campaign} service={played.service} initialTab={activeTab === 'widgets' ? 'initiative' : activeTab} onClose={() => setCampaignOpen(false)} />;
+  }
+
   return (
     <SettingsDialog
       title={t('csm.title', { name: collectionName })}
@@ -208,6 +220,7 @@ export function CollectionSettingsModal({
       canSave={canSave}
       onSave={() => { void save(); }}
       onClose={onClose}
+      size="fullscreen"
     >
       <RulesSettingsTabs
         tabs={collectionTabs(statblockEditorOn)}
@@ -222,6 +235,11 @@ export function CollectionSettingsModal({
         fieldSuggestions={resourceFieldSuggestions(roleTemplates, statblockRecords)}
         initiativeFieldSuggestions={initiativeFields}
         renderOther={renderOther}
+        rulesNotice={playedNotice}
+        // Recovery buttons belong to a collection's templates, never to a campaign's rules
+        resourcesAside={app && statblockEditorOn ? (
+          <CollectionRecoveryPane app={app} assetService={assetService} collectionId={collectionId} draft={draft} presets={systemPresets.presets} />
+        ) : undefined}
       />
     </SettingsDialog>
   );

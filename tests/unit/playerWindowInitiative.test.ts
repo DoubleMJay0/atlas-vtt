@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { ViewAtlasState } from '../../src/app/storeFactory';
@@ -11,7 +12,6 @@ import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { attachFakePlayerWindow } from '../mocks/playerPopout';
 import { memoryPluginData } from '../mocks/pluginData';
 
-vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class {}, ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 const collection = vi.hoisted(() => ({ hpVisibleToPlayers: false }));
 vi.mock('../../src/app/resources/collectionResources', () => ({
   mapResources: () => [{ key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: collection.hpVisibleToPlayers }],

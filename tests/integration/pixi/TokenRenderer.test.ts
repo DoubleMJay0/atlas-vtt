@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   Container,
@@ -58,6 +59,8 @@ type TokenInput = Parameters<ReturnType<ViewStore['getState']>['addToken']>[0];
 /** Records ticker callbacks so a test can advance animations frame by frame. */
 class FakeTicker {
   private callbacks = new Set<TickerCallback>();
+  /** Read by Motion's ticker driver as the frame time. */
+  lastTime = 0;
   add(callback: TickerCallback): void {
     this.callbacks.add(callback);
   }
@@ -65,6 +68,7 @@ class FakeTicker {
     this.callbacks.delete(callback);
   }
   advance(deltaMS: number): void {
+    this.lastTime += deltaMS;
     for (const callback of Array.from(this.callbacks)) callback({ deltaMS });
   }
   get size(): number {
@@ -258,7 +262,15 @@ describe('TokenRenderer Integration Tests', () => {
 
       store.getState().deleteToken('token-1');
 
+      // Gone from the renderer at once, still on the canvas while it fades out
       await vi.waitFor(() => expect(tokenRenderer.getTokenSprites()['token-1']).toBeUndefined());
+      expect(group.destroyed).toBe(false);
+      ticker.advance(0);
+      ticker.advance(150);
+      expect(group.alpha).toBeLessThan(1);
+      expect(group.scale.x).toBeLessThan(1);
+
+      ticker.advance(400);
       expect(group.destroyed).toBe(true);
       expect(tokenRenderer.getTokenContainer().children).not.toContain(group);
     });
@@ -450,7 +462,7 @@ describe('TokenRenderer Integration Tests', () => {
       expect(tokenGroup('covered').visible).toBe(false);
     });
 
-    it('hides a held token at its displayed centre before the store catches up, and completes the drag', async () => {
+    it('hides a held token at its displayed centre, and completes the drag', async () => {
       wireFog();
       setFog();
       store.getState().setGMView(false);
@@ -460,7 +472,8 @@ describe('TokenRenderer Integration Tests', () => {
       viewport.emit('pointermove', pointerEvent(120, 105));
       viewport.emit('pointermove', pointerEvent(180, 105));
       expect(tokenGroup('moving').x).toBe(180);
-      expect(store.getState().objects.tokens['moving']?.x).not.toBe(180);
+      // The store follows every move, so sight and footprints never trail the sprite.
+      expect(store.getState().objects.tokens['moving']?.x).toBe(180);
       expect(tokenGroup('moving').visible).toBe(false);
       const rulerLayers = tokenRenderer.getPlayerViewLayers(DEFAULT_SETTINGS.localPlayerView).slice(-2);
       expect(rulerLayers).toHaveLength(2);
@@ -1280,8 +1293,6 @@ describe('TokenRenderer Integration Tests', () => {
       await waitForTokens('moving');
       const listener = vi.fn();
       tokenRenderer.onPlayersViewChange(listener);
-      // One write of the live positions to the store, at the drag's first step.
-      vi.spyOn(Date, 'now').mockReturnValue(1000);
       viewport.emit('pointerdown', pointerEvent(105, 105));
       viewport.emit('pointermove', pointerEvent(120, 105));
       const calls: number[] = [];
@@ -1290,9 +1301,9 @@ describe('TokenRenderer Integration Tests', () => {
         viewport.emit('pointermove', pointerEvent(x, 105));
         calls.push(listener.mock.calls.length);
       }
-      expect(calls).toEqual([0, 0, 1, 0, 0, 1, 0]);
+      // Every move writes the store, which is one pass over the players' view; entering or leaving their sight tells them once more.
+      expect(calls).toEqual([1, 1, 2, 1, 1, 2, 1]);
       viewport.emit('pointerup', pointerEvent(330, 105));
-      vi.mocked(Date.now).mockRestore();
     });
 
     it('in the GM view, a drag asks nothing of the players\' sight or fog', async () => {
@@ -1764,7 +1775,6 @@ describe('TokenRenderer Integration Tests', () => {
       await goblins({ id: 'moving' }, { id: 'twin', x: 105, y: 245 });
       await expectLooks(['moving', 'twin'], ['gm 1', 'gm 2']);
       const sync = vi.spyOn(playerBadges(), 'syncCanvas');
-      vi.spyOn(Date, 'now').mockReturnValue(1000);
       viewport.emit('pointerdown', pointerEvent(105, 105));
       viewport.emit('pointermove', pointerEvent(120, 105));
       const calls: number[] = [];
@@ -1775,10 +1785,10 @@ describe('TokenRenderer Integration Tests', () => {
         calls.push(sync.mock.calls.length);
         shown.push(looks('twin'));
       }
-      expect(calls).toEqual([0, 0, 1, 0, 0, 1, 0]);
+      // Every move writes the store, which is one pass; entering or leaving the players' sight syncs once more.
+      expect(calls).toEqual([1, 1, 2, 1, 1, 2, 1]);
       expect(shown.flat()).toEqual(['gm 2', 'gm 2', 'none', 'none', 'none', 'gm 2', 'gm 2']);
       viewport.emit('pointerup', pointerEvent(330, 105));
-      vi.mocked(Date.now).mockRestore();
     });
   });
 

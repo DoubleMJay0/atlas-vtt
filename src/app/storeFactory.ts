@@ -101,6 +101,11 @@ export interface ViewAtlasState extends ViewState {
    * a token without it gains it at `delta`, one that falls to 0 loses it.
    */
   changeTokensConditionValue: (tokenIds: string[], conditionId: string, delta: number) => void;
+  /**
+   * Sets a valued condition to `value` on every token in one store write: a token without it gains
+   * it, and a value of 0 or less, or null, takes it off.
+   */
+  setTokensConditionValue: (tokenIds: string[], conditionId: string, value: number | null) => void;
   clearTokenConditions: (id: string) => void;
   /** Spends every resource of `definitions` that defeats a token. */
   killTokens: (ids: string[], definitions: readonly ResourceDefinition[]) => void;
@@ -1335,6 +1340,13 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
               if (!token) continue;
               const current = (token.conditions ?? []).includes(conditionId) ? conditionValue(token, conditionId) : 0;
               setConditionValue(token, conditionId, current + delta, true);
+            }
+          }),
+
+          setTokensConditionValue: (tokenIds, conditionId, value) => set((draft) => {
+            for (const tokenId of tokenIds) {
+              const token = draft.objects.tokens[tokenId];
+              if (token) setConditionValue(token, conditionId, value ?? 0, true);
             }
           }),
 

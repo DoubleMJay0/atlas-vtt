@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { produce } from 'immer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ALL_PLAYERS, parseGmMessage, type BookCharacter } from '../../../../src/app/online/protocol/index.ts';
@@ -19,6 +18,7 @@ vi.mock('../../../../src/app/online/gm/gmMarks.ts', () => ({
       return null;
     }
     showPlayers(): void {}
+    showPlayerDrags(): void {}
     showPlayerCursors(): void {}
     dispose(): void {}
   },

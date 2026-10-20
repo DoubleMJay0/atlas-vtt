@@ -111,6 +111,7 @@ export const BOUNDARIES = {
       "src/app/react/hooks/useElementHeight.ts",
       "src/app/packages/components/shared/TokenPortrait.tsx",
       "src/app/tools/diceLabels.ts",
+      "src/app/tools/namedModifiers.ts",
       "src/app/pixi/MeasureRenderer.ts",
       "src/app/pixi/measurePartsVisibility.ts",
       "src/app/pixi/mapLayerOrder.ts",
@@ -125,7 +126,10 @@ export const BOUNDARIES = {
       "src/app/statblocks/model/asciiFold.ts",
       "src/app/statblocks/format/jsonValues.ts",
       "src/app/statblocks/roles/roleValidation.ts",
-      "src/app/statblocks/roles/collectionStatblockRoles.ts"
+      "src/app/statblocks/roles/collectionStatblockRoles.ts",
+      "src/app/recovery/recoveryTypes.ts",
+      "src/app/recovery/parseRecovery.ts",
+      "src/app/recovery/collectionRecovery.ts"
     ],
     "exclude": [
       "src/app/grid/GridController.ts",

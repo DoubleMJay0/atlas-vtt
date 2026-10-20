@@ -10,9 +10,11 @@
 import type { StatblockTemplate } from '../model/templateTypes';
 import {
   CONDITION_KEYS,
+  COUNTER_PRESET_KEYS,
   DERIVED_FROM_KEYS,
   ENTRY_EXTRA_KEYS,
   ENTRY_SHAPE_KEYS,
+  FIELD_TRACKING_KEYS,
   FIELD_KEYS,
   HEADER_KEYS,
   HEADER_TRACK_KEYS,
@@ -69,13 +71,25 @@ const BLOCK_NESTED: NestedWriters = new Map([
 
 const writeEntryShape = objectWriter(ENTRY_SHAPE_KEYS, new Map([['extras', listWriter(objectWriter(ENTRY_EXTRA_KEYS))]]));
 
+const writeField = objectWriter(FIELD_KEYS, new Map([
+  ['entry', writeEntryShape],
+  ['counterRows', listWriter(objectWriter(COUNTER_PRESET_KEYS))],
+  ['tracks', objectWriter(FIELD_TRACKING_KEYS)],
+]));
+
+/** A record written with its keys in order, so the same settings always write the same file. */
+function writeSortedRecord(value: unknown): unknown {
+  return isRecord(value) ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value;
+}
+
 const TEMPLATE_NESTED: NestedWriters = new Map([
   ['derivedFrom', objectWriter(DERIVED_FROM_KEYS)],
   ['source', objectWriter(SOURCE_KEYS)],
   ['importedFrom', objectWriter(IMPORTED_FROM_KEYS)],
-  ['fields', listWriter(objectWriter(FIELD_KEYS, new Map([['entry', writeEntryShape]])))],
+  ['fields', listWriter(writeField)],
   ['header', objectWriter(HEADER_KEYS, new Map([['hitPoints', objectWriter(HEADER_TRACK_KEYS)]]))],
   ['layout', objectWriter(LAYOUT_KEYS, new Map([['blocks', listWriter(writeBlock)]]))],
+  ['players', writeSortedRecord],
 ]);
 
 /** The template as the plain JSON object its file holds. */

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadStatblockOverrides } from '../../../../src/app/packages/components/asset-manager/utils/statblockLoader';
 import { buildStatblockLinkUpdates } from '../../../../src/app/pixi/token-renderer/statblockFrontmatter';

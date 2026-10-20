@@ -18,6 +18,7 @@ import { builtInTemplate } from './builtInTemplates';
 import { copyTemplateBody, trashTemplateBody, writeNewTemplateBody } from './templateBodyNotes';
 import { TemplateLibrary } from './TemplateLibrary';
 import { copyName } from './templatePaths';
+import { moveRecoveryButtons } from './templateRecovery';
 import { templateUsage } from './templateUsage';
 import { newTemplateFile } from './templateWriter';
 
@@ -58,7 +59,9 @@ export async function copyTemplate(app: App, id: TemplateId, name?: string): Pro
  * With a `replacement`, every statblock that names the template switches to
  * it (one batch, notes changed meanwhile keep theirs) and every role that
  * starts from it, a collection's own or a saved system's, starts from the
- * replacement. Without one, notes and roles are left as they are.
+ * replacement. Without one, notes and roles are left as they are. Its recovery
+ * buttons, a collection's own or a saved system's, move to the replacement, or
+ * go with the template where there is none.
  */
 export async function deleteTemplate(app: App, id: TemplateId, replacement: TemplateId | null): Promise<void> {
   if (isBuiltInTemplateId(id)) throw new Error('Built-in templates can\'t be deleted.');
@@ -67,6 +70,7 @@ export async function deleteTemplate(app: App, id: TemplateId, replacement: Temp
     await switchTemplates(app, usage.notes.map((path) => ({ path, from: id })), replacement);
     await replaceRoleTemplates(app, id, replacement);
   }
+  await moveRecoveryButtons(app, id, replacement === id ? null : replacement);
   const path = TemplateLibrary.forApp(app).get(id)?.path;
   const file = path ? app.vault.getFileByPath(path) : null;
   if (!path || !file) return;

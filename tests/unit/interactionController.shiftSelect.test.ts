@@ -1,8 +1,10 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { InteractionController } from '../../src/app/pixi/token-renderer/InteractionController';
 
-function makeController(selectedIds: string[]): { controller: InteractionController; setSelection: ReturnType<typeof vi.fn>; viewport: any } {
+function makeController(selectedIds: string[]): { controller: InteractionController; setSelection: ReturnType<typeof vi.fn>; setTokenPositions: ReturnType<typeof vi.fn>; viewport: any } {
   const setSelection = vi.fn();
+  const setTokenPositions = vi.fn();
   const viewport = {
     on: vi.fn(),
     off: vi.fn(),
@@ -15,7 +17,7 @@ function makeController(selectedIds: string[]): { controller: InteractionControl
       selectedIds,
       setSelection,
       setIsDragging: vi.fn(),
-      setTokenPositions: vi.fn(),
+      setTokenPositions,
       dropTokens: vi.fn(),
       grid: { snapToGrid: false },
       objects: { tokens: { a: { id: 'a' }, b: { id: 'b' } } },
@@ -25,7 +27,7 @@ function makeController(selectedIds: string[]): { controller: InteractionControl
   } as any;
   const controller = new InteractionController(viewport, store, {} as any, {} as any, {} as any, false);
   controller.setTokenSpriteProvider(() => null);
-  return { controller, setSelection, viewport };
+  return { controller, setSelection, setTokenPositions, viewport };
 }
 
 const shiftClick = { button: 0, shiftKey: true, global: { x: 0, y: 0 }, stopPropagation: vi.fn() } as any;
@@ -77,5 +79,22 @@ describe('InteractionController drag ruler', () => {
 
     onUp({ global: { x: 245, y: 35 } });
     expect(ruler.end).toHaveBeenCalled();
+  });
+});
+
+describe('InteractionController drag positions', () => {
+  it('moves the stored token with every pointer move, so sight and its footprint never trail the sprite', () => {
+    const { controller, setTokenPositions, viewport } = makeController(['a']);
+    const sprite = { position: { x: 35, y: 35, set: vi.fn() } };
+    controller.setTokenSpriteProvider(() => sprite as any);
+    (viewport.toWorld as ReturnType<typeof vi.fn>).mockImplementation((point: { x: number; y: number }) => point);
+
+    controller.handleViewportTokenPointerDown('a', { ...plainClick, global: { x: 35, y: 35 } });
+    const onMove = viewport.on.mock.calls.find(([name]: [string]) => name === 'pointermove')[1];
+    onMove({ global: { x: 60, y: 35 } });
+    onMove({ global: { x: 70, y: 35 } });
+
+    expect(sprite.position.set).toHaveBeenLastCalledWith(70, 35);
+    expect(setTokenPositions).toHaveBeenLastCalledWith([{ id: 'a', x: 70, y: 35 }]);
   });
 });

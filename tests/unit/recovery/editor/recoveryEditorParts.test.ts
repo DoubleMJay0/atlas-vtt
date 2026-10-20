@@ -1,0 +1,75 @@
+import { describe, expect, it } from 'vitest';
+import { formulaReads, withFieldReference } from '../../../../src/app/recovery/editor/recoveryFormulas';
+import { changedResourceKeys, withSavedResourceKeys } from '../../../../src/app/recovery/editor/recoveryResourceKeys';
+import { recoveryTemplateTabs } from '../../../../src/app/recovery/editor/recoveryTemplateTabs';
+import { ruleBadge } from '../../../../src/app/recovery/editor/ruleBadge';
+import { savedResources } from '../../../../src/app/resources/resourceDefinitions';
+import type { RecoveryRecord } from '../../../../src/app/recovery/recoveryTypes';
+import { RESOURCES } from '../../../fixtures/recoveryFixtures';
+
+const HP = { kind: 'resource', key: 'hp' } as const;
+const DICE = { kind: 'counters', field: 'hit_dice', rows: 'all' } as const;
+
+describe('the template tabs', () => {
+  const names: Record<string, string> = { pc: 'Adventurer', npc: 'Generic NPC', other: 'Old sheet' };
+  const nameOf = (id: string): string | null => names[id] ?? null;
+
+  it('name a template by the roles that start from it, else by its own name', () => {
+    const roles = [
+      { id: 'pc', name: 'Player character', templateId: 'pc' },
+      { id: 'npc', name: 'NPC', templateId: 'npc' },
+      { id: 'hireling', name: 'Hireling', templateId: 'npc' },
+      { id: 'lost', name: 'Lost', templateId: 'missing' },
+    ];
+    expect(recoveryTemplateTabs(roles, ['other', 'pc', 'missing'], nameOf)).toEqual([
+      { templateId: 'pc', label: 'Player character' },
+      { templateId: 'npc', label: 'NPC · Hireling' },
+      { templateId: 'other', label: 'Old sheet' },
+    ]);
+  });
+});
+
+describe('formulas', () => {
+  it('read with their fields as numbers', () => {
+    expect(formulaReads('1d4+@tier')).toBe(true);
+    expect(formulaReads('@level')).toBe(true);
+    // A field as a dice count, as the rest reads it
+    expect(formulaReads('@level d6')).toBe(true);
+    expect(formulaReads('1d4+')).toBe(false);
+    expect(formulaReads('  ')).toBe(false);
+  });
+
+  it('take a field at the caret, joined with a plus', () => {
+    expect(withFieldReference('1d8', 'con')).toEqual({ text: '1d8+@con', caret: 8 });
+    expect(withFieldReference('1d8+', 'con')).toEqual({ text: '1d8+@con', caret: 8 });
+    expect(withFieldReference('', 'level')).toEqual({ text: '@level', caret: 6 });
+    expect(withFieldReference('1d8 2', 'con', 3).text).toBe('1d8+@con+2');
+  });
+});
+
+describe('resources added in the dialog', () => {
+  it('take their rules along to the key they are saved with', () => {
+    const draft = [...RESOURCES, { ...RESOURCES[0]!, key: 'new:1234', name: 'Grit', field: 'grit' }];
+    const keys = changedResourceKeys(draft, savedResources(draft));
+    expect([...keys]).toEqual([['new:1234', 'grit']]);
+    const record: RecoveryRecord = {
+      pc: [{ id: 'r', name: 'Rest', rules: [{ target: HP, does: 'spend', from: { kind: 'resource', key: 'new:1234' }, each: '1' }] }],
+    };
+    expect(withSavedResourceKeys(record, keys).pc![0]!.rules[0]).toEqual({ target: HP, does: 'spend', from: { kind: 'resource', key: 'grit' }, each: '1' });
+    expect(withSavedResourceKeys(record, new Map())).toBe(record);
+  });
+});
+
+describe('badges', () => {
+  const nameOf = (): string => 'Hit Dice';
+  it('say each rule in a word or a formula', () => {
+    expect(ruleBadge({ target: HP, does: 'full' }, nameOf)).toBe('Full');
+    expect(ruleBadge({ target: HP, does: 'amount', formula: '1d4 + @tier' }, nameOf)).toBe('+1d4+@tier');
+    expect(ruleBadge({ target: DICE, does: 'share', share: 0.5, round: 'down' }, nameOf)).toBe('½');
+    expect(ruleBadge({ target: HP, does: 'set', to: 0 }, nameOf)).toBe('→ 0');
+    expect(ruleBadge({ target: HP, does: 'set', to: { field: 'level' } }, nameOf)).toBe('→ @level');
+    expect(ruleBadge({ target: HP, does: 'spend', from: DICE, each: '1d8' }, nameOf)).toBe('From Hit Dice');
+    expect(ruleBadge({ target: { kind: 'condition', id: 'x' }, does: 'step', by: -1 }, nameOf)).toBe('−1');
+    expect(ruleBadge({ target: { kind: 'condition', id: 'x' }, does: 'clear' }, nameOf)).toBe('Clear');
+  });
+});

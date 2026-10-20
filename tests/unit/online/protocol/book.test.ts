@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
   bookLine, bookText, fitsPlayerFrame, isQuestDone, MAX_BOOK_NOTES, MAX_RESOURCE_KEY, MAX_TOKEN_VALUE, MAX_BOOK_QUESTS, MAX_NOTE_BODY, MAX_QUEST_REWARDS, parseGmMessage, parsePlayerMessage, type BookItem, type BookQuest, type PlayerBook,
@@ -137,6 +136,14 @@ describe('what a player writes into their book', () => {
     }
     expect(parseGmMessage({ t: 'book-resource', key: 'hp', current: 1 })).toBeNull();
     expect(fitsPlayerFrame({ t: 'book-resource', key: 'k'.repeat(MAX_RESOURCE_KEY), current: -MAX_TOKEN_VALUE })).toBe(true);
+  });
+
+  it('reads the token a book follows, by the scene and the id the token list names it by, and refuses anything else', () => {
+    expect(parsePlayerMessage({ t: 'book-token', scene: 'scene-1', token: ID, extra: true })).toEqual({ t: 'book-token', scene: 'scene-1', token: ID });
+    for (const broken of [{ scene: 'scene-1' }, { token: ID }, { scene: 'scene-1', token: 'tok-brannoch' }, { scene: 'x'.repeat(65), token: ID }, { scene: 1, token: ID }, { scene: 'scene-1', token: null }]) {
+      expect(parsePlayerMessage({ t: 'book-token', ...broken }), JSON.stringify(broken)).toBeNull();
+    }
+    expect(parseGmMessage({ t: 'book-token', scene: 'scene-1', token: ID })).toBeNull();
   });
 
   it('refuses what is malformed or too long, and never takes a GM kind from a player', () => {

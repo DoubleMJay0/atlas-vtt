@@ -6,6 +6,7 @@ import { fitTokenArtwork, syncTokenArtwork } from './token-renderer/tokenArtwork
 import type { AtlasSettings } from '../services/SettingsService';
 import { HIDDEN_TOKEN_ALPHA, gmTokenLayers, type HideableLayer, type LayerVisibility } from './playerSafeFrame';
 import type { TokenPerception } from '../vision/tokenPerception';
+import { TokenExit } from './token-renderer/TokenExit';
 import { NOTHING_SEEN, PlayerSightTokens, seenByPlayers, seenTokens } from './token-renderer/PlayerSightTokens';
 import { PlayersViewWatch } from './token-renderer/PlayersViewWatch';
 import { PlayerInstanceBadges } from './token-renderer/PlayerInstanceBadges';
@@ -26,7 +27,7 @@ import { computeTokenPixelSize } from './token-renderer/tokenSizing';
 import { TextureCache } from './token-renderer/TextureCache';
 import { UIManager } from './token-renderer/UIManager';
 import { InteractionController } from './token-renderer/InteractionController';
-import { DragRuler } from './token-renderer/DragRuler';
+import { DragRuler, type DragRulerPath } from './token-renderer/DragRuler';
 import { DragRulerView } from './token-renderer/DragRulerView';
 import { SyncService } from './token-renderer/SyncService';
 import { TokenGlide, placedAtOnce } from './token-renderer/TokenGlide';
@@ -85,6 +86,13 @@ export class TokenRenderer {
     () => this.pixiApp?.ticker ?? null,
   );
   private readonly glide: TokenGlide;
+  private readonly exit = new TokenExit({
+    getTicker: () => this.pixiApp?.ticker ?? null,
+    reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
+    requestRender: () => {
+      if (this.pixiApp) requestRender(this.pixiApp);
+    },
+  });
   /** Whether a token may be drawn on its way between two places; set by the lighting while it lights the view. */
   private glideWay?: (from: Point, to: Point) => boolean;
   private uiManager: UIManager;
@@ -290,7 +298,7 @@ export class TokenRenderer {
     this.playersView.listen(() => this.playerSight.whenSettled(() => this.syncCanvasBadges()));
 
     this.dragRuler = new DragRuler(
-      new DragRulerView(this.viewport, this.tokenContainer),
+      new DragRulerView(this.viewport),
       this.gridSystem,
       this.store,
       this.collectionSync.measurement,
@@ -360,6 +368,7 @@ export class TokenRenderer {
       // Sprites still loading belong to the previous load and are discarded when they finish
       this.mapLoadGeneration++;
       this.tokensLoading = new Set();
+      this.exit.finishAll();
 
       // First, clear all existing token sprites (tokenSprites is an object, not a Map)
       for (const [id, tokenGroup] of Object.entries(this.tokenSprites)) {
@@ -789,21 +798,25 @@ export class TokenRenderer {
 
     const totalChanges = changedTokenIds.size + newTokenIds.size + deletedTokenIds.size;
 
-    // Handle deleted tokens
+    // Deleted tokens leave the renderer at once and play out on their own
+    const leaving: TokenGroupContainer[] = [];
     for (const id of deletedTokenIds) {
       const tokenGroup = this.tokenSprites[id];
 
       this.glide.cancel(id);
       if (tokenGroup) {
-        this.destroyTokenGroup(id, tokenGroup);
+        this.interactionController.removeInteractionHandlers(id, tokenGroup);
         delete this.tokenSprites[id];
         // Clean up ring tracking (ring is destroyed with tokenGroup)
         delete this.tokenRings[id];
-        // Clean up token UI
         this.uiManager.destroyTokenUI(id);
+        leaving.push(tokenGroup);
       }
     }
-    if (deletedTokenIds.size > 0) this.evictUnusedArt();
+    this.exit.play(leaving, (group) => {
+      this.freeTokenGroup(group);
+      this.evictUnusedArt();
+    });
 
     // Process only changed and new tokens (skip unchanged tokens entirely)
     for (const token of Object.values(tokensRecord)) {
@@ -1108,6 +1121,11 @@ export class TokenRenderer {
   /** Detaches a token group's pointer handlers, destroys it with all of its children and drops its hold on its art. */
   private destroyTokenGroup(id: string, tokenGroup: TokenGroupContainer): void {
     this.interactionController.removeInteractionHandlers(id, tokenGroup);
+    this.freeTokenGroup(tokenGroup);
+  }
+
+  /** Destroys a token group no longer listening to the pointer, with all of its children, and drops its hold on its art. */
+  private freeTokenGroup(tokenGroup: TokenGroupContainer): void {
     this.downedTokenOverlay.release(tokenGroup);
     this.spriteFactory.destroyTokenSprite(tokenGroup);
     this.textureCache.release(tokenGroup.artPath);
@@ -1126,6 +1144,7 @@ export class TokenRenderer {
 
   public destroy(): void {
     this.isDestroyed = true;
+    this.exit.finishAll();
 
     // Unsubscribe from store
     this._unsubscribeFromStore?.();
@@ -1349,12 +1368,17 @@ export class TokenRenderer {
     perception = this.playerFramePerception(perception);
     const isSeen = seenTokens(perception);
     this.playerBadges.pass(this.playerSight.sightIsCurrent() ? seenByPlayers(this.store.getState().objects.tokens, perception) : NOTHING_SEEN);
-    return [...this.playerSight.frameLayers(perception), ...this.uiManager.getPlayerViewLayers(settings, isSeen), ...this.playerBadges.layers(), ...this.dragRuler.getPlayerViewLayers(isSeen)];
+    return [...this.playerSight.frameLayers(perception), ...this.uiManager.getPlayerViewLayers(settings, isSeen), ...this.playerBadges.layers(), ...this.dragRuler.getPlayerViewLayers(isSeen), ...this.exit.playerViewLayers()];
   }
 
   /** How far a selected token's resources reach beyond its bottom, right and top edges, in world units. */
   public barsReach(tokenId: string): number {
     return this.uiManager.barsReach(tokenId);
+  }
+
+  /** What the ruler of the drag under way measures, or null while it shows none. */
+  public dragRulerPath(): DragRulerPath | null {
+    return this.dragRuler.path();
   }
 
   /** Tokens and their bars, nameplates and badges as the GM view shows them, whatever view the canvas is in: for a picture of the scene. */
