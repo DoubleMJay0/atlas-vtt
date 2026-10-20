@@ -69,7 +69,7 @@ describe('the recovery pane of the Resources tab', () => {
     expect(rail.bottom).toBeLessThan(stage.top);
     expect(rail.left).toBeCloseTo(strip.left, 0);
     expect(stage.left).toBeCloseTo(strip.left, 0);
-    const capsules = all('.atlas-rc-capsule, .atlas-rc-rail__add');
+    const capsules = all('.atlas-rc-rail .atlas-rc-capsule, .atlas-rc-rail__add');
     expect(capsules).toHaveLength(3);
     for (const capsule of capsules) expect(capsule.height).toBeCloseTo(30, 0);
     expect(new Set(capsules.map((capsule) => Math.round(capsule.top))).size).toBe(1);
@@ -89,10 +89,12 @@ describe('the recovery pane of the Resources tab', () => {
     expect(card.left).toBeGreaterThanOrEqual(stage.left);
     expect(card.right).toBeLessThanOrEqual(stage.right);
     expect(card.bottom).toBeLessThanOrEqual(stage.bottom);
-    // Nothing lies over the card's fields
+    // Nothing lies over the card's fields, once the card has come into view
     const input = page.getByRole('textbox', { name: 'At least' }).element();
-    const box = input.getBoundingClientRect();
-    expect(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)).toBe(input);
+    await expect.poll(() => {
+      const box = input.getBoundingClientRect();
+      return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    }).toBe(input);
   });
 
   it('offers the kinds a resource or counters take, and a condition\'s two, the rule\'s own chosen', async () => {
@@ -170,8 +172,8 @@ describe('the recovery pane of the Resources tab', () => {
     await press('Long rest{Enter}');
     expect(document.activeElement?.textContent).toBe('Long rest');
 
-    // Past Add to the card: hit points back to full, the rule a metric starts with
-    await press('{Tab}{Tab}');
+    // Past Add, Always and Add a step to the card: hit points back to full, the rule a metric starts with
+    await press('{Tab}{Tab}{Tab}{Tab}');
     expect(document.activeElement?.getAttribute('aria-label')).toBe('HP: not given back');
     await press('{Enter}');
     expect(document.activeElement).toBe(page.getByRole('radio', { name: 'Full' }).element());
@@ -254,6 +256,6 @@ describe('the recovery pane of the Resources tab', () => {
   it('says why a number that is no token resource cannot be picked', async () => {
     mountRecoveryDialog('dark');
     await userEvent.hover(document.querySelector<HTMLElement>('[data-block-id="statac01"] .atlas-rc-spot--refused')!);
-    await expect.poll(() => document.querySelector('[role="tooltip"]')?.textContent).toContain('Not a token resource');
+    await expect.poll(() => document.querySelector('[role="tooltip"]')?.textContent).toContain('Not tracked');
   });
 });

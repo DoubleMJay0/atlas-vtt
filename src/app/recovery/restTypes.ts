@@ -16,6 +16,9 @@ import type { RecoveryButton, RecoveryRule } from './recoveryTypes';
  * statblock's template fields, and where each of its values is held now.
  */
 export interface RestCharacter {
+  /** Who it is (the library token that is the character), and its name, as changes made to it are told. */
+  readonly id: string;
+  readonly name: string;
   readonly resources: readonly ResourceDefinition[];
   readonly conditions: readonly ConditionDefinition[];
   /** The template's fields by key. */
@@ -52,11 +55,30 @@ export interface SpendChoice {
   readonly each: string;
 }
 
+/**
+ * Where a rule stands in a rest, which spends and skips name: `always:2` (the button's third rule),
+ * `pick:0:1` (the second rule of the first action picked).
+ */
+export type RuleRef = string;
+
+export const alwaysRef = (rule: number): RuleRef => `always:${rule}`;
+export const pickRef = (pick: number, rule: number): RuleRef => `pick:${pick}:${rule}`;
+
+/** An action the player picked in one of the button's steps, for themselves (`for` null) or another player character, by its id. */
+export interface RestPick {
+  readonly choice: string;
+  readonly action: string;
+  readonly for: string | null;
+}
+
 /** A rule whose metrics were found. */
 export interface PlannedRule {
-  /** The rule's place in its button, which choices and skips name. */
+  /** The rule's place in the rest, in the order rules apply: the button's own, then each pick's. */
   readonly index: number;
+  readonly ref: RuleRef;
   readonly rule: RecoveryRule;
+  /** The character whose metric it changes: the one resting, or the one an action is taken for. */
+  readonly character: RestCharacter;
   readonly target: RestMetric;
   /** A Spend rule's source. */
   readonly source?: RestMetric;
@@ -72,11 +94,14 @@ export type RestSkip =
   | { readonly kind: 'unknown-resource' | 'static-resource' | 'no-value'; readonly key: string }
   | { readonly kind: 'unknown-field' | 'unreadable-counters'; readonly key: FieldKey }
   | { readonly kind: 'unknown-condition' | 'no-token'; readonly id: string }
+  /** An action taken for a character the rest cannot reach (gone from the table, no statblock of its own). */
+  | { readonly kind: 'unknown-ally'; readonly id: string }
   | { readonly kind: 'formula'; readonly problem: FormulaProblem }
   | { readonly kind: 'roll'; readonly formula: string };
 
 export interface SkippedRule {
   readonly index: number;
+  readonly ref: RuleRef;
   readonly rule: RecoveryRule;
   /** The metric it names, as the character calls it where it was found, else as the rule names it. */
   readonly label: string;
@@ -90,9 +115,10 @@ export interface RestPlan {
   readonly skipped: readonly SkippedRule[];
 }
 
-/** How many units each Spend rule spends, by the rule's index; a rule not named spends none. */
+/** What the player chose: the actions they picked, and how many units each Spend rule spends, by its reference (a rule not named spends none). */
 export interface RestChoices {
-  readonly spends: ReadonlyMap<number, number>;
+  readonly picks: readonly RestPick[];
+  readonly spends: ReadonlyMap<RuleRef, number>;
 }
 
 /** A roll a rest made, as shown in its summary: "2d8+2" for 11. */
@@ -119,6 +145,8 @@ export type RestChangeTarget =
  * number (0: gone).
  */
 export interface RestChange {
+  /** The character it was made to: the one resting, or one an action was taken for. */
+  readonly character: { readonly id: string; readonly name: string };
   readonly target: RestChangeTarget;
   readonly label: string;
   readonly from: number;
@@ -127,10 +155,15 @@ export interface RestChange {
   readonly rolls: readonly RestRoll[];
 }
 
-/** What a rest did: its changes in the order of their metrics' first rule, the skipped rules, and the values to write. */
+/** What a rest did: its changes in the order of their metrics' first rule, the skipped rules, and each character's values to write, by its id. */
 export interface RestOutcome {
   readonly changes: readonly RestChange[];
   readonly skipped: readonly SkippedRule[];
+  readonly byCharacter: ReadonlyMap<string, CharacterChanges>;
+}
+
+/** The values a rest changed of one character, as they are to be written. */
+export interface CharacterChanges {
   /** Each changed resource's value as it is to be written. */
   readonly resources: ReadonlyMap<string, ResourceValue>;
   /** Each changed Counters field's value as it is to be written, with the value it was planned from. */

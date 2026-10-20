@@ -27,11 +27,20 @@ function retargetRule(rule: RecoveryRule, keys: ReadonlyMap<string, string>): Re
   return rule.does === 'spend' ? { ...rule, target, from: retarget(rule.from, keys) } : { ...rule, target } as RecoveryRule;
 }
 
-/** The record with every rule on a resource whose key changes pointing at its saved key. */
+/** The record with every rule on a resource whose key changes pointing at its saved key, the rules of every action included. */
 export function withSavedResourceKeys(record: RecoveryRecord, keys: ReadonlyMap<string, string>): RecoveryRecord {
   if (keys.size === 0) return record;
   return Object.fromEntries(Object.entries(record).map(([templateId, buttons]) => [
     templateId,
-    buttons.map((button) => ({ ...button, rules: button.rules.map((rule) => retargetRule(rule, keys)) })),
+    buttons.map((button) => ({
+      ...button,
+      rules: button.rules.map((rule) => retargetRule(rule, keys)),
+      ...(button.choices && {
+        choices: button.choices.map((choice) => ({
+          ...choice,
+          actions: choice.actions.map((action) => ({ ...action, rules: action.rules.map((rule) => retargetRule(rule, keys)) })),
+        })),
+      }),
+    })),
   ]));
 }

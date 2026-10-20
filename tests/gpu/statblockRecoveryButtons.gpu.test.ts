@@ -23,7 +23,7 @@ vi.mock('../../src/app/services/statblockDiceLinks', () => ({
 }));
 vi.mock('../../src/app/statblocks/render/shared/useStatblockDiceRolling', () => ({ useStatblockDiceRolling: () => [undefined, null] }));
 vi.mock('../../src/app/recovery/takeRest', () => ({ takeRest: vi.fn() }));
-vi.mock('../../src/app/recovery/characterRest', () => ({ characterRestOf: vi.fn() }));
+vi.mock('../../src/app/recovery/characterRest', () => ({ characterRestOf: vi.fn(), characterRest: vi.fn(() => null) }));
 vi.mock('../../src/app/services/statblockRolls', () => ({ rollStatblockDice: vi.fn() }));
 
 const THEME = `body { margin: 0; font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --font-ui-smaller: 12px;

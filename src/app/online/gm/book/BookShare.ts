@@ -103,6 +103,7 @@ export class BookShare implements LootRecipientSource {
       rests: ports.rests, cards: ports.cards, randomId: () => ports.randomId(),
       answer: (player, request, outcome) => ports.send({ t: 'book-rest-answer', request, outcome }, player),
       character: (player) => this.characters.of(player),
+      played: () => this.characters.all(),
       mayWrite: (player) => this.isOnline(player) && this.rate.take(player, ports.now()),
       resend: (player) => this.whileRunning(() => this.resendStatblock(player)),
       changed: () => ports.cardsChanged(),

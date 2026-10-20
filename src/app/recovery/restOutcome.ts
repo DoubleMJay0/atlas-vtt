@@ -13,7 +13,7 @@ import { computeFormula, type FilledFormula } from './recoveryFormula';
 import { regainedRows, rowsLeftAt, sharedRows } from './restCounters';
 import { spendable } from './restPlan';
 import { metricChanges, type Ledger } from './restLedger';
-import type { PlannedRule, RestChoices, RestMetric, RestOutcome, RestPlan, RestRoll, RestRoller, RestSkip, SkippedRule } from './restTypes';
+import type { PlannedRule, RestChange, RestCharacter, RestChoices, RestMetric, RestOutcome, RestPlan, RestRoll, RestRoller, RestSkip, SkippedRule } from './restTypes';
 import { spendFormula } from './spendFormula';
 
 type Gain = { gain: number; roll: RestRoll | null } | RestSkip;
@@ -67,34 +67,35 @@ function nextCounters(planned: PlannedRule, metric: CountersMetric, gain: number
   }
 }
 
-/** What an Amount or Spend rule gives, or why it gives nothing. */
-function gainOf(planned: PlannedRule, choices: RestChoices, ledger: Ledger, roll: RestRoller, restName: string): Gain {
+/** What an Amount or Spend rule gives, or why it gives nothing; a Spend takes from the resting character (`actor`). */
+function gainOf(planned: PlannedRule, choices: RestChoices, actor: Ledger, roll: RestRoller, restName: string): Gain {
   const { rule, formula, target } = planned;
   if (rule.does === 'amount' && formula) {
     const result = worked(formula, `${target.label} (${restName})`, roll);
     return 'total' in result ? { gain: Math.max(rule.min ?? 0, result.total, 0), roll: result.roll } : result;
   }
   if (rule.does !== 'spend' || !formula || !planned.source) return { gain: 0, roll: null };
-  const units = Math.min(Math.max(0, Math.trunc(choices.spends.get(planned.index) ?? 0)), planned.spend?.max ?? 0, spendable(ledger.current(planned.source)));
+  const units = Math.min(Math.max(0, Math.trunc(choices.spends.get(planned.ref) ?? 0)), planned.spend?.max ?? 0, spendable(actor.current(planned.source)));
   if (units === 0) return { gain: 0, roll: null };
   const combined = spendFormula(formula, units);
   if (!combined.ok) return { kind: 'formula', problem: combined.problem };
   const result = worked(combined, `${planned.source.label} (${restName})`, roll);
   if (!('total' in result)) return result;
-  ledger.spend(planned.source, units);
+  actor.spend(planned.source, units);
   return { gain: Math.max(0, result.total), roll: result.roll };
 }
 
-/** Applies one rule to the ledger; the reason where it changed nothing it was meant to. */
-function applyRule(planned: PlannedRule, choices: RestChoices, ledger: Ledger, roll: RestRoller, restName: string): RestSkip | null {
+/** Applies one rule to its character's ledger; the reason where it changed nothing it was meant to. */
+function applyRule(planned: PlannedRule, choices: RestChoices, ledgers: Ledgers, roll: RestRoller, restName: string): RestSkip | null {
   const { rule } = planned;
+  const ledger = ledgers.of(planned.character);
   const target = ledger.current(planned.target);
   if (target.kind === 'condition') {
     const to = rule.does === 'step' ? Math.max(0, target.value + rule.by) : 0;
     ledger.setCondition(target, to);
     return null;
   }
-  const gain = gainOf(planned, choices, ledger, roll, restName);
+  const gain = gainOf(planned, choices, ledgers.actor, roll, restName);
   if (!('gain' in gain)) return gain;
   if (rule.does === 'spend' && gain.gain === 0 && gain.roll === null) return null;
   if (target.kind === 'resource') {
@@ -118,17 +119,46 @@ function applyRule(planned: PlannedRule, choices: RestChoices, ledger: Ledger, r
   return null;
 }
 
+/** The ledger of each character a rest changes, the resting one (`actor`) first. */
+interface Ledgers {
+  readonly actor: Ledger;
+  of(character: RestCharacter): Ledger;
+  outcome(): Omit<RestOutcome, 'skipped'>;
+}
+
+function restLedgers(actor: RestCharacter): Ledgers {
+  let touched = 0;
+  const next = (): number => touched++;
+  const byId = new Map<string, Ledger>([[actor.id, metricChanges(actor, next)]]);
+  return {
+    actor: byId.get(actor.id)!,
+    of: (character) => {
+      let ledger = byId.get(character.id);
+      if (!ledger) byId.set(character.id, ledger = metricChanges(character, next));
+      return ledger;
+    },
+    outcome: () => {
+      // Only characters the rest changed: the resting one may have changed nobody but an ally
+      const outcomes = [...byId].map(([id, ledger]) => [id, ledger.outcome()] as const).filter(([, outcome]) => outcome.changes.length > 0);
+      const changes = outcomes.flatMap(([, outcome]) => outcome.changes).sort((a, b) => a.order - b.order).map(({ order: _order, ...change }): RestChange => change);
+      const byCharacter = new Map(outcomes.map(([id, { resources, counters, conditions }]) => [id, { resources, counters, conditions }]));
+      return { changes, byCharacter };
+    },
+  };
+}
+
 /**
- * The changes `plan` makes with the player's `choices`, rolling through `roll`. A rule whose formula
- * cannot be rolled, or whose spend does not fit one roll, is skipped with the plan's skipped rules.
+ * The changes `plan` makes with the player's `choices`, rolling through `roll`: each rule on its
+ * character's values as the rules before it left them. A rule whose formula cannot be rolled, or
+ * whose spend does not fit one roll, is skipped with the plan's skipped rules.
  */
-export function restOutcome(plan: RestPlan, choices: RestChoices, roll: RestRoller): RestOutcome {
-  const ledger = metricChanges();
+export function restOutcome(plan: RestPlan, actor: RestCharacter, choices: RestChoices, roll: RestRoller): RestOutcome {
+  const ledgers = restLedgers(actor);
   const skipped: SkippedRule[] = [...plan.skipped];
   for (const planned of plan.rules) {
-    const reason = applyRule(planned, choices, ledger, roll, plan.button.name);
-    if (reason) skipped.push({ index: planned.index, rule: planned.rule, label: planned.target.label, reason });
+    const reason = applyRule(planned, choices, ledgers, roll, plan.button.name);
+    if (reason) skipped.push({ index: planned.index, ref: planned.ref, rule: planned.rule, label: planned.target.label, reason });
   }
   skipped.sort((a, b) => a.index - b.index);
-  return { ...ledger.outcome(), skipped };
+  return { ...ledgers.outcome(), skipped };
 }

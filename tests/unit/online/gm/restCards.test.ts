@@ -41,7 +41,7 @@ function requests(timers: Timers, cards: ArmedCards, overrides: Partial<RestRequ
   const answers: string[] = [];
   const changes = { count: 0 };
   const ports: RestRequestPorts = {
-    check: () => ({ button: 'Long rest', rules: ['Hit Points to full', 'Exhaustion −1'] }),
+    check: () => ({ button: 'Long rest', picks: [], rules: ['Hit Points to full', 'Exhaustion −1'] }),
     take: () => Promise.resolve('done'),
     plays: () => true,
     answer: (_player, answer) => void answers.push(answer.outcome),
@@ -53,8 +53,8 @@ function requests(timers: Timers, cards: ArmedCards, overrides: Partial<RestRequ
 }
 
 /** The checks of a test: a request for a button named `nap` fits nothing, any other its button's name. */
-const byButton = (_path: string, _character: string, request: { button: string }): { button: string; rules: string[] } | null =>
-  (request.button === 'nap' ? null : { button: request.button === 'short' ? 'Short rest' : 'Long rest', rules: ['Hit Points to full'] });
+const byButton = (_path: string, _character: string, request: { button: string }): { button: string; picks: string[]; rules: string[] } | null =>
+  (request.button === 'nap' ? null : { button: request.button === 'short' ? 'Short rest' : 'Long rest', picks: [], rules: ['Hit Points to full'] });
 
 describe('the cards over the online control', () => {
   it('share one arming clock: a rest request that goes starts a newcomer\'s card again, and the other way round', () => {
@@ -94,7 +94,7 @@ describe('the cards over the online control', () => {
 
   it('stack in the order they came, each kind drawn as one line with its answers', () => {
     const knock = { ...MIRA, answered: false, full: false, armed: true };
-    const rest = { key: restKey(CHARACTER), character: 'Brannoch', button: 'Long rest', rules: ['Hit Points to full', '2 Hit Dice'], armed: true, answered: false };
+    const rest = { key: restKey(CHARACTER), character: 'Brannoch', button: 'Long rest', picks: [], rules: ['Hit Points to full', '2 Hit Dice'], armed: true, answered: false };
     const gate = { admit: vi.fn(), decline: vi.fn() };
     const answers = { approve: vi.fn(), decline: vi.fn() };
     const cards = stackCards([...knockCards([knock], gate), ...restCards([rest], answers)], [restKey(CHARACTER), knockKey(MIRA.id)]);

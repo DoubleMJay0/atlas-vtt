@@ -113,7 +113,7 @@ describe('Recovery buttons in the statblock pane', () => {
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'Rest' })); });
     const [, , buttonId, choices] = takeRest.mock.calls[0]! as [unknown, unknown, string, { spends: Map<number, number> }];
     expect(buttonId).toBe('breath');
-    expect([...choices.spends]).toEqual([[0, 2]]);
+    expect([...choices.spends]).toEqual([['always:0', 2]]);
   });
 
   it('lets each row of counters name the rest that gives its uses back', async () => {

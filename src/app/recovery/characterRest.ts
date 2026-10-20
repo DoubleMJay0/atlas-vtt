@@ -142,6 +142,8 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
   };
 
   const character: RestCharacter = {
+    id: asset.id,
+    name: asset.name,
     resources: [...collection, ...[...tracked.values()].map((each) => each.definition)],
     conditions: settings.conditions ?? [],
     fields,

@@ -10,6 +10,8 @@ export interface RestCard {
   /** The name of the character who asks, as their sheet has it. */
   readonly character: string;
   readonly button: string;
+  /** The actions picked in the rest's steps, each with whom it is taken for where that is another character. */
+  readonly picks: readonly string[];
   /** What the rest will do, rule by rule. */
   readonly rules: readonly string[];
   /** The card has stood in its place for `ARM_MS`: until then it takes no answer, and looks it. */
@@ -51,8 +53,8 @@ interface Pending extends AskedRest {
 
 /** Whether two cards read the same: who asks, for what, doing what. */
 function sameCardText(a: RestCard, b: RestCard): boolean {
-  return a.character === b.character && a.button === b.button
-    && a.rules.length === b.rules.length && a.rules.every((rule, index) => rule === b.rules[index]);
+  const same = (x: readonly string[], y: readonly string[]): boolean => x.length === y.length && x.every((item, index) => item === y[index]);
+  return a.character === b.character && a.button === b.button && same(a.picks, b.picks) && same(a.rules, b.rules);
 }
 
 /** A rest request's card among the cards over the control (`ArmedCards`). */
@@ -108,7 +110,7 @@ export class RestRequests {
     }
     const key = restKey(asked.characterId);
     this.cards.show(key, this.heard);
-    const card: RestCard = { key, character: asked.name, button: checked.button, rules: checked.rules, armed: false, answered: false };
+    const card: RestCard = { key, character: asked.name, button: checked.button, picks: checked.picks, rules: checked.rules, armed: false, answered: false };
     this.list = [...this.list, { ...asked, card }];
     this.refresh();
     this.ports.changed();
@@ -160,7 +162,7 @@ export class RestRequests {
 
   /** A waiting request's place is taken by a newer one of its player: same card, which arms anew where it says something else now. */
   private replace(waiting: Pending, asked: AskedRest, checked: CheckedRest): void {
-    const card: RestCard = { ...waiting.card, character: asked.name, button: checked.button, rules: checked.rules };
+    const card: RestCard = { ...waiting.card, character: asked.name, button: checked.button, picks: checked.picks, rules: checked.rules };
     this.list = this.list.map((other) => (other === waiting ? { ...asked, card } : other));
     if (!sameCardText(waiting.card, card)) this.cards.rearm(card.key, this.heard);
     this.refresh();

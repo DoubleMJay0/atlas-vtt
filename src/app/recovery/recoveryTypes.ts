@@ -8,9 +8,13 @@
 
 import type { FieldKey, TemplateId } from '../statblocks/model/templateTypes';
 
-/** The most buttons one template offers, and the most rules one button holds. */
+/** The most buttons one template offers, and the most rules one button (or one action) holds. */
 export const MAX_RECOVERY_BUTTONS = 6;
 export const MAX_RECOVERY_RULES = 16;
+/** The most steps one button asks the player through, the most actions a step offers, and the most picks a step takes. */
+export const MAX_RECOVERY_CHOICES = 4;
+export const MAX_RECOVERY_ACTIONS = 8;
+export const MAX_ACTION_PICKS = 6;
 
 /** A collection resource, by its key (`ResourceDefinition.key`): HP, Stress. */
 export interface ResourceTarget {
@@ -99,13 +103,47 @@ export type RecoveryRule = FullRule | AmountRule | ShareRule | SetRule | SpendRu
 
 export type RecoveryRuleKind = RecoveryRule['does'];
 
+/**
+ * Something a player may do on a rest, picked in one of its button's steps ("Tend to Wounds"):
+ * its own rules, none where it changes nothing Atlas keeps ("Work on a Project").
+ */
+export interface RecoveryAction {
+  /** Never changes: requests and logs name it. */
+  id: string;
+  name: string;
+  /** What it does, in a sentence for the player. */
+  text?: string;
+  /** Applied in order, to the character it is taken for. */
+  rules: RecoveryRule[];
+  /** It may be taken for another player character instead (an ally's wounds); unset: for oneself only. */
+  forOthers?: true;
+}
+
+/**
+ * A step of a rest: the player picks from its actions, at least `min` and at most `max` of them
+ * ("Choose two downtime moves": 2 and 2; "up to two": 0 and 2), each once unless `repeat`.
+ */
+export interface RecoveryChoice {
+  /** Never changes: requests name it. */
+  id: string;
+  /** What the player is asked. */
+  prompt: string;
+  min: number;
+  max: number;
+  /** An action may be picked more than once. */
+  repeat?: true;
+  actions: RecoveryAction[];
+}
+
 export interface RecoveryButton {
   /** Never changes: requests, counter rows and logs name it. */
   id: string;
   /** "Long rest". */
   name: string;
-  /** Applied in order. */
+  /** Applied in order, every time, before what the player picks. */
   rules: RecoveryRule[];
+  /** Steps the player picks actions in, in order; unset or empty: the rest asks for nothing but its spends. */
+  choices?: RecoveryChoice[];
 }
 
 /** The buttons of each template, by template id. */

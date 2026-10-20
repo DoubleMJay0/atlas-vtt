@@ -1,4 +1,4 @@
-import { GM_AUTHOR, isRecord, MAX_LOG_ENTRIES, MAX_PLAYERS, parseLogEntry, PLAYER_ID_PATTERN, quoting, type LogEntry } from '../../protocol/index.ts';
+import { GM_AUTHOR, isRecord, MAX_LOG_ENTRIES, MAX_PLAYERS, parseLogEntry, PLAYER_ID_PATTERN, quoting, type LogEntry, type RestChange, type RestEntry } from '../../protocol/index.ts';
 import type { TokenEntity } from '../../../types';
 import type { DiceRollResult } from '../../../types/diceTypes';
 
@@ -32,7 +32,9 @@ export interface FoundPin {
  * `speakerArt`: the vault path of the speaking token's artwork, which its viewers may be sent.
  * `imageFile`: the vault path of an image the GM showed, which players may be sent while it is logged.
  * `pin`: the readable pin a found note was found at.
- * `restPlayers`: the players of a rest's character, who alone are sent what it changed.
+ * `restPlayers`: the players of a rest's character, who alone are sent all it changed.
+ * `changePlayers`: beside each change of a rest, the players of the other character it was made to
+ * (an action taken for them), who are sent that change; none for a change to the character resting.
  */
 export type GmLogEntry = LogEntry & {
   readonly hidden?: true;
@@ -41,6 +43,7 @@ export type GmLogEntry = LogEntry & {
   readonly imageFile?: string;
   readonly pin?: FoundPin;
   readonly restPlayers?: readonly string[];
+  readonly changePlayers?: readonly (readonly string[])[];
 };
 
 /** The token the GM's log names for an entry, when it holds one. */
@@ -50,7 +53,7 @@ export function faceOf(entry: LogEntry): RollFace | undefined {
 
 /** An entry as players are sent it: without what only the GM's log has. */
 export function sharedEntry(entry: GmLogEntry): LogEntry {
-  const { hidden: _hidden, face: _face, speakerArt: _art, imageFile: _file, pin: _pin, restPlayers: _players, ...shared } = entry;
+  const { hidden: _hidden, face: _face, speakerArt: _art, imageFile: _file, pin: _pin, restPlayers: _players, changePlayers: _changePlayers, ...shared } = entry;
   return shared;
 }
 
@@ -73,17 +76,25 @@ export function seesWhole(entry: LogEntry, viewer: string): boolean {
   return author || entry.to.includes(viewer);
 }
 
+/** The changes of a rest made to another character whose player `viewer` is, in order. */
+function changesFor(entry: GmLogEntry, changes: RestEntry['changes'], viewer: string): RestChange[] {
+  return (changes ?? []).filter((_change, index) => entry.changePlayers?.[index]?.includes(viewer) ?? false);
+}
+
 /**
  * An entry as one viewer is sent it (`'gm'` or a player's id): whole, a line that a roll was made
- * in private, a rest without what it changed (to anyone but its character's players), or nothing
- * (a whisper to others, a GM's roll players are not shown).
+ * in private, a rest without what it changed (to anyone but its character's players: a player of a
+ * character an action was taken for gets the changes made to that character alone), or nothing (a
+ * whisper to others, a GM's roll players are not shown).
  */
 export function viewOf(entry: GmLogEntry, viewer: string): LogEntry | null {
   if (entry.hidden === true) return viewer === GM_AUTHOR ? sharedEntry(entry) : null;
   const shared = sharedEntry(entry);
   if (shared.kind === 'rest' && !seesRestChanges(entry, viewer)) {
-    const { changes: _changes, skipped: _skipped, ...title } = shared;
-    return title;
+    const { changes, skipped: _skipped, ...title } = shared;
+    // Their character's changes without the rolls, which carry the resting character's numbers
+    const theirs = changesFor(entry, changes, viewer).map(({ roll: _roll, ...change }) => change);
+    return theirs.length > 0 ? { ...title, changes: theirs } : title;
   }
   if (seesWhole(entry, viewer)) return shared;
   if (entry.kind !== 'roll' || entry.mode === undefined) return null;
@@ -110,6 +121,12 @@ function readFace(value: unknown): RollFace | undefined {
   if (!isRecord(value) || typeof value.name !== 'string' || value.name === '' || value.name.length > MAX_FACE_TEXT) return undefined;
   const image = typeof value.image === 'string' && value.image !== '' && value.image.length <= MAX_FACE_TEXT ? value.image : null;
   return { name: value.name, image };
+}
+
+/** Beside each change of a rest, the players of the character it was made to, as kept with the entry; undefined where they do not fit its changes. */
+function readChangePlayers(value: unknown, entry: LogEntry): string[][] | undefined {
+  if (entry.kind !== 'rest' || !Array.isArray(value) || value.length !== (entry.changes?.length ?? 0)) return undefined;
+  return value.map((players) => readPlayerIds(players) ?? []);
 }
 
 /** Players' ids as kept with an entry, each once; undefined where none reads. */
@@ -145,6 +162,7 @@ function readLogEntries(saved: unknown): GmLogEntry[] {
     const imageFile = entry.kind === 'image' ? vaultPath(value.imageFile) : undefined;
     const pin = entry.kind === 'found' ? readFoundPin(value.pin) : undefined;
     const restPlayers = entry.kind === 'rest' ? readPlayerIds(value.restPlayers) : undefined;
+    const changePlayers = readChangePlayers(value.changePlayers, entry);
     entries.push({
       ...entry,
       ...(value.hidden === true && { hidden: true as const }),
@@ -153,6 +171,7 @@ function readLogEntries(saved: unknown): GmLogEntry[] {
       ...(imageFile !== undefined && { imageFile }),
       ...(pin !== undefined && { pin }),
       ...(restPlayers !== undefined && { restPlayers }),
+      ...(changePlayers !== undefined && { changePlayers }),
     });
   }
   return entries;

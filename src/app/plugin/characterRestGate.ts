@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { t } from '../i18n';
-import type { CheckedRest, RestGate } from '../online/gm/book/restGate.ts';
-import { restRulesText } from '../online/gm/book/restRules.ts';
+import type { CheckedRest, RestAlly, RestGate } from '../online/gm/book/restGate.ts';
+import { restPicksText, restRulesText } from '../online/gm/book/restRules.ts';
 import { quietRoll } from '../online/gm/quietRoll.ts';
 import { characterRest, type CharacterRest } from '../recovery/characterRest';
 import type { RecoveryButton } from '../recovery/recoveryTypes';
@@ -9,6 +9,7 @@ import { onRested } from '../recovery/restEvents';
 import { checkRest, restOffers, type RestRequest } from '../recovery/restOffer';
 import { restPlan } from '../recovery/restPlan';
 import type { RestChoices, RestRoller } from '../recovery/restTypes';
+import type { AllyRests } from '../recovery/restWrites';
 import { takeRest } from '../recovery/takeRest';
 import { diceSetOfCollection } from '../services/diceSets/collectionDiceSets';
 import { templateDiceSet } from '../statblocks/resolve/templateDiceSet';
@@ -21,11 +22,32 @@ function restOf(app: App, path: string, character: string): CharacterRest | null
   return rest !== null && rest.asset.id === character && rest.buttons.length > 0 ? rest : null;
 }
 
-/** The request checked against what the character offers now: the button it takes and the choices it makes, or null. */
-function checked(rest: CharacterRest, request: RestRequest): { button: RecoveryButton; choices: RestChoices } | null {
-  const fit = checkRest(restOffers(rest.buttons, rest.character), request);
+/**
+ * The other characters at the table Atlas reaches as player characters, as a rest finds them by id:
+ * each the player character whose statblock its note is, read as the note panel reads it.
+ */
+function allyRests(app: App, allies: readonly RestAlly[], resting: string): { reach: AllyRests; ids: Set<string> } {
+  const found = new Map<string, CharacterRest>();
+  for (const ally of allies) {
+    if (ally.character === resting || found.has(ally.character)) continue;
+    const rest = characterRest(app, ally.path);
+    if (rest !== null && rest.asset.id === ally.character) found.set(ally.character, rest);
+  }
+  return { reach: (id) => found.get(id) ?? null, ids: new Set(found.keys()) };
+}
+
+interface Checked {
+  readonly button: RecoveryButton;
+  readonly choices: RestChoices;
+  readonly allies: AllyRests;
+}
+
+/** The request checked against what the character offers now, actions for others only for `allies`: the button it takes, the choices it makes and the allies it reaches, or null. */
+function checked(app: App, rest: CharacterRest, request: RestRequest, allies: readonly RestAlly[]): Checked | null {
+  const reached = allyRests(app, allies, rest.asset.id);
+  const fit = checkRest(restOffers(rest.buttons, rest.character), request, reached.ids);
   const button = fit === null ? undefined : rest.buttons.find((each) => each.id === fit.button.id);
-  return fit === null || button === undefined ? null : { button, choices: fit.choices };
+  return fit === null || button === undefined ? null : { button, choices: fit.choices, allies: reached.reach };
 }
 
 /**
@@ -52,17 +74,22 @@ export function characterRestGate(app: App): RestGate {
       const rest = restOf(app, path, character);
       return rest === null ? null : restOffers(rest.buttons, rest.character);
     },
-    check: (path, character, request): CheckedRest | null => {
+    check: (path, character, request, allies): CheckedRest | null => {
       const rest = restOf(app, path, character);
-      const fit = rest === null ? null : checked(rest, request);
+      const fit = rest === null ? null : checked(app, rest, request, allies);
       if (rest === null || fit === null) return null;
-      return { button: fit.button.name, rules: restRulesText(restPlan(fit.button, rest.character), fit.choices) };
+      const plan = restPlan(fit.button, rest.character, fit.choices.picks, (id) => fit.allies(id)?.character ?? null);
+      return {
+        button: fit.button.name,
+        picks: restPicksText(fit.button, fit.choices.picks, (id) => fit.allies(id)?.asset.name ?? id),
+        rules: restRulesText(plan, fit.choices, rest.asset.id),
+      };
     },
-    take: async (path, character, request) => {
+    take: async (path, character, request, allies) => {
       const rest = restOf(app, path, character);
-      const fit = rest === null ? null : checked(rest, request);
+      const fit = rest === null ? null : checked(app, rest, request, allies);
       if (rest === null || fit === null) return 'refused';
-      const taken = await takeRest(app, rest, fit.button.id, fit.choices, quietRoller(app, rest));
+      const taken = await takeRest(app, rest, fit.button.id, fit.choices, quietRoller(app, rest), undefined, fit.allies);
       // The rest went through but its counters did not: the GM is told, as the note panel tells them.
       if (taken?.problem) showNotice(`${taken.summary.text}\n${t('rest.failed', { problem: taken.problem })}`);
       return taken === null ? 'refused' : 'done';

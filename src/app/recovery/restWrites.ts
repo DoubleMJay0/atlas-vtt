@@ -1,5 +1,5 @@
 /**
- * Writing what a rest changed, the way the GM's own edits are written: a resource on the token it
+ * Writing what a rest changed of every character it changed, the way the GM's own edits are written: a resource on the token it
  * was read from (one undo step per map, which `PartyReconciler` carries to the played campaign's
  * values) or else into those values (no undo step); a condition on every token of the character
  * on an open map; counters into the note through the note writer, one patch per field with the
@@ -8,6 +8,7 @@
 
 import type { App } from 'obsidian';
 import { PartySync } from '../campaigns/partyValues/PartySync';
+import type { ResourceHolder } from '../resources/resourceTypes';
 import { resourceUpdate } from '../resources/resourceValues';
 import { runHistoryTransaction } from '../stores/history';
 import type { ViewAtlasStore } from '../storeFactory';
@@ -18,7 +19,7 @@ import type { NotePatch } from '../statblocks/notes/patchTypes';
 import { readField } from '../statblocks/values/fieldValues';
 import type { TokenUpdates } from '../types/viewState';
 import type { CharacterRest } from './characterRest';
-import type { RestOutcome } from './restTypes';
+import type { CharacterChanges, RestOutcome } from './restTypes';
 
 /** One Counters field to write: its patches, and the value they start from and lead to. */
 export interface CounterWrite {
@@ -40,49 +41,82 @@ export function noteCounterWriter(app: App, notePath: string): CounterWriter {
 }
 
 interface StoreWrites {
-  resources: Array<{ id: string; changes: TokenUpdates }>;
+  /** Each token's resources as the rest leaves them, every changed key of it in one record. */
+  resources: Map<string, ResourceHolder>;
   conditions: Array<{ tokenIds: string[]; id: string; value: number }>;
 }
 
-/** Writes the rest's resources and conditions on the maps and into the campaign's values. */
-function writeScene(app: App, rest: CharacterRest, outcome: RestOutcome): void {
+/** One character's part of a rest: where its values live, and what the rest changed of them. */
+interface CharacterWrite {
+  readonly rest: CharacterRest;
+  readonly changes: CharacterChanges;
+}
+
+/** Writes the rest's resources and conditions on the maps (one undo step per map, every character's together) and into the campaign's values. */
+function writeScene(app: App, parts: readonly CharacterWrite[]): void {
   const byStore = new Map<ViewAtlasStore, StoreWrites>();
   const writesOf = (store: ViewAtlasStore): StoreWrites => {
     let writes = byStore.get(store);
-    if (!writes) byStore.set(store, writes = { resources: [], conditions: [] });
+    if (!writes) byStore.set(store, writes = { resources: new Map(), conditions: [] });
     return writes;
   };
-  for (const [key, value] of outcome.resources) {
-    const place = rest.resourcePlace(key);
-    if (place?.kind === 'party') {
-      const sync = PartySync.forApp(app);
-      sync?.setValue(place.campaignId, rest.asset.id, key, { ...sync.value(place.campaignId, rest.asset.id, key), ...value });
-    } else if (place?.kind === 'token') {
-      const token = place.store.getState().objects.tokens[place.tokenId];
-      if (token) writesOf(place.store).resources.push({ id: place.tokenId, changes: resourceUpdate(token, key, value, false) });
+  for (const { rest, changes } of parts) {
+    for (const [key, value] of changes.resources) {
+      const place = rest.resourcePlace(key);
+      if (place?.kind === 'party') {
+        const sync = PartySync.forApp(app);
+        sync?.setValue(place.campaignId, rest.asset.id, key, { ...sync.value(place.campaignId, rest.asset.id, key), ...value });
+      } else if (place?.kind === 'token') {
+        const token = place.store.getState().objects.tokens[place.tokenId];
+        if (!token) continue;
+        // Several resources of one token: each update starts from what the ones before it left
+        const writes = writesOf(place.store);
+        const held = writes.resources.get(place.tokenId) ?? token;
+        writes.resources.set(place.tokenId, { ...held, ...resourceUpdate(held, key, value, false) });
+      }
     }
-  }
-  for (const [id, value] of outcome.conditions) {
-    for (const { store, tokenIds } of rest.holds) writesOf(store).conditions.push({ tokenIds: [...tokenIds], id, value });
+    for (const [id, value] of changes.conditions) {
+      for (const { store, tokenIds } of rest.holds) writesOf(store).conditions.push({ tokenIds: [...tokenIds], id, value });
+    }
   }
   for (const [store, writes] of byStore) {
     runHistoryTransaction(store, () => {
       const state = store.getState();
-      if (writes.resources.length > 0) state.updateTokens(writes.resources);
+      const updates = [...writes.resources].map(([id, held]): { id: string; changes: TokenUpdates } => ({ id, changes: { resources: held.resources ?? {} } }));
+      if (updates.length > 0) state.updateTokens(updates);
       for (const { tokenIds, id, value } of writes.conditions) state.setTokensConditionValue(tokenIds, id, value > 0 ? value : null);
     });
   }
 }
 
-/**
- * Writes everything a rest changed. Counters go through `writeCounters` (the app's note writer
- * unless given); answers why they could not be written, or null.
- */
-export async function writeRest(app: App, rest: CharacterRest, outcome: RestOutcome, writeCounters: CounterWriter = noteCounterWriter(app, rest.notePath)): Promise<string | null> {
-  writeScene(app, rest, outcome);
-  const counters = [...outcome.counters.values()].map(({ field, base, next }): CounterWrite => {
+/** Another player character a rest changed, by its id, ready to be written; null where it cannot be reached. */
+export type AllyRests = (id: string) => CharacterRest | null;
+
+const NO_ALLY_RESTS: AllyRests = () => null;
+
+/** One character's counters, written into its note through `writeCounters`; why they could not be, or null. */
+function writeCharacterCounters({ rest, changes }: CharacterWrite, writeCounters: CounterWriter): Promise<string | null> {
+  const counters = [...changes.counters.values()].map(({ field, base, next }): CounterWrite => {
     const read = readField(rest.record, field);
     return { field, base, next, patches: fieldPatches(field.key, { ...read, value: base }, next) };
   });
-  return counters.length > 0 ? writeCounters(counters) : null;
+  return counters.length > 0 ? writeCounters(counters) : Promise.resolve(null);
+}
+
+/**
+ * Writes everything a rest changed, of the resting character (`rest`) and of every other one an
+ * action was taken for (`allies`). The resting character's counters go through `writeCounters`
+ * (the app's note writer unless given), another's through the app's note writer for its note;
+ * answers why some could not be written, or null.
+ */
+export async function writeRest(
+  app: App, rest: CharacterRest, outcome: RestOutcome, writeCounters: CounterWriter = noteCounterWriter(app, rest.notePath), allies: AllyRests = NO_ALLY_RESTS,
+): Promise<string | null> {
+  const parts = [...outcome.byCharacter].flatMap(([id, changes]): CharacterWrite[] => {
+    const owner = id === rest.asset.id ? rest : allies(id);
+    return owner ? [{ rest: owner, changes }] : [];
+  });
+  writeScene(app, parts);
+  const problems = await Promise.all(parts.map((part) => writeCharacterCounters(part, part.rest === rest ? writeCounters : noteCounterWriter(app, part.rest.notePath))));
+  return problems.find((problem) => problem !== null) ?? null;
 }

@@ -8,6 +8,7 @@ import type { StatblockTemplate } from '../../../../statblocks/model/templateTyp
 import type { ConditionMetric, SheetMetrics } from '../../../../recovery/editor/recoveryMetrics';
 import { metricKey, numberFields } from '../../../../recovery/editor/recoveryMetrics';
 import { ruleFor } from '../../../../recovery/editor/recoveryEdits';
+import { scopeKey, scopeName, type RuleScope } from '../../../../recovery/editor/recoveryScope';
 import { ruleBadge } from '../../../../recovery/editor/ruleBadge';
 import type { RecoveryButton, RecoveryRuleKind, RecoveryTarget } from '../../../../recovery/recoveryTypes';
 import type { ResourceDefinition } from '../../../../resources/resourceTypes';
@@ -25,6 +26,8 @@ interface RecoveryStageProps {
   chips: readonly ConditionMetric[];
   resources: readonly ResourceDefinition[];
   button: RecoveryButton | null;
+  /** What of the button the spots edit: its own rules, or one action's. */
+  scope: RuleScope;
   buttons: readonly RecoveryButton[];
   editing: RuleEditing;
   spots: Spots;
@@ -70,7 +73,7 @@ const STAGE_BORDERS = 2;
  * picked metric hanging from its row.
  */
 export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
-  const { template, name, metrics, chips, resources, button, buttons, editing, spots, onPick, onSpotKey, active, onActive, onKind, onPickSource, onRemove } = props;
+  const { template, name, metrics, chips, resources, button, scope, buttons, editing, spots, onPick, onSpotKey, active, onActive, onKind, onPickSource, onRemove } = props;
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
   const fields = useMemo(() => sampleRecord(template), [template]);
   const picked = editing.picked;
@@ -94,13 +97,13 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
       ?? targetName(target);
   };
   const badgeOf = (target: RecoveryTarget): string | null => {
-    const rule = button ? ruleFor(button, target) : undefined;
+    const rule = button ? ruleFor(button, target, scope) : undefined;
     return rule ? ruleBadge(rule, nameOf) : null;
   };
   const sources = editing.spending && picked
     ? new Set(metrics.metrics.filter((metric) => metricKey(metric.target) !== metricKey(picked.target)).map((metric) => metric.spotId))
     : null;
-  const shared: SpotShared = { badgeOf: button?.id ?? '', register: spots.register, onPick, onKeyDown: onSpotKey, onFocus: onActive };
+  const shared: SpotShared = { badgeOf: button ? `${button.id}:${scopeKey(scope)}` : '', register: spots.register, onPick, onKeyDown: onSpotKey, onFocus: onActive };
   const chrome = button
     ? recoveryChrome({ metrics, shared, badgeOf: (metric) => badgeOf(metric.target), picked: picked?.spotId ?? null, sources, tabStop: active })
     : null;
@@ -132,7 +135,7 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
             rule: editing.rule,
             metric: pickedLabel,
             color,
-            button,
+            owner: scopeName(button, scope),
             buttons,
             fields: numberFields(template),
             nameOf,

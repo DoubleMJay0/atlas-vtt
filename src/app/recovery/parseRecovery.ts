@@ -10,17 +10,24 @@ import { isValidTemplateId } from '../statblocks/model/templateIds';
 import type { TemplateId } from '../statblocks/model/templateTypes';
 import { FORMULA_LIMITS } from '../tools/formulaTypes';
 import {
+  MAX_ACTION_PICKS,
+  MAX_RECOVERY_ACTIONS,
   MAX_RECOVERY_BUTTONS,
+  MAX_RECOVERY_CHOICES,
   MAX_RECOVERY_RULES,
   type ConditionTarget,
+  type RecoveryAction,
   type RecoveryButton,
+  type RecoveryChoice,
   type RecoveryRecord,
   type RecoveryRule,
   type ResourceOrCounters,
 } from './recoveryTypes';
 
 /** The longest id or name a button, metric or field may have. */
-const MAX_RECOVERY_TEXT = 100;
+export const MAX_RECOVERY_TEXT = 100;
+/** The longest text an action has. */
+export const MAX_ACTION_TEXT = 400;
 /** The largest number a rule names (a minimum, a value to set, a cap, a step). */
 const MAX_RECOVERY_NUMBER = 1_000_000;
 
@@ -149,30 +156,72 @@ export function parseRecoveryRule(raw: unknown): RecoveryRule | undefined {
   return condition ? conditionRule(raw, condition) : undefined;
 }
 
-/** One button: an id and a name, and the rules it can read, the first `MAX_RECOVERY_RULES`. */
+/** The rules of a list that can be read, the first `MAX_RECOVERY_RULES`; undefined where it is no list. */
+function ruleList(raw: unknown): RecoveryRule[] | undefined {
+  return Array.isArray(raw) ? raw.flatMap((rule) => parseRecoveryRule(rule) ?? []).slice(0, MAX_RECOVERY_RULES) : undefined;
+}
+
+/** Entries that can be read, the first of each id, at most `most`. */
+function uniqueById<T extends { id: string }>(raw: unknown, read: (entry: unknown) => T | undefined, most: number): T[] {
+  if (!Array.isArray(raw)) return [];
+  const ids = new Set<string>();
+  const kept: T[] = [];
+  for (const entry of raw) {
+    const item = read(entry);
+    if (!item || ids.has(item.id)) continue;
+    ids.add(item.id);
+    kept.push(item);
+    if (kept.length === most) break;
+  }
+  return kept;
+}
+
+/** One action: an id, a name and its rules (none is fine), a text and whether it may be taken for another. */
+export function parseRecoveryAction(raw: unknown): RecoveryAction | undefined {
+  if (!isRecord(raw)) return undefined;
+  const id = name(own(raw, 'id'));
+  const label = name(own(raw, 'name'));
+  const rules = ruleList(own(raw, 'rules'));
+  if (id === undefined || label === undefined || rules === undefined) return undefined;
+  const written = own(raw, 'text');
+  const text = typeof written === 'string' ? written.trim().slice(0, MAX_ACTION_TEXT) : '';
+  return { id, name: label.trim(), rules, ...(text !== '' && { text }), ...(own(raw, 'forOthers') === true && { forOthers: true }) };
+}
+
+/**
+ * One step: an id, a prompt, how many picks it takes (`min` 0 to `max`, `max` 1 to
+ * `MAX_ACTION_PICKS`) and at least one action that can be read. A step whose counts do not read is
+ * left out: guessing them would let a player take more, or fewer, than the rules allow.
+ */
+export function parseRecoveryChoice(raw: unknown): RecoveryChoice | undefined {
+  if (!isRecord(raw)) return undefined;
+  const id = name(own(raw, 'id'));
+  const prompt = name(own(raw, 'prompt'));
+  const max = whole(own(raw, 'max'), 1);
+  const min = whole(own(raw, 'min'), 0);
+  if (id === undefined || prompt === undefined || max === undefined || min === undefined || max > MAX_ACTION_PICKS || min > max) return undefined;
+  const actions = uniqueById(own(raw, 'actions'), parseRecoveryAction, MAX_RECOVERY_ACTIONS);
+  if (actions.length === 0) return undefined;
+  const repeat = own(raw, 'repeat') === true;
+  // Without repeats a step cannot ask for more picks than it has actions
+  if (!repeat && min > actions.length) return undefined;
+  return { id, prompt: prompt.trim(), min, max: repeat ? max : Math.min(max, actions.length), ...(repeat && { repeat: true }), actions };
+}
+
+/** One button: an id and a name, the rules it can read, the first `MAX_RECOVERY_RULES`, and its steps. */
 export function parseRecoveryButton(raw: unknown): RecoveryButton | undefined {
   if (!isRecord(raw)) return undefined;
   const id = name(own(raw, 'id'));
   const label = name(own(raw, 'name'));
-  const rules = own(raw, 'rules');
-  if (id === undefined || label === undefined || !Array.isArray(rules)) return undefined;
-  const read = rules.flatMap((rule) => parseRecoveryRule(rule) ?? []).slice(0, MAX_RECOVERY_RULES);
-  return { id, name: label.trim(), rules: read };
+  const rules = ruleList(own(raw, 'rules'));
+  if (id === undefined || label === undefined || rules === undefined) return undefined;
+  const choices = uniqueById(own(raw, 'choices'), parseRecoveryChoice, MAX_RECOVERY_CHOICES);
+  return { id, name: label.trim(), rules, ...(choices.length > 0 && { choices }) };
 }
 
 /** A template's buttons that can be read, the first of each id, the first `MAX_RECOVERY_BUTTONS`. */
 export function parseRecoveryButtons(raw: unknown): RecoveryButton[] {
-  if (!Array.isArray(raw)) return [];
-  const ids = new Set<string>();
-  const buttons: RecoveryButton[] = [];
-  for (const entry of raw) {
-    const button = parseRecoveryButton(entry);
-    if (!button || ids.has(button.id)) continue;
-    ids.add(button.id);
-    buttons.push(button);
-    if (buttons.length === MAX_RECOVERY_BUTTONS) break;
-  }
-  return buttons;
+  return uniqueById(raw, parseRecoveryButton, MAX_RECOVERY_BUTTONS);
 }
 
 /**

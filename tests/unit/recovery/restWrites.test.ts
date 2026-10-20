@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterRest } from '../../../src/app/recovery/characterRest';
-import type { RestOutcome } from '../../../src/app/recovery/restTypes';
+import type { CharacterChanges, RestOutcome } from '../../../src/app/recovery/restTypes';
 import { writeRest, type CounterWrite } from '../../../src/app/recovery/restWrites';
 import { createViewAtlasStore } from '../../../src/app/storeFactory';
 import { getHistoryStore } from '../../../src/app/stores/history';
@@ -34,13 +34,14 @@ function setUp() {
     buttons: [],
     character: restCharacter(),
     holds: [{ store, tokenIds: ['a', 'b'] }],
-    resourcePlace: (key) => (key === 'hp' ? { kind: 'token', store, tokenId: 'a' } : key === 'stress' ? { kind: 'party', campaignId: 'camp' } : null),
+    resourcePlace: (key) => (key === 'hp' || key === 'hitDice' ? { kind: 'token', store, tokenId: 'a' } : key === 'stress' ? { kind: 'party', campaignId: 'camp' } : null),
   };
   return { app, store, rest, record };
 }
 
-function outcome(parts: Partial<RestOutcome>): RestOutcome {
-  return { changes: [], skipped: [], resources: new Map(), counters: new Map(), conditions: new Map(), ...parts };
+/** A rest that changed Mira's values by `parts`. */
+function outcome(parts: Partial<CharacterChanges>): RestOutcome {
+  return { changes: [], skipped: [], byCharacter: new Map([['mira', { resources: new Map(), counters: new Map(), conditions: new Map(), ...parts }]]) };
 }
 
 describe('writeRest', () => {
@@ -53,6 +54,12 @@ describe('writeRest', () => {
     expect(a?.conditionValues).toEqual({ exhaustion: 1 });
     expect(b?.conditionValues).toEqual({ exhaustion: 1 });
     expect(getHistoryStore(store)?.getState().pastStates.length ?? 0).toBe(before + 1);
+  });
+
+  it('writes every resource it changed of one token, not only the last', async () => {
+    const { app, store, rest } = setUp();
+    await writeRest(app, rest, outcome({ resources: new Map([['hp', { current: 20, max: 20 }], ['hitDice', { current: 3, max: 4 }]]) }), async () => null);
+    expect(store.getState().objects.tokens.a?.resources).toEqual({ hp: { current: 20, max: 20 }, hitDice: { current: 3, max: 4 } });
   });
 
   it('takes a condition at 0 off every token', async () => {

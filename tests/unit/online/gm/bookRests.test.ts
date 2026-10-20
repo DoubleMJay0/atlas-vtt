@@ -40,15 +40,17 @@ const TEMPLATE = templateOf(FIELDS, BLOCKS);
 const note = (name: string): string => ['---', 'statblock: true', `atlas-template: ${TEMPLATE.id}`, `name: ${name}`, 'speed: 30 ft.', '---', ''].join('\n');
 
 const OFFERS: RestOffer[] = [
-  { id: 'short', name: 'Short rest', spends: [{ rule: 0, label: 'Hit Dice', each: '1d8+(2)', max: 3 }] },
-  { id: 'long', name: 'Long rest', spends: [] },
+  { id: 'short', name: 'Short rest', spends: [{ rule: 0, label: 'Hit Dice', each: '1d8+(2)', max: 3 }], choices: [] },
+  { id: 'long', name: 'Long rest', spends: [], choices: [] },
 ];
 
+const BRANNOCH = { id: BRANNOCH_PC, name: 'Brannoch' };
+
 const SUMMARY: RestSummary = {
-  characterId: BRANNOCH_PC, characterName: 'Brannoch', notePath: BRANNOCH_NOTE, button: { id: 'short', name: 'Short rest' },
+  characterId: BRANNOCH_PC, characterName: 'Brannoch', notePath: BRANNOCH_NOTE, button: { id: 'short', name: 'Short rest' }, picks: [],
   changes: [
-    { target: { kind: 'resource', key: 'hp' }, label: 'Hit Points', from: 4, to: 13, rolls: [{ formula: '2d8+(2)', total: 9 }] },
-    { target: { kind: 'counters', key: 'hitDice', row: 0 }, label: 'Hit Dice', from: 3, to: 1, rolls: [] },
+    { character: BRANNOCH, target: { kind: 'resource', key: 'hp' }, label: 'Hit Points', from: 4, to: 13, rolls: [{ formula: '2d8+(2)', total: 9 }] },
+    { character: BRANNOCH, target: { kind: 'counters', key: 'hitDice', row: 0 }, label: 'Hit Dice', from: 3, to: 1, rolls: [] },
   ],
   skipped: [{ index: 2, rule: { target: { kind: 'condition', id: 'exhaustion' }, does: 'step', by: -1 }, label: 'Exhaustion', reason: { kind: 'no-token', id: 'exhaustion' } }],
   text: 'Short rest: Hit Points 4 → 13',
@@ -67,7 +69,7 @@ class FakeRests implements RestGate {
   check(path: string, character: string, request: RestRequest): CheckedRest | null {
     const offers = this.offers(path, character);
     const fit = offers === null ? null : checkRest(offers, request);
-    return fit === null ? null : { button: fit.button.name, rules: ['Hit Points to full', `${request.spends[0] ?? 0} Hit Dice`] };
+    return fit === null ? null : { button: fit.button.name, picks: [], rules: ['Hit Points to full', `${request.spends[0] ?? 0} Hit Dice`] };
   }
 
   take(path: string, character: string, request: RestRequest): Promise<TakenRest> {
@@ -180,7 +182,7 @@ describe('rests a player asks the GM for at a running table', () => {
     from(ANA, { t: 'book-rest', request: SECOND, character: characterId, button: 'short', spends: [2] });
     await advance(100);
     expect(answers(delivered(socket).slice(since), ANA)).toEqual([]);
-    expect(online.table?.rests.cards()).toEqual([{ key, character: 'Brannoch', button: 'Short rest', rules: ['Hit Points to full', '2 Hit Dice'], armed: false, answered: false }]);
+    expect(online.table?.rests.cards()).toEqual([{ key, character: 'Brannoch', button: 'Short rest', picks: [], rules: ['Hit Points to full', '2 Hit Dice'], armed: false, answered: false }]);
 
     // A press before the card has stood long enough is not meant.
     online.table?.rests.approve(key);
@@ -305,7 +307,8 @@ describe('rests a player asks the GM for at a running table', () => {
 
   it('logs no rest of a character nobody at the table plays', async () => {
     const { online } = await restingTable();
-    rests.announce({ ...SUMMARY, characterId: 'npc-stranger', characterName: 'Stranger' });
+    const stranger = { id: 'npc-stranger', name: 'Stranger' };
+    rests.announce({ ...SUMMARY, characterId: stranger.id, characterName: stranger.name, changes: SUMMARY.changes.map((change) => ({ ...change, character: stranger })) });
     expect(online.table?.log.entries().filter((entry) => entry.kind === 'rest')).toEqual([]);
     online.stop();
   });

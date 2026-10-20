@@ -10,10 +10,10 @@ import { SetToInput } from './SetToInput';
 
 export interface RuleCardProps {
   rule: RecoveryRule | undefined;
-  /** The metric's name and colour, and the button the rule belongs to. */
+  /** The metric's name and colour, and the name of the button or action the rule belongs to. */
   metric: string;
   color: string | undefined;
-  button: RecoveryButton;
+  owner: string;
   /** The template's buttons, which a counters rule picks rows by. */
   buttons: readonly RecoveryButton[];
   fields: readonly FieldChoice[];
@@ -107,12 +107,12 @@ function RuleFields({ rule, fields, nameOf, onChange, onPickSource }: Pick<RuleC
 }
 
 /**
- * The card under a picked metric: its name and the button's, Remove, the kinds of rule its type
+ * The card under a picked metric: its name and its button's (or action's), Remove, the kinds of rule its type
  * takes as one segmented row (the rule's own chosen), and what the chosen kind asks for. A
  * counters rule also says which rows it gives back.
  */
 export function RuleCard(props: RuleCardProps): React.ReactElement | null {
-  const { rule, metric, color, button, buttons, canSpend, focusKind, onKind, onChange, onRemove } = props;
+  const { rule, metric, color, owner, buttons, canSpend, focusKind, onKind, onChange, onRemove } = props;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (focusKind) ref.current?.querySelector<HTMLElement>('.atlas-rc-card__kinds [aria-checked="true"]')?.focus({ preventScroll: true });
@@ -127,12 +127,12 @@ export function RuleCard(props: RuleCardProps): React.ReactElement | null {
   const hasFields = rule.target.kind === 'counters' || (rule.does !== 'full' && rule.does !== 'clear');
 
   return (
-    <div ref={ref} className="atlas-rc-card__body" role="group" aria-label={t('recoveryEditor.metricRule', { metric, rule: button.name })}>
+    <div ref={ref} className="atlas-rc-card__body" role="group" aria-label={t('recoveryEditor.metricRule', { metric, rule: owner })}>
       <div className="atlas-rc-card__head">
         <span className="atlas-rc-card__dot" style={color ? { backgroundColor: color } : undefined} aria-hidden="true" />
         <span className="atlas-rc-card__metric">{metric}</span>
-        <span className="atlas-rc-card__button">{button.name}</span>
-        <LabelTooltip label={t('recoveryEditor.kind.remove', { button: button.name })}>
+        <span className="atlas-rc-card__button">{owner}</span>
+        <LabelTooltip label={t('recoveryEditor.kind.remove', { button: owner })}>
           <button type="button" className="atlas-rc-card__remove" onClick={onRemove}><Trash2 /></button>
         </LabelTooltip>
       </div>
