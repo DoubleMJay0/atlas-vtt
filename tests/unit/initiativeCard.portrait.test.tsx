@@ -9,10 +9,14 @@ const state = vi.hoisted(() => ({
   tokenSettings: { showInstanceBadges: true },
 }));
 
-vi.mock('../../src/app/react/root/AtlasUIContext', () => ({
+vi.mock('../../src/app/react/root/AtlasUIContext', async () => ({
+  AtlasUIContext: (await import('react')).createContext(null),
   useAtlasUI: () => ({ app: { vault: { adapter: { getResourcePath: (path: string) => `app://${path}` } } }, view: null }),
 }));
-vi.mock('../../src/app/react/ViewStoreContext', () => ({ useAtlasStore: (selector: (s: typeof state) => unknown) => selector(state) }));
+vi.mock('../../src/app/react/ViewStoreContext', () => ({
+  useAtlasStore: (selector: (s: typeof state) => unknown) => selector(state),
+  useViewStoreHook: () => ({ getState: () => state }),
+}));
 vi.mock('../../src/app/pixi/utils/tokenHighlight', () => ({ zoomToTokenWithHighlight: vi.fn() }));
 vi.mock('../../src/app/resources/useMapResources', () => ({ useMapResources: () => [] }));
 

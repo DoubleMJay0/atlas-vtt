@@ -6,6 +6,7 @@
 import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
 import { actsInTurn, backToRoundBefore, beginRound, canStillAct, type RoundChanges } from './rounds';
 import { tieBreakModifier } from './tieBreak';
+import { setInitiative } from './awaitingInitiative';
 
 /** Updates every entry's `order` to its place in the list. */
 export function renumber(entries: InitiativeEntry[]): void {
@@ -120,7 +121,7 @@ export function actNow(initiative: InitiativeState, id: string): void {
   if (current) {
     entries.splice(from, 1);
     entries.splice(entries.indexOf(current), 0, entry);
-    entry.initiative = current.initiative;
+    setInitiative(entry, current.initiative);
     entry.tieBreak = tieBreakModifier(current);
     renumber(entries);
   }

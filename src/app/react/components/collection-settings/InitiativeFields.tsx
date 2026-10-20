@@ -6,6 +6,7 @@ import React from 'react';
 import { ObsidianMenuDropdown } from '../ObsidianMenuDropdown';
 import { isValidDefaultRoll } from '../../../gameSystems/diceRules';
 import type { FieldSuggestion } from '../../../resources/resourceFieldSuggestions';
+import type { NamedModifierStatblock } from '../../../initiative/modifierPreview';
 import type { InitiativeMode, InitiativeRules } from '../../../types/initiativeRulesTypes';
 import { t } from '../../../i18n';
 import { InitiativeModifierFields } from './InitiativeModifierFields';
@@ -17,6 +18,8 @@ interface InitiativeFieldsProps {
   onChange: (initiative: InitiativeRules) => void;
   /** The statblock fields offered for the modifier (`initiativeFieldSuggestions`). */
   fieldSuggestions: readonly FieldSuggestion[];
+  /** The collection's statblocks, for what the chosen field reads in them (`modifierPreview`). */
+  modifierStatblocks?: readonly NamedModifierStatblock[] | undefined;
 }
 
 const MODE_OPTIONS: Record<InitiativeMode, string> = {
@@ -31,7 +34,7 @@ const MODE_DESCRIPTIONS: Record<InitiativeMode, string> = {
   cards: t('initRules.mode.cardsHint'),
 };
 
-export function InitiativeFields({ initiative, onChange, fieldSuggestions }: InitiativeFieldsProps): React.ReactElement {
+export function InitiativeFields({ initiative, onChange, fieldSuggestions, modifierStatblocks }: InitiativeFieldsProps): React.ReactElement {
   const rollValid = isValidDefaultRoll(initiative.roll);
 
   return (
@@ -67,7 +70,7 @@ export function InitiativeFields({ initiative, onChange, fieldSuggestions }: Ini
               <p className="atlas-csm-hint atlas-csm-hint--error" role="alert">{t('initRules.rollError')}</p>
             )}
           </div>
-          <InitiativeModifierFields initiative={initiative} onChange={onChange} fieldSuggestions={fieldSuggestions} />
+          <InitiativeModifierFields initiative={initiative} onChange={onChange} fieldSuggestions={fieldSuggestions} statblocks={modifierStatblocks} />
         </>
       )}
       {initiative.mode === 'sides' && <InitiativeSideFields initiative={initiative} onChange={onChange} />}

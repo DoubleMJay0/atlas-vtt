@@ -68,11 +68,12 @@ describe("the online players' list of a fight by cards", () => {
   it('sends the cards where the numbers stand, so older pages show them too, and says they are cards', () => {
     collection.initiative = { mode: 'cards', roll: '1d20', firstSide: 'players' } satisfies InitiativeRules;
     const list = share(
-      { ...createDefaultInitiativeState(), isActive: true, round: 1, cards: { deck: 10 }, entries: [entry('a', 0, { card: 3, initiative: 17, isActive: true }), entry('b', 1, { card: 7 })] },
-      { a: token('a'), b: token('b') },
+      { ...createDefaultInitiativeState(), isActive: true, round: 1, cards: { deck: 10 }, entries: [entry('a', 0, { card: 3, initiative: 17, isActive: true }), entry('b', 1, { card: 7, awaitingInitiative: true }), entry('c', 2, { initiative: 12 })] },
+      { a: token('a'), b: token('b'), c: token('c') },
     );
     expect(list?.byCards).toBe(true);
-    expect(list?.combatants.map((c) => [c.initiative, c.turn])).toEqual([[3, true], [7, false]]);
+    // Numbered once a card is dealt, whatever number the entry holds
+    expect(list?.combatants.map((c) => [c.initiative, c.turn, c.unnumbered])).toEqual([[3, true, undefined], [7, false, undefined], [0, false, true]]);
     expect(parseInitiative(JSON.parse(JSON.stringify(list)))).toEqual(list);
   });
 });

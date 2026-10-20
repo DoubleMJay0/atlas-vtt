@@ -5,6 +5,8 @@
 @use '../../../../styles/mixins' as *;
 
 $tracker-width: 96px;
+// Wide enough for a name of two short words a line, which the portrait column alone is not
+$tracker-width-named: 168px;
 
 .atlas-initiative-tracker {
   position: fixed;
@@ -30,6 +32,11 @@ $tracker-width: 96px;
   @include atlas-panel-radius($radius-2xl);
 
   overflow: hidden;
+
+  // The GM's cards show names (the tracker's Show Names on Cards)
+  &--named {
+    width: $tracker-width-named;
+  }
 }
 
 // Controls — fills panel width, buttons sized to fit
@@ -361,12 +368,64 @@ $tracker-width: 96px;
   }
 }
 
-// Initiative number
-.atlas-initiative-card__initiative {
+// Initiative number: a slot typed in place (`InitiativeNumber`), framed while a click would edit it
+.atlas-initiative-card .atlas-initiative-card__initiative,
+.atlas-initiative-card .atlas-initiative-card__initiative-input {
+  box-sizing: border-box;
+  min-width: 32px;
+  height: 24px;
+  padding: 0 $spacing-xs;
+  border: 1px solid transparent;
+  border-radius: $radius-s;
+  font-family: var(--font-interface);
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
   line-height: 1;
+  text-align: center;
+  color: var(--text-normal);
+  box-shadow: none;
+}
+
+.atlas-initiative-card .atlas-initiative-card__initiative {
+  background: transparent;
+  cursor: text;
+
+  &:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border);
+  }
+
+  @include atlas-focus-ring;
+
+  // Nothing rolled or typed yet: an empty field asks for a number
+  &--empty {
+    background: var(--background-modifier-form-field);
+    border-color: var(--background-modifier-border);
+    color: var(--text-faint);
+  }
+}
+
+.atlas-initiative-card .atlas-initiative-card__initiative-input {
+  width: 48px;
+  background: var(--background-modifier-form-field);
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+// The combatant's name, where the GM chose to see names
+.atlas-initiative-card__name {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text-normal);
+  text-align: center;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 // The card dealt in a fight by cards: a small playing card where the number stands otherwise
@@ -395,15 +454,35 @@ $tracker-width: 96px;
 }
 
 // HP Bar — full width
-// One thin bar per resource of the token, in the collection's order
+// One thin bar per resource of the token, in the collection's order; a click edits it
 .atlas-initiative-card__resources {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   width: 100%;
 }
 
-.atlas-initiative-card__hp-bar {
+// The bar is drawn 4px high inside a taller button, so it is easy to hit
+.atlas-initiative-card .atlas-initiative-card__hp-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+
+  &:hover .atlas-initiative-card__hp-meter {
+    background: color-mix(in oklch, var(--mono-100) 20%, transparent);
+  }
+
+  @include atlas-focus-ring;
+}
+
+.atlas-initiative-card__hp-meter {
+  display: block;
   width: 100%;
   height: 4px;
   background: color-mix(in oklch, var(--mono-100) 10%, transparent);
@@ -412,6 +491,7 @@ $tracker-width: 96px;
 }
 
 .atlas-initiative-card__hp-fill {
+  display: block;
   height: 100%;
   border-radius: 2px;
   // The resource's own colour, set per bar

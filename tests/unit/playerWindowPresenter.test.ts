@@ -80,7 +80,7 @@ function createFakeView(app?: Application): FakeView {
   const diceEvents = new EventEmitter();
   const canRenderPlayerFrame = vi.fn(() => true);
   const releasePlayerFrame = vi.fn();
-  const renderer = { getAppInstance: () => (app ? Object.assign(app, { canvas }) : { canvas }), withPlayerSafeFrame, playerRollTokens, canRenderPlayerFrame, releasePlayerFrame };
+  const renderer = { getAppInstance: () => (app ? Object.assign(app, { canvas }) : { canvas }), withPlayerSafeFrame, playerRollTokens, playerBadgeNumbers: () => null, canRenderPlayerFrame, releasePlayerFrame };
   const view = {
     getViewType: () => ATLAS_VIEW_TYPE,
     viewId: 'view-1',

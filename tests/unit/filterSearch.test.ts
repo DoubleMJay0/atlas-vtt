@@ -169,3 +169,20 @@ describe('statblock text', () => {
     expect(passing(apply('-text:fire').filters.selection)).toEqual([false, true, true]);
   });
 });
+
+describe('statblock text as a phrase', () => {
+  it('reads unquoted words after text: up to the next keyword', () => {
+    const { filters, leftover } = apply('text:pack   tactics type:beast');
+    expect(filters.selection.text.include).toEqual(['pack tactics']);
+    expect(filters.selection.options.type?.include).toEqual(['beast']);
+    expect(leftover).toBe('');
+  });
+
+  it('keeps every word of the phrase, a trailing space included, in the value, so Enter applies it', () => {
+    for (const text of ['text:pack t', 'text:pack tactics ']) {
+      const suggestions = filterSuggestions(text, text.length, sources);
+      expect(suggestions?.mode).toBe('value');
+      expect(suggestions?.items).toEqual([]);
+    }
+  });
+});

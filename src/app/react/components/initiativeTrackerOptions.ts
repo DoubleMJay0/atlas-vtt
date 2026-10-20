@@ -10,10 +10,13 @@ interface TrackerOptionsState {
   bySides: boolean;
   /** The tracker holds no combatant: there is nothing to clear. */
   empty: boolean;
+  /** The GM's cards show names (Atlas' setting, the same in every scene). */
+  showNames: boolean;
 }
 
 interface TrackerOptionsActions {
   setAutoSort: (autoSort: boolean) => void;
+  setShowNames: (showNames: boolean) => void;
   clear: () => void;
 }
 
@@ -34,7 +37,7 @@ export async function clearInitiativeAsking(empty: boolean, clear: () => void): 
   clear();
 }
 
-/** The menu behind the tracker's options button: how it sorts, and clearing it. */
+/** The menu behind the tracker's options button: how it sorts, what its cards show, and clearing it. */
 export function initiativeTrackerOptions(state: TrackerOptionsState, actions: TrackerOptionsActions): ContextMenuEntry[] {
   return [
     {
@@ -45,6 +48,14 @@ export function initiativeTrackerOptions(state: TrackerOptionsState, actions: Tr
       disabled: state.bySides,
       description: t('initiative.autoSortHint'),
       onClick: () => actions.setAutoSort(!state.autoSort),
+    },
+    {
+      type: 'item',
+      label: t('initiative.showNames'),
+      icon: 'tag',
+      checked: state.showNames,
+      description: t('initiative.showNamesHint'),
+      onClick: () => actions.setShowNames(!state.showNames),
     },
     MENU_SEPARATOR,
     {

@@ -1,7 +1,9 @@
 import { mapResources } from '../resources/collectionResources';
 import { rulesLookup } from './mapRules';
 import type { App } from 'obsidian';
+import type { StoreApi } from 'zustand';
 import type { ViewAtlasState } from '../storeFactory';
+import type { PlayerBadgeNumbers } from '../pixi/token-renderer/PlayerInstanceBadges';
 import { entryTokenOf, listedForPlayers, playerInitiativeList, renderPlayerInitiative, sideIdsOf, type EntryToken } from './playerInitiativeList';
 import { mapInitiativeRules } from './mapInitiativeRules';
 import { PlayerSceneOverlay, type PlayerSettings } from './PlayerSceneOverlay';
@@ -23,10 +25,46 @@ interface InitiativeScene {
 /**
  * Read-only initiative projection; never mounts the DM tracker or its controls. It lists the
  * GM's combatants without those whose token is hidden, in turn order or by sides as the fight runs.
+ * Look-alikes carry the number their badge shows the players (`PlayerBadgeNumbers`), which may
+ * differ from the GM's: the list is drawn anew once the players' frame numbered them anew.
  */
 export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
+  private badgeNumbers: PlayerBadgeNumbers | undefined;
+  private stopBadgeNumbers: (() => void) | undefined;
+  /** The numbers the list showed last, kept as plain data for a held list, which lets go of the renderer. */
+  private shownNumbers: ReadonlyMap<string, number> = new Map();
+  private redrawQueued = false;
+
   constructor(private readonly app: App, settings: SettingsService) {
     super({ cls: 'atlas-player-initiative-container' }, settings);
+  }
+
+  override present(store: StoreApi<ViewAtlasState>, _diceEvents?: unknown, _rollSources?: unknown, badgeNumbers?: PlayerBadgeNumbers): void {
+    this.letGoOfBadgeNumbers();
+    this.badgeNumbers = badgeNumbers;
+    this.stopBadgeNumbers = badgeNumbers?.onNumbersChange(() => this.redrawSoon());
+    super.present(store);
+  }
+
+  override hold(): void {
+    this.letGoOfBadgeNumbers();
+    super.hold();
+  }
+
+  /** The players' frame numbers its badges while it renders: the list is drawn once that render is done. */
+  private redrawSoon(): void {
+    if (this.redrawQueued) return;
+    this.redrawQueued = true;
+    queueMicrotask(() => {
+      this.redrawQueued = false;
+      this.refresh();
+    });
+  }
+
+  private letGoOfBadgeNumbers(): void {
+    this.stopBadgeNumbers?.();
+    this.stopBadgeNumbers = undefined;
+    this.badgeNumbers = undefined;
   }
 
   protected select({ initiative, initiativeTrackerOpen, objects, mapPath }: ViewAtlasState): InitiativeScene {
@@ -57,8 +95,17 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       mapInitiativeRules(this.app, scene.mapPath),
       hpVisible,
     );
+    const live = this.badgeNumbers;
+    const held = this.shownNumbers;
+    const shown = new Map<string, number>();
+    for (const { entry } of list.combatants) {
+      const number = live ? live.numberOf(entry.tokenId) : held.get(entry.tokenId) ?? null;
+      if (number !== null) shown.set(entry.tokenId, number);
+    }
+    this.shownNumbers = shown;
     renderPlayerInitiative(container, list, {
       showNames: settings.showTokenNameplates,
+      badgeNumber: (tokenId) => shown.get(tokenId) ?? null,
       portraitSrc: (imagePath) => (/^(?:https?:|data:|blob:|app:)/.test(imagePath) ? imagePath : this.app.vault.adapter.getResourcePath(imagePath)),
     });
   }

@@ -14,6 +14,7 @@ import { sortCombatants } from '../initiative/sortCombatants';
 import { clearSittingOut } from '../initiative/rounds';
 import { createInitiativeTurnActions, type InitiativeTurnActions } from './initiativeTurnActions';
 import { fightDraws, roundChangesOf } from './initiativeFightStart';
+import { setInitiative } from '../initiative/awaitingInitiative';
 
 /**
  * Initiative slice state interface
@@ -87,7 +88,7 @@ interface RolledTotal {
 
 /** Writes a roll onto its combatant; the modifier is kept for breaking ties only. */
 function applyRoll(entry: InitiativeEntry, { total, modifier }: RolledTotal): void {
-  entry.initiative = total;
+  setInitiative(entry, total);
   entry.rolledModifier = modifier;
   delete entry.tieBreak;
 }
@@ -142,6 +143,7 @@ export function createInitiativeActions(
         const initiativeChanged = updates.initiative !== undefined && updates.initiative !== entry.initiative;
         const modifierChanged = updates.initiativeModifier !== undefined && updates.initiativeModifier !== entry.initiativeModifier;
         Object.assign(entry, updates);
+        if (updates.initiative !== undefined) setInitiative(entry, updates.initiative);
         // A number or modifier of its own replaces where Act Now placed it
         if (initiativeChanged || modifierChanged) delete entry.tieBreak;
 

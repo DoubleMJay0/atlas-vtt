@@ -190,8 +190,18 @@
     }
   }
 
-  .atlas-token-value-editor__separator {
+  .atlas-token-value-editor__separator,
+  .atlas-token-value-editor__label {
     color: var(--text-muted);
+  }
+
+  .atlas-token-value-editor__label {
+    white-space: nowrap;
+  }
+
+  // A change typed for a selection may be a sum (`-9/2`), wider than a value
+  .atlas-token-value-editor__input--wide {
+    width: 96px;
   }
 
   // Scene tabs and widgets share one row so they can never overlap:

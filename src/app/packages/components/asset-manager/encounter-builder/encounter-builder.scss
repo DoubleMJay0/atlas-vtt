@@ -250,6 +250,11 @@ $tray-room: 72px;
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────
+// Every control in it is one height, so the tray's padding is the same on all
+// sides of all of them, and its chips hold their parts as evenly.
+
+$tray-control: 32px;
+$chip-inset: $spacing-xs;
 // Floats over the bottom of the feed once a creature is picked, as wide as the bar above it
 // whatever it holds: its picks scroll and its numbers keep their room.
 
@@ -280,16 +285,20 @@ $tray-room: 72px;
   align-items: center;
   flex-shrink: 0;
   gap: $spacing-xs;
-  height: 32px;
-  padding: 2px;
-  padding-inline-end: 0;
+  height: $tray-control;
+  padding: $chip-inset;
   @include atlas-panel-inset-radius($spacing-s);
   background: var(--background-modifier-hover);
 }
 
 .atlas-encounter-tray__portrait {
-  width: 28px;
-  height: 28px;
+  width: calc(#{$tray-control} - 2 * #{$chip-inset});
+  height: calc(#{$tray-control} - 2 * #{$chip-inset});
+}
+
+// The chip's stepper sits $chip-inset inside it, its buttons filling the chip's height.
+.atlas-encounter-tray__pick .atlas-encounter-stepper {
+  padding: 0;
 }
 
 .atlas-encounter-tray__name {
@@ -338,6 +347,7 @@ $tray-room: 72px;
 
   // Its end control sits in the tray's corner, concentric with it.
   .btn {
+    height: $tray-control;
     @include atlas-panel-inset-radius($spacing-s);
   }
 }

@@ -22,6 +22,8 @@ export interface SharedCombatant {
   readonly delayed?: true;
   /** Defeated, as the GM's card shows it: drawn dimmed and marked. Absent from older GMs. */
   readonly defeated?: true;
+  /** No number rolled or typed yet: an empty slot, not the 0 `initiative` holds. Absent from older GMs. */
+  readonly unnumbered?: true;
   /** The portrait's artwork, asked for by hash like the map. */
   readonly art: AssetRef | null;
   /** The ring around the portrait (`#rrggbb`, or null untinted); absent for an unframed token. */
@@ -90,6 +92,7 @@ function parseCombatant(value: unknown): SharedCombatant | null {
     // Optional flags: anything but `true` reads as unset, so a page never fails on them
     ...(value.delayed === true ? { delayed: true as const } : {}),
     ...(value.defeated === true ? { defeated: true as const } : {}),
+    ...(value.unnumbered === true ? { unnumbered: true as const } : {}),
     ...(isSideId(value.sideId) ? { sideId: value.sideId } : {}),
   };
 }

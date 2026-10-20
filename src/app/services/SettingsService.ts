@@ -245,6 +245,17 @@ export class SettingsService {
     this.commit();
   }
 
+  /** Whether the GM's initiative cards show names: off unless the file says `true`. */
+  showsInitiativeNames(): boolean {
+    return this.settings.initiativeNames === true;
+  }
+
+  setInitiativeNames(on: boolean): void {
+    if (this.showsInitiativeNames() === on) return;
+    this.settings.initiativeNames = on;
+    this.commit();
+  }
+
   /** Whether a new scene looks for the grid of its map: on unless the file says `false`. */
   detectsGridOnNewScenes(): boolean {
     return this.settings.detectGridOnNewScenes !== false;

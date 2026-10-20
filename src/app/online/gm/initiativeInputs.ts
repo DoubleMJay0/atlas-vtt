@@ -9,6 +9,7 @@ import type { TokenEntity } from '../../types';
 import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { ViewState } from '../../types/viewState';
 import { ringColour } from './scenePicture.ts';
+import { hasInitiative } from '../../initiative/awaitingInitiative';
 
 /** What the players' initiative list is made of. */
 export interface InitiativeInputs {
@@ -88,6 +89,8 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
     sitsOut: entry.sitsOut === true,
     ...(entry.delayed === true ? { delayed: true } : {}),
     ...(token.defeated ? { defeated: true } : {}),
+    // In a fight by cards a combatant is numbered once it holds a card
+    ...((list.byCards ? entry.card !== undefined : hasInitiative(entry)) ? {} : { unnumbered: true }),
     art: typeof entry.imagePath === 'string' && entry.imagePath !== '' ? inputs.art(entry.imagePath) : null,
     ring: token.showRing ? { colour: token.ringColor ? ringColour(token.ringColor) : null } : null,
     side: legacySide(token.side),
