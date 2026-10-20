@@ -2,6 +2,7 @@
 - Statblock templates: a Value, Metric, Table or Labels and values tile can roll its numbers. Switch on Roll as a bonus in its Options, and a click on a number, such as a trait's 2, rolls +2 with the game's own dice.
 - Statblocks: a number value can add to the next roll. Switch on Add to next roll in a value's Options, and the card shows a small switch after the number. Turn it on, and the next roll from that statblock adds the value under its own name, such as "d20 + 3 + 2 Proficiency", then the switch turns off. This works for a list of labels and values, so each Daggerheart Experience can have its own switch.
 - Statblock templates: a Counters tile tracks anything with limited uses, such as spell slots per level, ki or a feature's uses per day. Each row shows its uses as pips.
+- Online play: hand any item to your players, not only rolled ones. In a loot base, each item's name has a gift button. Its menu gives the item to one player or to all players at once, and sets how many copies, with − and + or by typing the number.
 
 ## Improved
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.

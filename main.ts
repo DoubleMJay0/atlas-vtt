@@ -25,6 +25,7 @@ import { registerStatblockFileMenu } from './src/app/statblocks/editor/create/st
 import { disposeImageProcessing } from './src/app/imageProcessing/imageProcessing';
 import { disposeSpectralEngine } from './src/app/pixi/spectralEngine/spectralEngineService';
 import { registerLootQueryView } from './src/app/loot/lootQueryView';
+import { registerBaseGiveButtons } from './src/app/loot/baseGiveButtons';
 import { GlobalAssetManagerService } from './src/app/services/GlobalAssetManagerService';
 import { releaseOverlayBodyClass } from './src/app/packages/components/asset-manager/hooks/useOverlayBodyClass';
 import { ImageDisplayService } from './src/app/services/ImageDisplayService';
@@ -286,6 +287,7 @@ export default class AtlasVTTPlugin extends Plugin {
     this.registerView(LOCAL_PLAYER_VIEW_TYPE, (leaf) => new LocalPlayerView(leaf));
     this.registerView(DASHBOARD_VIEW_TYPE, (leaf) => new DashboardView(leaf, this));
     registerLootQueryView(this);
+    registerBaseGiveButtons(this);
     this.registerView(TEMPLATE_EDITOR_VIEW_TYPE, (leaf) => new TemplateEditorView(leaf));
     this.registerExtensions([TEMPLATE_EXTENSION], TEMPLATE_EDITOR_VIEW_TYPE);
   }

@@ -87,8 +87,8 @@ describe('the players\' books at a running table', () => {
     from(ANA, { t: 'book-pin', pin: { id: 'b'.repeat(24), x: 0.5, y: 0.25, kind: 'treasure', title: 'Dig here', body: '' } });
     from(ANA, { t: 'book-purse', purse: [{ name: 'Thorns', amount: 40 }] });
     // The GM hands Ana an item from the loot roller, and tries one for someone who is not there.
-    expect(giveLoot(ANA, DRAW)).toBe(true);
-    expect(giveLoot(CAL, DRAW)).toBe(false);
+    expect(giveLoot(ANA, DRAW)).toBe(1);
+    expect(giveLoot(CAL, DRAW)).toBe(0);
     await advance(1_000);
     const items = ofType(delivered(socket), 'book-item');
     expect(items.map(({ to }) => to)).toEqual([ANA]);
@@ -158,7 +158,7 @@ describe('the players\' books at a running table', () => {
     from(ANA, { t: 'book-purse', purse: [{ name: 'Stolen', amount: 9 }] });
     await advance(3_000);
     expect(source.dump()).not.toContain('Stolen');
-    expect(giveLoot(ANA, DRAW)).toBe(false);
+    expect(giveLoot(ANA, DRAW)).toBe(0);
     expect(lootRecipients()).toEqual([{ id: ANA, name: 'Ana', character: null }, { id: BEN, name: 'Ben', character: 'Brannoch' }]);
     online.stop();
   });
@@ -167,7 +167,7 @@ describe('the players\' books at a running table', () => {
     const source = keptBooks();
     const first = await openTable(new BookShelf(source), PLAYERS, undefined, undefined, LIBRARY_HEROES);
     first.from(ANA, { t: 'book-note', note: { id: NOTE, title: 'Kept', body: SECRET_NOTE } });
-    expect(giveLoot(ANA, DRAW)).toBe(true);
+    expect(giveLoot(ANA, DRAW)).toBe(1);
     await advance(100);
     first.online.stop();
 

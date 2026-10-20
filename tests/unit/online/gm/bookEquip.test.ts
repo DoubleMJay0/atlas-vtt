@@ -120,8 +120,8 @@ describe('slots at a running table', () => {
   it('keeps a player\'s slots in their own character\'s book only, and answers what it refuses with that player\'s book alone', async () => {
     const shelf = new BookShelf();
     const { online, socket, from } = await openTable(shelf, [{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]);
-    expect(giveLoot(ANA, DRAW)).toBe(true);
-    expect(giveLoot(BEN, DRAW)).toBe(true);
+    expect(giveLoot(ANA, DRAW)).toBe(1);
+    expect(giveLoot(BEN, DRAW)).toBe(1);
     const blade = shelf.of(BRANNOCH_BOOK).items[0]?.id ?? '';
     const bens = shelf.of(MIRA_BOOK).items[0]?.id ?? '';
     expect(lastBook(socket, ANA)).toMatchObject({ slots: { hidden: [], own: [] }, equipped: [] });
