@@ -79,6 +79,14 @@ interface MenuState {
   collisionBoundary: Element | null;
 }
 
+/** The provider's own pane, only where the point lies in it: a menu opened over a body-level overlay belongs to no pane. */
+function leafHolding(anchor: Element | null, point: { x: number; y: number }): Element | null {
+  const leaf = anchor?.closest('.workspace-leaf');
+  if (!leaf) return null;
+  const rect = leaf.getBoundingClientRect();
+  return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom ? leaf : null;
+}
+
 /** Focuses `element` where the menu left focus nowhere (on the body): a choice that moved focus keeps it there. */
 function returnFocusTo(element: HTMLElement | null, event: Event): void {
   // The virtual trigger is only a point; restore keyboard focus explicitly without scrolling.
@@ -131,7 +139,7 @@ export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = ({ childr
     // Global callers may be served by a provider in another leaf: use the clicked view.
     const collisionBoundary = options?.returnFocus?.closest('.workspace-leaf')
       ?? doc?.elementFromPoint?.(position.x, position.y)?.closest('.workspace-leaf')
-      ?? anchorElement.current?.closest('.workspace-leaf') ?? null;
+      ?? leafHolding(anchorElement.current, position);
     setMenuState({ entries, position, returnFocus: options?.returnFocus ?? null, collisionBoundary });
   }, [told]);
 

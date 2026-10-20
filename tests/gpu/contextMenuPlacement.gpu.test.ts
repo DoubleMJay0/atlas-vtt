@@ -156,3 +156,14 @@ it('dismisses the menu and its submenu when the map pane is resized', async () =
   expect(window.scrollY).toBe(0);
   expect(leaf.scrollTop).toBe(0);
 });
+
+it('keeps a menu opened beside the pane, over a body-level overlay, out of that pane', async () => {
+  render(h('div', { className: 'workspace-leaf', style: { left: 40, top: 80, width: 260, height: 300 } }, h(ContextMenuProvider, null)));
+  render(h('div', { style: { position: 'fixed', left: 480, top: 120, width: 300, height: 300 } }));
+  await act(async () => {
+    openContextMenuGlobal(items(4), { x: 520, y: 200 });
+  });
+  await frames();
+  expect(menus()).toHaveLength(1);
+  expect(menus()[0]!.getBoundingClientRect().left).toBeGreaterThanOrEqual(515);
+});
