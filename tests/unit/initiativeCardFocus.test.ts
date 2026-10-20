@@ -24,9 +24,12 @@ describe('the selection a click on a card makes', () => {
 });
 
 describe('focusCombatant', () => {
+  const viewOf = (shown: (id: string) => boolean, viewport: object = {}): AtlasView =>
+    ({ renderer: { getViewportInstance: () => viewport, canvasShowsToken: shown } }) as unknown as AtlasView;
+
   it('selects the token, brings it into view at the grid of the scene and lets it glow', () => {
     const viewport = {};
-    const view = { renderer: { getViewportInstance: () => viewport } } as unknown as AtlasView;
+    const view = viewOf(() => true, viewport);
     const setSelection = vi.fn();
     const goblin = token('goblin', 'g.png');
 
@@ -37,9 +40,20 @@ describe('focusCombatant', () => {
     expect(pixi.addTokenHighlight).toHaveBeenCalledWith(view, 'goblin');
   });
 
+  it('selects no token the canvas does not show, and still brings its place into view', () => {
+    pixi.panToToken.mockClear();
+    const setSelection = vi.fn();
+    const goblin = token('goblin', 'g.png');
+
+    focusCombatant(viewOf((id) => id !== 'goblin'), { objects: { tokens: { goblin } }, selectedIds: ['rat'], setSelection, grid: { size: 70 } } as never, 'goblin', true);
+
+    expect(setSelection).not.toHaveBeenCalled();
+    expect(pixi.panToToken).toHaveBeenCalledOnce();
+  });
+
   it('does nothing for a combatant whose token is gone', () => {
     const setSelection = vi.fn();
-    focusCombatant(null, { objects: { tokens: {} }, selectedIds: ['a'], setSelection, grid: { size: 70 } } as never, 'gone', false);
+    focusCombatant(viewOf(() => true), { objects: { tokens: {} }, selectedIds: ['a'], setSelection, grid: { size: 70 } } as never, 'gone', false);
     expect(setSelection).not.toHaveBeenCalled();
   });
 });

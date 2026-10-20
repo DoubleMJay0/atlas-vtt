@@ -780,6 +780,11 @@ export class PixiRendererOrchestrator { // Renamed class
     return shownRollTokens(this.store.getState(), mapPath, tokens.getTokenSprites(), () => tokens.playerFramePerception(this.lighting?.playerSight()), tokenIds);
   }
 
+  /** Whether the canvas shows the token, so it may be selected; none is shown while there is no token renderer. */
+  public canvasShowsToken(tokenId: string): boolean {
+    return this.tokenRenderer?.showsToken(tokenId) ?? false;
+  }
+
   /** The numbers the players' instance badges show; null while there is no token renderer. */
   public playerBadgeNumbers(): PlayerBadgeNumbers | null {
     return this.tokenRenderer?.playerBadgeNumbers() ?? null;

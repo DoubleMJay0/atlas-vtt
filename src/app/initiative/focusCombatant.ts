@@ -14,7 +14,10 @@ export function cardClickSelection(selectedIds: readonly string[], tokenId: stri
 
 /**
  * A click on a combatant's card: selects its token as a click on the map would, so its bars and
- * their controls show, brings it into view at the GM's zoom (`panToToken`) and lets it glow.
+ * their controls show, brings it into view at the GM's zoom (`panToToken`) and lets it glow. A token
+ * the canvas does not show (the players' view, a peek, out of the players' sight) is not selected,
+ * as the canvas itself drops it from the selection: its controls would float over empty map and
+ * Delete or the arrow keys act on what nobody sees.
  */
 export function focusCombatant(
   view: AtlasView | null,
@@ -24,7 +27,7 @@ export function focusCombatant(
 ): void {
   const token = state.objects.tokens[tokenId];
   if (!token) return;
-  state.setSelection(cardClickSelection(state.selectedIds, tokenId, additive));
+  if (view?.renderer?.canvasShowsToken(tokenId)) state.setSelection(cardClickSelection(state.selectedIds, tokenId, additive));
   const viewport = view?.renderer?.getViewportInstance?.();
   if (!viewport) return;
   panToToken(viewport, token, state.grid?.size ?? 70);

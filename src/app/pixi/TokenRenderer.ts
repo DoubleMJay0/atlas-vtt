@@ -626,6 +626,12 @@ export class TokenRenderer {
     return ((token.isHidden ?? false) && this.isInPlayerMode()) || this.playerSight.hides(token.id, perception);
   }
 
+  /** Whether the canvas shows the token: it is on the map and neither the players' perspective nor their sight leaves it out. */
+  public showsToken(tokenId: string): boolean {
+    const token = this.store.getState().objects.tokens[tokenId];
+    return token !== undefined && !this.hidesToken(token);
+  }
+
   /** A token the canvas no longer shows cannot stay selected: its handles would float over nothing. */
   private deselect(tokenId: string): void {
     const { selectedIds, setSelection } = this.store.getState();

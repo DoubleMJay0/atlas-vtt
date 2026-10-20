@@ -35,9 +35,10 @@ const opened = vi.hoisted(() => ({ entries: [] as ContextMenuEntry[] }));
 vi.mock('../../src/app/react/root/ContextMenuContext', () => ({
   openContextMenuGlobal: (entries: ContextMenuEntry[]) => { opened.entries = entries; },
 }));
+const canvas = vi.hoisted(() => ({ shows: (_id: string): boolean => true }));
 vi.mock('../../src/app/react/root/AtlasUIContext', async () => ({
   AtlasUIContext: (await import('react')).createContext(null),
-  useAtlasUI: () => ({ app: null, view: null }),
+  useAtlasUI: () => ({ app: null, view: { renderer: { canvasShowsToken: (id: string) => canvas.shows(id), getViewportInstance: () => null } } }),
 }));
 vi.mock('../../src/app/keyboard/useMapHotkeys', () => ({
   useAtlasSettings: () => ({ showsInitiativeNames: () => settings.names, setInitiativeNames: settings.setInitiativeNames }),
@@ -79,6 +80,7 @@ beforeEach(() => {
   opened.entries = [];
   state.selectedIds = [];
   settings.names = false;
+  canvas.shows = () => true;
 });
 
 describe('typing initiative on the cards', () => {
@@ -173,6 +175,15 @@ describe('a click on a card', () => {
     state.selectedIds = ['goblin'];
     fireEvent.click(cards[1]!, { shiftKey: true });
     expect(state.setSelection).toHaveBeenLastCalledWith(['goblin', 'rat']);
+  });
+
+  it('selects no token the canvas hides, as in the players\' view', () => {
+    canvas.shows = (id) => id !== 'rat';
+    const cards = table().querySelectorAll('.atlas-initiative-card');
+
+    fireEvent.click(cards[1]!);
+
+    expect(state.setSelection).not.toHaveBeenCalled();
   });
 });
 
