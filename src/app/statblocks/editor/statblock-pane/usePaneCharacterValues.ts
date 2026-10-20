@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef } from 'react';
 import type { App } from 'obsidian';
 import { PartySync } from '../../../campaigns/partyValues/PartySync';
-import { playerCharactersLinking } from '../../../characters/playerCharacters';
+import { characterOfNote } from '../../../characters/playerCharacters';
 import { characterRestOf } from '../../../recovery/characterRest';
 import { collectionResources } from '../../../resources/collectionResources';
 import type { ResourceDefinition, ResourceValue } from '../../../resources/resourceTypes';
@@ -66,7 +66,7 @@ export function usePaneCharacterValues(app: App, notePath: string, template: Sta
     return () => app.workspace.offref(ref);
   }, [app]);
   // `assets` reads the index again after it changed.
-  const character = useMemo(() => playerCharactersLinking(AssetService.getInstance(app).loadedTokenAssets(), notePath)[0], [app, notePath, assets]);
+  const character = useMemo(() => characterOfNote(AssetService.getInstance(app).loadedTokenAssets(), notePath) ?? undefined, [app, notePath, assets]);
   // Only a player character's note follows the maps and the campaign
   useEffect(() => (character ? watchValues(app, refresh) : undefined), [app, character]);
 

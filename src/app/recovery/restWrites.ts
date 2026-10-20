@@ -67,12 +67,17 @@ function writeScene(app: App, parts: readonly CharacterWrite[]): void {
         const sync = PartySync.forApp(app);
         sync?.setValue(place.campaignId, rest.asset.id, key, { ...sync.value(place.campaignId, rest.asset.id, key), ...value });
       } else if (place?.kind === 'token') {
-        const token = place.store.getState().objects.tokens[place.tokenId];
-        if (!token) continue;
-        // Several resources of one token: each update starts from what the ones before it left
-        const writes = writesOf(place.store);
-        const held = writes.resources.get(place.tokenId) ?? token;
-        writes.resources.set(place.tokenId, { ...held, ...resourceUpdate(held, key, value, false) });
+        // Every token of the character on every open map, its forms' too: without a played campaign nothing else carries the value to them
+        for (const { store, tokenIds } of rest.holds) {
+          for (const tokenId of tokenIds) {
+            const token = store.getState().objects.tokens[tokenId];
+            if (!token) continue;
+            // Several resources of one token: each update starts from what the ones before it left
+            const writes = writesOf(store);
+            const held = writes.resources.get(tokenId) ?? token;
+            writes.resources.set(tokenId, { ...held, ...resourceUpdate(held, key, value, false) });
+          }
+        }
       }
     }
     for (const [id, value] of changes.conditions) {

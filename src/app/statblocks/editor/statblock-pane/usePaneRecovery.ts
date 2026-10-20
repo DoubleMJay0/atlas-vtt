@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import type { App } from 'obsidian';
-import { playerCharactersLinking } from '../../../characters/playerCharacters';
+import { characterOfNote } from '../../../characters/playerCharacters';
 import { useExperimentalFeature } from '../../../react/hooks/useExperimentalFeature';
 import { useSystemPresets } from '../../../react/hooks/useSystemPresets';
 import { collectionRecovery } from '../../../recovery/collectionRecovery';
@@ -11,10 +11,8 @@ import type { StatblockTemplate, TemplateId } from '../../model/templateTypes';
 
 /** The recovery buttons the pane offers its note's player character. */
 export interface PaneRecovery {
-  /** The character: of several linking the note, the first by name. */
+  /** The character: every player character linking the note is one, named by the first of them made (`characterOfNote`). */
   readonly character: TokenAsset;
-  /** Whether other player characters link the note too, so the pane names the one it rests. */
-  readonly several: boolean;
   readonly templateId: TemplateId;
   /** The template the note is drawn with, whose fields the rest reads. */
   readonly template: StatblockTemplate;
@@ -49,10 +47,10 @@ export function usePaneRecovery(app: App, notePath: string, template: StatblockT
   return useMemo((): PaneRecovery | null => {
     if (!on) return null;
     const assets = AssetService.getInstance(app);
-    const [character, ...others] = playerCharactersLinking(assets.loadedTokenAssets(), notePath);
+    const character = characterOfNote(assets.loadedTokenAssets(), notePath);
     if (!character) return null;
     const buttons = collectionRecovery(assets.getCollectionSettings(character.collection), presets, template.id);
-    return buttons.length > 0 ? { character, several: others.length > 0, templateId: template.id, template, buttons } : null;
+    return buttons.length > 0 ? { character, templateId: template.id, template, buttons } : null;
     // `revision` reads the index and the settings again after they changed.
   }, [app, on, notePath, template, presets, revision]);
 }

@@ -72,7 +72,7 @@ vi.mock('../../../../src/app/recovery/characterRest', async () => {
     // Only Bram's note (of the other player characters) is a native statblock; Ghost's is not.
     characterRest: (_app: unknown, path: string) => {
       const id = allyNotes.get(path);
-      return id ? { asset: { id }, notePath: path } : null;
+      return id ? { asset: { id, name: id.charAt(0).toUpperCase() + id.slice(1) }, notePath: path } : null;
     },
   };
 });

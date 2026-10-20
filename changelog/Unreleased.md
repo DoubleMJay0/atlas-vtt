@@ -30,6 +30,7 @@
 - Simplified Chinese interface when Obsidian's language is 简体中文 or 繁體中文. Text that is not translated yet stays in English.
 
 ## Improved
+- A player character's forms share its values: every player character token linked to the same statblock note, such as a druid and its beast shapes, keeps one set of hit points and other numbers.
 - Range filters such as challenge rating, level and hit points show their lowest and highest value as fields you can type into. A typed value moves to the nearest value your creatures have.
 - Old-School Essentials collections run initiative by sides, with each side rolling a d6 every round.
 - DM screen: during a fight it shows the statblocks of the creatures in the fight, with a switch to show every creature on the map.

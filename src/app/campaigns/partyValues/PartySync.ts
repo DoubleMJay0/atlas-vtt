@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import { isPlayerCharacter, libraryTokenOf, type PlacedTokenSource } from '../../characters/playerCharacters';
+import { characterOf, libraryTokenOf, type PlacedTokenSource } from '../../characters/playerCharacters';
 import type { TokenAsset } from '../../services/AssetService';
 import type { ViewAtlasStore } from '../../storeFactory';
 import { runUntracked } from '../../stores/history';
@@ -129,13 +129,14 @@ export class PartySync {
     return values[partyKey(campaignId, characterId, key)];
   }
 
-  /** The library token id of the player character a token was placed from, remembered until the library changes; null for a token of no player character. */
+  /** The player character a token was placed from (`characterOf`: one of its forms names it), by its library token id, remembered until the library changes; null for a token of no player character. */
   characterOf(token: PlacedTokenSource): string | null {
     const key = `${token.assetId ?? ''}\u0000${token.imagePath}`;
     let id = this.characterIds.get(key);
     if (id === undefined) {
-      const record = libraryTokenOf(token, this.deps.tokens());
-      id = record && isPlayerCharacter(record) ? record.id : null;
+      const tokens = this.deps.tokens();
+      const record = libraryTokenOf(token, tokens);
+      id = record ? characterOf(record, tokens)?.id ?? null : null;
       this.characterIds.set(key, id);
     }
     return id;

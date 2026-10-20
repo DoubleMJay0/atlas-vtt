@@ -51,6 +51,8 @@ describe('writeRest', () => {
     await writeRest(app, rest, outcome({ resources: new Map([['hp', { current: 20, max: 20 }]]), conditions: new Map([['exhaustion', 1]]) }), async () => null);
     const { a, b } = store.getState().objects.tokens;
     expect(a?.resources?.hp).toEqual({ current: 20, max: 20 });
+    // Every token of the character takes it, another form's too
+    expect(b?.resources?.hp).toEqual({ current: 20, max: 20 });
     expect(a?.conditionValues).toEqual({ exhaustion: 1 });
     expect(b?.conditionValues).toEqual({ exhaustion: 1 });
     expect(getHistoryStore(store)?.getState().pastStates.length ?? 0).toBe(before + 1);

@@ -3,7 +3,9 @@ import { t } from '../i18n';
 import type { CheckedRest, RestAlly, RestGate } from '../online/gm/book/restGate.ts';
 import { restPicksText, restRulesText } from '../online/gm/book/restRules.ts';
 import { quietRoll } from '../online/gm/quietRoll.ts';
+import { characterOf } from '../characters/playerCharacters';
 import { characterRest, type CharacterRest } from '../recovery/characterRest';
+import { AssetService } from '../services/AssetService';
 import type { RecoveryButton } from '../recovery/recoveryTypes';
 import { onRested } from '../recovery/restEvents';
 import { checkRest, restOffers, type RestRequest } from '../recovery/restOffer';
@@ -16,10 +18,17 @@ import { templateDiceSet } from '../statblocks/resolve/templateDiceSet';
 import { showNotice } from '../ui/notice';
 import { randomHex } from '../utils/randomHex';
 
-/** The player character `character` (its library token's id) whose statblock is the note at `path`, with buttons; null for any other. */
+/** Whether the library token `character` (the one a token at the table was placed from) is a form of the character `rest` is. */
+function isFormOf(app: App, rest: CharacterRest, character: string): boolean {
+  const tokens = AssetService.getInstance(app).loadedTokenAssets();
+  const record = tokens.find((asset) => asset.id === character);
+  return record !== undefined && characterOf(record, tokens)?.id === rest.asset.id;
+}
+
+/** The player character `character` (its library token's id, any of its forms) whose statblock is the note at `path`, with buttons; null for any other. */
 function restOf(app: App, path: string, character: string): CharacterRest | null {
   const rest = characterRest(app, path);
-  return rest !== null && rest.asset.id === character && rest.buttons.length > 0 ? rest : null;
+  return rest !== null && isFormOf(app, rest, character) && rest.buttons.length > 0 ? rest : null;
 }
 
 /**
@@ -29,11 +38,14 @@ function restOf(app: App, path: string, character: string): CharacterRest | null
 function allyRests(app: App, allies: readonly RestAlly[], resting: string): { reach: AllyRests; ids: Set<string> } {
   const found = new Map<string, CharacterRest>();
   for (const ally of allies) {
-    if (ally.character === resting || found.has(ally.character)) continue;
+    if (found.has(ally.character)) continue;
     const rest = characterRest(app, ally.path);
-    if (rest !== null && rest.asset.id === ally.character) found.set(ally.character, rest);
+    // Another form of the resting character is no ally: it is the one resting
+    if (rest !== null && rest.asset.id !== resting && isFormOf(app, rest, ally.character)) found.set(ally.character, rest);
   }
-  return { reach: (id) => found.get(id) ?? null, ids: new Set(found.keys()) };
+  // A pick names an ally by the token played, a rest writes it by the character it is: either finds it
+  const byCharacter = new Map([...found.values()].map((rest) => [rest.asset.id, rest]));
+  return { reach: (id) => found.get(id) ?? byCharacter.get(id) ?? null, ids: new Set(found.keys()) };
 }
 
 interface Checked {

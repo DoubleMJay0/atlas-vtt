@@ -108,7 +108,6 @@ export function PaneRecoveryButtons({ recovery }: { recovery: PaneRecovery }): R
 
   return (
     <div className="atlas-sb-recovery" role="group" aria-label={t('rest.buttons', { name: recovery.character.name })}>
-      {recovery.several && <span className="atlas-sb-recovery__who">{recovery.character.name}</span>}
       {recovery.buttons.map(control)}
     </div>
   );

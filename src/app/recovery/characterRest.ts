@@ -11,7 +11,7 @@
 import type { App } from 'obsidian';
 import { CampaignPlay } from '../campaigns/campaignPlay';
 import { PartySync } from '../campaigns/partyValues/PartySync';
-import { libraryTokenOf } from '../characters/playerCharacters';
+import { characterOf, libraryTokenOf } from '../characters/playerCharacters';
 import { playerCharacterOfNote } from '../characters/noteCharacter';
 import { collectionResources } from '../resources/collectionResources';
 import { trackedResources } from '../resources/trackedResources';
@@ -78,7 +78,11 @@ function characterHolds(app: App, asset: TokenAsset): TokenHold[] {
     const store = view.getStore();
     const state = store.getState();
     if (!state.mapLoaded || state.isMapLoading) return [];
-    const tokenIds = Object.values(state.objects.tokens).filter((token) => libraryTokenOf(token, library)?.id === asset.id).map((token) => token.id);
+    // Every form of the character: tokens placed from any library token that is one of its forms
+    const tokenIds = Object.values(state.objects.tokens).filter((token) => {
+      const record = libraryTokenOf(token, library);
+      return record !== null && characterOf(record, library)?.id === asset.id;
+    }).map((token) => token.id);
     return tokenIds.length > 0 ? [{ store, tokenIds }] : [];
   });
 }
