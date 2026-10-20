@@ -8,7 +8,7 @@
 
 import type { App } from 'obsidian';
 import { PartySync } from '../campaigns/partyValues/PartySync';
-import type { ResourceHolder } from '../resources/resourceTypes';
+import type { ResourceHolder, ResourceValue } from '../resources/resourceTypes';
 import { resourceUpdate } from '../resources/resourceValues';
 import { runHistoryTransaction } from '../stores/history';
 import type { ViewAtlasStore } from '../storeFactory';
@@ -87,6 +87,14 @@ function writeScene(app: App, parts: readonly CharacterWrite[]): void {
       for (const { tokenIds, id, value } of writes.conditions) state.setTokensConditionValue(tokenIds, id, value > 0 ? value : null);
     });
   }
+}
+
+/**
+ * Sets resources of one character outside a rest (the note panel's − and + on a tracked number):
+ * on its token on an open map as one undo step, else in the played campaign's values, as a rest writes them.
+ */
+export function writeCharacterResources(app: App, rest: CharacterRest, resources: ReadonlyMap<string, ResourceValue>): void {
+  writeScene(app, [{ rest, changes: { resources, counters: new Map(), conditions: new Map() } }]);
 }
 
 /** Another player character a rest changed, by its id, ready to be written; null where it cannot be reached. */

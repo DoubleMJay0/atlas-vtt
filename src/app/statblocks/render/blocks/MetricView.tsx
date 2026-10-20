@@ -61,7 +61,7 @@ function MetricCell({ block, number }: { block: MetricBlock; number: MetricNumbe
   const untracked = hasText(shown) || shown.problems.length > 0
     ? <BonusLink text={shown.text} rollable={block.rollable}><ValueText shown={shown} /></BonusLink>
     : editing ? <FieldPrompt prompt={key ? valuePrompt(field, label) : unnamedPrompt} /> : <span className="atlas-sb-value atlas-sb-metric__blank">{BLANK}</span>;
-  const value = tracked ? <TrackedText value={tracked} /> : untracked;
+  const value = tracked ? <TrackedText field={key} value={tracked} /> : untracked;
 
   return (
     <div

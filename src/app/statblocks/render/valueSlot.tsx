@@ -1,4 +1,5 @@
 import React, { createContext, useContext } from 'react';
+import type { ResourceValue } from '../../resources/resourceTypes';
 import type { CountersBlock, EntriesBlock, FieldKey, FieldValue, ScoresBlock, TemplateBlock } from '../model/templateTypes';
 import type { ShownCounters } from './blocks/CountersView';
 import type { TableLook } from './blocks/ScoresView';
@@ -45,6 +46,11 @@ export interface ValueEditing {
    * character. Unset: nothing, as a card that is only read (a hover preview, the DM screen) shows.
    */
   recovery?(): React.ReactNode;
+  /**
+   * What stands where a tracked number shows its current value over its maximum (`text`, "2 / 4"): the
+   * note panel's − and + around it, stepping the character's current value. Unset: `text` alone.
+   */
+  tracked?(field: FieldKey, value: ResourceValue, text: React.ReactNode): React.ReactNode;
   /**
    * A tile not named yet is drawn as it will be once named (`provisionalSheet`): the template editor's tiles while
    * their name is asked for. Unset (a statblock's pane): such a block shows only its prompt, and no value of it is edited.
