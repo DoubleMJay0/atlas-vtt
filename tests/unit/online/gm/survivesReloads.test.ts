@@ -1,4 +1,4 @@
-import { CLOSE } from '../../../../src/app/online/protocol/index.ts';
+import { CLOSE, GM_LEVEL } from '../../../../src/app/online/protocol/index.ts';
 import type { TokenEntity } from '../../../../src/app/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SceneState } from '../../../../src/app/online/gm/atlasView.ts';
@@ -383,7 +383,7 @@ describe('the online table', () => {
     socket.relay({ t: 'welcome', role: 'gm', players: [], waiting: [{ id: ANA, name: 'Ana' }] });
     await advance(0);
     // Hello, then the gates, ahead of every game message.
-    expect(socket.frames().slice(0, 2)).toEqual([{ v: 1, t: 'hello', role: 'gm', secret: 'n'.repeat(43), level: 1 }, { v: 1, t: 'gate', code, ask: true }]);
+    expect(socket.frames().slice(0, 2)).toEqual([{ v: 1, t: 'hello', role: 'gm', secret: 'n'.repeat(43), level: GM_LEVEL }, { v: 1, t: 'gate', code, ask: true }]);
     expect(online.table?.gate.view().waiting).toEqual([{ id: ANA, name: 'Ana', answered: false, full: false, armed: false }]);
 
     const before = changes;

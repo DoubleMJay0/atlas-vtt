@@ -4,7 +4,7 @@ import { CampaignFiles } from '../../../../src/app/campaigns/CampaignFiles';
 import { CampaignPlay } from '../../../../src/app/campaigns/campaignPlay';
 import { CAMPAIGNS_FOLDER } from '../../../../src/app/campaigns/campaignPaths';
 import { CampaignPlayers } from '../../../../src/app/campaigns/players/CampaignPlayers';
-import { MAX_CAMPAIGN_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
+import { GM_LEVEL, MAX_CAMPAIGN_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
 import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
@@ -124,7 +124,7 @@ describe('a table of the played campaign', () => {
     const table = await online.start(leaf);
     expect(table).not.toBeNull();
     expect(files.isLoaded()).toBe(true);
-    expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${LINK}","gmLevel":1}`]);
+    expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${LINK}","gmLevel":${GM_LEVEL}}`]);
     await files.flush();
     expect([...vault.files.keys()].filter((path) => path.endsWith('players.json'))).toEqual([PLAYERS]);
     // The campaign's books are bound before the table's socket opens, and let go when it ends.
@@ -139,7 +139,7 @@ describe('a table of the played campaign', () => {
     await files.flush();
     const link = (JSON.parse(vault.files.get(PLAYERS) ?? '{}') as { link?: string }).link;
     expect(link).toMatch(/^[a-z2-7]{26}$/);
-    expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${link}","gmLevel":1}`]);
+    expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${link}","gmLevel":${GM_LEVEL}}`]);
     online.stop();
   });
 
@@ -169,7 +169,7 @@ describe('a table of the played campaign', () => {
     const socket = FakeSocket.all.at(-1);
     expect(FakeSocket.all).toHaveLength(1);
     expect(socket?.url).toContain(`/api/tables/${stray}/socket`);
-    expect(socket?.frames()).toEqual([{ v: 1, t: 'hello', role: 'gm', secret: 'x'.repeat(43), level: 1 }]);
+    expect(socket?.frames()).toEqual([{ v: 1, t: 'hello', role: 'gm', secret: 'x'.repeat(43), level: GM_LEVEL }]);
     socket?.relay({ t: 'welcome', role: 'gm', players: [] });
     await advance(100);
     expect(socket?.frames().map((frame) => frame.t)).toEqual(['hello', 'end']);
@@ -372,7 +372,7 @@ describe('a new link', () => {
     const link = files.of('c1').link;
     expect(link).not.toBe(LINK);
     expect(frames().at(-1)).toEqual({ v: 1, t: 'end' });
-    expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${LINK}","gmLevel":1}`, `{"code":"${link}","gmLevel":1}`]);
+    expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${LINK}","gmLevel":${GM_LEVEL}}`, `{"code":"${link}","gmLevel":${GM_LEVEL}}`]);
     expect(online.table).not.toBeNull();
     online.stop();
   });

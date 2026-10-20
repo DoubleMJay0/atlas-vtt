@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createTable } from '../../../../src/app/online/gm/createTable.ts';
 import { readCreated } from '../../../../src/app/online/gm/createdTable.ts';
 import { bodyOf, type HttpRequest } from '../../../../src/app/online/gm/account/http.ts';
+import { GM_LEVEL } from '../../../../src/app/online/protocol/index.ts';
 
 const TABLE = { code: 'b'.repeat(26), secret: 'n'.repeat(43), maxPlayers: 12, plan: 'beta' };
 
@@ -43,8 +44,8 @@ describe('the relay\'s answer to a table request', () => {
       return Promise.resolve({ status: 201, json: TABLE });
     }, 'https://play.atlas-vtt.dev', 'account-token', link);
     expect(created).toMatchObject({ code: TABLE.code });
-    expect(requests).toEqual([{ url: 'https://play.atlas-vtt.dev/api/tables', method: 'POST', authorization: 'Bearer account-token', json: { code: link, gmLevel: 1 } }]);
-    expect(requests.map(bodyOf)).toEqual([{ body: `{"code":"${link}","gmLevel":1}`, contentType: 'application/json' }]);
+    expect(requests).toEqual([{ url: 'https://play.atlas-vtt.dev/api/tables', method: 'POST', authorization: 'Bearer account-token', json: { code: link, gmLevel: GM_LEVEL } }]);
+    expect(requests.map(bodyOf)).toEqual([{ body: `{"code":"${link}","gmLevel":${GM_LEVEL}}`, contentType: 'application/json' }]);
     expect(await createTable(() => Promise.resolve({ status: 403, json: { error: 'access-ended' } }), 'https://play.atlas-vtt.dev', 'account-token', link))
       .toEqual({ status: 403, message: 'Your access to online play has ended. See your account page.' });
     expect(await createTable(() => Promise.resolve({ status: 409, json: { error: 'link-taken' } }), 'https://play.atlas-vtt.dev', 'account-token', link))
