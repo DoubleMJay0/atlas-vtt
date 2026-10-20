@@ -134,12 +134,7 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
       >
         <PaneDiceRolls app={app} collectionId={collectionId} coversMaps>
           <header className="atlas-encounter-builder__bar">
-            <h2 className="atlas-encounter-builder__title">
-              <span id={titleId}>{t('encounter.builder.title')}</span>
-              {!roster.loading && roster.total > 0 && (
-                <span className="atlas-encounter-builder__total">{t('encounter.builder.count', { count: roster.total })}</span>
-              )}
-            </h2>
+            <h2 id={titleId} className="atlas-encounter-builder__title">{t('encounter.builder.title')}</h2>
             <HeaderSearch
               app={app}
               search={roster.search}
@@ -149,7 +144,19 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
             />
             <CloseButton onClick={onClose} />
           </header>
-          <ActiveFilterBar groups={roster.query.chips} onReset={roster.query.reset} />
+          {/* Its height is kept whether filters are active or not, so applying one never moves the feed. */}
+          <div className="atlas-encounter-builder__status">
+            <div className="atlas-encounter-builder__status-row">
+              {!roster.loading && roster.total > 0 && (
+                <span className="atlas-encounter-builder__total">
+                  {roster.shown.length === roster.total
+                    ? t('encounter.builder.count', { count: roster.total })
+                    : t('encounter.builder.shown', { shown: roster.shown.length, count: roster.total })}
+                </span>
+              )}
+              <ActiveFilterBar groups={roster.query.chips} onReset={roster.query.reset} />
+            </div>
+          </div>
           {renderFeed()}
           <AnimatePresence>
             {picks.length > 0 && (

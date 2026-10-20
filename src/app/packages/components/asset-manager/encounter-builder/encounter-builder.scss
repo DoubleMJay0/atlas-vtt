@@ -14,7 +14,7 @@
 .atlas-encounter-builder__window {
   // Anchors the dice rolls (`.atlas-sb-pane-rolls`), which hang from its top right.
   position: relative;
-  @include atlas-flex-col($spacing-m);
+  @include atlas-flex-col($spacing-s);
   width: 100%;
   height: 100%;
   // Four feeds at their widest (dm-screen/feedLayout.ts).
@@ -44,10 +44,7 @@
 }
 
 .atlas-encounter-builder__title {
-  display: flex;
   flex: 1;
-  align-items: baseline;
-  gap: $spacing-s;
   min-width: 0;
   margin: 0;
   padding-inline-start: $spacing-s;
@@ -56,12 +53,49 @@
   font-weight: var(--font-semibold);
 }
 
+// ── Status: how many creatures show, and the active filters ─────────────────
+// One chip row tall whether filters are active or not; chips that need more rows
+// wrap over the top of the feed instead of pushing it down.
+
+$chip-height: 24px;
+
+.atlas-encounter-builder__status {
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  height: $chip-height;
+}
+
+.atlas-encounter-builder__status-row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-s;
+  min-height: $chip-height;
+  padding-inline: $spacing-l;
+
+  .atlas-active-filters {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+  }
+
+  // Over the feed's cards the chips need a ground of their own.
+  .atlas-active-filters .atlas-active-filter.btn {
+    background: var(--background-primary);
+  }
+}
+
 .atlas-encounter-builder__total {
-  color: var(--text-faint);
-  font-family: var(--font-interface);
+  color: var(--text-muted);
   font-size: $font-ui-smaller;
-  font-weight: var(--font-normal);
   font-variant-numeric: tabular-nums;
+  line-height: $chip-height;
+  white-space: nowrap;
 }
 
 // Room above the first row for the cards' notches, and below the last for the tray floating over it.
@@ -216,7 +250,8 @@ $tray-room: 72px;
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────
-// Floats over the bottom of the feed, centred, once a creature is picked.
+// Floats over the bottom of the feed once a creature is picked, as wide as the bar above it
+// whatever it holds: its picks scroll and its numbers keep their room.
 
 .atlas-encounter-tray {
   position: absolute;
@@ -226,14 +261,11 @@ $tray-room: 72px;
   z-index: 2;
   display: flex;
   align-items: center;
-  width: fit-content;
-  max-width: 100%;
-  margin-inline: auto;
 }
 
 .atlas-encounter-tray__picks {
   display: flex;
-  flex: 0 1 auto;
+  flex: 1;
   gap: $spacing-xs;
   min-width: 0;
   margin: 0;
@@ -251,7 +283,7 @@ $tray-room: 72px;
   height: 32px;
   padding: 2px;
   padding-inline-end: 0;
-  border-radius: $radius-full;
+  @include atlas-panel-inset-radius($spacing-s);
   background: var(--background-modifier-hover);
 }
 
@@ -288,10 +320,24 @@ $tray-room: 72px;
   border-radius: $radius-s;
 }
 
+.atlas-encounter-tray__count {
+  min-width: 11ch;
+  text-align: end;
+}
+
 .atlas-encounter-tray__metric-label {
   color: var(--text-muted);
 }
 
+.atlas-encounter-tray__metric-value {
+  min-width: 4ch;
+}
+
 .atlas-encounter-tray__actions {
   @include atlas-flex-row($spacing-xs);
+
+  // Its end control sits in the tray's corner, concentric with it.
+  .btn {
+    @include atlas-panel-inset-radius($spacing-s);
+  }
 }

@@ -14,6 +14,7 @@ export const encounter = {
   'encounter.builder.title': 'Create encounter',
   'encounter.builder.search': 'Creatures',
   'encounter.builder.count': { one: '{count} creature', other: '{count} creatures' },
+  'encounter.builder.shown': { one: '{shown} of {count} creature', other: '{shown} of {count} creatures' },
   'encounter.builder.add': 'Add',
   'encounter.builder.addNamed': 'Add {name} to the encounter',
   'encounter.builder.fewer': 'One {name} fewer',
