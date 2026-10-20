@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { HiddenSummary } from '../../../../../creatures/creatureFilterEngine';
+import type { HiddenSummary, OptionsFacet, RangeFacet } from '../../../../../creatures/creatureFilterEngine';
 import { hasPicks, LAYOUT_FACET, withOptionState, withRange, withStatblockFilter } from '../../../../../creatures/creatureSelection';
 import type { StatblockLinkFilter } from '../../../../../types/creatureFilterTypes';
 import { EASE_OUT_CONTROL_POINTS } from '../../../../../utils/motion';
@@ -20,6 +20,13 @@ const STATBLOCK_CHOICES = [
   { value: 'linked', label: t('filters.withStatblock') },
   { value: 'unlinked', label: t('filters.without') },
 ] as const;
+
+/** The statblock template's filters show this many before the rest fold away. */
+const TEMPLATE_FOLD_AT = 3;
+
+function isFacetActive(facet: RangeFacet | OptionsFacet): boolean {
+  return 'values' in facet ? facet.selected !== null : facet.options.some((option) => option.state !== null);
+}
 
 const PANEL_MOTION = {
   initial: { opacity: 0, transform: 'translateY(-4px) scale(0.98)' },
@@ -79,7 +86,30 @@ export function AdvancedFilterPanel({ panel, onClose, onReset, anchorRef }: Adva
   const ranges = facets.ranges.filter((facet) => facet.values.length > 1 || facet.selected);
   const options = facets.options.filter((facet) => facet.options.length > 0);
   const showLayouts = facets.layouts.length > 1 || hasPicks(selection.layouts);
+  const fromTemplate = (facet: RangeFacet | OptionsFacet): boolean => facet.definition.origin === 'template';
+  const templateFacets = [...ranges.filter(fromTemplate), ...options.filter(fromTemplate)];
   const hasStatblockFields = ranges.length > 0 || options.length > 0 || showLayouts;
+  const [templateExpanded, setTemplateExpanded] = useState(false);
+  // Folded to its first few while it holds many; never while one of the folded ones filters.
+  const foldsTemplate = templateFacets.length > TEMPLATE_FOLD_AT
+    && !templateFacets.slice(TEMPLATE_FOLD_AT).some((facet) => isFacetActive(facet));
+  const shownTemplateFacets = foldsTemplate && !templateExpanded ? templateFacets.slice(0, TEMPLATE_FOLD_AT) : templateFacets;
+
+  const renderFacet = (facet: RangeFacet | OptionsFacet): React.JSX.Element => ('values' in facet ? (
+    <RangeFilter
+      key={facet.definition.id}
+      facet={facet}
+      onChange={(range) => setSelection((current) => withRange(current, facet.definition.id, range))}
+    />
+  ) : (
+    <FilterSection key={facet.definition.id} title={facet.definition.label} active={isFacetActive(facet)}>
+      <OptionChips
+        label={facet.definition.label}
+        options={facet.options}
+        onChange={(key, state) => setSelection((current) => withOptionState(current, facet.definition.id, key, state))}
+      />
+    </FilterSection>
+  ));
 
   useDialogEscape(rootRef, onClose);
 
@@ -112,23 +142,8 @@ export function AdvancedFilterPanel({ panel, onClose, onReset, anchorRef }: Adva
           />
         </FilterSection>
 
-        {ranges.map((facet) => (
-          <RangeFilter
-            key={facet.definition.id}
-            facet={facet}
-            onChange={(range) => setSelection((current) => withRange(current, facet.definition.id, range))}
-          />
-        ))}
-
-        {options.map((facet) => (
-          <FilterSection key={facet.definition.id} title={facet.definition.label} active={facet.options.some((option) => option.state !== null)}>
-            <OptionChips
-              label={facet.definition.label}
-              options={facet.options}
-              onChange={(key, state) => setSelection((current) => withOptionState(current, facet.definition.id, key, state))}
-            />
-          </FilterSection>
-        ))}
+        {ranges.filter((facet) => !fromTemplate(facet)).map(renderFacet)}
+        {options.filter((facet) => !fromTemplate(facet)).map(renderFacet)}
 
         {showLayouts && (
           <FilterSection title={t('filters.template')} active={hasPicks(selection.layouts)}>
@@ -138,6 +153,18 @@ export function AdvancedFilterPanel({ panel, onClose, onReset, anchorRef }: Adva
               onChange={(layout, state) => setSelection((current) => withOptionState(current, LAYOUT_FACET, layout, state))}
             />
           </FilterSection>
+        )}
+
+        {templateFacets.length > 0 && (
+          <div className="atlas-filter-panel__group" role="group" aria-label={t('filters.templateFields')}>
+            <div className="atlas-filter-panel__group-label">{t('filters.templateFields')}</div>
+            {shownTemplateFacets.map(renderFacet)}
+            {foldsTemplate && (
+              <Button variant="ghost" className="atlas-filter-chips__more" onClick={() => setTemplateExpanded(!templateExpanded)}>
+                {templateExpanded ? t('filters.showFewer') : t('filters.showAll', { count: templateFacets.length })}
+              </Button>
+            )}
+          </div>
         )}
 
         {!hasStatblockFields && (panel.pending ? <FilterSkeleton /> : (

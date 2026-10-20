@@ -14,6 +14,8 @@ interface CreatureFilterBase {
   id: string;
   /** Shown in the asset manager, e.g. "CR" or "Role". */
   label: string;
+  /** Worked out from a field of the collection's statblock templates (`templateCreatureFilters`), never stored. */
+  origin?: 'template';
 }
 
 /**
