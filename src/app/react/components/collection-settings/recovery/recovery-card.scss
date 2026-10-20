@@ -1,41 +1,50 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Recovery pane: the fan over a picked metric (RuleFan) and the rule card under
-// it (RuleCard, RuleInputs).
+// Recovery pane: the rule card hanging from a picked metric's row (RuleCardLayer,
+// RuleCard, RuleInputs).
 // ═══════════════════════════════════════════════════════════════════════════
 
 @use '../../../../../../styles/tokens' as *;
 @use '../../../../../../styles/mixins' as *;
 
-$card-width: 304px; // RULE_CARD_WIDTH in RuleCardLayer.tsx
+// One spacing throughout: the card's padding, and the gap between everything in it.
+$gap: $spacing-s;
+$card-width: 368px; // RULE_CARD_WIDTH in RuleCardLayer.tsx
+$control-height: $input-height-s;
 
-// ── Fan and card over the picked metric ────────────────────────────────────
-.atlas-rc-fan .atlas-csm-fan {
-  z-index: 3;
-}
-
-.atlas-rc-fan-glyph {
-  font-size: $font-ui-medium;
-  font-weight: $font-weight-semibold;
-  line-height: 1;
-}
-
+// ── Card ───────────────────────────────────────────────────────────────────
+// Placed by its edge that faces the row: its top under the row, its bottom over it, so the
+// height it grows or shrinks by goes away from the row.
 .atlas-rc-card-layer {
   position: absolute;
   z-index: 3;
   width: $card-width;
-  transform-origin: top center;
+  transform-origin: top left;
+  // Scrolled into view with the stage's own room around it
+  scroll-margin: $spacing-l;
+
+  &[data-side='above'] { transform-origin: bottom left; }
 }
 
+// The height follows the chosen kind's fields (RuleCardLayer animates it): what does not fit yet
+// stays inside.
 .atlas-rc-card {
   @include atlas-elevated-surface;
-  @include atlas-flex-col($spacing-m);
-  padding: $spacing-m;
+  @include atlas-panel-radius($radius-2xl);
+  overflow: hidden;
+  color: var(--text-normal);
 }
 
+.atlas-rc-card__body {
+  @include atlas-flex-col($gap);
+  padding: $gap;
+}
+
+// ── Head: the metric, the button, Remove in the corner ─────────────────────
 .atlas-rc-card__head {
-  @include atlas-flex-row($spacing-s);
+  @include atlas-flex-row($gap);
   min-width: 0;
-  font-size: $font-ui-smaller;
+  min-height: $control-height;
+  font-size: $font-ui-small;
 }
 
 .atlas-rc-card__dot {
@@ -48,7 +57,6 @@ $card-width: 304px; // RULE_CARD_WIDTH in RuleCardLayer.tsx
 
 .atlas-rc-card__metric {
   @include atlas-truncate;
-  color: var(--text-normal);
   font-weight: $font-weight-semibold;
 }
 
@@ -56,19 +64,81 @@ $card-width: 304px; // RULE_CARD_WIDTH in RuleCardLayer.tsx
   @include atlas-truncate;
   margin-inline-start: auto;
   color: var(--text-faint);
+  font-size: $font-ui-smaller;
 }
 
+// Two classes: above Obsidian's `button:not(.clickable-icon)` look.
+.atlas-rc-card__remove.atlas-rc-card__remove {
+  @include atlas-icon-button;
+  @include atlas-panel-inset-radius($gap);
+  width: $control-height;
+  height: $control-height;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  transition: color $transition-fast $transition-ease, background-color $transition-fast $transition-ease,
+    transform $transition-press $transition-ease-out;
+
+  svg {
+    width: $icon-s;
+    height: $icon-s;
+  }
+
+  &:active { transform: scale(0.94); }
+
+  @include atlas-focus-ring;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .atlas-rc-card__remove.atlas-rc-card__remove:hover {
+    background: color-mix(in oklch, var(--background-modifier-error) 15%, transparent);
+    color: var(--text-error);
+  }
+}
+
+// ── Kinds: one segmented row, each kind an icon and a word ─────────────────
+.atlas-rc-card .atlas-segmented {
+  width: 100%;
+  @include atlas-panel-inset-radius($gap);
+}
+
+.atlas-rc-card .atlas-segmented__option {
+  @include atlas-panel-inset-radius($gap + $spacing-xs);
+}
+
+.atlas-rc-card__kinds .atlas-segmented__option {
+  height: $control-height;
+  font-size: $font-ui-smaller;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.atlas-rc-card__glyph {
+  width: 14px;
+  font-weight: $font-weight-semibold;
+  line-height: 1;
+  text-align: center;
+}
+
+// ── Fields: what the chosen kind asks for ──────────────────────────────────
 .atlas-rc-card__fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: $spacing-m;
+  gap: $gap;
+  padding-top: $gap;
+  border-top: $border-width-s solid var(--background-modifier-border);
 }
 
 .atlas-rc-card__field {
   @include atlas-flex-col($spacing-xs);
   min-width: 0;
 
-  .atlas-csm-input { height: $input-height-s; }
+  .atlas-csm-input { height: $control-height; }
 }
 
 .atlas-rc-card__field--wide {
@@ -100,12 +170,8 @@ $card-width: 304px; // RULE_CARD_WIDTH in RuleCardLayer.tsx
   max-height: none;
 }
 
-.atlas-rc-card .atlas-segmented {
-  width: 100%;
-}
-
 .atlas-rc-card__source {
-  @include atlas-flex-row($spacing-s);
+  @include atlas-flex-row($gap);
   justify-content: space-between;
   min-width: 0;
 }
@@ -118,8 +184,12 @@ $card-width: 304px; // RULE_CARD_WIDTH in RuleCardLayer.tsx
 }
 
 .atlas-rc-card__change.atlas-rc-card__change {
-  height: $input-height-s;
+  height: $control-height;
   padding: 0 $spacing-s;
   border-radius: $radius-l;
   font-size: $font-ui-smaller;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-rc-card__remove.atlas-rc-card__remove { transition: none; }
 }

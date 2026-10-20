@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { cn } from '../../../../../utils/cn';
 import { BlockChromeContext } from '../../../../statblocks/render/blockChrome';
@@ -9,13 +9,12 @@ import type { ConditionMetric, SheetMetrics } from '../../../../recovery/editor/
 import { metricKey, numberFields } from '../../../../recovery/editor/recoveryMetrics';
 import { ruleFor } from '../../../../recovery/editor/recoveryEdits';
 import { ruleBadge } from '../../../../recovery/editor/ruleBadge';
-import type { RecoveryButton, RecoveryTarget } from '../../../../recovery/recoveryTypes';
+import type { RecoveryButton, RecoveryRuleKind, RecoveryTarget } from '../../../../recovery/recoveryTypes';
 import type { ResourceDefinition } from '../../../../resources/resourceTypes';
 import { ConditionChips } from './ConditionChips';
 import { recoveryChrome, type SpotShared } from './recoveryChrome';
 import { RuleCardLayer } from './RuleCardLayer';
-import { RuleFan } from './RuleFan';
-import { placeRuleFan, type Box } from './rulePlacement';
+import { RULE_GAP, type Box } from './rulePlacement';
 import type { RuleEditing } from './useRuleEditing';
 import { useBoxIn, type Spots } from './useSpots';
 
@@ -35,12 +34,11 @@ interface RecoveryStageProps {
   /** The spot the Tab key stops at, which also opens the tabs that hold it. */
   active: string | null;
   onActive: (spotId: string) => void;
-  /** What a fan may reach over above the stage: the rail and the line under it. */
-  bounds: HTMLElement | null;
+  /** The card's kinds and Remove, which the editor follows with focus. */
+  onKind: (kind: RecoveryRuleKind) => void;
+  onPickSource: () => void;
+  onRemove: () => void;
 }
-
-/** The fan's buttons: seven kinds and Remove. */
-const FAN_BUTTONS = 8;
 
 /** A metric's own key, field or id: its name where neither the card nor the chips name it. */
 function targetName(target: RecoveryTarget): string {
@@ -63,21 +61,31 @@ function targetColor(target: RecoveryTarget, resources: readonly ResourceDefinit
   }
 }
 
+/** The stage's border, above and below its padding box (atlas-inset-surface). */
+const STAGE_BORDERS = 2;
+
 /**
  * The template drawn as a statblock with sample values, its metrics dressed as spots through the
- * renderer's chrome, the collection's valued conditions under it, and the fan and card of the
- * picked metric over it.
+ * renderer's chrome, the collection's valued conditions under it, and the rule card of the
+ * picked metric hanging from its row.
  */
 export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
-  const { template, name, metrics, chips, resources, button, buttons, editing, spots, onPick, onSpotKey, active, onActive, bounds } = props;
+  const { template, name, metrics, chips, resources, button, buttons, editing, spots, onPick, onSpotKey, active, onActive, onKind, onPickSource, onRemove } = props;
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
   const fields = useMemo(() => sampleRecord(template), [template]);
   const picked = editing.picked;
   const metricBox = useBoxIn(stage, picked ? spots.element(picked.spotId) : null);
-  const reach = useBoxIn(stage, bounds);
-  // A fan opens over its metric wherever the editor has room above it, the rail included
-  const frame: Box | null = stage ? { left: 0, top: Math.min(0, reach?.top ?? 0), right: stage.clientWidth, bottom: stage.clientHeight } : null;
-  const fan = metricBox && frame ? placeRuleFan(FAN_BUTTONS, metricBox, frame) : null;
+  const frame: Box | null = stage ? { left: 0, top: 0, right: stage.clientWidth, bottom: stage.clientHeight } : null;
+  // A card taller than the room under its row makes the stage taller while it is open
+  const [cardReach, setCardReach] = useState<{ spotId: string; bottom: number } | null>(null);
+  const pickedSpot = picked?.spotId ?? null;
+  const onReach = useCallback((bottom: number | null): void => {
+    // A card that leaves takes back only its own reach
+    setCardReach((was) => {
+      if (bottom === null) return was?.spotId === pickedSpot ? null : was;
+      return was?.spotId === pickedSpot && was.bottom === bottom ? was : { spotId: pickedSpot ?? '', bottom };
+    });
+  }, [pickedSpot]);
 
   const nameOf = (target: RecoveryTarget): string => {
     const key = metricKey(target);
@@ -107,6 +115,7 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
       className={cn('atlas-rc-stage', button && 'atlas-rc-stage--picking', picked && 'atlas-focused', editing.spending && 'atlas-spending')}
       // A press on the card beside the picked metric puts it down
       onPointerDown={() => { if (picked) editing.closeAll(); }}
+      style={cardReach === null ? undefined : { minHeight: cardReach.bottom + RULE_GAP + STAGE_BORDERS }}
     >
       <div className="atlas-rc-sheet">
         <BlockChromeContext.Provider value={chrome}>
@@ -118,14 +127,8 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
           tabStop={active} order={metrics.metrics.length} pickable={button !== null} />
       )}
       <AnimatePresence>
-        {editing.fanOpen && picked && fan && button && (
-          <RuleFan key={picked.spotId} place={fan} target={picked.target} rule={editing.rule} metric={pickedLabel} button={button.name}
-            canSpend={canSpend} focusFirst={editing.fromKeyboard} onChoose={editing.chooseKind} />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
         {editing.cardOpen && picked && metricBox && frame && button && (
-          <RuleCardLayer key={picked.spotId} metricBox={metricBox} frame={frame} fan={fan} card={{
+          <RuleCardLayer key={picked.spotId} metricBox={metricBox} frame={frame} onReach={onReach} card={{
             rule: editing.rule,
             metric: pickedLabel,
             color,
@@ -133,9 +136,12 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
             buttons,
             fields: numberFields(template),
             nameOf,
-            focusFirst: editing.fromKeyboard,
+            canSpend,
+            focusKind: editing.fromKeyboard,
+            onKind,
             onChange: editing.changeRule,
-            onPickSource: editing.pickSource,
+            onPickSource,
+            onRemove,
           }} />
         )}
       </AnimatePresence>

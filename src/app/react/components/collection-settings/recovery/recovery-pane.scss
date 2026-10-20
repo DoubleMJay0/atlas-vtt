@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Collection Settings: the recovery pane beside the token's sockets
 // (recovery/: RecoveryPane, RecoveryRail; the card in recovery-stage.scss, the
-// fan and rule card in recovery-card.scss).
+// rule card in recovery-card.scss).
 // ═══════════════════════════════════════════════════════════════════════════
 
 @use '../../../../../../styles/tokens' as *;
@@ -246,6 +246,5 @@ input.atlas-rc-capsule--input {
 
 @media (prefers-reduced-motion: reduce) {
   .atlas-rc-capsule,
-  .atlas-rc-rail__add,
-  .atlas-rc-rail { transition: none; }
+  .atlas-rc-rail__add { transition: none; }
 }

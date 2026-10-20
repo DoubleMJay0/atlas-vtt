@@ -37,15 +37,17 @@ describe('the recovery pane, as it looks', () => {
       await shot(`2-long-rest-${theme}`);
 
       await userEvent.click(page.getByRole('button', { name: /^HP: Full/ }));
-      await wait(700);
-      await shot(`3-fan-${theme}`);
+      await wait(600);
+      await shot(`3-full-card-${theme}`);
 
-      await userEvent.click(page.getByRole('button', { name: 'Back by an amount' }));
+      await userEvent.click(page.getByRole('radio', { name: 'Amount' }));
       await wait(600);
       await shot(`4-amount-card-${theme}`);
 
+      // The card hangs over the rows under HP: Escape puts it away first
+      await userEvent.keyboard('{Escape}');
       await userEvent.click(page.getByRole('button', { name: /^Stress: →/ }));
-      await userEvent.click(page.getByRole('button', { name: 'Back by spending another' }));
+      await userEvent.click(page.getByRole('radio', { name: 'Spend' }));
       await wait(500);
       await shot(`5-spending-${theme}`);
       await userEvent.click(page.getByRole('button', { name: /^Hit Dice:/ }));
@@ -54,9 +56,9 @@ describe('the recovery pane, as it looks', () => {
 
       await userEvent.keyboard('{Escape}{Escape}');
       await userEvent.click(page.getByRole('button', { name: /^Exhaustion:/ }));
-      await wait(700);
-      await shot(`7-condition-fan-${theme}`);
-      expect(document.querySelector('.atlas-rc-fan')).not.toBeNull();
+      await wait(600);
+      await shot(`7-condition-card-${theme}`);
+      expect(document.querySelector('.atlas-rc-card')).not.toBeNull();
     }, 60_000);
   }
 

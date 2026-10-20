@@ -10,40 +10,42 @@ export interface PickedMetric {
   target: RecoveryTarget;
 }
 
+/** What one Escape took back: picking a source, the card, or the picked metric. */
+export type EscapeStep = 'spending' | 'card' | 'metric';
+
 export interface RuleEditing {
   picked: PickedMetric | null;
   /** The picked metric's rule under the selected button. */
   rule: RecoveryRule | undefined;
-  fanOpen: boolean;
   cardOpen: boolean;
-  /** Waiting for the metric a Spend rule spends: the card is closed meanwhile. */
+  /** Waiting for the metric a Spend rule spends: the card makes way meanwhile. */
   spending: boolean;
-  /** The fan or the card was opened from the keyboard: its first control takes focus. */
+  /** The card was opened from the keyboard: its chosen kind takes focus. */
   fromKeyboard: boolean;
-  /** Adds the metric to the button where it is not in it yet, and opens its fan; picks the source while spending. */
+  /**
+   * Adds the metric to the button where it is not in it yet and opens its card, or closes the card
+   * of the metric already picked; picks the source while spending.
+   */
   pick: (spotId: string, target: RecoveryTarget, fromKeyboard: boolean) => 'picked' | 'source' | 'full' | 'ignored';
-  chooseKind: (kind: RecoveryRuleKind | 'remove', fromKeyboard: boolean) => void;
+  /** Changes the rule to one of `kind`; Spend without a source waits for one ('spending'). */
+  chooseKind: (kind: RecoveryRuleKind) => 'chosen' | 'spending';
   changeRule: (rule: RecoveryRule) => void;
   /** Spend: waits for another metric to spend. */
   pickSource: () => void;
-  /** Closes the innermost of fan, card and pick; false where nothing was open. */
-  escape: () => boolean;
+  /** Leaves the picked metric out of the button, and lets go of it. */
+  remove: () => void;
+  /** Takes back the innermost of picking a source, the card and the pick; null where nothing was. */
+  escape: () => EscapeStep | null;
   closeAll: () => void;
-}
-
-/** Whether a rule needs the card: anything with a number or formula, and every counters rule (its rows). */
-export function needsCard(rule: RecoveryRule): boolean {
-  return rule.target.kind === 'counters' || (rule.does !== 'full' && rule.does !== 'clear');
 }
 
 /**
  * The picking of metrics on the card for one button, and the rules it sets: a metric picked is
- * added to the button with its first rule, its fan chooses the kind of rule, and the card under
- * it the rule's numbers. Every change goes to `onButton` at once.
+ * added to the button with its first rule and opens its card, where the kind of rule and its
+ * numbers are set. Every change goes to `onButton` at once.
  */
 export function useRuleEditing(button: RecoveryButton | null, onButton: (button: RecoveryButton) => void): RuleEditing {
   const [picked, setPicked] = useState<PickedMetric | null>(null);
-  const [fanOpen, setFanOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
   const [spending, setSpending] = useState(false);
   const [fromKeyboard, setFromKeyboard] = useState(false);
@@ -51,7 +53,6 @@ export function useRuleEditing(button: RecoveryButton | null, onButton: (button:
 
   const closeAll = (): void => {
     setPicked(null);
-    setFanOpen(false);
     setCardOpen(false);
     setSpending(false);
   };
@@ -64,70 +65,70 @@ export function useRuleEditing(button: RecoveryButton | null, onButton: (button:
 
   const pick: RuleEditing['pick'] = (spotId, target, keyboard) => {
     if (!button) return 'full';
+    setFromKeyboard(keyboard);
     if (spending && picked) {
       // Only another metric with a maximum can be spent
       if (picked.target.kind === 'condition' || target.kind === 'condition' || spotId === picked.spotId) return 'ignored';
       setRule(spendRule(picked.target, target, rule));
       setSpending(false);
       setCardOpen(true);
-      setFromKeyboard(keyboard);
       return 'source';
     }
-    if (picked?.spotId === spotId && fanOpen) {
-      setFanOpen(false);
+    if (picked?.spotId === spotId) {
+      setCardOpen(!cardOpen);
       return 'picked';
     }
-    const had = ruleFor(button, target);
-    if (!had && !setRule(firstRule(target))) return 'full';
-    const shown = had ?? firstRule(target);
+    if (!ruleFor(button, target) && !setRule(firstRule(target))) return 'full';
     setPicked({ spotId, target });
-    setFanOpen(true);
-    setCardOpen(Boolean(had) && needsCard(shown));
+    setCardOpen(true);
     setSpending(false);
-    setFromKeyboard(keyboard);
     return 'picked';
-  };
-
-  const chooseKind: RuleEditing['chooseKind'] = (kind, keyboard) => {
-    if (!button || !picked) return;
-    setFromKeyboard(keyboard);
-    if (kind === 'remove') {
-      onButton(withoutRule(button, picked.target));
-      closeAll();
-      return;
-    }
-    if (!kindFits(kind, picked.target)) return;
-    const next = ruleOfKind(kind, picked.target, rule);
-    if (kind === 'spend' && !next) {
-      startSpending();
-      return;
-    }
-    if (!next) return;
-    setRule(next);
-    setSpending(false);
-    setCardOpen(needsCard(next));
   };
 
   /** Spend waits for the metric it spends: the card makes way, so every other metric can be clicked. */
   const startSpending = (): void => {
     setSpending(true);
-    setFanOpen(false);
     setCardOpen(false);
   };
 
-  const escape = (): boolean => {
-    if (fanOpen) setFanOpen(false);
-    else if (spending) setSpending(false);
-    else if (cardOpen) setCardOpen(false);
-    else if (picked) setPicked(null);
-    else return false;
-    return true;
+  const chooseKind: RuleEditing['chooseKind'] = (kind) => {
+    if (!picked || !kindFits(kind, picked.target)) return 'chosen';
+    const next = ruleOfKind(kind, picked.target, rule);
+    if (kind === 'spend' && !next) {
+      startSpending();
+      return 'spending';
+    }
+    if (next) setRule(next);
+    return 'chosen';
+  };
+
+  const remove = (): void => {
+    if (button && picked) onButton(withoutRule(button, picked.target));
+    closeAll();
+  };
+
+  const escape = (): EscapeStep | null => {
+    if (spending) {
+      // Back to the card the Spend kind was chosen on, with the rule it had
+      setSpending(false);
+      setCardOpen(true);
+      setFromKeyboard(true);
+      return 'spending';
+    }
+    if (cardOpen) {
+      setCardOpen(false);
+      return 'card';
+    }
+    if (picked) {
+      setPicked(null);
+      return 'metric';
+    }
+    return null;
   };
 
   return {
     picked,
     rule,
-    fanOpen,
     cardOpen,
     spending,
     fromKeyboard,
@@ -135,6 +136,7 @@ export function useRuleEditing(button: RecoveryButton | null, onButton: (button:
     chooseKind,
     changeRule: (next) => { setRule(next); },
     pickSource: startSpending,
+    remove,
     escape,
     closeAll,
   };

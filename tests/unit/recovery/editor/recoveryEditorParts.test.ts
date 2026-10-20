@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formulaFields, formulaReads, withFieldReference } from '../../../../src/app/recovery/editor/recoveryFormulas';
+import { formulaReads, withFieldReference } from '../../../../src/app/recovery/editor/recoveryFormulas';
 import { changedResourceKeys, withSavedResourceKeys } from '../../../../src/app/recovery/editor/recoveryResourceKeys';
 import { recoveryTemplateTabs } from '../../../../src/app/recovery/editor/recoveryTemplateTabs';
 import { ruleBadge } from '../../../../src/app/recovery/editor/ruleBadge';
@@ -33,9 +33,10 @@ describe('formulas', () => {
   it('read with their fields as numbers', () => {
     expect(formulaReads('1d4+@tier')).toBe(true);
     expect(formulaReads('@level')).toBe(true);
+    // A field as a dice count, as the rest reads it
+    expect(formulaReads('@level d6')).toBe(true);
     expect(formulaReads('1d4+')).toBe(false);
     expect(formulaReads('  ')).toBe(false);
-    expect(formulaFields('@a.b + 1d6 + @c + @a.b')).toEqual(['a.b', 'c']);
   });
 
   it('take a field at the caret, joined with a plus', () => {

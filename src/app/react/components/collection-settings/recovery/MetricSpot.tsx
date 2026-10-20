@@ -4,7 +4,6 @@ import { cn } from '../../../../../utils/cn';
 import { EASE_OUT_CONTROL_POINTS } from '../../../../utils/motion';
 import { t } from '../../../../i18n';
 import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
-import { FAN_TIMING } from '../fan/RadialFan';
 
 /** What a metric's spot shows of the selected button's rule on it, and how it is pressed. */
 export interface SpotProps {
@@ -16,7 +15,7 @@ export interface SpotProps {
   badge: string | null;
   /** The button the badge belongs to: another button's badge swaps in. */
   badgeOf: string;
-  /** Its place among the metrics, which staggers the badges as the fan staggers its buttons. */
+  /** Its place among the metrics, which staggers the badges one after the other. */
   order: number;
   picked: boolean;
   /** Offered as what a Spend rule spends. */
@@ -29,12 +28,15 @@ export interface SpotProps {
   onFocus: (spotId: string) => void;
 }
 
-/** The badges move in the fan's timing; a badge keeps its place while another button's takes it. */
+/** How the badges come and go, in seconds: each a little after the one before it. */
+const BADGE_TIMING = { stagger: 0.028, enter: 0.26, exit: 0.12 } as const;
+
+/** A badge keeps its place while another button's takes it. */
 function badgeMotion(order: number): React.ComponentProps<typeof motion.span> {
   return {
     initial: { opacity: 0, y: 4, scale: 0.8 },
-    animate: { opacity: 1, y: 0, scale: 1, transition: { duration: FAN_TIMING.enter, ease: EASE_OUT_CONTROL_POINTS, delay: order * FAN_TIMING.stagger } },
-    exit: { opacity: 0, y: -4, scale: 0.8, transition: { duration: FAN_TIMING.exit, ease: EASE_OUT_CONTROL_POINTS } },
+    animate: { opacity: 1, y: 0, scale: 1, transition: { duration: BADGE_TIMING.enter, ease: EASE_OUT_CONTROL_POINTS, delay: order * BADGE_TIMING.stagger } },
+    exit: { opacity: 0, y: -4, scale: 0.8, transition: { duration: BADGE_TIMING.exit, ease: EASE_OUT_CONTROL_POINTS } },
   };
 }
 
@@ -65,7 +67,7 @@ export function MetricSpot(props: SpotProps): React.ReactElement {
         tabIndex={tabbable ? 0 : -1}
         aria-label={badge === null ? t('recoveryEditor.metricUnset', { metric: label }) : t('recoveryEditor.metricRule', { metric: label, rule: badge })}
         aria-expanded={picked}
-        // A press on the card would otherwise close the fan this opens
+        // A press on the stage would otherwise close the card this opens
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => onPick(spotId, event.detail === 0)}
         onKeyDown={(event) => onKeyDown(spotId, event)}

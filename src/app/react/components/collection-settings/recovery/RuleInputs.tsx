@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { cn } from '../../../../../utils/cn';
 import { t } from '../../../../i18n';
 import { formulaReads, withFieldReference } from '../../../../recovery/editor/recoveryFormulas';
@@ -14,8 +14,6 @@ interface FormulaInputProps {
   label: string;
   value: string;
   fields: readonly FieldChoice[];
-  /** Takes focus as the card opens from the keyboard. */
-  autoFocus: boolean;
   /** Called with every text that reads as a formula; one that does not stays in the field, marked. */
   onChange: (formula: string) => void;
 }
@@ -35,11 +33,10 @@ function FieldChips({ fields, onPick }: { fields: readonly FieldChoice[]; onPick
 }
 
 /** A formula field ("1d4+@tier") with the statblock's number fields to click in. */
-export function FormulaInput({ label, value, fields, autoFocus, onChange }: FormulaInputProps): React.ReactElement {
+export function FormulaInput({ label, value, fields, onChange }: FormulaInputProps): React.ReactElement {
   const [text, setText] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   const hintId = useId();
-  useEffect(() => { if (autoFocus) ref.current?.focus({ preventScroll: true }); }, [autoFocus]);
   const reads = formulaReads(text);
 
   const type = (next: string): void => {
@@ -78,7 +75,6 @@ interface WholeInputProps {
   least: number;
   /** Empty means unset. */
   optional?: boolean;
-  autoFocus?: boolean;
   /** On a line of its own, the label beside a short field. */
   inline?: boolean;
   onChange: (value: number | undefined) => void;
@@ -87,17 +83,15 @@ interface WholeInputProps {
 const WHOLE = /^\d{1,7}$/;
 
 /** A whole number; an optional one may be left empty. */
-export function WholeInput({ label, value, least, optional = false, autoFocus = false, inline = false, onChange }: WholeInputProps): React.ReactElement {
+export function WholeInput({ label, value, least, optional = false, inline = false, onChange }: WholeInputProps): React.ReactElement {
   const [text, setText] = useState(value === undefined ? '' : String(value));
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (autoFocus) ref.current?.focus({ preventScroll: true }); }, [autoFocus]);
   const accepts = (read: string): boolean => (optional && read === '') || (WHOLE.test(read) && Number(read) >= least);
   const valid = accepts(text.trim());
 
   return (
     <label className={cn('atlas-rc-card__field atlas-rc-card__label', inline && 'atlas-rc-card__field--inline')}>
       {label}
-      <input ref={ref} type="text" inputMode="numeric" className="atlas-csm-input atlas-rc-card__number" value={text}
+      <input type="text" inputMode="numeric" className="atlas-csm-input atlas-rc-card__number" value={text}
         placeholder={optional ? t('recoveryEditor.card.optional') : undefined}
         aria-invalid={valid ? undefined : true}
         onChange={(event) => {

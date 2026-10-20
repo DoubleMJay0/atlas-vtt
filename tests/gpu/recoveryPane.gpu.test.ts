@@ -75,50 +75,83 @@ describe('the recovery pane of the Resources tab', () => {
     expect(new Set(capsules.map((capsule) => Math.round(capsule.top))).size).toBe(1);
   });
 
-  it('opens a fan of eight over a picked metric and the card under it, inside the stage, nothing over its fields', async () => {
+  it('hangs one card 8 px under a picked metric\'s row, from its left edge, inside the stage, never on it', async () => {
     mountRecoveryDialog('dark');
     await userEvent.click(page.getByRole('button', { name: /^Long rest/ }));
     await userEvent.click(spot(/^Hit Dice:/));
     await frames();
     const stage = rect('.atlas-rc-stage');
     const metric = rect('.atlas-rc-spot.atlas-picked');
-    const items = all('.atlas-rc-fan .atlas-csm-fan__item');
-    expect(items).toHaveLength(8);
-    for (const item of items) {
-      expect(item.left).toBeGreaterThanOrEqual(stage.left);
-      expect(item.right).toBeLessThanOrEqual(stage.right);
-      expect(item.bottom).toBeLessThanOrEqual(metric.top);
-    }
-    for (let i = 1; i < items.length; i++) {
-      const [a, b] = [items[i - 1]!, items[i]!];
-      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(a.width);
-    }
-    // The kinds a counters metric does not take stay in place, inert
-    expect(page.getByRole('button', { name: 'Only for conditions' }).elements()).toHaveLength(2);
-
     const card = rect('.atlas-rc-card');
-    expect(card.top).toBeGreaterThanOrEqual(metric.bottom);
+    expect(document.querySelectorAll('.atlas-rc-card')).toHaveLength(1);
+    expect(card.top - metric.bottom).toBeCloseTo(8, 0);
+    expect(card.left).toBeCloseTo(metric.left, 0);
     expect(card.left).toBeGreaterThanOrEqual(stage.left);
     expect(card.right).toBeLessThanOrEqual(stage.right);
+    expect(card.bottom).toBeLessThanOrEqual(stage.bottom);
+    // Nothing lies over the card's fields
     const input = page.getByRole('textbox', { name: 'At least' }).element();
     const box = input.getBoundingClientRect();
     expect(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)).toBe(input);
   });
 
-  it('takes Escape back step by step: the fan, the card, the metric, then the dialog', async () => {
+  it('offers the kinds a resource or counters take, and a condition\'s two, the rule\'s own chosen', async () => {
+    mountRecoveryDialog('dark');
+    await userEvent.click(page.getByRole('button', { name: /^Long rest/ }));
+    await userEvent.click(spot(/^Hit Dice:/));
+    const kinds = (): string[] => [...document.querySelectorAll('.atlas-rc-card__kinds [role="radio"]')].map((radio) => radio.textContent ?? '');
+    const chosen = (): string | null | undefined => document.querySelector('.atlas-rc-card__kinds [aria-checked="true"]')?.textContent;
+    expect(kinds()).toEqual(['Full', 'Amount', '½Half', 'Set', 'Spend']);
+    expect(chosen()).toBe('½Half');
+    // One row, inside the card's padding, every word whole
+    const row = rect('.atlas-rc-card__kinds');
+    const body = rect('.atlas-rc-card__body');
+    expect(row.right).toBeLessThanOrEqual(body.right - 8 + 0.5);
+    for (const option of document.querySelectorAll<HTMLElement>('.atlas-rc-card__kinds [role="radio"]')) {
+      const box = option.getBoundingClientRect();
+      expect(box.top).toBeCloseTo(row.top + 4, 0);
+      expect(box.right).toBeLessThanOrEqual(row.right - 4 + 0.5);
+      expect(option.scrollWidth).toBeLessThanOrEqual(option.clientWidth);
+    }
+
+    // A kind with no fields leaves the card its head and kinds; a counters rule keeps its rows
+    await userEvent.click(spot(/^HP: Full/));
+    expect(chosen()).toBe('Full');
+    expect(document.querySelector('.atlas-rc-card__fields')).toBeNull();
+    await userEvent.click(page.getByRole('radio', { name: 'Amount' }));
+    expect(page.getByRole('textbox', { name: 'Amount' }).element()).toBeTruthy();
+
+    // A condition's card hangs over its chip, at the stage's foot
+    await userEvent.click(spot(/^Exhaustion:/));
+    await frames();
+    expect(kinds()).toEqual(['Step', 'Clear']);
+    expect(chosen()).toBe('Step');
+    const chip = rect('.atlas-rc-spot.atlas-picked');
+    const card = rect('.atlas-rc-card');
+    // Clear of the badge on the chip's top edge
+    const clearance = rect('.atlas-rc-chip--picked .atlas-rc-badge').top - card.bottom;
+    expect(clearance).toBeGreaterThanOrEqual(7.5);
+    expect(clearance).toBeLessThanOrEqual(10);
+    expect(card.bottom).toBeLessThan(chip.top);
+    expect(card.top).toBeGreaterThanOrEqual(rect('.atlas-rc-stage').top);
+    await userEvent.click(page.getByRole('radio', { name: 'Clear' }));
+    expect(document.querySelector('.atlas-rc-card__fields')).toBeNull();
+  });
+
+  it('takes Escape back step by step: picking a source, the card, the metric, then the dialog', async () => {
     const onClose = vi.fn();
     mountRecoveryDialog('dark', undefined, onClose);
     await userEvent.click(page.getByRole('button', { name: /^Long rest/ }));
-    await userEvent.click(spot(/^Hit Dice:/));
-    await frames();
-    expect(document.querySelector('.atlas-rc-fan')).not.toBeNull();
-    expect(document.querySelector('.atlas-rc-card')).not.toBeNull();
+    await userEvent.click(spot(/^Stress: →/));
+    await userEvent.click(page.getByRole('radio', { name: 'Spend' }));
+    expect(document.querySelector('.atlas-rc-card')).toBeNull();
 
     await press('{Escape}');
-    expect(document.querySelector('.atlas-rc-fan')).toBeNull();
     expect(document.querySelector('.atlas-rc-card')).not.toBeNull();
+    expect(document.activeElement).toBe(page.getByRole('radio', { name: 'Set' }).element());
     await press('{Escape}');
     expect(document.querySelector('.atlas-rc-card')).toBeNull();
+    expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^Stress:/);
     expect(document.querySelector('.atlas-rc-spot.atlas-picked')).not.toBeNull();
     await press('{Escape}');
     expect(document.querySelector('.atlas-rc-spot.atlas-picked')).toBeNull();
@@ -141,17 +174,19 @@ describe('the recovery pane of the Resources tab', () => {
     await press('{Tab}{Tab}');
     expect(document.activeElement?.getAttribute('aria-label')).toBe('HP: not given back');
     await press('{Enter}');
-    expect(document.activeElement?.closest('.atlas-rc-fan')).not.toBeNull();
+    expect(document.activeElement).toBe(page.getByRole('radio', { name: 'Full' }).element());
     await press('{Escape}');
     expect(document.activeElement?.getAttribute('aria-label')).toBe('HP: Full');
 
-    // Stress set to 0
+    // Stress set to 0: the arrows walk the kinds, Enter chooses, Tab goes on into the fields
     await press('{ArrowDown}{Enter}{ArrowRight}{ArrowRight}{ArrowRight}{Enter}');
+    await press('{Tab}');
     expect(document.activeElement).toBe(page.getByRole('textbox', { name: 'Set to' }).element());
-    await press('{Escape}{Escape}');
+    await press('{Escape}');
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Stress: → 0');
 
     // Half the Hit Dice
-    await press('{ArrowDown}{Enter}{ArrowRight}{ArrowRight}{Enter}{Escape}{Escape}');
+    await press('{ArrowDown}{Enter}{ArrowRight}{ArrowRight}{Enter}{Escape}');
 
     // Features back to full, and Exhaustion one step down
     await press('{ArrowDown}{Enter}{Escape}{ArrowDown}');
@@ -167,6 +202,17 @@ describe('the recovery pane of the Resources tab', () => {
       { target: { kind: 'counters', field: 'features', rows: 'all' }, does: 'full' },
       { target: { kind: 'condition', id: 'exhaustion' }, does: 'step', by: -1 },
     ]);
+  });
+
+  it('removes a metric from the button with the card\'s Remove', async () => {
+    const harness = mountRecoveryDialog('dark');
+    await userEvent.click(page.getByRole('button', { name: /^Long rest/ }));
+    await userEvent.click(spot(/^Stress: →/));
+    await userEvent.click(page.getByRole('button', { name: 'Remove from Long rest' }));
+    expect(document.querySelector('.atlas-rc-card')).toBeNull();
+    const long = templateButtons(harness.record(), ADVENTURER.id)[1]!;
+    expect(long.rules.some((rule) => rule.target.kind === 'resource' && rule.target.key === 'stress')).toBe(false);
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Stress: not given back');
   });
 
   it('renames a button in place, and Delete removes it, focus going to the next', async () => {
@@ -194,7 +240,7 @@ describe('the recovery pane of the Resources tab', () => {
     const harness = mountRecoveryDialog('dark');
     await userEvent.click(page.getByRole('button', { name: /^Long rest/ }));
     await userEvent.click(spot(/^Stress: →/));
-    await userEvent.click(page.getByRole('button', { name: 'Back by spending another' }));
+    await userEvent.click(page.getByRole('radio', { name: 'Spend' }));
     expect(document.querySelector('.atlas-rc-prompt')?.textContent).toContain('Pick what is spent');
     expect(document.querySelector('.atlas-rc-card')).toBeNull();
     expect(document.querySelectorAll('.atlas-rc-spot.atlas-source').length).toBeGreaterThan(0);
@@ -202,6 +248,7 @@ describe('the recovery pane of the Resources tab', () => {
     const rule = templateButtons(harness.record(), ADVENTURER.id)[1]!.rules.find((each) => each.target.kind === 'resource' && each.target.key === 'stress');
     expect(rule).toEqual({ target: { kind: 'resource', key: 'stress' }, does: 'spend', from: { kind: 'counters', field: 'hit_dice', rows: 'all' }, each: '1' });
     expect(page.getByRole('textbox', { name: 'Each one gives back' }).element()).toBeTruthy();
+    expect(document.querySelector('.atlas-rc-card__kinds [aria-checked="true"]')?.textContent).toBe('Spend');
   });
 
   it('says why a number that is no token resource cannot be picked', async () => {

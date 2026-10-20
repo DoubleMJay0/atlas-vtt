@@ -1,26 +1,16 @@
 /**
  * Whether a formula a rule names can be rolled: `@field` stands for a statblock's whole number,
- * which the rest puts in before the formula is read (`recoveryFormula.ts` of the engine). The
- * editor reads it with 1 in every field's place, so the GM sees a typo before the rest is taken.
- * Pure.
+ * which the rest puts in before the formula is read. The editor puts 1 in every field's place
+ * through the engine's own substitution (`fillFormula`), so the GM sees a typo before the rest is
+ * taken, and a formula the rest reads (`@level d6`) is never refused. Pure.
  */
 
-import { parseFormula } from '../../tools/parseFormula';
-import { FORMULA_LIMITS } from '../../tools/formulaTypes';
+import { fillFormula } from '../recoveryFormula';
 
-/** A field a formula names: `@level`, `@abilities.con`. */
-const FIELD_REFERENCE = /@([A-Za-z_][\w-]*(?:\.[\w-]+)*)/g;
-
-/** The fields a formula names, each once, in order. */
-export function formulaFields(formula: string): string[] {
-  return [...new Set([...formula.matchAll(FIELD_REFERENCE)].map((match) => match[1]!))];
-}
-
-/** Whether `formula` reads as dice and numbers once its fields hold numbers. */
+/** Whether `formula` reads as dice and numbers once its fields hold numbers, as the rest reads it. */
 export function formulaReads(formula: string): boolean {
   const text = formula.trim();
-  if (text === '' || text.length > FORMULA_LIMITS.characters) return false;
-  return parseFormula(text.replace(FIELD_REFERENCE, '1')).ok;
+  return text !== '' && fillFormula(text, () => 1).ok;
 }
 
 /** The formula with `@key` put in at `caret` (or at its end), with the spaces a sum needs around it. */

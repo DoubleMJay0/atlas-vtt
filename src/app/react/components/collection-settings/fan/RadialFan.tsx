@@ -15,8 +15,7 @@ export interface FanButton {
   danger?: boolean;
   /** Shown and focusable but inert, so its tooltip can say why. */
   disabled?: boolean;
-  /** `fromKeyboard`: pressed with Enter or Space, so what it opens may take focus. */
-  onClick: (fromKeyboard: boolean) => void;
+  onClick: () => void;
 }
 
 interface RadialFanProps {
@@ -30,17 +29,12 @@ interface RadialFanProps {
   label?: string | undefined;
   /** Opened from the keyboard: its first button takes focus. */
   focusFirst?: boolean;
-  /** The button that takes focus with `focusFirst`, where not the first. */
-  focusIndex?: number;
 }
 
 /** Delay between two buttons leaving the origin, in seconds. */
 const STAGGER_S = 0.028;
 const ENTER_S = 0.26;
 const EXIT_S = 0.12;
-
-/** The fan's timing, in seconds, for what moves with it (the recovery editor's badges). */
-export const FAN_TIMING = { stagger: STAGGER_S, enter: ENTER_S, exit: EXIT_S } as const;
 
 /** The fan's buttons, in order: an inert one too, whose name says why it is. */
 const fanButtons = (fan: HTMLElement): HTMLButtonElement[] => [...fan.querySelectorAll<HTMLButtonElement>('.atlas-csm-fan__button')];
@@ -50,13 +44,13 @@ const fanButtons = (fan: HTMLElement): HTMLButtonElement[] => [...fan.querySelec
  * spot of an arc (the Resources tab's sockets, the dice lab's dice). The arrow
  * keys move between them; Escape is left to whoever opened the fan.
  */
-export function RadialFan({ buttons, spots, x, y, label, focusFirst = false, focusIndex = 0 }: RadialFanProps): React.ReactElement {
+export function RadialFan({ buttons, spots, x, y, label, focusFirst = false }: RadialFanProps): React.ReactElement {
   const isPresent = useIsPresent();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (focusFirst && ref.current) fanButtons(ref.current)[focusIndex]?.focus({ preventScroll: true });
-  }, [focusFirst, focusIndex]);
+    if (focusFirst && ref.current) fanButtons(ref.current)[0]?.focus({ preventScroll: true });
+  }, [focusFirst]);
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
@@ -99,7 +93,7 @@ export function RadialFan({ buttons, spots, x, y, label, focusFirst = false, foc
               aria-pressed={button.pressed}
               aria-expanded={button.expanded}
               aria-disabled={button.disabled || undefined}
-              onClick={(event) => { if (!button.disabled) button.onClick(event.detail === 0); }}
+              onClick={() => { if (!button.disabled) button.onClick(); }}
             >
               {button.icon}
             </button>

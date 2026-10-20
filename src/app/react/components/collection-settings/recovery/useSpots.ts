@@ -12,7 +12,7 @@ export interface Spots {
 
 /**
  * The spots of the card by id, which the chrome's overlays hand over: what the keys move focus
- * to and what the fan and the card are placed by. Nothing is looked up in the document.
+ * to and what the rule card is placed by. Nothing is looked up in the document.
  */
 export function useSpots(): Spots {
   const elements = useRef(new Map<string, HTMLElement>());
@@ -37,7 +37,7 @@ export function useSpots(): Spots {
 const sameBox = (a: Box | null, b: Box): boolean =>
   a !== null && a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
 
-/** The box of `target` in px of `stage`, kept up to date while either changes size; null without both. */
+/** The box of `target` in px of `stage`'s padding box, kept up to date while either changes size; null without both. */
 export function useBoxIn(stage: HTMLElement | null, target: HTMLElement | null): Box | null {
   const [box, setBox] = useState<Box | null>(null);
 
@@ -47,9 +47,11 @@ export function useBoxIn(stage: HTMLElement | null, target: HTMLElement | null):
       return;
     }
     const measure = (): void => {
+      // From the padding box, which absolutely placed children are placed in
       const frame = stage.getBoundingClientRect();
+      const [x, y] = [frame.left + stage.clientLeft, frame.top + stage.clientTop];
       const rect = target.getBoundingClientRect();
-      const next = { left: rect.left - frame.left, top: rect.top - frame.top, right: rect.right - frame.left, bottom: rect.bottom - frame.top };
+      const next = { left: rect.left - x, top: rect.top - y, right: rect.right - x, bottom: rect.bottom - y };
       setBox((was) => (sameBox(was, next) ? was : next));
     };
     measure();

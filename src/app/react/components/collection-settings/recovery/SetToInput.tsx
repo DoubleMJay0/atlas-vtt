@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { cn } from '../../../../../utils/cn';
 import { t } from '../../../../i18n';
 import type { SetRule } from '../../../../recovery/recoveryTypes';
@@ -7,7 +7,6 @@ import type { FieldChoice } from './RuleInputs';
 interface SetToInputProps {
   value: SetRule['to'];
   fields: readonly FieldChoice[];
-  autoFocus: boolean;
   onChange: (to: SetRule['to']) => void;
 }
 
@@ -25,10 +24,8 @@ function readTo(text: string): SetRule['to'] | undefined {
 const written = (to: SetRule['to']): string => (typeof to === 'number' ? String(to) : `@${to.field}`);
 
 /** What a Set rule sets the metric to: a number ("0"), or the number a statblock field holds. */
-export function SetToInput({ value, fields, autoFocus, onChange }: SetToInputProps): React.ReactElement {
+export function SetToInput({ value, fields, onChange }: SetToInputProps): React.ReactElement {
   const [text, setText] = useState(written(value));
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (autoFocus) ref.current?.focus({ preventScroll: true }); }, [autoFocus]);
   const type = (next: string): void => {
     setText(next);
     const read = readTo(next);
@@ -39,7 +36,7 @@ export function SetToInput({ value, fields, autoFocus, onChange }: SetToInputPro
     <div className="atlas-rc-card__field atlas-rc-card__field--wide">
       <label className="atlas-rc-card__label">
         {t('recoveryEditor.card.setTo')}
-        <input ref={ref} type="text" className="atlas-csm-input atlas-rc-card__formula" spellCheck={false} value={text}
+        <input type="text" className="atlas-csm-input atlas-rc-card__formula" spellCheck={false} value={text}
           aria-invalid={readTo(text) === undefined ? true : undefined} onChange={(event) => type(event.target.value)} />
       </label>
       {fields.length > 0 && (

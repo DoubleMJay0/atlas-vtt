@@ -41,15 +41,6 @@ $accent-line: color-mix(in oklch, var(--interactive-accent) 45%, transparent);
   opacity: 1;
 }
 
-// A fan may reach over the rail: the rail steps back under it
-.atlas-rc-rail {
-  transition: opacity $transition-normal $transition-ease;
-}
-
-.atlas-rc-editor--fanned .atlas-rc-rail {
-  opacity: 0.38;
-}
-
 // ── Spots: the metrics a button can give back ──────────────────────────────
 // Laid over a block by the chrome's overlay: the block's own box never changes.
 .atlas-rc-spot {
@@ -151,7 +142,7 @@ $accent-line: color-mix(in oklch, var(--interactive-accent) 45%, transparent);
 }
 
 // ── Conditions: chips under the card ───────────────────────────────────────
-// Centred under the card, so a chip's fan opens over it as a metric's does over the card
+// Centred under the card
 .atlas-rc-conditions {
   @include atlas-flex-col($spacing-s);
   align-items: center;

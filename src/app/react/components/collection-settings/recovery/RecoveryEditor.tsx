@@ -6,7 +6,7 @@ import {
   newButtonId, withAddedButton, withButtonMoved, withButtonOrder, withoutButton, withRenamedButton,
 } from '../../../../recovery/editor/recoveryEdits';
 import { conditionMetrics, sheetMetrics } from '../../../../recovery/editor/recoveryMetrics';
-import { MAX_RECOVERY_RULES, type RecoveryButton, type RecoveryTarget } from '../../../../recovery/recoveryTypes';
+import { MAX_RECOVERY_RULES, type RecoveryButton, type RecoveryRuleKind, type RecoveryTarget } from '../../../../recovery/recoveryTypes';
 import type { ResourceDefinition } from '../../../../resources/resourceTypes';
 import type { StatblockTemplate } from '../../../../statblocks/model/templateTypes';
 import type { ConditionDefinition } from '../../../../types/collectionSettingsTypes';
@@ -43,8 +43,9 @@ function idlePrompt(count: number, button: RecoveryButton | null): string {
 
 /**
  * One template's recovery buttons: the rail of buttons over the template's card, whose metrics
- * the selected button's rules restore. Escape closes the fan, then the card, then puts the picked
- * metric down, and stops there each time: the dialog listens for Escape on the document.
+ * the selected button's rules restore. Escape cancels picking what a Spend rule spends, then closes
+ * the card (focus back on its metric), then puts the picked metric down, and stops there each
+ * time: the dialog listens for Escape on the document.
  */
 export function RecoveryEditor({ template, name, buttons, onButtonsChange, resources, conditions }: RecoveryEditorProps): React.ReactElement {
   const metrics = useMemo(() => sheetMetrics(template, resources), [template, resources]);
@@ -54,7 +55,6 @@ export function RecoveryEditor({ template, name, buttons, onButtonsChange, resou
   const button = buttons.find((each) => each.id === chosen) ?? (chosen === '' ? null : buttons[0] ?? null);
   const [notice, setNotice] = useState<string | null>(null);
   const spots = useSpots();
-  const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const editing = useRuleEditing(button, (next) => onButtonsChange(buttons.map((each) => (each.id === next.id ? next : each))));
 
   const targets = useMemo(() => new Map<string, RecoveryTarget>([
@@ -76,8 +76,24 @@ export function RecoveryEditor({ template, name, buttons, onButtonsChange, resou
     setActive(spotId);
     const result = editing.pick(spotId, target, fromKeyboard);
     setNotice(result === 'full' ? t('recoveryEditor.rulesFull', { count: MAX_RECOVERY_RULES }) : null);
-    // Spend waits for its source: the keys go on to the next metric
-    if (result === 'source' && fromKeyboard) spots.focus(spotId);
+  };
+
+  /** Picking what a Spend rule spends: the keys go on from the metric, to the one it spends. */
+  const startSpending = (): void => {
+    const picked = editing.picked;
+    editing.pickSource();
+    if (picked) spots.focus(picked.spotId);
+  };
+
+  const chooseKind = (kind: RecoveryRuleKind): void => {
+    const picked = editing.picked;
+    if (editing.chooseKind(kind) === 'spending' && picked) spots.focus(picked.spotId);
+  };
+
+  const removeRule = (): void => {
+    const picked = editing.picked;
+    editing.remove();
+    if (picked) spots.focus(picked.spotId);
   };
 
   const onSpotKey = (spotId: string, event: React.KeyboardEvent): void => {
@@ -97,9 +113,11 @@ export function RecoveryEditor({ template, name, buttons, onButtonsChange, resou
     // A tooltip closing on this Escape leaves it to us; an open list or another control does not
     if (event.key !== 'Escape' || handledByAnotherControl(event.nativeEvent)) return;
     const picked = editing.picked;
-    if (!editing.escape()) return;
+    const step = editing.escape();
+    if (!step) return;
     event.stopPropagation();
-    if (picked) spots.focus(picked.spotId);
+    // Picking a source given up, the card comes back and its kind takes focus
+    if (step !== 'spending' && picked) spots.focus(picked.spotId);
   };
 
   const add = (label: string): string | null => {
@@ -121,7 +139,7 @@ export function RecoveryEditor({ template, name, buttons, onButtonsChange, resou
   const prompt = notice ?? (editing.spending ? t('recoveryEditor.pickSource') : idlePrompt(buttons.length, button));
 
   return (
-    <div ref={setRoot} className={cn('atlas-rc-editor', editing.fanOpen && 'atlas-rc-editor--fanned')} onKeyDown={onKeyDown}>
+    <div className="atlas-rc-editor" onKeyDown={onKeyDown}>
       <RecoveryRail
         buttons={buttons}
         selected={button?.id ?? null}
@@ -147,7 +165,9 @@ export function RecoveryEditor({ template, name, buttons, onButtonsChange, resou
         onSpotKey={onSpotKey}
         active={active}
         onActive={setActive}
-        bounds={root}
+        onKind={chooseKind}
+        onPickSource={startSpending}
+        onRemove={removeRule}
       />
     </div>
   );

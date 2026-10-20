@@ -1,8 +1,10 @@
-import React from 'react';
-import { SegmentedControl } from '../../../../packages/components/primitives/SegmentedControl';
-import { t } from '../../../../i18n';
+import React, { useEffect, useRef } from 'react';
+import { ArrowLeftRight, BatteryFull, ChevronsDown, Equal, Eraser, Plus, Trash2 } from 'lucide-react';
+import { SegmentedControl, type SegmentedOption } from '../../../../packages/components/primitives/SegmentedControl';
+import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
+import { t, type MessageKey } from '../../../../i18n';
 import { withRows } from '../../../../recovery/editor/recoveryEdits';
-import type { RecoveryButton, RecoveryRule, ResourceOrCounters } from '../../../../recovery/recoveryTypes';
+import type { RecoveryButton, RecoveryRule, RecoveryRuleKind, ResourceOrCounters } from '../../../../recovery/recoveryTypes';
 import { FormulaInput, RowsChips, WholeInput, type FieldChoice } from './RuleInputs';
 import { SetToInput } from './SetToInput';
 
@@ -16,19 +18,44 @@ export interface RuleCardProps {
   buttons: readonly RecoveryButton[];
   fields: readonly FieldChoice[];
   nameOf: (target: ResourceOrCounters) => string;
-  /** Its first field takes focus: opened from the keyboard. */
-  focusFirst: boolean;
+  /** Whether the card holds another metric a Spend rule could spend. */
+  canSpend: boolean;
+  /** Its chosen kind takes focus: opened from the keyboard. */
+  focusKind: boolean;
+  onKind: (kind: RecoveryRuleKind) => void;
   onChange: (rule: RecoveryRule) => void;
   onPickSource: () => void;
+  onRemove: () => void;
 }
 
+interface KindChoice {
+  kind: RecoveryRuleKind;
+  label: MessageKey;
+  icon: React.ReactNode;
+}
+
+/** The kinds a resource or a row of counters takes, in the card's order: back up, then what spends. */
+const AMOUNT_KINDS: readonly KindChoice[] = [
+  { kind: 'full', label: 'recoveryEditor.kind.full', icon: <BatteryFull /> },
+  { kind: 'amount', label: 'recoveryEditor.kind.amount', icon: <Plus /> },
+  { kind: 'share', label: 'recoveryEditor.kind.share', icon: <span className="atlas-rc-card__glyph">{'½'}</span> },
+  { kind: 'set', label: 'recoveryEditor.kind.set', icon: <Equal /> },
+  { kind: 'spend', label: 'recoveryEditor.kind.spend', icon: <ArrowLeftRight /> },
+];
+
+/** The kinds a condition takes. */
+const CONDITION_KINDS: readonly KindChoice[] = [
+  { kind: 'step', label: 'recoveryEditor.kind.step', icon: <ChevronsDown /> },
+  { kind: 'clear', label: 'recoveryEditor.kind.clear', icon: <Eraser /> },
+];
+
 /** What a rule asks for beyond its kind: formulas and numbers, a share, what it spends. */
-function RuleFields({ rule, fields, nameOf, focusFirst, onChange, onPickSource }: Omit<RuleCardProps, 'metric' | 'color' | 'button' | 'buttons'> & { rule: RecoveryRule }): React.ReactElement | null {
+function RuleFields({ rule, fields, nameOf, onChange, onPickSource }: Pick<RuleCardProps, 'fields' | 'nameOf' | 'onChange' | 'onPickSource'> & { rule: RecoveryRule }): React.ReactElement | null {
   switch (rule.does) {
     case 'amount':
       return (
         <>
-          <FormulaInput label={t('recoveryEditor.card.formula')} value={rule.formula} fields={fields} autoFocus={focusFirst}
+          <FormulaInput label={t('recoveryEditor.card.formula')} value={rule.formula} fields={fields}
             onChange={(formula) => onChange({ ...rule, formula })} />
           <WholeInput label={t('recoveryEditor.card.atLeast')} value={rule.min} least={0} optional inline
             onChange={(min) => onChange(min === undefined ? { target: rule.target, does: 'amount', formula: rule.formula } : { ...rule, min })} />
@@ -54,7 +81,7 @@ function RuleFields({ rule, fields, nameOf, focusFirst, onChange, onPickSource }
         </>
       );
     case 'set':
-      return <SetToInput value={rule.to} fields={fields} autoFocus={focusFirst} onChange={(to) => onChange({ ...rule, to })} />;
+      return <SetToInput value={rule.to} fields={fields} onChange={(to) => onChange({ ...rule, to })} />;
     case 'spend':
       return (
         <>
@@ -65,14 +92,14 @@ function RuleFields({ rule, fields, nameOf, focusFirst, onChange, onPickSource }
               <button type="button" className="atlas-rc-card__change" onClick={onPickSource}>{t('recoveryEditor.card.changeSource')}</button>
             </div>
           </div>
-          <FormulaInput label={t('recoveryEditor.card.each')} value={rule.each} fields={fields} autoFocus={focusFirst}
+          <FormulaInput label={t('recoveryEditor.card.each')} value={rule.each} fields={fields}
             onChange={(each) => onChange({ ...rule, each })} />
           <WholeInput label={t('recoveryEditor.card.most')} value={rule.most} least={1} optional inline
             onChange={(most) => onChange(most === undefined ? { target: rule.target, does: 'spend', from: rule.from, each: rule.each } : { ...rule, most })} />
         </>
       );
     case 'step':
-      return <WholeInput label={t('recoveryEditor.card.lowerBy')} value={Math.abs(rule.by)} least={1} autoFocus={focusFirst} inline
+      return <WholeInput label={t('recoveryEditor.card.lowerBy')} value={Math.abs(rule.by)} least={1} inline
         onChange={(by) => { if (by !== undefined) onChange({ ...rule, by: -by }); }} />;
     default:
       return null;
@@ -80,26 +107,45 @@ function RuleFields({ rule, fields, nameOf, focusFirst, onChange, onPickSource }
 }
 
 /**
- * The card under a picked metric, for a rule that asks for more than its kind (the ResourceCard's
- * idiom): its numbers or formula, a counters rule's rows, and for Spend what it spends.
+ * The card under a picked metric: its name and the button's, Remove, the kinds of rule its type
+ * takes as one segmented row (the rule's own chosen), and what the chosen kind asks for. A
+ * counters rule also says which rows it gives back.
  */
 export function RuleCard(props: RuleCardProps): React.ReactElement | null {
-  const { rule, metric, color, button, buttons, onChange } = props;
+  const { rule, metric, color, button, buttons, canSpend, focusKind, onKind, onChange, onRemove } = props;
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusKind) ref.current?.querySelector<HTMLElement>('.atlas-rc-card__kinds [aria-checked="true"]')?.focus({ preventScroll: true });
+  }, [focusKind]);
   if (!rule) return null;
 
+  const kinds = rule.target.kind === 'condition' ? CONDITION_KINDS : AMOUNT_KINDS;
+  const options: SegmentedOption<RecoveryRuleKind>[] = kinds.map(({ kind, label, icon }) => {
+    const refused = kind === 'spend' && !canSpend;
+    return { value: kind, label: t(label), icon, ...(refused && { disabled: true, hint: t('recoveryEditor.kindNoSource') }) };
+  });
+  const hasFields = rule.target.kind === 'counters' || (rule.does !== 'full' && rule.does !== 'clear');
+
   return (
-    <div className="atlas-rc-card" role="group" aria-label={t('recoveryEditor.metricRule', { metric, rule: button.name })}>
+    <div ref={ref} className="atlas-rc-card__body" role="group" aria-label={t('recoveryEditor.metricRule', { metric, rule: button.name })}>
       <div className="atlas-rc-card__head">
         <span className="atlas-rc-card__dot" style={color ? { backgroundColor: color } : undefined} aria-hidden="true" />
         <span className="atlas-rc-card__metric">{metric}</span>
         <span className="atlas-rc-card__button">{button.name}</span>
+        <LabelTooltip label={t('recoveryEditor.kind.remove', { button: button.name })}>
+          <button type="button" className="atlas-rc-card__remove" onClick={onRemove}><Trash2 /></button>
+        </LabelTooltip>
       </div>
-      <div className="atlas-rc-card__fields">
-        <RuleFields {...props} rule={rule} />
-        {rule.target.kind === 'counters' && (
-          <RowsChips rows={rule.target.rows} buttons={buttons} onChange={(rows) => onChange(withRows(rule, rows))} />
-        )}
-      </div>
+      <SegmentedControl className="atlas-segmented--fit atlas-rc-card__kinds" ariaLabel={t('recoveryEditor.card.kind')} value={rule.does}
+        options={options} roving onChange={onKind} />
+      {hasFields && (
+        <div className="atlas-rc-card__fields">
+          <RuleFields key={rule.does} {...props} rule={rule} />
+          {rule.target.kind === 'counters' && (
+            <RowsChips rows={rule.target.rows} buttons={buttons} onChange={(rows) => onChange(withRows(rule, rows))} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
