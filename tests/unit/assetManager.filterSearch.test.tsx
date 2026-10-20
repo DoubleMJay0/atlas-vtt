@@ -103,7 +103,7 @@ function type(text: string): void {
 
 it('suggests the keywords the characters in view have, and their values with counts', async () => {
   await openManager();
-  expect(suggestionLabels().map((label) => label.split(':')[0])).toEqual(['name', 'tag', 'statblock', 'cr', 'type', 'source']);
+  expect(suggestionLabels().map((label) => label.split(':')[0])).toEqual(['name', 'tag', 'statblock', 'cr', 'type', 'source', 'text']);
   type('type:');
   expect(suggestionLabels()).toEqual(['beast2', 'dragon1', 'humanoid1']);
 });
