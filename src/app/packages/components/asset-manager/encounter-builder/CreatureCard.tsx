@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { App } from 'obsidian';
 import { Plus } from 'lucide-react';
 import { Button } from '../../primitives/button';
 import { LinkedStatblock } from '../../../../statblocks/render/LinkedStatblock';
+import type { TokenVitals } from '../../../../services/statblockVitalsSync';
 import { t } from '../../../../i18n';
 import type { TokenAsset } from '../types';
 import { CountStepper } from './CountStepper';
@@ -24,6 +25,8 @@ const OWN_CONTROLS = 'a, button, input, textarea, select, summary, [role="button
  */
 export function CreatureCard({ app, token, count, onCountChange }: CreatureCardProps): React.JSX.Element {
   const picked = count > 0;
+  // The statblock shows the creature as its token looks, with or without its ring, as the DM screen does.
+  const art = useMemo((): TokenVitals[] => [{ name: token.name, imagePath: token.imagePath, showRing: token.showRing }], [token.name, token.imagePath, token.showRing]);
 
   const handleClick = (event: React.MouseEvent<HTMLElement>): void => {
     const target = event.target as Element;
@@ -50,7 +53,7 @@ export function CreatureCard({ app, token, count, onCountChange }: CreatureCardP
           </Button>
         )}
       </div>
-      {token.statblockPath && <LinkedStatblock app={app} path={token.statblockPath} variant="feed" />}
+      {token.statblockPath && <LinkedStatblock app={app} path={token.statblockPath} variant="feed" tokens={art} />}
     </article>
   );
 }
