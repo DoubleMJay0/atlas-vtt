@@ -20,10 +20,10 @@ const TEMPLATE: StatblockTemplate = {
 
 const BUTTONS: RecoveryButton[] = [
   { id: 'short', name: 'Short rest', rules: [{ target: { kind: 'counters', field: 'uses', rows: ['short'] }, does: 'full' }] },
-  { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'full' }] },
+  { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', field: 'hp' }, does: 'full' }] },
   {
     id: 'breath', name: 'Catch breath',
-    rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'hitDice' }, each: '1d8+@con' }],
+    rules: [{ target: { kind: 'resource', field: 'hp' }, does: 'spend', from: { kind: 'resource', field: 'hitDice' }, each: '1d8+@con' }],
   },
 ];
 
@@ -38,7 +38,7 @@ vi.mock('../../../../src/app/services/AssetService', async (importOriginal) => {
     getAssets: async () => [],
     getDefaultCollectionId: () => 'campaign',
     loadedTokenAssets: () => library.tokens,
-    getCollectionSettings: () => ({ conditions: [], recovery: { 'pc-k7m2qa': BUTTONS } }),
+    getCollectionSettings: () => ({ conditions: [] }),
   };
   return { ...actual, AssetService: { getInstance: () => assets } };
 });
@@ -63,7 +63,7 @@ afterEach(() => {
 });
 
 async function pane(values: Record<string, unknown>): Promise<PaneHarness> {
-  vi.spyOn(TemplateLibrary.prototype, 'get').mockReturnValue({ template: TEMPLATE, name: 'PC', status: 'ok', builtIn: false, path: 'Templates/PC.atlastemplate' });
+  vi.spyOn(TemplateLibrary.prototype, 'get').mockReturnValue({ template: { ...TEMPLATE, recovery: [...BUTTONS] }, name: 'PC', status: 'ok', builtIn: false, path: 'Templates/PC.atlastemplate' });
   const harness = await renderPane({ frontmatter: { statblock: true, 'atlas-template': TEMPLATE.id, name: 'Mira', ...values } });
   apps.push(harness.app);
   return harness;

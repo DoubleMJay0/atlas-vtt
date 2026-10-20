@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Reorder } from 'framer-motion';
 import { Plus } from 'lucide-react';
-import { cn } from '../../../../../utils/cn';
-import { t } from '../../../../i18n';
-import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
-import { MAX_RECOVERY_BUTTONS, type RecoveryButton } from '../../../../recovery/recoveryTypes';
+import { cn } from '../../../../utils/cn';
+import { t } from '../../../i18n';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
+import { MAX_RECOVERY_BUTTONS, type RecoveryButton } from '../../../recovery/recoveryTypes';
 import { RailNameInput } from './RailNameInput';
 
 interface RecoveryRailProps {

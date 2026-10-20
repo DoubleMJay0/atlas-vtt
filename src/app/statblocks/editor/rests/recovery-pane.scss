@@ -1,11 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Collection Settings: the recovery pane beside the token's sockets
-// (recovery/: RecoveryPane, RecoveryRail; the card in recovery-stage.scss, the
-// rule card in recovery-card.scss).
+// The template editor's recovery buttons (rests/: TemplateRests, RecoveryRail;
+// the card in recovery-stage.scss, the rule card in recovery-card.scss).
 // ═══════════════════════════════════════════════════════════════════════════
 
-@use '../../../../../../styles/tokens' as *;
-@use '../../../../../../styles/mixins' as *;
+@use '../../../../../styles/tokens' as *;
+@use '../../../../../styles/mixins' as *;
 
 $capsule-height: 30px;
 $badge-height: 18px;
@@ -19,6 +18,12 @@ $accent-line: color-mix(in oklch, var(--interactive-accent) 45%, transparent);
 
 .atlas-rc-pane__head {
   @include atlas-flex-col($spacing-xs);
+}
+
+// In the template editor: the title with Done, which goes back to the card
+.atlas-te-rests__title-row {
+  @include atlas-flex-row($spacing-s);
+  justify-content: space-between;
 }
 
 .atlas-rc-pane__title {
@@ -223,25 +228,6 @@ input.atlas-rc-capsule--input {
 .atlas-rc-prompt--spending {
   color: var(--text-accent);
   font-weight: $font-weight-medium;
-}
-
-// ── Layout beside the token's sockets ──────────────────────────────────────
-// The Resources tab takes the whole width when the pane is beside it (ResourcesTab's `aside`).
-.atlas-csm-resources-layout {
-  display: grid;
-  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
-  gap: $spacing-xl;
-  align-items: start;
-}
-
-.atlas-csm-resources-layout__aside {
-  min-width: 0;
-}
-
-@container atlas-settings-page (max-width: 860px) {
-  .atlas-csm-resources-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

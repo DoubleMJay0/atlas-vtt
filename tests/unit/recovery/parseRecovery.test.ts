@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseRecovery, parseRecoveryButton, parseRecoveryButtons, parseRecoveryRule } from '../../../src/app/recovery/parseRecovery';
+import { parseRecoveryButton, parseRecoveryButtons, parseRecoveryRule } from '../../../src/app/recovery/parseRecovery';
 import { MAX_RECOVERY_BUTTONS, MAX_RECOVERY_RULES, type RecoveryButton, type RecoveryRule } from '../../../src/app/recovery/recoveryTypes';
 
-const HP = { kind: 'resource', key: 'hp' } as const;
+const HP = { kind: 'resource', field: 'hp' } as const;
 const SLOTS = { kind: 'counters', field: 'slots', rows: ['short', 'long'] } as const;
 const EXHAUSTION = { kind: 'condition', id: 'exhaustion' } as const;
-const PC = 'player-character-k7m2qa';
 
 const longRest: RecoveryButton = {
   id: 'long',
@@ -15,7 +14,7 @@ const longRest: RecoveryButton = {
     { target: { kind: 'counters', field: 'slots', rows: 'all' }, does: 'full' },
     { target: HP, does: 'amount', formula: '1d4+@tier', min: 1 },
     { target: SLOTS, does: 'share', share: 0.5, round: 'up', min: 1 },
-    { target: { kind: 'resource', key: 'stress' }, does: 'set', to: 0 },
+    { target: { kind: 'resource', field: 'stress' }, does: 'set', to: 0 },
     { target: HP, does: 'set', to: { field: 'level' } },
     { target: HP, does: 'spend', from: { kind: 'counters', field: 'hit-dice', rows: 'all' }, each: '1d8+@abilities.con', most: 3 },
     { target: EXHAUSTION, does: 'step', by: -1 },
@@ -47,7 +46,7 @@ describe('parseRecoveryRule', () => {
       { target: HP },
       { target: HP, does: 'heal' },
       { target: { kind: 'resource' }, does: 'full' },
-      { target: { kind: 'resource', key: '  ' }, does: 'full' },
+      { target: { kind: 'resource', field: '  ' }, does: 'full' },
       { target: { kind: 'counters', field: 'slots' }, does: 'full' },
       { target: { kind: 'counters', field: 'slots', rows: ['long', 3] }, does: 'full' },
       { target: { kind: 'counters', field: 'slots', rows: 'some' }, does: 'full' },
@@ -104,7 +103,7 @@ describe('parseRecoveryButton', () => {
   });
 
   it(`keeps the first ${MAX_RECOVERY_RULES} rules`, () => {
-    const rules: RecoveryRule[] = Array.from({ length: MAX_RECOVERY_RULES + 4 }, (_, i) => ({ target: { kind: 'resource', key: `r${i}` }, does: 'full' }));
+    const rules: RecoveryRule[] = Array.from({ length: MAX_RECOVERY_RULES + 4 }, (_, i) => ({ target: { kind: 'resource', field: `r${i}` }, does: 'full' }));
     expect(parseRecoveryButton({ id: 'long', name: 'Long rest', rules })?.rules).toEqual(rules.slice(0, MAX_RECOVERY_RULES));
   });
 });
@@ -118,20 +117,3 @@ describe('parseRecoveryButtons', () => {
   });
 });
 
-describe('parseRecovery', () => {
-  it('reads every template\'s buttons', () => {
-    expect(parseRecovery({ [PC]: [structuredClone(longRest)], 'builtin:generic-npc': [{ id: 'short', name: 'Short rest', rules: [] }] }))
-      .toEqual({ [PC]: [longRest], 'builtin:generic-npc': [{ id: 'short', name: 'Short rest', rules: [] }] });
-  });
-
-  it('leaves out keys that are no template id and templates without a button that reads', () => {
-    expect(parseRecovery({ 'Not an id': [longRest], [PC]: [{ id: 'x' }], 'builtin:generic-npc': 'long' })).toEqual({});
-  });
-
-  it('is undefined for what is no record, and keeps an empty record', () => {
-    expect(parseRecovery(undefined)).toBeUndefined();
-    expect(parseRecovery([longRest])).toBeUndefined();
-    expect(parseRecovery('long')).toBeUndefined();
-    expect(parseRecovery({})).toEqual({});
-  });
-});

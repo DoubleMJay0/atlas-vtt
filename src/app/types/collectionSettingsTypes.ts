@@ -5,7 +5,6 @@
  * grid defaults, and token conditions.
  */
 
-import type { RecoveryRecord } from '../recovery/recoveryTypes';
 import type { ResourceDefinition } from '../resources/resourceTypes';
 import type { CreatureFilterDefinition } from './creatureFilterTypes';
 import type { DiceRules } from './diceRulesTypes';
@@ -125,12 +124,6 @@ export interface CollectionSettings {
    * one leaves the roles inherited. Unset: Obsidian's location for new notes. Read with `roleFolder`.
    */
   statblockRoleFolders?: StatblockRoleFolders | undefined;
-  /**
-   * The recovery buttons of each statblock template ("Short rest", "Long rest"), stored only once
-   * the collection has buttons of its own. Unset while it takes those of its preset. Arrives
-   * unchecked: read with `collectionRecovery`.
-   */
-  recovery?: RecoveryRecord | undefined;
   /** Vault paths of the `.base` files whose views the loot roller rolls on. */
   lootBases?: string[];
   /** Named after plain-number item prices, e.g. "gold" or "thorns". */

@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useState } from 'react';
-import { cn } from '../../../../../utils/cn';
+import { cn } from '../../../../utils/cn';
 
 interface CommitTextInputProps {
   value: string;

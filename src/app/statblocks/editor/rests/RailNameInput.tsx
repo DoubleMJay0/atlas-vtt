@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { t } from '../../../../i18n';
+import { t } from '../../../i18n';
 
 interface RailNameInputProps {
   initial: string;

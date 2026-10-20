@@ -49,3 +49,19 @@ export function trackedResources(template: StatblockTemplate, resources: readonl
       },
     }));
 }
+
+/** The resources a recovery can restore: every one that counts, never a static value. */
+export function recoverableResources(resources: readonly ResourceDefinition[]): ResourceDefinition[] {
+  return resources.filter((resource) => resource.direction !== 'static' && resource.field.trim() !== '');
+}
+
+/**
+ * The resource of the character a template field is, as a recovery rule names it: the number the
+ * template tracks, else the collection's resource that counts and reads the field. Undefined where
+ * it is neither (a static value, a number nothing tracks).
+ */
+export function resourceOfField(template: StatblockTemplate, resources: readonly ResourceDefinition[]): (key: FieldKey) => ResourceDefinition | undefined {
+  const tracked = new Map(trackedResources(template, resources).map((each) => [each.tracked.field.key, each.definition]));
+  const recoverable = recoverableResources(resources);
+  return (key) => tracked.get(key) ?? recoverable.find((resource) => readsTemplateField(resource, key));
+}

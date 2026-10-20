@@ -18,7 +18,7 @@ const TEMPLATE: StatblockTemplate = {
   layout: { maxColumns: 1, blocks: [{ id: 'title001', type: 'title', field: 'name', level: 1 }] },
 };
 
-const HIT_DICE_SPEND = { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'hitDice' }, each: '1d8+@con' } as const;
+const HIT_DICE_SPEND = { target: { kind: 'resource', field: 'hp' }, does: 'spend', from: { kind: 'resource', field: 'hitDice' }, each: '1d8+@con' } as const;
 
 const DOWNTIME: RecoveryButton = {
   id: 'downtime',
@@ -28,7 +28,7 @@ const DOWNTIME: RecoveryButton = {
     {
       id: 'moves', prompt: 'Choose two downtime moves', min: 2, max: 2,
       actions: [
-        { id: 'tend', name: 'Tend to Wounds', text: 'Clear 1d4 HP.', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'amount', formula: '1d4' }], forOthers: true },
+        { id: 'tend', name: 'Tend to Wounds', text: 'Clear 1d4 HP.', rules: [{ target: { kind: 'resource', field: 'hp' }, does: 'amount', formula: '1d4' }], forOthers: true },
         { id: 'project', name: 'Work on a Project', rules: [] },
         { id: 'wind', name: 'Second Wind', rules: [HIT_DICE_SPEND] },
       ],
@@ -36,7 +36,7 @@ const DOWNTIME: RecoveryButton = {
     { id: 'boons', prompt: 'Up to two boons', min: 0, max: 2, repeat: true, actions: [{ id: 'boon', name: 'Boon', rules: [], forOthers: true }] },
   ],
 };
-const LONG: RecoveryButton = { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'full' }] };
+const LONG: RecoveryButton = { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', field: 'hp' }, does: 'full' }] };
 
 const pc = (id: string, name: string, extra: Record<string, unknown>): Record<string, unknown> => ({
   id, name, type: 'token', imagePath: `${id}.webp`, tags: [], collection: 'campaign', createdAt: 1, modifiedAt: 1, playerCharacter: true, ...extra,
@@ -58,7 +58,7 @@ vi.mock('../../../../src/app/services/AssetService', async (importOriginal) => {
     getAssets: async () => [],
     getDefaultCollectionId: () => 'campaign',
     loadedTokenAssets: () => [NPC, GHOST, CORA, BRAM, MIRA],
-    getCollectionSettings: () => ({ conditions: [], recovery: { 'pc-k7m2qa': [DOWNTIME, LONG] } }),
+    getCollectionSettings: () => ({ conditions: [] }),
   };
   return { ...actual, AssetService: { getInstance: () => assets } };
 });
@@ -90,7 +90,7 @@ afterEach(() => {
 });
 
 async function openChooser(): Promise<{ harness: PaneHarness; dialog: HTMLElement }> {
-  vi.spyOn(TemplateLibrary.prototype, 'get').mockReturnValue({ template: TEMPLATE, name: 'PC', status: 'ok', builtIn: false, path: 'Templates/PC.atlastemplate' });
+  vi.spyOn(TemplateLibrary.prototype, 'get').mockReturnValue({ template: { ...TEMPLATE, recovery: [DOWNTIME, LONG] }, name: 'PC', status: 'ok', builtIn: false, path: 'Templates/PC.atlastemplate' });
   const harness = await renderPane({ frontmatter: { statblock: true, 'atlas-template': TEMPLATE.id, name: 'Mira' } });
   apps.push(harness.app);
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Downtime' })); });

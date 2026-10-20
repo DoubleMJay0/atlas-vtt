@@ -4,10 +4,10 @@ import { restSummaryText } from '../../../src/app/recovery/restSummary';
 import type { RecoveryRule } from '../../../src/app/recovery/recoveryTypes';
 import { button, character } from './restFixtures';
 
-const HP = { kind: 'resource', key: 'hp' } as const;
+const HP = { kind: 'resource', field: 'hp' } as const;
 const MIRA = { id: 'mira', name: 'Mira' };
-const spendHitDice: RecoveryRule = { target: HP, does: 'spend', from: { kind: 'resource', key: 'hitDice' }, each: '1d8+@con', most: 2 };
-const short = button([{ target: { kind: 'resource', key: 'stress' }, does: 'set', to: 0 }, spendHitDice], 'Short rest', 'short');
+const spendHitDice: RecoveryRule = { target: HP, does: 'spend', from: { kind: 'resource', field: 'hitDice' }, each: '1d8+@con', most: 2 };
+const short = button([{ target: { kind: 'resource', field: 'stress' }, does: 'set', to: 0 }, spendHitDice], 'Short rest', 'short');
 const long = button([{ target: HP, does: 'full' }]);
 const state = character({ resources: { hp: { current: 3, max: 20 }, hitDice: { current: 1, max: 4 } }, note: { con: 1 } });
 

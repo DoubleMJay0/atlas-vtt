@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  firstRule, kindFits, newButtonId, ruleFor, ruleOfKind, spendRule, templateButtons, withAddedButton, withButtonMoved,
-  withButtonOrder, withoutButton, withoutRule, withRenamedButton, withRows, withRule, withTemplateButtons,
+  firstRule, kindFits, newButtonId, ruleFor, ruleOfKind, spendRule, withAddedButton, withButtonMoved,
+  withButtonOrder, withoutButton, withoutRule, withRenamedButton, withRows, withRule,
 } from '../../../../src/app/recovery/editor/recoveryEdits';
 import { MAX_RECOVERY_BUTTONS, MAX_RECOVERY_RULES, type RecoveryButton } from '../../../../src/app/recovery/recoveryTypes';
-import { ADVENTURER, RECORD } from '../../../fixtures/recoveryFixtures';
+import { BUTTONS } from '../../../fixtures/recoveryFixtures';
 
-const HP = { kind: 'resource', key: 'hp' } as const;
+const HP = { kind: 'resource', field: 'hp' } as const;
 const DICE = { kind: 'counters', field: 'hit_dice', rows: 'all' } as const;
 const EXHAUSTION = { kind: 'condition', id: 'exhaustion' } as const;
-const buttons = templateButtons(RECORD, ADVENTURER.id);
+const buttons = BUTTONS;
 
 describe('editing a template\'s buttons', () => {
   it('adds a button with an id that stays, up to the limit', () => {
@@ -41,11 +41,6 @@ describe('editing a template\'s buttons', () => {
     expect(kept.rules[1]!.target).toEqual({ kind: 'counters', field: 'features', rows: ['rest-short1'] });
     expect(withoutButton([short, { ...short, id: 'other' }], 'rest-short1')[0]!.rules[1]!.target).toEqual({ kind: 'counters', field: 'features', rows: [] });
   });
-
-  it('keeps and removes template buttons in a record', () => {
-    expect(withTemplateButtons(RECORD, ADVENTURER.id, [])).toEqual({});
-    expect(withTemplateButtons({}, 'other', buttons)).toEqual({ other: buttons });
-  });
 });
 
 describe('editing a button\'s rules', () => {
@@ -62,10 +57,10 @@ describe('editing a button\'s rules', () => {
   it('refuses a rule past the limit, but a metric already held may change', () => {
     const many: RecoveryButton = {
       id: 'many', name: 'Many',
-      rules: Array.from({ length: MAX_RECOVERY_RULES }, (_, index) => ({ target: { kind: 'resource', key: `r${index}` }, does: 'full' })),
+      rules: Array.from({ length: MAX_RECOVERY_RULES }, (_, index) => ({ target: { kind: 'resource', field: `r${index}` }, does: 'full' })),
     };
     expect(withRule(many, { target: HP, does: 'full' })).toBeNull();
-    expect(withRule(many, { target: { kind: 'resource', key: 'r0' }, does: 'set', to: 0 })).not.toBeNull();
+    expect(withRule(many, { target: { kind: 'resource', field: 'r0' }, does: 'set', to: 0 })).not.toBeNull();
   });
 
   it('fits the kinds to the metric: conditions step and clear, the others never do', () => {
@@ -87,7 +82,7 @@ describe('editing a button\'s rules', () => {
 
   it('spends another metric, keeping a Spend rule\'s formula and cap', () => {
     const had = { target: HP, does: 'spend', from: DICE, each: '1d10+@con', most: 2 } as const;
-    expect(spendRule(HP, { kind: 'resource', key: 'stress' }, had)).toEqual({ ...had, from: { kind: 'resource', key: 'stress' } });
+    expect(spendRule(HP, { kind: 'resource', field: 'stress' }, had)).toEqual({ ...had, from: { kind: 'resource', field: 'stress' } });
     expect(spendRule(HP, DICE)).toEqual({ target: HP, does: 'spend', from: DICE, each: '1' });
   });
 

@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { App } from 'obsidian';
 import { useTemplateLibrary } from '../../library/useTemplateLibrary';
 import { deleteTemplate } from '../../library/templateActions';
-import { recoveryButtonsLost } from '../../library/templateRecovery';
 import { templateUsage, type TemplateUsage } from '../../library/templateUsage';
 import type { FieldRecord } from '../../values/fieldValues';
 import { TemplateDragAndDrop } from '../dnd/DndProvider';
@@ -23,6 +22,7 @@ import { insertItems } from './insertItems';
 import { optionsKindOf } from './options/optionsKind';
 import { usePlayersRow } from './options/usePlayersRow';
 import { TemplateJsonEditor } from './json/TemplateJsonEditor';
+import { TemplateRests } from '../rests/TemplateRests';
 import { nameTakenIn, type SaveRequest } from './save/saveChoice';
 import { SaveTemplateDialog } from './save/SaveTemplateDialog';
 import type { BlockSelection } from './selection';
@@ -89,6 +89,8 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
   const [saving, setSaving] = useState(false);
   const [diceRolls, setDiceRolls] = useState(false);
   const [json, setJson] = useState(false);
+  // The recovery buttons stand where the card does (`TemplateRests`)
+  const [rests, setRests] = useState(false);
   // The selected tile's Options popover, and the input it opens on.
   const [options, setOptions] = useState<{ focusKey?: string | undefined } | null>(null);
   const collectionId = useEditorCollection(app, props.collectionId);
@@ -139,6 +141,11 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
     editLabel, announce: state.announce, collectionId, collectionKeys, openOptions, playersRow, tableTyping,
   };
   // Focus goes back to the card: the selected tile, else the first thing on it.
+  const toggleRests = (): void => {
+    // Nothing of the card stays selected under the buttons
+    if (!rests) state.select([]);
+    setRests(!rests);
+  };
   const closeJson = (): void => {
     setJson(false);
     state.select(state.selection.length > 0 ? state.selection : selectableBlocks(snapshot.template).slice(0, 1));
@@ -152,6 +159,8 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
         data-width={room.editorWidth}
         style={{ '--atlas-te-panel-width': `${room.width}px` } as React.CSSProperties}
         onKeyDown={(event) => {
+          // The recovery buttons keep their keys; the view's scope still undoes
+          if (rests) return;
           if (!handleShellKey(event.nativeEvent, () => openOptions()) && !onKey(event.nativeEvent)) return;
           event.preventDefault();
           event.stopPropagation();
@@ -182,6 +191,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
                   startFromNote: app && !snapshot.readOnly ? () => chooseNoteToStartFrom(app, session) : undefined,
                   diceRolls: () => setDiceRolls(true),
                   json: { open: json, toggle: () => (json ? closeJson() : setJson(true)) },
+                  rests: snapshot.readOnly ? undefined : { open: rests, toggle: toggleRests },
                   deleteTemplate: app && snapshot.path !== null && !snapshot.readOnly ? () => setDeleting(templateUsage(app, snapshot.id)) : undefined,
                   add: room.editorWidth === 'stacked' && !snapshot.readOnly
                     ? insertItems().map((item) => ({ label: `Add ${item.label.toLowerCase()}`, icon: 'plus', onClick: () => context.insert(item) }))
@@ -192,7 +202,9 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
             noteCover={json ? <TemplateJsonEditor onDone={closeJson} /> : undefined}
             focusText={focusText}
             stateBars={<TemplateStateBars session={session} snapshot={snapshot} />}
-            card={(
+            card={rests && !snapshot.readOnly ? (
+              <TemplateRests app={app} session={session} snapshot={snapshot} collectionId={collectionId} onDone={toggleRests} />
+            ) : (
               <Canvas
                 stageRef={stageRef}
                 app={app}
@@ -221,7 +233,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
               </>
             )}
           />
-          {room.editorWidth !== 'stacked' && (
+          {room.editorWidth !== 'stacked' && !rests && (
             <EditorDock
               onAdd={snapshot.readOnly ? undefined : context.insert}
               canUndo={snapshot.canUndo || state.naming !== null}
@@ -272,7 +284,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
             templateId={snapshot.id}
             usage={deleting}
             templates={library?.templates ?? []}
-            lostButtons={(replacement) => recoveryButtonsLost(app, snapshot.id, replacement)}
+            lostButtons={(snapshot.template.recovery ?? []).map((button) => button.name)}
             onDelete={async (replacement) => {
               await deleteTemplate(app, snapshot.id, replacement);
               setDeleting(null);

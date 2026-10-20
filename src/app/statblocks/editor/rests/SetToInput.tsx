@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { cn } from '../../../../../utils/cn';
-import { t } from '../../../../i18n';
-import type { SetRule } from '../../../../recovery/recoveryTypes';
+import { cn } from '../../../../utils/cn';
+import { t } from '../../../i18n';
+import type { SetRule } from '../../../recovery/recoveryTypes';
 import type { FieldChoice } from './RuleInputs';
 
 interface SetToInputProps {

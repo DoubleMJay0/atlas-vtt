@@ -38,6 +38,5 @@ export const rest = {
   'rest.failed': 'The rest could not be written: {problem}',
   'rest.resetLabel': 'Which rest gives {name} its uses back',
   'rest.resetNone': 'None',
-  'rest.copyButtonsFailed': 'The copy is there, but without the recovery buttons of its original.',
   'rest.lostWithTemplate': { one: 'The recovery button {list} goes with it.', other: 'The recovery buttons {list} go with it.' },
 } as const satisfies Record<string, Message>;

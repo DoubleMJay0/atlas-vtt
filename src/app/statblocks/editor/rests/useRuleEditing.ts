@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
   firstRule, kindFits, ruleFor, ruleOfKind, spendRule, withoutRule, withRule,
-} from '../../../../recovery/editor/recoveryEdits';
-import type { RuleScope } from '../../../../recovery/editor/recoveryScope';
-import type { RecoveryButton, RecoveryRule, RecoveryRuleKind, RecoveryTarget } from '../../../../recovery/recoveryTypes';
+} from '../../../recovery/editor/recoveryEdits';
+import type { RuleScope } from '../../../recovery/editor/recoveryScope';
+import type { RecoveryButton, RecoveryRule, RecoveryRuleKind, RecoveryTarget } from '../../../recovery/recoveryTypes';
 
 /** A metric picked on the card: its spot and what a rule on it changes. */
 export interface PickedMetric {

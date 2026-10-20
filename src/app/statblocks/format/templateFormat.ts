@@ -7,6 +7,7 @@
  * a trailing newline; `serialize ∘ parse` is a fixed point after one pass.
  */
 
+import { parseRecoveryButtons } from '../../recovery/parseRecovery';
 import type { StatblockTemplate } from '../model/templateTypes';
 import {
   CONDITION_KEYS,
@@ -90,6 +91,8 @@ const TEMPLATE_NESTED: NestedWriters = new Map([
   ['header', objectWriter(HEADER_KEYS, new Map([['hitPoints', objectWriter(HEADER_TRACK_KEYS)]]))],
   ['layout', objectWriter(LAYOUT_KEYS, new Map([['blocks', listWriter(writeBlock)]]))],
   ['players', writeSortedRecord],
+  // Read again as written: every button and rule takes its keys in the reader's order
+  ['recovery', (value: unknown) => parseRecoveryButtons(value)],
 ]);
 
 /** The template as the plain JSON object its file holds. */

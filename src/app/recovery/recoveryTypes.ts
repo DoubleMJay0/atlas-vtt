@@ -1,12 +1,14 @@
 /**
- * Recovery buttons: what a collection's statblock template offers a player character to get its
- * metrics back with ("Short rest", "Long rest"). A button is a list of rules, each saying what
- * happens to one metric: a token resource, a row of counters or a valued condition. Rules belong
+ * Recovery buttons: what a statblock template offers a player character to get its metrics back
+ * with ("Short rest", "Long rest"), stored in the template (`StatblockTemplate.recovery`). A button
+ * is a list of rules, each saying what happens to one metric: a number of the statblock (the
+ * collection's resource that reads it, or the number the template tracks), a row of counters or a
+ * valued condition of the collection. Rules belong
  * to the button, never to the metric, so one metric may be restored differently by each button.
  * Pure data.
  */
 
-import type { FieldKey, TemplateId } from '../statblocks/model/templateTypes';
+import type { FieldKey } from '../statblocks/model/templateTypes';
 
 /** The most buttons one template offers, and the most rules one button (or one action) holds. */
 export const MAX_RECOVERY_BUTTONS = 6;
@@ -16,10 +18,14 @@ export const MAX_RECOVERY_CHOICES = 4;
 export const MAX_RECOVERY_ACTIONS = 8;
 export const MAX_ACTION_PICKS = 6;
 
-/** A collection resource, by its key (`ResourceDefinition.key`): HP, Stress. */
+/**
+ * A number of the statblock, by its template field: the resource of the character that reads it
+ * (the collection's resource reading that field, else the number the template tracks), found when
+ * a rest runs (`resourceOfField`), so the same template restores HP in every collection.
+ */
 export interface ResourceTarget {
   kind: 'resource';
-  key: string;
+  field: FieldKey;
 }
 
 /**
@@ -146,5 +152,3 @@ export interface RecoveryButton {
   choices?: RecoveryChoice[];
 }
 
-/** The buttons of each template, by template id. */
-export type RecoveryRecord = Readonly<Record<TemplateId, readonly RecoveryButton[]>>;

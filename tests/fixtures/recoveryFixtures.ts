@@ -1,5 +1,5 @@
 import { TEMPLATE_FORMAT, TEMPLATE_VERSION, type StatblockTemplate } from '../../src/app/statblocks/model/templateTypes';
-import type { RecoveryRecord } from '../../src/app/recovery/recoveryTypes';
+import type { RecoveryButton } from '../../src/app/recovery/recoveryTypes';
 import type { ResourceDefinition } from '../../src/app/resources/resourceTypes';
 import type { ConditionDefinition } from '../../src/app/types/collectionSettingsTypes';
 
@@ -50,25 +50,24 @@ export const CONDITIONS: ConditionDefinition[] = [
   { id: 'poisoned', name: 'Poisoned', color: '#84cc16' },
 ];
 
-export const RECORD: RecoveryRecord = {
-  [ADVENTURER.id]: [
-    {
-      id: 'rest-short1',
-      name: 'Short rest',
-      rules: [
-        { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'counters', field: 'hit_dice', rows: 'all' }, each: '1d10+@con' },
-        { target: { kind: 'counters', field: 'features', rows: ['rest-short1'] }, does: 'full' },
-      ],
-    },
-    {
-      id: 'rest-long01',
-      name: 'Long rest',
-      rules: [
-        { target: { kind: 'resource', key: 'hp' }, does: 'full' },
-        { target: { kind: 'resource', key: 'stress' }, does: 'set', to: 0 },
-        { target: { kind: 'counters', field: 'hit_dice', rows: 'all' }, does: 'share', share: 0.5, round: 'down', min: 1 },
-        { target: { kind: 'condition', id: 'exhaustion' }, does: 'step', by: -1 },
-      ],
-    },
-  ],
-};
+/** The adventurer's recovery buttons: a Short rest that spends Hit Dice, a Long rest that restores everything. */
+export const BUTTONS: RecoveryButton[] = [
+  {
+    id: 'rest-short1',
+    name: 'Short rest',
+    rules: [
+      { target: { kind: 'resource', field: 'hp' }, does: 'spend', from: { kind: 'counters', field: 'hit_dice', rows: 'all' }, each: '1d10+@con' },
+      { target: { kind: 'counters', field: 'features', rows: ['rest-short1'] }, does: 'full' },
+    ],
+  },
+  {
+    id: 'rest-long01',
+    name: 'Long rest',
+    rules: [
+      { target: { kind: 'resource', field: 'hp' }, does: 'full' },
+      { target: { kind: 'resource', field: 'stress' }, does: 'set', to: 0 },
+      { target: { kind: 'counters', field: 'hit_dice', rows: 'all' }, does: 'share', share: 0.5, round: 'down', min: 1 },
+      { target: { kind: 'condition', id: 'exhaustion' }, does: 'step', by: -1 },
+    ],
+  },
+];

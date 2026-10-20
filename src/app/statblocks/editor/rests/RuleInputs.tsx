@@ -1,8 +1,8 @@
 import React, { useId, useRef, useState } from 'react';
-import { cn } from '../../../../../utils/cn';
-import { t } from '../../../../i18n';
-import { formulaReads, withFieldReference } from '../../../../recovery/editor/recoveryFormulas';
-import type { RecoveryButton } from '../../../../recovery/recoveryTypes';
+import { cn } from '../../../../utils/cn';
+import { t } from '../../../i18n';
+import { formulaReads, withFieldReference } from '../../../recovery/editor/recoveryFormulas';
+import type { RecoveryButton } from '../../../recovery/recoveryTypes';
 
 /** A number field of the template, offered as `@key`. */
 export interface FieldChoice {

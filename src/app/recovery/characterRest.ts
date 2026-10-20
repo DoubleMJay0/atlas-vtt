@@ -1,6 +1,6 @@
 /**
- * A player character as a rest reads it in this app: the recovery buttons its collection offers
- * statblocks of its note's template, its collection's resources and conditions, and where each of
+ * A player character as a rest reads it in this app: the recovery buttons its note's template
+ * offers, its collection's resources and conditions, and where each of
  * its values is held now. A resource is read from the character's token on an open map (one on
  * screen first), else from the values the played campaign keeps of it; a condition from its token
  * on an open map; counters and `@` references from the note (`statblockLookup`: `@level`, `@str.mod`). The template's tracked numbers are
@@ -14,11 +14,10 @@ import { PartySync } from '../campaigns/partyValues/PartySync';
 import { characterOf, libraryTokenOf } from '../characters/playerCharacters';
 import { playerCharacterOfNote } from '../characters/noteCharacter';
 import { collectionResources } from '../resources/collectionResources';
-import { trackedResources } from '../resources/trackedResources';
+import { readsTemplateField, resourceOfField, trackedResources } from '../resources/trackedResources';
 import type { ResourceValue } from '../resources/resourceTypes';
 import { AssetService, type TokenAsset } from '../services/AssetService';
 import { openMapViews } from '../services/collectionScenes';
-import { systemPresetsOf } from '../services/mapCollectionRules';
 import type { ViewAtlasStore } from '../storeFactory';
 import type { StatblockTemplate, TemplateId } from '../statblocks/model/templateTypes';
 import { NoteSource } from '../statblocks/notes/noteSource';
@@ -30,9 +29,11 @@ import { statblockLookup } from '../statblocks/values/statblockLookup';
 import { withReferencesFilled } from '../statblocks/values/fillReferences';
 import { trackedMax, trackedValue } from '../statblocks/values/trackedNumbers';
 import { conditionValue } from '../utils/conditionValues';
-import { collectionRecovery } from './collectionRecovery';
 import type { RecoveryButton } from './recoveryTypes';
 import type { RestCharacter } from './restTypes';
+
+/** A template without recovery buttons offers none. */
+const NO_BUTTONS: readonly RecoveryButton[] = [];
 
 /** The character's tokens on one open map. */
 export interface TokenHold {
@@ -102,7 +103,7 @@ function tokenHolding(holds: readonly TokenHold[], key: string): { store: ViewAt
 /** The character `asset` resting with its note `note`, as this app holds it now. */
 export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): CharacterRest {
   const settings = AssetService.getInstance(app).getCollectionSettings(asset.collection);
-  const buttons = collectionRecovery(settings, systemPresetsOf(app), note.templateId);
+  const buttons = note.template.recovery ?? NO_BUTTONS;
   const holds = characterHolds(app, asset);
   const sync = PartySync.forApp(app);
   const campaignId = CampaignPlay.forApp(app).playing();
@@ -110,6 +111,7 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
   const fields = new Map(note.template.fields.map((field) => [field.key, field]));
 
   const collection = collectionResources(settings);
+  const ofField = resourceOfField(note.template, collection);
   const tracked = new Map(trackedResources(note.template, collection).map((each) => [each.definition.key, each]));
   const readIn = (record: FieldRecord) => (key: string): ReturnType<typeof readField>['value'] => {
     const field = fields.get(key);
@@ -149,6 +151,8 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
     id: asset.id,
     name: asset.name,
     resources: [...collection, ...[...tracked.values()].map((each) => each.definition)],
+    // A static resource is found too: the rest then says it changes none
+    resourceOf: (key) => ofField(key) ?? collection.find((resource) => readsTemplateField(resource, key)),
     conditions: settings.conditions ?? [],
     fields,
     resourceValue,

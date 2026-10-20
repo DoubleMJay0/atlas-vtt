@@ -11,8 +11,8 @@ import {
   type RecoveryButton, type RecoveryChoice, type RecoveryRule,
 } from '../../../../src/app/recovery/recoveryTypes';
 
-const HP = { kind: 'resource', key: 'hp' } as const;
-const STRESS = { kind: 'resource', key: 'stress' } as const;
+const HP = { kind: 'resource', field: 'hp' } as const;
+const STRESS = { kind: 'resource', field: 'stress' } as const;
 
 const DOWNTIME: RecoveryChoice = {
   id: 'step-a', prompt: 'Choose two downtime moves', min: 2, max: 2,
@@ -62,7 +62,7 @@ describe('scopes', () => {
   it('hold an action to the rules a button may hold', () => {
     const many = Array.from({ length: MAX_RECOVERY_RULES }, (_, index): RecoveryRule => ({ target: { kind: 'resource', key: `r${index}` }, does: 'full' }));
     const full = withScopeRules(REST, TEND, many);
-    expect(withRule(full, { target: { kind: 'resource', key: 'one-more' }, does: 'full' }, TEND)).toBeNull();
+    expect(withRule(full, { target: { kind: 'resource', field: 'one-more' }, does: 'full' }, TEND)).toBeNull();
   });
 
   it('let a removed button go from the rows of action rules too', () => {

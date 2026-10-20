@@ -8,8 +8,8 @@ import type { RecoveryButton } from '../../../src/app/recovery/recoveryTypes';
 import type { RestChoices } from '../../../src/app/recovery/restTypes';
 import { character, roller } from './restFixtures';
 
-const HP = { kind: 'resource', key: 'hp' } as const;
-const STRESS = { kind: 'resource', key: 'stress' } as const;
+const HP = { kind: 'resource', field: 'hp' } as const;
+const STRESS = { kind: 'resource', field: 'stress' } as const;
 
 /** A short rest as Daggerheart's runs: two downtime moves, the same one twice if wanted, wounds tended on anyone. */
 const SHORT: RecoveryButton = {

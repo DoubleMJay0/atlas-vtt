@@ -1,7 +1,7 @@
 import React from 'react';
-import { isContainerBlock, type FieldKey, type MetricBlock, type TemplateBlock } from '../../../../statblocks/model/templateTypes';
-import type { BlockChrome, BlockDecoration } from '../../../../statblocks/render/blockChrome';
-import { numberSpotId, type SheetMetric, type SheetMetrics } from '../../../../recovery/editor/recoveryMetrics';
+import { isContainerBlock, type FieldKey, type MetricBlock, type TemplateBlock } from '../../model/templateTypes';
+import type { BlockChrome, BlockDecoration } from '../../render/blockChrome';
+import { numberSpotId, type SheetMetric, type SheetMetrics } from '../../../recovery/editor/recoveryMetrics';
 import { MetricSpot, RefusedSpot, type SpotProps } from './MetricSpot';
 
 /** What the spots of the card share; each spot adds its own metric. */

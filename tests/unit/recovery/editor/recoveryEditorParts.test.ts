@@ -1,33 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { formulaReads, withFieldReference } from '../../../../src/app/recovery/editor/recoveryFormulas';
-import { changedResourceKeys, withSavedResourceKeys } from '../../../../src/app/recovery/editor/recoveryResourceKeys';
-import { recoveryTemplateTabs } from '../../../../src/app/recovery/editor/recoveryTemplateTabs';
 import { ruleBadge } from '../../../../src/app/recovery/editor/ruleBadge';
-import { savedResources } from '../../../../src/app/resources/resourceDefinitions';
-import type { RecoveryRecord } from '../../../../src/app/recovery/recoveryTypes';
-import { RESOURCES } from '../../../fixtures/recoveryFixtures';
 
-const HP = { kind: 'resource', key: 'hp' } as const;
+const HP = { kind: 'resource', field: 'hp' } as const;
 const DICE = { kind: 'counters', field: 'hit_dice', rows: 'all' } as const;
-
-describe('the template tabs', () => {
-  const names: Record<string, string> = { pc: 'Adventurer', npc: 'Generic NPC', other: 'Old sheet' };
-  const nameOf = (id: string): string | null => names[id] ?? null;
-
-  it('name a template by the roles that start from it, else by its own name', () => {
-    const roles = [
-      { id: 'pc', name: 'Player character', templateId: 'pc' },
-      { id: 'npc', name: 'NPC', templateId: 'npc' },
-      { id: 'hireling', name: 'Hireling', templateId: 'npc' },
-      { id: 'lost', name: 'Lost', templateId: 'missing' },
-    ];
-    expect(recoveryTemplateTabs(roles, ['other', 'pc', 'missing'], nameOf)).toEqual([
-      { templateId: 'pc', label: 'Player character' },
-      { templateId: 'npc', label: 'NPC · Hireling' },
-      { templateId: 'other', label: 'Old sheet' },
-    ]);
-  });
-});
 
 describe('formulas', () => {
   it('read with their fields as numbers', () => {
@@ -49,19 +25,6 @@ describe('formulas', () => {
     expect(withFieldReference('1+@armxx+2', 'armor', 6)).toEqual({ text: '1+@armor+2', caret: 8 });
     expect(withFieldReference('', 'level')).toEqual({ text: '@level', caret: 6 });
     expect(withFieldReference('1d8 2', 'con', 3).text).toBe('1d8+@con+2');
-  });
-});
-
-describe('resources added in the dialog', () => {
-  it('take their rules along to the key they are saved with', () => {
-    const draft = [...RESOURCES, { ...RESOURCES[0]!, key: 'new:1234', name: 'Grit', field: 'grit' }];
-    const keys = changedResourceKeys(draft, savedResources(draft));
-    expect([...keys]).toEqual([['new:1234', 'grit']]);
-    const record: RecoveryRecord = {
-      pc: [{ id: 'r', name: 'Rest', rules: [{ target: HP, does: 'spend', from: { kind: 'resource', key: 'new:1234' }, each: '1' }] }],
-    };
-    expect(withSavedResourceKeys(record, keys).pc![0]!.rules[0]).toEqual({ target: HP, does: 'spend', from: { kind: 'resource', key: 'grit' }, each: '1' });
-    expect(withSavedResourceKeys(record, new Map())).toBe(record);
   });
 });
 

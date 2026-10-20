@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { RecoveryEditor } from '../../../../src/app/react/components/collection-settings/recovery/RecoveryEditor';
+import { RecoveryEditor } from '../../../../src/app/statblocks/editor/rests/RecoveryEditor';
 import { parseRecoveryButtons } from '../../../../src/app/recovery/parseRecovery';
 import type { RecoveryButton } from '../../../../src/app/recovery/recoveryTypes';
 import { ADVENTURER, CONDITIONS, RESOURCES } from '../../../fixtures/recoveryFixtures';
@@ -51,7 +51,7 @@ describe('the steps of a recovery button', () => {
     const button = mount();
     addStep();
     fireEvent.click(hpSpot());
-    expect(button().choices![0]!.actions[0]!.rules).toEqual([{ target: { kind: 'resource', key: 'hp' }, does: 'full' }]);
+    expect(button().choices![0]!.actions[0]!.rules).toEqual([{ target: { kind: 'resource', field: 'hp' }, does: 'full' }]);
     expect(button().rules).toEqual([]);
     expect(hpSpot().getAttribute('aria-label')).toBe('HP: Full');
 

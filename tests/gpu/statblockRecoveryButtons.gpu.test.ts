@@ -41,7 +41,7 @@ const TEMPLATE: StatblockTemplate = {
 
 const BUTTONS = [
   { id: 'short', name: 'Short rest', rules: [] },
-  { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'hitDice' }, each: '1d8' }] },
+  { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', field: 'hp' }, does: 'spend', from: { kind: 'resource', field: 'hitDice' }, each: '1d8' }] },
 ] as const;
 
 const RECOVERY = {

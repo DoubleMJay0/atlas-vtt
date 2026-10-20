@@ -1,8 +1,6 @@
 import { BUILT_IN_SYSTEM_PRESETS } from '../../gameSystems/builtInPresets';
 import { legacyCollectionResources } from '../../resources/collectionResources';
 import { sameResourceDefinitions } from '../../resources/resourceDefinitions';
-import { presetRecovery, recoveryTemplateIds, sameRecovery } from '../../recovery/collectionRecovery';
-import { parseRecovery } from '../../recovery/parseRecovery';
 import { collectionStatblockRoles, sameStatblockRoles } from '../../statblocks/roles/collectionStatblockRoles';
 import { withSettingsTemplates, type TemplateIdMap } from '../../statblocks/bundles/bundleTemplateIds';
 import type { CollectionSettings } from '../../types/collectionSettingsTypes';
@@ -16,22 +14,20 @@ import { collectionFolderPath } from '../assetPaths';
  * (`storeLegacyResources`), which is no edit of the GM's. Nor is what players see. Roles equal
  * to those the settings read from their preset (`presets`, the generic pair without one) are
  * left out too: a bundle writes out a user preset's roles (`withPresetRoles`), which the
- * collection it was made from reads unset. So are recovery buttons equal to the preset's.
+ * collection it was made from reads unset.
  */
 export function comparableSettings(
   settings: CollectionSettings | undefined,
   presets: readonly SystemPreset[] = BUILT_IN_SYSTEM_PRESETS,
 ): Partial<CollectionSettings> | undefined {
   if (!settings) return settings;
-  const { resources, statblockRoles, recovery, ...rest } = settings;
+  const { resources, statblockRoles, ...rest } = settings;
   const ownResources = resources !== undefined
     && !sameResourceDefinitions(resources, legacyCollectionResources(rest, BUILT_IN_SYSTEM_PRESETS));
   // An empty list is none: the collection reads its preset's
   const ownRoles = !!statblockRoles?.length
     && !sameStatblockRoles(statblockRoles, collectionStatblockRoles({ systemPresetId: rest.systemPresetId }, presets));
-  const ownRecovery = parseRecovery(recovery);
-  const keepsRecovery = ownRecovery !== undefined && !sameRecovery(ownRecovery, presetRecovery(rest.systemPresetId, presets));
-  return { ...rest, ...(ownResources && { resources }), ...(ownRoles && { statblockRoles }), ...(keepsRecovery && { recovery: ownRecovery }) };
+  return { ...rest, ...(ownResources && { resources }), ...(ownRoles && { statblockRoles }) };
 }
 
 /** `settings` with each loot base at the path `pathOf` gives it; a base without one is left out. */
@@ -67,14 +63,6 @@ export function withPresetRoles(settings: CollectionSettings, presets: readonly 
   return preset && !preset.builtIn && roles?.length ? { ...settings, statblockRoles: structuredClone(roles) } : settings;
 }
 
-/** The settings a bundle carries: recovery buttons the collection reads from a user preset written out, as its roles are (`withPresetRoles`). */
-export function withPresetRecovery(settings: CollectionSettings, presets: readonly SystemPreset[]): CollectionSettings {
-  if (settings.recovery !== undefined) return settings;
-  const preset = presets.find((candidate) => candidate.id === settings.systemPresetId);
-  const recovery = preset && !preset.builtIn ? parseRecovery(preset.rules.recovery) : undefined;
-  return recovery && recoveryTemplateIds(recovery).length > 0 ? { ...settings, recovery: structuredClone(recovery) } : settings;
-}
-
 /** The settings an import takes from a bundle. One written by an older Atlas names no resources: the vault keeps its own. */
 export function settingsFromBundle(theirs: CollectionSettings, mine: CollectionSettings | undefined): CollectionSettings {
   return theirs.resources || !mine?.resources ? theirs : { ...theirs, resources: mine.resources };
@@ -95,14 +83,14 @@ export interface BundledPaths {
 }
 
 /**
- * The settings an export carries: only the loot bases that travel, roles and recovery buttons
- * read from a user preset written out (`withPresetRoles`, `withPresetRecovery`), and role folders
+ * The settings an export carries: only the loot bases that travel, roles read from a user preset
+ * written out (`withPresetRoles`), and role folders
  * inside the collection's folder.
  * A role folder outside it is left out: the recipient's vault may not have it, and new
  * statblocks of that role then go where Obsidian puts new notes.
  */
 export function exportedSettings(settings: CollectionSettings, presets: readonly SystemPreset[], paths: BundledPaths): CollectionSettings {
-  return withRoleFolders(withPresetRecovery(withPresetRoles(withLootBases(settings, paths.file), presets), presets), paths.folder);
+  return withRoleFolders(withPresetRoles(withLootBases(settings, paths.file), presets), paths.folder);
 }
 
 /** Where an import puts what the bundle's settings point at. */
@@ -137,7 +125,7 @@ export function withRecordIds<T extends { systemPresetId?: string | undefined; d
 
 /**
  * The bundle's settings as the import stores them: its loot bases at the paths they get in this
- * vault, its roles and recovery buttons on the templates' ids here, its game system and dice set the ids
+ * vault, its roles on the templates' ids here, its game system and dice set the ids
  * the preset and the set have here, its role folders in the collection's folder here (a folder
  * outside the collection is left out).
  */

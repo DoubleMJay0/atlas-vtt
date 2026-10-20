@@ -3,9 +3,8 @@ import type { Message } from '../../types';
 /** The collection settings' recovery pane: buttons such as Long rest, set up on a template's statblock. */
 export const recoveryEditor = {
   'recoveryEditor.title': 'Recovery',
+  'recoveryEditor.done': 'Done',
   'recoveryEditor.hint': 'Buttons on player characters\' statblocks that give back what a rest restores.',
-  'recoveryEditor.templates': 'Statblock templates',
-  'recoveryEditor.noTemplates': 'No statblock template to set up yet. Give the collection a statblock role, or link a player character to a statblock.',
   'recoveryEditor.buttons': 'Recovery buttons',
   'recoveryEditor.add': 'Add a button',
   'recoveryEditor.addFull': 'A template has at most {count} buttons',

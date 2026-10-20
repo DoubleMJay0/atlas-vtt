@@ -8,7 +8,6 @@ import { builtInTemplate } from '../../../../src/app/statblocks/library/builtInT
 import { TemplateLibrary } from '../../../../src/app/statblocks/library/TemplateLibrary';
 import { TemplateSession } from '../../../../src/app/statblocks/library/TemplateSession';
 import { copyTemplate, createTemplateFile, deleteTemplate } from '../../../../src/app/statblocks/library/templateActions';
-import { copyRecoveryButtons, recoveryButtonsLost } from '../../../../src/app/statblocks/library/templateRecovery';
 import { templateUsage } from '../../../../src/app/statblocks/library/templateUsage';
 import { NoteFieldWriter } from '../../../../src/app/statblocks/notes/NoteFieldWriter';
 import type { StatblockTemplate } from '../../../../src/app/statblocks/model/templateTypes';
@@ -118,22 +117,6 @@ describe('createTemplateFile and copyTemplate', () => {
   });
 });
 
-describe('copyRecoveryButtons', () => {
-  const rest = { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'full' }] } as const;
-
-  it('gives a copy the buttons of its original in one collection, as its own, writing nothing else of its settings', async () => {
-    collections = [{ ...collection('rested'), settings: { conditions: [], recovery: { [MARSH_ID]: [rest] } } }, { ...collection('other'), settings: { conditions: [], recovery: { [MARSH_ID]: [rest] } } }];
-    await copyRecoveryButtons(vault.app, 'rested', MARSH_ID, 'marsh-copy-a1b2c3');
-    expect(updateCollectionSettings).toHaveBeenCalledTimes(1);
-    expect(updateCollectionSettings).toHaveBeenCalledWith('rested', { recovery: { [MARSH_ID]: [rest], 'marsh-copy-a1b2c3': [rest] } });
-  });
-
-  it('writes nothing where the original offers no button in the collection', async () => {
-    await copyRecoveryButtons(vault.app, 'plain', MARSH_ID, 'marsh-copy-a1b2c3');
-    expect(updateCollectionSettings).not.toHaveBeenCalled();
-  });
-});
-
 describe('deleteTemplate', () => {
   it('switches its notes and roles to the replacement, then trashes the file', async () => {
     await deleteTemplate(vault.app, MARSH_ID, REPLACEMENT);
@@ -161,36 +144,6 @@ describe('deleteTemplate', () => {
     expect(JSON.parse(trashed[0]!)).toMatchObject({ description: MARSH_CREATURE.description });
     expect(vault.files.get('Bestiary/Bog.md')).toBe(note(MARSH_ID));
     expect(updateCollectionSettings).not.toHaveBeenCalled();
-  });
-
-  it('moves its recovery buttons to the replacement, or lets them go without one', async () => {
-    const rest = { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'full' }] } as const;
-    const rested = (): CollectionMetadata => ({ ...collection('rested'), settings: { conditions: [], recovery: { [MARSH_ID]: [rest] } } });
-    const presets = new SystemPresetService(settings);
-    const homebrew = presets.list().find((preset) => preset.name === 'Homebrew')!;
-    presets.update(homebrew.id, { ...homebrew.rules, recovery: { [MARSH_ID]: [rest] } });
-    collections = [rested()];
-    await deleteTemplate(vault.app, MARSH_ID, REPLACEMENT);
-    expect(updateCollectionSettings).toHaveBeenCalledWith('rested', { recovery: { [REPLACEMENT]: [rest] } });
-    expect(presets.list().find((preset) => preset.id === homebrew.id)?.rules.recovery).toEqual({ [REPLACEMENT]: [rest] });
-
-    updateCollectionSettings.mockClear();
-    collections = [{ ...rested(), settings: { conditions: [], recovery: { [MARSH_ID]: [rest], [REPLACEMENT]: [rest] } } }];
-    await deleteTemplate(vault.app, MARSH_ID, null);
-    expect(updateCollectionSettings).toHaveBeenCalledWith('rested', { recovery: { [REPLACEMENT]: [rest] } });
-  });
-
-  it('names the recovery buttons that go with it, of collections and saved systems, each once', () => {
-    const button = (id: string, name: string) => ({ id, name, rules: [] });
-    const presets = new SystemPresetService(settings);
-    const homebrew = presets.list().find((preset) => preset.name === 'Homebrew')!;
-    presets.update(homebrew.id, { ...homebrew.rules, recovery: { [MARSH_ID]: [button('long', 'Long rest'), button('dawn', 'Dawn')] } });
-    collections = [{ ...collection('rested'), settings: { conditions: [], recovery: { [MARSH_ID]: [button('long', 'Long rest'), button('short', 'Short rest')], [REPLACEMENT]: [button('long', 'Long rest')] } } }];
-    expect(recoveryButtonsLost(vault.app, MARSH_ID, null)).toEqual(['Long rest', 'Short rest', 'Dawn']);
-    // The replacement takes what it has room and no id for.
-    expect(recoveryButtonsLost(vault.app, MARSH_ID, REPLACEMENT)).toEqual(['Long rest']);
-    collections = [];
-    expect(recoveryButtonsLost(vault.app, MARSH_ID, REPLACEMENT)).toEqual([]);
   });
 
   it('never deletes a built-in', async () => {

@@ -68,10 +68,11 @@ describe('the template editor\'s capsule', () => {
     expect(offered(saveButton())).toBe(true);
   });
 
-  it('keeps only Dice rolls…, Edit as JSON (Close JSON while open) and Delete template… in ⋯', async () => {
+  it('keeps only Dice rolls…, Recovery buttons (Back to the card while open), Edit as JSON (Close JSON while open) and Delete template… in ⋯', async () => {
     setup(new FakeSession(sampleTemplate()));
-    expect(await menuRows()).toEqual(['Dice rolls…', 'Edit as JSON', 'Delete template…']);
+    expect(await menuRows()).toEqual(['Dice rolls…', 'Recovery buttons', 'Edit as JSON', 'Delete template…']);
     expect(capsuleMenuEntries({ json: { open: true, toggle: vi.fn() } }).map((entry) => entry.type === 'item' && entry.label)).toEqual(['Close JSON', 'Delete template…']);
+    expect(capsuleMenuEntries({ rests: { open: true, toggle: vi.fn() } }).map((entry) => entry.type === 'item' && entry.label)).toEqual(['Back to the card', 'Delete template…']);
     expect(capsuleMenuEntries({}).find((entry) => entry.type === 'item' && entry.label === 'Delete template…')).toMatchObject({ disabled: true });
   });
 });

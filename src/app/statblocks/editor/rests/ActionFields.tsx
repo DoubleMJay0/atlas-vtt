@@ -1,11 +1,11 @@
 import React, { useId } from 'react';
 import { Trash2 } from 'lucide-react';
-import { t } from '../../../../i18n';
-import { ToggleSwitch } from '../../../../packages/components/primitives/Toggle';
-import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
-import { withActionName, withActionText, withForOthers } from '../../../../recovery/editor/recoveryChoiceEdits';
-import { MAX_ACTION_TEXT } from '../../../../recovery/parseRecovery';
-import type { RecoveryAction } from '../../../../recovery/recoveryTypes';
+import { t } from '../../../i18n';
+import { ToggleSwitch } from '../../../packages/components/primitives/Toggle';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
+import { withActionName, withActionText, withForOthers } from '../../../recovery/editor/recoveryChoiceEdits';
+import { MAX_ACTION_TEXT } from '../../../recovery/parseRecovery';
+import type { RecoveryAction } from '../../../recovery/recoveryTypes';
 import { CommitTextInput } from './CommitTextInput';
 import { MAX_NAME_LENGTH } from './RailNameInput';
 

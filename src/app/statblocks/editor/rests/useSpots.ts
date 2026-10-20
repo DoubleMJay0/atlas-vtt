@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { observeResize } from '../../../../utils/observeResize';
+import { observeResize } from '../../../utils/observeResize';
 import type { Box } from './rulePlacement';
 
 export interface Spots {

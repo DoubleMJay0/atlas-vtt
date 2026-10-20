@@ -12,8 +12,6 @@
  */
 
 import type { InstalledTemplate } from '../../services/collectionBundle/installRecord';
-import { parseRecovery } from '../../recovery/parseRecovery';
-import type { RecoveryButton, RecoveryRecord } from '../../recovery/recoveryTypes';
 import type { StatblockRole } from '../model/roleTypes';
 import { isValidTemplateId } from '../model/templateIds';
 import { isBuiltInTemplateId, type TemplateId } from '../model/templateTypes';
@@ -149,7 +147,6 @@ export function rewriteNoteTemplate(text: string, ids: TemplateIdMap): string {
 
 interface TemplateSettings {
   statblockRoles?: readonly StatblockRole[] | undefined;
-  recovery?: RecoveryRecord | undefined;
 }
 
 /** Settings whose roles start from the templates' ids in this vault. */
@@ -159,24 +156,9 @@ export function withRoleTemplates<T extends TemplateSettings>(settings: T, ids: 
   return { ...settings, statblockRoles: roles.map((role) => ({ ...role, templateId: ids.get(role.templateId) ?? role.templateId })) };
 }
 
-/**
- * Settings whose recovery buttons belong to the templates' ids in this vault. A template the map
- * moves onto an id the record already names keeps the buttons it had there.
- */
-export function withRecoveryTemplates<T extends TemplateSettings>(settings: T, ids: TemplateIdMap): T {
-  const recovery = parseRecovery(settings.recovery);
-  if (!recovery || !Object.keys(recovery).some((templateId) => ids.has(templateId))) return settings;
-  const kept = new Map<TemplateId, readonly RecoveryButton[]>(Object.entries(recovery).filter(([templateId]) => !ids.has(templateId)));
-  for (const [templateId, buttons] of Object.entries(recovery)) {
-    const local = ids.get(templateId);
-    if (local !== undefined && !kept.has(local)) kept.set(local, buttons);
-  }
-  return { ...settings, recovery: Object.fromEntries(kept) };
-}
-
-/** Settings whose roles and recovery buttons name the templates' ids in this vault. */
+/** Settings whose roles name the templates' ids in this vault. */
 export function withSettingsTemplates<T extends TemplateSettings>(settings: T, ids: TemplateIdMap): T {
-  return withRecoveryTemplates(withRoleTemplates(settings, ids), ids);
+  return withRoleTemplates(settings, ids);
 }
 
 /** A note the import keeps as the vault has it, which names a template whose bundle version arrives as a copy. */

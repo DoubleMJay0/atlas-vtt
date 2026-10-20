@@ -7,7 +7,6 @@ import { isRecord } from '../../utils/guards';
 import { localImage, statblockImageField } from '../statblockImportCandidates';
 import { linkedFilePath } from '../sceneLinks';
 import { readLootBaseItems } from '../../loot/lootBaseItems';
-import { collectionRecoveryRecord, recoveryTemplateIds } from '../../recovery/collectionRecovery';
 import { withTemplateFiles } from '../../statblocks/bundles/bundleTemplates';
 import { collectionStatblockRoles } from '../../statblocks/roles/collectionStatblockRoles';
 import type { CollectionSettings } from '../../types/collectionSettingsTypes';
@@ -209,12 +208,11 @@ export class CollectionReferenceCollector {
 
 /**
  * `files` with the statblock templates the collection needs: those its roles start from (its
- * own roles, or its system's), those it gives recovery buttons, and those its notes name, once
+ * own roles, or its system's), and those its notes name, once
  * every note is known (`withLinkedFiles` first). Built-in templates never travel.
  */
 export function withStatblockTemplates(app: App, files: readonly BundleFile[], settings: CollectionSettings): Promise<BundleFile[]> {
   const presets = systemPresetsOf(app);
   const roles = collectionStatblockRoles(settings, presets).map((role) => role.templateId);
-  const recovery = recoveryTemplateIds(collectionRecoveryRecord(settings, presets));
-  return withTemplateFiles(app, files, [...new Set([...roles, ...recovery])]);
+  return withTemplateFiles(app, files, [...new Set(roles)]);
 }

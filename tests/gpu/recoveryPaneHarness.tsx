@@ -1,60 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { render } from '@testing-library/react';
-import { FIVE_E_2014_MONSTER } from '../../src/app/statblocks/presets/fiveE2014';
-import type { RecoveryRecord } from '../../src/app/recovery/recoveryTypes';
-import { ADVENTURER, CONDITIONS, RECORD, RESOURCES } from '../fixtures/recoveryFixtures';
-import { ResourcesTab } from '../../src/app/react/components/collection-settings/ResourcesTab';
-import { SettingsContent } from '../../src/app/react/components/collection-settings/SettingsContent';
-import { SettingsDialog } from '../../src/app/react/components/collection-settings/SettingsDialog';
-import { RecoveryPane, type RecoveryTemplate } from '../../src/app/react/components/collection-settings/recovery/RecoveryPane';
-import type { RecoveryTemplateTab } from '../../src/app/recovery/editor/recoveryTemplateTabs';
+import type { RecoveryButton } from '../../src/app/recovery/recoveryTypes';
+import { ADVENTURER, BUTTONS, CONDITIONS, RESOURCES } from '../fixtures/recoveryFixtures';
+import { RecoveryEditor } from '../../src/app/statblocks/editor/rests/RecoveryEditor';
 import { DASHBOARD_THEME } from './dashboardTheme';
 
-const TABS: RecoveryTemplateTab[] = [
-  { templateId: ADVENTURER.id, label: 'Player character' },
-  { templateId: FIVE_E_2014_MONSTER.id, label: 'Creature · NPC' },
-];
-const TEMPLATES = new Map<string, RecoveryTemplate>([
-  [ADVENTURER.id, { template: ADVENTURER, name: 'Adventurer' }],
-  [FIVE_E_2014_MONSTER.id, { template: FIVE_E_2014_MONSTER.template, name: FIVE_E_2014_MONSTER.name }],
-]);
-
 /** Obsidian's buttons, inputs and scrollbars as the plugin meets them. */
-export const RECOVERY_THEME = `${DASHBOARD_THEME}
-  .atlas-vtt-plugin .atlas-collection-settings-content { scrollbar-width: auto; scrollbar-color: auto; }
-`;
+export const RECOVERY_THEME = DASHBOARD_THEME;
 
-/** What the harness hands back: the record after every edit. */
+/** The width the template editor's card column has at a common panel width. */
+const COLUMN_WIDTH = 520;
+
+/** What the harness hands back: the buttons after every edit. */
 export interface RecoveryHarness {
-  record: () => RecoveryRecord;
+  buttons: () => readonly RecoveryButton[];
 }
 
-/** The collection settings dialog, fullscreen, on its Resources tab with the recovery pane beside the sockets. */
-export function mountRecoveryDialog(theme: 'light' | 'dark', initial: RecoveryRecord = RECORD, onClose: () => void = () => undefined): RecoveryHarness {
+/**
+ * The recovery buttons as the template editor shows them where the card stands, a column of the
+ * card's width. `onEscapeOut`: an Escape the editor leaves alone, as whatever listens beyond it hears it.
+ */
+export function mountRecoveryEditor(theme: 'light' | 'dark', initial: readonly RecoveryButton[] = BUTTONS, onEscapeOut: () => void = () => undefined): RecoveryHarness {
   document.body.className = `theme-${theme}`;
   let latest = initial;
-  function Dialog(): React.ReactElement {
-    const [resources, setResources] = useState(RESOURCES);
-    const [record, setRecord] = useState(initial);
+  function Column(): React.ReactElement {
+    const [buttons, setButtons] = useState(initial);
+    useEffect(() => {
+      const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') onEscapeOut(); };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }, []);
     return (
-      <SettingsDialog title="Collection Settings: Cairn" closeLabel="Close" canSave onSave={() => undefined} onClose={onClose} size="fullscreen">
-        <div className="atlas-collection-settings-body">
-          <nav className="atlas-collection-settings-sidebar" />
-          <SettingsContent wide>
-            <ResourcesTab
-              resources={resources}
-              onChange={setResources}
-              fieldSuggestions={[{ path: 'hp' }, { path: 'stress' }]}
-              aside={(
-                <RecoveryPane tabs={TABS} templates={TEMPLATES} resources={resources} conditions={CONDITIONS} record={record}
-                  onChange={(next) => { latest = next; setRecord(next); }} />
-              )}
-            />
-          </SettingsContent>
-        </div>
-      </SettingsDialog>
+      <div className="atlas-vtt-plugin" style={{ width: COLUMN_WIDTH, padding: 16 }}>
+        <section className="atlas-rc-pane atlas-te-rests">
+          <RecoveryEditor template={ADVENTURER} name="Adventurer" buttons={buttons} resources={RESOURCES} conditions={CONDITIONS}
+            onButtonsChange={(next) => { latest = next; setButtons(next); }} />
+        </section>
+      </div>
     );
   }
-  render(<Dialog />);
-  return { record: () => latest };
+  render(<Column />);
+  return { buttons: () => latest };
 }

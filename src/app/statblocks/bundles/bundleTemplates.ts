@@ -175,7 +175,7 @@ export function noteTemplateId(app: App, path: string): TemplateId | null {
 
 /**
  * `files` with the template files the collection names (`collectionTemplates`: those its roles
- * start from and those it gives recovery buttons) and its notes name. A template the collection
+ * start from) and its notes name. A template the collection
  * names travels with the collection; one only notes name travels with those
  * notes (`linkedFrom`), so it stays behind with them. Built-ins never travel: every Atlas has
  * them. A template the vault lacks stays behind too: what names it shows the auto template.

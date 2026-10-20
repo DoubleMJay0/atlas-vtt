@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { ArrowLeftRight, BatteryFull, ChevronsDown, Equal, Eraser, Plus, Trash2 } from 'lucide-react';
-import { SegmentedControl, type SegmentedOption } from '../../../../packages/components/primitives/SegmentedControl';
-import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
-import { t, type MessageKey } from '../../../../i18n';
-import { withRows } from '../../../../recovery/editor/recoveryEdits';
-import type { RecoveryButton, RecoveryRule, RecoveryRuleKind, ResourceOrCounters } from '../../../../recovery/recoveryTypes';
+import { SegmentedControl, type SegmentedOption } from '../../../packages/components/primitives/SegmentedControl';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
+import { t, type MessageKey } from '../../../i18n';
+import { withRows } from '../../../recovery/editor/recoveryEdits';
+import type { RecoveryButton, RecoveryRule, RecoveryRuleKind, ResourceOrCounters } from '../../../recovery/recoveryTypes';
 import { FormulaInput, RowsChips, WholeInput, type FieldChoice } from './RuleInputs';
 import { SetToInput } from './SetToInput';
 

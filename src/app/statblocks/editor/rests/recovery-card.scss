@@ -3,8 +3,8 @@
 // RuleCard, RuleInputs).
 // ═══════════════════════════════════════════════════════════════════════════
 
-@use '../../../../../../styles/tokens' as *;
-@use '../../../../../../styles/mixins' as *;
+@use '../../../../../styles/tokens' as *;
+@use '../../../../../styles/mixins' as *;
 
 // One spacing throughout: the card's padding, and the gap between everything in it.
 $gap: $spacing-s;

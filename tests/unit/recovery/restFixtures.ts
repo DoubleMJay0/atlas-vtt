@@ -39,6 +39,7 @@ export function character(state: CharacterState = {}, id = 'mira', name = 'Mira'
     id,
     name,
     resources: RESOURCES,
+    resourceOf: (field) => RESOURCES.find((resource) => resource.field === field),
     conditions: CONDITIONS,
     fields: new Map(FIELDS.map((field) => [field.key, field])),
     resourceValue: (key) => state.resources?.[key],

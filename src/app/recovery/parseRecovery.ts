@@ -1,13 +1,10 @@
 /**
- * Reads recovery buttons where they arrive unchecked: a collection's settings, a preset file, a
- * bundle. Strict: a button or rule it cannot read whole is left out, never guessed at, and what
+ * Reads recovery buttons where they arrive unchecked: a template's file, a bundle. Strict: a button or rule it cannot read whole is left out, never guessed at, and what
  * it keeps is capped at `MAX_RECOVERY_BUTTONS` buttons per template and `MAX_RECOVERY_RULES`
  * rules per button. Pure.
  */
 
 import { isRecord, own } from '../statblocks/format/jsonValues';
-import { isValidTemplateId } from '../statblocks/model/templateIds';
-import type { TemplateId } from '../statblocks/model/templateTypes';
 import { FORMULA_LIMITS } from '../tools/formulaTypes';
 import {
   MAX_ACTION_PICKS,
@@ -19,7 +16,6 @@ import {
   type RecoveryAction,
   type RecoveryButton,
   type RecoveryChoice,
-  type RecoveryRecord,
   type RecoveryRule,
   type ResourceOrCounters,
 } from './recoveryTypes';
@@ -73,8 +69,8 @@ function metricTarget(value: unknown): ResourceOrCounters | undefined {
   if (!isRecord(value)) return undefined;
   const kind = own(value, 'kind');
   if (kind === 'resource') {
-    const key = name(own(value, 'key'));
-    return key === undefined ? undefined : { kind, key };
+    const field = name(own(value, 'field'));
+    return field === undefined ? undefined : { kind, field };
   }
   if (kind !== 'counters') return undefined;
   const field = name(own(value, 'field'));
@@ -222,19 +218,4 @@ export function parseRecoveryButton(raw: unknown): RecoveryButton | undefined {
 /** A template's buttons that can be read, the first of each id, the first `MAX_RECOVERY_BUTTONS`. */
 export function parseRecoveryButtons(raw: unknown): RecoveryButton[] {
   return uniqueById(raw, parseRecoveryButton, MAX_RECOVERY_BUTTONS);
-}
-
-/**
- * The buttons of each template as stored: undefined where `raw` is no record at all. A key that is
- * no template id, or a template left with no button that reads, is left out. An empty record is
- * kept: it says the collection has buttons of its own, none.
- */
-export function parseRecovery(raw: unknown): RecoveryRecord | undefined {
-  if (!isRecord(raw)) return undefined;
-  const entries = Object.keys(raw).flatMap((templateId): Array<[TemplateId, RecoveryButton[]]> => {
-    if (!isValidTemplateId(templateId)) return [];
-    const buttons = parseRecoveryButtons(raw[templateId]);
-    return buttons.length > 0 ? [[templateId, buttons]] : [];
-  });
-  return Object.fromEntries(entries);
 }

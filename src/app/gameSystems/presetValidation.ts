@@ -31,8 +31,6 @@ import { parseSenseDefinitions } from './senseValidation';
 import { parseVisionDefaults } from './visionDefaults';
 import { isHexColor } from '../utils/hexColor';
 import { parseStatblockRoles } from '../statblocks/roles/roleValidation';
-import { recoveryTemplateIds } from '../recovery/collectionRecovery';
-import { parseRecovery } from '../recovery/parseRecovery';
 
 const UNIT_TYPES: readonly GridUnitType[] = ['feet', 'yards', 'meters', 'units', 'custom'];
 const MEASUREMENT_MODES: readonly MeasurementMode[] = ['metric', 'abstract'];
@@ -165,8 +163,6 @@ export function parseSystemRules(raw: unknown): SystemRules | null {
   // An empty list names no roles: the preset's collections offer the generic ones.
   const statblockRoles = parseStatblockRoles(raw.statblockRoles);
   const itemRarities = parseItemRarities(raw.itemRarities);
-  // Buttons for no template are no buttons: the preset's collections then offer none.
-  const recovery = parseRecovery(raw.recovery);
   // A collection set from the preset has these senses, so only they can be a default.
   const defaultTokenVision = parseVisionDefaults(raw.defaultTokenVision, senses ?? GENERIC_SENSES);
   return {
@@ -183,7 +179,6 @@ export function parseSystemRules(raw: unknown): SystemRules | null {
     ...(lightPresets?.length && { lightPresets }),
     ...(statblockRoles?.length && { statblockRoles }),
     ...(itemRarities && { itemRarities }),
-    ...(recovery && recoveryTemplateIds(recovery).length > 0 && { recovery }),
   };
 }
 

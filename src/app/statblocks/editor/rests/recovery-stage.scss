@@ -3,8 +3,8 @@
 // spots with the selected button's badges (MetricSpot), and the condition chips.
 // ═══════════════════════════════════════════════════════════════════════════
 
-@use '../../../../../../styles/tokens' as *;
-@use '../../../../../../styles/mixins' as *;
+@use '../../../../../styles/tokens' as *;
+@use '../../../../../styles/mixins' as *;
 
 $badge-height: 18px;
 // How far a spot's ring stands off its block, so the ring never touches the block's text

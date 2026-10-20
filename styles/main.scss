@@ -141,10 +141,10 @@
   @import '../src/app/react/components/senses/senses-editor.scss';
   @import '../src/app/react/components/collection-settings/fan/radial-fan.scss';
   @import '../src/app/react/components/collection-settings/resources-tab.scss';
-  @import '../src/app/react/components/collection-settings/recovery/recovery-pane.scss';
-  @import '../src/app/react/components/collection-settings/recovery/recovery-stage.scss';
-  @import '../src/app/react/components/collection-settings/recovery/recovery-scopes.scss';
-  @import '../src/app/react/components/collection-settings/recovery/recovery-card.scss';
+  @import '../src/app/statblocks/editor/rests/recovery-pane.scss';
+  @import '../src/app/statblocks/editor/rests/recovery-stage.scss';
+  @import '../src/app/statblocks/editor/rests/recovery-scopes.scss';
+  @import '../src/app/statblocks/editor/rests/recovery-card.scss';
   @import '../src/app/react/components/collection-settings/random-tables/random-tables-tab.scss';
   @import '../src/app/react/components/collection-settings/random-tables/item-rarities.scss';
   @import '../src/app/react/components/collection-settings/statblock-field-chips.scss';

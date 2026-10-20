@@ -21,8 +21,6 @@ interface ResourcesTabProps {
   onChange: (resources: ResourceDefinition[]) => void;
   /** Statblock fields that hold a quantity, offered for the field (`resourceFieldSuggestions`). */
   fieldSuggestions: readonly FieldSuggestion[];
-  /** Beside the token, which then keeps to its column: a collection's recovery buttons. */
-  aside?: React.ReactNode;
 }
 
 const CARD_MOTION = {
@@ -31,7 +29,7 @@ const CARD_MOTION = {
   exit: { opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.12, ease: EASE_OUT_CONTROL_POINTS } },
 } as const;
 
-export function ResourcesTab({ resources, onChange, fieldSuggestions, aside }: ResourcesTabProps): React.ReactElement {
+export function ResourcesTab({ resources, onChange, fieldSuggestions }: ResourcesTabProps): React.ReactElement {
   const [selected, setSelected] = useState<number | null>(null);
   /** The socket a resource was last placed in by a click; its card starts with the name. */
   const [placed, setPlaced] = useState<number | null>(null);
@@ -156,12 +154,7 @@ export function ResourcesTab({ resources, onChange, fieldSuggestions, aside }: R
 
   return (
     <MotionConfig reducedMotion="user">
-      {aside ? (
-        <div className="atlas-csm-resources-layout">
-          <div className="atlas-csm-resources-layout__sockets">{sockets}</div>
-          <div className="atlas-csm-resources-layout__aside">{aside}</div>
-        </div>
-      ) : sockets}
+      {sockets}
     </MotionConfig>
   );
 }

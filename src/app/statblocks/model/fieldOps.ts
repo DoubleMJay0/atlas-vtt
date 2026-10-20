@@ -4,6 +4,7 @@
 // removed field's values stay in the notes, a renamed key stays readable
 // through `formerKeys`.
 
+import { recoveryWithFieldRenamed } from '../../recovery/recoveryFieldRename';
 import {
   formulaCanName, formulaReads, formulaRefs, patternFormulas, refReads, renameFormulaRefs, renamePatternRefs, renamedRef,
 } from '../expressions/patternRename';
@@ -197,5 +198,6 @@ export function renameFieldKey(template: StatblockTemplate, from: FieldKey, to: 
   });
   const blocks = renamedBlocks(template.layout.blocks, from, to);
   const renamed: StatblockTemplate = { ...template, fields, layout: blocks === template.layout.blocks ? template.layout : { ...template.layout, blocks } };
+  if (template.recovery) renamed.recovery = recoveryWithFieldRenamed(template.recovery, from, to);
   return withKeyMoved(renamed, from, to);
 }

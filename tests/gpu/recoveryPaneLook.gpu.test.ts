@@ -3,7 +3,7 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import css from '../../styles/main.scss?inline';
-import { mountRecoveryDialog, RECOVERY_THEME } from './recoveryPaneHarness';
+import { mountRecoveryEditor, RECOVERY_THEME } from './recoveryPaneHarness';
 
 vi.mock('../../src/app/services/statblockDiceLinks', () => ({
   attachDiceRolling: () => () => undefined,
@@ -16,10 +16,10 @@ const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(
 const shot = (name: string): Promise<string> => page.screenshot({ path: `__screenshots__/recovery-editor/${name}.png` });
 
 /**
- * The recovery pane through its states with real motion, for judging by eye: the screenshots land
+ * The recovery buttons of the template editor through their states with real motion, for judging by eye: the screenshots land
  * in `tests/gpu/__screenshots__/recovery-editor/`. Its only assertion is that each state drew.
  */
-describe('the recovery pane, as it looks', () => {
+describe('the recovery buttons in the template editor, as they look', () => {
   const style = document.createElement('style');
   style.textContent = RECOVERY_THEME + css;
   beforeEach(() => { document.head.append(style); });
@@ -28,7 +28,7 @@ describe('the recovery pane, as it looks', () => {
   for (const theme of ['dark', 'light'] as const) {
     it(`draws its states (${theme})`, async () => {
       await page.viewport(1440, 900);
-      mountRecoveryDialog(theme);
+      mountRecoveryEditor(theme);
       await wait(600);
       await shot(`1-short-rest-${theme}`);
 
@@ -61,13 +61,4 @@ describe('the recovery pane, as it looks', () => {
       expect(document.querySelector('.atlas-rc-card')).not.toBeNull();
     }, 60_000);
   }
-
-  it('stacks the pane under the sockets in a narrow window', async () => {
-    await page.viewport(1000, 820);
-    mountRecoveryDialog('dark');
-    await wait(600);
-    await shot('8-narrow-dark');
-    expect(document.querySelector('.atlas-rc-pane')!.getBoundingClientRect().top)
-      .toBeGreaterThan(document.querySelector('.atlas-csm-token-stage')!.getBoundingClientRect().bottom);
-  }, 60_000);
 });

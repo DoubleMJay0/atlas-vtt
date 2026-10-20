@@ -1,16 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { cn } from '../../../../../utils/cn';
-import { t } from '../../../../i18n';
-import { handledByAnotherControl } from '../../../../keyboard/tooltipEscape';
+import { cn } from '../../../../utils/cn';
+import { t } from '../../../i18n';
+import { handledByAnotherControl } from '../../../keyboard/tooltipEscape';
 import {
   newButtonId, withAddedButton, withButtonMoved, withButtonOrder, withoutButton, withRenamedButton,
-} from '../../../../recovery/editor/recoveryEdits';
-import { conditionMetrics, sheetMetrics } from '../../../../recovery/editor/recoveryMetrics';
-import { ALWAYS, resolveScope, scopeName, type RuleScope } from '../../../../recovery/editor/recoveryScope';
-import { MAX_RECOVERY_RULES, type RecoveryButton, type RecoveryRuleKind, type RecoveryTarget } from '../../../../recovery/recoveryTypes';
-import type { ResourceDefinition } from '../../../../resources/resourceTypes';
-import type { StatblockTemplate } from '../../../../statblocks/model/templateTypes';
-import type { ConditionDefinition } from '../../../../types/collectionSettingsTypes';
+} from '../../../recovery/editor/recoveryEdits';
+import { conditionMetrics, sheetMetrics } from '../../../recovery/editor/recoveryMetrics';
+import { ALWAYS, resolveScope, scopeName, type RuleScope } from '../../../recovery/editor/recoveryScope';
+import { MAX_RECOVERY_RULES, type RecoveryButton, type RecoveryRuleKind, type RecoveryTarget } from '../../../recovery/recoveryTypes';
+import type { ResourceDefinition } from '../../../resources/resourceTypes';
+import type { StatblockTemplate } from '../../model/templateTypes';
+import type { ConditionDefinition } from '../../../types/collectionSettingsTypes';
 import { chipSpotId } from './ConditionChips';
 import { RecoveryRail } from './RecoveryRail';
 import { RecoveryScopes } from './RecoveryScopes';

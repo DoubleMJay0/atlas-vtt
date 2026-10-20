@@ -68,8 +68,6 @@ interface RulesSettingsTabsProps {
   renderOther?: (tab: SettingsTab) => React.ReactNode;
   /** A line above the rules' tabs (`RULES_TABS`), such as that a played campaign's rules apply in their place. */
   rulesNotice?: React.ReactNode;
-  /** Shown beside the token's sockets in the Resources tab, which then takes the whole width (a collection's recovery buttons). */
-  resourcesAside?: React.ReactNode;
 }
 
 /**
@@ -79,7 +77,6 @@ interface RulesSettingsTabsProps {
  */
 export function RulesSettingsTabs({
   tabs, activeTab, onTabChange, draft, view, presets, diceSets, onDeletePreset, none, lightingOn, fieldSuggestions, initiativeFieldSuggestions, modifierStatblocks, renderOther, rulesNotice,
-  resourcesAside,
 }: RulesSettingsTabsProps): React.ReactElement {
   const shown = tabs.filter((tab) => tab !== 'vision' || lightingOn);
 
@@ -121,7 +118,7 @@ export function RulesSettingsTabs({
       case 'conditions':
         return <ConditionsTab conditions={draft.conditions} onChange={draft.setConditions} />;
       case 'resources':
-        return <ResourcesTab resources={draft.resources} onChange={draft.setResources} fieldSuggestions={fieldSuggestions} aside={resourcesAside} />;
+        return <ResourcesTab resources={draft.resources} onChange={draft.setResources} fieldSuggestions={fieldSuggestions} />;
       case 'initiative':
         return <InitiativeFields initiative={view.initiative} onChange={initiativeEdit(draft, view)} fieldSuggestions={initiativeFieldSuggestions} modifierStatblocks={modifierStatblocks} />;
       default:
@@ -144,7 +141,7 @@ export function RulesSettingsTabs({
           </Button>
         ))}
       </nav>
-      <SettingsContent wide={activeTab === 'resources' && resourcesAside !== undefined}>
+      <SettingsContent>
         {RULES_TABS.includes(activeTab) && rulesNotice}
         {content()}
       </SettingsContent>

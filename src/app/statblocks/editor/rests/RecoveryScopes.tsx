@@ -1,10 +1,10 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { t } from '../../../../i18n';
-import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
-import { withAddedChoice, withoutChoice } from '../../../../recovery/editor/recoveryChoiceEdits';
-import { ALWAYS, type RuleScope } from '../../../../recovery/editor/recoveryScope';
-import { MAX_RECOVERY_CHOICES, type RecoveryButton } from '../../../../recovery/recoveryTypes';
+import { t } from '../../../i18n';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
+import { withAddedChoice, withoutChoice } from '../../../recovery/editor/recoveryChoiceEdits';
+import { ALWAYS, type RuleScope } from '../../../recovery/editor/recoveryScope';
+import { MAX_RECOVERY_CHOICES, type RecoveryButton } from '../../../recovery/recoveryTypes';
 import { RecoveryStep, stepKeys } from './RecoveryStep';
 import { ScopeChip } from './ScopeChip';
 import { useFocusRequests } from './useFocusRequests';

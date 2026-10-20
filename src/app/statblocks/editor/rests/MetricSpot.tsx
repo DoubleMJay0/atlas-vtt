@@ -1,9 +1,9 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn } from '../../../../../utils/cn';
-import { EASE_OUT_CONTROL_POINTS } from '../../../../utils/motion';
-import { t } from '../../../../i18n';
-import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
+import { cn } from '../../../../utils/cn';
+import { EASE_OUT_CONTROL_POINTS } from '../../../utils/motion';
+import { t } from '../../../i18n';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 
 /** What a metric's spot shows of the selected button's rule on it, and how it is pressed. */
 export interface SpotProps {

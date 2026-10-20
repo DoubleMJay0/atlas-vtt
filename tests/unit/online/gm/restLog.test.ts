@@ -64,8 +64,8 @@ describe('what a rest request will do, as its card says it', () => {
     const plan = {
       button: { id: 'short', name: 'Short rest', rules: [] },
       rules: [
-        { index: 0, ref: 'always:0', rule: { target: { kind: 'resource', key: 'hp' }, does: 'full' }, target: hp, character: { id: 'pc', name: 'Mira' } },
-        { index: 1, ref: 'pick:0:0', rule: { target: { kind: 'resource', key: 'hp' }, does: 'amount', formula: '1d4' }, target: hp, character: { id: 'pc-kestrel', name: 'Kestrel' } },
+        { index: 0, ref: 'always:0', rule: { target: { kind: 'resource', field: 'hp' }, does: 'full' }, target: hp, character: { id: 'pc', name: 'Mira' } },
+        { index: 1, ref: 'pick:0:0', rule: { target: { kind: 'resource', field: 'hp' }, does: 'amount', formula: '1d4' }, target: hp, character: { id: 'pc-kestrel', name: 'Kestrel' } },
       ],
       skipped: [],
     } as unknown as RestPlan;
@@ -79,9 +79,9 @@ describe('what a rest request will do, as its card says it', () => {
     const plan = {
       button: { id: 'long', name: 'Long rest', rules: [] },
       rules: [
-        { index: 0, ref: 'always:0', rule: { target: { kind: 'resource', key: 'hp' }, does: 'full' }, target: hp },
-        { index: 1, ref: 'always:1', rule: { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'hd' }, each: '1d8' }, target: hp, source: source('hd', 'Hit Dice', 3), spend: { label: 'Hit Dice', max: 3, each: '1d8' } },
-        { index: 2, ref: 'always:2', rule: { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'sp' }, each: '1' }, target: hp, source: source('sp', 'Spirit', 3), spend: { label: 'Spirit', max: 3, each: '1' } },
+        { index: 0, ref: 'always:0', rule: { target: { kind: 'resource', field: 'hp' }, does: 'full' }, target: hp },
+        { index: 1, ref: 'always:1', rule: { target: { kind: 'resource', field: 'hp' }, does: 'spend', from: { kind: 'resource', field: 'hd' }, each: '1d8' }, target: hp, source: source('hd', 'Hit Dice', 3), spend: { label: 'Hit Dice', max: 3, each: '1d8' } },
+        { index: 2, ref: 'always:2', rule: { target: { kind: 'resource', field: 'hp' }, does: 'spend', from: { kind: 'resource', field: 'sp' }, each: '1' }, target: hp, source: source('sp', 'Spirit', 3), spend: { label: 'Spirit', max: 3, each: '1' } },
         { index: 3, ref: 'always:3', rule: { target: { kind: 'condition', id: 'ex' }, does: 'step', by: -1 }, target: exhaustion },
       ],
       skipped: [],

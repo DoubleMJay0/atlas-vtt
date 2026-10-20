@@ -18,7 +18,6 @@ import { builtInTemplate } from './builtInTemplates';
 import { copyTemplateBody, trashTemplateBody, writeNewTemplateBody } from './templateBodyNotes';
 import { TemplateLibrary } from './TemplateLibrary';
 import { copyName } from './templatePaths';
-import { moveRecoveryButtons } from './templateRecovery';
 import { templateUsage } from './templateUsage';
 import { newTemplateFile } from './templateWriter';
 
@@ -70,7 +69,6 @@ export async function deleteTemplate(app: App, id: TemplateId, replacement: Temp
     await switchTemplates(app, usage.notes.map((path) => ({ path, from: id })), replacement);
     await replaceRoleTemplates(app, id, replacement);
   }
-  await moveRecoveryButtons(app, id, replacement === id ? null : replacement);
   const path = TemplateLibrary.forApp(app).get(id)?.path;
   const file = path ? app.vault.getFileByPath(path) : null;
   if (!path || !file) return;

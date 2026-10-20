@@ -3,6 +3,8 @@
  * Pure data, no Obsidian and no React (a lint rule keeps it that way).
  */
 
+import type { RecoveryButton } from '../../recovery/recoveryTypes';
+
 export const TEMPLATE_FORMAT = 'atlas-statblock-template';
 export const TEMPLATE_VERSION = 1;
 export const BUILT_IN_TEMPLATE_PREFIX = 'builtin:';
@@ -42,6 +44,11 @@ export interface StatblockTemplate {
   lookups?: Record<string, Record<string, string>>;
   /** Values the template editor previews with when no statblock is picked. Never creature content in built-ins. */
   sample?: Record<FieldKey, FieldValue>;
+  /**
+   * The recovery buttons statblocks of this template offer a player character ("Short rest", "Long rest"),
+   * in order. Absent: none. Read as stored through `parseRecoveryButtons`, so every button holds.
+   */
+  recovery?: RecoveryButton[];
   /** The template it was copied from, with the built-in's revision at the time. */
   derivedFrom?: { templateId: TemplateId; revision?: number };
   /** Licence and attribution of a licensed built-in; copied with the template and kept on copies. */

@@ -1,17 +1,17 @@
 import React, { useId } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { t } from '../../../../i18n';
-import { SegmentedControl } from '../../../../packages/components/primitives/SegmentedControl';
-import { Select, type SelectOption } from '../../../../packages/components/primitives/Select';
-import { ToggleSwitch } from '../../../../packages/components/primitives/Toggle';
-import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
+import { t } from '../../../i18n';
+import { SegmentedControl } from '../../../packages/components/primitives/SegmentedControl';
+import { Select, type SelectOption } from '../../../packages/components/primitives/Select';
+import { ToggleSwitch } from '../../../packages/components/primitives/Toggle';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import {
   canRemoveAction, mostPicks, pickMode, withActionChanged, withAddedAction, withChoiceChanged, withoutAction,
   withPicks, withPrompt, withRepeat, type PickMode,
-} from '../../../../recovery/editor/recoveryChoiceEdits';
-import type { RuleScope } from '../../../../recovery/editor/recoveryScope';
-import { MAX_RECOVERY_TEXT } from '../../../../recovery/parseRecovery';
-import { MAX_RECOVERY_ACTIONS, type RecoveryButton, type RecoveryChoice } from '../../../../recovery/recoveryTypes';
+} from '../../../recovery/editor/recoveryChoiceEdits';
+import type { RuleScope } from '../../../recovery/editor/recoveryScope';
+import { MAX_RECOVERY_TEXT } from '../../../recovery/parseRecovery';
+import { MAX_RECOVERY_ACTIONS, type RecoveryButton, type RecoveryChoice } from '../../../recovery/recoveryTypes';
 import { ActionFields } from './ActionFields';
 import { CommitTextInput } from './CommitTextInput';
 import { ScopeChip } from './ScopeChip';

@@ -1,8 +1,8 @@
 import React from 'react';
-import { cn } from '../../../../../utils/cn';
-import { t } from '../../../../i18n';
-import type { ConditionMetric } from '../../../../recovery/editor/recoveryMetrics';
-import { metricKey } from '../../../../recovery/editor/recoveryMetrics';
+import { cn } from '../../../../utils/cn';
+import { t } from '../../../i18n';
+import type { ConditionMetric } from '../../../recovery/editor/recoveryMetrics';
+import { metricKey } from '../../../recovery/editor/recoveryMetrics';
 import { MetricSpot } from './MetricSpot';
 import type { SpotShared } from './recoveryChrome';
 

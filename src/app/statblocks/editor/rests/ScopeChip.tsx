@@ -1,6 +1,6 @@
 import React from 'react';
-import { cn } from '../../../../../utils/cn';
-import { LabelTooltip } from '../../../../packages/components/primitives/tooltip';
+import { cn } from '../../../../utils/cn';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 
 interface ScopeChipProps {
   name: string;

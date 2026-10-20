@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BADGE_RISE, placeRuleCard, RULE_GAP } from '../../../../src/app/react/components/collection-settings/recovery/rulePlacement';
+import { BADGE_RISE, placeRuleCard, RULE_GAP } from '../../../../src/app/statblocks/editor/rests/rulePlacement';
 
 const FRAME = { left: 0, top: 0, right: 800, bottom: 900 };
 const ROW = { left: 10, top: 400, right: 780, bottom: 430 };

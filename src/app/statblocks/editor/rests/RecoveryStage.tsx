@@ -1,17 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { cn } from '../../../../../utils/cn';
-import { BlockChromeContext } from '../../../../statblocks/render/blockChrome';
-import { StatblockSheet } from '../../../../statblocks/render/StatblockSheet';
-import { sampleRecord } from '../../../../statblocks/model/sampleValues';
-import type { StatblockTemplate } from '../../../../statblocks/model/templateTypes';
-import type { ConditionMetric, SheetMetrics } from '../../../../recovery/editor/recoveryMetrics';
-import { metricKey, numberFields } from '../../../../recovery/editor/recoveryMetrics';
-import { ruleFor } from '../../../../recovery/editor/recoveryEdits';
-import { scopeKey, scopeName, type RuleScope } from '../../../../recovery/editor/recoveryScope';
-import { ruleBadge } from '../../../../recovery/editor/ruleBadge';
-import type { RecoveryButton, RecoveryRuleKind, RecoveryTarget } from '../../../../recovery/recoveryTypes';
-import type { ResourceDefinition } from '../../../../resources/resourceTypes';
+import { cn } from '../../../../utils/cn';
+import { BlockChromeContext } from '../../render/blockChrome';
+import { StatblockSheet } from '../../render/StatblockSheet';
+import { sampleRecord } from '../../model/sampleValues';
+import type { FieldKey, StatblockTemplate } from '../../model/templateTypes';
+import type { ConditionMetric, SheetMetrics } from '../../../recovery/editor/recoveryMetrics';
+import { metricKey, numberFields } from '../../../recovery/editor/recoveryMetrics';
+import { ruleFor } from '../../../recovery/editor/recoveryEdits';
+import { scopeKey, scopeName, type RuleScope } from '../../../recovery/editor/recoveryScope';
+import { ruleBadge } from '../../../recovery/editor/ruleBadge';
+import type { RecoveryButton, RecoveryRuleKind, RecoveryTarget } from '../../../recovery/recoveryTypes';
+import type { ResourceDefinition } from '../../../resources/resourceTypes';
+import { resourceOfField } from '../../../resources/trackedResources';
 import { ConditionChips } from './ConditionChips';
 import { recoveryChrome, type SpotShared } from './recoveryChrome';
 import { RuleCardLayer } from './RuleCardLayer';
@@ -46,16 +47,15 @@ interface RecoveryStageProps {
 /** A metric's own key, field or id: its name where neither the card nor the chips name it. */
 function targetName(target: RecoveryTarget): string {
   switch (target.kind) {
-    case 'resource': return target.key;
-    case 'counters': return target.field;
+    case 'resource': case 'counters': return target.field;
     case 'condition': return target.id;
   }
 }
 
 /** The colour a metric is shown in: its resource's or its condition's; a Counters block has none. */
-function targetColor(target: RecoveryTarget, resources: readonly ResourceDefinition[], chips: readonly ConditionMetric[]): string | undefined {
+function targetColor(target: RecoveryTarget, resourceOf: (key: FieldKey) => ResourceDefinition | undefined, chips: readonly ConditionMetric[]): string | undefined {
   switch (target.kind) {
-    case 'resource': return resources.find((resource) => resource.key === target.key)?.color;
+    case 'resource': return resourceOf(target.field)?.color;
     case 'condition': {
       const key = metricKey(target);
       return chips.find((chip) => metricKey(chip.target) === key)?.color;
@@ -108,7 +108,7 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
     ? recoveryChrome({ metrics, shared, badgeOf: (metric) => badgeOf(metric.target), picked: picked?.spotId ?? null, sources, tabStop: active })
     : null;
   const pickedLabel = picked ? nameOf(picked.target) : '';
-  const color = picked ? targetColor(picked.target, resources, chips) : undefined;
+  const color = picked ? targetColor(picked.target, resourceOfField(template, resources), chips) : undefined;
   const canSpend = picked !== null && metrics.metrics.some((metric) => metricKey(metric.target) !== metricKey(picked.target));
   const reveal = active === null ? null : metrics.bySpot.get(active)?.blockId ?? null;
 

@@ -5,9 +5,9 @@ import type { RecoveryRule } from '../../../src/app/recovery/recoveryTypes';
 import type { CharacterChanges, RestChoices, RestOutcome, RestRoller } from '../../../src/app/recovery/restTypes';
 import { button, character, roller, row, type CharacterState } from './restFixtures';
 
-const HP = { kind: 'resource', key: 'hp' } as const;
-const STRESS = { kind: 'resource', key: 'stress' } as const;
-const HIT_DICE = { kind: 'resource', key: 'hitDice' } as const;
+const HP = { kind: 'resource', field: 'hp' } as const;
+const STRESS = { kind: 'resource', field: 'stress' } as const;
+const HIT_DICE = { kind: 'resource', field: 'hitDice' } as const;
 const EXHAUSTION = { kind: 'condition', id: 'exhaustion' } as const;
 /** What the rest changed of Mira. */
 const own = (outcome: RestOutcome): CharacterChanges => outcome.byCharacter.get('mira') ?? { resources: new Map(), counters: new Map(), conditions: new Map() };
@@ -171,8 +171,8 @@ describe('skipped rules', () => {
 
   it('skips what the character has no metric or value for, with the reason', () => {
     expect(reasons([
-      { target: { kind: 'resource', key: 'mana' }, does: 'full' },
-      { target: { kind: 'resource', key: 'ac' }, does: 'full' },
+      { target: { kind: 'resource', field: 'mana' }, does: 'full' },
+      { target: { kind: 'resource', field: 'ac' }, does: 'full' },
       { target: HP, does: 'full' },
       { target: { kind: 'counters', field: 'level', rows: 'all' }, does: 'full' },
       { target: { kind: 'counters', field: 'slots', rows: 'all' }, does: 'full' },

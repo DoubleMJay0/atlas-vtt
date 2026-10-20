@@ -17,12 +17,12 @@ import { alwaysRef, pickRef, type PlannedRule, type RestCharacter, type RestMetr
 export function restMetric(target: RecoveryTarget, character: RestCharacter): RestMetric | RestSkip {
   switch (target.kind) {
     case 'resource': {
-      const definition = character.resources.find((each) => each.key === target.key);
-      if (!definition) return { kind: 'unknown-resource', key: target.key };
-      if (definition.direction === 'static') return { kind: 'static-resource', key: target.key };
-      const value = character.resourceValue(target.key);
-      if (!value) return { kind: 'no-value', key: target.key };
-      return { kind: 'resource', key: target.key, label: definition.name, definition, value };
+      const definition = character.resourceOf(target.field);
+      if (!definition) return { kind: 'unknown-resource', key: target.field };
+      if (definition.direction === 'static') return { kind: 'static-resource', key: target.field };
+      const value = character.resourceValue(definition.key);
+      if (!value) return { kind: 'no-value', key: target.field };
+      return { kind: 'resource', key: definition.key, label: definition.name, definition, value };
     }
     case 'counters': {
       const field = character.fields.get(target.field);
@@ -46,7 +46,7 @@ const isMetric = (found: RestMetric | RestSkip): found is RestMetric => found.ki
 /** How a target is called where the character has no metric for it: its definition's or field's name where those exist. */
 function targetLabel(target: RecoveryTarget, character: RestCharacter): string {
   switch (target.kind) {
-    case 'resource': return character.resources.find((each) => each.key === target.key)?.name ?? target.key;
+    case 'resource': return character.resourceOf(target.field)?.name ?? character.fields.get(target.field)?.label ?? target.field;
     case 'counters': return character.fields.get(target.field)?.label ?? target.field;
     case 'condition': return character.conditions.find((each) => each.id === target.id)?.name ?? target.id;
   }

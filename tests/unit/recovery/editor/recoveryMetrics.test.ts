@@ -40,7 +40,7 @@ describe('the metrics of a card', () => {
 
   it('keeps a number a collection resource reads that resource, though the template tracks it', () => {
     const template: StatblockTemplate = { ...ADVENTURER, fields: ADVENTURER.fields.map((field) => (field.key === 'stress' ? { ...field, tracks: { counts: 'up' } } : field)) };
-    expect(sheetMetrics(template, RESOURCES).metrics.find((metric) => metric.blockId === 'track001')?.target).toEqual({ kind: 'resource', key: 'stress' });
+    expect(sheetMetrics(template, RESOURCES).metrics.find((metric) => metric.blockId === 'track001')?.target).toEqual({ kind: 'resource', field: 'stress' });
   });
 
   it('offers the valued conditions only', () => {

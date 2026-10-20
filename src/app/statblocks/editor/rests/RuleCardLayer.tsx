@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, useIsPresent, useReducedMotion } from 'framer-motion';
-import { EASE_OUT_CONTROL_POINTS, PANEL_ENTER_MS, PANEL_EXIT_MS } from '../../../../utils/motion';
-import { useElementHeight } from '../../../hooks/useElementHeight';
+import { EASE_OUT_CONTROL_POINTS, PANEL_ENTER_MS, PANEL_EXIT_MS } from '../../../utils/motion';
+import { useElementHeight } from '../../../react/hooks/useElementHeight';
 import { RuleCard, type RuleCardProps } from './RuleCard';
 import { placeRuleCard, type Box, type RuleCardSide } from './rulePlacement';
 

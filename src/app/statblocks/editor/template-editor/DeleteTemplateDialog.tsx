@@ -21,8 +21,8 @@ export interface DeleteTemplateDialogProps {
   templateId: TemplateId;
   usage: TemplateUsage;
   templates: readonly LibraryTemplate[];
-  /** The names of the recovery buttons that go with the template when it is deleted for `replacement` (null: none). */
-  lostButtons: (replacement: TemplateId | null) => readonly string[];
+  /** The names of the template's recovery buttons, which go with it: a replacement offers its own. */
+  lostButtons: readonly string[];
   onDelete: (replacement: TemplateId | null) => Promise<void>;
   onClose: () => void;
 }
@@ -52,7 +52,7 @@ export function DeleteTemplateDialog(props: DeleteTemplateDialogProps): React.JS
   const [busy, setBusy] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
   const used = usageText(usage);
-  const lost = lostButtons(replacement === KEEP ? null : replacement);
+  const lost = lostButtons;
   const options: SelectOption<string>[] = [
     { value: KEEP, label: 'Leave them as they are' },
     ...templates.filter((entry) => entry.template.id !== templateId)

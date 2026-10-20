@@ -20,6 +20,11 @@ export interface RestCharacter {
   readonly id: string;
   readonly name: string;
   readonly resources: readonly ResourceDefinition[];
+  /**
+   * The resource a template field is, which a rule names it by: the number the template tracks, else the
+   * collection's resource that reads the field (`resourceOfField`; a static one too, which no rest changes).
+   */
+  resourceOf(field: FieldKey): ResourceDefinition | undefined;
   readonly conditions: readonly ConditionDefinition[];
   /** The template's fields by key. */
   readonly fields: ReadonlyMap<FieldKey, TemplateField>;

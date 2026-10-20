@@ -3,11 +3,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { expect, it } from 'vitest';
 import { DeleteTemplateDialog } from '../../../../src/app/statblocks/editor/template-editor/DeleteTemplateDialog';
-import type { TemplateId } from '../../../../src/app/statblocks/model/templateTypes';
-
-const KEEPER = 'keeper-abc123';
-
-function dialog(lostButtons: (replacement: TemplateId | null) => readonly string[]): void {
+function dialog(lostButtons: readonly string[]): void {
   render(
     <DeleteTemplateDialog
       anchor={document.body}
@@ -23,11 +19,11 @@ function dialog(lostButtons: (replacement: TemplateId | null) => readonly string
 }
 
 it('says which recovery buttons go with the template', () => {
-  dialog((replacement) => (replacement === KEEPER ? [] : ['Short rest', 'Long rest']));
+  dialog(['Short rest', 'Long rest']);
   expect(screen.getByText('The recovery buttons Short rest and Long rest go with it.')).toBeTruthy();
 });
 
 it('says nothing of recovery where no button is lost', () => {
-  dialog(() => []);
+  dialog([]);
   expect(screen.queryByText(/recovery button/)).toBeNull();
 });

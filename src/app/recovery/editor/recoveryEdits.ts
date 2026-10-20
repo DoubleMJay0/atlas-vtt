@@ -5,13 +5,11 @@
  * returns null. Pure.
  */
 
-import type { TemplateId } from '../../statblocks/model/templateTypes';
 import {
   MAX_RECOVERY_BUTTONS,
   MAX_RECOVERY_RULES,
   type ConditionTarget,
   type RecoveryButton,
-  type RecoveryRecord,
   type RecoveryRule,
   type RecoveryRuleKind,
   type RecoveryTarget,
@@ -19,19 +17,6 @@ import {
 } from '../recoveryTypes';
 import { metricKey } from './recoveryMetrics';
 import { ALWAYS, rulesOf, withEachAction, withScopeRules, type RuleScope } from './recoveryScope';
-
-const NO_BUTTONS: readonly RecoveryButton[] = [];
-
-/** The buttons of one template in a record; none where it has none. */
-export function templateButtons(record: RecoveryRecord, templateId: TemplateId): readonly RecoveryButton[] {
-  return Object.hasOwn(record, templateId) ? record[templateId]! : NO_BUTTONS;
-}
-
-/** The record with the template's buttons replaced; a template left with none is left out. */
-export function withTemplateButtons(record: RecoveryRecord, templateId: TemplateId, buttons: readonly RecoveryButton[]): RecoveryRecord {
-  const rest = Object.fromEntries(Object.entries(record).filter(([id]) => id !== templateId));
-  return buttons.length > 0 ? { ...rest, [templateId]: buttons } : rest;
-}
 
 /** An id `<prefix>-xxxxxx` none of `taken` has: it names what it is given to for good, whatever it is renamed to. */
 export function newRecoveryId(prefix: string, taken: readonly { id: string }[], random: () => number = Math.random): string {
