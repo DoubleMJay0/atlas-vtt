@@ -214,7 +214,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         )}
 
         {hiddenFromPlayers && (
-          <LabelTooltip label="Hidden from players" side={tooltipSide}>
+          <LabelTooltip label={t('initiative.hiddenFromPlayers')} side={tooltipSide}>
             <span className="atlas-initiative-card__hidden-badge"><EyeOff /></span>
           </LabelTooltip>
         )}

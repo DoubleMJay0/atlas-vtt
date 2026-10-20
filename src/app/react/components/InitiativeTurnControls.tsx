@@ -46,7 +46,7 @@ export function InitiativeTurnControls({ fightRuns, round, tooltipSide, onPrevio
   return (
     <div className="atlas-initiative-tracker__turn-controls">
       {button('prev')}
-      <span className="atlas-initiative-tracker__round">{fightRuns ? `R${round}` : '—'}</span>
+      <span className="atlas-initiative-tracker__round">{fightRuns ? t('initiative.roundShort', { round }) : '—'}</span>
       {button('next')}
     </div>
   );

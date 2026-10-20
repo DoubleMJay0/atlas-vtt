@@ -14,6 +14,7 @@
 - Initiative: during a fight the list starts at whoever acts now and runs on into the next round below a Round divider, in the tracker and in the players' list. Switch it off with Turn on top in the tracker's ⋯ menu.
 - Initiative: each card shows its token's conditions as the map does, with the number of a valued condition. In the tracker, point at a badge to see its name.
 - Initiative tracker: Dock on the left in the ⋯ menu moves the tracker and the players' list to the left edge, and the toggle at the top of the tracker shows only the current turn and the next two.
+- Simplified Chinese interface when Obsidian's language is 简体中文 or 繁體中文. Text that is not translated yet stays in English.
 
 ## Improved
 - DM screen: during a fight it shows the statblocks of the creatures in the fight, with a switch to show every creature on the map.
@@ -32,6 +33,11 @@
 - Type sums into a token's HP: -10-5 takes 15, -9/2 takes half of 9 rounded down, and -9*2 takes 18 (#495, #396).
 - Initiative modifiers are found more easily. The modifier field matches statblock fields in any capitalisation and by their name in the template, reads numbers written as +3, +3 (13), 16 (+3) or Perception +12, and reads statblocks from Fantasy Statblocks too: its own initiative modifier, a Pathfinder import's Perception and the six 5e scores (type dex). The field's suggestions show what a statblock holds, and the settings say how many statblocks the field reads a modifier from.
 - When a roll finds no modifier for some combatants, a notice says how many, which field was looked for and where to choose it.
+- The initiative tracker's buttons, card menu and sides, and the collection's initiative settings are now available in Russian.
+- The collection settings' Resources tab is now available in Russian.
+- Senses are now available in Russian: the sense editors in Edit Token and the collection settings' Vision tab, and the conditions' effect on sight.
+- The dice settings, the dice tray, the roll panel and part of the dice lab are now available in Russian.
+- The toolbar editor and links to scenes and encounters in notes are now available in Russian.
 
 ## Fixed
 
