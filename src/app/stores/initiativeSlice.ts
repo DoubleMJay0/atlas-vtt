@@ -10,6 +10,7 @@ import type { InitiativeRules } from '../types/initiativeRulesTypes';
 import { DEFAULT_INITIATIVE_RULES } from '../gameSystems/initiativeRules';
 import { combatantModifier, ownModifier } from '../initiative/initiativeModifier';
 import { clearSittingOut, nextSideTurn, previousSideTurn, rollInitiativeDice } from '../initiative/turns';
+import { setInitiative } from './initiativeEntries';
 
 /**
  * Initiative slice state interface
@@ -147,6 +148,7 @@ export function createInitiativeActions(
       if (entry) {
         const initiativeChanged = updates.initiative !== undefined && updates.initiative !== entry.initiative;
         Object.assign(entry, updates);
+        if (updates.initiative !== undefined) setInitiative(entry, updates.initiative);
 
         // Re-sort if initiative value changed and autoSort is enabled
         if (initiativeChanged && draft.initiative.config.autoSort) {
@@ -163,7 +165,7 @@ export function createInitiativeActions(
       set((draft) => {
         for (const entry of draft.initiative.entries) {
           const total = totals.get(entry.id);
-          if (total !== undefined) entry.initiative = total;
+          if (total !== undefined) setInitiative(entry, total);
         }
         if (draft.initiative.config.autoSort) {
           draft.initiative.entries.sort((a, b) => b.initiative - a.initiative);
@@ -178,7 +180,7 @@ export function createInitiativeActions(
       const total = rollInitiativeDice(roll, random) + combatantModifier(ownModifier(entry), fromStatblock);
       set((draft) => {
         const current = draft.initiative.entries.find(e => e.id === id);
-        if (current) current.initiative = total;
+        if (current) setInitiative(current, total);
       });
     },
 

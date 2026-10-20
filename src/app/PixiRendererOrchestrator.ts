@@ -52,6 +52,7 @@ import { findAtlasLeafByViewId } from './utils/atlasLeafLookup';
 import { requestRender } from './pixi/RenderScheduler';
 import { MAP_LAYER_Z } from './pixi/mapLayerOrder';
 import { shownRollTokens } from './pixi/playerRollTokens';
+import type { PlayerBadgeNumbers } from './pixi/token-renderer/PlayerInstanceBadges';
 import type { ShownRollToken } from './services/playerRollSource';
 import { t } from './i18n';
 import type { MapImage } from './pixi/mapImage/MapImage';
@@ -777,6 +778,11 @@ export class PixiRendererOrchestrator { // Renamed class
     const tokens = this.tokenRenderer;
     if (!tokens || this._isDestroyed) return new Map();
     return shownRollTokens(this.store.getState(), mapPath, tokens.getTokenSprites(), () => tokens.playerFramePerception(this.lighting?.playerSight()), tokenIds);
+  }
+
+  /** The numbers the players' instance badges show; null while there is no token renderer. */
+  public playerBadgeNumbers(): PlayerBadgeNumbers | null {
+    return this.tokenRenderer?.playerBadgeNumbers() ?? null;
   }
 
   /** Which tokens a players' frame shows, by the scene's `sight` with committed fog; none while there is no token renderer. */

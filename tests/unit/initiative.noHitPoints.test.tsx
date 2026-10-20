@@ -24,7 +24,8 @@ const state = vi.hoisted(() => ({
   updateInitiativeEntry: vi.fn(),
 }));
 
-vi.mock('../../src/app/react/root/AtlasUIContext', () => ({
+vi.mock('../../src/app/react/root/AtlasUIContext', async () => ({
+  AtlasUIContext: (await import('react')).createContext(null),
   useAtlasUI: () => ({ app: null, view: null }),
 }));
 

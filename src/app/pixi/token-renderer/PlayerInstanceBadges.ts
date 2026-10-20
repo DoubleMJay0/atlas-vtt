@@ -17,6 +17,14 @@ export interface PlayerBadgeHost {
   sprites: () => Readonly<Record<string, Container | null>>;
 }
 
+/** The numbers the players' badges show, for what else shows a token to them (their initiative list). */
+export interface PlayerBadgeNumbers {
+  /** The number the players' badge of `tokenId` shows after the last pass: none where it shows none. */
+  numberOf(tokenId: string): number | null;
+  /** Calls `listener` whenever a pass or a reset changes what `numberOf` answers; returns the unsubscribe. */
+  onNumbersChange(listener: () => void): () => void;
+}
+
 /** What a token's badge shows the players: nothing, their own number, or the GM's (the same number). */
 type BadgeLook = 'none' | 'players' | 'gm';
 
@@ -62,8 +70,10 @@ function withPlayersNumber(parts: InstanceBadgeParts, shown: string): InstanceBa
  * swapped by `visible`: for one capture (`layers`), and held on the canvas while it shows the players'
  * view (`syncCanvas`). The GM's drawing writes only the badge itself, never these three.
  */
-export class PlayerInstanceBadges {
+export class PlayerInstanceBadges implements PlayerBadgeNumbers {
   private numbers: InstanceNumbers = NO_INSTANCE_NUMBERS;
+  private badgesOn = true;
+  private readonly listeners = new Set<() => void>();
   private numberedMap: string | null = null;
   /** Every badge as the last pass found it. */
   private passed: ReadonlyMap<string, PassedBadge> = new Map();
@@ -75,6 +85,7 @@ export class PlayerInstanceBadges {
   /** Numbers the tokens `seen` answers for and works out what each badge shows; writes only a players' number that changed. */
   pass(seen: TokenSeen): void {
     const { mapPath, objects, tokenSettings } = this.host.state();
+    const before = { numbers: this.numbers, badgesOn: this.badgesOn };
     if (mapPath !== this.numberedMap) {
       this.numbers = NO_INSTANCE_NUMBERS;
       this.numberedMap = mapPath;
@@ -85,12 +96,27 @@ export class PlayerInstanceBadges {
     }
     this.numbers = numberTokensInView(this.numbers, inView);
     const badgesOn = tokenSettings?.showInstanceBadges ?? true;
+    this.badgesOn = badgesOn;
     const passed = new Map<string, PassedBadge>();
     for (const [id, group] of Object.entries(this.host.sprites())) {
       const parts = group && badgeParts(group);
       if (parts) passed.set(id, this.passedBadge(parts, badgeNumberInView(this.numbers, id, badgesOn)));
     }
     this.passed = passed;
+    if (before.numbers !== this.numbers || before.badgesOn !== badgesOn) this.announce();
+  }
+
+  numberOf(tokenId: string): number | null {
+    return badgeNumberInView(this.numbers, tokenId, this.badgesOn);
+  }
+
+  onNumbersChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private announce(): void {
+    for (const listener of this.listeners) listener();
   }
 
   /** Fewer badges than the GM's, never more: none where the GM's drawing shows none. */
@@ -154,9 +180,11 @@ export class PlayerInstanceBadges {
 
   /** Starts anew, for a map whose token groups were all made anew. */
   reset(): void {
+    const numbered = this.numbers !== NO_INSTANCE_NUMBERS;
     this.numbers = NO_INSTANCE_NUMBERS;
     this.numberedMap = null;
     this.passed = new Map();
     this.held = new Map();
+    if (numbered) this.announce();
   }
 }

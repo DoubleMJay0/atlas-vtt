@@ -8,6 +8,9 @@
 - Online play: hand any item to your players, not only rolled ones. In a loot base, each item's name has a gift button. Its menu gives the item to one player or to all players at once, and sets how many copies, with − and + or by typing the number.
 
 ## Improved
+- Initiative tracker: click a combatant's number to type it on the card. Tab goes on to the next card and Shift+Tab back, so you can type a whole table's initiative in a row. A combatant with no number yet shows an empty slot.
+- Initiative tracker: Show Names on Cards in a card's menu puts each combatant's name under its portrait, so two monsters of one kind can be told apart.
+- Initiative tracker: click a card's hit point bar to type a new value, as on the map's bar.
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
 - Atlas' messages slide in at the top right with a light spring and lift away when they close, and the messages below them move up smoothly. They sit as far from the top as from the right edge, like the dice rolls.
@@ -16,6 +19,9 @@
 
 ## Fixed
 
+- Initiative tracker: clicking a card selects its token, so its bars and their controls show, and brings it into view without zooming in further than needed.
+- The players' initiative list shows the number that tells look-alike monsters apart, as their badges on the map do.
+- With a pinned note open, an initiative card no longer shows its statblock without Ctrl (Cmd on macOS), and the statblock closes when the key is released or the pointer leaves the card.
 - The line that measures a dragged token's path is no longer darkened by dynamic lighting, and it now stops at the token's edge.
 - A player character dragged through the dark is shown exactly where it is drawn. Before, the lit circle around it trailed behind the token.
 - Dynamic lighting only gives the graphics card as much work as it keeps up with. On laptops with integrated graphics, placing or carrying a light or opening a scene with many lights could make the graphics driver reset, turning the map white until Obsidian was restarted. There, a scene's lights now appear over a few frames. The Balanced and Saver lighting qualities also make each light cheaper, with rougher soft shadow edges.

@@ -129,6 +129,25 @@ describe('NotePreviewWindow markdown previews', () => {
     expect(harness.atlasLeafRoot.contains(preview.element!)).toBe(true);
   });
 
+  it('keeps the keys typed in a note to itself, but lets the Mod key go, so what Mod shows hears it released (#501)', async () => {
+    const harness = createHarness(null);
+    const preview = openPreview(harness, 'atlas-vtt/notes/Pinned.md');
+    const heard: string[] = [];
+    const listen = (e: KeyboardEvent): void => {
+      heard.push(`${e.type} ${e.key}`);
+    };
+    document.addEventListener('keydown', listen);
+    document.addEventListener('keyup', listen);
+
+    const inside = preview.element!.createDiv();
+    inside.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    inside.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control', bubbles: true }));
+
+    expect(heard).toEqual(['keyup Control']);
+    document.removeEventListener('keydown', listen);
+    document.removeEventListener('keyup', listen);
+  });
+
   /** A note view on Tavern.md whose cache lists "Cellar" on line 3 and "Room #3" on line 12. */
   function tavernPreview(): { view: MarkdownView; harness: PreviewHarness } {
     const previewLeaf = new WorkspaceLeaf();

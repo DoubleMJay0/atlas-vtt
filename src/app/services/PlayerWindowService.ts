@@ -416,7 +416,7 @@ export class PlayerWindowService {
   private presentScene(): void {
     const store = this.streamSource?.store ?? this.store;
     const source = this.streamSource;
-    this.sceneOverlays.forEach((overlay) => overlay.present(store, source?.diceEvents, source?.rollSources));
+    this.sceneOverlays.forEach((overlay) => overlay.present(store, source?.diceEvents, source?.rollSources, source?.badgeNumbers));
   }
 
   private destroySceneOverlays(): void {

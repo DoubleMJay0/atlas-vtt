@@ -42,6 +42,8 @@ export interface AtlasSettings {
   diceColour: DiceColour;
   /** Face of the dice numerals and roll totals. Read with `getDiceLook`. */
   diceFont: DiceFont;
+  /** Whether the GM's initiative cards show each combatant's name. Read with `showsInitiativeNames`. */
+  initiativeNames: boolean;
   /** Experimental features the GM switched on. Read with `isExperimentalOn`. */
   experimental: Partial<Record<ExperimentalFeatureId, boolean>>;
   /** The GM's toolbar layout, only what differs from the default; read with `getToolbarLayout`. */
@@ -77,6 +79,7 @@ export const DEFAULT_SETTINGS: AtlasSettings = {
   detectGridOnNewScenes: true,
   diceColour: DEFAULT_DICE_LOOK.colour,
   diceFont: DEFAULT_DICE_LOOK.font,
+  initiativeNames: false,
   experimental: {},
   toolbar: {},
   localPlayerView: {

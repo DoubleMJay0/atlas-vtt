@@ -5,6 +5,7 @@ export const initiative = {
   'initiative.abilityScoreHint': 'The field holds a score such as DEX 16, which adds its modifier: (score − 10) ÷ 2, rounded down',
   'initiative.card': 'initiative card',
   'initiative.edit': 'Edit Initiative',
+  'initiative.editNumber': 'Initiative {value}, click to type',
   'initiative.editHint': 'Enter to save · Esc to cancel',
   'initiative.fallback': 'Where a statblock has neither: {field}',
   'initiative.fallbackScore': 'Where a statblock has neither: {field}, read as an ability score',
@@ -17,6 +18,7 @@ export const initiative = {
   'initiative.remove': 'Remove from Initiative',
   'initiative.removeFallback': 'Remove fallback',
   'initiative.roll': 'Roll Initiative',
+  'initiative.showNames': 'Show Names on Cards',
   'initiative.statblocksLoading': {
     one: 'Fantasy Statblocks is still reading the vault: {count} combatant rolled without its statblock\'s modifier',
     other: 'Fantasy Statblocks is still reading the vault: {count} combatants rolled without their statblock\'s modifier',
@@ -25,4 +27,5 @@ export const initiative = {
   'initiative.toBack': 'Move to Back',
   'initiative.toFront': 'Move to Front',
   'initiative.token': 'Token',
+  'initiative.typeNumber': 'No initiative yet, click to type',
 } as const satisfies Record<string, Message>;
