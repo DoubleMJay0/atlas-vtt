@@ -60,9 +60,7 @@
 }
 
 .atlas-update-notice__body {
-  // The close button stands $close-button-gap inside the border, so it reaches into the
-  // notice's padding; the text keeps $spacing-s from the button's hover square.
-  padding-inline-end: calc(#{$close-button-size} + #{$close-button-gap} - #{$spacing-m} + #{$spacing-s});
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: $spacing-xs;
@@ -71,6 +69,13 @@
 
 .atlas-vtt-plugin .atlas-update-notice__close.atlas-close-btn.btn {
   @include atlas-close-corner;
+}
+
+// The close button stands $close-button-gap inside the border, so it reaches into the notice's
+// padding; the text keeps $spacing-s from the button's hover square.
+.atlas-update-notice__title,
+.atlas-update-notice__text {
+  padding-inline-end: calc(#{$close-button-size} + #{$close-button-gap} - #{$spacing-m} + #{$spacing-s});
 }
 
 .atlas-update-notice__title {
@@ -84,6 +89,8 @@
 
 .atlas-update-notice__actions {
   display: flex;
+  // In the notice's corner: as far from its right border as from its bottom.
+  justify-content: flex-end;
   gap: $spacing-s;
   margin-top: $spacing-xs;
 }
