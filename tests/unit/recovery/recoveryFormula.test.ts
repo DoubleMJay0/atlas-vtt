@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { computeFormula, fillFormula, readableFormula, wholeNumber, type FormulaFill } from '../../../src/app/recovery/recoveryFormula';
 import { spendFormula } from '../../../src/app/recovery/spendFormula';
 
-const NOTE: Record<string, unknown> = { level: 3, tier: '2', con: -1, big: 12000, many: 1200, half: 2.5, name: 'Mira', abilities: { con: 2 } };
+const NOTE: Record<string, unknown> = { level: 3, tier: '2', con: -1, big: 12000, many: 1200, half: 2.5, name: 'Mira', abilities: { con: 2 }, 'hit-dice': 4, 'con-mod': 1, stats: [{ 'max-hp': 9 }] };
 const lookup = (path: string): unknown => path.split('.').reduce<unknown>((value, part) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined), NOTE);
 
 function filled(formula: string): string {
@@ -26,6 +26,28 @@ describe('fillFormula', () => {
     expect(filled('@leveld6+@con')).toBe('3d6+(-1)');
     expect(filled('@level dF')).toBe('3dF');
     expect(filled('@leveld%')).toBe('3d%');
+  });
+
+  it('reads keys with dashes, as field keys may have them', () => {
+    expect(filled('@hit-dice d8')).toBe('4d8');
+    expect(filled('@hit-diced8')).toBe('4d8');
+    expect(filled('1d4+@con-mod')).toBe('1d4+(1)');
+    expect(filled('@stats.0.max-hp')).toBe('(9)');
+  });
+
+  it('reads a dash after a key as a minus where the note holds no key with it', () => {
+    expect(filled('1d8+@con-1')).toBe('1d8+(-1)-1');
+    expect(filled('@level-1d6')).toBe('(3)-1d6');
+    expect(filled('@level - 1')).toBe('(3) - 1');
+    expect(filled('(@level)-1')).toBe('((3))-1');
+    // A key never ends in a dash
+    expect(filled('@level-(1)')).toBe('(3)-(1)');
+    expect(problem(fillFormula('1d8+@wis-1', lookup))).toEqual({ kind: 'missing', field: 'wis-1' });
+  });
+
+  it('takes the whole path for a lookup that holds every field, as the editor checks a formula', () => {
+    const check = fillFormula('@hit-dice-1 d8+@con', () => 1);
+    expect(check.ok && check.formula).toBe('1d8+(1)');
   });
 
   it('reads nothing inside a label', () => {
