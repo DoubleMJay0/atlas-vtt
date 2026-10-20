@@ -43,6 +43,7 @@ import { sbImport } from './sbImport';
 import { vaultImages } from './vaultImages';
 import { filters } from './filters';
 import { search } from './search';
+import { senses } from './senses';
 import { sort } from './sort';
 import { toolbar } from './toolbar';
 import { hotkey } from './hotkey';
@@ -126,6 +127,7 @@ export const ru: Translation = {
   ...vaultImages,
   ...filters,
   ...search,
+  ...senses,
   ...sort,
   ...toolbar,
   ...hotkey,
