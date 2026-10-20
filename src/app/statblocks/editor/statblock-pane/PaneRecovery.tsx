@@ -2,71 +2,48 @@ import React, { useContext, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { t } from '../../../i18n';
 import { MENU_SEPARATOR, type ContextMenuEntry } from '../../../react/components/context-menu/AtlasContextMenu';
-import { characterRestOf, type CharacterRest } from '../../../recovery/characterRest';
 import { readableFormula } from '../../../recovery/recoveryFormula';
 import type { RecoveryButton } from '../../../recovery/recoveryTypes';
-import { restOffers, type RestOffer } from '../../../recovery/restOffer';
-import { alwaysRef, type RestRoller, type RuleRef } from '../../../recovery/restTypes';
-import type { CounterWriter } from '../../../recovery/restWrites';
-import { takeRest } from '../../../recovery/takeRest';
-import { rollStatblockDice, type OffMapRolls } from '../../../services/statblockRolls';
-import { showNotice } from '../../../ui/notice';
+import type { RestOffer } from '../../../recovery/restOffer';
+import { alwaysRef, type RestChoices, type RuleRef } from '../../../recovery/restTypes';
+import type { AllyRests } from '../../../recovery/restWrites';
 import { OffMapRollsContext } from '../../render/shared/offMapRolls';
 import { CardMenuButton } from './CardMenuButton';
-import { usePaneEdit, type PaneEditController } from './paneEditContext';
+import { usePaneEdit } from './paneEditContext';
+import { restOfferNow, takePaneRest, type PaneRestContext } from './paneRest';
+import { RestChooserButton } from './RestChooserButton';
 import { usePaneRecoveryContext, type PaneRecovery } from './usePaneRecovery';
 
-/** Rolls a rest's formula as a roll of the statblock, named by its label ("HP (Long rest)"), where Atlas shows the statblock's rolls. */
-function paneRoller(pane: PaneEditController, recovery: PaneRecovery, offMap: OffMapRolls | null): RestRoller {
-  return (formula, label) => {
-    const result = rollStatblockDice(pane.app, formula, { statblockPath: pane.notePath, tokenName: recovery.character.name, abilityName: label }, offMap);
-    return result && { formula, total: result.total };
-  };
-}
-
-/** Writes counters through the pane, so a change the note made meanwhile shows as the pane's conflict. */
-function paneCounterWriter(pane: PaneEditController): CounterWriter {
-  return async (writes) => {
-    await Promise.all(writes.map(({ field, patches, base, next }) => pane.write(field, patches, { base, mine: next })));
-    return null;
-  };
-}
-
-/** The character as it rests now, with the note's values as the pane holds them. */
-function restNow(pane: PaneEditController, recovery: PaneRecovery): CharacterRest {
-  const { character, templateId, template } = recovery;
-  return characterRestOf(pane.app, character, { notePath: pane.notePath, templateId, template, record: pane.record });
-}
-
 const hasSpend = (button: RecoveryButton): boolean => button.rules.some((rule) => rule.does === 'spend');
+const hasSteps = (button: RecoveryButton): boolean => (button.choices?.length ?? 0) > 0;
 
 /**
  * A player character's recovery buttons under the statblock's header (D5, R4): a press takes the
  * rest at once; a button that spends something (Hit Dice) first opens a menu with a stepper for
- * each thing it spends, from 0 to what the character holds. What the rest did is said in a notice.
+ * each thing it spends, from 0 to what the character holds; a button with steps opens the rest
+ * chooser, where the player picks its actions. What the rest did is said in a notice.
  */
 export function PaneRecoveryButtons({ recovery }: { recovery: PaneRecovery }): React.JSX.Element {
   const pane = usePaneEdit();
   const offMap = useContext(OffMapRollsContext);
+  const context: PaneRestContext = { pane, recovery, offMap };
   const [busy, setBusy] = useState(false);
   const [offer, setOffer] = useState<RestOffer | null>(null);
   const [counts, setCounts] = useState<readonly number[]>([]);
 
-  const take = async (buttonId: string, spends: ReadonlyMap<RuleRef, number>): Promise<void> => {
+  const take = async (buttonId: string, choices: RestChoices, allies?: AllyRests): Promise<void> => {
     setBusy(true);
     try {
-      const taken = await takeRest(pane.app, restNow(pane, recovery), buttonId, { picks: [], spends }, paneRoller(pane, recovery, offMap), paneCounterWriter(pane));
-      if (!taken) return;
-      const { text } = taken.summary;
-      showNotice(taken.problem === null ? text : `${text}\n${t('rest.failed', { problem: taken.problem })}`);
+      await takePaneRest(context, buttonId, choices, allies);
     } finally {
       setBusy(false);
     }
   };
+  const takeSpending = (buttonId: string, spends: ReadonlyMap<RuleRef, number>): Promise<void> => take(buttonId, { picks: [], spends });
 
   const opened = (button: RecoveryButton) => (open: boolean): void => {
     if (!open) return;
-    const now = restOffers([button], restNow(pane, recovery).character)[0] ?? null;
+    const now = restOfferNow(pane, recovery, button);
     setOffer(now);
     setCounts(now?.spends.map(() => 0) ?? []);
   };
@@ -93,7 +70,7 @@ export function PaneRecoveryButtons({ recovery }: { recovery: PaneRecovery }): R
       },
     }));
     const choices = new Map(spends.map((spend, index) => [alwaysRef(spend.rule), count(index)]));
-    const rest: ContextMenuEntry = { type: 'item', label: t('rest.take'), icon: 'rotate-ccw', onClick: () => take(button.id, choices) };
+    const rest: ContextMenuEntry = { type: 'item', label: t('rest.take'), icon: 'rotate-ccw', onClick: () => takeSpending(button.id, choices) };
     return rows.length > 0 ? [...rows, MENU_SEPARATOR, rest] : [rest];
   };
 
@@ -104,22 +81,35 @@ export function PaneRecoveryButtons({ recovery }: { recovery: PaneRecovery }): R
     </>
   );
 
+  const disabled = busy || !pane.writable;
+  const control = (button: RecoveryButton): React.ReactNode => {
+    if (hasSteps(button)) {
+      return (
+        <RestChooserButton key={button.id} button={button} context={context} disabled={disabled} busy={busy} onRest={take}>
+          {content(button)}
+        </RestChooserButton>
+      );
+    }
+    if (hasSpend(button)) {
+      return (
+        <CardMenuButton key={button.id} className="atlas-sb-recovery__button" disabled={disabled}
+          entries={() => spendEntries(button)} onOpenChange={opened(button)}>
+          {content(button)}
+        </CardMenuButton>
+      );
+    }
+    return (
+      <button key={button.id} type="button" className="atlas-sb-recovery__button" disabled={disabled}
+        onClick={() => void takeSpending(button.id, new Map())}>
+        {content(button)}
+      </button>
+    );
+  };
+
   return (
     <div className="atlas-sb-recovery" role="group" aria-label={t('rest.buttons', { name: recovery.character.name })}>
       {recovery.several && <span className="atlas-sb-recovery__who">{recovery.character.name}</span>}
-      {recovery.buttons.map((button) => (hasSpend(button)
-        ? (
-          <CardMenuButton key={button.id} className="atlas-sb-recovery__button" disabled={busy || !pane.writable}
-            entries={() => spendEntries(button)} onOpenChange={opened(button)}>
-            {content(button)}
-          </CardMenuButton>
-        )
-        : (
-          <button key={button.id} type="button" className="atlas-sb-recovery__button" disabled={busy || !pane.writable}
-            onClick={() => void take(button.id, new Map())}>
-            {content(button)}
-          </button>
-        )))}
+      {recovery.buttons.map(control)}
     </div>
   );
 }
