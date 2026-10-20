@@ -10,10 +10,12 @@ import { focusCombatant } from '../../initiative/focusCombatant';
 import { cardInstanceNumber } from '../../initiative/cardInstanceNumber';
 import { hasInitiative } from '../../initiative/awaitingInitiative';
 import { tokenDisplayName } from '../../pixi/token-renderer/tokenDisplayName';
+import { isOffMap } from '../../tokens/offMap';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { TokenPortrait } from '../../packages/components/shared/TokenPortrait';
 import { InitiativeNumber, type NumberStep } from './InitiativeNumber';
 import { CardResourceBars } from './CardResourceBars';
+import { OffMapIcon } from './OffMapIcon';
 import { CardConditions } from './CardConditions';
 import { useMapConditions } from '../hooks/useMapConditions';
 import { combatantConditions } from '../../utils/activeConditions';
@@ -89,6 +91,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   const conditions = combatantConditions(token, conditionDefinitions);
   // A hidden token's entry is left out of the players' list (`PlayerInitiativePanel`)
   const hiddenFromPlayers = token?.isHidden === true;
+  // Kept beside the map: in the tracker only, until the GM places it
+  const offMap = isOffMap(token);
   const name = (token && tokenDisplayName(token)) || entry.name;
 
   // Get image URL from vault path
@@ -220,6 +224,12 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         {hiddenFromPlayers && (
           <LabelTooltip label={t('initiative.hiddenFromPlayers')} side={tooltipSide}>
             <span className="atlas-initiative-card__hidden-badge"><EyeOff /></span>
+          </LabelTooltip>
+        )}
+
+        {offMap && (
+          <LabelTooltip label={t('initiative.offMap')} side={tooltipSide}>
+            <span className="atlas-initiative-card__off-map-badge"><OffMapIcon /></span>
           </LabelTooltip>
         )}
       </div>

@@ -75,6 +75,28 @@ export function InitiativeFields({ initiative, onChange, fieldSuggestions, modif
       )}
       {initiative.mode === 'sides' && <InitiativeSideFields initiative={initiative} onChange={onChange} />}
       {initiative.mode === 'cards' && <InitiativeCardFields initiative={initiative} onChange={onChange} />}
+
+      <div className="atlas-csm-toggle-row">
+        <div>
+          <div className="atlas-csm-toggle-label">{t('initiative.rollHitPoints')}</div>
+          <div className="atlas-csm-hint">{t('initiative.rollHitPointsHint')}</div>
+        </div>
+        <label className="atlas-csm-switch">
+          <input
+            type="checkbox"
+            aria-label={t('initiative.rollHitPoints')}
+            checked={initiative.rollHitPoints === true}
+            onChange={(e) => onChange(withHitPointRolls(initiative, e.target.checked))}
+          />
+          <span className="atlas-csm-switch-track" />
+        </label>
+      </div>
     </>
   );
+}
+
+/** The rules with hit points rolled as creatures join, or taken as their statblocks give them. */
+function withHitPointRolls(initiative: InitiativeRules, on: boolean): InitiativeRules {
+  const { rollHitPoints: _off, ...rest } = initiative;
+  return on ? { ...rest, rollHitPoints: true } : rest;
 }

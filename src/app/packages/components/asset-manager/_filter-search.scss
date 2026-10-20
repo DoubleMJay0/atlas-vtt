@@ -183,6 +183,23 @@
   padding: 0 $spacing-l;
 }
 
+// The filters of the statblock template's own fields, under a rule after the shared ones.
+.atlas-filter-panel__group {
+  @include atlas-flex-col($gap: $spacing-l);
+  padding-top: $spacing-l;
+  border-top: $border-width-s solid var(--background-modifier-border);
+}
+
+.atlas-filter-panel__group-label {
+  color: var(--text-faint);
+  font-size: $font-ui-smaller;
+  font-weight: $font-weight-medium;
+}
+
+.atlas-filter-panel__group > .atlas-filter-chips__more {
+  align-self: flex-start;
+}
+
 .atlas-filter-panel__statblock {
   width: 100%;
 
@@ -253,7 +270,7 @@
   gap: $spacing-xs;
 }
 
-.atlas-asset-manager-header .atlas-filter-chip.btn {
+:is(.atlas-asset-manager-header, .atlas-encounter-builder__bar) .atlas-filter-chip.btn {
   @include atlas-flex-row($gap: $spacing-xs);
   height: 24px;
   padding: 0 $spacing-s;
@@ -302,7 +319,7 @@
   }
 }
 
-.atlas-asset-manager-header .atlas-filter-chips__more {
+:is(.atlas-asset-manager-header, .atlas-encounter-builder__bar) .atlas-filter-chips__more {
   height: 24px;
   padding: 0 $spacing-s;
   border-radius: $radius-full;
@@ -344,9 +361,40 @@
 .atlas-filter-range__ends {
   display: flex;
   justify-content: space-between;
-  color: var(--text-faint);
+  gap: $spacing-s;
+}
+
+// The two ends of a range, typed into: quiet until hovered or focused, as wide as a few digits.
+input.atlas-filter-range__input {
+  width: 7ch;
+  height: 24px;
+  padding: 0 $spacing-xs;
+  border: $border-width-s solid transparent;
+  border-radius: $radius-s;
+  background: transparent;
+  color: var(--text-muted);
   font-size: $font-ui-smaller;
   font-variant-numeric: tabular-nums;
+  transition: border-color $transition-fast $transition-ease, background-color $transition-fast $transition-ease;
+
+  &:hover {
+    border-color: var(--background-modifier-border);
+  }
+
+  &:focus {
+    border-color: var(--background-modifier-border-focus);
+    background: var(--background-modifier-form-field);
+    color: var(--text-normal);
+    box-shadow: none;
+  }
+
+  &--start {
+    text-align: start;
+  }
+
+  &--end {
+    text-align: end;
+  }
 }
 
 // ── Active filters: a chip per filter above the content ───────────────────

@@ -31,6 +31,8 @@ interface TrackerOptionsActions {
   setDock: (dock: InitiativeDock) => void;
   setTurn: (changes: Partial<InitiativeTurnOptions>) => void;
   clear: () => void;
+  /** Opens the library on its tokens, whose menu adds them to the tracker beside the map. */
+  addCombatant: () => void;
 }
 
 /**
@@ -50,7 +52,7 @@ export async function clearInitiativeAsking(empty: boolean, clear: () => void): 
   clear();
 }
 
-/** The menu behind the tracker's options button: how it sorts, what its cards show, how the lists are laid out, what a turn change does, and clearing it. */
+/** The menu behind the tracker's options button: how it sorts, what its cards show, how the lists are laid out, what a turn change does, adding combatants and clearing it. */
 export function initiativeTrackerOptions(state: TrackerOptionsState, actions: TrackerOptionsActions): ContextMenuEntry[] {
   return [
     {
@@ -112,6 +114,13 @@ export function initiativeTrackerOptions(state: TrackerOptionsState, actions: Tr
       onClick: () => actions.setTurn({ movesOnTurn: !state.turn.movesOnTurn }),
     }] : []),
     MENU_SEPARATOR,
+    {
+      type: 'item',
+      label: t('initiative.addCombatant'),
+      icon: 'list-plus',
+      description: t('initiative.addCombatantHint'),
+      onClick: actions.addCombatant,
+    },
     {
       type: 'item',
       label: t('initiative.clear'),

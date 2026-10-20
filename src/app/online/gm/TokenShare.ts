@@ -9,6 +9,7 @@ import { SequencedList } from './sequencedList.ts';
 import { NO_TOKEN_RULES, numberShownTokens, type TokenRules } from './tokenUI.ts';
 import type { AtlasPlayerSettings } from './atlasLighting.ts';
 import { sharedTurnTokens, type TurnShareState } from './turnShare.ts';
+import { mapTokens } from '../../tokens/offMap';
 
 /** An image as read from the vault. */
 export interface VaultImage {
@@ -198,13 +199,13 @@ export class TokenShare {
     const { mapPath } = state;
     const seats = this.ports.seats;
     const shown = source.playerRollTokens(state.mapPath);
-    const badges = numberShownTokens(this.numbers, state.objects.tokens, (id) => shown.has(id), state.tokenSettings?.showInstanceBadges ?? true);
+    const badges = numberShownTokens(this.numbers, mapTokens(state.objects), (id) => shown.has(id), state.tokenSettings?.showInstanceBadges ?? true);
     this.numbers = badges.numbers;
     // The store holds the fight too: the scene's type names only what every share reads
     const turnState: TurnShareState = state;
     const turn = sharedTurnTokens(turnState, this.ports.atlasSettings?.().showInitiative === true);
     const tokens = sharedTokens({
-      tokens: state.objects.tokens,
+      tokens: mapTokens(state.objects),
       shown,
       gridSize,
       showNames: this.ports.showNames(),

@@ -151,6 +151,7 @@ describe('a token placed from a statblock note', () => {
     const ctx: SpawnContext = {
       app: current.app,
       view,
+      random: Math.random,
       assetService: {
         getAssetById: vi.fn(async () => ({ ...asset, type: 'token' })),
         getCollectionForMap: vi.fn(() => 'dungeon'),

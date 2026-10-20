@@ -35,6 +35,7 @@ export function parseInitiativeRules(raw: unknown): InitiativeRules | undefined 
     ...modifierSources(fields),
     ...(sideRoll && { sideRoll }),
     ...cardParts(fields),
+    ...hitPointRolls(fields.rollHitPoints),
   };
 }
 
@@ -61,7 +62,13 @@ export function savedInitiativeRules(rules: InitiativeRules): InitiativeRules {
     ...modifierSources(rules),
     ...(rules.mode === 'sides' ? savedSideParts(rules) : { firstSide: rules.firstSide }),
     ...(rules.mode === 'cards' ? cardParts(rules) : {}),
+    ...hitPointRolls(rules.rollHitPoints),
   };
+}
+
+/** The hit point switch as it is stored: present only where it is on. */
+function hitPointRolls(raw: unknown): Pick<InitiativeRules, 'rollHitPoints'> {
+  return raw === true ? { rollHitPoints: true } : {};
 }
 
 /**
@@ -86,5 +93,6 @@ export function sameInitiativeRules(a: InitiativeRules | undefined, b: Initiativ
     && (left.mode !== 'sides' || sameSideParts(left, right))
     && (left.mode !== 'cards' || sameCardParts(left, right))
     && sameModifierSources(left, right)
+    && Boolean(left.rollHitPoints) === Boolean(right.rollHitPoints)
     && left.roll.trim().toLowerCase() === right.roll.trim().toLowerCase();
 }

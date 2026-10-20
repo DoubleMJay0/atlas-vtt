@@ -4,6 +4,7 @@ import { NO_INSTANCE_NUMBERS, badgeNumberInView, numberTokensInView, type Instan
 import type { TokenSeen } from '../../vision/measureOrigin';
 import { setLayerVisibility, type LayerVisibility } from '../playerSafeFrame';
 import { PLAYER_BADGE_TEXT_LABEL, badgeParts, type InstanceBadgeParts } from './instanceBadgeParts';
+import { isOffMap, sceneTokens } from '../../tokens/offMap';
 
 /** What the players' instance badges read of the view's state: its tokens, its map and whether it shows badges. */
 export type PlayerBadgeState = Pick<ViewState, 'mapPath'> & {
@@ -65,8 +66,8 @@ function withPlayersNumber(parts: InstanceBadgeParts, shown: string): InstanceBa
 
 /**
  * Instance badges as the players' picture shows them: counted and numbered among the tokens the
- * players see (`numberTokensInView`), so a look-alike they do not see neither counts nor takes a
- * number. Their number is a second text in the token's own badge, and the disc and both texts are
+ * players see (`numberTokensInView`) and the combatants beside the map their initiative list shows,
+ * so a look-alike they do not see neither counts nor takes a number. Their number is a second text in the token's own badge, and the disc and both texts are
  * swapped by `visible`: for one capture (`layers`), and held on the canvas while it shows the players'
  * view (`syncCanvas`). The GM's drawing writes only the badge itself, never these three.
  */
@@ -91,8 +92,9 @@ export class PlayerInstanceBadges implements PlayerBadgeNumbers {
       this.numberedMap = mapPath;
     }
     const inView: TokenInView[] = [];
-    for (const [id, token] of Object.entries(objects.tokens)) {
-      if (seen(id)) inView.push({ id, art: token.imagePath, rank: token.instanceNumber ?? 1 });
+    // A combatant kept beside the map is shown to the players by their initiative list alone, unless hidden
+    for (const [id, token] of Object.entries(sceneTokens(objects))) {
+      if (isOffMap(token) ? token.isHidden !== true : seen(id)) inView.push({ id, art: token.imagePath, rank: token.instanceNumber ?? 1 });
     }
     this.numbers = numberTokensInView(this.numbers, inView);
     const badgesOn = tokenSettings?.showInstanceBadges ?? true;
