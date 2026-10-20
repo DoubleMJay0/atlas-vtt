@@ -145,10 +145,10 @@ describe('the recovery buttons in the template editor', () => {
   it('sets up a Long rest from the keyboard alone', async () => {
     const harness = mountRecoveryEditor('dark', []);
     await frames();
-    page.getByRole('button', { name: 'Add a button' }).element().focus();
+    page.getByRole('button', { name: 'Add a recovery action' }).element().focus();
 
     await press('{Enter}');
-    expect(document.activeElement).toBe(page.getByRole('textbox', { name: 'Button name' }).element());
+    expect(document.activeElement).toBe(page.getByRole('textbox', { name: 'Recovery action name' }).element());
     await press('Long rest{Enter}');
     expect(document.activeElement?.textContent).toBe('Long rest');
 

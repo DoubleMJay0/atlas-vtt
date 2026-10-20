@@ -20,10 +20,10 @@ function dialog(lostButtons: readonly string[]): void {
 
 it('says which recovery buttons go with the template', () => {
   dialog(['Short rest', 'Long rest']);
-  expect(screen.getByText('The recovery buttons Short rest and Long rest go with it.')).toBeTruthy();
+  expect(screen.getByText('The recovery actions Short rest and Long rest go with it.')).toBeTruthy();
 });
 
 it('says nothing of recovery where no button is lost', () => {
   dialog([]);
-  expect(screen.queryByText(/recovery button/)).toBeNull();
+  expect(screen.queryByText(/recovery action/)).toBeNull();
 });

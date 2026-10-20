@@ -25,7 +25,7 @@ describe('the recovery buttons in the template editor', () => {
   it('add a button to the template as one step of its history', () => {
     const session = new FakeSession(ADVENTURER);
     mount(session);
-    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Add a button' })); });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Add a recovery action' })); });
     const name = screen.getByRole('textbox');
     fireEvent.change(name, { target: { value: 'Long rest' } });
     act(() => { fireEvent.keyDown(name, { key: 'Enter' }); });

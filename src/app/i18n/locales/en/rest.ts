@@ -1,6 +1,6 @@
 import type { Message } from '../../types';
 
-/** A player character's recovery buttons beside its statblock, and what taking one says. */
+/** A player character's recovery actions beside its statblock, and what taking one says. */
 export const rest = {
   'rest.buttons': 'Recovery of {name}',
   'rest.spendTitle': '{name}: how many to spend',
@@ -34,9 +34,9 @@ export const rest = {
   'rest.skipLimitsField': '{label} ({field} makes the roll too large)',
   'rest.skipSyntax': '{label} (its formula does not read)',
   'rest.skipRoll': '{label} (could not be rolled)',
-  'rest.skipAlly': 'an action for a character who is not here',
+  'rest.skipAlly': 'an option for a character who is not here',
   'rest.failed': 'The rest could not be written: {problem}',
   'rest.resetLabel': 'Which rest gives {name} its uses back',
   'rest.resetNone': 'None',
-  'rest.lostWithTemplate': { one: 'The recovery button {list} goes with it.', other: 'The recovery buttons {list} go with it.' },
+  'rest.lostWithTemplate': { one: 'The recovery action {list} goes with it.', other: 'The recovery actions {list} go with it.' },
 } as const satisfies Record<string, Message>;

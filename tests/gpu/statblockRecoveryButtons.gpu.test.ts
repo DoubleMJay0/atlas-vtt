@@ -76,7 +76,7 @@ function mount(): void {
 const rectOf = (selector: string, within: ParentNode = document): DOMRect => within.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
 
 /** A player character's recovery buttons and its counters' rests, in the real stylesheets. */
-describe('Recovery buttons in the note panel', () => {
+describe('Recovery actions in the note panel', () => {
   const style = document.createElement('style');
   style.textContent = THEME + css + paneCss;
 

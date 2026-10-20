@@ -34,14 +34,14 @@ beforeAll(() => {
 });
 afterEach(cleanup);
 
-describe('the steps of a recovery button', () => {
-  it('adds a step asking for exactly one of a single action, selects that action and focuses the prompt', () => {
+describe('the steps of a recovery action', () => {
+  it('adds a step asking for exactly one of a single option, selects that option and focuses the prompt', () => {
     const button = mount();
     addStep();
     const choice = button().choices![0]!;
-    expect(choice).toMatchObject({ prompt: 'Choose one', min: 1, max: 1, actions: [{ name: 'Action', rules: [] }] });
+    expect(choice).toMatchObject({ prompt: 'Choose one', min: 1, max: 1, actions: [{ name: 'Option', rules: [] }] });
     expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'What the player is asked' }));
-    expect(within(step()).getByRole('button', { name: 'Action', pressed: true })).toBeTruthy();
+    expect(within(step()).getByRole('button', { name: 'Option', pressed: true })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Always', pressed: false })).toBeTruthy();
     // What the editor stores reads back whole
     expect(parseRecoveryButtons([button()])).toEqual([button()]);
@@ -70,7 +70,7 @@ describe('the steps of a recovery button', () => {
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['1']);
     fireEvent.click(screen.getByRole('combobox', { name: 'Number of picks' }));
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Pick the same action again' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Pick the same option again' }));
     expect(button().choices![0]!.repeat).toBe(true);
     fireEvent.click(screen.getByRole('combobox', { name: 'Number of picks' }));
     fireEvent.click(screen.getByRole('option', { name: '3' }));
@@ -80,7 +80,7 @@ describe('the steps of a recovery button', () => {
     expect(button().choices![0]).toMatchObject({ min: 3, max: 3 });
 
     // Repeats off again: no more picks than actions
-    fireEvent.click(screen.getByRole('switch', { name: 'Pick the same action again' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Pick the same option again' }));
     expect(button().choices![0]).toMatchObject({ min: 1, max: 1 });
     expect('repeat' in button().choices![0]!).toBe(false);
   });
@@ -88,7 +88,7 @@ describe('the steps of a recovery button', () => {
   it('names an action, says what it does and opens it to another player character', () => {
     const button = mount();
     addStep();
-    const name = screen.getByRole('textbox', { name: 'Action name' });
+    const name = screen.getByRole('textbox', { name: 'Option name' });
     fireEvent.change(name, { target: { value: 'Tend to Wounds' } });
     fireEvent.blur(name);
     const text = screen.getByRole('textbox', { name: 'What it does' });
@@ -106,18 +106,18 @@ describe('the steps of a recovery button', () => {
   it('brings the counts within the actions left when one is removed, and keeps the last', () => {
     const button = mount();
     addStep();
-    fireEvent.click(screen.getByRole('button', { name: 'Add an action' }));
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Action name' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add an option' }));
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Option name' }));
     fireEvent.click(screen.getByRole('combobox', { name: 'Number of picks' }));
     fireEvent.click(screen.getByRole('option', { name: '2' }));
     expect(button().choices![0]).toMatchObject({ min: 2, max: 2 });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove this action' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this option' }));
     expect(button().choices![0]).toMatchObject({ min: 1, max: 1 });
     expect(button().choices![0]!.actions).toHaveLength(1);
 
     // The last action of a step stays
-    const remove = screen.getByRole('button', { name: 'Remove this action' });
+    const remove = screen.getByRole('button', { name: 'Remove this option' });
     expect(remove.getAttribute('aria-disabled')).toBe('true');
     fireEvent.click(remove);
     expect(button().choices![0]!.actions).toHaveLength(1);
