@@ -1,5 +1,5 @@
 import type { ContextMenuEntry } from '../root/ContextMenuContext';
-import { SIDE_LABELS, otherSide, sideOf } from '../../initiative/sides';
+import { otherSide, sideOf } from '../../initiative/sides';
 import type { TokenUpdates } from '../../types/viewState';
 import type { TokenEntity } from '../../types';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
@@ -51,10 +51,10 @@ export function initiativeCardMenu(
     item(t('initiative.toFront'), 'arrow-up-to-line', actions.moveToFront),
     item(t('initiative.toBack'), 'arrow-down-to-line', actions.moveToBack),
     ...(mode.bySides
-      ? [item(`Move to ${SIDE_LABELS[other]}`, 'arrow-left-right', () => actions.updateToken(sideChanges(token, other)))]
+      ? [item(t(other === 'players' ? 'initiative.moveToPlayers' : 'initiative.moveToOpponents'), 'arrow-left-right', () => actions.updateToken(sideChanges(token, other)))]
       : [item(t('initiative.edit'), 'pencil', actions.edit)]),
     ...(mode.fightRuns ? [sitOut, ...(mode.bySides ? [] : [delay])] : []),
-    item(hidden ? 'Show to Players' : 'Hide from Players', hidden ? 'eye' : 'eye-off', () => actions.updateToken({ isHidden: !hidden })),
+    item(hidden ? t('initiative.showToPlayers') : t('initiative.hideFromPlayers'), hidden ? 'eye' : 'eye-off', () => actions.updateToken({ isHidden: !hidden })),
     { type: 'item', label: t('initiative.remove'), icon: 'trash-2', destructive: true, onClick: actions.remove },
   ];
 }
