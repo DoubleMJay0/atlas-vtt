@@ -384,12 +384,14 @@ $collapse-height: 24px;
   }
 }
 
-// A combatant kept beside the map: the third corner, with its tooltip
+// A combatant kept beside the map: the third corner, with its tooltip. Its token-beside-a-map
+// glyph has no stroke through it, unlike the hidden badge's eye, and is drawn muted: a note, not a warning.
 .atlas-initiative-card__off-map-badge {
   top: -2px;
   bottom: auto;
   padding: 0;
   pointer-events: auto;
+  color: var(--text-muted);
 
   svg {
     width: 12px;

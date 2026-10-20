@@ -2,7 +2,7 @@ import { useMapResources } from '../../resources/useMapResources';
 import { combatantDefeated } from '../../initiative/defeated';
 import { visibleResources } from '../../resources/visibleResources';
 import React, { useCallback, useRef, useState } from 'react';
-import { EyeOff, GripVertical, MapPinOff, Skull, User, Bot } from 'lucide-react';
+import { EyeOff, GripVertical, Skull, User, Bot } from 'lucide-react';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
 import { useAtlasUI } from '../root/AtlasUIContext';
 import { useAtlasStore, useViewStoreHook } from '../ViewStoreContext';
@@ -15,6 +15,7 @@ import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { TokenPortrait } from '../../packages/components/shared/TokenPortrait';
 import { InitiativeNumber, type NumberStep } from './InitiativeNumber';
 import { CardResourceBars } from './CardResourceBars';
+import { OffMapIcon } from './OffMapIcon';
 import { CardConditions } from './CardConditions';
 import { useMapConditions } from '../hooks/useMapConditions';
 import { combatantConditions } from '../../utils/activeConditions';
@@ -228,7 +229,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
         {offMap && (
           <LabelTooltip label={t('initiative.offMap')} side={tooltipSide}>
-            <span className="atlas-initiative-card__off-map-badge"><MapPinOff /></span>
+            <span className="atlas-initiative-card__off-map-badge"><OffMapIcon /></span>
           </LabelTooltip>
         )}
       </div>
