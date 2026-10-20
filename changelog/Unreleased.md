@@ -11,6 +11,7 @@
 - Initiative: a combatant can delay its turn. It waits below the order until Act Now puts it right before the combatant whose turn it is.
 - Initiative: Sit Out This Round now works in turn order too.
 - Initiative: the tracker's ⋯ menu has an Auto sort switch.
+- Simplified Chinese interface when Obsidian's language is 简体中文 or 繁體中文. Text that is not translated yet stays in English.
 
 ## Improved
 - Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.
