@@ -43,6 +43,7 @@ const app = {
 };
 const state = {
   objects: { tokens: {} as Record<string, unknown> },
+  initiative: { entries: [], isActive: false, round: 0 },
   dmNotePath: null,
   setDMNotePath: vi.fn(),
   updateToken: vi.fn(),

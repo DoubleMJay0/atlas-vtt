@@ -36,7 +36,10 @@ describe('PlayerWindowService cleanup', () => {
       subscribe: vi.fn(() => unsubscribe),
     };
 
-    const settings = { getLocalPlayerViewSettings: () => ({ showWidgets: true }), onChange: () => vi.fn() };
+    const settings = {
+      getLocalPlayerViewSettings: () => ({ showWidgets: true }), onChange: () => vi.fn(),
+      initiativeLayout: () => ({ fromTurn: true, dock: 'right', collapsed: false }),
+    };
     const service = new PlayerWindowService({ workspace: {} } as any, store as any, settings as any);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     const doc = attachFakePlayerWindow(service, { canvas: createEl('canvas'), store: store as any, withPlayerSafeFrame: vi.fn() });

@@ -14,10 +14,14 @@
 - Initiative by cards: each combatant is dealt a card from a numbered deck, and the lowest card acts first. Deal once when the fight starts or anew every round, let look-alikes share a card, and swap two combatants' cards from the card menu.
 - Initiative by sides: name more sides than players and opponents, such as Allies, set the order they act in, and move a token to any side from its card.
 - Initiative by sides: the sides can roll for their order at the start of every round. The highest acts first, and sides with equal rolls act at the same time.
+- Initiative: during a fight the list starts at whoever acts now and runs on into the next round below a Round divider, in the tracker and in the players' list. Switch it off with Turn on top in the tracker's ⋯ menu.
+- Initiative: each card shows its token's conditions as the map does, with the number of a valued condition. In the tracker, point at a badge to see its name.
+- Initiative tracker: Dock on the left in the ⋯ menu moves the tracker and the players' list to the left edge, and the toggle at the top of the tracker shows only the current turn and the next two.
 - Simplified Chinese interface when Obsidian's language is 简体中文 or 繁體中文. Text that is not translated yet stays in English.
 
 ## Improved
 - Old-School Essentials collections run initiative by sides, with each side rolling a d6 every round.
+- DM screen: during a fight it shows the statblocks of the creatures in the fight, with a switch to show every creature on the map.
 - Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.
 - Initiative: combatants with the same number are ordered by their initiative modifier.
 - Initiative: Clear initiative asks before it removes every combatant. It is in the tracker's ⋯ menu.
@@ -27,6 +31,7 @@
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
 - Atlas' messages slide in at the top right with a light spring and lift away when they close, and the messages below them move up smoothly. They sit as far from the top as from the right edge, like the dice rolls.
+- Initiative: the GM and player lists scroll to keep the current combatant and the next two in view where space allows, so players can see their turns coming. Smaller panels keep the current combatant visible first.
 - Online play: busy tables send far fewer messages. Cursors, lasers and measurements go out ten times a second and still move smoothly, and a changed quest or world map reaches players without their whole book being sent again.
 - Random tables: rename a table or remove it from the list from its menu (⋯ or right-click) in the Random tables window, and undo a removal from the message that follows. A new name shows only in Atlas and leaves the note as it is; you can also set it in the collection settings. A table whose note was deleted can now be removed too.
 - Type sums into a token's HP: -10-5 takes 15, -9/2 takes half of 9 rounded down, and -9*2 takes 18 (#495, #396).

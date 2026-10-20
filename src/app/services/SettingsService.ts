@@ -19,7 +19,8 @@ import {
   type TutorialId,
   TUTORIAL_IDS,
 } from './atlasSettings';
-import { loadInputMode, loadLightingQuality, saveInputMode, saveLightingQuality } from './deviceSettings';
+import { loadInitiativeCollapsed, loadInputMode, loadLightingQuality, saveInitiativeCollapsed, saveInputMode, saveLightingQuality } from './deviceSettings';
+import { readDock, type InitiativeLayout } from '../initiative/initiativeLayout';
 import type { LightingQualityLevel } from '../lighting/lightingQuality';
 
 export { TUTORIAL_IDS } from './atlasSettings';
@@ -31,8 +32,8 @@ export type PluginDataStore = Pick<Plugin, 'loadData' | 'saveData'>;
 type SettingsListener = (settings: AtlasSettings) => void;
 
 /**
- * The GM's Atlas preferences, kept in the plugin's data (`data.json`), except the input mode
- * and the lighting quality, which belong to the device (`deviceSettings.ts`). Without a data store (tests, a view
+ * The GM's Atlas preferences, kept in the plugin's data (`data.json`), except the input mode,
+ * the lighting quality and the collapsed initiative tracker, which belong to the device (`deviceSettings.ts`). Without a data store (tests, a view
  * without the plugin) the settings live in memory only.
  */
 export class SettingsService {
@@ -253,6 +254,29 @@ export class SettingsService {
   setInitiativeNames(on: boolean): void {
     if (this.showsInitiativeNames() === on) return;
     this.settings.initiativeNames = on;
+    this.commit();
+  }
+
+  /** How the initiative lists are laid out: the GM's choices, and whether this device collapsed the tracker. */
+  initiativeLayout(): InitiativeLayout {
+    return {
+      fromTurn: this.settings.initiativeFromTurn !== false,
+      dock: readDock(this.settings.initiativeDock),
+      collapsed: loadInitiativeCollapsed(this.app),
+    };
+  }
+
+  /** The GM's choices go into the synced settings, the collapsed tracker into this device's local storage. */
+  setInitiativeLayout(changes: Partial<InitiativeLayout>): void {
+    const current = this.initiativeLayout();
+    const { fromTurn = current.fromTurn, dock = current.dock, collapsed = current.collapsed } = changes;
+    if (collapsed !== current.collapsed) saveInitiativeCollapsed(this.app, collapsed);
+    if (fromTurn === current.fromTurn && dock === current.dock) {
+      if (collapsed !== current.collapsed) this.notify();
+      return;
+    }
+    this.settings.initiativeFromTurn = fromTurn;
+    this.settings.initiativeDock = dock;
     this.commit();
   }
 

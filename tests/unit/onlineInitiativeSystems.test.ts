@@ -6,7 +6,7 @@ import { createDefaultInitiativeState, type InitiativeEntry, type InitiativeStat
 
 const collection = vi.hoisted(() => ({ initiative: undefined as unknown }));
 vi.mock('../../src/app/resources/collectionResources', () => ({ mapResources: () => [] }));
-vi.mock('../../src/app/gameSystems/mapRules', () => ({ rulesForMap: () => ({ settings: { initiative: collection.initiative } }) }));
+vi.mock('../../src/app/gameSystems/mapRules', () => ({ rulesForMap: () => ({ settings: { initiative: collection.initiative } }), mapConditions: () => [] }));
 
 import { sharedInitiative } from '../../src/app/online/gm/initiativeInputs';
 import { parseInitiative } from '../../src/app/online/protocol/initiative';

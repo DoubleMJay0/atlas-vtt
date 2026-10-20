@@ -213,14 +213,27 @@ describe('player initiative panel', () => {
   });
 
   it('keeps the combatant whose turn it is in view: the list is drawn anew on every change', () => {
-    const { store, doc } = setup();
+    const { store, doc, settings } = setup();
+    settings.setInitiativeLayout({ fromTurn: false });
     const { initiative } = store.getState();
     scrolls.calls.length = 0;
 
     store.setState({ initiative: { ...initiative, round: 2 } });
 
-    expect(scrolls.calls).toEqual([[doc.querySelector('.atlas-player-initiative__list'), doc.querySelector('.atlas-player-initiative__card--active'), 'nearest']]);
+    expect(scrolls.calls).toEqual([[doc.querySelector('.atlas-player-initiative__list'), doc.querySelector('.atlas-player-initiative__card--active'), 'nearest', 2]]);
     expect(scrolls.calls[0]?.[1]).not.toBeNull();
+  });
+
+  it('follows the GM\'s layout: the edge the lists stand at, drawn anew when it changes', () => {
+    const { settings, doc } = setup();
+    const panel = (): Element | null => doc.querySelector('.atlas-player-initiative');
+    expect(panel()?.classList.contains('atlas-player-initiative--left')).toBe(false);
+    settings.setInitiativeLayout({ dock: 'left' });
+    expect(panel()?.classList.contains('atlas-player-initiative--left')).toBe(true);
+    // Collapsing the GM's tracker is the GM's own view of it: the players' list stays as it is
+    const drawn = panel();
+    settings.setInitiativeLayout({ collapsed: true });
+    expect(panel()).toBe(drawn);
   });
 
   it('defaults on for old settings and persists the DM choice across reloads', async () => {
@@ -282,7 +295,9 @@ describe('player initiative panel of a collection that fights by sides', () => {
     const { initiative } = store.getState();
     store.setState({ initiative: { ...initiative, entries: initiative.entries.map((each) => ({ ...each, isActive: true })) } });
     expect(doc.querySelector('.atlas-player-initiative__card--active')).toBeNull();
-    expect(groups(doc).map(({ side, active }) => [side, active])).toEqual([['Opponents', false], ['Players', true]]);
+    // The GM's list starts at the turn: the side whose turn it is on top, the next round's below a divider
+    expect(groups(doc).map(({ side, active }) => [side, active])).toEqual([['Players', true], ['Opponents', false]]);
+    expect(doc.querySelector('.atlas-player-initiative__next-round')?.getAttribute('aria-label')).toBe('Round 3');
     expect(doc.querySelectorAll('.atlas-player-initiative__card--sitting-out')).toHaveLength(1);
     expect(doc.body.textContent).toContain('Round 2');
   });

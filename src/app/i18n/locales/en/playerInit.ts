@@ -1,6 +1,7 @@
 import type { Message } from '../../types';
 
 export const playerInit = {
+  'playerInit.conditions': 'Conditions',
   'playerInit.defeated': 'Defeated',
   'playerInit.delayed': 'Delayed',
   'playerInit.order': 'Initiative order',

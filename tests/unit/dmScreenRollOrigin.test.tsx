@@ -43,12 +43,13 @@ function scene(mapPath: string, name: string, changes: object = {}): typeof stat
   return {
     mapPath, mapLoaded: true, isMapLoading: false,
     objects: { tokens: { wolf: { id: 'wolf', kind: 'character', name, x: 0, y: 0, imagePath: '', statblockPath: WOLF } } },
+    initiative: { entries: [], isActive: false, round: 0 },
     dmNotePath: null, setDMNotePath: vi.fn(), updateToken: vi.fn(),
     ...changes,
   };
 }
 
-let state: { mapPath: string; mapLoaded: boolean; isMapLoading: boolean; objects: { tokens: Record<string, object> }; dmNotePath: null; setDMNotePath: () => void; updateToken: () => void };
+let state: { mapPath: string; mapLoaded: boolean; isMapLoading: boolean; objects: { tokens: Record<string, object> }; initiative: { entries: never[]; isActive: boolean; round: number }; dmNotePath: null; setDMNotePath: () => void; updateToken: () => void };
 
 /** Clicks the first dice link while a render is committed, before the screen's effects run. */
 function ClickDuringCommit({ armed }: { armed: boolean }): null {
