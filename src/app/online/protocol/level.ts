@@ -4,8 +4,9 @@
  * new level is published.
  *
  * 1: everything up to the campaign players' codes (2026-10-18).
+ * 2: rest requests from a player character's recovery buttons (`book-rest`, `book-rest-answer`) and the `rest` log entry (2026-10-20).
  */
-export const GM_LEVEL = 1;
+export const GM_LEVEL = 2;
 
 /** The level of a GM that names none: one from before levels, which serves level 1. */
 export const UNNAMED_GM_LEVEL = 1;

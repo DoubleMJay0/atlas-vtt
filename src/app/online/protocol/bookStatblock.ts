@@ -1,5 +1,6 @@
 import { MAX_ABILITY_COMPONENTS, MAX_ABILITY_TABS, parseComponent, type AbilityComponent } from './bookAbilities.ts';
 import { isResourceKey } from './bookCharacter.ts';
+import { parseStatblockRest, type StatblockRest } from './bookRest.ts';
 import { MAX_FORMULA } from './dice.ts';
 import { MAX_COUNTERS, MAX_REFILLS, parseCounter, parseRefill, type CounterRefill, type SheetCounter } from './sheetCounters.ts';
 import { bookLine, MAX_BOOK_TITLE } from './bookText.ts';
@@ -69,9 +70,10 @@ export interface SheetSigils {
 /**
  * The player's own character's statblock as the GM's Atlas draws it for them: only what the
  * template lets players see, every text worked out. `editable` is false where the template cannot
- * be read as it was written (missing, of a newer Atlas): then nothing of it may be changed.
+ * be read as it was written (missing, of a newer Atlas): then nothing of it may be changed. A player
+ * character's has its recovery buttons (`StatblockRest`).
  */
-export interface BookStatblock {
+export interface BookStatblock extends StatblockRest {
   readonly editable: boolean;
   readonly displayName: string | null;
   readonly sigils: SheetSigils;
@@ -288,7 +290,8 @@ export function parseBookStatblock(value: unknown): BookStatblock | null | undef
   const abilities = components as AbilityComponent[];
   if (new Set(abilities.map((entry) => entry.id)).size !== abilities.length) return undefined;
   const refills = parseRefills(value.refills, budget);
-  if (refills === null) return undefined;
-  return { editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }) };
+  const rest = parseStatblockRest(value, budget);
+  if (refills === null || rest === null) return undefined;
+  return { editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }), ...rest };
 }
 
