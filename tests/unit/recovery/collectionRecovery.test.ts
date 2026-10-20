@@ -3,7 +3,7 @@ import { BUILT_IN_SYSTEM_PRESETS } from '../../../src/app/gameSystems/builtInPre
 import { parseSystemRules } from '../../../src/app/gameSystems/presetValidation';
 import { rulesOfPreset, sameSystemRules, vanillaSystemSettings } from '../../../src/app/gameSystems/systemRules';
 import {
-  collectionRecovery, collectionRecoveryRecord, editedRecovery, recoveryMoved, recoveryTemplateIds, sameRecovery,
+  collectionRecovery, collectionRecoveryRecord, editedRecovery, recoveryLost, recoveryMoved, recoveryTemplateIds, sameRecovery,
 } from '../../../src/app/recovery/collectionRecovery';
 import { MAX_RECOVERY_BUTTONS, type RecoveryButton, type RecoveryRecord } from '../../../src/app/recovery/recoveryTypes';
 import { comparableSettings, exportedSettings, importedSettings, withPresetRecovery } from '../../../src/app/services/collectionBundle/bundleSettings';
@@ -117,6 +117,23 @@ describe('recoveryMoved', () => {
     expect(recoveryMoved(record, 'other-template-aaaaaa', NPC)).toBeUndefined();
     expect(recoveryMoved(undefined, PC, null)).toBeUndefined();
     expect(recoveryMoved(record, PC, PC)).toBeUndefined();
+  });
+});
+
+describe('recoveryLost', () => {
+  const record: RecoveryRecord = { [PC]: [shortRest, longRest], [NPC]: [longRest] };
+
+  it('names the buttons a replacement has no id or room for, and all of them without a replacement', () => {
+    expect(recoveryLost(record, PC, NPC)).toEqual([longRest]);
+    expect(recoveryLost(record, PC, null)).toEqual([shortRest, longRest]);
+    const many = (prefix: string): RecoveryButton[] => Array.from({ length: 4 }, (_, i) => ({ id: `${prefix}${i}`, name: `${prefix}${i}`, rules: [] }));
+    expect(recoveryLost({ [PC]: many('a'), [NPC]: many('b') }, PC, NPC).map((button) => button.id)).toEqual(['a2', 'a3']);
+  });
+
+  it('names none where everything moves, or the template had none', () => {
+    expect(recoveryLost({ [PC]: [shortRest] }, PC, NPC)).toEqual([]);
+    expect(recoveryLost(record, 'other-template-aaaaaa', null)).toEqual([]);
+    expect(recoveryLost(record, PC, PC)).toEqual([]);
   });
 });
 

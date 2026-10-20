@@ -11,8 +11,6 @@ import type { App } from 'obsidian';
 import { AssetService } from '../../services/AssetService';
 import { SystemPresetFiles } from '../../services/systemPresets/SystemPresetFiles';
 import { SystemPresetService } from '../../services/SystemPresetService';
-import { editedRecovery, presetRecovery, recoveryMoved, recoveryTemplateIds } from '../../recovery/collectionRecovery';
-import { parseRecovery } from '../../recovery/parseRecovery';
 import type { StatblockRole } from '../model/roleTypes';
 import { isBuiltInTemplateId, type StatblockTemplate, type TemplateId } from '../model/templateTypes';
 import { switchTemplates } from '../notes/templateSwitch';
@@ -20,6 +18,7 @@ import { builtInTemplate } from './builtInTemplates';
 import { copyTemplateBody, trashTemplateBody, writeNewTemplateBody } from './templateBodyNotes';
 import { TemplateLibrary } from './TemplateLibrary';
 import { copyName } from './templatePaths';
+import { moveRecoveryButtons } from './templateRecovery';
 import { templateUsage } from './templateUsage';
 import { newTemplateFile } from './templateWriter';
 
@@ -97,26 +96,5 @@ async function replaceRoleTemplates(app: App, from: TemplateId, to: TemplateId):
   for (const preset of presets.list()) {
     const statblockRoles = preset.builtIn ? null : rolesWith(preset.rules.statblockRoles, from, to);
     if (statblockRoles) presets.update(preset.id, { ...preset.rules, statblockRoles });
-  }
-}
-
-/** Recovery buttons of the template `from` move to `to` (go, without one): the collections' own and those of saved systems. */
-async function moveRecoveryButtons(app: App, from: TemplateId, to: TemplateId | null): Promise<void> {
-  const assets = AssetService.getInstance(app);
-  const files = SystemPresetFiles.forApp(app);
-  const presets = files ? new SystemPresetService(files) : null;
-  const known = presets?.list() ?? [];
-  for (const collection of assets.loadedCollections()) {
-    const settings = collection.settings;
-    const own = parseRecovery(settings?.recovery);
-    const moved = own && recoveryMoved(own, from, to);
-    if (moved) await assets.updateCollectionSettings(collection.id, { recovery: editedRecovery(moved, presetRecovery(settings?.systemPresetId, known)) });
-  }
-  if (!presets) return;
-  for (const preset of known) {
-    const moved = preset.builtIn ? undefined : recoveryMoved(preset.rules.recovery, from, to);
-    if (!moved) continue;
-    const { recovery: _recovery, ...rules } = preset.rules;
-    presets.update(preset.id, recoveryTemplateIds(moved).length > 0 ? { ...rules, recovery: moved } : rules);
   }
 }

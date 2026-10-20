@@ -59,18 +59,35 @@ function withoutEmptyTemplates(record: RecoveryRecord): RecoveryRecord {
   return Object.fromEntries(recoveryTemplateIds(record).map((templateId) => [templateId, record[templateId]!]));
 }
 
+interface Moved {
+  readonly record: RecoveryRecord;
+  /** The buttons of `from` that did not move, in order. */
+  readonly lost: readonly RecoveryButton[];
+}
+
+function moved(record: RecoveryRecord | undefined, from: TemplateId, to: TemplateId | null): Moved | undefined {
+  const moving = record && Object.hasOwn(record, from) ? record[from]! : NO_BUTTONS;
+  if (moving.length === 0 || to === from) return undefined;
+  const rest = Object.fromEntries(Object.entries(record!).filter(([templateId]) => templateId !== from));
+  if (to === null) return { record: rest, lost: moving };
+  const kept = Object.hasOwn(rest, to) ? rest[to]! : NO_BUTTONS;
+  const taken = new Set(kept.map((button) => button.id));
+  const room = Math.max(0, MAX_RECOVERY_BUTTONS - kept.length);
+  const fitting = moving.filter((button) => !taken.has(button.id));
+  const joining = new Set(fitting.slice(0, room));
+  return { record: { ...rest, [to]: [...kept, ...joining] }, lost: moving.filter((button) => !joining.has(button)) };
+}
+
 /**
  * The record once the template `from` is gone: its buttons move to `to` after those `to` already
  * offers (one whose id `to` uses stays behind, and none past `MAX_RECOVERY_BUTTONS`), or go with it
  * where there is no replacement. Undefined where `from` offers no button.
  */
 export function recoveryMoved(record: RecoveryRecord | undefined, from: TemplateId, to: TemplateId | null): RecoveryRecord | undefined {
-  const moving = record && Object.hasOwn(record, from) ? record[from]! : NO_BUTTONS;
-  if (moving.length === 0 || to === from) return undefined;
-  const rest = Object.fromEntries(Object.entries(record!).filter(([templateId]) => templateId !== from));
-  if (to === null) return rest;
-  const kept = Object.hasOwn(rest, to) ? rest[to]! : NO_BUTTONS;
-  const taken = new Set(kept.map((button) => button.id));
-  const joined = [...kept, ...moving.filter((button) => !taken.has(button.id))].slice(0, MAX_RECOVERY_BUTTONS);
-  return { ...rest, [to]: joined };
+  return moved(record, from, to)?.record;
+}
+
+/** The buttons of the template `from` that go with it once it is gone (`recoveryMoved`): all without a replacement, else those `to` has no room or id for. */
+export function recoveryLost(record: RecoveryRecord | undefined, from: TemplateId, to: TemplateId | null): readonly RecoveryButton[] {
+  return moved(record, from, to)?.lost ?? NO_BUTTONS;
 }

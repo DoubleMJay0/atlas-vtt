@@ -8,6 +8,7 @@ import { builtInTemplate } from '../../../../src/app/statblocks/library/builtInT
 import { TemplateLibrary } from '../../../../src/app/statblocks/library/TemplateLibrary';
 import { TemplateSession } from '../../../../src/app/statblocks/library/TemplateSession';
 import { copyTemplate, createTemplateFile, deleteTemplate } from '../../../../src/app/statblocks/library/templateActions';
+import { recoveryButtonsLost } from '../../../../src/app/statblocks/library/templateRecovery';
 import { templateUsage } from '../../../../src/app/statblocks/library/templateUsage';
 import { NoteFieldWriter } from '../../../../src/app/statblocks/notes/NoteFieldWriter';
 import type { StatblockTemplate } from '../../../../src/app/statblocks/model/templateTypes';
@@ -157,6 +158,19 @@ describe('deleteTemplate', () => {
     collections = [{ ...rested(), settings: { conditions: [], recovery: { [MARSH_ID]: [rest], [REPLACEMENT]: [rest] } } }];
     await deleteTemplate(vault.app, MARSH_ID, null);
     expect(updateCollectionSettings).toHaveBeenCalledWith('rested', { recovery: { [REPLACEMENT]: [rest] } });
+  });
+
+  it('names the recovery buttons that go with it, of collections and saved systems, each once', () => {
+    const button = (id: string, name: string) => ({ id, name, rules: [] });
+    const presets = new SystemPresetService(settings);
+    const homebrew = presets.list().find((preset) => preset.name === 'Homebrew')!;
+    presets.update(homebrew.id, { ...homebrew.rules, recovery: { [MARSH_ID]: [button('long', 'Long rest'), button('dawn', 'Dawn')] } });
+    collections = [{ ...collection('rested'), settings: { conditions: [], recovery: { [MARSH_ID]: [button('long', 'Long rest'), button('short', 'Short rest')], [REPLACEMENT]: [button('long', 'Long rest')] } } }];
+    expect(recoveryButtonsLost(vault.app, MARSH_ID, null)).toEqual(['Long rest', 'Short rest', 'Dawn']);
+    // The replacement takes what it has room and no id for.
+    expect(recoveryButtonsLost(vault.app, MARSH_ID, REPLACEMENT)).toEqual(['Long rest']);
+    collections = [];
+    expect(recoveryButtonsLost(vault.app, MARSH_ID, REPLACEMENT)).toEqual([]);
   });
 
   it('never deletes a built-in', async () => {

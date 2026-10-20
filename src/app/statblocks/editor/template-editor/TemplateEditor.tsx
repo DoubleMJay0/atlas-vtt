@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { App } from 'obsidian';
 import { useTemplateLibrary } from '../../library/useTemplateLibrary';
 import { deleteTemplate } from '../../library/templateActions';
+import { recoveryButtonsLost } from '../../library/templateRecovery';
 import { templateUsage, type TemplateUsage } from '../../library/templateUsage';
 import type { FieldRecord } from '../../values/fieldValues';
 import { TemplateDragAndDrop } from '../dnd/DndProvider';
@@ -271,6 +272,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
             templateId={snapshot.id}
             usage={deleting}
             templates={library?.templates ?? []}
+            lostButtons={(replacement) => recoveryButtonsLost(app, snapshot.id, replacement)}
             onDelete={async (replacement) => {
               await deleteTemplate(app, snapshot.id, replacement);
               setDeleting(null);
