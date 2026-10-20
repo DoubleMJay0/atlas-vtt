@@ -26,9 +26,17 @@ const state = vi.hoisted(() => ({
   updateTokens: vi.fn(),
   setInitiativeSitsOut: vi.fn(),
   resetInitiative: vi.fn(),
+  setInitiativeConfig: vi.fn(),
+  delayInitiativeTurn: vi.fn(),
+  actNowInInitiative: vi.fn(),
 }));
 const collection = vi.hoisted(() => ({ rules: { mode: 'sides', roll: '1d20', firstSide: 'players' } as InitiativeRules }));
 const opened = vi.hoisted(() => ({ entries: [] as ContextMenuEntry[] }));
+
+const confirm = vi.hoisted(() => ({ answer: true, asked: [] as string[] }));
+vi.mock('../../src/app/ui/confirmDialog', () => ({
+  confirmAction: (options: { title: string }) => { confirm.asked.push(options.title); return Promise.resolve(confirm.answer); },
+}));
 
 const scrolls = vi.hoisted(() => ({ calls: [] as unknown[][] }));
 vi.mock('../../src/app/utils/scrollWithin', () => ({ scrollWithin: (...args: unknown[]) => { scrolls.calls.push(args); } }));
@@ -42,7 +50,8 @@ vi.mock('../../src/app/react/ViewStoreContext', () => ({
   useAtlasStore: (selector: (storeState: typeof state) => unknown) => selector(state),
   useViewStoreHook: () => ({ getState: () => state }),
 }));
-vi.mock('../../src/app/resources/useMapResources', () => ({ useMapResources: () => [] }));
+const resources = vi.hoisted(() => ({ definitions: [] as unknown[] }));
+vi.mock('../../src/app/resources/useMapResources', () => ({ useMapResources: () => resources.definitions }));
 vi.mock('../../src/app/pixi/utils/tokenHighlight', () => ({ zoomToTokenWithHighlight: vi.fn() }));
 vi.mock('../../src/app/react/components/StatblockHoverPreview', () => ({
   StatblockHoverPreview: () => null,
@@ -53,6 +62,7 @@ vi.mock('../../src/app/react/components/StatblockHoverPreview', () => ({
 }));
 
 import { InitiativeTracker } from '../../src/app/react/components/InitiativeTracker';
+import { HP_RESOURCE } from '../../src/app/resources/resourceDefinitions';
 
 const token = (id: string, extra: Partial<TokenEntity> = {}): TokenEntity => ({ id, kind: 'token', x: 0, y: 0, imagePath: '', ...extra });
 const entryOf = (tokenId: string, order: number, extra: Partial<InitiativeEntry> = {}): InitiativeEntry => ({
@@ -66,7 +76,7 @@ function scene(initiative: Partial<InitiativeState> = {}): void {
     goblin: token('goblin'), hero: token('hero', { vision: { enabled: true } }), rat: token('rat'), cleric: token('cleric', { side: 'players' }),
   };
   state.initiative = {
-    entries: [entryOf('goblin', 0), entryOf('hero', 1), entryOf('rat', 2), entryOf('cleric', 3)], isActive: false, round: 0, ...initiative,
+    entries: [entryOf('goblin', 0), entryOf('hero', 1), entryOf('rat', 2), entryOf('cleric', 3)], isActive: false, round: 0, config: { autoSort: true }, ...initiative,
   } as InitiativeState;
 }
 
@@ -91,6 +101,9 @@ function clickItem(label: string): void {
 beforeEach(() => {
   vi.clearAllMocks();
   opened.entries = [];
+  confirm.answer = true;
+  confirm.asked = [];
+  resources.definitions = [];
   scrolls.calls.length = 0;
   collection.rules = { mode: 'sides', roll: '1d20', firstSide: 'players' };
   scene();
@@ -121,7 +134,7 @@ describe('the initiative tracker of a collection that fights by sides', () => {
   it('starts the fight with the collection\'s rules and marks the side whose turn it is', () => {
     const { container, unmount } = render(<InitiativeTracker />);
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
-    expect(state.startCombat).toHaveBeenCalledWith(collection.rules);
+    expect(state.startCombat).toHaveBeenCalledWith(collection.rules, new Set());
     unmount();
 
     scene({ isActive: true, round: 1, sides: { first: 'players', active: 'opponents' } });
@@ -192,58 +205,86 @@ describe('the initiative tracker in turn order', () => {
 });
 
 describe('clearing the initiative tracker', () => {
-  it('removes every combatant with one button, in either mode', () => {
+  const options = (): void => { fireEvent.click(screen.getByRole('button', { name: 'Tracker options' })); };
+
+  it('asks first, then removes every combatant, in either mode', async () => {
     render(<InitiativeTracker />);
-    fireEvent.click(screen.getByRole('button', { name: 'Clear initiative' }));
-    expect(state.resetInitiative).toHaveBeenCalledTimes(1);
+    options();
+    clickItem('Clear initiative');
+    await waitFor(() => expect(state.resetInitiative).toHaveBeenCalledTimes(1));
+    expect(confirm.asked).toEqual(['Clear initiative?']);
+  });
+
+  it('keeps the combatants when the GM cancels', async () => {
+    confirm.answer = false;
+    render(<InitiativeTracker />);
+    options();
+    clickItem('Clear initiative');
+    await waitFor(() => expect(confirm.asked).toHaveLength(1));
+    expect(state.resetInitiative).not.toHaveBeenCalled();
   });
 
   it('has nothing to clear in an empty tracker', () => {
-    state.initiative = { entries: [], isActive: false, round: 0 } as unknown as InitiativeState;
+    state.initiative = { entries: [], isActive: false, round: 0, config: { autoSort: true } } as unknown as InitiativeState;
     render(<InitiativeTracker />);
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Clear initiative' }).disabled).toBe(true);
+    options();
+    const clear = opened.entries.find((entry) => entry.type === 'item' && entry.label === 'Clear initiative');
+    expect(clear).toMatchObject({ disabled: true });
   });
 });
 
-describe('the initiative tracker keeps the turn in view', () => {
-  const list = (container: HTMLElement): Element => container.querySelector('.atlas-initiative-tracker__content')!;
-
-  it('scrolls its list to the combatant whose turn it is when the turn moves on', () => {
+describe('the auto sort switch', () => {
+  it('shows the setting and switches it', () => {
     collection.rules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
-    scene({ isActive: true, round: 1, currentIndex: 0 });
-    state.initiative.entries[0] = entryOf('goblin', 0, { isActive: true });
-    const { container, rerender } = render(<InitiativeTracker />);
-    scrolls.calls.length = 0;
-
-    state.initiative = { ...state.initiative, currentIndex: 2, entries: state.initiative.entries.map((entry, index) => ({ ...entry, isActive: index === 2 })) };
-    rerender(<InitiativeTracker />);
-
-    expect(scrolls.calls).toEqual([[list(container), container.querySelectorAll('.atlas-initiative-card')[2], 'nearest']]);
-  });
-
-  it('scrolls its list to the top of the side whose turn it is', () => {
-    scene({ isActive: true, round: 1, sides: { first: 'players', active: 'players' } });
-    const { container, rerender } = render(<InitiativeTracker />);
-    scrolls.calls.length = 0;
-
-    state.initiative = { ...state.initiative, sides: { first: 'players', active: 'opponents' } };
-    rerender(<InitiativeTracker />);
-
-    expect(scrolls.calls).toEqual([[list(container), container.querySelectorAll('.atlas-initiative-side')[1], 'start']]);
-  });
-
-  it('leaves the list alone while nothing about the turn changes, and without a fight', () => {
-    scene({ isActive: true, round: 1, sides: { first: 'players', active: 'players' } });
-    const { rerender, unmount } = render(<InitiativeTracker />);
-    scrolls.calls.length = 0;
-
-    state.objects = { tokens: { ...state.objects.tokens } };
-    rerender(<InitiativeTracker />);
-    expect(scrolls.calls).toEqual([]);
-
-    unmount();
-    scene();
     render(<InitiativeTracker />);
-    expect(scrolls.calls).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Tracker options' }));
+    expect(opened.entries[0]).toMatchObject({ label: 'Auto sort', checked: true, disabled: false });
+    clickItem('Auto sort');
+    expect(state.setInitiativeConfig).toHaveBeenCalledWith({ autoSort: false });
+  });
+
+  it('stays in place, disabled, where the sides take turns', () => {
+    render(<InitiativeTracker />);
+    fireEvent.click(screen.getByRole('button', { name: 'Tracker options' }));
+    expect(opened.entries[0]).toMatchObject({ label: 'Auto sort', disabled: true });
+  });
+});
+
+describe('a fight in turn order', () => {
+  beforeEach(() => {
+    collection.rules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
+    scene({ isActive: true, round: 1 });
+    state.initiative.entries[0] = entryOf('goblin', 0, { isActive: true });
+  });
+
+  it('lets a combatant sit the round out or delay its turn while the fight runs', () => {
+    const { container } = render(<InitiativeTracker />);
+    expect(menuOf(container, 0)).toEqual(expect.arrayContaining(['Sit Out This Round', 'Delay Turn']));
+    clickItem('Delay Turn');
+    clickItem('Sit Out This Round');
+    expect(state.delayInitiativeTurn).toHaveBeenCalledWith('entry-goblin', new Set());
+    expect(state.setInitiativeSitsOut).toHaveBeenCalledWith('entry-goblin', true);
+  });
+
+  it('keeps delayed combatants below the order, and lets them act now', () => {
+    state.initiative.entries[1] = entryOf('hero', 1, { delayed: true });
+    const { container } = render(<InitiativeTracker />);
+    expect(groups(container)).toEqual([{ label: 'Delayed', cards: 1, active: false }]);
+    const cards = [...container.querySelectorAll('.atlas-initiative-card')];
+    expect(cards.at(-1)!.classList.contains('atlas-initiative-card--delayed')).toBe(true);
+    expect(menuOf(container, 3)).toContain('Act Now');
+    clickItem('Act Now');
+    expect(state.actNowInInitiative).toHaveBeenCalledWith('entry-hero');
+  });
+
+  it('passes the defeated combatants to the turn buttons', () => {
+    resources.definitions = [{ ...HP_RESOURCE }];
+    state.objects.tokens.rat = token('rat', { resources: { hp: { current: 0, max: 7 } } });
+    const { container } = render(<InitiativeTracker />);
+    const [previous, next] = container.querySelectorAll('.atlas-initiative-tracker__turn-controls button');
+    fireEvent.click(next!);
+    fireEvent.click(previous!);
+    expect(state.nextTurn).toHaveBeenCalledWith(new Set(['entry-rat']));
+    expect(state.previousTurn).toHaveBeenCalledWith(new Set(['entry-rat']));
   });
 });

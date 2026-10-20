@@ -8,7 +8,9 @@ import type { ContextMenuEntry } from '../../src/app/react/components/context-me
 
 const state = vi.hoisted(() => ({
   initiativeTrackerOpen: true,
-  initiative: { entries: [] as unknown[], isActive: false, round: 0 },
+  initiative: { entries: [] as unknown[], isActive: false, round: 0, config: { autoSort: true } },
+  setInitiativeConfig: vi.fn(),
+  resetInitiative: vi.fn(),
   objects: { tokens: {} as Record<string, unknown> },
   tokenSettings: { showInstanceBadges: true },
   selectedIds: [] as string[],
@@ -175,13 +177,13 @@ describe('a click on a card', () => {
 });
 
 describe('names on the GM\'s cards', () => {
-  it('shows none until the GM switches them on, from any card\'s menu', () => {
+  it('shows none until the GM switches them on in the tracker\'s options', () => {
     const container = table();
     expect(container.querySelector('.atlas-initiative-card__name')).toBeNull();
     expect(container.querySelector('.atlas-initiative-tracker--named')).toBeNull();
 
-    fireEvent.contextMenu(container.querySelector('.atlas-initiative-card')!);
-    const item = opened.entries.find((entry) => entry.type === 'item' && entry.label === 'Show Names on Cards');
+    fireEvent.click(container.querySelector('[aria-haspopup="menu"]')!);
+    const item = opened.entries.find((entry) => entry.type === 'item' && entry.label === 'Show names');
     if (item?.type !== 'item') throw new Error('no names switch');
     expect(item.checked).toBe(false);
     void item.onClick();

@@ -1,11 +1,13 @@
-import type { ResourceValue } from '../resources/resourceTypes';
+import type { ResourceDefinition, ResourceValue } from '../resources/resourceTypes';
 import type { TokenEntity } from '../types';
 import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
 import type { InitiativeRules, InitiativeSide } from '../types/initiativeRulesTypes';
 import { createTokenPortrait } from '../packages/components/shared/tokenPortraitElement';
 import { SIDE_LABELS, listedBySides, sideOf, sidesInOrder } from '../initiative/sides';
+import { combatantDefeated } from '../initiative/defeated';
 import { scrollWithin } from '../utils/scrollWithin';
-import { hasInitiative } from '../stores/initiativeEntries';
+import { hasInitiative } from '../initiative/awaitingInitiative';
+import { setIcon } from 'obsidian';
 import './player-initiative.scss';
 import { t } from '../i18n';
 
@@ -16,10 +18,12 @@ export interface EntryToken {
   showRing: boolean;
   ringColor?: string | undefined;
   side: InitiativeSide;
+  /** Defeated, as the GM's card shows it with its skull: shown dimmed and marked, never left out. */
+  defeated: boolean;
 }
 
 /** What the players' list shows of an initiative entry. */
-export type PlayerInitiativeEntry = Pick<InitiativeEntry, 'tokenId' | 'name' | 'initiative' | 'awaitingInitiative' | 'isActive' | 'imagePath' | 'order' | 'sitsOut'>;
+export type PlayerInitiativeEntry = Pick<InitiativeEntry, 'tokenId' | 'name' | 'initiative' | 'awaitingInitiative' | 'isActive' | 'imagePath' | 'order' | 'sitsOut' | 'delayed'>;
 
 /** A combatant the players see, with what the list shows of its token. */
 export interface Combatant {
@@ -55,9 +59,15 @@ export function listedForPlayers(token: Pick<TokenEntity, 'isHidden'> | undefine
   return !!token && !token.isHidden;
 }
 
-/** What the players' list reads of a combatant's token. */
-export function entryTokenOf(token: Pick<TokenEntity, 'resources' | 'showRing' | 'ringColor' | 'side' | 'vision'> | undefined): EntryToken {
-  return { hp: token?.resources?.hp ?? null, showRing: token?.showRing !== false, ringColor: token?.ringColor, side: sideOf(token) };
+/** What the players' list reads of a combatant's token; `definitions` are the map's resources, which say who is defeated. */
+export function entryTokenOf(token: TokenEntity | undefined, definitions: readonly ResourceDefinition[]): EntryToken {
+  return {
+    hp: token?.resources?.hp ?? null,
+    showRing: token?.showRing !== false,
+    ringColor: token?.ringColor,
+    side: sideOf(token),
+    defeated: combatantDefeated(token, definitions),
+  };
 }
 
 /**
@@ -97,8 +107,7 @@ export function renderPlayerInitiative(container: HTMLElement, list: PlayerIniti
   if (list.bySides) {
     renderSides(panel, list, look);
   } else {
-    const entries = panel.createDiv({ cls: 'atlas-player-initiative__list', attr: { role: 'list' } });
-    for (const combatant of list.combatants) renderEntry(entries, combatant, look, list.isActive);
+    renderTurnOrder(panel, list, look);
   }
   if (list.isActive) {
     panel.createDiv({ cls: 'atlas-player-initiative__round', text: t('playerInit.round', { round: list.round }) });
@@ -109,6 +118,19 @@ export function renderPlayerInitiative(container: HTMLElement, list: PlayerIniti
     if (entries && side) scrollWithin(entries, side, 'start');
     else if (entries && card) scrollWithin(entries, card, 'nearest');
   }
+}
+
+/** The combatants in turn order, those that delayed their turn below it until they act. */
+function renderTurnOrder(panel: HTMLElement, list: PlayerInitiativeList, look: PlayerInitiativeLook): void {
+  const entries = panel.createDiv({ cls: 'atlas-player-initiative__list', attr: { role: 'list' } });
+  const delayed = list.combatants.filter(({ entry }) => entry.delayed);
+  for (const combatant of list.combatants) {
+    if (!combatant.entry.delayed) renderEntry(entries, combatant, look, list.isActive);
+  }
+  if (!delayed.length) return;
+  const group = entries.createDiv({ cls: 'atlas-player-initiative__side', attr: { role: 'list', 'aria-label': t('playerInit.delayed') } });
+  group.createDiv({ cls: 'atlas-player-initiative__side-label', text: t('playerInit.delayed'), attr: { 'aria-hidden': 'true' } });
+  for (const combatant of delayed) renderEntry(group, combatant, look, false);
 }
 
 /** The combatants under their side, the side that acts first on top; a side the players see nobody of is left out. */
@@ -135,12 +157,14 @@ function renderEntry(parent: HTMLElement, { entry, token }: Combatant, look: Pla
     card.setAttribute('aria-current', 'true');
   }
   if (entry.sitsOut) card.addClass('atlas-player-initiative__card--sitting-out');
+  if (entry.delayed) card.addClass('atlas-player-initiative__card--delayed');
   const src = entry.imagePath ? look.portraitSrc(entry.imagePath) : null;
   const portrait = src
     ? createTokenPortrait(card, { src, alt: look.showNames ? entry.name : '', cls: 'atlas-player-initiative__avatar', showRing: token.showRing, ringColor: token.ringColor })
     : null;
   const badge = look.badgeNumber?.(entry.tokenId) ?? null;
   if (badge !== null) (portrait ?? card).createSpan({ cls: 'atlas-player-initiative__badge', text: String(badge) });
+  if (token.defeated) renderDefeated(card, src !== null);
   // A combatant without a number yet shows a dash, not a 0 nobody rolled
   if (showValue) card.createSpan({ cls: 'atlas-player-initiative__value', text: hasInitiative(entry) ? String(entry.initiative) : '–' });
   if (look.showNames) {
@@ -153,4 +177,12 @@ function renderEntry(parent: HTMLElement, { entry, token }: Combatant, look: Pla
       attr: { max: hp.max, value: Math.max(0, hp.current), 'aria-label': 'HP' },
     });
   }
+}
+
+/** The GM card's skull, over a defeated combatant's portrait (in its place without one); the card is dimmed with it. */
+function renderDefeated(card: HTMLElement, overPortrait: boolean): void {
+  card.addClass('atlas-player-initiative__card--defeated');
+  const mark = card.createSpan({ cls: 'atlas-player-initiative__defeated', attr: { role: 'img', 'aria-label': t('playerInit.defeated') } });
+  if (overPortrait) mark.addClass('atlas-player-initiative__defeated--over');
+  setIcon(mark, 'skull');
 }

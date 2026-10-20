@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
 import { initiativeEdit, modifierText } from '../../initiative/initiativeEdit';
-import { hasInitiative } from '../../stores/initiativeEntries';
+import { hasInitiative } from '../../initiative/awaitingInitiative';
 import { EditInitiativePopup } from './EditInitiativePopup';
 
 interface OpenPopup {

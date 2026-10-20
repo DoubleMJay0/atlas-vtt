@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Character } from '../../src/app/types';
-import { hasInitiative, initiativeEntryForToken, setInitiative } from '../../src/app/stores/initiativeEntries';
+import { initiativeEntryForToken } from '../../src/app/stores/initiativeEntries';
+import { hasInitiative, setInitiative } from '../../src/app/initiative/awaitingInitiative';
 
 const character: Character = {
   id: 'goblin', kind: 'character', name: 'Goblin', x: 10, y: 20,

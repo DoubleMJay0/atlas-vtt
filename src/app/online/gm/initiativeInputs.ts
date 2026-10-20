@@ -45,10 +45,11 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
   const initiative = state.initiative;
   if (!inputs.shown || state.initiativeTrackerOpen !== true || initiative === undefined) return null;
   const tokens = state.objects.tokens;
-  const hpVisible = rules !== null && mapResources(rules, state.mapPath).some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
+  const definitions = rules !== null ? mapResources(rules, state.mapPath) : [];
+  const hpVisible = definitions.some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
   const list = playerInitiativeList(
     initiative,
-    (entry) => (listedForPlayers(tokens[entry.tokenId]) ? entryTokenOf(tokens[entry.tokenId]) : null),
+    (entry) => (listedForPlayers(tokens[entry.tokenId]) ? entryTokenOf(tokens[entry.tokenId], definitions) : null),
     initiativeRulesOf(rules, state.mapPath),
     hpVisible,
   );
@@ -57,6 +58,8 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
     name: inputs.showNames && typeof entry.name === 'string' ? entry.name.slice(0, MAX_NAME) : null,
     turn: list.isActive && !list.bySides && entry.isActive === true,
     sitsOut: entry.sitsOut === true,
+    ...(entry.delayed === true ? { delayed: true } : {}),
+    ...(token.defeated ? { defeated: true } : {}),
     art: typeof entry.imagePath === 'string' && entry.imagePath !== '' ? inputs.art(entry.imagePath) : null,
     ring: token.showRing ? { colour: token.ringColor ? ringColour(token.ringColor) : null } : null,
     side: token.side,

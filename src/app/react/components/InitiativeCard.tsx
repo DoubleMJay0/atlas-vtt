@@ -1,5 +1,5 @@
 import { useMapResources } from '../../resources/useMapResources';
-import { isDefeated } from '../../resources/resourceValues';
+import { combatantDefeated } from '../../initiative/defeated';
 import { visibleResources } from '../../resources/visibleResources';
 import React, { useCallback, useRef, useState } from 'react';
 import { EyeOff, GripVertical, Skull, User, Bot } from 'lucide-react';
@@ -8,7 +8,7 @@ import { useAtlasUI } from '../root/AtlasUIContext';
 import { useAtlasStore, useViewStoreHook } from '../ViewStoreContext';
 import { focusCombatant } from '../../initiative/focusCombatant';
 import { cardInstanceNumber } from '../../initiative/cardInstanceNumber';
-import { hasInitiative } from '../../stores/initiativeEntries';
+import { hasInitiative } from '../../initiative/awaitingInitiative';
 import { tokenDisplayName } from '../../pixi/token-renderer/tokenDisplayName';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { TokenPortrait } from '../../packages/components/shared/TokenPortrait';
@@ -74,7 +74,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   const definitions = useMapResources();
   const token = tokens[entry.tokenId];
   const bars = token ? visibleResources(token, definitions, 'dm').filter(({ definition }) => definition.defeatedWhenSpent) : [];
-  const defeated = token !== undefined && isDefeated(token, definitions);
+  const defeated = combatantDefeated(token, definitions);
   // A hidden token's entry is left out of the players' list (`PlayerInitiativePanel`)
   const hiddenFromPlayers = token?.isHidden === true;
   const name = (token && tokenDisplayName(token)) || entry.name;
@@ -150,6 +150,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
     defeated && 'atlas-initiative-card--defeated',
     hiddenFromPlayers && 'atlas-initiative-card--hidden',
     entry.sitsOut && 'atlas-initiative-card--sitting-out',
+    entry.delayed && 'atlas-initiative-card--delayed',
     isHoveredForPreview && 'atlas-initiative-card--preview-hover',
     dropPosition === 'above' && 'atlas-initiative-card--drop-above',
     dropPosition === 'below' && 'atlas-initiative-card--drop-below',
