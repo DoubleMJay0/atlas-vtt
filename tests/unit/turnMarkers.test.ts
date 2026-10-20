@@ -21,7 +21,7 @@ function sprite(x: number, y: number): TokenGroupContainer {
 }
 
 /** A store and the markers over it; `sprites` are the tokens on the map (one beside the map has none). */
-function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>, sprites: Record<string, TokenGroupContainer>, reduced = true) {
+function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>, sprites: Record<string, TokenGroupContainer>, reduced = true, defeated: ReadonlySet<string> = new Set()) {
   let state: TurnMarkerState = { initiative, objects: { tokens }, grid: { size: 70 }, isMapLoading: false };
   const listeners = new Set<(next: TurnMarkerState) => void>();
   const world = new Container();
@@ -36,6 +36,7 @@ function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>,
     spriteOf: (id) => sprites[id] ?? null,
     ticker: () => ticker,
     reducedMotion: () => reduced,
+    defeated: () => defeated,
   });
   const set = (changes: Partial<TurnMarkerState>): void => {
     state = { ...state, ...changes };
@@ -111,10 +112,33 @@ describe('the turn marker', () => {
     cleanups.push(() => markers.destroy());
     const seen = (id: string): boolean => id === 'ogre';
     const visible = markers.playerLayers(seen, true).map((layer) => layer.visible);
-    expect(visible).toEqual([true, false]);
+    // The layer, then the ogre's and the ghost's markers
+    expect(visible).toEqual([true, true, false]);
     expect(markers.playerLayers(seen, false).every((layer) => !layer.visible)).toBe(true);
     // A picture of the scene shows none
     expect(markers.pictureLayers()).toEqual([{ layer: markers.layer, visible: false }]);
+  });
+
+  it('leaves the defeated of the side with the turn without a marker', () => {
+    const sides = { ...order('none'), sides: { first: 'players' as const, active: 'opponents' as const } };
+    const { markers } = setup(sides, tokens, sprites, true, new Set(['e-ogre']));
+    cleanups.push(() => markers.destroy());
+    expect(markers.tokenIds).toEqual(['ghost']);
+  });
+
+  it('hides from the canvas where the players are not shown their list, and works the turn out again on request', () => {
+    const defeated = new Set<string>();
+    const sides = { ...order('none'), sides: { first: 'players' as const, active: 'opponents' as const } };
+    const { markers } = setup(sides, tokens, sprites, true, defeated);
+    cleanups.push(() => markers.destroy());
+    markers.showOnCanvas(false);
+    expect(markers.layer.visible).toBe(false);
+    markers.showOnCanvas(true);
+    expect(markers.layer.visible).toBe(true);
+    // The collection's resources changed: the ogre is defeated now
+    defeated.add('e-ogre');
+    markers.refresh();
+    expect(markers.tokenIds).toEqual(['ghost']);
   });
 
   it('grows in as the turn comes, unless motion is reduced, and then stands still', () => {
@@ -128,10 +152,14 @@ describe('the turn marker', () => {
     expect(markers.layer.children[0]?.scale.x).toBe(1);
     set({ initiative: order('hero') });
     expect(markers.layer.children[0]?.scale.x).toBeLessThan(1);
+    // Players see it fade in as the canvas does
+    const [, growing] = markers.playerLayers(() => true, true);
+    expect(growing?.alpha).toBe(0);
     vi.spyOn(performance, 'now').mockReturnValue(Number.MAX_SAFE_INTEGER);
     cleanups.push(() => vi.restoreAllMocks());
     frames.shift()?.(0);
     expect(markers.layer.children[0]?.scale.x).toBe(1);
+    expect(markers.playerLayers(() => true, true)[1]?.alpha).toBe(1);
     expect(frames).toEqual([]);
     const reduced = setup(order('ogre'), tokens, sprites, true);
     cleanups.push(() => reduced.markers.destroy());

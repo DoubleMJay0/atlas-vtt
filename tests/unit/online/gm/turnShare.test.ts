@@ -33,6 +33,16 @@ describe('the turn players are told of', () => {
     expect(sharedTurnTokens(state({ ...fight('ogre'), isActive: false }), true).size).toBe(0);
   });
 
+  it('leaves out, by sides, a combatant its resources call defeated: no marker, and no move on its side\'s turn', () => {
+    const hp = { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: false } as never;
+    const fallen = { ...tokens, ogre: token('ogre', { resources: { hp: { current: 0, max: 7 } } } as never) };
+    const sides = { initiative: fight('none', { sides: { first: 'opponents', active: 'opponents' } }), initiativeTrackerOpen: true, objects: { tokens: fallen } };
+    expect([...sharedTurnTokens(sides, true)]).toEqual(['ogre']);
+    expect(sharedTurnTokens(sides, true, [hp]).size).toBe(0);
+    expect(movesOutOfTurn(sides, true, 'ogre')).toBe(false);
+    expect(movesOutOfTurn(sides, true, 'ogre', [hp])).toBe(true);
+  });
+
   it('tells the page when the GM switched the banner off or keeps moves to the turn, and nothing otherwise', () => {
     const inputs = { state: { initiative: fight('ogre'), initiativeTrackerOpen: true, mapPath: null, objects: { tokens } }, shown: true, showNames: false, rules: null, art: () => null };
     expect(sharedInitiative({ ...inputs, bannerOff: true, movesOnTurn: true })).toMatchObject({ bannerOff: true, movesOnTurn: true });

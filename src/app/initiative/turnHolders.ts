@@ -37,26 +37,31 @@ export function knownSideIds(initiative: Pick<InitiativeState, 'sides'>): SideId
   return initiative.sides ? fightSides(initiative.sides).map((side) => side.id) : [];
 }
 
+/** Nobody is defeated: what a caller passes that cannot tell. */
+const NOBODY: ReadonlySet<string> = new Set();
+
 /**
  * The entries that hold `turn`: its combatant, or by sides each combatant on a side with the
- * turn that acts this round (neither sitting out nor delayed). Tokens decide a combatant's side.
+ * turn that acts this round (neither sitting out, delayed nor among the `defeated` entry ids, as
+ * `defeatedCombatants` reads them). Tokens decide a combatant's side.
  */
 export function turnEntries(
   turn: CurrentTurn | null,
   initiative: Pick<InitiativeState, 'entries' | 'sides'>,
   tokens: Readonly<Record<string, TokenEntity>>,
+  defeated: ReadonlySet<string> = NOBODY,
 ): InitiativeEntry[] {
   if (!turn) return [];
   if (turn.kind === 'combatant') return [turn.entry];
   const known = knownSideIds(initiative);
-  return initiative.entries.filter((entry) => !entry.sitsOut && !entry.delayed && tokens[entry.tokenId] !== undefined
+  return initiative.entries.filter((entry) => !entry.sitsOut && !entry.delayed && !defeated.has(entry.id) && tokens[entry.tokenId] !== undefined
     && turn.sides.includes(sideOf(tokens[entry.tokenId], known)));
 }
 
-/** The ids of the tokens that hold the turn now; none outside a fight. */
-export function turnTokenIds(initiative: TurnState | undefined, tokens: Readonly<Record<string, TokenEntity>>): string[] {
+/** The ids of the tokens that hold the turn now (by sides without the `defeated` entries); none outside a fight. */
+export function turnTokenIds(initiative: TurnState | undefined, tokens: Readonly<Record<string, TokenEntity>>, defeated: ReadonlySet<string> = NOBODY): string[] {
   if (!initiative) return [];
-  return turnEntries(currentTurn(initiative), initiative, tokens).map((entry) => entry.tokenId);
+  return turnEntries(currentTurn(initiative), initiative, tokens, defeated).map((entry) => entry.tokenId);
 }
 
 /** Whether `tokenId` fights in the tracker's fight: it has an entry. */

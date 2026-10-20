@@ -203,14 +203,15 @@ export class TokenShare {
     this.numbers = badges.numbers;
     // The store holds the fight too: the scene's type names only what every share reads
     const turnState: TurnShareState = state;
-    const turn = sharedTurnTokens(turnState, this.ports.atlasSettings?.().showInitiative === true);
+    const rules = this.ports.tokenRules?.() ?? NO_TOKEN_RULES;
+    const turn = sharedTurnTokens(turnState, this.ports.atlasSettings?.().showInitiative === true, rules.resources);
     const tokens = sharedTokens({
       tokens: mapTokens(state.objects),
       shown,
       gridSize,
       showNames: this.ports.showNames(),
       claimOf: (id, token) => seats?.claimOf(mapPath, id, token) ?? null,
-      rules: this.ports.tokenRules?.() ?? NO_TOKEN_RULES,
+      rules,
       badge: (id) => badges.badge(id),
       turn,
       art: (path) => {

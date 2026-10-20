@@ -3,7 +3,7 @@ import { StatblockTokenSync } from '../plugin/StatblockTokenSync';
 import { TokenCollectionSync } from '../plugin/TokenCollectionSync';
 import type { ResourceDefsProvider } from '../resources/resourceTypes';
 import { fitTokenArtwork, syncTokenArtwork } from './token-renderer/tokenArtwork';
-import type { AtlasSettings } from '../services/SettingsService';
+import { SettingsService, type AtlasSettings } from '../services/SettingsService';
 import { HIDDEN_TOKEN_ALPHA, gmTokenLayers, type HideableLayer, type LayerVisibility } from './playerSafeFrame';
 import type { TokenPerception } from '../vision/tokenPerception';
 import { TokenExit } from './token-renderer/TokenExit';
@@ -54,6 +54,7 @@ import type { LightPointerHandlers } from './lighting/LightInteraction';
 import { runInBackground } from '../utils/backgroundTask';
 import { isModHeld } from '../keyboard/modKey';
 import { mapTokens, sceneTokens } from '../tokens/offMap';
+import { defeatedCombatants } from '../initiative/defeated';
 
 /** What the lighting controller answers about a right-click on a door's badge. */
 export interface DoorMenuHandlers {
@@ -250,6 +251,16 @@ export class TokenRenderer {
       }
     });
     
+    // Before the collection's rules arrive: their refresh works the markers out again
+    this.turnMarkers = new TurnMarkers({
+      parent: this.viewport,
+      getState: () => this.store.getState(),
+      subscribe: (listener) => this.store.subscribe(listener),
+      spriteOf: (tokenId) => this.tokenSprites[tokenId] ?? null,
+      ticker: () => this.pixiApp?.ticker ?? null,
+      reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
+      defeated: (state) => defeatedCombatants(state.initiative.entries, sceneTokens(state.objects), this.resourceDefsProvider()),
+    });
     this.collectionSync = new TokenCollectionSync(obsApp, store.getState, {
       refreshRules: () => this.refreshCollectionRules(),
       refreshArt: (path) => this.refreshArt(path),
@@ -296,14 +307,7 @@ export class TokenRenderer {
     this.tokenContainer.zIndex = 0;
     this.viewport.addChild(this.tokenContainer);
     this.viewport.addChild(this.playerSight.outlineLayer);
-    this.turnMarkers = new TurnMarkers({
-      parent: this.viewport,
-      getState: () => this.store.getState(),
-      subscribe: (listener) => this.store.subscribe(listener),
-      spriteOf: (tokenId) => this.tokenSprites[tokenId] ?? null,
-      ticker: () => this.pixiApp?.ticker ?? null,
-      reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
-    });
+    this.watchCanvasTurn();
     this.playersView.listen(() => this.playerSight.whenSettled(() => this.syncCanvasBadges()));
 
     this.dragRuler = new DragRuler(
@@ -748,6 +752,7 @@ export class TokenRenderer {
     }
     this.playerSight.syncOutlines(perception);
     this.uiManager.setPlayersView(this.playerSight.showsPlayers() || this.isInPlayerMode());
+    this.syncCanvasTurn();
     this.dragRuler.refreshVisibility();
     this.notifyPlayersView();
   }
@@ -761,6 +766,33 @@ export class TokenRenderer {
     const seen = this.playerSight.sharesFrameSight() ? this.playersSeeOnCanvas() : null;
     if (!seen) this.playerBadges.syncCanvas(null);
     else if (!this.store.getState().isMapLoading) this.playerBadges.syncCanvas(this.playerSight.sightIsCurrent() ? seen : NOTHING_SEEN);
+  }
+
+  /**
+   * The turn markers on the canvas: while it shows the players' view (session view, the peek, the
+   * palette's player mode) only where the players are shown their initiative list, as their frame.
+   */
+  private syncCanvasTurn(): void {
+    const showsPlayers = this.playerSight.showsPlayers() || this.isInPlayerMode();
+    const view = SettingsService.forApp(this.obsApp)?.getLocalPlayerViewSettings();
+    this.turnMarkers.showOnCanvas(!showsPlayers || ((view?.showInitiative ?? false) && this.store.getState().initiativeTrackerOpen));
+  }
+
+  /** Keeps the canvas's turn markers in step with the players' view, the player view's settings and the tracker. */
+  private watchCanvasTurn(): void {
+    const stopView = this.playersView.listen(() => this.syncCanvasTurn());
+    const stopSettings = SettingsService.forApp(this.obsApp)?.onChange(() => this.syncCanvasTurn());
+    const stopStore = this.store.subscribe((state, previous) => {
+      if (state.initiativeTrackerOpen !== previous.initiativeTrackerOpen) this.syncCanvasTurn();
+    });
+    const earlier = this._unsubscribeFromStore;
+    this._unsubscribeFromStore = () => {
+      stopView();
+      stopSettings?.();
+      stopStore();
+      earlier?.();
+    };
+    this.syncCanvasTurn();
   }
 
   /** Tells whoever follows the players' view (`onPlayersViewChange`) which tokens they see now. */
@@ -1280,6 +1312,7 @@ export class TokenRenderer {
   /** Redraws what tokens show of their collection's rules (conditions, resources) and starts the resources they lack. */
   private refreshCollectionRules(): void {
     if (this.isDestroyed) return;
+    this.turnMarkers.refresh();
     this.uiManager.refreshConditions();
     this.uiManager.refreshResources();
     this.fillMissingResources();

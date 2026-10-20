@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { TurnWatch } from '../../initiative/banner/turnBanner';
 import { TurnBannerDisplay } from '../../initiative/banner/turnBannerElement';
+import { defeatedOnMap } from '../../initiative/defeatedOnMap';
 import { followTurn } from '../../initiative/followTurn';
 import { DEFAULT_TURN_OPTIONS } from '../../initiative/turnOptions';
 import { SettingsService } from '../../services/SettingsService';
@@ -33,7 +34,7 @@ export function TurnAnnouncer(): React.ReactElement {
       if (!banner) return;
       const options = SettingsService.forApp(app)?.initiativeTurnOptions() ?? DEFAULT_TURN_OPTIONS;
       if (options.banner) display.show(banner);
-      if (options.followTurn) followTurn(view?.renderer?.getViewportInstance(), state, (tokenId) => view?.renderer?.canvasShowsToken(tokenId) ?? false);
+      if (options.followTurn) followTurn(view?.renderer?.getViewportInstance(), state, (tokenId) => view?.renderer?.canvasShowsToken(tokenId) ?? false, defeatedOnMap(app, state));
     };
     look(store.getState());
     const stop = store.subscribe(look);

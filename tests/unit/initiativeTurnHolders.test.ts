@@ -34,6 +34,9 @@ describe('who holds the turn', () => {
     expect(turnTokenIds(fight(entries, { sides: { ...sides, active: 'opponents' } }), tokens)).toEqual(['ogre', 'ghost']);
     const tied: SidesFight = { ...sides, roll: '1d6', rolls: { 1: { players: 4, opponents: 4 } } };
     expect(turnTokenIds(fight(entries, { sides: tied }), tokens)).toEqual(['hero', 'ogre', 'ghost']);
+    // A defeated combatant holds no turn of its side; in turn order the holder keeps it
+    expect(turnTokenIds(fight(entries, { sides: { ...sides, active: 'opponents' } }), tokens, new Set(['e-ogre']))).toEqual(['ghost']);
+    expect(turnTokenIds(fight([entry('ogre', 0, { isActive: true })]), tokens, new Set(['e-ogre']))).toEqual(['ogre']);
   });
 
   it('tells turns apart by round and holder', () => {
@@ -92,6 +95,7 @@ describe('following the turn', () => {
     state.initiative.entries.push(entry('ghost', 2));
     expect(followedToken(state, () => true)?.id).toBe('ogre');
     expect(followedToken(state, (id) => id !== 'ogre')?.id).toBe('ghost');
+    expect(followedToken(state, () => true, new Set(['e-ogre']))?.id).toBe('ghost');
     expect(followedToken(state, () => false)).toBeNull();
     // A combatant beside the map has nothing to go to
     state.objects.tokens.ogre = token('ogre', { offMap: true } as Partial<TokenEntity>);

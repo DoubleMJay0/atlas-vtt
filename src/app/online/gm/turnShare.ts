@@ -1,4 +1,6 @@
+import { defeatedCombatants } from '../../initiative/defeated';
 import { currentTurn, inFight, turnEntries } from '../../initiative/turnHolders';
+import type { ResourceDefinition } from '../../resources/resourceTypes';
 import type { TokenEntity } from '../../types';
 import type { InitiativeState } from '../../types/initiativeTypes';
 
@@ -9,24 +11,33 @@ export interface TurnShareState {
   readonly objects: { readonly tokens: Readonly<Record<string, TokenEntity>> };
 }
 
+/** The tokens holding the turn of the store's fight, by sides without the combatants `definitions` call defeated. */
+function holders(state: TurnShareState, definitions: readonly ResourceDefinition[]): string[] {
+  const initiative = state.initiative;
+  if (!initiative) return [];
+  const defeated = defeatedCombatants(initiative.entries, state.objects.tokens, definitions);
+  return turnEntries(currentTurn(initiative), initiative, state.objects.tokens, defeated).map((entry) => entry.tokenId);
+}
+
 /**
  * The GM ids of the tokens players are told hold the turn (the page's turn marker): those of the
  * running fight's turn (`turnEntries`), and none while players are not shown the initiative list
- * (the player view's switch off, or the GM's tracker closed). Which of them a player is sent at all
- * is the token list's business: only tokens they see.
+ * (the player view's switch off, or the GM's tracker closed). By sides a defeated combatant (by the
+ * map's resource `definitions`) holds none. Which of them a player is sent at all is the token
+ * list's business: only tokens they see.
  */
-export function sharedTurnTokens(state: TurnShareState, showInitiative: boolean): ReadonlySet<string> {
-  if (!showInitiative || state.initiativeTrackerOpen !== true || !state.initiative) return new Set();
-  return new Set(turnEntries(currentTurn(state.initiative), state.initiative, state.objects.tokens).map((entry) => entry.tokenId));
+export function sharedTurnTokens(state: TurnShareState, showInitiative: boolean, definitions: readonly ResourceDefinition[] = []): ReadonlySet<string> {
+  if (!showInitiative || state.initiativeTrackerOpen !== true) return new Set();
+  return new Set(holders(state, definitions));
 }
 
 /**
  * Whether a player's move of `tokenId` is refused for being out of turn: the GM chose that players
  * move only on their turn (`movesOnTurn`), a fight runs, the token fights in it and does not hold
- * the turn (by sides: its side does not). A token outside the fight moves freely.
+ * the turn (by sides: its side does not, or it is defeated by the map's resource `definitions`). A
+ * token outside the fight moves freely.
  */
-export function movesOutOfTurn(state: TurnShareState, movesOnTurn: boolean, tokenId: string): boolean {
-  const initiative = state.initiative;
-  if (!movesOnTurn || !initiative?.isActive || !inFight(initiative, tokenId)) return false;
-  return !turnEntries(currentTurn(initiative), initiative, state.objects.tokens).some((entry) => entry.tokenId === tokenId);
+export function movesOutOfTurn(state: TurnShareState, movesOnTurn: boolean, tokenId: string, definitions: readonly ResourceDefinition[] = []): boolean {
+  if (!movesOnTurn || !state.initiative?.isActive || !inFight(state.initiative, tokenId)) return false;
+  return !holders(state, definitions).includes(tokenId);
 }

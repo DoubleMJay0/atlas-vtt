@@ -41,6 +41,8 @@ export interface TurnMarkerDeps {
   /** The ticker the markers follow their tokens by. */
   ticker(): Ticker | null;
   reducedMotion(): boolean;
+  /** The entry ids of the defeated combatants, which hold no turn of their side; none without. */
+  defeated?(state: TurnMarkerState): ReadonlySet<string>;
 }
 
 /** The marker on one token: the drawn rings in a container that grows in and follows the token. */
@@ -48,7 +50,8 @@ class TurnMarker {
   readonly view = new Container({ label: 'turnMarker', eventMode: 'none' });
   private readonly rings = new Graphics();
   private drawn = '';
-  private growth = 1;
+  /** How far the marker has grown in, 0 to 1: its scale and its opacity follow it. */
+  growth = 1;
   private readonly grow: ValueTransition;
 
   constructor() {
@@ -133,6 +136,20 @@ export class TurnMarkers {
     if (this.markers.size > 0) this.startFollowing();
   }
 
+  /** Works the markers out again: the collection's resources, which say who is defeated, may have changed. */
+  refresh(): void {
+    this.last = null;
+    this.sync(this.deps.getState());
+  }
+
+  /**
+   * Whether the canvas shows the markers. While it shows the players' view (session view, the peek,
+   * the palette's player mode) it shows them only where the players are shown their initiative list.
+   */
+  showOnCanvas(shown: boolean): void {
+    if (this.layer.visible !== shown) this.layer.visible = shown;
+  }
+
   /** Draws every marker anew: the theme's accent may have changed. */
   refreshTheme(): void {
     this.accent = readAccent();
@@ -141,10 +158,14 @@ export class TurnMarkers {
 
   /**
    * The markers in the players' frame: only on tokens they see (`seen`: not hidden, seen, not under
-   * fog), and none while their initiative list is not shown (`shown`).
+   * fog), and none while their initiative list is not shown (`shown`). A marker growing in fades in
+   * for them as it does on the canvas; the GM's translucency of a hidden token is no concern of theirs.
    */
   playerLayers(seen: TokenSeen, shown: boolean): LayerVisibility[] {
-    return [...this.markers].map(([tokenId, marker]) => ({ layer: marker.view, visible: shown && seen(tokenId), alpha: 1 }));
+    return [
+      { layer: this.layer, visible: shown },
+      ...[...this.markers].map(([tokenId, marker]) => ({ layer: marker.view, visible: shown && seen(tokenId), alpha: marker.growth })),
+    ];
   }
 
   /** A picture of the scene shows no marker. */
@@ -168,7 +189,8 @@ export class TurnMarkers {
     const key = turn ? turnKey(turn) : null;
     // Sides are read off every combatant's token; only those on the map carry a marker
     const onMap = mapTokens(state.objects);
-    const ids = new Set(turnTokenIds(state.initiative, sceneTokens(state.objects)).filter((tokenId) => onMap[tokenId] !== undefined));
+    const defeated = this.deps.defeated?.(state);
+    const ids = new Set(turnTokenIds(state.initiative, sceneTokens(state.objects), defeated).filter((tokenId) => onMap[tokenId] !== undefined));
     const turnMoved = key !== this.shownKey;
     this.shownKey = key;
     if (turnMoved) this.accent = readAccent();
