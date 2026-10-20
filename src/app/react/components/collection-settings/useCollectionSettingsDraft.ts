@@ -3,6 +3,7 @@ import { parseCreatureFilters, parseHiddenCreatureFilters } from '../../../creat
 import { parseRecovery } from '../../../recovery/parseRecovery';
 import type { RecoveryRecord } from '../../../recovery/recoveryTypes';
 import { changedResourceKeys, withSavedResourceKeys } from '../../../recovery/editor/recoveryResourceKeys';
+import { savedResources } from '../../../resources/resourceDefinitions';
 import type { AssetService } from '../../../services/AssetService';
 import type { StatblockRole, StatblockRoleFolders } from '../../../statblocks/model/roleTypes';
 import {
@@ -44,6 +45,8 @@ export interface CollectionSettingsDraft extends Omit<RulesDraft, 'toSettings'> 
   recovery: RecoveryRecord | undefined;
   /** Set only once the GM edits the buttons (`editedRecovery`), so an untouched collection keeps following its preset. */
   setRecovery: (recovery: RecoveryRecord | undefined) => void;
+  /** The own buttons as saving stores them: rules on a resource added in the dialog aim at the key it is saved with. */
+  savedRecovery: () => RecoveryRecord | undefined;
   /** The draft as the settings to save. */
   toSettings: () => Partial<CollectionSettings>;
 }
@@ -84,6 +87,10 @@ export function useCollectionSettingsDraft(
     setRecovery(parseRecovery(settings.recovery));
   }, [isOpen, collectionId, assetService, load]);
 
+  // Rules on a resource added in this dialog follow it to the key it is saved with.
+  const savedRecovery = (): RecoveryRecord | undefined =>
+    recovery && withSavedResourceKeys(recovery, changedResourceKeys(rules.resources, savedResources(rules.resources)));
+
   return {
     ...rules,
     // The collection reads its preset's roles and recovery buttons until they are edited.
@@ -108,10 +115,9 @@ export function useCollectionSettingsDraft(
     statblockRoles, setStatblockRoles,
     statblockRoleFolders, setStatblockRoleFolders,
     recovery, setRecovery,
+    savedRecovery,
     toSettings: () => {
       const system = rules.toSettings();
-      // Rules on a resource added in this dialog follow it to the key it is saved with.
-      const keys = changedResourceKeys(rules.resources, system.resources ?? []);
       return {
         ...system,
         // Trimmed, with the field as label where none was typed.
@@ -123,7 +129,7 @@ export function useCollectionSettingsDraft(
         itemRarities,
         statblockRoles: statblockRoles?.length ? savedStatblockRoles(statblockRoles) : undefined,
         statblockRoleFolders: savedRoleFolders(statblockRoleFolders, statblockRoles),
-        recovery: recovery && withSavedResourceKeys(recovery, keys),
+        recovery: savedRecovery(),
       };
     },
   };

@@ -16,19 +16,18 @@ import { syncCollectionSystem } from '../../services/collectionSystemSync';
 import { useSystemPresets } from '../hooks/useSystemPresets';
 import { useDiceSets } from '../hooks/useDiceSets';
 import { useCollectionSettingsDraft } from './collection-settings/useCollectionSettingsDraft';
+import { collectionRulesView } from './collection-settings/collectionRulesView';
 import { useExperimentalFeature } from '../hooks/useExperimentalFeature';
 import { DefaultWidgetsTab } from './collection-settings/DefaultWidgetsTab';
 import { resourceFieldSuggestions } from '../../resources/resourceFieldSuggestions';
 import { initiativeFieldSuggestions } from '../../initiative/initiativeFieldSuggestions';
 import { RandomTablesTab } from './collection-settings/RandomTablesTab';
-import { viewOfRules, type RulesView } from '../../gameSystems/rulesView';
 import { CreatureFiltersTab } from './collection-settings/CreatureFiltersTab';
 import { useCollectionCreatures } from './collection-settings/useCollectionCreatures';
 import { useRoleTemplates } from './collection-settings/useRoleTemplates';
 import { isCompleteCreatureFilter } from '../../creatures/creatureFilterDefinitions';
 import type { TemplateId } from '../../statblocks/model/templateTypes';
 import { collectionStatblockRoles } from '../../statblocks/roles/collectionStatblockRoles';
-import { collectionRecoveryRecord, recoveryTemplateIds } from '../../recovery/collectionRecovery';
 import { statblockRolesAreValid } from '../../statblocks/roles/roleValidation';
 import { StatblocksTab } from '../../statblocks/settings/StatblocksTab';
 import { initiativeEdit, RulesSettingsTabs, type SettingsTab } from './collection-settings/RulesSettingsTabs';
@@ -113,18 +112,7 @@ export function CollectionSettingsModal({
     return () => { cancelled = true; };
   }, [isOpen, collectionId, assetService]);
 
-  const rulesView = viewOfRules(draft, systemPresets.presets, diceSets.sets);
-  // A collection's statblock roles and recovery buttons are part of its game system, as a preset holds them.
-  const recovery = collectionRecoveryRecord(draft, systemPresets.presets);
-  const view: RulesView = {
-    ...rulesView,
-    systemRules: {
-      ...rulesView.systemRules,
-      statblockRoles: collectionStatblockRoles(draft, systemPresets.presets),
-      // Own buttons, even none, differ from a preset's; inherited ones are written out only where there are some.
-      ...((draft.recovery !== undefined || recoveryTemplateIds(recovery).length > 0) && { recovery }),
-    },
-  };
+  const view = collectionRulesView(draft, systemPresets.presets, diceSets.sets);
   const canSave = view.isValid
     && draft.customCreatureFilters.every(isCompleteCreatureFilter)
     && statblockRolesAreValid(draft.statblockRoles ?? []);
