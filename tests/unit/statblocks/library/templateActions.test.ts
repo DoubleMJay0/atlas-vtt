@@ -8,7 +8,7 @@ import { builtInTemplate } from '../../../../src/app/statblocks/library/builtInT
 import { TemplateLibrary } from '../../../../src/app/statblocks/library/TemplateLibrary';
 import { TemplateSession } from '../../../../src/app/statblocks/library/TemplateSession';
 import { copyTemplate, createTemplateFile, deleteTemplate } from '../../../../src/app/statblocks/library/templateActions';
-import { recoveryButtonsLost } from '../../../../src/app/statblocks/library/templateRecovery';
+import { copyRecoveryButtons, recoveryButtonsLost } from '../../../../src/app/statblocks/library/templateRecovery';
 import { templateUsage } from '../../../../src/app/statblocks/library/templateUsage';
 import { NoteFieldWriter } from '../../../../src/app/statblocks/notes/NoteFieldWriter';
 import type { StatblockTemplate } from '../../../../src/app/statblocks/model/templateTypes';
@@ -52,7 +52,11 @@ beforeEach(async () => {
     collection('plain'),
   ];
   updateCollectionSettings = vi.fn(async () => undefined);
-  vi.spyOn(AssetService, 'getInstance').mockReturnValue({ loadedCollections: () => collections, updateCollectionSettings } as unknown as AssetService);
+  vi.spyOn(AssetService, 'getInstance').mockReturnValue({
+    loadedCollections: () => collections,
+    getCollectionSettings: (id: string) => collections.find((entry) => entry.id === id)?.settings ?? { conditions: [] },
+    updateCollectionSettings,
+  } as unknown as AssetService);
   addNote('Bestiary/Bog.md', MARSH_ID);
   addNote('Bestiary/Fen.md', MARSH_ID);
   addNote('Bestiary/Goblin.md', REPLACEMENT);
@@ -111,6 +115,22 @@ describe('createTemplateFile and copyTemplate', () => {
     expect(read(copy.path).derivedFrom).not.toHaveProperty('revision');
     expect(vault.files.has(MARSH_PATH)).toBe(true);
     await expect(copyTemplate(vault.app, 'unknown-abc123')).rejects.toThrow();
+  });
+});
+
+describe('copyRecoveryButtons', () => {
+  const rest = { id: 'long', name: 'Long rest', rules: [{ target: { kind: 'resource', key: 'hp' }, does: 'full' }] } as const;
+
+  it('gives a copy the buttons of its original in one collection, as its own, writing nothing else of its settings', async () => {
+    collections = [{ ...collection('rested'), settings: { conditions: [], recovery: { [MARSH_ID]: [rest] } } }, { ...collection('other'), settings: { conditions: [], recovery: { [MARSH_ID]: [rest] } } }];
+    await copyRecoveryButtons(vault.app, 'rested', MARSH_ID, 'marsh-copy-a1b2c3');
+    expect(updateCollectionSettings).toHaveBeenCalledTimes(1);
+    expect(updateCollectionSettings).toHaveBeenCalledWith('rested', { recovery: { [MARSH_ID]: [rest], 'marsh-copy-a1b2c3': [rest] } });
+  });
+
+  it('writes nothing where the original offers no button in the collection', async () => {
+    await copyRecoveryButtons(vault.app, 'plain', MARSH_ID, 'marsh-copy-a1b2c3');
+    expect(updateCollectionSettings).not.toHaveBeenCalled();
   });
 });
 

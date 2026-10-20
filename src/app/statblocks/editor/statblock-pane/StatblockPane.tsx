@@ -49,7 +49,7 @@ export function StatblockPane(props: StatblockPaneProps): React.JSX.Element {
   const duplicate = useCallback((): void => {
     const templateId = note.templateId;
     if (!templateId) return;
-    void duplicateTemplate(app, services.writer, notePath, note.record, templateId).then((copy) => {
+    void duplicateTemplate(app, services.writer, notePath, note.record, templateId, collectionId).then((copy) => {
       if (copy) editTemplate?.(copy.id, collectionId, notePath, { path: copy.path });
     });
   }, [app, services.writer, notePath, note.record, note.templateId, editTemplate, collectionId]);

@@ -55,6 +55,17 @@ export function editedRecovery(next: RecoveryRecord, system: RecoveryRecord | un
   return sameRecovery(next, system) ? undefined : withoutEmptyTemplates(next);
 }
 
+/**
+ * The buttons a collection stores once the template `to` was made as a copy of `from`: every
+ * template's buttons it reads now, its preset's included, and `to` offering those of `from`. As the
+ * collection's own, since the copy is the collection's. Undefined where `from` offers none there.
+ */
+export function recoveryCopied(settings: RecoverySettings, presets: readonly SystemPreset[], from: TemplateId, to: TemplateId): RecoveryRecord | undefined {
+  const record = collectionRecoveryRecord(settings, presets);
+  const buttons = Object.hasOwn(record, from) ? record[from]! : NO_BUTTONS;
+  return buttons.length === 0 || from === to ? undefined : { ...record, [to]: buttons };
+}
+
 function withoutEmptyTemplates(record: RecoveryRecord): RecoveryRecord {
   return Object.fromEntries(recoveryTemplateIds(record).map((templateId) => [templateId, record[templateId]!]));
 }

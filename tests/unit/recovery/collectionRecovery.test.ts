@@ -3,7 +3,7 @@ import { BUILT_IN_SYSTEM_PRESETS } from '../../../src/app/gameSystems/builtInPre
 import { parseSystemRules } from '../../../src/app/gameSystems/presetValidation';
 import { rulesOfPreset, sameSystemRules, vanillaSystemSettings } from '../../../src/app/gameSystems/systemRules';
 import {
-  collectionRecovery, collectionRecoveryRecord, editedRecovery, recoveryLost, recoveryMoved, recoveryTemplateIds, sameRecovery,
+  collectionRecovery, collectionRecoveryRecord, editedRecovery, recoveryCopied, recoveryLost, recoveryMoved, recoveryTemplateIds, sameRecovery,
 } from '../../../src/app/recovery/collectionRecovery';
 import { MAX_RECOVERY_BUTTONS, type RecoveryButton, type RecoveryRecord } from '../../../src/app/recovery/recoveryTypes';
 import { comparableSettings, exportedSettings, importedSettings, withPresetRecovery } from '../../../src/app/services/collectionBundle/bundleSettings';
@@ -117,6 +117,20 @@ describe('recoveryMoved', () => {
     expect(recoveryMoved(record, 'other-template-aaaaaa', NPC)).toBeUndefined();
     expect(recoveryMoved(undefined, PC, null)).toBeUndefined();
     expect(recoveryMoved(record, PC, PC)).toBeUndefined();
+  });
+});
+
+describe('recoveryCopied', () => {
+  const COPY = 'player-character-copy-z9y8x7';
+
+  it('gives the copy the original\'s buttons, as the collection\'s own, the preset\'s read along', () => {
+    expect(recoveryCopied({ recovery: { [PC]: [shortRest], [NPC]: [longRest] } }, [], PC, COPY)).toEqual({ [PC]: [shortRest], [NPC]: [longRest], [COPY]: [shortRest] });
+    expect(recoveryCopied({ systemPresetId: marsh.id }, [marsh], PC, COPY)).toEqual({ ...marshRecovery, [COPY]: marshRecovery[PC] });
+  });
+
+  it('stores nothing where the original offers no button there', () => {
+    expect(recoveryCopied({ recovery: { [NPC]: [longRest] } }, [], PC, COPY)).toBeUndefined();
+    expect(recoveryCopied({}, [], PC, COPY)).toBeUndefined();
   });
 });
 

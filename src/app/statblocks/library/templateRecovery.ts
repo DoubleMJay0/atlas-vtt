@@ -1,10 +1,12 @@
 /**
- * What becomes of the recovery buttons a template offers when the template is deleted: the
- * collections' own buttons and those of saved systems move to its replacement, or go with it.
+ * What becomes of the recovery buttons a template offers when the template is copied or deleted:
+ * a copy made for one statblock offers the original's buttons in that statblock's collection; on a
+ * deletion the collections' own buttons and those of saved systems move to its replacement, or go
+ * with it.
  */
 
 import type { App } from 'obsidian';
-import { editedRecovery, presetRecovery, recoveryLost, recoveryMoved, recoveryTemplateIds } from '../../recovery/collectionRecovery';
+import { editedRecovery, presetRecovery, recoveryCopied, recoveryLost, recoveryMoved, recoveryTemplateIds } from '../../recovery/collectionRecovery';
 import { parseRecovery } from '../../recovery/parseRecovery';
 import type { RecoveryRecord } from '../../recovery/recoveryTypes';
 import { AssetService } from '../../services/AssetService';
@@ -15,6 +17,16 @@ import type { TemplateId } from '../model/templateTypes';
 function presetService(app: App): SystemPresetService | null {
   const files = SystemPresetFiles.forApp(app);
   return files ? new SystemPresetService(files) : null;
+}
+
+/**
+ * The copy `to` of the template `from` offers the buttons `from` offers in the collection
+ * `collectionId`, stored as the collection's own; nothing else of its settings changes.
+ */
+export async function copyRecoveryButtons(app: App, collectionId: string, from: TemplateId, to: TemplateId): Promise<void> {
+  const assets = AssetService.getInstance(app);
+  const recovery = recoveryCopied(assets.getCollectionSettings(collectionId), presetService(app)?.list() ?? [], from, to);
+  if (recovery) await assets.updateCollectionSettings(collectionId, { recovery });
 }
 
 /** Every record of buttons that deleting a template changes: each collection's own, and each saved (not built-in) system's. */
