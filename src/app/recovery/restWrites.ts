@@ -7,7 +7,7 @@
  */
 
 import type { App } from 'obsidian';
-import { writeCharacterValue } from '../online/gm/book/characterValues';
+import { PartySync } from '../campaigns/partyValues/PartySync';
 import { resourceUpdate } from '../resources/resourceValues';
 import { runHistoryTransaction } from '../stores/history';
 import type { ViewAtlasStore } from '../storeFactory';
@@ -55,7 +55,8 @@ function writeScene(app: App, rest: CharacterRest, outcome: RestOutcome): void {
   for (const [key, value] of outcome.resources) {
     const place = rest.resourcePlace(key);
     if (place?.kind === 'party') {
-      writeCharacterValue(app, { kind: 'character', from: '', placed: { assetId: rest.asset.id, imagePath: rest.asset.imagePath }, key, current: value.current });
+      const sync = PartySync.forApp(app);
+      sync?.setValue(place.campaignId, rest.asset.id, key, { ...sync.value(place.campaignId, rest.asset.id, key), ...value });
     } else if (place?.kind === 'token') {
       const token = place.store.getState().objects.tokens[place.tokenId];
       if (token) writesOf(place.store).resources.push({ id: place.tokenId, changes: resourceUpdate(token, key, value, false) });

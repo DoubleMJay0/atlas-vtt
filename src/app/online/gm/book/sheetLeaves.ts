@@ -58,6 +58,12 @@ export function plainValue(build: SheetBuild, label: string | null, display: Blo
 
 const plainNode = (build: SheetBuild, label: string | null, display: BlockDisplay, field: SheetField | null, rollable = false): SheetNode => ({ k: 'value', value: plainValue(build, label, display, field, rollable) });
 
+/** The resource key a tracked number's value carries, where the sheet holds a value of it; else nothing. */
+function trackedResource(build: SheetBuild, key: FieldKey): Pick<SheetValue, 'resource'> {
+  const tracked = build.shown.tracked.get(key);
+  return tracked && isResourceKey(tracked.key) && build.resources[tracked.key] ? { resource: tracked.key } : {};
+}
+
 /** The label a block shows its value under: its own, else its field's, else its key. */
 export function labelOf(build: SheetBuild, block: { label?: string | undefined; field: string }): string {
   return block.label ?? build.shown.fields.get(block.field)?.label ?? block.field;
@@ -103,7 +109,7 @@ function metricNode(build: SheetBuild, block: MetricBlock, display: BlockDisplay
     const text = metricNumberText(key, build.shown).text;
     const known = build.shown.fields.get(key);
     const label = known?.label ?? key;
-    return sheetValue(build, label, text, 'plain', field, text.trim() === '' && field ? valuePrompt(known, label) : null, { rollable: rollableBlock(block) });
+    return sheetValue(build, label, text, 'plain', field, text.trim() === '' && field ? valuePrompt(known, label) : null, { rollable: rollableBlock(block), ...trackedResource(build, key) });
   });
   return values.length > 0 ? { k: 'metric', heading, values } : null;
 }
@@ -143,17 +149,22 @@ function tableNode(build: SheetBuild, block: ScoresBlock, display: BlockDisplay,
 function trackNode(build: SheetBuild, block: TrackBlock, display: BlockDisplay, field: SheetField | null): SheetNode | null {
   const label = clippedLine(labelOf(build, block), MAX_BOOK_TITLE);
   if (display.state !== 'value') return plainNode(build, label, display, field);
-  const held = block.resource !== undefined && isResourceKey(block.resource) ? build.resources[block.resource] : undefined;
+  const resource = block.resource ?? trackedResource(build, block.field).resource;
+  const held = resource !== undefined && isResourceKey(resource) ? build.resources[resource] : undefined;
   const max = numericValue(build.shown.reader(block.field));
-  if (held && held.max > 0) return track(block, label, held.current, held.max, block.resource ?? null, null);
+  if (held && held.max > 0) {
+    // A tracked number counts the way its field says, which its value follows
+    const counts = block.resource === undefined ? build.shown.tracked.get(block.field)?.counts ?? block.counts : block.counts;
+    return track(block, label, held.current, held.max, resource ?? null, null, counts);
+  }
   if (max !== null && max > 0) return track(block, label, block.counts === 'down' ? Math.floor(max) : 0, Math.floor(max), null, field);
   const text = misfitText(build, block.field);
   return text === null ? null : { k: 'value', value: sheetValue(build, label, text, 'plain', field, null) };
 }
 
-function track(block: TrackBlock, label: string | null, current: number, max: number, resource: string | null, field: SheetField | null): SheetNode {
+function track(block: TrackBlock, label: string | null, current: number, max: number, resource: string | null, field: SheetField | null, counts = block.counts): SheetNode {
   const look = block.look === 'boxes' && max <= MAX_TRACK_BOXES ? 'boxes' : 'gauge';
-  return { k: 'track', label, look, counts: block.counts, current: Math.max(0, Math.min(current, max)), max, resource, field };
+  return { k: 'track', label, look, counts, current: Math.max(0, Math.min(current, max)), max, resource, field };
 }
 
 /** Whether the protocol carries a line exactly as it is written. */
@@ -200,7 +211,10 @@ export function leafNode(build: SheetBuild, block: TemplateBlock, display: Block
       const field = key === undefined ? null : shownFieldOf(build, key, block, display);
       return plainNode(build, null, display, field);
     }
-    case 'stat': return plainNode(build, labelOf(build, block), display, shownFieldOf(build, block.field, block, display), rollableBlock(block));
+    case 'stat': {
+      const value = plainValue(build, labelOf(build, block), display, shownFieldOf(build, block.field, block, display), rollableBlock(block));
+      return { k: 'value', value: { ...value, ...trackedResource(build, block.field) } };
+    }
     case 'tags': return wordsNode(build, block, display, shownFieldOf(build, block.field, block, display));
     case 'pairs': return pairsNode(build, block, display, shownFieldOf(build, block.field, block, display));
     case 'metric': return metricNode(build, block, display);

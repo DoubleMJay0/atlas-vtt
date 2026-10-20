@@ -63,6 +63,15 @@ $accent-line: color-mix(in oklch, var(--interactive-accent) 45%, transparent);
   transition: box-shadow $transition-fast $transition-ease, background-color $transition-fast $transition-ease;
 }
 
+// A Metric's numbers sit side by side: each spot keeps to its own column
+.atlas-sb-metric__number > .atlas-rc-spot {
+  inset: (-$spot-inset-block) 0;
+}
+
+.atlas-sb-metric__number > .atlas-rc-badge-slot {
+  right: 0;
+}
+
 // A metric the button gives back carries a quiet ring, so the button's rules read at a glance
 .atlas-rc-spot.atlas-restored {
   background: $accent-wash !important;

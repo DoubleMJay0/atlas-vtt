@@ -98,7 +98,7 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
     return rule ? ruleBadge(rule, nameOf) : null;
   };
   const sources = editing.spending && picked
-    ? new Set(metrics.metrics.filter((metric) => metricKey(metric.target) !== metricKey(picked.target)).map((metric) => metric.blockId))
+    ? new Set(metrics.metrics.filter((metric) => metricKey(metric.target) !== metricKey(picked.target)).map((metric) => metric.spotId))
     : null;
   const shared: SpotShared = { badgeOf: button?.id ?? '', register: spots.register, onPick, onKeyDown: onSpotKey, onFocus: onActive };
   const chrome = button
@@ -107,7 +107,7 @@ export function RecoveryStage(props: RecoveryStageProps): React.ReactElement {
   const pickedLabel = picked ? nameOf(picked.target) : '';
   const color = picked ? targetColor(picked.target, resources, chips) : undefined;
   const canSpend = picked !== null && metrics.metrics.some((metric) => metricKey(metric.target) !== metricKey(picked.target));
-  const reveal = active !== null && metrics.byBlock.has(active) ? active : null;
+  const reveal = active === null ? null : metrics.bySpot.get(active)?.blockId ?? null;
 
   return (
     <div

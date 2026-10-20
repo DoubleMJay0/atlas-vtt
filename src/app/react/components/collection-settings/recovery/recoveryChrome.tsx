@@ -1,7 +1,7 @@
 import React from 'react';
-import { isContainerBlock, type TemplateBlock } from '../../../../statblocks/model/templateTypes';
+import { isContainerBlock, type FieldKey, type MetricBlock, type TemplateBlock } from '../../../../statblocks/model/templateTypes';
 import type { BlockChrome, BlockDecoration } from '../../../../statblocks/render/blockChrome';
-import type { SheetMetric, SheetMetrics } from '../../../../recovery/editor/recoveryMetrics';
+import { numberSpotId, type SheetMetric, type SheetMetrics } from '../../../../recovery/editor/recoveryMetrics';
 import { MetricSpot, RefusedSpot, type SpotProps } from './MetricSpot';
 
 /** What the spots of the card share; each spot adds its own metric. */
@@ -21,33 +21,45 @@ export interface RecoveryChromeInput {
 
 /**
  * How the recovery editor dresses the card (the template editor's seam, `BlockChromeContext`): a
- * metric gets a spot laid over it, a number no resource reads a spot that says so, and every other
- * block a class that dims it while a metric is picked. Nothing changes a block's box.
+ * metric gets a spot laid over it (each number of a Metric its own), a number nothing restores a
+ * spot that says so, and every other block a class that dims it while a metric is picked. Nothing
+ * changes a block's box.
  */
 export function recoveryChrome({ metrics, shared, badgeOf, picked, sources, tabStop }: RecoveryChromeInput): BlockChrome {
-  const order = new Map(metrics.metrics.map((metric, index) => [metric.blockId, index]));
+  const order = new Map(metrics.metrics.map((metric, index) => [metric.spotId, index]));
+  const pickedBlock = picked === null ? null : metrics.bySpot.get(picked)?.blockId ?? null;
+  const spotOf = (spotId: string): React.ReactNode => {
+    const metric = metrics.bySpot.get(spotId);
+    if (metric) {
+      return (
+        <MetricSpot
+          {...shared}
+          spotId={spotId}
+          label={metric.label}
+          badge={badgeOf(metric)}
+          order={order.get(spotId) ?? 0}
+          picked={picked === spotId}
+          source={sources?.has(spotId) ?? false}
+          tabbable={tabStop === spotId}
+        />
+      );
+    }
+    return metrics.refused.has(spotId) ? <RefusedSpot /> : null;
+  };
+  const blockClass = (blockId: string): string => {
+    if (pickedBlock === blockId) return 'atlas-rc-block atlas-rc-block--picked';
+    return metrics.metrics.some((metric) => metric.blockId === blockId) ? 'atlas-rc-block atlas-rc-block--metric' : 'atlas-rc-block';
+  };
   return {
     decorate(block: TemplateBlock): BlockDecoration | null {
-      const metric = metrics.byBlock.get(block.id);
-      if (metric) {
-        return {
-          className: picked === block.id ? 'atlas-rc-block atlas-rc-block--picked' : 'atlas-rc-block atlas-rc-block--metric',
-          overlay: (
-            <MetricSpot
-              {...shared}
-              spotId={block.id}
-              label={metric.label}
-              badge={badgeOf(metric)}
-              order={order.get(block.id) ?? 0}
-              picked={picked === block.id}
-              source={sources?.has(block.id) ?? false}
-              tabbable={tabStop === block.id}
-            />
-          ),
-        };
-      }
-      if (metrics.refused.has(block.id)) return { className: 'atlas-rc-block', overlay: <RefusedSpot /> };
+      // A Metric's numbers carry their own spots (`decorateNumber`)
+      if (block.type === 'metric') return { className: blockClass(block.id) };
+      const overlay = spotOf(block.id);
+      if (overlay) return { className: blockClass(block.id), overlay };
       return isContainerBlock(block) ? null : { className: 'atlas-rc-block' };
+    },
+    decorateNumber(block: MetricBlock, key: FieldKey): React.ReactNode {
+      return spotOf(numberSpotId(block.id, key));
     },
   };
 }

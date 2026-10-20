@@ -12,6 +12,7 @@ import { boundField, fieldsShownBy } from '../model/treeQueries';
 import { isContainerBlock, type ContainerBlock, type CountersBlock, type FieldKey, type TemplateBlock, type TemplateField } from '../model/templateTypes';
 import { isDrawnCounter, shownCounterRows } from '../values/counterValues';
 import type { SheetState } from './sheetState';
+import { trackedShown } from './values/trackedShown';
 import { blockText, isPatternBlock } from './values/blockText';
 import { hasText, shownPattern, type ShownText } from './values/shownText';
 
@@ -86,7 +87,10 @@ export function isUnboundBlock(block: TemplateBlock): boolean {
 
 function tokenHolds(block: TemplateBlock, sheet: SheetState): boolean {
   if (block.type === 'image') return Boolean(sheet.token?.art);
-  if (block.type === 'track') return Boolean(block.resource && sheet.token?.resources?.[block.resource]);
+  if (block.type === 'track') return Boolean(block.resource && sheet.token?.resources?.[block.resource]) || trackedShown(block.field, sheet) !== null;
+  // A tracked number whose maximum another field holds shows though its own field is empty
+  if (block.type === 'stat') return trackedShown(block.field, sheet) !== null;
+  if (block.type === 'metric') return block.fields.some((key) => key !== '' && trackedShown(key, sheet) !== null);
   return false;
 }
 

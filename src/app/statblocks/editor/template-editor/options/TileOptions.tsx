@@ -19,6 +19,7 @@ import { CountersOptions } from './CountersOptions';
 import { optionsKindOf } from './optionsKind';
 import { PlayersSetting } from './PlayersSetting';
 import { RollSetting } from './RollSetting';
+import { MetricTrackedSettings } from './TrackedSetting';
 import { placeOptions, type OptionsPlacement, type OptionsRoom } from './optionsPlacement';
 import { TableOptions } from './TableOptions';
 import { ValueOptions } from './ValueOptions';
@@ -182,6 +183,7 @@ export function TileOptions({ layer, stage, blockId, revision, focusKey, onClose
           {kind === 'abilities' && <AbilitiesOptions {...props} />}
           {kind === 'table' && <TableOptions {...props} />}
           {kind === 'counters' && <CountersOptions {...props} />}
+          {kind === 'metric' && block.type === 'metric' && <MetricTrackedSettings {...props} block={block} template={template} />}
           {kind === 'metric' && <RollSetting {...props} />}
           {kind === 'metric' && <AddsToRollsSetting {...props} />}
           {kind === 'line' && block.type === 'line' && <LineFields {...props} block={block} template={template} parent={null} />}

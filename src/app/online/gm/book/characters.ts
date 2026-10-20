@@ -34,8 +34,8 @@ export interface CharacterInputs {
   ownerOf(tokenId: string): string | undefined;
   /** Whether the table still knows the player. */
   isKnown(player: string): boolean;
-  /** The sheet of a token the players' frame shows, or null when none can be made of it. */
-  sheet(shown: ShownRollToken, token: TokenEntity): BookCharacter | null;
+  /** The sheet of a token the players' frame shows, with its statblock note, or null when none can be made of it. */
+  sheet(shown: ShownRollToken, token: TokenEntity, statblockPath: string | null): BookCharacter | null;
   /** The statblock note the library token a placed token came from links, or null. */
   libraryStatblock(placed: PlacedTokenSource): string | null;
 }
@@ -92,7 +92,9 @@ export class Characters {
     if (character === undefined) return;
     const resources = character.sheet.resources.map((resource) => (resource.key === key ? { ...resource, current } : resource));
     const held = character.drawnWith.resources;
-    const value = held?.[key];
+    // A tracked number the token held none of yet takes the maximum the sheet offered it with
+    const offered = character.sheet.resources.find((resource) => resource.key === key);
+    const value = held?.[key] ?? (offered && { current: offered.current, max: offered.max });
     const drawnWith = value === undefined ? character.drawnWith : { ...character.drawnWith, resources: { ...held, [key]: { ...value, current } } };
     this.played.set(player, { ...character, sheet: { ...character.sheet, resources }, drawnWith });
   }
@@ -127,12 +129,13 @@ export class Characters {
       }
       const character = { collection: scene.collection, key: characterKeyOf(token), imagePath: seen.imagePath };
       const holder = holders.get(character.key);
-      const sheet = holder === undefined || holder === owner ? inputs.sheet(seen, token) : null;
+      const statblockPath = statblockOf(token, inputs);
+      const sheet = holder === undefined || holder === owner ? inputs.sheet(seen, token, statblockPath) : null;
       if (sheet === null) continue;
       if (before !== undefined) holders.delete(before.key);
       holders.set(character.key, owner);
       const drawnWith = { definitions: scene.resources, resources: token.resources };
-      this.played.set(owner, { ...character, tokenId, placed: placedOf(token), sheet, statblockPath: statblockOf(token, inputs), drawnWith });
+      this.played.set(owner, { ...character, tokenId, placed: placedOf(token), sheet, statblockPath, drawnWith });
       settled.add(owner);
     }
   }

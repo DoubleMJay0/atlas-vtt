@@ -15,7 +15,7 @@ export const recoveryEditor = {
   'recoveryEditor.noButtons': 'Add a button such as Long rest, then click on the statblock what it gives back.',
   'recoveryEditor.pickButton': 'Pick a button to set what it gives back.',
   'recoveryEditor.pickMetrics': 'Click what {button} gives back.',
-  'recoveryEditor.notResource': 'Not a token resource: add it in the sockets first',
+  'recoveryEditor.notResource': 'Not tracked: turn on Tracked in its template options',
   'recoveryEditor.conditions': 'Conditions',
   'recoveryEditor.metricRule': '{metric}: {rule}',
   'recoveryEditor.metricUnset': '{metric}: not given back',

@@ -11,6 +11,7 @@ import type { NamedAssets } from './bookAssets.ts';
 import { bookItemOf } from './bookItem.ts';
 import type { BookShelf } from './BookShelf.ts';
 import { sheetOf } from './bookSheet.ts';
+import { trackedSheetValues } from './trackedSheet.ts';
 import { applyBookMessage, EMPTY_BOOK, withItem } from './bookStore.ts';
 import { Characters, type PlayedCharacter } from './characters.ts';
 import type { DrawnStatblock } from './statblockSheet.ts';
@@ -230,7 +231,10 @@ export class BookShare implements LootRecipientSource {
     this.characters.update(scene, {
       ownerOf: (tokenId) => this.ports.ownerOf(tokenId, scene.tokens[tokenId]),
       isKnown: (player) => known.has(player),
-      sheet: (shown, token) => sheetOf(shown, token, scene.resources, (path) => this.art.get(path)),
+      sheet: (shown, token, statblockPath) => sheetOf(
+        shown, token, scene.resources, (path) => this.art.get(path),
+        trackedSheetValues(statblockPath === null ? null : this.statblocks.resolved(statblockPath), scene.resources, token.resources),
+      ),
       libraryStatblock: (placed) => this.ports.libraryStatblock(placed),
     });
   }

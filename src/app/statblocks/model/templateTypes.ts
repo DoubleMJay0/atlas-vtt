@@ -151,6 +151,18 @@ export interface TemplateField {
   counterRows?: CounterPreset[];
   /** Prompt for an empty value in the statblock pane ("Add speed"). */
   prompt?: string;
+  /** number: a value a character spends and gets back (Luck, Ki, Hit Dice), read as `trackOf` reads it. */
+  tracks?: FieldTracking;
+}
+
+/**
+ * A tracked number: the note's value (or `max`'s) is its maximum, and the character's current value
+ * is kept with its tokens and the played campaign, as a resource's is. `down` starts full, `up` at 0.
+ */
+export interface FieldTracking {
+  counts: 'down' | 'up';
+  /** The number field that holds the maximum (Hit Dice up to `level`); unset: this field's own value. */
+  max?: FieldKey;
 }
 
 /**

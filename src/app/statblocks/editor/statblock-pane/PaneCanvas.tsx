@@ -11,6 +11,7 @@ import { PaneEditContext } from './paneEditContext';
 import type { PendingCommit } from './paneTypes';
 import { usePaneEditor } from './usePaneEditor';
 import { PaneRecoveryContext, usePaneRecovery } from './usePaneRecovery';
+import { usePaneCharacterValues } from './usePaneCharacterValues';
 import { holdTypingFocus } from './typingFocus';
 
 export interface PaneCanvasProps {
@@ -66,6 +67,7 @@ export function PaneCanvas(props: PaneCanvasProps): React.JSX.Element {
   }, []);
   const editor = usePaneEditor({ ...props, cardRef, folded, setUnfolded });
   const recovery = usePaneRecovery(app, notePath, template);
+  const character = usePaneCharacterValues(app, notePath, template, record);
   const { spots } = editor.controller;
 
   // A chip unfolds its section with focus in its first value ("Add spell").
@@ -108,6 +110,7 @@ export function PaneCanvas(props: PaneCanvasProps): React.JSX.Element {
           sourcePath={notePath}
           folded={editor.controller.foldedSet}
           reveal={editor.controller.editing?.blockId ?? null}
+          token={character}
         />
         {props.cardMenu}
         {writable && <FoldedChips folded={folded} onUnfold={(blockId) => setUnfolded(blockId, true)} />}

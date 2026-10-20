@@ -7,6 +7,9 @@ import { startCountersValue } from '../values/counterValues';
 import { fieldLabels, readField, readerFor, type FieldRecord, type ValueReader } from '../values/fieldValues';
 import { startTableValue } from '../values/tableValues';
 import type { SheetMode, StatblockTokenContext } from './sheetTypes';
+import type { ResourceDefinition } from '../../resources/resourceTypes';
+import { trackedResources } from '../../resources/trackedResources';
+import { trackedNumbers, type TrackedNumber } from '../values/trackedNumbers';
 
 /** What deciding and writing a block's text needs; no React, no Obsidian. */
 export interface SheetState {
@@ -17,8 +20,10 @@ export interface SheetState {
   /** Lookup tables and field labels for patterns and formulas. */
   context: PatternContext;
   mode: SheetMode;
-  /** The token the statblock is shown for: its art and resource values show in Image and Track blocks. */
+  /** The token the statblock is shown for: its art and resource values show in Image and Track blocks and tracked numbers. */
   token: StatblockTokenContext | undefined;
+  /** The numbers the template tracks, by field key: they show the token's current value over the note's maximum. */
+  tracked: ReadonlyMap<FieldKey, TrackedNumber>;
   /** Blocks folded into chips under the card (`foldRule.ts`): not drawn, and no value of theirs is edited. */
   folded: ReadonlySet<string>;
   /** The field a tile not named yet is drawn with, named after its kind (`provisionalSheet.ts`); never stored. */
@@ -35,6 +40,8 @@ export interface SheetStateInput {
   mode: SheetMode;
   token?: StatblockTokenContext | undefined;
   folded?: ReadonlySet<string> | undefined;
+  /** The collection's resources, where known (else the token's): a number one of them reads is not tracked by the template. */
+  resources?: readonly ResourceDefinition[] | undefined;
 }
 
 const NONE_FOLDED: ReadonlySet<string> = new Set();
@@ -60,7 +67,13 @@ function withStartingValues(record: FieldRecord, fields: readonly TemplateField[
   return filled.length > 0 ? { ...record, ...Object.fromEntries(filled) } : record;
 }
 
-export function sheetState({ template, record: stored, lookups, mode, token, folded }: SheetStateInput): SheetState {
+/** The numbers the template tracks, by field, without those a resource of `resources` is. */
+function trackedByField(template: StatblockTemplate, resources: readonly ResourceDefinition[] | undefined): ReadonlyMap<FieldKey, TrackedNumber> {
+  const numbers = resources ? trackedResources(template, resources).map((each) => each.tracked) : trackedNumbers(template);
+  return new Map(numbers.map((number) => [number.field.key, number]));
+}
+
+export function sheetState({ template, record: stored, lookups, mode, token, folded, resources }: SheetStateInput): SheetState {
   // A template not read from a file (one being made, a test's) may lack a header part's field: the part still has its name and prompt.
   const { fields } = withHeaderFields(template);
   const record = withStartingValues(stored, fields);
@@ -74,6 +87,7 @@ export function sheetState({ template, record: stored, lookups, mode, token, fol
     },
     mode,
     token,
+    tracked: trackedByField({ ...template, fields }, resources ?? token?.definitions),
     folded: folded ?? NONE_FOLDED,
     scriptReads: scriptReads(template),
   };

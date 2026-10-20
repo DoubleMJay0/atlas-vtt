@@ -7,6 +7,7 @@ import type { StatblockTemplate, TemplateField } from '../../../statblocks/model
 import { sheetState } from '../../../statblocks/render/sheetState';
 import { readerFor, type FieldRecord } from '../../../statblocks/values/fieldValues';
 import { playerAccess } from './playerAccess.ts';
+import { trackedSheetValues } from './trackedSheet.ts';
 import { SheetBudget } from './sheetBudget.ts';
 import type { SheetBuild } from './sheetFields.ts';
 import { fittedNodes, sheetNodes, type SheetWalk } from './sheetNodes.ts';
@@ -74,12 +75,14 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
   const record = input.resolved.fields;
   const shown = shownRecord(record, template, fields);
   const reader = readerFor(record, fields);
+  // The numbers the template tracks are resources of the character too, held or where they start
+  const tracked = trackedSheetValues(input.resolved, input.definitions, input.resources);
   const build: SheetBuild = {
     template, record, editable, texts,
-    shown: sheetState({ template, record: shown, mode: 'view' }),
-    editing: sheetState({ template, record: shown, mode: 'editing' }),
-    definitions: input.definitions,
-    resources: input.resources ?? {},
+    shown: sheetState({ template, record: shown, mode: 'view', resources: input.definitions }),
+    editing: sheetState({ template, record: shown, mode: 'editing', resources: input.definitions }),
+    definitions: [...input.definitions, ...tracked.map((each) => each.definition)],
+    resources: { ...input.resources, ...Object.fromEntries(tracked.map((each) => [each.definition.key, each.value])) },
     budget: new SheetBudget(),
     holds: (block) => block.showWhen === undefined || evaluateCondition(block.showWhen, reader),
   };
