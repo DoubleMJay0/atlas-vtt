@@ -15,12 +15,16 @@ export interface RestRowProps extends Omit<RowFlags, 'editing'> {
   readonly api: RowApi;
 }
 
-/** One change as the row says it: "HP 4 → 18 (2d8+2 = 9)". */
+/** One change as the row says it: "HP 4 → 18 (2d8+2 = 9)", and "Kestrel: HP 4 → 8" for one made to another character than the one resting. */
 export function restChangeText(change: RestChange): string {
-  return `${change.label} ${change.from} → ${change.to}${change.roll === undefined ? '' : ` (${change.roll})`}`;
+  const text = `${change.label} ${change.from} → ${change.to}${change.roll === undefined ? '' : ` (${change.roll})`}`;
+  return change.character === undefined ? text : `${change.character}: ${text}`;
 }
 
-/** A rest the GM's Atlas applied: who rested and which rest, then what it changed and what it could not, where this player may see it. */
+/**
+ * A rest the GM's Atlas applied: who rested and which rest, the actions picked in it, then what it
+ * changed and what it could not, where this player may see it.
+ */
 export const RestRow = memo(function RestRow({ entry, time, thread, api, ...flags }: RestRowProps): ReactElement {
   const reactions = reactionsFor(entry, api.self);
   return (
@@ -32,11 +36,12 @@ export const RestRow = memo(function RestRow({ entry, time, thread, api, ...flag
             <span className="atlas-online-log__name">{`${entry.character} · ${entry.button}`}</span>
             <span className="atlas-online-log__time">{time}</span>
           </div>
-          {entry.changes !== undefined && (
+          {(entry.changes !== undefined || entry.picks !== undefined) && (
             <div className="atlas-online-log__rest">
-              {entry.changes.length === 0
+              {entry.picks !== undefined && <span className="atlas-online-log__rest-picks">{entry.picks.join(', ')}</span>}
+              {entry.changes !== undefined && (entry.changes.length === 0
                 ? <span className="atlas-online-log__rest-quiet">Nothing to restore.</span>
-                : <span className="atlas-online-log__rest-changes">{entry.changes.map(restChangeText).join(', ')}</span>}
+                : <span className="atlas-online-log__rest-changes">{entry.changes.map(restChangeText).join(', ')}</span>)}
               {entry.skipped !== undefined && <span className="atlas-online-log__rest-quiet">{`Not changed: ${entry.skipped.join(', ')}`}</span>}
             </div>
           )}

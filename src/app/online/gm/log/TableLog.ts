@@ -84,10 +84,17 @@ export class TableLog {
 
   /**
    * The GM's Atlas took a rest of a player character (a player's request the GM approved, or the
-   * GM's own). Everyone reads who rested and how; what it changed only the character's `players`.
+   * GM's own). Everyone reads who rested, how and the actions picked; all it changed only the
+   * character's `players`, and a change made to another character also that character's players
+   * (`changePlayers`, beside each change; none for a change to the character resting).
    */
-  rested(rest: RestRecord, players: readonly string[]): void {
-    void this.add({ ...this.stamp(GM_AUTHOR, GM_NAME), kind: 'rest', ...rest, ...(players.length > 0 && { restPlayers: [...players] }) });
+  rested(rest: RestRecord, players: readonly string[], changePlayers: readonly (readonly string[])[] = []): void {
+    const others = changePlayers.some((list) => list.length > 0) && changePlayers.length === (rest.changes?.length ?? 0);
+    void this.add({
+      ...this.stamp(GM_AUTHOR, GM_NAME), kind: 'rest', ...rest,
+      ...(players.length > 0 && { restPlayers: [...players] }),
+      ...(others && { changePlayers: changePlayers.map((list) => [...list]) }),
+    });
   }
 
   /** A player at the table found a readable pin: everyone reads its note. Its entry's id, or null where it could not be logged. */
