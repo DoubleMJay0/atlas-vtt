@@ -44,6 +44,8 @@ export const csm = {
   'csm.filters.reading': 'Reading statblocks…',
   'csm.filters.remove': 'Remove filter',
   'csm.filters.statblockFields': 'Statblock fields',
+  'csm.filters.templateFilters': 'From the statblock templates',
+  'csm.filters.templateFiltersHint': 'Every number, rating, choice and list field of this collection\'s statblock templates becomes a filter.',
   'csm.filters.yours': 'Your filters',
   'csm.filters.yoursHint': 'Filter by other fields: a range for numbers such as hit dice, options for categories. Options can merge several fields.',
   'csm.grid.abstract': 'Abstract',

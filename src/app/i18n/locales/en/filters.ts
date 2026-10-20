@@ -29,6 +29,7 @@ export const filters = {
   'filters.keyword.template': 'Statblock template or layout',
   'filters.keyword.text': 'Statblock text: a word or phrase anywhere in it, like text:fire or text:pack tactics',
   'filters.text': 'Text',
+  'filters.templateFields': 'From the statblock template',
   'filters.exclude': 'Exclude',
   'filters.filterBy': 'Filter by',
   'filters.excludeField': 'Exclude {field}',
