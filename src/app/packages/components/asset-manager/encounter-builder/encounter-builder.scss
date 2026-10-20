@@ -2,10 +2,12 @@
 @use '../../../../../../styles/mixins' as *;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Encounter builder: the DM screen's statblock feeds over the asset manager,
-// a search bar above them and the encounter's tray below, all floating on the
-// blurred backdrop without a window of their own.
+// Encounter builder: a sidebar with the search and every filter, and beside it
+// the DM screen's statblock feeds with the encounter's tray below them, all
+// floating on the blurred backdrop over the asset manager.
 // ═══════════════════════════════════════════════════════════════════════════
+
+$sidebar-width: 320px;
 
 .atlas-encounter-builder {
   @include atlas-modal-overlay($z-atlas-modal);
@@ -14,43 +16,82 @@
 .atlas-encounter-builder__window {
   // Anchors the dice rolls (`.atlas-sb-pane-rolls`), which hang from its top right.
   position: relative;
-  @include atlas-flex-col($spacing-s);
+  display: flex;
+  gap: $spacing-m;
   width: 100%;
   height: 100%;
-  // Four feeds at their widest (dm-screen/feedLayout.ts).
-  max-width: calc(4 * 540px + 3 * 12px);
+  // The sidebar and four feeds at their widest (dm-screen/feedLayout.ts).
+  max-width: calc(#{$sidebar-width} + #{$spacing-m} + 4 * 540px + 3 * 12px);
   outline: none;
 }
 
-// The bar and the tray are the floating surfaces; the feed scrolls between and under them.
-.atlas-encounter-builder__bar,
+// ── Sidebar: title, search and the filters, always open ─────────────────────
+
+.atlas-encounter-builder__sidebar,
 .atlas-encounter-tray {
   @include atlas-elevated-surface;
   @include atlas-panel-radius($radius-2xl);
-  padding: $spacing-s;
-  gap: $spacing-s;
 }
 
-.atlas-encounter-builder__bar {
-  // Anchors the filter panel (`_filter-search.scss`).
-  position: relative;
+.atlas-encounter-builder__sidebar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   flex-shrink: 0;
+  width: $sidebar-width;
+  // Not clipped: the search's suggestions reach out over the feed. The filters scroll inside.
+  min-height: 0;
+}
 
-  .atlas-asset-manager-search {
-    width: min(420px, 50%);
-  }
+.atlas-encounter-builder__sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  @include atlas-close-header;
+  flex-shrink: 0;
 }
 
 .atlas-encounter-builder__title {
   flex: 1;
   min-width: 0;
   margin: 0;
-  padding-inline-start: $spacing-s;
   color: var(--text-normal);
   font-size: $font-ui-medium;
   font-weight: var(--font-semibold);
+}
+
+.atlas-encounter-builder__search {
+  flex-shrink: 0;
+  padding: 0 $spacing-l $spacing-l;
+
+  .atlas-asset-manager-search {
+    width: 100%;
+  }
+
+  // The field starts at the sidebar's left edge, so its suggestions open from there, over the feed.
+  .atlas-search-suggestions {
+    right: auto;
+    left: 0;
+    transform-origin: top left;
+  }
+}
+
+.atlas-encounter-builder__filters {
+  flex: 1;
+  padding-bottom: $spacing-l;
+}
+
+// ── Main: the count and chips, the feed, the tray floating over its foot ────
+
+.atlas-encounter-builder__main {
+  // Anchors the tray.
+  position: relative;
+  @include atlas-flex-col($spacing-s);
+  flex: 1;
+  min-width: 0;
+}
+
+.atlas-encounter-tray {
+  padding: $spacing-s;
+  gap: $spacing-s;
 }
 
 // ── Status: how many creatures show, and the active filters ─────────────────
@@ -272,6 +313,16 @@ $chip-inset: $spacing-xs;
   z-index: 2;
   display: flex;
   align-items: center;
+}
+
+// The encounter's name, first in the tray: its start sits in the tray's corner, concentric with it.
+input.atlas-encounter-tray__name-input {
+  flex: 0 0 14rem;
+  min-width: 0;
+  height: $tray-control;
+  padding: 0 $spacing-m;
+  @include atlas-panel-inset-radius($spacing-s);
+  font-size: $font-ui-small;
 }
 
 .atlas-encounter-tray__picks {

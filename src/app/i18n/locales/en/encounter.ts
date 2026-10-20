@@ -12,6 +12,8 @@ export const encounter = {
   'encounter.saved': 'Encounter "{name}" saved successfully!',
   'encounter.saveFailed': 'Failed to save encounter',
   'encounter.builder.title': 'Create encounter',
+  'encounter.builder.editTitle': 'Edit encounter',
+  'encounter.builder.name': 'Encounter name',
   'encounter.builder.search': 'Creatures',
   'encounter.builder.count': { one: '{count} creature', other: '{count} creatures' },
   'encounter.builder.shown': { one: '{shown} of {count} creature', other: '{shown} of {count} creatures' },
