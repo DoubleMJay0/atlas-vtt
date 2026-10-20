@@ -15,7 +15,7 @@ import type { CreatedTable } from './createdTable.ts';
 import { ImageShare } from './image/ImageShare.ts';
 import { PAUSED_TEXT, TableGate, type GateSettings } from './joinGate.ts';
 import { gmRoll, type GmRollDraft, type GmRollRefusal } from './log/gmRolls.ts';
-import { restRecordOf } from './log/restEntry.ts';
+import { restChangeOwners, restRecordOf } from './log/restEntry.ts';
 import { TableLog } from './log/TableLog.ts';
 import type { Ownership } from './ownership.ts';
 import { presentedScene, presentedSceneSource } from './presentedScene.ts';
@@ -243,10 +243,11 @@ export class OnlineTable {
     this.connection.start();
     this.books.start();
     this.found.start();
-    // Every rest of a character of this table the GM's Atlas takes while it runs is logged: approved requests and the GM's own.
+    // Every rest that reaches a character of this table the GM's Atlas takes while it runs is logged: approved requests and the GM's own.
     this.stopLoggingRests = gatedRests.onRested((rest) => {
       const players = this.playersOfCharacter(rest.characterId);
-      if (players.length > 0) this.log.rested(restRecordOf(rest), players);
+      const changePlayers = restChangeOwners(rest).map((id) => (id === rest.characterId ? [] : this.playersOfCharacter(id)));
+      if (players.length > 0 || changePlayers.some((list) => list.length > 0)) this.log.rested(restRecordOf(rest), players, changePlayers);
     });
     this.watch.check();
     this.stopWatchTimer = every(companionTimers(), WATCH_MS, () => this.watch.check());

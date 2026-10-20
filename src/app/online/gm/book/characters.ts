@@ -76,6 +76,11 @@ export class Characters {
     return true;
   }
 
+  /** Every character played now. */
+  all(): PlayedCharacter[] {
+    return [...this.played.values()];
+  }
+
   /** The players who play the character `key` now. */
   playersOf(key: string): string[] {
     return [...this.played].flatMap(([player, character]) => (character.key === key ? [player] : []));

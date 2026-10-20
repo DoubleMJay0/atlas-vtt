@@ -115,24 +115,31 @@ export interface FoundEntry extends EntryBase, FoundNote {
   readonly reactions?: readonly LogReaction[];
 }
 
-/** One value a rest changed: its label, what it was and became, and the roll that decided it ("2d8+2 = 9"). */
+/**
+ * One value a rest changed: its label, what it was and became, and the roll that decided it ("2d8+2 = 9").
+ * `character` names another character than the one resting, whom an action picked in the rest was taken for.
+ */
 export interface RestChange {
   readonly label: string;
   readonly from: number;
   readonly to: number;
   readonly roll?: string;
+  readonly character?: string;
 }
 
 /**
  * A rest the GM's Atlas applied (a player's request the GM approved, or the GM's own): the character
- * by name, the button by name, what it changed, and the labels of what it could not change (`skipped`).
- * Only the GM logs it. What changed is the character's player's and the GM's alone: everyone else gets
- * the entry without `changes` and `skipped`, which reads as the rest's title only.
+ * by name, the button by name, the actions picked in its steps by name (`picks`), what it changed,
+ * and the labels of what it could not change (`skipped`). Only the GM logs it. What changed is the
+ * character's player's and the GM's alone, and a change made to another character also that
+ * character's player's: everyone else gets the entry without `changes` and `skipped`, which reads
+ * as the rest's title and its picks only.
  */
 export interface RestEntry extends EntryBase {
   readonly kind: 'rest';
   readonly character: string;
   readonly button: string;
+  readonly picks?: readonly string[];
   readonly changes?: readonly RestChange[];
   readonly skipped?: readonly string[];
   readonly reactions?: readonly LogReaction[];

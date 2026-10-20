@@ -33,3 +33,39 @@ describe('a rest in the log', () => {
     expect(entries[1]).not.toHaveProperty('restPlayers');
   });
 });
+
+const ANNA = 'a'.repeat(20);
+
+/** Brannoch rests and tends to Kestrel's wounds: Mira plays Brannoch, Anna plays Kestrel, Tom neither. */
+const HELPED: GmLogEntry = {
+  id: 'c'.repeat(24), at: 2_000, who: 'gm', name: 'GM', kind: 'rest', character: 'Brannoch', button: 'Short rest', picks: ['Tend to Wounds', 'Clear Stress'],
+  changes: [{ label: 'Stress', from: 3, to: 2 }, { label: 'Hit Points', from: 2, to: 6, roll: '1d4+1 = 4', character: 'Kestrel' }],
+  skipped: ['Hope'], restPlayers: [MIRA], changePlayers: [[], [ANNA]],
+};
+
+describe('a rest with actions picked for another character', () => {
+  it('reads whole to the resting character\'s player, the changes to their own character to the other\'s, and its picks to everyone', () => {
+    const { restPlayers: _players, changePlayers: _changePlayers, ...shared } = HELPED;
+    expect(viewOf(HELPED, 'gm')).toEqual(shared);
+    expect(viewOf(HELPED, MIRA)).toEqual(shared);
+    const { changes: _changes, skipped: _skipped, ...title } = shared;
+    expect(viewOf(HELPED, ANNA)).toEqual({ ...title, changes: [{ label: 'Hit Points', from: 2, to: 6, roll: '1d4+1 = 4', character: 'Kestrel' }] });
+    expect(viewOf(HELPED, TOM)).toEqual(title);
+    expect(viewOf(HELPED, TOM)).toMatchObject({ picks: ['Tend to Wounds', 'Clear Stress'] });
+    for (const viewer of ['gm', MIRA, ANNA, TOM]) expect(parseLogEntry(JSON.parse(JSON.stringify(viewOf(HELPED, viewer))))).toEqual(viewOf(HELPED, viewer));
+  });
+
+  it('keeps whose each change is with the saved log, and none that does not fit its changes', () => {
+    const { entries } = readSavedLog({ entries: [JSON.parse(JSON.stringify(HELPED)), { ...HELPED, id: 'd'.repeat(24), changePlayers: [[ANNA]] }], present: [] });
+    expect(entries[0]?.changePlayers).toEqual([[], [ANNA]]);
+    expect(entries[1]).not.toHaveProperty('changePlayers');
+    expect(viewOf(entries[1]!, ANNA)).not.toHaveProperty('changes');
+  });
+
+  it('reads an entry of an older GM, without picks or named changes, as before', () => {
+    const { picks: _picks, changePlayers: _changePlayers, restPlayers: _players, ...older } = HELPED;
+    const read = parseLogEntry({ ...older, changes: [{ label: 'Stress', from: 3, to: 2 }] });
+    expect(read).not.toHaveProperty('picks');
+    expect(parseLogEntry({ ...older, picks: ['ok', 7] })).toBeNull();
+  });
+});

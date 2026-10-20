@@ -4,6 +4,7 @@ import {
   chatText, isLogId, isLogReaction, isTime, LOG_REACTIONS, LOG_REFUSALS, MAX_LOG_ENTRIES, MAX_REPLY_PREVIEW, MAX_REST_CHANGES, MAX_REST_ROLL, MAX_REST_TEXT,
   type ChatRefusal, type LogEntry, type LogMessage, type LogReaction, type LogReply, type PlayerChat, type PlayerLogMessage, type RestChange, type RollRequestRef,
 } from './log.ts';
+import { MAX_REST_PICKS } from './bookRest.ts';
 import { parseFoundNote, parseLootCard, parseShownImageRef } from './logShown.ts';
 import { MAX_PLAYERS, playerName, UNSEEN, UNSHOWN } from './relay.ts';
 import { isRecord } from './shape.ts';
@@ -115,7 +116,9 @@ function parseRestChange(value: unknown): RestChange | null {
   if (!isRecord(value) || !isRestValue(value.from) || !isRestValue(value.to)) return null;
   const label = exactLine(value.label, MAX_REST_TEXT);
   const roll = optional(value.roll, (held) => exactLine(held, MAX_REST_ROLL));
-  return label === null || roll === null ? null : { label, from: value.from, to: value.to, ...(roll !== undefined && { roll }) };
+  const character = optional(value.character, (held) => exactLine(held, MAX_REST_TEXT));
+  if (label === null || roll === null || character === null) return null;
+  return { label, from: value.from, to: value.to, ...(roll !== undefined && { roll }), ...(character !== undefined && { character }) };
 }
 
 function parseRestEntry(value: Record<string, unknown>, base: Pick<LogEntry, 'id' | 'at' | 'who' | 'name'>, reactions: readonly LogReaction[] | undefined): LogEntry | null {
@@ -126,9 +129,12 @@ function parseRestEntry(value: Record<string, unknown>, base: Pick<LogEntry, 'id
   // Without changes the entry is for someone who may not see what the rest changed.
   const changes = optional(value.changes, (list) => (Array.isArray(list) && list.length <= MAX_REST_CHANGES ? list.map(parseRestChange) : null));
   const skipped = optional(value.skipped, (list) => (Array.isArray(list) && list.length > 0 && list.length <= MAX_REST_CHANGES ? list.map((label) => exactLine(label, MAX_REST_TEXT)) : null));
+  const picks = optional(value.picks, (list) => (Array.isArray(list) && list.length > 0 && list.length <= MAX_REST_PICKS ? list.map((name) => exactLine(name, MAX_REST_TEXT)) : null));
   if (character === null || button === null || changes === null || changes?.some((change) => change === null) || skipped === null || skipped?.some((label) => label === null)) return null;
+  if (picks === null || picks?.some((name) => name === null)) return null;
   return {
     ...base, kind: 'rest', character, button,
+    ...(picks !== undefined && { picks: picks as string[] }),
     ...(changes !== undefined && { changes: changes as RestChange[] }),
     ...(skipped !== undefined && { skipped: skipped as string[] }),
     ...(reactions !== undefined && { reactions }),

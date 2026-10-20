@@ -53,14 +53,20 @@ export function knockCards(waiting: readonly WaitingPlayer[], actions: Pick<Gate
   }));
 }
 
-/** A card per rest a player asks for: Decline and Approve, and behind its line what the rest will do. */
+/** What a rest request's card says behind its line: the actions picked, then what the rest will do. */
+function restAbout(rest: RestCard): string {
+  const picks = rest.picks.length === 0 ? [] : [rest.picks.join(', ')];
+  return picks.length === 0 && rest.rules.length === 0 ? 'Nothing to restore' : [...picks, ...rest.rules].join(' · ');
+}
+
+/** A card per rest a player asks for: Decline and Approve, and behind its line the actions picked and what the rest will do. */
 export function restCards(rests: readonly RestCard[], actions: RestActions): StackCard[] {
   return rests.map((rest) => ({
     key: rest.key,
     label: `${rest.character} asks for a ${rest.button}`,
     name: rest.character,
     text: ` asks for a ${rest.button}`,
-    about: rest.rules.length === 0 ? 'Nothing to restore' : rest.rules.join(' · '),
+    about: restAbout(rest),
     armed: rest.armed,
     answered: rest.answered,
     actions: [
