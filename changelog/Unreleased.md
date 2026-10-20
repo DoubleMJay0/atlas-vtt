@@ -14,6 +14,7 @@
 - Initiative by cards: each combatant is dealt a card from a numbered deck, and the lowest card acts first. Deal once when the fight starts or anew every round, let look-alikes share a card, and swap two combatants' cards from the card menu.
 - Initiative by sides: name more sides than players and opponents, such as Allies, set the order they act in, and move a token to any side from its card.
 - Initiative by sides: the sides can roll for their order at the start of every round. The highest acts first, and sides with equal rolls act at the same time.
+- Simplified Chinese interface when Obsidian's language is 简体中文 or 繁體中文. Text that is not translated yet stays in English.
 
 ## Improved
 - Old-School Essentials collections run initiative by sides, with each side rolling a d6 every round.
@@ -31,6 +32,11 @@
 - Type sums into a token's HP: -10-5 takes 15, -9/2 takes half of 9 rounded down, and -9*2 takes 18 (#495, #396).
 - Initiative modifiers are found more easily. The modifier field matches statblock fields in any capitalisation and by their name in the template, reads numbers written as +3, +3 (13), 16 (+3) or Perception +12, and reads statblocks from Fantasy Statblocks too: its own initiative modifier, a Pathfinder import's Perception and the six 5e scores (type dex). The field's suggestions show what a statblock holds, and the settings say how many statblocks the field reads a modifier from.
 - When a roll finds no modifier for some combatants, a notice says how many, which field was looked for and where to choose it.
+- The initiative tracker's buttons, card menu and sides, and the collection's initiative settings are now available in Russian.
+- The collection settings' Resources tab is now available in Russian.
+- Senses are now available in Russian: the sense editors in Edit Token and the collection settings' Vision tab, and the conditions' effect on sight.
+- The dice settings, the dice tray, the roll panel and part of the dice lab are now available in Russian.
+- The toolbar editor and links to scenes and encounters in notes are now available in Russian.
 
 ## Fixed
 

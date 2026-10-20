@@ -1,14 +1,14 @@
 import { BUILT_IN_SIDES, defaultSides, sidesOfRules } from '../gameSystems/initiativeSideRules';
+import { t } from '../i18n';
 import type { TokenEntity } from '../types';
 import type { InitiativeRules, SideId, SideRef } from '../types/initiativeRulesTypes';
 import type { InitiativeState, SidesFight } from '../types/initiativeTypes';
-import { t } from '../i18n';
 import { activeSides, roundTurns } from './sideOrder';
 
 /** What the tracker and the players' list call a side: the built-in two by their translated names, a named one by its name. */
 export function sideName(side: SideRef): string {
-  if (side.id === 'players') return t('initRules.side.players');
-  if (side.id === 'opponents') return t('initRules.side.opponents');
+  if (side.id === 'players') return t('initiative.side.players');
+  if (side.id === 'opponents') return t('initiative.side.opponents');
   return side.name ?? side.id;
 }
 

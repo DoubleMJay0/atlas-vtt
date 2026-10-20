@@ -3,12 +3,12 @@
  */
 
 import React from 'react';
+import { t } from '../../../i18n';
 import { ObsidianMenuDropdown } from '../ObsidianMenuDropdown';
 import { isValidDefaultRoll } from '../../../gameSystems/diceRules';
 import type { FieldSuggestion } from '../../../resources/resourceFieldSuggestions';
 import type { NamedModifierStatblock } from '../../../initiative/modifierPreview';
 import type { InitiativeMode, InitiativeRules } from '../../../types/initiativeRulesTypes';
-import { t } from '../../../i18n';
 import { InitiativeModifierFields } from './InitiativeModifierFields';
 import { InitiativeSideFields } from './InitiativeSideFields';
 import { InitiativeCardFields } from './InitiativeCardFields';
@@ -23,13 +23,13 @@ interface InitiativeFieldsProps {
 }
 
 const MODE_OPTIONS: Record<InitiativeMode, string> = {
-  'turn-order': t('initRules.mode.turnOrder'),
-  sides: t('initRules.mode.sides'),
+  'turn-order': t('initiative.rules.turnOrder'),
+  sides: t('initiative.rules.sides'),
   cards: t('initRules.mode.cards'),
 };
 
 const MODE_DESCRIPTIONS: Record<InitiativeMode, string> = {
-  'turn-order': t('initRules.mode.turnOrderHint'),
+  'turn-order': t('initiative.rules.turnOrderHint'),
   sides: t('initRules.mode.sidesHint'),
   cards: t('initRules.mode.cardsHint'),
 };
@@ -40,7 +40,7 @@ export function InitiativeFields({ initiative, onChange, fieldSuggestions, modif
   return (
     <>
       <div className="atlas-csm-field">
-        <label className="atlas-csm-label">{t('initRules.label')}</label>
+        <label className="atlas-csm-label">{t('initiative.rules.title')}</label>
         <ObsidianMenuDropdown
           className="atlas-setting-dropdown atlas-csm-dropdown"
           value={initiative.mode}
@@ -48,14 +48,14 @@ export function InitiativeFields({ initiative, onChange, fieldSuggestions, modif
           onChange={(value) => onChange({ ...initiative, mode: value as InitiativeMode })}
         />
         <p className="atlas-csm-hint">
-          {MODE_DESCRIPTIONS[initiative.mode]} {t('initRules.applies')}
+          {MODE_DESCRIPTIONS[initiative.mode]} {t('initiative.rules.appliesHint')}
         </p>
       </div>
 
       {initiative.mode === 'turn-order' && (
         <>
           <div className="atlas-csm-field">
-            <label className="atlas-csm-label" htmlFor="atlas-csm-initiative-roll">{t('initRules.roll')}</label>
+            <label className="atlas-csm-label" htmlFor="atlas-csm-initiative-roll">{t('initiative.rules.roll')}</label>
             <input
               id="atlas-csm-initiative-roll"
               type="text"
@@ -67,7 +67,7 @@ export function InitiativeFields({ initiative, onChange, fieldSuggestions, modif
               onChange={(e) => onChange({ ...initiative, roll: e.target.value })}
             />
             {!rollValid && (
-              <p className="atlas-csm-hint atlas-csm-hint--error" role="alert">{t('initRules.rollError')}</p>
+              <p className="atlas-csm-hint atlas-csm-hint--error" role="alert">{t('initiative.rules.rollError')}</p>
             )}
           </div>
           <InitiativeModifierFields initiative={initiative} onChange={onChange} fieldSuggestions={fieldSuggestions} statblocks={modifierStatblocks} />

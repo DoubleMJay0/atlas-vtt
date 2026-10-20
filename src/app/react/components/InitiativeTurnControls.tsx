@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { t } from '../../i18n';
 
 interface InitiativeTurnControlsProps {
   fightRuns: boolean;
@@ -32,7 +33,7 @@ export function InitiativeTurnControls({ fightRuns, round, onPrevious, onNext }:
       <button className={buttonClass('prev')} onClick={onPrevious} disabled={!fightRuns}>
         <ChevronUp />
       </button>
-      <span className="atlas-initiative-tracker__round">{fightRuns ? `R${round}` : '—'}</span>
+      <span className="atlas-initiative-tracker__round">{fightRuns ? t('initiative.roundShort', { round }) : '—'}</span>
       <button className={buttonClass('next')} onClick={onNext} disabled={!fightRuns}>
         <ChevronDown />
       </button>

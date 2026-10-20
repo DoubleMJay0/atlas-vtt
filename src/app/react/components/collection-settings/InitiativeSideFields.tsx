@@ -53,8 +53,8 @@ export function InitiativeSideFields({ initiative, onChange }: InitiativeSideFie
 
   return (
     <div className="atlas-csm-field">
-      <label className="atlas-csm-label">{t('initRules.sides')}</label>
-      <p className="atlas-csm-hint">{t('initRules.sidesHint')}</p>
+      <label className="atlas-csm-label">{t('initiative.rules.sides')}</label>
+      <p className="atlas-csm-hint">{t('initRules.sidesOrder')} {t('initiative.rules.sidesOfTokens')}</p>
       <div className="atlas-csm-condition-list">
         {sides.map((side, index) => (
           <div key={side.id} className="atlas-csm-condition-row atlas-csm-side">
@@ -95,7 +95,7 @@ export function InitiativeSideFields({ initiative, onChange }: InitiativeSideFie
         value={sideRoll}
         onChange={(e) => onChange({ ...initiative, sideRoll: e.target.value })}
       />
-      {!rollValid && <p className="atlas-csm-hint atlas-csm-hint--error" role="alert">{t('initRules.rollError')}</p>}
+      {!rollValid && <p className="atlas-csm-hint atlas-csm-hint--error" role="alert">{t('initiative.rules.rollError')}</p>}
     </div>
   );
 }

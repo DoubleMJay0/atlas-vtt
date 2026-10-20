@@ -19,6 +19,8 @@ import { quest } from './quest';
 import { dashboard } from './dashboard';
 import { dice } from './dice';
 import { diceLab } from './diceLab';
+import { diceRoll } from './diceRoll';
+import { diceSettings } from './diceSettings';
 import { exportDialog } from './exportDialog';
 import { grid } from './grid';
 import { gridModal } from './gridModal';
@@ -48,8 +50,10 @@ import { sbImport } from './sbImport';
 import { vaultImages } from './vaultImages';
 import { filters } from './filters';
 import { search } from './search';
+import { senses } from './senses';
 import { sort } from './sort';
 import { toolbar } from './toolbar';
+import { toolbarEdit } from './toolbarEdit';
 import { hotkey } from './hotkey';
 import { pin } from './pin';
 import { laser } from './laser';
@@ -111,6 +115,8 @@ export const en = {
   ...dashboard,
   ...dice,
   ...diceLab,
+  ...diceRoll,
+  ...diceSettings,
   ...exportDialog,
   ...grid,
   ...gridModal,
@@ -140,8 +146,10 @@ export const en = {
   ...vaultImages,
   ...filters,
   ...search,
+  ...senses,
   ...sort,
   ...toolbar,
+  ...toolbarEdit,
   ...hotkey,
   ...pin,
   ...laser,

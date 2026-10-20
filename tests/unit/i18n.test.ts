@@ -17,6 +17,9 @@ describe('i18n', () => {
     expect(resolveLocale('ru', TRANSLATIONS)).toBe('ru');
     expect(resolveLocale('RU', TRANSLATIONS)).toBe('ru');
     expect(resolveLocale('ru-RU', TRANSLATIONS)).toBe('ru');
+    expect(resolveLocale('zh', TRANSLATIONS)).toBe('zh');
+    expect(resolveLocale('zh-CN', TRANSLATIONS)).toBe('zh');
+    expect(resolveLocale('zh-TW', TRANSLATIONS)).toBe('zh');
     expect(resolveLocale('pt-BR', TRANSLATIONS)).toBe('en');
     expect(resolveLocale('', TRANSLATIONS)).toBe('en');
   });
@@ -25,6 +28,10 @@ describe('i18n', () => {
     setLocale('ru', TRANSLATIONS);
     expect(getLocale()).toBe('ru');
     expect(t('command.openDashboard')).toBe('Открыть панель');
+    setLocale('zh', TRANSLATIONS);
+    expect(getLocale()).toBe('zh');
+    expect(t('command.openDashboard')).toBe('打开仪表盘');
+    expect(t('count.files', { count: 1 })).toBe('1 个文件');
     setLocale('fr', TRANSLATIONS);
     expect(t('command.openDashboard')).toBe('Open dashboard');
   });

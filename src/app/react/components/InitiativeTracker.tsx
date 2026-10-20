@@ -23,6 +23,7 @@ import { useStatblockHoverPreview } from './StatblockHoverPreview';
 import { InitiativeStatblockPreview, type PreviewedEntry } from './InitiativeStatblockPreview';
 import { captureRollContext } from '../../tools/diceRollOrigins';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
+import { t } from '../../i18n';
 import './initiative-tracker.scss';
 
 /**
@@ -193,7 +194,7 @@ export const InitiativeTracker: React.FC = () => {
       {/* Content - Cards for each combatant */}
       <div ref={contentRef} className="atlas-initiative-tracker__content">
         {sortedEntries.length === 0 && (
-          <p className="atlas-initiative-tracker__empty">Right-click a token to add it</p>
+          <p className="atlas-initiative-tracker__empty">{t('initiative.empty')}</p>
         )}
         {sortedEntries.length > 0 && (
           <InitiativeTrackerList

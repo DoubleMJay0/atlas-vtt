@@ -64,8 +64,13 @@ export function initiativeCardMenu(
   const moveTo = (side: SideId): void => actions.updateToken(sideChanges(token, side));
   const others = mode.sides.filter((side) => side.id !== current);
   // Of two sides the move goes to the other at once; of more, the GM picks one
+  const moveToLabel = (side: { id: SideId; name: string }): string => {
+    if (side.id === 'players') return t('initiative.moveToPlayers');
+    if (side.id === 'opponents') return t('initiative.moveToOpponents');
+    return t('initRules.moveTo', { side: side.name });
+  };
   const moveToSide: ContextMenuEntry = others.length === 1
-    ? item(t('initRules.moveTo', { side: others[0]!.name }), 'arrow-left-right', () => moveTo(others[0]!.id))
+    ? item(moveToLabel(others[0]!), 'arrow-left-right', () => moveTo(others[0]!.id))
     : {
       type: 'submenu',
       label: t('initRules.moveToSide'),
@@ -93,7 +98,7 @@ export function initiativeCardMenu(
     ...(numbered ? [item(t('initiative.edit'), 'pencil', actions.edit)] : []),
     ...(mode.cards && entry.card !== undefined && mode.swapTargets.length > 0 ? [swapCard] : []),
     ...(mode.fightRuns ? [sitOut, ...(numbered ? [delay] : [])] : []),
-    item(hidden ? 'Show to Players' : 'Hide from Players', hidden ? 'eye' : 'eye-off', () => actions.updateToken({ isHidden: !hidden })),
+    item(hidden ? t('initiative.showToPlayers') : t('initiative.hideFromPlayers'), hidden ? 'eye' : 'eye-off', () => actions.updateToken({ isHidden: !hidden })),
     { type: 'item', label: t('initiative.remove'), icon: 'trash-2', destructive: true, onClick: actions.remove },
   ];
 }

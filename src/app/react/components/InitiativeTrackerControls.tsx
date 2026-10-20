@@ -22,7 +22,7 @@ export function InitiativeTrackerControls({ rolls, empty, rolling, fightRuns, on
   return (
     <div className="atlas-initiative-tracker__controls">
       {rolls && (
-        <LabelTooltip label="Roll initiative">
+        <LabelTooltip label={t('initiative.rollAll')}>
           <button className="clickable-icon atlas-initiative-tracker__btn" onClick={onRoll} disabled={empty || rolling}>
             <Dices />
           </button>
@@ -30,13 +30,13 @@ export function InitiativeTrackerControls({ rolls, empty, rolling, fightRuns, on
       )}
 
       {!fightRuns ? (
-        <LabelTooltip label="Start combat">
+        <LabelTooltip label={t('initiative.startCombat')}>
           <button className="clickable-icon atlas-initiative-tracker__btn" onClick={onStart} disabled={empty}>
             <Swords />
           </button>
         </LabelTooltip>
       ) : (
-        <LabelTooltip label="End combat">
+        <LabelTooltip label={t('initiative.endCombat')}>
           <button className="clickable-icon atlas-initiative-tracker__btn atlas-initiative-tracker__btn--end" onClick={onEnd}>
             <EndCombatIcon />
           </button>
