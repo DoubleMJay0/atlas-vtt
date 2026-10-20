@@ -60,7 +60,8 @@ export interface BookRestMessage {
 /**
  * The GM's answer to a rest request, to its player alone: the rest was taken (`done`), the GM said no
  * (`declined`), or the request did not fit what the sheet offers or came while another waited (`refused`).
- * A request the GM never answers (the player left, the table ended) gets none.
+ * A request the GM never answers (the player left, the table ended) gets none. An outcome a newer GM
+ * names and this reader does not know reads as `refused`, so no request waits for ever.
  */
 export interface BookRestAnswer {
   readonly t: 'book-rest-answer';
@@ -69,6 +70,8 @@ export interface BookRestAnswer {
 }
 
 const REST_OUTCOMES: readonly unknown[] = ['done', 'declined', 'refused'];
+/** The longest outcome a reader takes, known or not. */
+const MAX_REST_OUTCOME = 32;
 
 export const isRestId = (value: unknown): value is string => typeof value === 'string' && REST_ID_PATTERN.test(value);
 export const isRecoveryId = (value: unknown): value is string => isPlainKey(value, MAX_RECOVERY_ID);
@@ -97,13 +100,16 @@ function parseRecovery(value: unknown): BookRecoveryButton[] | null {
   return new Set(read.map((button) => button.id)).size === read.length ? read : null;
 }
 
-/** The rest fields of a statblock, each where it was sent, its texts spent from the statblock's budget; null when they are malformed. */
-export function parseStatblockRest(value: Record<string, unknown>, budget: SheetBudget): StatblockRest | null {
-  if (value.characterId === undefined && value.recovery === undefined) return {};
-  if (!isRestId(value.characterId)) return null;
+/**
+ * The rest fields of a statblock, each where it was sent, its texts spent from the statblock's budget.
+ * Malformed ones (a bad id, too many buttons or spends, more text than the statblock may hold) read as
+ * none: the sheet still shows, without rests.
+ */
+export function parseStatblockRest(value: Record<string, unknown>, budget: SheetBudget): StatblockRest {
+  if (!isRestId(value.characterId)) return {};
   if (value.recovery === undefined) return { characterId: value.characterId };
   const recovery = parseRecovery(value.recovery);
-  if (recovery === null || !spendText(budget, recovery.map((button) => button.name + button.spends.map((spend) => spend.label).join('')).join(''))) return null;
+  if (recovery === null || !spendText(budget, recovery.map((button) => button.name + button.spends.map((spend) => spend.label).join('')).join(''))) return {};
   return { characterId: value.characterId, recovery };
 }
 
@@ -115,7 +121,9 @@ export function parseBookRestMessage(value: Record<string, unknown>): BookRestMe
   return { t: 'book-rest', request, character, button, spends: [...spends] };
 }
 
-/** The GM's answer to a rest request as the page reads it, or null when it is malformed. */
+/** The GM's answer to a rest request as the page reads it (an outcome it does not know as `refused`), or null when it is malformed. */
 export function parseBookRestAnswer(value: Record<string, unknown>): BookRestAnswer | null {
-  return isRestId(value.request) && REST_OUTCOMES.includes(value.outcome) ? { t: 'book-rest-answer', request: value.request, outcome: value.outcome as BookRestAnswer['outcome'] } : null;
+  const { request, outcome } = value;
+  if (!isRestId(request) || typeof outcome !== 'string' || outcome.length === 0 || outcome.length > MAX_REST_OUTCOME) return null;
+  return { t: 'book-rest-answer', request, outcome: REST_OUTCOMES.includes(outcome) ? (outcome as BookRestAnswer['outcome']) : 'refused' };
 }

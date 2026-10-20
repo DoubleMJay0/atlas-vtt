@@ -290,8 +290,7 @@ export function parseBookStatblock(value: unknown): BookStatblock | null | undef
   const abilities = components as AbilityComponent[];
   if (new Set(abilities.map((entry) => entry.id)).size !== abilities.length) return undefined;
   const refills = parseRefills(value.refills, budget);
-  const rest = parseStatblockRest(value, budget);
-  if (refills === null || rest === null) return undefined;
-  return { editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }), ...rest };
+  if (refills === null) return undefined;
+  return { editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }), ...parseStatblockRest(value, budget) };
 }
 

@@ -20,7 +20,7 @@ export function restChangeText(change: RestChange): string {
   return `${change.label} ${change.from} → ${change.to}${change.roll === undefined ? '' : ` (${change.roll})`}`;
 }
 
-/** A rest the GM's Atlas applied: who rested and which rest, then what it changed and what it could not. */
+/** A rest the GM's Atlas applied: who rested and which rest, then what it changed and what it could not, where this player may see it. */
 export const RestRow = memo(function RestRow({ entry, time, thread, api, ...flags }: RestRowProps): ReactElement {
   const reactions = reactionsFor(entry, api.self);
   return (
@@ -32,12 +32,14 @@ export const RestRow = memo(function RestRow({ entry, time, thread, api, ...flag
             <span className="atlas-online-log__name">{`${entry.character} · ${entry.button}`}</span>
             <span className="atlas-online-log__time">{time}</span>
           </div>
-          <div className="atlas-online-log__rest">
-            {entry.changes.length === 0
-              ? <span className="atlas-online-log__rest-quiet">Nothing to restore.</span>
-              : <span className="atlas-online-log__rest-changes">{entry.changes.map(restChangeText).join(', ')}</span>}
-            {entry.skipped !== undefined && <span className="atlas-online-log__rest-quiet">{`Not changed: ${entry.skipped.join(', ')}`}</span>}
-          </div>
+          {entry.changes !== undefined && (
+            <div className="atlas-online-log__rest">
+              {entry.changes.length === 0
+                ? <span className="atlas-online-log__rest-quiet">Nothing to restore.</span>
+                : <span className="atlas-online-log__rest-changes">{entry.changes.map(restChangeText).join(', ')}</span>}
+              {entry.skipped !== undefined && <span className="atlas-online-log__rest-quiet">{`Not changed: ${entry.skipped.join(', ')}`}</span>}
+            </div>
+          )}
           <ReactionChips id={entry.id} reactions={reactions} api={api} />
           <ThreadPill stat={thread} onOpen={() => api.openThread(entry.id)} />
         </div>

@@ -126,13 +126,14 @@ export interface RestChange {
 /**
  * A rest the GM's Atlas applied (a player's request the GM approved, or the GM's own): the character
  * by name, the button by name, what it changed, and the labels of what it could not change (`skipped`).
- * Only the GM logs it.
+ * Only the GM logs it. What changed is the character's player's and the GM's alone: everyone else gets
+ * the entry without `changes` and `skipped`, which reads as the rest's title only.
  */
 export interface RestEntry extends EntryBase {
   readonly kind: 'rest';
   readonly character: string;
   readonly button: string;
-  readonly changes: readonly RestChange[];
+  readonly changes?: readonly RestChange[];
   readonly skipped?: readonly string[];
   readonly reactions?: readonly LogReaction[];
 }

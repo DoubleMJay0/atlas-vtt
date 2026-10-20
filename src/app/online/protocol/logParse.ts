@@ -120,14 +120,16 @@ function parseRestChange(value: unknown): RestChange | null {
 
 function parseRestEntry(value: Record<string, unknown>, base: Pick<LogEntry, 'id' | 'at' | 'who' | 'name'>, reactions: readonly LogReaction[] | undefined): LogEntry | null {
   // A rest is the GM's to apply, and so to log.
-  if (value.who !== GM_AUTHOR || !Array.isArray(value.changes) || value.changes.length > MAX_REST_CHANGES) return null;
+  if (value.who !== GM_AUTHOR) return null;
   const character = exactLine(value.character, MAX_REST_TEXT);
   const button = exactLine(value.button, MAX_REST_TEXT);
-  const changes = value.changes.map(parseRestChange);
+  // Without changes the entry is for someone who may not see what the rest changed.
+  const changes = optional(value.changes, (list) => (Array.isArray(list) && list.length <= MAX_REST_CHANGES ? list.map(parseRestChange) : null));
   const skipped = optional(value.skipped, (list) => (Array.isArray(list) && list.length > 0 && list.length <= MAX_REST_CHANGES ? list.map((label) => exactLine(label, MAX_REST_TEXT)) : null));
-  if (character === null || button === null || changes.some((change) => change === null) || skipped === null || skipped?.some((label) => label === null)) return null;
+  if (character === null || button === null || changes === null || changes?.some((change) => change === null) || skipped === null || skipped?.some((label) => label === null)) return null;
   return {
-    ...base, kind: 'rest', character, button, changes: changes as RestChange[],
+    ...base, kind: 'rest', character, button,
+    ...(changes !== undefined && { changes: changes as RestChange[] }),
     ...(skipped !== undefined && { skipped: skipped as string[] }),
     ...(reactions !== undefined && { reactions }),
   };
