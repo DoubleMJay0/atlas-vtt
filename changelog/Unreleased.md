@@ -30,6 +30,8 @@
 
 - The initiative tracker's buttons, card menu and sides, and the collection's initiative settings are now available in Russian.
 
+- The collection settings' Resources tab and the resource switches of a scene are now available in Russian.
+
 ## Fixed
 
 - Initiative tracker: clicking a card selects its token, so its bars and their controls show, and brings it into view without zooming in further than needed.
