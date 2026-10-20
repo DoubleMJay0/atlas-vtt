@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { parseCreatureFilters, parseHiddenCreatureFilters } from '../../../creatures/creatureFilterDefinitions';
 import { parseRecovery } from '../../../recovery/parseRecovery';
 import type { RecoveryRecord } from '../../../recovery/recoveryTypes';
+import { changedResourceKeys, withSavedResourceKeys } from '../../../recovery/editor/recoveryResourceKeys';
 import type { AssetService } from '../../../services/AssetService';
 import type { StatblockRole, StatblockRoleFolders } from '../../../statblocks/model/roleTypes';
 import {
@@ -107,18 +108,23 @@ export function useCollectionSettingsDraft(
     statblockRoles, setStatblockRoles,
     statblockRoleFolders, setStatblockRoleFolders,
     recovery, setRecovery,
-    toSettings: () => ({
-      ...rules.toSettings(),
-      // Trimmed, with the field as label where none was typed.
-      customCreatureFilters: parseCreatureFilters(customCreatureFilters),
-      hiddenCreatureFilters,
-      lootBases,
-      lootCurrency: lootCurrency.trim() || undefined,
-      randomTables: randomTables.length > 0 ? [...randomTables] : undefined,
-      itemRarities,
-      statblockRoles: statblockRoles?.length ? savedStatblockRoles(statblockRoles) : undefined,
-      statblockRoleFolders: savedRoleFolders(statblockRoleFolders, statblockRoles),
-      recovery,
-    }),
+    toSettings: () => {
+      const system = rules.toSettings();
+      // Rules on a resource added in this dialog follow it to the key it is saved with.
+      const keys = changedResourceKeys(rules.resources, system.resources ?? []);
+      return {
+        ...system,
+        // Trimmed, with the field as label where none was typed.
+        customCreatureFilters: parseCreatureFilters(customCreatureFilters),
+        hiddenCreatureFilters,
+        lootBases,
+        lootCurrency: lootCurrency.trim() || undefined,
+        randomTables: randomTables.length > 0 ? [...randomTables] : undefined,
+        itemRarities,
+        statblockRoles: statblockRoles?.length ? savedStatblockRoles(statblockRoles) : undefined,
+        statblockRoleFolders: savedRoleFolders(statblockRoleFolders, statblockRoles),
+        recovery: recovery && withSavedResourceKeys(recovery, keys),
+      };
+    },
   };
 }

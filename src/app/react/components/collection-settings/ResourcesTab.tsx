@@ -20,6 +20,8 @@ interface ResourcesTabProps {
   onChange: (resources: ResourceDefinition[]) => void;
   /** Statblock fields that hold a quantity, offered for the field (`resourceFieldSuggestions`). */
   fieldSuggestions: readonly FieldSuggestion[];
+  /** Beside the token, which then keeps to its column: a collection's recovery buttons. */
+  aside?: React.ReactNode;
 }
 
 const CARD_MOTION = {
@@ -28,7 +30,7 @@ const CARD_MOTION = {
   exit: { opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.12, ease: EASE_OUT_CONTROL_POINTS } },
 } as const;
 
-export function ResourcesTab({ resources, onChange, fieldSuggestions }: ResourcesTabProps): React.ReactElement {
+export function ResourcesTab({ resources, onChange, fieldSuggestions, aside }: ResourcesTabProps): React.ReactElement {
   const [selected, setSelected] = useState<number | null>(null);
   /** The socket a resource was last placed in by a click; its card starts with the name. */
   const [placed, setPlaced] = useState<number | null>(null);
@@ -106,54 +108,63 @@ export function ResourcesTab({ resources, onChange, fieldSuggestions }: Resource
     close();
   };
 
-  return (
-    <MotionConfig reducedMotion="user">
-      <div className="atlas-csm-resources" onKeyDown={onKeyDown}>
-        <p className="atlas-csm-hint">
-          Click a socket to put a resource there, and drag it to another socket to move it. Each
-          resource reads its number from a field of the token&apos;s statblock; tokens whose statblock
-          lacks that field don&apos;t show it.
-        </p>
+  const sockets = (
+    <div className="atlas-csm-resources" onKeyDown={onKeyDown}>
+      <p className="atlas-csm-hint">
+        Click a socket to put a resource there, and drag it to another socket to move it. Each
+        resource reads its number from a field of the token&apos;s statblock; tokens whose statblock
+        lacks that field don&apos;t show it.
+      </p>
 
-        <div className={cn('atlas-csm-token-stage', selected !== null && 'atlas-focused', lifted !== null && 'atlas-dragging')}
-          role="presentation" onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
-          <div className="atlas-csm-token-rig" role="group" aria-label="Resource sockets">
-            {/* A token as the map draws it: the fighter of the starter tokens in Atlas' ring */}
-            <span className="atlas-csm-token-art" aria-hidden="true"><TokenPortrait src={fighterArt} alt="" /></span>
-            <span className="atlas-csm-token-nameplate" aria-hidden="true">Name</span>
-            <span className="atlas-csm-token-caption atlas-csm-token-caption--bars" aria-hidden="true">Always shown</span>
-            <span className="atlas-csm-token-caption atlas-csm-token-caption--right" aria-hidden="true">On hover</span>
-            <span className="atlas-csm-token-caption atlas-csm-token-caption--left" aria-hidden="true">On hover</span>
-            {SOCKETS.map((socket) => (
-              <ResourceSocket
-                key={socket.slot}
-                place={socket}
-                resource={bySocket[socket.slot]}
-                selected={selected === socket.slot}
-                lifted={lifted === socket.slot}
-                dropTarget={dropTarget === socket.slot}
-                onSelect={() => select(socket.slot)}
-                onPress={() => { pressed.current = socket.slot; }}
-                onEnter={() => enter(socket.slot)}
-              />
-            ))}
-            <AnimatePresence>
-              {place && current && <ResourceFan key={place.slot} place={place} resource={current} onChange={change} onRemove={remove} />}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        <div className="atlas-csm-resource-dock">
-          <div className={cn('atlas-csm-resource-dock__idle', current && 'atlas-hidden')}>Click a socket to set what it tracks</div>
+      <div className={cn('atlas-csm-token-stage', selected !== null && 'atlas-focused', lifted !== null && 'atlas-dragging')}
+        role="presentation" onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
+        <div className="atlas-csm-token-rig" role="group" aria-label="Resource sockets">
+          {/* A token as the map draws it: the fighter of the starter tokens in Atlas' ring */}
+          <span className="atlas-csm-token-art" aria-hidden="true"><TokenPortrait src={fighterArt} alt="" /></span>
+          <span className="atlas-csm-token-nameplate" aria-hidden="true">Name</span>
+          <span className="atlas-csm-token-caption atlas-csm-token-caption--bars" aria-hidden="true">Always shown</span>
+          <span className="atlas-csm-token-caption atlas-csm-token-caption--right" aria-hidden="true">On hover</span>
+          <span className="atlas-csm-token-caption atlas-csm-token-caption--left" aria-hidden="true">On hover</span>
+          {SOCKETS.map((socket) => (
+            <ResourceSocket
+              key={socket.slot}
+              place={socket}
+              resource={bySocket[socket.slot]}
+              selected={selected === socket.slot}
+              lifted={lifted === socket.slot}
+              dropTarget={dropTarget === socket.slot}
+              onSelect={() => select(socket.slot)}
+              onPress={() => { pressed.current = socket.slot; }}
+              onEnter={() => enter(socket.slot)}
+            />
+          ))}
           <AnimatePresence>
-            {place && current && (
-              <motion.div key="card" className="atlas-csm-resource-dock__card" {...CARD_MOTION}>
-                <ResourceCard place={place} resource={current} fieldSuggestions={fieldSuggestions} focusName={placed === place.slot} onChange={change} />
-              </motion.div>
-            )}
+            {place && current && <ResourceFan key={place.slot} place={place} resource={current} onChange={change} onRemove={remove} />}
           </AnimatePresence>
         </div>
       </div>
+
+      <div className="atlas-csm-resource-dock">
+        <div className={cn('atlas-csm-resource-dock__idle', current && 'atlas-hidden')}>Click a socket to set what it tracks</div>
+        <AnimatePresence>
+          {place && current && (
+            <motion.div key="card" className="atlas-csm-resource-dock__card" {...CARD_MOTION}>
+              <ResourceCard place={place} resource={current} fieldSuggestions={fieldSuggestions} focusName={placed === place.slot} onChange={change} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+
+  return (
+    <MotionConfig reducedMotion="user">
+      {aside ? (
+        <div className="atlas-csm-resources-layout">
+          <div className="atlas-csm-resources-layout__sockets">{sockets}</div>
+          <div className="atlas-csm-resources-layout__aside">{aside}</div>
+        </div>
+      ) : sockets}
     </MotionConfig>
   );
 }

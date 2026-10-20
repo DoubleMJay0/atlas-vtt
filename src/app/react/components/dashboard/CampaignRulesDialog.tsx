@@ -96,6 +96,7 @@ export function CampaignRulesDialog({ app, campaign, service, onClose, initialTa
       canSave={canSave}
       onSave={save}
       onClose={onClose}
+      size="fullscreen"
     >
       <RulesSettingsTabs
         tabs={hasSystem ? RULES_TABS : NO_SYSTEM_TABS}

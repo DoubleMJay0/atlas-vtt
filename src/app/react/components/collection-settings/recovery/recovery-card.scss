@@ -1,0 +1,125 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// Recovery pane: the fan over a picked metric (RuleFan) and the rule card under
+// it (RuleCard, RuleInputs).
+// ═══════════════════════════════════════════════════════════════════════════
+
+@use '../../../../../../styles/tokens' as *;
+@use '../../../../../../styles/mixins' as *;
+
+$card-width: 304px; // RULE_CARD_WIDTH in RuleCardLayer.tsx
+
+// ── Fan and card over the picked metric ────────────────────────────────────
+.atlas-rc-fan .atlas-csm-fan {
+  z-index: 3;
+}
+
+.atlas-rc-fan-glyph {
+  font-size: $font-ui-medium;
+  font-weight: $font-weight-semibold;
+  line-height: 1;
+}
+
+.atlas-rc-card-layer {
+  position: absolute;
+  z-index: 3;
+  width: $card-width;
+  transform-origin: top center;
+}
+
+.atlas-rc-card {
+  @include atlas-elevated-surface;
+  @include atlas-flex-col($spacing-m);
+  padding: $spacing-m;
+}
+
+.atlas-rc-card__head {
+  @include atlas-flex-row($spacing-s);
+  min-width: 0;
+  font-size: $font-ui-smaller;
+}
+
+.atlas-rc-card__dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: $radius-full;
+  background: var(--interactive-accent);
+}
+
+.atlas-rc-card__metric {
+  @include atlas-truncate;
+  color: var(--text-normal);
+  font-weight: $font-weight-semibold;
+}
+
+.atlas-rc-card__button {
+  @include atlas-truncate;
+  margin-inline-start: auto;
+  color: var(--text-faint);
+}
+
+.atlas-rc-card__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-m;
+}
+
+.atlas-rc-card__field {
+  @include atlas-flex-col($spacing-xs);
+  min-width: 0;
+
+  .atlas-csm-input { height: $input-height-s; }
+}
+
+.atlas-rc-card__field--wide {
+  grid-column: 1 / -1;
+}
+
+// A short number on a line of its own: its label beside it
+.atlas-rc-card__label.atlas-rc-card__field--inline {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+
+  .atlas-csm-input { width: 96px; }
+}
+
+.atlas-rc-card__label {
+  @include atlas-flex-col($spacing-xs);
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+}
+
+.atlas-rc-card__formula {
+  font-family: var(--font-monospace);
+}
+
+// Every number field shows: the shared chips scroll past two lines, which hid the last ones here
+.atlas-rc-card .atlas-rc-card__chips {
+  max-height: none;
+}
+
+.atlas-rc-card .atlas-segmented {
+  width: 100%;
+}
+
+.atlas-rc-card__source {
+  @include atlas-flex-row($spacing-s);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.atlas-rc-card__source-name {
+  @include atlas-truncate;
+  color: var(--text-normal);
+  font-size: $font-ui-small;
+  font-weight: $font-weight-medium;
+}
+
+.atlas-rc-card__change.atlas-rc-card__change {
+  height: $input-height-s;
+  padding: 0 $spacing-s;
+  border-radius: $radius-l;
+  font-size: $font-ui-smaller;
+}
