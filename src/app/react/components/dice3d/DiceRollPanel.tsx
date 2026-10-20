@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../../../utils/cn';
+import { t } from '../../../i18n';
 import { CloseButton } from '../../../packages/components/primitives/CloseButton';
 import { chainDepth, layoutDice, restingFrame, type DiceScene } from '../../../dice3d/diceScene';
 import type { ThrowStyle } from '../../../dice3d/diceDisplay';
@@ -192,7 +193,7 @@ export function DiceRollPanel({ result, presentation, scene, compact: compactNow
         {!compact && (
           <CloseButton
             className="atlas-dice-roll__close"
-            aria-label="Hide roll"
+            aria-label={t('diceRoll.hide')}
             onClick={(e) => {
               e.stopPropagation();
               close();
@@ -279,7 +280,7 @@ export function DiceRollPanel({ result, presentation, scene, compact: compactNow
             // The verdict belongs to the roll being watched; a displaced one reports silently.
             if (!muted && !displaced.current) reveal(result.crit ?? null);
           }}
-          label={shown === null ? `Rolling ${result.formula}` : `${label}: rolled ${shown}`}
+          label={shown === null ? t('diceRoll.rolling', { formula: result.formula }) : t('diceRoll.rolled', { label, total: String(shown) })}
           className="atlas-dice-roll__stage"
         />
       </div>

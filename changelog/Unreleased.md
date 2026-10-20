@@ -34,6 +34,8 @@
 
 - Senses are now available in Russian: the sense editors in Edit Token and the collection settings' Vision tab, and the conditions' effect on sight.
 
+- Dice settings, the dice tray and the roll panel are now available in Russian.
+
 ## Fixed
 
 - Initiative tracker: clicking a card selects its token, so its bars and their controls show, and brings it into view without zooming in further than needed.

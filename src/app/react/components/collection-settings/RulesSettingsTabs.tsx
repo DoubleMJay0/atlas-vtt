@@ -31,7 +31,7 @@ export const RULES_TABS: readonly SettingsTab[] = ['system', 'dice', 'grid', 'vi
 
 const TAB_LABELS: Record<SettingsTab, { label: string; icon: React.ReactNode }> = {
   system: { label: t('csm.tab.system'), icon: <Dices size={16} /> },
-  dice: { label: 'Dice', icon: <Dice5 size={16} /> },
+  dice: { label: t('diceSettings.dice'), icon: <Dice5 size={16} /> },
   grid: { label: t('csm.tab.grid'), icon: <Grid3X3 size={16} /> },
   vision: { label: t('csm.tab.vision'), icon: <Eye size={16} /> },
   widgets: { label: t('csm.tab.widgets'), icon: <LayoutGrid size={16} /> },
