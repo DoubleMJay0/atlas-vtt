@@ -113,11 +113,15 @@ export class PlacementGhost {
     this.lift.target = pose.lift;
   }
 
-  /** Turns the token to face `degrees` the short way round; `showing` the mark of the way it faces. */
+  /**
+   * Turns the token to face `degrees` the short way round. `showing` puts the mark of the way it will
+   * face there at once and solid, while the art turns after it; otherwise the mark fades.
+   */
   turnTo(degrees: number, showing: boolean): void {
     const step = ((((degrees - this.facing.target) % 360) + 540) % 360) - 180;
     this.facing.target += step;
-    this.markShown.target = showing ? 1 : 0;
+    if (showing) this.markShown.jump(1);
+    else this.markShown.target = 0;
   }
 
   /** Puts the ghost down at its place: it presses into the map, then fades into the token placed there. */
@@ -195,7 +199,8 @@ export class PlacementGhost {
     this.preview.group.scale.set(scale);
     this.body.alpha = Math.min(1, Math.max(0, this.alpha.value));
     this.preview.rotate(((this.facing.value % 360) + 360) % 360);
-    this.mark.rotation = (this.facing.value * Math.PI) / 180;
+    // The mark shows where the token will face, never the art's way there
+    this.mark.rotation = (this.facing.target * Math.PI) / 180;
     this.mark.scale.set(scale);
     this.mark.alpha = Math.min(1, Math.max(0, this.markShown.value));
     this.mark.visible = this.mark.alpha > 0.005;

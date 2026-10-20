@@ -55,6 +55,7 @@
 - Senses are now available in Russian: the sense editors in Edit Token and the collection settings' Vision tab, and the conditions' effect on sight.
 - The dice settings, the dice tray, the roll panel and part of the dice lab are now available in Russian.
 - The toolbar editor and links to scenes and encounters in notes are now available in Russian.
+- A token now looks the way the face on its art does, towards the bottom of the art. Its vision cone and the beam of a light it carries point that way, so a token you turned before looks the other way now.
 - Dragging a token no longer selects it. Click a token and let go without moving it to select it; dragging one leaves the selection as it was.
 
 ## Fixed
