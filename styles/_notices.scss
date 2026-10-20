@@ -60,6 +60,9 @@
 }
 
 .atlas-update-notice__body {
+  // The close button stands $close-button-gap inside the border, so it reaches into the
+  // notice's padding; the text keeps $spacing-s from the button's hover square.
+  padding-inline-end: calc(#{$close-button-size} + #{$close-button-gap} - #{$spacing-m} + #{$spacing-s});
   display: flex;
   flex-direction: column;
   gap: $spacing-xs;
@@ -71,8 +74,6 @@
 }
 
 .atlas-update-notice__title {
-  // Clear of the close button in the corner.
-  padding-inline-end: $close-button-size;
   font-size: $font-ui-medium;
   font-weight: $font-weight-semibold;
 }
