@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Button } from '../../primitives/button';
 import { LabelTooltip } from '../../primitives/tooltip';
 import { TokenPortrait } from '../../shared/TokenPortrait';
@@ -29,24 +30,27 @@ function Metric({ label, value, hint }: { label: string; value: string; hint: st
   );
 }
 
-/** The encounter being built: its creatures with their counts, what can be said of it in any system, and Save. */
+/** The encounter being built, floating over the feed once it holds a creature: its creatures with their counts, what can be said of it in any system, and Save. */
 export function EncounterTray({ picks, metrics, saving, onCountChange, onClear, onSave }: EncounterTrayProps): React.JSX.Element {
-  const empty = picks.length === 0;
+  const still = useReducedMotion();
+  const away = still ? { opacity: 0 } : { opacity: 0, y: 12 };
   return (
-    <footer className="atlas-encounter-tray" data-empty={empty}>
-      {empty ? (
-        <p className="atlas-encounter-tray__empty">{t('encounter.builder.empty')}</p>
-      ) : (
-        <ul className="atlas-encounter-tray__picks">
-          {picks.map(({ token, count }) => (
-            <li key={token.id} className="atlas-encounter-tray__pick">
-              <TokenPortrait src={token.thumbnailUrl ?? token.imageUrl} alt="" showRing={token.showRing} className="atlas-encounter-tray__portrait" />
-              <span className="atlas-encounter-tray__name">{token.name}</span>
-              <CountStepper name={token.name} count={count} onChange={(next) => onCountChange(token, next)} />
-            </li>
-          ))}
-        </ul>
-      )}
+    <motion.footer
+      className="atlas-encounter-tray"
+      initial={away}
+      animate={{ opacity: 1, y: 0 }}
+      exit={away}
+      transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+    >
+      <ul className="atlas-encounter-tray__picks">
+        {picks.map(({ token, count }) => (
+          <li key={token.id} className="atlas-encounter-tray__pick">
+            <TokenPortrait src={token.thumbnailUrl ?? token.imageUrl} alt="" showRing={token.showRing} className="atlas-encounter-tray__portrait" />
+            <span className="atlas-encounter-tray__name">{token.name}</span>
+            <CountStepper name={token.name} count={count} onChange={(next) => onCountChange(token, next)} />
+          </li>
+        ))}
+      </ul>
       <div className="atlas-encounter-tray__summary">
         <span className="atlas-encounter-tray__count">{t('encounter.builder.count', { count: metrics.count })}</span>
         {metrics.rating && (
@@ -56,10 +60,10 @@ export function EncounterTray({ picks, metrics, saving, onCountChange, onClear, 
           <Metric key={total.key} label={total.name} value={String(total.value)} hint={t('encounter.builder.totalHint', { name: total.name })} />
         ))}
         <div className="atlas-encounter-tray__actions">
-          <Button variant="ghost" disabled={empty || saving} onClick={onClear}>{t('encounter.builder.clear')}</Button>
-          <Button variant="default" disabled={empty || saving} onClick={onSave}>{t('encounter.builder.save')}</Button>
+          <Button variant="ghost" disabled={saving} onClick={onClear}>{t('encounter.builder.clear')}</Button>
+          <Button variant="default" disabled={saving} onClick={onSave}>{t('encounter.builder.save')}</Button>
         </div>
       </div>
-    </footer>
+    </motion.footer>
   );
 }
