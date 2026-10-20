@@ -34,3 +34,39 @@
     }
   }
 }
+
+// The update notice (`announceUpdate`): Atlas' icon beside a heading, the version and its buttons.
+.atlas-update-notice {
+  display: flex;
+  gap: $spacing-m;
+  align-items: flex-start;
+}
+
+.atlas-update-notice__icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: $radius-l;
+}
+
+.atlas-update-notice__body {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  min-width: 0;
+}
+
+.atlas-update-notice__title {
+  font-size: $font-ui-medium;
+  font-weight: $font-weight-semibold;
+}
+
+.atlas-update-notice__text {
+  color: var(--text-muted);
+}
+
+.atlas-update-notice__actions {
+  display: flex;
+  gap: $spacing-s;
+  margin-top: $spacing-xs;
+}
