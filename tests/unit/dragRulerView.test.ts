@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';
 import { DragRulerView } from '../../src/app/pixi/token-renderer/DragRulerView';
-import { LIGHTING_Z_INDEX } from '../../src/app/pixi/lighting/LightingRenderer';
 import { pathMidpoint, shortenPathEnd } from '../../src/app/pixi/utils/measureDrawing';
 
 function makeScene(): { viewport: Container; background: Graphics; tokens: Container; view: DragRulerView } {
@@ -12,17 +11,19 @@ function makeScene(): { viewport: Container; background: Graphics; tokens: Conta
   const background = new Graphics();
   const tokens = new Container();
   viewport.addChild(background, tokens);
-  const view = new DragRulerView(viewport as unknown as Viewport);
+  const view = new DragRulerView(viewport as unknown as Viewport, tokens);
   return { viewport, background, tokens, view };
 }
 
 describe('DragRulerView', () => {
-  it('draws the path and the label above the lighting, so the dark never covers them', () => {
-    const { view } = makeScene();
+  it('draws the path between the map and the tokens and the label above them', () => {
+    const { viewport, background, tokens, view } = makeScene();
     const [path, label] = view.layers as Container[];
+    viewport.sortChildren();
 
-    expect(path!.zIndex).toBeGreaterThan(LIGHTING_Z_INDEX);
-    expect(label!.zIndex).toBeGreaterThan(path!.zIndex);
+    expect(viewport.getChildIndex(path!)).toBeGreaterThan(viewport.getChildIndex(background));
+    expect(viewport.getChildIndex(path!)).toBeLessThan(viewport.getChildIndex(tokens));
+    expect(label!.zIndex).toBeGreaterThan(tokens.zIndex);
   });
 
   it('stays hidden until a drag draws it', () => {

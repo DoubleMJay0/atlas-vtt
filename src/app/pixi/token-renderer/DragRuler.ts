@@ -14,7 +14,6 @@ import { formatDistance, type MeasurementSettings } from '../../grid/measurement
 import type { ViewAtlasState } from '../../storeFactory';
 import type { LayerVisibility } from '../playerSafeFrame';
 import type { DragRulerView } from './DragRulerView';
-import { computeTokenPixelSize } from './tokenSizing';
 import { mapTokens } from '../../tokens/offMap';
 
 /** What a drag ruler measures: the token and the points it runs through (its start, each waypoint, its landing). */
@@ -28,6 +27,8 @@ export class DragRuler {
   /** The snapped start followed by every waypoint. */
   private waypoints: Point[] = [];
   private landing: Point | null = null;
+  /** Where the dragged token is drawn now: the line ends under its centre, wherever it snaps to. */
+  private tip: Point | null = null;
   private keyWindow: Window | null = null;
 
   constructor(
@@ -47,10 +48,11 @@ export class DragRuler {
     this.keyWindow.addEventListener('keydown', this.onKeyDown, true);
   }
 
-  /** Moves the ruler's end to the cell a token at `position` would snap to. */
+  /** Measures to the cell a token at `position` would snap to, and draws the line to `position` itself. */
   update(position: Point): void {
     if (!this.tokenId) return;
     this.landing = this.snap(position);
+    this.tip = { x: position.x, y: position.y };
     this.redraw();
   }
 
@@ -60,6 +62,7 @@ export class DragRuler {
     this.tokenId = null;
     this.waypoints = [];
     this.landing = null;
+    this.tip = null;
     this.view.clear();
   }
 
@@ -110,7 +113,8 @@ export class DragRuler {
     const grid = this.gridSystem.getOptions();
     const settings = this.settingsProvider();
     const cells = pathLengthInCells(grid, this.cellPath(points, grid), settings.diagonalRule);
-    this.view.draw(points, formatDistance(cells, settings), computeTokenPixelSize(grid.size, this.tokenSize()) / 2);
+    const drawn = this.tip ? [...points.slice(0, -1), this.tip] : points;
+    this.view.draw(drawn, formatDistance(cells, settings));
     this.refreshVisibility();
   }
 
