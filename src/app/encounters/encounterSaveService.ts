@@ -38,7 +38,7 @@ function promptForEncounterName(app: ObsidianApp, tokens: EncounterTokenDraft[])
     const inputEl = dialog.createEl('input', {
       type: 'text',
       placeholder: t('encounter.namePlaceholder'),
-      value: t('encounter.defaultName', { date: new Date().toLocaleDateString(getLocale()) }),
+      value: defaultEncounterName(),
       cls: 'atlas-encounter-save-input',
     });
 
@@ -89,9 +89,85 @@ async function saveThumbnailToVault(app: ObsidianApp, tokens: EncounterTokenDraf
   return '';
 }
 
+/** The name an encounter gets when none is typed: today's date. */
+export function defaultEncounterName(): string {
+  return t('encounter.defaultName', { date: new Date().toLocaleDateString(getLocale()) });
+}
+
 /**
- * Prompt for a name and persist a group of tokens as an encounter asset in `collectionId`.
- * Pass `formation` when the tokens carry cell/offset data captured from a map.
+ * Persists a group of tokens as an encounter asset named `name` in `collectionId`. Pass
+ * `formation` when the tokens carry cell/offset data captured from a map.
+ * Resolves with the created asset, or null when saving failed.
+ */
+export async function storeEncounter(
+  app: ObsidianApp,
+  assetService: AssetService,
+  collectionId: string,
+  tokens: EncounterTokenDraft[],
+  name: string,
+  formation?: EncounterFormation,
+): Promise<EncounterAsset | null> {
+  if (tokens.length === 0) {
+    showNotice(t('encounter.noTokens'));
+    return null;
+  }
+  try {
+    const thumbnailUrl = await saveThumbnailToVault(app, tokens);
+    const encounter = await assetService.createEncounter({
+      name,
+      collection: collectionId,
+      tokens,
+      ...(formation ? { formation } : {}),
+      difficulty: 'medium',
+      tags: [],
+      thumbnailUrl,
+      data: { description: t('encounter.description', { count: tokens.length }) },
+    });
+    showNotice(t('encounter.saved', { name }));
+    return encounter;
+  } catch (error) {
+    console.error('[encounterSaveService] Error saving encounter:', error);
+    showNotice(t('encounter.saveFailed'));
+    return null;
+  }
+}
+
+/**
+ * Gives a saved encounter a new name and tokens, with a thumbnail of them; its formation, tags and
+ * difficulty stay. Resolves with whether it was saved.
+ */
+export async function updateEncounter(
+  app: ObsidianApp,
+  assetService: AssetService,
+  encounterId: string,
+  tokens: EncounterTokenDraft[],
+  name: string,
+): Promise<boolean> {
+  if (tokens.length === 0) {
+    showNotice(t('encounter.noTokens'));
+    return false;
+  }
+  try {
+    const current = await assetService.getAssetById(encounterId);
+    if (current?.type !== 'encounter') throw new Error(`No encounter ${encounterId}`);
+    const thumbnailUrl = (await saveThumbnailToVault(app, tokens)) || current.thumbnailUrl;
+    await assetService.updateAsset(encounterId, {
+      name,
+      tokens,
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      data: { ...current.data, tokens, description: t('encounter.description', { count: tokens.length }) },
+    });
+    showNotice(t('encounter.saved', { name }));
+    return true;
+  } catch (error) {
+    console.error('[encounterSaveService] Error updating encounter:', error);
+    showNotice(t('encounter.saveFailed'));
+    return false;
+  }
+}
+
+/**
+ * Prompts for a name and persists a group of tokens as an encounter (`storeEncounter`).
  * Resolves with the created asset, or null when the user cancelled or saving failed.
  */
 export async function saveEncounter(
@@ -105,27 +181,7 @@ export async function saveEncounter(
     showNotice(t('encounter.noTokens'));
     return null;
   }
-
   const encounterName = await promptForEncounterName(app, tokens);
   if (!encounterName) return null;
-
-  try {
-    const thumbnailUrl = await saveThumbnailToVault(app, tokens);
-    const encounter = await assetService.createEncounter({
-      name: encounterName,
-      collection: collectionId,
-      tokens,
-      ...(formation ? { formation } : {}),
-      difficulty: 'medium',
-      tags: [],
-      thumbnailUrl,
-      data: { description: t('encounter.description', { count: tokens.length }) },
-    });
-    showNotice(t('encounter.saved', { name: encounterName }));
-    return encounter;
-  } catch (error) {
-    console.error('[encounterSaveService] Error saving encounter:', error);
-    showNotice(t('encounter.saveFailed'));
-    return null;
-  }
+  return storeEncounter(app, assetService, collectionId, tokens, encounterName, formation);
 }

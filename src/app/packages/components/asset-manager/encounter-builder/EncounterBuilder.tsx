@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { App } from 'obsidian';
 import type { AssetService } from '../../../../services/AssetService';
 import type { AtlasView } from '../../../../atlas-view';
 import { spawnTokenGroups } from '../utils/tokenSpawnService';
-import { saveEncounter } from '../../../../encounters/encounterSaveService';
 import { collectionResources } from '../../../../resources/collectionResources';
 import { useCreatureIndex } from '../../../../creatures/useCreatureIndex';
 import { linkedStatblockPaths } from '../../../../creatures/creatureFacts';
@@ -13,13 +12,14 @@ import { isShortcutScopeActive } from '../../../../utils/activeLeafGuard';
 import { dialogOverlayMotion, useDialogWindowVariants } from '../../primitives/dialogMotion';
 import { ActiveFilterBar } from '../components/search/ActiveFilterBar';
 import { t } from '../../../../i18n';
-import type { TokenAsset } from '../types';
+import type { EncounterAsset, TokenAsset } from '../types';
 import { EncounterTray } from './EncounterTray';
 import { RosterFeed } from './RosterFeed';
 import { EncounterSidebar } from './EncounterSidebar';
 import { StatblockFeeds } from '../../../../react/components/dm-screen/StatblockFeeds';
 import { StatblockSkeleton } from '../../../../react/components/statblock/StatblockSkeleton';
-import { countOf, encounterDrafts, withCount, type EncounterPick } from './encounterPicks';
+import { countOf, withCount } from './encounterPicks';
+import { useEncounterDraft } from './useEncounterDraft';
 import { encounterMetrics } from './encounterMetrics';
 import { useEncounterRoster } from './useEncounterRoster';
 import { diceRandom } from '../../../../services/offlineDiceInputs';
@@ -32,6 +32,8 @@ interface EncounterBuilderProps {
   view: AtlasView | null;
   assetService: AssetService | null;
   collectionId: string;
+  /** A saved encounter to change: the builder starts from its creatures and name and saves in its place. */
+  editEncounter?: EncounterAsset | null;
   onClose: () => void;
   onSaved: () => void;
   /** The picks were brought into the scene: the asset manager makes way for the map. */
@@ -43,10 +45,10 @@ interface EncounterBuilderProps {
  * the DM screen float over the asset manager, searched and filtered as the Characters tab is, and
  * the tray at the bottom holds what was picked until it is saved as an encounter.
  */
-export function EncounterBuilder({ app, view, assetService, collectionId, onClose, onSaved, onBrought }: EncounterBuilderProps): React.JSX.Element {
+export function EncounterBuilder({ app, view, assetService, collectionId, editEncounter = null, onClose, onSaved, onBrought }: EncounterBuilderProps): React.JSX.Element {
   const roster = useEncounterRoster(app, assetService, collectionId, true);
-  const [picks, setPicks] = useState<EncounterPick[]>([]);
-  const [saving, setSaving] = useState(false);
+  const draft = useEncounterDraft(app, assetService, collectionId, editEncounter, roster);
+  const { picks, setPicks, saving, setSaving } = draft;
   const windowRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const windowVariants = useDialogWindowVariants();
@@ -65,17 +67,10 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
   const countOfToken = useCallback((tokenId: string): number => countOf(picks, tokenId), [picks]);
 
   const save = async (): Promise<void> => {
-    if (!assetService || picks.length === 0) return;
-    setSaving(true);
-    try {
-      const saved = await saveEncounter(app, assetService, collectionId, encounterDrafts(picks));
-      if (!saved) return;
-      app.workspace.trigger('atlas-vtt:refresh-assets');
-      onSaved();
-      onClose();
-    } finally {
-      setSaving(false);
-    }
+    if (!(await draft.save())) return;
+    app.workspace.trigger('atlas-vtt:refresh-assets');
+    onSaved();
+    onClose();
   };
 
   // A fight without saving an encounter first: the picks go into the open scene as they are
@@ -157,6 +152,7 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
           <EncounterSidebar
             app={app}
             titleId={titleId}
+            title={editEncounter ? t('encounter.builder.editTitle') : t('encounter.builder.title')}
             search={roster.search}
             onSearch={roster.setSearch}
             query={roster.query}
@@ -185,6 +181,9 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
                   saving={saving}
                   onCountChange={changeCount}
                   onClear={() => setPicks([])}
+                  name={draft.name}
+                  defaultName={draft.defaultName}
+                  onNameChange={draft.setName}
                   onSave={() => { void save(); }}
                   onBring={(placement) => { void bring(placement); }}
                 />

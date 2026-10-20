@@ -11,6 +11,7 @@ interface EncounterSidebarProps {
   app: App;
   /** Id of the title, which names the builder's dialog. */
   titleId: string;
+  title: string;
   search: string;
   onSearch: (search: string) => void;
   query: FilterSearch;
@@ -21,13 +22,13 @@ interface EncounterSidebarProps {
  * The builder's left side: its title, the search and every filter the collection's creatures
  * offer, always open, so what can be filtered is seen without opening anything.
  */
-export function EncounterSidebar({ app, titleId, search, onSearch, query, onClose }: EncounterSidebarProps): React.JSX.Element {
+export function EncounterSidebar({ app, titleId, title, search, onSearch, query, onClose }: EncounterSidebarProps): React.JSX.Element {
   const { panel } = query;
   const hidden = panel ? hiddenFilterText(panel.result.hidden) : null;
   return (
     <aside className="atlas-encounter-builder__sidebar" aria-labelledby={titleId}>
       <header className="atlas-encounter-builder__sidebar-header">
-        <h2 id={titleId} className="atlas-encounter-builder__title">{t('encounter.builder.title')}</h2>
+        <h2 id={titleId} className="atlas-encounter-builder__title">{title}</h2>
         <CloseButton onClick={onClose} />
       </header>
       <div className="atlas-encounter-builder__search">

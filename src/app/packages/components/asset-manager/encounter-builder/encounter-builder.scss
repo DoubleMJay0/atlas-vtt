@@ -315,6 +315,16 @@ $chip-inset: $spacing-xs;
   align-items: center;
 }
 
+// The encounter's name, first in the tray: its start sits in the tray's corner, concentric with it.
+input.atlas-encounter-tray__name-input {
+  flex: 0 0 14rem;
+  min-width: 0;
+  height: $tray-control;
+  padding: 0 $spacing-m;
+  @include atlas-panel-inset-radius($spacing-s);
+  font-size: $font-ui-small;
+}
+
 .atlas-encounter-tray__picks {
   display: flex;
   flex: 1;
