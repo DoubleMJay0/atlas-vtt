@@ -12,8 +12,12 @@
   }
 }
 
-// Obsidian clips its notice container, which would cut the surface's shadow off at its padding.
+// Obsidian clips its notice container, which would cut the surface's shadow off at its padding,
+// and sets it 32 px from the top but 10 px from the right. Atlas' notices stand as far from both
+// edges as the dice rolls from the map's (`.atlas-top-bar-row`).
 .notice-container:has(> .atlas-notice) {
+  top: 0;
+  padding: $spacing-s;
   overflow: visible;
 }
 
