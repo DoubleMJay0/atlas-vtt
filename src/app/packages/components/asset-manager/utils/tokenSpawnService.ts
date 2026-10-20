@@ -7,6 +7,8 @@ import { t } from '../../../../i18n';
 import { showNotice } from '../../../../ui/notice';
 import { getSpawnTarget, getViewportCenter, gridPosition, type SpawnContext, type SpawnTarget } from './spawnTarget';
 import { buildTokenData, imageExists, joiningSavedToken, resolveTokenSource, spawnRules } from './tokenSpawnData';
+import { tokenDiameterInCells } from '../../../../pixi/token-renderer/tokenSizing';
+import type { ViewAtlasStore } from '../../../../storeFactory';
 
 export type { SpawnContext } from './spawnTarget';
 
@@ -28,18 +30,39 @@ function encounterSlots(encounter: EncounterAsset): FormationSlot[] | null {
   return slots;
 }
 
-/**
- * Adds the tokens to the target's scene in one store write (a single undo step): on the map, where
- * they are selected and, for a fight, put in the tracker; or beside it, into the tracker.
- */
-function addSpawnedTokens(target: SpawnTarget, tokens: TokenInput[], placement: SpawnPlacement): string[] {
-  const store = target.view.getStore();
-  if (placement === 'beside') return addOffMapCombatants(store, tokens);
-  const { addTokens, setSelection } = store.getState();
-  const ids = addTokens(tokens);
-  if (ids.length > 0) setSelection(ids);
+/** Adds tokens to the map in one store write (a single undo step) and, for a fight, puts them in the tracker. */
+function addToMap(store: ViewAtlasStore, tokens: TokenInput[], placement: SpawnPlacement): string[] {
+  const ids = store.getState().addTokens(tokens);
   if (placement === 'fight') joinInitiative(store, ids);
   return ids;
+}
+
+/**
+ * Brings the tokens into the target's scene. Beside the map they go straight into the tracker. On
+ * it the GM places them by hand where the map can (`TokenPlacer`): they wait in the GM's hand,
+ * laid out as given, and each is added as it is put down; elsewhere they are added as laid out.
+ * Resolves with the ids of the tokens added, which end up selected.
+ */
+async function addSpawnedTokens(ctx: SpawnContext, target: SpawnTarget, tokens: TokenInput[], placement: SpawnPlacement): Promise<string[]> {
+  const store = target.view.getStore();
+  if (placement === 'beside') return addOffMapCombatants(store, tokens);
+  if (tokens.length === 0) return [];
+  let ids: string[];
+  if (target.placer) {
+    const placing = target.placer.place({ tokens, commit: (placed) => addToMap(store, placed, placement) });
+    ctx.onPlacing?.();
+    ctx.app.workspace.setActiveLeaf(target.view.leaf, { focus: true });
+    ids = await placing;
+  } else {
+    ids = addToMap(store, tokens, placement);
+  }
+  if (ids.length > 0) store.getState().setSelection(ids);
+  return ids;
+}
+
+/** Spacing for tokens laid out together: the widest footprint among them, so none overlap. */
+function layoutPitch(target: SpawnTarget, sizes: ReadonlyArray<number | undefined>): number {
+  return target.pitch * Math.max(1, ...sizes.map((size) => tokenDiameterInCells(size || 1)));
 }
 
 // ─── Public spawn functions ─────────────────────────────────────────
@@ -58,22 +81,25 @@ export interface TokenGroup {
 export async function spawnTokenGroups(ctx: SpawnContext, groups: readonly TokenGroup[], placement: SpawnPlacement = 'map'): Promise<string[]> {
   const target = await getSpawnTarget(ctx);
   if (!target) return [];
-  const { viewport, grid, pitch } = target;
+  const { viewport, grid } = target;
   const gridSystem = grid ? target.gridSystem : null;
   const center = getViewportCenter(viewport);
   const rules = spawnRules(ctx, target);
-  const total = groups.reduce((sum, group) => sum + group.count, 0);
 
-  const tokens: TokenInput[] = [];
+  const built = [];
   for (const { asset, count } of groups) {
     const source = await resolveTokenSource(ctx, asset);
-    if (!source) continue;
-    const built = await buildTokenData(ctx.app, center, source, rules);
+    if (source) built.push({ token: await buildTokenData(ctx.app, center, source, rules), count });
+  }
+  const total = built.reduce((sum, { count }) => sum + count, 0);
+  const pitch = layoutPitch(target, built.map(({ token }) => token.data.size));
+  const tokens: TokenInput[] = [];
+  for (const { token, count } of built) {
     for (let copy = 0; copy < count; copy++) {
-      tokens.push({ ...built.joined(), ...gridPosition(tokens.length, total, center.x, center.y, pitch, gridSystem, built.data.size || 1) });
+      tokens.push({ ...token.joined(), ...gridPosition(tokens.length, total, center.x, center.y, pitch, gridSystem, token.data.size || 1) });
     }
   }
-  return addSpawnedTokens(target, tokens, placement);
+  return addSpawnedTokens(ctx, target, tokens, placement);
 }
 
 /** Spawn `count` copies of a single token asset (`spawnTokenGroups`). */
@@ -140,7 +166,9 @@ export async function spawnEncounterTokens(
     }
   }
 
-  const ids = addSpawnedTokens(target, tokens, placement);
+  const ids = await addSpawnedTokens(ctx, target, tokens, placement);
+  // Placed by hand, the GM may have put every token away again
+  if (ids.length === 0 && tokens.length > 0 && placement !== 'beside') return ids;
   showNotice(ids.length < tokensToSpawn.length
     ? t(placement === 'beside' ? 'am.besidePartial' : 'am.spawnedPartial', { count: ids.length, expected: tokensToSpawn.length, name: encounter.name })
     : t(placement === 'beside' ? 'am.beside' : 'am.spawned', { count: ids.length, name: encounter.name }));
@@ -157,22 +185,39 @@ export async function spawnSelectedTokens(
 ): Promise<string[]> {
   const target = await getSpawnTarget(ctx);
   if (!target) return [];
-  const { viewport, grid, pitch } = target;
+  const { viewport, grid } = target;
   const gridSystem = grid ? target.gridSystem : null;
   const center = getViewportCenter(viewport);
   const tokensToSpawn = selectedAssets.filter(a => a.type === 'tokens');
 
   const rules = spawnRules(ctx, target);
-  const tokens: TokenInput[] = [];
-  for (let i = 0; i < tokensToSpawn.length; i++) {
-    const tokenAsset = tokensToSpawn[i];
-    if (!tokenAsset) continue;
-
+  const sources = [];
+  for (const tokenAsset of tokensToSpawn) {
     const source = await resolveTokenSource(ctx, tokenAsset);
-    if (!source) continue;
-    const pos = gridPosition(i, tokensToSpawn.length, center.x, center.y, pitch, gridSystem, source.size || 1);
+    if (source) sources.push(source);
+  }
+  const pitch = layoutPitch(target, sources.map((source) => source.size));
+  const tokens: TokenInput[] = [];
+  for (const [i, source] of sources.entries()) {
+    const pos = gridPosition(i, sources.length, center.x, center.y, pitch, gridSystem, source.size || 1);
     tokens.push((await buildTokenData(ctx.app, pos, source, rules)).joined());
   }
 
-  return addSpawnedTokens(target, tokens, placement);
+  return addSpawnedTokens(ctx, target, tokens, placement);
+}
+
+/**
+ * Runs `spawn` and calls `onClose` once: as soon as the tokens are in the GM's hand to be placed,
+ * or once they were added, so the asset manager gets out of the way of the map.
+ */
+export async function spawnAndClose(ctx: SpawnContext, onClose: () => void, spawn: (ctx: SpawnContext) => Promise<string[]>): Promise<string[]> {
+  let closed = false;
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    onClose();
+  };
+  const ids = await spawn({ ...ctx, onPlacing: close });
+  if (ids.length > 0) close();
+  return ids;
 }

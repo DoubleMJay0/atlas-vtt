@@ -46,6 +46,8 @@ import { normalizeImagePath } from '../utils/pathUtils';
 import { prefersReducedMotion } from '../utils/motion';
 import { destroyTree } from './utils/destroyTree';
 import type { TokenGroupContainer } from './token-renderer/types';
+import type { TokenPreview } from './tokenPlacement/PlacementGhost';
+import type { TokenInput } from '../types/viewState';
 import { setCanvasCursor } from './utils/canvasCursor';
 import { markHandled, resetHandled } from './utils/handledEvents';
 import { watchClick } from './utils/clickRelease';
@@ -143,6 +145,8 @@ export class TokenRenderer {
   private hexLinkHandlers?: HexLinkPointerHandlers;
   /** Ends the watch on a right press that opens a hex or fog menu on release. */
   private stopMenuPress?: () => void;
+  /** Whether the GM holds spawned tokens to place (`TokenPlacer`): the pointer is theirs then. */
+  private placementActive: () => boolean = () => false;
   private doorClickHandler?: (worldX: number, worldY: number) => boolean;
   /** A right-click on a door's badge, with any tool but the lighting tool, whose own menu has the door's entries. */
   private doorMenuHandlers?: DoorMenuHandlers;
@@ -1490,6 +1494,31 @@ export class TokenRenderer {
     this.drawingDragStartHandler = fn;
   }
 
+  public setPlacementGuard(active: () => boolean): void {
+    this.placementActive = active;
+  }
+
+  /**
+   * `token` drawn as it will look once placed, by the factory that draws placed tokens, for the GM's
+   * hand (`TokenPlacer`). It holds its art until released.
+   */
+  public async previewToken(token: TokenInput): Promise<TokenPreview> {
+    const art = token.imagePath;
+    const texture = await this.textureCache.acquire(art);
+    const group = await this.spriteFactory.createTokenSprite({ ...token, id: 'placement-preview', kind: token.kind ?? 'token' } as TokenEntity, texture);
+    group.zIndex = 0;
+    const ringScale = this.store.getState().tokenSettings?.tokenRingSize ?? 1;
+    if (ringScale !== 1) this.spriteFactory.createTokenRing(group, token.ringColor || '#ffffff', group.tokenSize * ringScale);
+    return {
+      group,
+      diameter: group.tokenSize,
+      release: () => {
+        this.spriteFactory.destroyTokenSprite(group);
+        this.textureCache.release(art);
+      },
+    };
+  }
+
   public setPinHitTestProvider(fn: (worldX: number, worldY: number) => string | null): void {
     this.pinHitTestProvider = fn;
   }
@@ -1699,6 +1728,8 @@ export class TokenRenderer {
   private onViewportPointerDown = (e: FederatedPointerEvent): void => {
     // PIXI v8 reuses FederatedPointerEvent objects — clear custom flags from previous events
     resetHandled(e);
+    // Held tokens take the pointer: a right-drag still pans, but nothing on the map opens its menu
+    if (this.placementActive()) return;
 
     const activeTool = this.store.getState().activeTool;
     const worldPos = this.viewport.toWorld(e.global);
@@ -1882,6 +1913,12 @@ export class TokenRenderer {
     // If dragging, InteractionController already has viewport listeners — skip hover
     if (this.interactionController.isDraggingTokens()) return;
     if (!this.isPointerOverCanvas(e)) return;
+    // Held tokens are the cursor (`bindPlacementInput` hides the system one): nothing is hovered
+    if (this.placementActive()) {
+      this.interactionController.handleViewportTokenHover(null);
+      this.uiManager.setHoverState(null);
+      return;
+    }
 
     const worldPos = this.viewport.toWorld(e.global);
     const activeTool = this.store.getState().activeTool;

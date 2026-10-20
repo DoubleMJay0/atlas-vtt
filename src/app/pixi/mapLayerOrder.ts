@@ -6,6 +6,8 @@
  * drawn unlit by the composite itself (`GridMark`).
  */
 export const MAP_LAYER_Z = {
+  /** The cells under tokens being placed by hand, and their ripples when put down (GM only). */
+  placementCells: 91,
   /** The hover, press and Shift-preview highlight of linked hexes (GM only). */
   hexLinks: 92,
   /** The marker on the token whose turn it is: above the lighting, below the tokens' bars. */
@@ -22,4 +24,6 @@ export const MAP_LAYER_Z = {
   gridAlignment: 99,
   /** Text objects and the preview of the one being placed. */
   text: 500,
+  /** Tokens being placed by hand (GM only): above everything on the map but the laser. */
+  placement: 1100,
 } as const;

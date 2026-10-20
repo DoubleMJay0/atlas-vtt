@@ -4,6 +4,7 @@ import type { AtlasView } from '../../../../atlas-view';
 import { loadAtlasView } from '../../../../plugin/atlasLeaves';
 import { FALLBACK_PITCH, cellPitch, formationGridFromOptions, type FormationGrid } from '../../../../encounters/encounterFormation';
 import { showNotice } from '../../../../ui/notice';
+import type { PlacementRequest } from '../../../../pixi/tokenPlacement/TokenPlacer';
 
 // ─── Viewport helpers ───────────────────────────────────────────────
 
@@ -30,6 +31,13 @@ export interface SpawnContext {
   assetService: AssetService | null;
   /** The dice stream hit points joining a scene are rolled with: the local roller's (`diceRandom`). */
   random: () => number;
+  /** Called once spawned tokens are in the GM's hand, waiting to be placed on the map: the asset manager closes then. */
+  onPlacing?: () => void;
+}
+
+/** Lets the GM place tokens by hand on the target's map (`TokenPlacer`). */
+export interface SpawnPlacer {
+  place(request: PlacementRequest): Promise<string[]>;
 }
 
 export interface SpawnTarget {
@@ -40,6 +48,8 @@ export interface SpawnTarget {
   grid: FormationGrid | null;
   /** Spacing between spawned tokens. */
   pitch: number;
+  /** Places the tokens by hand; null where the map cannot, and they are added where they were laid out. */
+  placer: SpawnPlacer | null;
 }
 
 /**
@@ -67,8 +77,11 @@ export function spawnTargetOf(view: AtlasView): SpawnTarget | null {
     return null;
   }
   const gridSystem = rendererService.getGridSystem() as GridSystemLike | null;
-  const grid = formationGridFromOptions(gridSystem?.getOptions());
-  return { view, viewport, gridSystem, grid, pitch: grid ? cellPitch(grid) : FALLBACK_PITCH };
+  const options = gridSystem?.getOptions();
+  const grid = formationGridFromOptions(options);
+  // A hidden grid still sizes the tokens, so it spaces them too
+  const pitch = grid ? cellPitch(grid) : options && options.size > 0 ? options.size : FALLBACK_PITCH;
+  return { view, viewport, gridSystem, grid, pitch, placer: rendererService.getRenderer()?.getTokenPlacer() ?? null };
 }
 
 export function getViewportCenter(viewport: ViewportLike): { x: number; y: number } {

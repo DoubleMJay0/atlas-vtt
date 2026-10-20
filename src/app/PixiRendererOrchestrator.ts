@@ -64,6 +64,7 @@ import { NO_STRETCH, readMapStretch, sameStretch, type MapStretch } from './grid
 import { fitZoomRange } from './pixi/fitMapRect';
 import { viewCentreInClient, worldToClient, type ClientPoint } from './pixi/utils/worldToClient';
 import { mapTokens } from './tokens/offMap';
+import { TokenPlacer } from './pixi/tokenPlacement/TokenPlacer';
 
 export class PixiRendererOrchestrator { // Renamed class
   private _isDestroyed: boolean = false;
@@ -71,6 +72,7 @@ export class PixiRendererOrchestrator { // Renamed class
   private tokenRenderer?: TokenRenderer; // Add TokenRenderer instance
   private pinRenderer?: PinRenderer; // Add PinRenderer instance
   private hexLinkRenderer?: HexLinkRenderer;
+  private tokenPlacer?: TokenPlacer;
   private hexLinkInteraction?: HexLinkInteraction;
   private selectionManager?: SelectionManager; // Add SelectionManager instance
   private fogRenderer?: FogOfWarRenderer; // Add FogRenderer instance
@@ -801,6 +803,7 @@ export class PixiRendererOrchestrator { // Renamed class
     const layers: LayerVisibility[] = [];
     if (this.pinRenderer) layers.push({ layer: this.pinRenderer.getPinContainer(), visible: false });
     if (this.hexLinkRenderer) layers.push({ layer: this.hexLinkRenderer.container, visible: false });
+    for (const layer of this.tokenPlacer?.layers ?? []) layers.push({ layer, visible: false });
     return layers;
   }
 
@@ -831,6 +834,25 @@ export class PixiRendererOrchestrator { // Renamed class
   getCanvasElement(): HTMLCanvasElement { return this.pixiAppManager.getCanvasElement(); }
   getGridSystem(): GridSystem | null { return this.gridSystem || null; }
   getTokenRenderer(): TokenRenderer | null { return this.tokenRenderer || null; }
+
+  /** Places spawned tokens by hand on this view's map; null until the map's tokens can be drawn. */
+  getTokenPlacer(): TokenPlacer | null {
+    if (this._isDestroyed) return null;
+    const tokens = this.tokenRenderer;
+    const viewport = this.pixiAppManager.getViewport();
+    if (!tokens || !viewport) return null;
+    this.tokenPlacer ??= new TokenPlacer({
+      app: this.pixiAppManager.app,
+      viewport,
+      canvas: this.pixiAppManager.getCanvasElement(),
+      viewId: this.viewId,
+      settings: () => SettingsService.forApp(this.obsApp),
+      store: this.store,
+      grid: () => this.gridSystem ?? null,
+      previewToken: (token) => tokens.previewToken(token),
+    });
+    return this.tokenPlacer;
+  }
 
   /**
    * Reinitialize viewport plugins after map switch to restore interactions
@@ -916,6 +938,8 @@ export class PixiRendererOrchestrator { // Renamed class
    *  Must be called after TokenRenderer is available (either from setupRenderersAndManagers or initGrid). */
   private wireViewportDispatchProviders(): void {
     if (!this.tokenRenderer) return;
+
+    this.tokenRenderer.setPlacementGuard(() => this.tokenPlacer?.active ?? false);
 
     if (this.fogRenderer) {
       this.tokenRenderer.setFogCoverageProvider(() => this.fogRenderer!.getCommittedCoverage());
@@ -1072,6 +1096,7 @@ export class PixiRendererOrchestrator { // Renamed class
     
     // Remove drawing tool handlers
 
+    this.tokenPlacer?.destroy();
     this.tokenRenderer?.destroy(); // Destroy TokenRenderer
     this.pinRenderer?.destroy(); // Destroy PinRenderer
     this.hexLinkInteraction?.destroy();

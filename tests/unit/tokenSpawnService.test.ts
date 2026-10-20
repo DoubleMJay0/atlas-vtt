@@ -28,7 +28,7 @@ function mapView(mapPath: string | null = 'maps/cave.atlasmap', isMapLoading = f
   const setSelection = vi.fn();
   const view = {
     leaf: {},
-    serviceManager: { getRendererService: () => ({ getViewport: () => viewport, getGridSystem: () => null }) },
+    serviceManager: { getRendererService: () => ({ getViewport: () => viewport, getGridSystem: () => null, getRenderer: () => null }) },
     getStore: () => ({ getState: () => ({ mapPath, isMapLoading, addTokens, setSelection }) }),
   } as unknown as AtlasView;
   return { view, spawned, addTokens, setSelection };

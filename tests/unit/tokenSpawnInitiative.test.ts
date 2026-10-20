@@ -36,7 +36,7 @@ function openScene(rolls: boolean, random: () => number = Math.random): Scene {
   const viewport = { screenWidth: 800, screenHeight: 600, toWorld: (p: { x: number; y: number }) => p, scale: { x: 1 } };
   const view = {
     leaf: {},
-    serviceManager: { getRendererService: () => ({ getViewport: () => viewport, getGridSystem: () => null }) },
+    serviceManager: { getRendererService: () => ({ getViewport: () => viewport, getGridSystem: () => null, getRenderer: () => null }) },
     getStore: () => store,
   } as unknown as AtlasView;
   const initiative = { mode: 'turn-order', roll: '1d20', firstSide: 'players', ...(rolls && { rollHitPoints: true }) };
