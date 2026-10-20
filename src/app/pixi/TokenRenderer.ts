@@ -1512,6 +1512,7 @@ export class TokenRenderer {
     return {
       group,
       diameter: group.tokenSize,
+      rotate: (degrees) => this.spriteFactory.updateTokenRotation(group, degrees),
       release: () => {
         this.spriteFactory.destroyTokenSprite(group);
         this.textureCache.release(art);

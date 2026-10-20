@@ -1,14 +1,16 @@
 import type { TokenInput } from '../../types/viewState';
-import { QUEUE_SHOWN, footprintCells, formationAt, queueCountOffset, queueSlot, type PlacementGrid, type Point } from './placementLayout';
+import { QUEUE_SHOWN, cycled, facingTowards, footprintCells, formationAt, handCentre, queueCountOffset, queueSlot, type PlacementGrid, type Point } from './placementLayout';
 import { HELD_SCALE, type PlacementGhost } from './PlacementGhost';
 import type { PlacementMarks } from './PlacementMarks';
 
-/** A token in the GM's hand: what will be added, where the spawn laid it out and its ghost. */
+/** A token in the GM's hand: what will be added, where the spawn laid it out, its ghost and which way it faces. */
 export interface HeldToken {
   readonly input: TokenInput;
   readonly home: Point;
   readonly size: number;
   readonly ghost: PlacementGhost;
+  /** Degrees from up, clockwise, as `rotation`; unset while it faces as its input does. */
+  rotation: number | undefined;
 }
 
 export interface PlacementSessionDeps {
@@ -28,9 +30,27 @@ export interface PlacementSessionDeps {
   end(placed: string[]): void;
 }
 
+/** A press that will put tokens down when the button is released; moved meanwhile, it turns them. */
+interface Press {
+  /** How many tokens from the front of the hand it puts down. */
+  count: number;
+  /** Where the press began, on the canvas. */
+  start: Point;
+  /** Which way those tokens faced before, for a press that is cancelled. */
+  before: Array<number | undefined>;
+  turning: boolean;
+}
+
 /** How visible held tokens are while the pointer is off the map. */
 const AWAY_ALPHA = 0.35;
 const HELD_ALPHA = 0.92;
+/** While a press turns the token being placed, the queue steps back. */
+const QUEUE_PRESSED_ALPHA = 0.4;
+/** A token pressed onto the map is held lower, almost down. */
+const PRESSED_SCALE = 1.02;
+const PRESSED_LIFT = 0.45;
+/** How far, in screen pixels, a press moves before it turns the tokens rather than putting them down as they face. */
+const TURN_AFTER_PX = 8;
 /** Seconds between the ripples of a formation put down, from the pointer outwards, at most `MAX_RIPPLE_DELAY` in all. */
 const RIPPLE_DELAY_PER_CELL = 0.035;
 const MAX_RIPPLE_DELAY = 0.2;
@@ -39,7 +59,8 @@ const MAX_RIPPLE_DELAY = 0.2;
  * Tokens spawned from the asset manager, held in the GM's hand until a click puts them on the map.
  * They follow the pointer laid out as the spawn arranged them (a formation, all put down at once);
  * while Shift is held they queue up instead, the first at the pointer and the rest waiting beside
- * it, and each click puts down the first. Releasing Shift lays out the rest again.
+ * it, the wheel cycles them, and each click puts down the first. Releasing Shift lays out the rest
+ * again. Holding the button and moving the pointer turns the tokens being put down towards it.
  */
 export class PlacementSession {
   private hand: HeldToken[];
@@ -48,6 +69,7 @@ export class PlacementSession {
   private shift = false;
   private onMap = true;
   private ended = false;
+  private press: Press | null = null;
   /** Where each held token would be put down now, by its index in the hand. */
   private places: Point[] = [];
 
@@ -61,9 +83,19 @@ export class PlacementSession {
     return !this.ended;
   }
 
+  /** Whether a press holds tokens down, so moving the pointer turns them. */
+  get pressing(): boolean {
+    return this.press !== null;
+  }
+
+  /** Whether the wheel cycles the queue: Shift is held over more than one token, and nothing is pressed. */
+  get cycling(): boolean {
+    return !this.ended && !this.press && this.queued();
+  }
+
   /** The pointer moved to `screen` (a canvas point) with Shift held or not. */
   moveTo(screen: Point, shift: boolean): void {
-    if (this.ended) return;
+    if (this.ended || this.press) return;
     this.pointer = screen;
     this.shift = shift;
     this.onMap = true;
@@ -71,7 +103,7 @@ export class PlacementSession {
   }
 
   setShift(shift: boolean): void {
-    if (this.ended || shift === this.shift) return;
+    if (this.ended || this.press || shift === this.shift) return;
     this.shift = shift;
     this.arrange();
   }
@@ -88,20 +120,42 @@ export class PlacementSession {
     if (!this.ended) this.arrange();
   }
 
-  /** A click at `screen`: puts down every held token, or with Shift the first of the queue. */
-  put(screen: Point, shift: boolean): void {
-    if (this.ended) return;
+  /** The button went down at `screen`: every held token, or with Shift the first of the queue, is held there to be put down. */
+  pressAt(screen: Point, shift: boolean): void {
+    if (this.ended || this.press) return;
     this.pointer = screen;
     this.shift = shift;
     this.onMap = true;
+    const count = this.queued() ? 1 : this.hand.length;
+    this.press = { count, start: screen, before: this.hand.slice(0, count).map(({ rotation }) => rotation), turning: false };
     this.arrange();
-    const queued = this.queued();
-    const count = queued ? 1 : this.hand.length;
-    const batch = this.hand.slice(0, count);
-    const places = this.places.slice(0, count);
+  }
+
+  /** The pointer moved to `screen` with the button held: the pressed tokens face it, in 15° steps unless `free`. */
+  turn(screen: Point, free: boolean): void {
+    const press = this.press;
+    if (!press) return;
+    if (!press.turning && Math.hypot(screen.x - press.start.x, screen.y - press.start.y) < TURN_AFTER_PX) return;
+    press.turning = true;
+    const batch = this.hand.slice(0, press.count);
+    const centre = handCentre(this.places.slice(0, press.count).map((home, i) => ({ home, size: batch[i]!.size })));
+    const facing = facingTowards(centre, this.deps.toWorld(screen), free);
+    for (const token of batch) {
+      token.rotation = facing;
+      token.ghost.turnTo(facing, true);
+    }
+  }
+
+  /** The button came up: the pressed tokens are put down where they are held, facing as they were turned. */
+  release(): void {
+    const press = this.press;
+    if (!press || this.ended) return;
+    this.press = null;
+    const batch = this.hand.slice(0, press.count);
+    const places = this.places.slice(0, press.count);
     let ids: string[];
     try {
-      ids = this.deps.commit(batch.map(({ input }, i) => ({ ...input, x: places[i]!.x, y: places[i]!.y })));
+      ids = this.deps.commit(batch.map(({ input, rotation }, i) => ({ ...input, x: places[i]!.x, y: places[i]!.y, ...(rotation !== undefined && { rotation }) })));
     } catch (error) {
       console.error('[TokenPlacement] Could not place the tokens:', error);
       this.cancel();
@@ -109,17 +163,38 @@ export class PlacementSession {
     }
     this.placed.push(...ids);
     this.land(batch, places);
-    this.hand = this.hand.slice(count);
-    if (this.hand.length === 0) {
-      this.deps.count(null, 0);
-      this.finish();
+    this.hand = this.hand.slice(press.count);
+    if (this.hand.length > 0) {
+      this.arrange();
+      return;
     }
-    else this.arrange();
+    this.deps.count(null, 0);
+    this.finish();
+  }
+
+  /** Lets go of a press without putting anything down: the tokens face as before and follow the pointer again. */
+  cancelPress(): void {
+    const press = this.press;
+    if (!press) return;
+    this.press = null;
+    this.hand.slice(0, press.count).forEach((token, i) => {
+      token.rotation = press.before[i];
+      token.ghost.turnTo(token.rotation ?? token.input.rotation ?? 0, false);
+    });
+    this.arrange();
+  }
+
+  /** Moves the queue `steps` on: the token being placed goes to the back, the next comes to the pointer. */
+  cycle(steps: number): void {
+    if (!this.cycling || steps === 0) return;
+    this.hand = cycled(this.hand, steps);
+    this.arrange();
   }
 
   /** Takes the held tokens away without placing them. */
   cancel(): void {
     if (this.ended) return;
+    this.press = null;
     for (const { ghost } of this.hand) ghost.vanish();
     this.deps.release(this.hand.map(({ ghost }) => ghost));
     this.hand = [];
@@ -137,6 +212,12 @@ export class PlacementSession {
     return this.shift && this.hand.length > 1;
   }
 
+  /** How the `index`th held token is held: pressed onto the map while a press holds it, lifted otherwise. */
+  private held(index: number, alpha: number): { scale: number; alpha: number; lift: number } {
+    const pressed = this.press !== null && index < this.press.count;
+    return { scale: pressed ? PRESSED_SCALE : HELD_SCALE, alpha, lift: pressed ? PRESSED_LIFT : 1 };
+  }
+
   /** Poses every ghost for the pointer and lights the cells the tokens would cover. */
   private arrange(): void {
     const grid = this.deps.grid();
@@ -149,15 +230,16 @@ export class PlacementSession {
     if (this.queued()) {
       const place = grid ? grid.snapToken(at, head.size) : at;
       this.places = [place];
-      head.ghost.pose({ at: place, scale: HELD_SCALE, alpha, lift: 1 }, 'head');
+      head.ghost.pose({ at: place, ...this.held(0, alpha) }, 'head');
       // The queue trails the token being placed, a constant size on screen
       const zoom = this.deps.zoom();
       const headRadius = (head.ghost.diameter * HELD_SCALE * zoom) / 2;
       const headOnScreen = { x: this.pointer.x + (place.x - at.x) * zoom, y: this.pointer.y + (place.y - at.y) * zoom };
       const fromHead = (offset: Point): Point => this.deps.toWorld({ x: headOnScreen.x + offset.x, y: headOnScreen.y + offset.y });
+      const queueAlpha = (this.onMap ? 1 : AWAY_ALPHA) * (this.press ? QUEUE_PRESSED_ALPHA : 1);
       waiting.forEach(({ ghost }, index) => {
         const slot = queueSlot(index, headRadius);
-        ghost.pose({ at: fromHead(slot.offset), scale: slot.diameter / (ghost.diameter * zoom), alpha: slot.alpha * (this.onMap ? 1 : AWAY_ALPHA), lift: 0.3 }, `queue-${Math.min(index, QUEUE_SHOWN - 1)}`);
+        ghost.pose({ at: fromHead(slot.offset), scale: slot.diameter / (ghost.diameter * zoom), alpha: slot.alpha * queueAlpha, lift: 0.3 }, `queue-${Math.min(index, QUEUE_SHOWN - 1)}`);
       });
       const unshown = waiting.length - QUEUE_SHOWN;
       this.deps.count(unshown > 0 ? fromHead(queueCountOffset(headRadius)) : null, unshown);
@@ -167,7 +249,7 @@ export class PlacementSession {
       this.places = formationAt(this.hand, at, grid);
       this.hand.forEach(({ ghost, size }, index) => {
         const place = this.places[index]!;
-        ghost.pose({ at: place, scale: HELD_SCALE, alpha, lift: 1 }, 'formation');
+        ghost.pose({ at: place, ...this.held(index, alpha) }, 'formation');
         if (grid && this.onMap) addCells(lit, place, size, grid);
       });
     }

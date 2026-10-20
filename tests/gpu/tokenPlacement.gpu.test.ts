@@ -43,6 +43,13 @@ function art(colour: string): Texture {
   gradient.addColorStop(1, '#111111');
   context.fillStyle = gradient;
   context.fillRect(0, 0, 128, 128);
+  // A point at the top, so the way the art faces shows
+  context.fillStyle = '#ffffff';
+  context.beginPath();
+  context.moveTo(64, 6);
+  context.lineTo(80, 40);
+  context.lineTo(48, 40);
+  context.fill();
   return new Texture({ source: new CanvasSource({ resource: canvas }) });
 }
 
@@ -56,6 +63,10 @@ interface Bench {
   run(ms: number): void;
   move(x: number, y: number, shift?: boolean): void;
   press(x: number, y: number, shift?: boolean): void;
+  down(x: number, y: number, shift?: boolean): void;
+  drag(x: number, y: number): void;
+  up(x: number, y: number): void;
+  wheel(deltaY: number): void;
   shot(name: string): Promise<void>;
 }
 
@@ -114,7 +125,7 @@ describe('placing spawned tokens by hand', () => {
       app, viewport, canvas, viewId: 'placement', settings: () => undefined, store, grid: () => grid,
       previewToken: async (token) => {
         const group = await factory.createTokenSprite({ ...token, id: 'preview', kind: 'token' } as TokenEntity, art(token.ringColor ?? '#888888'));
-        return { group, diameter: group.tokenSize, release: () => factory.destroyTokenSprite(group) };
+        return { group, diameter: group.tokenSize, rotate: (degrees) => factory.updateTokenRotation(group, degrees), release: () => factory.destroyTokenSprite(group) };
       },
     });
     let now = 0;
@@ -132,9 +143,22 @@ describe('placing spawned tokens by hand', () => {
       },
       move: (x, y, shift = false) => { viewport.emit('pointermove', event(x, y, shift)); },
       press: (x, y, shift = false) => {
+        bench.down(x, y, shift);
+        bench.up(x, y);
+      },
+      down: (x, y, shift = false) => {
         const rect = canvas.getBoundingClientRect();
         canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: rect.left + x, clientY: rect.top + y, button: 0, shiftKey: shift, bubbles: true, cancelable: true }));
       },
+      drag: (x, y) => {
+        const rect = canvas.getBoundingClientRect();
+        canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: rect.left + x, clientY: rect.top + y, buttons: 1, bubbles: true }));
+      },
+      up: (x, y) => {
+        const rect = canvas.getBoundingClientRect();
+        canvas.dispatchEvent(new PointerEvent('pointerup', { clientX: rect.left + x, clientY: rect.top + y, button: 0, bubbles: true }));
+      },
+      wheel: (deltaY) => { canvas.dispatchEvent(new WheelEvent('wheel', { deltaY, shiftKey: true, bubbles: true, cancelable: true })); },
       shot: async (name) => {
         renderer.render(app.stage);
         const copy = renderer.extract.canvas(app.stage) as HTMLCanvasElement;
@@ -202,6 +226,29 @@ describe('placing spawned tokens by hand', () => {
     expect(await placing).toHaveLength(6);
     const places = Object.values(store.getState().objects.tokens).map(({ x, y }) => `${x},${y}`);
     expect(new Set(places).size).toBe(6);
+  });
+
+  it('turns a token while the button is held, and cycles the queue with Shift and the wheel', async () => {
+    const { store, placer, run, move, down, drag, up, wheel, shot } = await bench();
+    const placing = placer.place({ tokens: tokens(4), commit: commitTo(store) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    move(300, 300, true);
+    run(500);
+    wheel(100);
+    run(150);
+    await shot('cycle-mid');
+    run(500);
+    await shot('cycled');
+    down(300, 300, true);
+    drag(420, 330);
+    run(300);
+    await shot('turning');
+    up(420, 330);
+    run(100);
+    const [first] = Object.values(store.getState().objects.tokens);
+    expect(first).toMatchObject({ imagePath: 'tokens/t1.png', x: 315, y: 315, rotation: 105 });
+    placer.cancel();
+    expect(await placing).toHaveLength(1);
   });
 
   it('lights the hexes of a large token on a hex grid', async () => {

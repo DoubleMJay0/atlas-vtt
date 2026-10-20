@@ -6,6 +6,7 @@ import { canRunMapHotkeys, matchesMapHotkey } from '../../keyboard/mapHotkeys';
 import type { SettingsService } from '../../services/SettingsService';
 import type { PlacementSession } from './PlacementSession';
 import type { Point } from './placementLayout';
+import { WheelSteps } from './wheelSteps';
 
 export interface PlacementInputDeps {
   app: Application;
@@ -21,15 +22,19 @@ const DOUBLE_CLICK_GUARD_MS = 500;
 /**
  * Hands the pointer and keys to `session` while it lasts; returns the function that gives them back.
  * A left press on the map is the session's alone: it is taken before PIXI sees it, so no tool,
- * token or marquee answers it. A right-drag still pans and a right click in place puts the tokens
- * away, as Escape does. Shift is read from every pointer and key event and dropped when the window
- * loses focus. The system cursor is hidden over the map: the held tokens are the cursor.
+ * token or marquee answers it. Moved while held it turns the tokens, released it puts them down.
+ * A right-drag still pans and a right click in place puts the tokens away, as Escape does (which
+ * first lets go of a press). With Shift held the wheel cycles the queue instead of zooming. Shift is
+ * read from every pointer, key and wheel event and dropped when the window loses focus. The system
+ * cursor is hidden over the map, the held tokens being the cursor, and shown while a press turns them.
  */
 export function bindPlacementInput(deps: PlacementInputDeps, session: PlacementSession): () => void {
   const { app, viewport, canvas } = deps;
   const host = canvas.parentElement ?? canvas;
   const win = canvas.ownerDocument.defaultView ?? window;
   let stopRightClick: (() => void) | null = null;
+  const wheel = new WheelSteps();
+  const cursor = (): string => (session.pressing ? 'grabbing' : 'none');
 
   const screenOf = (event: { clientX: number; clientY: number }): Point => {
     const point = new PixiPoint();
@@ -40,13 +45,34 @@ export function bindPlacementInput(deps: PlacementInputDeps, session: PlacementS
   const onMove = (event: FederatedPointerEvent): void => {
     session.moveTo({ x: event.global.x, y: event.global.y }, event.shiftKey);
     // After PIXI's own cursor write for this event
-    queueMicrotask(() => { if (session.active) setCanvasCursor(canvas, 'none'); });
+    queueMicrotask(() => { if (session.active) setCanvasCursor(canvas, cursor()); });
   };
   const onPress = (event: PointerEvent): void => {
     if (event.target !== canvas || event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
-    session.put(screenOf(event), event.shiftKey);
+    session.pressAt(screenOf(event), event.shiftKey);
+    setCanvasCursor(canvas, cursor());
+  };
+  const onPressMove = (event: PointerEvent): void => {
+    if (session.pressing) session.turn(screenOf(event), event.altKey);
+  };
+  const onRelease = (event: PointerEvent): void => {
+    if (event.button !== 0 || !session.pressing) return;
+    session.release();
+    if (session.active) setCanvasCursor(canvas, cursor());
+  };
+  const onPressLost = (): void => {
+    session.cancelPress();
+    if (session.active) setCanvasCursor(canvas, cursor());
+  };
+  const onWheel = (event: WheelEvent): void => {
+    if (event.target !== canvas || !event.shiftKey) return;
+    session.setShift(true);
+    if (!session.cycling) return;
+    event.preventDefault();
+    event.stopPropagation();
+    session.cycle(wheel.take(event));
   };
   const onDoubleClick = (event: MouseEvent): void => {
     if (event.target !== canvas) return;
@@ -54,7 +80,7 @@ export function bindPlacementInput(deps: PlacementInputDeps, session: PlacementS
     event.preventDefault();
   };
   const onRightPress = (event: FederatedPointerEvent): void => {
-    if (event.button !== 2) return;
+    if (event.button !== 2 || session.pressing) return;
     stopRightClick?.();
     stopRightClick = watchClick(viewport, event, () => session.cancel());
   };
@@ -63,10 +89,14 @@ export function bindPlacementInput(deps: PlacementInputDeps, session: PlacementS
     else if (event.type === 'keydown' && matchesMapHotkey(event, 'cancel', deps.settings()) && canRunMapHotkeys(event, deps.viewId)) {
       event.preventDefault();
       event.stopPropagation();
-      session.cancel();
+      if (session.pressing) onPressLost();
+      else session.cancel();
     }
   };
-  const onBlur = (): void => session.setShift(false);
+  const onBlur = (): void => {
+    onPressLost();
+    session.setShift(false);
+  };
   const onLeave = (): void => session.setOnMap(false);
   const onViewChanged = (): void => session.viewChanged();
 
@@ -76,7 +106,11 @@ export function bindPlacementInput(deps: PlacementInputDeps, session: PlacementS
   viewport.on('zoomed', onViewChanged);
   host.addEventListener('pointerdown', onPress, { capture: true });
   host.addEventListener('dblclick', onDoubleClick, { capture: true });
+  host.addEventListener('wheel', onWheel, { capture: true, passive: false });
   canvas.addEventListener('pointerleave', onLeave);
+  win.addEventListener('pointermove', onPressMove, { capture: true });
+  win.addEventListener('pointerup', onRelease, { capture: true });
+  win.addEventListener('pointercancel', onPressLost, { capture: true });
   win.addEventListener('keydown', onKey, { capture: true });
   win.addEventListener('keyup', onKey, { capture: true });
   win.addEventListener('blur', onBlur);
@@ -89,7 +123,11 @@ export function bindPlacementInput(deps: PlacementInputDeps, session: PlacementS
     viewport.off('zoomed', onViewChanged);
     stopRightClick?.();
     host.removeEventListener('pointerdown', onPress, { capture: true });
+    host.removeEventListener('wheel', onWheel, { capture: true });
     canvas.removeEventListener('pointerleave', onLeave);
+    win.removeEventListener('pointermove', onPressMove, { capture: true });
+    win.removeEventListener('pointerup', onRelease, { capture: true });
+    win.removeEventListener('pointercancel', onPressLost, { capture: true });
     win.removeEventListener('keydown', onKey, { capture: true });
     win.removeEventListener('keyup', onKey, { capture: true });
     win.removeEventListener('blur', onBlur);

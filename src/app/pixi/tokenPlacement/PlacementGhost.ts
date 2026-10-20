@@ -1,13 +1,16 @@
-import { CanvasSource, Container, Sprite, Texture } from 'pixi.js';
+import { CanvasSource, Container, Sprite, Texture, type Graphics } from 'pixi.js';
 import { destroyTree } from '../utils/destroyTree';
 import { Spring, type SpringFeel } from './placementSpring';
 import type { Point } from './placementLayout';
+import { facingMark } from './facingMark';
 
 /** A token as it will look once placed, holding its art until released. */
 export interface TokenPreview {
   readonly group: Container;
   /** Diameter of the token in world pixels. */
   readonly diameter: number;
+  /** Turns the token's art to face `degrees` (0 up, clockwise), as a placed token's `rotation` does. */
+  rotate(degrees: number): void;
   release(): void;
 }
 
@@ -28,6 +31,8 @@ const REARRANGE: SpringFeel = { frequency: 15, damping: 0.78 };
 const REARRANGE_S = 0.45;
 const SCALE: SpringFeel = { frequency: 26, damping: 0.62 };
 const FADE: SpringFeel = { frequency: 22, damping: 1 };
+/** Turns towards the way it is pointed, a little behind the pointer, without spinning past it. */
+const TURN: SpringFeel = { frequency: 30, damping: 0.85 };
 /** Put down: the token presses into the map and springs back to its size. */
 const LANDING: SpringFeel = { frequency: 34, damping: 0.4 };
 /** How long a landed ghost stays over the placed token before it fades into it. */
@@ -51,24 +56,30 @@ export class PlacementGhost {
   private readonly scale: Spring;
   private readonly alpha: Spring;
   private readonly lift: Spring;
+  /** Which way the token faces, in degrees, unwrapped so it always turns the short way. */
+  private readonly facing: Spring;
+  private readonly mark: Graphics;
+  private readonly markShown = new Spring(0, FADE);
   private rearranging = 0;
   private state: GhostState = 'held';
   private landedFor = 0;
   /** The part the ghost plays now, so a change of part is seen as a rearrangement. */
   private part: string | null = null;
 
-  constructor(private readonly preview: TokenPreview, start: Point, private readonly reducedMotion: boolean) {
+  constructor(private readonly preview: TokenPreview, start: Point, facing: number, accent: number, private readonly reducedMotion: boolean) {
     this.shadow = new Sprite(shadowTexture());
     this.shadow.anchor.set(0.5);
     this.shadow.eventMode = 'none';
     this.root.eventMode = 'none';
-    this.root.addChild(this.shadow, preview.group);
+    this.mark = facingMark(preview.diameter / 2, accent);
+    this.root.addChild(this.shadow, preview.group, this.mark);
     preview.group.position.set(0, 0);
     this.x = new Spring(start.x, FOLLOW);
     this.y = new Spring(start.y, FOLLOW);
     this.scale = new Spring(0.6, SCALE);
     this.alpha = new Spring(0, FADE);
     this.lift = new Spring(1, FADE);
+    this.facing = new Spring(facing, TURN);
     this.apply();
   }
 
@@ -90,11 +101,20 @@ export class PlacementGhost {
     if (this.state !== 'held') return;
     if (this.part !== null && this.part !== part) this.rearranging = REARRANGE_S;
     this.part = part;
+    // Tokens waiting in the queue pass under the one being placed
+    this.root.zIndex = part.startsWith('queue') ? 0 : 1;
     this.x.target = pose.at.x;
     this.y.target = pose.at.y;
     this.scale.target = pose.scale;
     this.alpha.target = pose.alpha;
     this.lift.target = pose.lift;
+  }
+
+  /** Turns the token to face `degrees` the short way round; `showing` the mark of the way it faces. */
+  turnTo(degrees: number, showing: boolean): void {
+    const step = ((((degrees - this.facing.target) % 360) + 540) % 360) - 180;
+    this.facing.target += step;
+    this.markShown.target = showing ? 1 : 0;
   }
 
   /** Puts the ghost down at its place: it presses into the map, then fades into the token placed there. */
@@ -109,6 +129,7 @@ export class PlacementGhost {
     this.scale.kick(-1.6);
     this.lift.target = 0;
     this.alpha.target = 1;
+    this.markShown.target = 0;
   }
 
   /** Takes the ghost away without placing it: it shrinks and fades where it is. */
@@ -117,6 +138,7 @@ export class PlacementGhost {
     this.scale.target = this.scale.value * 0.75;
     this.alpha.target = 0;
     this.lift.target = 0;
+    this.markShown.target = 0;
   }
 
   /** Moves the ghost `seconds` on; whether it still moves. */
@@ -126,6 +148,7 @@ export class PlacementGhost {
       this.y.jump(this.y.target);
       this.scale.jump(this.scale.target);
       this.lift.jump(this.lift.target);
+      this.facing.jump(this.facing.target);
     }
     this.followFeel(seconds);
     if (this.state === 'landing') {
@@ -133,7 +156,8 @@ export class PlacementGhost {
       if (this.landedFor >= (this.reducedMotion ? 0 : LANDED_HOLD_S)) this.alpha.target = 0;
     }
     for (const spring of [this.x, this.y]) spring.step(seconds);
-    for (const spring of [this.scale, this.alpha, this.lift]) spring.step(seconds, 0.01);
+    for (const spring of [this.scale, this.alpha, this.lift, this.markShown]) spring.step(seconds, 0.01);
+    this.facing.step(seconds, 0.1);
     this.apply();
     return !this.finished && !this.atRest();
   }
@@ -145,7 +169,7 @@ export class PlacementGhost {
   }
 
   private atRest(): boolean {
-    return this.state === 'held' && this.rearranging <= 0 && [this.x, this.y, this.scale, this.alpha, this.lift].every((spring) => spring.atRest);
+    return this.state === 'held' && this.rearranging <= 0 && [this.x, this.y, this.scale, this.alpha, this.lift, this.facing, this.markShown].every((spring) => spring.atRest);
   }
 
   /** A rearrangement hands over to following by raising the springs' frequency again as it ends. */
@@ -167,6 +191,11 @@ export class PlacementGhost {
     this.root.position.set(this.x.value, this.y.value);
     this.preview.group.scale.set(scale);
     this.root.alpha = Math.min(1, Math.max(0, this.alpha.value));
+    this.preview.rotate(((this.facing.value % 360) + 360) % 360);
+    this.mark.rotation = (this.facing.value * Math.PI) / 180;
+    this.mark.scale.set(scale);
+    this.mark.alpha = Math.min(1, Math.max(0, this.markShown.value));
+    this.mark.visible = this.mark.alpha > 0.005;
     const radius = (this.preview.diameter / 2) * scale;
     this.shadow.position.set(radius * 0.1 * lift, radius * 0.22 * lift);
     this.shadow.width = radius * 2 * (1.08 + 0.1 * lift);

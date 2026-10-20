@@ -48,13 +48,15 @@ export class TokenPlacer {
   /** Counts placements, so one whose previews arrive after another began is dropped. */
   private generation = 0;
   private destroyed = false;
+  private accentColour: number | null = null;
 
   constructor(private readonly deps: TokenPlacerDeps) {
     const reduced = prefersReducedMotion(deps.canvas);
-    let colour: number | null = null;
-    this.marks = new PlacementMarks(() => (colour ??= cssColorToHexNumber(getObsidianAccentColor())), () => deps.viewport.scale.x, reduced);
+    this.marks = new PlacementMarks(() => this.accent(), () => deps.viewport.scale.x, reduced);
     this.queueCount = new QueueCount(() => deps.viewport.scale.x, reduced);
     this.ghostLayer.eventMode = 'none';
+    this.ghostLayer.sortableChildren = true;
+    this.queueCount.root.zIndex = 2;
     this.ghostLayer.addChild(this.queueCount.root);
     this.ghostLayer.zIndex = MAP_LAYER_Z.placement;
     this.marks.container.zIndex = MAP_LAYER_Z.placementCells;
@@ -109,9 +111,9 @@ export class TokenPlacer {
     const reduced = prefersReducedMotion(canvas);
     const start = viewport.toWorld(viewport.screenWidth / 2, viewport.screenHeight / 2);
     this.held = request.tokens.map((input, i) => {
-      const ghost = new PlacementGhost(previews[i]!, start, reduced);
-      this.ghostLayer.addChildAt(ghost.root, this.ghostLayer.children.length - 1);
-      return { input, home: { x: input.x, y: input.y }, size: input.size || 1, ghost };
+      const ghost = new PlacementGhost(previews[i]!, start, input.rotation ?? 0, this.accent(), reduced);
+      this.ghostLayer.addChild(ghost.root);
+      return { input, home: { x: input.x, y: input.y }, size: input.size || 1, ghost, rotation: undefined };
     });
     const session = new PlacementSession({
       toWorld: (screen) => viewport.toWorld(screen.x, screen.y),
@@ -146,6 +148,11 @@ export class TokenPlacer {
     this.unbind = null;
     this.stopWatchingStore?.();
     this.stopWatchingStore = null;
+  }
+
+  /** The theme's accent, read once: the marks of a placement are drawn in it. */
+  private accent(): number {
+    return (this.accentColour ??= cssColorToHexNumber(getObsidianAccentColor()));
   }
 
   private release(ghosts: readonly PlacementGhost[]): void {

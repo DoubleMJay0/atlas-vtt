@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PlacementSession, type HeldToken } from '../../src/app/pixi/tokenPlacement/PlacementSession';
-import { footprintCells, formationAt, queueSlot, type PlacementGrid, type Point } from '../../src/app/pixi/tokenPlacement/placementLayout';
+import { cycled, facingTowards, footprintCells, formationAt, queueSlot, type PlacementGrid, type Point } from '../../src/app/pixi/tokenPlacement/placementLayout';
+import { WheelSteps } from '../../src/app/pixi/tokenPlacement/wheelSteps';
 import { Spring } from '../../src/app/pixi/tokenPlacement/placementSpring';
 import type { PlacementGhost } from '../../src/app/pixi/tokenPlacement/PlacementGhost';
 import type { PlacementMarks } from '../../src/app/pixi/tokenPlacement/PlacementMarks';
 import type { TokenInput } from '../../src/app/types/viewState';
+
+/** A click: the button goes down and up in place. */
+function put(session: PlacementSession, at: Point, shift: boolean): void {
+  session.pressAt(at, shift);
+  session.release();
+}
 
 /** A square grid of 70 px cells from the origin. */
 const square: PlacementGrid = {
@@ -46,6 +53,33 @@ describe('laying held tokens out', () => {
   });
 });
 
+describe('turning a token', () => {
+  it('faces the pointer in 15° steps from up, clockwise, or freely with Alt', () => {
+    expect(facingTowards({ x: 0, y: 0 }, { x: 0, y: -10 }, false)).toBe(0);
+    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 0 }, false)).toBe(90);
+    expect(facingTowards({ x: 0, y: 0 }, { x: -10, y: 0 }, false)).toBe(270);
+    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 1 }, false)).toBe(90);
+    expect(facingTowards({ x: 0, y: 0 }, { x: 10, y: 1 }, true)).toBeCloseTo(95.71, 1);
+  });
+});
+
+describe('cycling the queue', () => {
+  it('sends the first to the back for each step forward, and the last to the front for each step back', () => {
+    expect(cycled([1, 2, 3, 4], 1)).toEqual([2, 3, 4, 1]);
+    expect(cycled([1, 2, 3, 4], -1)).toEqual([4, 1, 2, 3]);
+    expect(cycled([1, 2, 3], 5)).toEqual([3, 1, 2]);
+  });
+
+  it('steps once per mouse wheel notch and once per stretch of a trackpad glide, sideways too', () => {
+    const steps = new WheelSteps();
+    expect(steps.take({ deltaX: 0, deltaY: 100, deltaMode: 0 })).toBe(1);
+    expect(steps.take({ deltaX: -100, deltaY: 0, deltaMode: 0 })).toBe(-1);
+    expect(steps.take({ deltaX: 0, deltaY: 3, deltaMode: 1 })).toBe(1);
+    expect([10, 10, 10, 10, 10, 10, 10, 10].map((deltaY) => steps.take({ deltaX: 0, deltaY, deltaMode: 0 }))).toEqual([0, 0, 0, 1, 0, 0, 0, 1]);
+    expect(steps.take({ deltaX: 0, deltaY: -10, deltaMode: 0 })).toBe(0);
+  });
+});
+
 describe('a spring', () => {
   it('arrives at its target and rests there', () => {
     const spring = new Spring(0, { frequency: 30, damping: 1 });
@@ -58,8 +92,9 @@ describe('a spring', () => {
 
 /** A ghost that records how it was posed and whether it landed or vanished. */
 function fakeGhost() {
-  const ghost = { diameter: 70, poses: [] as Array<{ at: Point; part: string }>, landed: null as Point | null, vanished: false };
+  const ghost = { diameter: 70, poses: [] as Array<{ at: Point; part: string }>, landed: null as Point | null, vanished: false, facing: 0 };
   return Object.assign(ghost, {
+    turnTo: (degrees: number) => { ghost.facing = degrees; },
     pose: (pose: { at: Point }, part: string) => ghost.poses.push({ at: pose.at, part }),
     land: (at: Point) => { ghost.landed = at; },
     vanish: () => { ghost.vanished = true; },
@@ -73,6 +108,7 @@ function hand(count: number) {
     home: { x: 35 + 70 * i, y: 35 },
     size: 1,
     ghost: ghost as unknown as PlacementGhost,
+    rotation: undefined,
   }));
   const committed: TokenInput[][] = [];
   const end = vi.fn();
@@ -93,7 +129,7 @@ function hand(count: number) {
 describe('placing held tokens', () => {
   it('puts the whole formation down with one click, on the grid', () => {
     const { session, committed, end, ghosts } = hand(3);
-    session.put({ x: 300, y: 300 }, false);
+    put(session, { x: 300, y: 300 }, false);
     expect(committed).toEqual([[
       expect.objectContaining({ imagePath: 't0.png', x: 245, y: 315 }),
       expect.objectContaining({ imagePath: 't1.png', x: 315, y: 315 }),
@@ -108,20 +144,60 @@ describe('placing held tokens', () => {
     session.moveTo({ x: 100, y: 100 }, true);
     expect(ghosts[0]!.poses.at(-1)).toEqual({ at: { x: 105, y: 105 }, part: 'head' });
     expect(ghosts[1]!.poses.at(-1)?.part).toBe('queue-0');
-    session.put({ x: 100, y: 100 }, true);
-    session.put({ x: 200, y: 100 }, true);
+    put(session, { x: 100, y: 100 }, true);
+    put(session, { x: 200, y: 100 }, true);
     expect(committed.map((batch) => batch.map(({ imagePath, x, y }) => [imagePath, x, y]))).toEqual([[['t0.png', 105, 105]], [['t1.png', 175, 105]]]);
     expect(ghosts[2]!.poses.at(-1)?.part).toBe('head');
     session.setShift(false);
     expect(ghosts[3]!.poses.at(-1)?.part).toBe('formation');
-    session.put({ x: 400, y: 400 }, false);
+    put(session, { x: 400, y: 400 }, false);
     expect(committed[2]).toHaveLength(2);
     expect(end).toHaveBeenCalledWith(['t0.png', 't1.png', 't2.png', 't3.png']);
   });
 
+  it('turns the pressed tokens towards the pointer while the button is held, and puts them down facing it', () => {
+    const { session, committed, ghosts } = hand(2);
+    session.moveTo({ x: 100, y: 100 }, true);
+    session.pressAt({ x: 100, y: 100 }, true);
+    session.turn({ x: 103, y: 102 }, false);
+    expect(ghosts[0]!.facing).toBe(0);
+    session.turn({ x: 300, y: 105 }, false);
+    expect(ghosts[0]!.facing).toBe(90);
+    session.moveTo({ x: 400, y: 400 }, true);
+    session.release();
+    expect(committed[0]).toEqual([expect.objectContaining({ imagePath: 't0.png', x: 105, y: 105, rotation: 90 })]);
+    expect(ghosts[1]!.facing).toBe(0);
+  });
+
+  it('lets go of a press without putting anything down, facing as before', () => {
+    const { session, committed, ghosts } = hand(1);
+    session.pressAt({ x: 100, y: 100 }, false);
+    session.turn({ x: 100, y: 300 }, false);
+    session.cancelPress();
+    expect(ghosts[0]!.facing).toBe(0);
+    put(session, { x: 100, y: 100 }, false);
+    expect(committed[0]?.[0]).not.toHaveProperty('rotation');
+  });
+
+  it('cycles the queue with Shift held, bringing the next token to the pointer', () => {
+    const { session, ghosts, committed } = hand(3);
+    session.moveTo({ x: 100, y: 100 }, false);
+    session.cycle(1);
+    expect(ghosts[1]!.poses.at(-1)?.part).toBe('formation');
+    session.setShift(true);
+    session.cycle(1);
+    expect(ghosts[1]!.poses.at(-1)?.part).toBe('head');
+    expect(ghosts[0]!.poses.at(-1)?.part).toBe('queue-1');
+    session.cycle(-1);
+    expect(ghosts[0]!.poses.at(-1)?.part).toBe('head');
+    session.cycle(-1);
+    put(session, { x: 100, y: 100 }, true);
+    expect(committed[0]?.[0]?.imagePath).toBe('t2.png');
+  });
+
   it('puts the tokens still held away and reports those already placed', () => {
     const { session, end, ghosts } = hand(3);
-    session.put({ x: 100, y: 100 }, true);
+    put(session, { x: 100, y: 100 }, true);
     session.cancel();
     expect(ghosts.slice(1).every((ghost) => ghost.vanished)).toBe(true);
     expect(end).toHaveBeenCalledWith(['t0.png']);

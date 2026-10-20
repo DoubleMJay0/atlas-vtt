@@ -132,3 +132,23 @@ export function queueCountOffset(headRadius: number): Point {
   const last = queueSlot(QUEUE_SHOWN - 1, headRadius);
   return { x: last.offset.x + last.diameter / 2 + QUEUE_GAP, y: last.offset.y };
 }
+
+/** Turns snap to this many degrees, as the rotate handle does; Alt turns freely. */
+const FACING_STEP = 15;
+
+/**
+ * The way a token at `from` faces when it is turned towards `to`: degrees from up, clockwise, as a
+ * token's `rotation` counts them, in steps of 15° unless `free`.
+ */
+export function facingTowards(from: Point, to: Point, free: boolean): number {
+  const degrees = (Math.atan2(to.x - from.x, from.y - to.y) * 180) / Math.PI;
+  const turned = free ? degrees : Math.round(degrees / FACING_STEP) * FACING_STEP;
+  return ((turned % 360) + 360) % 360;
+}
+
+/** `items` turned `steps` places on: the first goes to the back for each step forward. */
+export function cycled<T>(items: readonly T[], steps: number): T[] {
+  if (items.length === 0) return [];
+  const shift = ((steps % items.length) + items.length) % items.length;
+  return [...items.slice(shift), ...items.slice(0, shift)];
+}
