@@ -4,7 +4,8 @@ import type { TokenEntity } from '../types';
 import type { InitiativeEntry } from '../types/initiativeTypes';
 import type { TokenInput } from '../types/viewState';
 import { initiativeEntryForToken } from '../stores/initiativeEntries';
-import { isOffMap, offMapPlaces, sceneTokens } from '../tokens/offMap';
+import { isOffMap, offMapPlaces, placedByOlderVersion, sceneTokens, type MapArea } from '../tokens/offMap';
+import { runUntracked } from '../stores/history';
 
 type CombatStore = Pick<StoreApi<ViewAtlasState>, 'getState'>;
 
@@ -58,4 +59,15 @@ export function clearCombatants(store: CombatStore): void {
 export function offMapWithoutEntry(tokens: Readonly<Record<string, TokenEntity>>, entries: readonly Pick<InitiativeEntry, 'tokenId'>[]): TokenEntity[] {
   const listed = new Set(entries.map((entry) => entry.tokenId));
   return Object.values(tokens).filter((token) => isOffMap(token) && !listed.has(token.id));
+}
+
+/**
+ * Clears the flag of every combatant beside the map whose centre an older version moved onto the
+ * map image (`placedByOlderVersion`), in one write that is no undo step: the scene is as it was
+ * saved, only read right.
+ */
+export function takePlacedCombatants(store: CombatStore, map: MapArea): void {
+  const { objects, updateTokens } = store.getState();
+  const placed = placedByOlderVersion(sceneTokens(objects), map);
+  if (placed.length > 0) runUntracked(store, () => updateTokens(placed.map((id) => ({ id, changes: { offMap: undefined } }))));
 }

@@ -23,6 +23,7 @@ import { StatblockSkeleton } from '../../../../react/components/statblock/Statbl
 import { countOf, encounterDrafts, withCount, type EncounterPick } from './encounterPicks';
 import { encounterMetrics } from './encounterMetrics';
 import { useEncounterRoster } from './useEncounterRoster';
+import { diceRandom } from '../../../../services/offlineDiceInputs';
 
 const SKELETONS = ['a', 'b', 'c', 'd'];
 
@@ -84,7 +85,7 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
     setSaving(true);
     try {
       const groups = picks.map(({ token, count }) => ({ asset: token, count }));
-      const ids = await spawnTokenGroups({ app, view, assetService }, groups, placement);
+      const ids = await spawnTokenGroups({ app, view, assetService, random: diceRandom }, groups, placement);
       if (ids.length === 0) return;
       onClose();
       onBrought();

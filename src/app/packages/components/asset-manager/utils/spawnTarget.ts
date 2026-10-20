@@ -28,8 +28,8 @@ export interface SpawnContext {
   /** The view the asset manager belongs to; null for the global asset manager. */
   view: AtlasView | null;
   assetService: AssetService | null;
-  /** The dice stream hit points joining a scene are rolled with; the dice tool's own (`Math.random`) without one. */
-  random?: () => number;
+  /** The dice stream hit points joining a scene are rolled with: the local roller's (`diceRandom`). */
+  random: () => number;
 }
 
 export interface SpawnTarget {

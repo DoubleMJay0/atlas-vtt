@@ -41,6 +41,7 @@ function setup(records: Record<string, Partial<TokenAsset>> = {}, defaultTokenVi
   const ctx: SpawnContext = {
     app,
     view,
+    random: Math.random,
     assetService: {
       getAssetById: vi.fn(async (id: string) => (id in records ? { id, type: 'token', name: id, imagePath: `tokens/${id}.png`, ...records[id] } : null)),
       getCollectionForMap: vi.fn((path: string) => (path === 'maps/cave.atlasmap' ? 'dungeon' : null)),

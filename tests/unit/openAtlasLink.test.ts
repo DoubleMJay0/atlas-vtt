@@ -97,7 +97,7 @@ describe('encounter links', () => {
 
     await placeEncounterFile(vault.app as never, new TFile(primaryPath(encounter)!));
     expect(spawning.spawnEncounterTokens).toHaveBeenCalledWith(
-      { app: vault.app, view: null, assetService: assets },
+      { app: vault.app, view: null, assetService: assets, random: expect.any(Function) },
       expect.objectContaining({ type: 'encounters', id: encounter.id, tokens: [goblin] }),
       'map',
     );

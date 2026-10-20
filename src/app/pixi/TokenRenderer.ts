@@ -804,20 +804,7 @@ export class TokenRenderer {
     const totalChanges = changedTokenIds.size + newTokenIds.size + deletedTokenIds.size;
 
     // Deleted tokens leave the renderer at once and play out on their own
-    const leaving: TokenGroupContainer[] = [];
-    for (const id of deletedTokenIds) {
-      const tokenGroup = this.tokenSprites[id];
-
-      this.glide.cancel(id);
-      if (tokenGroup) {
-        this.interactionController.removeInteractionHandlers(id, tokenGroup);
-        delete this.tokenSprites[id];
-        // Clean up ring tracking (ring is destroyed with tokenGroup)
-        delete this.tokenRings[id];
-        this.uiManager.destroyTokenUI(id);
-        leaving.push(tokenGroup);
-      }
-    }
+    const leaving = this.releaseLeavingTokens(deletedTokenIds);
     this.exit.play(leaving, (group) => {
       this.freeTokenGroup(group);
       this.evictUnusedArt();
@@ -1121,6 +1108,29 @@ export class TokenRenderer {
     if (token.imagePath !== prevToken.imagePath) return true;
 
     return false;
+  }
+
+  /**
+   * Takes the sprites of tokens that left the map (deleted, or gone beside it by an undone Place on
+   * Map) out of the renderer and the selection, and hands back their groups to play out. A token
+   * beside the map keeps no selection: Delete would take it unseen.
+   */
+  private releaseLeavingTokens(ids: Iterable<string>): TokenGroupContainer[] {
+    const leaving: TokenGroupContainer[] = [];
+    for (const id of ids) {
+      const tokenGroup = this.tokenSprites[id];
+      this.glide.cancel(id);
+      this.deselect(id);
+      if (tokenGroup) {
+        this.interactionController.removeInteractionHandlers(id, tokenGroup);
+        delete this.tokenSprites[id];
+        // Clean up ring tracking (ring is destroyed with tokenGroup)
+        delete this.tokenRings[id];
+        this.uiManager.destroyTokenUI(id);
+        leaving.push(tokenGroup);
+      }
+    }
+    return leaving;
   }
 
   /** Detaches a token group's pointer handlers, destroys it with all of its children and drops its hold on its art. */

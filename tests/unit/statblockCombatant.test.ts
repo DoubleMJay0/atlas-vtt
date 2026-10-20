@@ -31,7 +31,7 @@ describe('adding a statblock\'s creature to initiative', () => {
     const { vault, assets } = await setup();
     await assets.addTokenAsset({ name: 'Goblin', imagePath: 'art/goblin.webp', statblockPath: STATBLOCK, collection: 'Default', tags: [] });
     await addStatblockCombatant(vault.app, STATBLOCK);
-    expect(spawning.spawnTokenAsset).toHaveBeenCalledWith(expect.objectContaining({ view: null, assetService: assets }), expect.objectContaining({ type: 'tokens', name: 'Goblin' }), 1, 'beside');
+    expect(spawning.spawnTokenAsset).toHaveBeenCalledWith(expect.objectContaining({ view: null, assetService: assets, random: expect.any(Function) }), expect.objectContaining({ type: 'tokens', name: 'Goblin' }), 1, 'beside');
   });
 
   it('says what is missing where no library token links it', async () => {

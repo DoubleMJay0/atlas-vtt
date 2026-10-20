@@ -45,6 +45,11 @@ export function mapTokens<T extends OffMapFlag>(objects: TokenHolder<T>): Readon
   return result;
 }
 
+/** `ids` without those of combatants beside the map: what a selection may delete, cut or copy. */
+export function withoutOffMap(objects: TokenHolder<OffMapFlag>, ids: readonly string[]): string[] {
+  return ids.filter((id) => !isOffMap(objects.tokens[id]));
+}
+
 /** Every token of the scene, those beside the map included: for what keeps a combatant, never for what shows the map. */
 export function sceneTokens<T>(objects: TokenHolder<T>): Readonly<Record<string, T>> {
   return objects.tokens;
@@ -62,4 +67,22 @@ export function offMapPlaces(tokens: Readonly<Record<string, OffMapFlag>>, cellS
   const cell = cellSize > 0 ? cellSize : 70;
   const taken = Object.values(tokens).filter(isOffMap).length;
   return Array.from({ length: count }, (_, i) => ({ x: -1.5 * cell, y: cell * (0.5 + ROW_PITCH * (taken + i)) }));
+}
+
+/** The part of the world the map image covers. */
+export interface MapArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The combatants kept beside the map whose centre lies on the map image: an older Atlas draws
+ * them, and the GM moved them onto the map there, which keeps the flag it does not know. A scene
+ * that loads takes them as placed (`MapService`), so what was put on the map in that version shows.
+ */
+export function placedByOlderVersion(tokens: Readonly<Record<string, OffMapFlag & { x: number; y: number }>>, map: MapArea): string[] {
+  const inside = (x: number, y: number): boolean => x >= map.x && x <= map.x + map.width && y >= map.y && y <= map.y + map.height;
+  return Object.entries(tokens).flatMap(([id, token]) => (isOffMap(token) && inside(token.x, token.y) ? [id] : []));
 }

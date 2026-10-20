@@ -25,6 +25,7 @@ import { scenePrefillFromMap } from '../utils/sceneCreation';
 import { createStatblockEntry } from '../../../../statblocks/editor/create/entryPoints';
 import { copyAssetLink } from '../../../../links/atlasLinkText';
 import { t } from '../../../../i18n';
+import { diceRandom } from '../../../../services/offlineDiceInputs';
 
 export interface AssetContextMenuDeps {
   app: ObsidianApp;
@@ -67,7 +68,7 @@ export function buildAssetContextMenuEntries(
   const spawnCtx: SpawnContext = {
     app: deps.app,
     view: deps.view,
-    assetService: deps.assetService,
+    assetService: deps.assetService, random: diceRandom,
   };
 
   // ── Create Scene from Map ─────────────────────────────────────

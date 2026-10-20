@@ -31,6 +31,8 @@ import { withoutCollectionWidgets } from './utils/collectionWidgets';
 import { withWidgetOff } from './utils/widgetActivation';
 import type { TimerState } from './utils/timerWidget';
 import { createMapObjectsActions, type MapObjectsSlice } from './stores/mapObjectsSlice';
+import { withoutOffMap } from './tokens/offMap';
+import { diceRandom } from './services/offlineDiceInputs';
 import type { MapMove } from './grid/mapStretch';
 import { objectsMovedWithMap } from './grid/mapStretchObjects';
 import { computeNextInstanceNumber } from './stores/tokenInstanceNumbers';
@@ -819,7 +821,8 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
             draft.selectedIds = draft.selectedIds.filter(selectedId => !ids.includes(selectedId));
           }),
 
-          deleteSelected: () => get().removeMapObjects(get().selectedIds),
+          // A combatant beside the map is never deleted by what the map has selected
+          deleteSelected: () => get().removeMapObjects(withoutOffMap(get().objects, get().selectedIds)),
 
           // --- Copy, paste and duplicate (from mapObjectsSlice.ts) ---
           ...createMapObjectsActions(set, get),
@@ -1389,7 +1392,7 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
           // --- Initiative Tracker State & Actions (from initiativeSlice.ts) ---
           initiative: createDefaultInitiativeState(),
           initiativeTrackerOpen: false,
-          ...createInitiativeActions(set, viewId, get, () => Math.random()),
+          ...createInitiativeActions(set, viewId, get, diceRandom),
 
           // --- Dice Roll Log (persisted per map) ---
           diceLog: [],

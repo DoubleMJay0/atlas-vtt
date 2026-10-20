@@ -91,7 +91,7 @@ export function spawnRules(ctx: SpawnContext, target: SpawnTarget): SpawnRules {
   return {
     definitions: mapResources(lookup, mapPath),
     visionDefaults: ctx.assetService ? mapVisionDefaults(lookup, mapPath, systemPresetsOf(ctx.app)) : undefined,
-    hitPointRoll: rollsHitPoints ? ctx.random ?? Math.random : null,
+    hitPointRoll: rollsHitPoints ? ctx.random : null,
   };
 }
 

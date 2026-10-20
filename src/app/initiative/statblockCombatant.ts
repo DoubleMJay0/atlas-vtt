@@ -6,6 +6,7 @@ import { spawnTokenAsset } from '../packages/components/asset-manager/utils/toke
 import { runInBackground } from '../utils/backgroundTask';
 import { showNotice } from '../ui/notice';
 import { t } from '../i18n';
+import { diceRandom } from '../services/offlineDiceInputs';
 
 /** Whether the metadata cache shows `file` as a statblock note: native, Fantasy Statblocks' frontmatter, or `statblock: inline`. */
 function isStatblockNote(app: App, file: TAbstractFile): file is TFile {
@@ -27,7 +28,7 @@ export async function addStatblockCombatant(app: App, path: string): Promise<voi
     return;
   }
   const shown = formatServiceAsset(token, '', app);
-  if (shown.type === 'tokens') await spawnTokenAsset({ app, view: null, assetService: assets }, shown, 1, 'beside');
+  if (shown.type === 'tokens') await spawnTokenAsset({ app, view: null, assetService: assets, random: diceRandom }, shown, 1, 'beside');
 }
 
 function addMenuItem(app: App, menu: Menu, file: TAbstractFile): void {

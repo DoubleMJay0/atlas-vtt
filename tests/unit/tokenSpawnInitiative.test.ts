@@ -28,7 +28,7 @@ interface Scene {
 }
 
 /** An open scene whose collection tracks hit points and rolls them as creatures join when `rolls` says so. */
-function openScene(rolls: boolean, random?: () => number): Scene {
+function openScene(rolls: boolean, random: () => number = Math.random): Scene {
   const { app } = createInMemoryApp({ files: { 'tokens/goblin.png': '', 'tokens/hero.png': '' } });
   const store = createViewAtlasStore(app, `spawn-initiative-${Math.random()}`);
   store.setState({ persistenceEnabled: false, mapPath: 'maps/cave.atlasmap', isMapLoading: false });
@@ -45,7 +45,7 @@ function openScene(rolls: boolean, random?: () => number): Scene {
     getCollectionForMap: vi.fn(() => 'dungeon'),
     getCollectionSettings: vi.fn(() => ({ conditions: [], resources: [HP], initiative })),
   } as unknown as AssetService;
-  return { ctx: { app, view, assetService, ...(random && { random }) }, store };
+  return { ctx: { app, view, assetService, random }, store };
 }
 
 const tokensOf = (store: ViewAtlasStore): TokenEntity[] => Object.values(store.getState().objects.tokens);

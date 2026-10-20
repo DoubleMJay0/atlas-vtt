@@ -9,6 +9,7 @@ import { encounterOfFile, findSnapshot, snapshotsOfMap } from './atlasLinkAssets
 import { snapshotNameOfSubpath } from './atlasLinkTargets';
 import { t } from '../i18n';
 import { showNotice } from '../ui/notice';
+import { diceRandom } from '../services/offlineDiceInputs';
 
 /** How long a snapshot link waits for its scene to open before it gives up. */
 const SCENE_OPEN_TIMEOUT_MS = 30_000;
@@ -72,5 +73,5 @@ export async function placeEncounterFile(app: App, file: TFile, placement: Spawn
     return;
   }
   const shown = formatServiceAsset(encounter, '', app);
-  if (shown.type === 'encounters') await spawnEncounterTokens({ app, view: null, assetService: assets }, shown, placement);
+  if (shown.type === 'encounters') await spawnEncounterTokens({ app, view: null, assetService: assets, random: diceRandom }, shown, placement);
 }

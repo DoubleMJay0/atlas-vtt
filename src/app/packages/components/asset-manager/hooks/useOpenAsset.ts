@@ -5,6 +5,7 @@ import type { AssetService } from '../../../../services/AssetService';
 import type { AtlasView } from '../../../../atlas-view';
 import { useStableCallback } from '../../../../react/hooks/useStableCallback';
 import { scenePrefillFromMap } from '../utils/sceneCreation';
+import { diceRandom } from '../../../../services/offlineDiceInputs';
 
 export interface OpenAssetDeps {
   app: App;
@@ -32,7 +33,7 @@ async function openScene(deps: OpenAssetDeps, assetId: string): Promise<void> {
 export function useOpenAsset(deps: OpenAssetDeps): OpenAsset {
   return useStableCallback(async (asset: AnyAsset, spawnCount: number): Promise<void> => {
     const spawnCtx: SpawnContext = {
-      app: deps.app, view: deps.view, assetService: deps.assetService,
+      app: deps.app, view: deps.view, assetService: deps.assetService, random: diceRandom,
     };
     switch (asset.type) {
       case 'maps':
