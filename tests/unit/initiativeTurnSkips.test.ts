@@ -182,3 +182,88 @@ describe('delaying a turn', () => {
     expect(store.getState().initiative.entries.some((entry) => entry.delayed)).toBe(false);
   });
 });
+
+describe('removing the combatant with the turn', () => {
+  it('passes the turn on past a delayed combatant, which then acts before the one that has it', () => {
+    const store = fight(['a', 'b', 'c', 'd']);
+    store.getState().startCombat();
+    store.getState().delayInitiativeTurn(idOf(store, 'b'));
+    store.getState().removeFromInitiative(idOf(store, 'a'));
+    expect(turn(store)).toEqual([1, 'c']);
+    store.getState().actNowInInitiative(idOf(store, 'b'));
+    expect(store.getState().initiative.entries.map((entry) => [entry.name, entry.isActive])).toEqual([['b', true], ['c', false], ['d', false]]);
+    store.getState().nextTurn();
+    expect(turn(store)).toEqual([1, 'c']);
+  });
+
+  it('passes the turn past the defeated, into the next round from the last place', () => {
+    const store = fight(['a', 'b', 'c']);
+    store.getState().startCombat();
+    store.getState().nextTurn();
+    store.getState().nextTurn();
+    store.getState().removeFromInitiative(idOf(store, 'c'), ids(store, 'a'));
+    expect(turn(store)).toEqual([2, 'b']);
+  });
+
+  it('acts from its own place when the delayed combatant itself holds the mark', () => {
+    const store = fight(['a', 'b', 'c']);
+    store.getState().startCombat();
+    store.setState((state) => ({
+      initiative: { ...state.initiative, entries: state.initiative.entries.map((entry, at) => (at === 1 ? { ...entry, delayed: true, isActive: true } : { ...entry, isActive: false })) },
+    }));
+    store.getState().actNowInInitiative(idOf(store, 'b'));
+    expect(store.getState().initiative.entries.map((entry) => [entry.name, entry.isActive, entry.delayed])).toEqual([['a', false, undefined], ['b', true, undefined], ['c', false, undefined]]);
+  });
+});
+
+describe('a combatant that acted now', () => {
+  /** A 15 (+3), B 12 (+1) delays, C 10; in round 2 B acts before A. */
+  function actedBeforeA(): Store {
+    const store = fight(['a', 'b', 'c']);
+    const set = (name: string, initiative: number, modifier: number): void =>
+      store.getState().updateInitiativeEntry(idOf(store, name), { initiative, initiativeModifier: modifier, modifierByHand: true });
+    set('a', 15, 3);
+    set('b', 12, 1);
+    set('c', 10, 0);
+    store.getState().startCombat();
+    store.getState().delayInitiativeTurn(idOf(store, 'b'));
+    store.getState().nextTurn();
+    store.getState().nextTurn();
+    expect(turn(store)).toEqual([2, 'a']);
+    store.getState().actNowInInitiative(idOf(store, 'b'));
+    return store;
+  }
+  const order = (store: Store): string[] => store.getState().initiative.entries.map((entry) => `${entry.name}${entry.initiative}${entry.isActive ? '*' : ''}`);
+
+  it('stays before the one it acted before when a late joiner ties them', () => {
+    const store = actedBeforeA();
+    expect(order(store)).toEqual(['b15*', 'a15', 'c10']);
+    store.getState().addToInitiative({ tokenId: 'd', name: 'd', initiative: 0, initiativeModifier: 0, imagePath: '', isNPC: true });
+    store.getState().updateInitiativeEntry(idOf(store, 'd'), { initiative: 15 });
+    expect(order(store)).toEqual(['b15*', 'a15', 'd15', 'c10']);
+    store.getState().nextTurn();
+    expect(turn(store)).toEqual([2, 'a']);
+  });
+
+  it('keeps its place against a joiner with a higher modifier, and loses it with a number of its own', () => {
+    const store = actedBeforeA();
+    store.getState().addToInitiative({ tokenId: 'd', name: 'd', initiative: 0, initiativeModifier: 5, modifierByHand: true, imagePath: '', isNPC: true });
+    store.getState().updateInitiativeEntry(idOf(store, 'd'), { initiative: 15 });
+    expect(order(store)).toEqual(['d15', 'b15*', 'a15', 'c10']);
+    store.getState().updateInitiativeEntry(idOf(store, 'b'), { initiative: 14 });
+    expect(store.getState().initiative.entries.find((entry) => entry.name === 'b')).not.toHaveProperty('tieBreak');
+  });
+});
+
+describe('stepping back by sides when nobody can act', () => {
+  it('leaves the turn where it is', () => {
+    const store = fight(['hero', 'goblin'], ['hero']);
+    store.getState().startCombat(SIDES);
+    store.getState().nextTurn();
+    store.getState().nextTurn();
+    store.getState().nextTurn();
+    expect(sideTurn(store)).toEqual([2, 'opponents']);
+    store.getState().previousTurn(ids(store, 'hero', 'goblin'));
+    expect(sideTurn(store)).toEqual([2, 'opponents']);
+  });
+});

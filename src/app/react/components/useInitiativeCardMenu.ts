@@ -39,7 +39,7 @@ export function useInitiativeCardMenu(inputs: CardMenuInputs): (event: React.Mou
       setSitsOut: (sitsOut) => setInitiativeSitsOut(entry.id, sitsOut),
       delay: () => delayInitiativeTurn(entry.id, defeated()),
       actNow: () => actNowInInitiative(entry.id),
-      remove: () => removeFromInitiative(entry.id),
+      remove: () => removeFromInitiative(entry.id, defeated()),
     });
     openContextMenuGlobal(entries, { x: event.clientX, y: event.clientY });
   }, [tokens, bySides, fightRuns, roll, defeated, edit, moveToFront, moveToBack, removeFromInitiative, updateTokens, setInitiativeSitsOut, delayInitiativeTurn, actNowInInitiative]);

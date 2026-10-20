@@ -210,7 +210,7 @@ export interface ViewAtlasState extends ViewState {
   setTokenSettings: (settings: ViewAtlasState['tokenSettings']) => void;
   setInitiativeTrackerOpen: (open: boolean) => void;
   addToInitiative: (entry: Omit<InitiativeEntry, 'id' | 'order' | 'isActive'>) => string;
-  removeFromInitiative: (id: string) => void;
+  removeFromInitiative: (id: string, defeated?: ReadonlySet<string>) => void;
   updateInitiativeEntry: (id: string, updates: Partial<InitiativeEntry>) => void;
   rollAllInitiative: (roll?: string, fromStatblocks?: ReadonlyMap<string, number>) => void;
   rollEntryInitiative: (id: string, roll?: string, fromStatblock?: number | null) => void;

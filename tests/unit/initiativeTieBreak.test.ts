@@ -1,7 +1,7 @@
 import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
 import { createInitiativeActions } from '../../src/app/stores/initiativeSlice';
-import { byInitiative } from '../../src/app/initiative/sortCombatants';
+import { byInitiative } from '../../src/app/initiative/tieBreak';
 import { createDefaultInitiativeState, type InitiativeEntry } from '../../src/app/types/initiativeTypes';
 import type { TokenEntity } from '../../src/app/types';
 

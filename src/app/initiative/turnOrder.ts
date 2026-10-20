@@ -5,6 +5,7 @@
 
 import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
 import { actsInTurn, backToRoundBefore, beginRound, canStillAct } from './rounds';
+import { tieBreakModifier } from './tieBreak';
 
 /** Updates every entry's `order` to its place in the list. */
 export function renumber(entries: InitiativeEntry[]): void {
@@ -66,6 +67,26 @@ export function previousOrderTurn(initiative: InitiativeState, defeated: Readonl
 }
 
 /**
+ * A combatant leaves the fight. Had it the turn in a running fight in turn order, the turn passes
+ * on as if it had ended (`nextOrderTurn`); otherwise the combatant now at its place takes the mark.
+ */
+export function removeCombatant(initiative: InitiativeState, id: string, defeated: ReadonlySet<string>): void {
+  const { entries } = initiative;
+  const index = entries.findIndex((entry) => entry.id === id);
+  if (index === -1) return;
+  const hadTurn = entries[index]!.isActive;
+  entries.splice(index, 1);
+  renumber(entries);
+  if (!hadTurn || entries.length === 0) return;
+  if (initiative.isActive && !initiative.sides) {
+    initiative.currentIndex = index - 1;
+    nextOrderTurn(initiative, defeated);
+    return;
+  }
+  giveTurn(initiative, Math.min(index, entries.length - 1));
+}
+
+/**
  * A combatant delays: it leaves the order and waits. Was it its turn, the turn passes on to the
  * next combatant that acts.
  */
@@ -82,7 +103,8 @@ export function delayTurn(initiative: InitiativeState, id: string, defeated: Rea
 
 /**
  * A delayed combatant acts now: it takes its place right before the combatant whose turn it is,
- * with that combatant's number, and the turn. With nobody's turn it acts from where it is.
+ * with that combatant's number and tie-break (`tieBreak`), so a later sort keeps it there, and
+ * takes the turn. With nobody else's turn it acts from where it is.
  */
 export function actNow(initiative: InitiativeState, id: string): void {
   const { entries } = initiative;
@@ -90,11 +112,12 @@ export function actNow(initiative: InitiativeState, id: string): void {
   const entry = entries[from];
   if (!entry?.delayed) return;
   delete entry.delayed;
-  const current = entries.find((other) => other.isActive);
+  const current = entries.find((other) => other.isActive && other !== entry);
   if (current) {
     entries.splice(from, 1);
     entries.splice(entries.indexOf(current), 0, entry);
     entry.initiative = current.initiative;
+    entry.tieBreak = tieBreakModifier(current);
     renumber(entries);
   }
   giveTurn(initiative, entries.indexOf(entry));

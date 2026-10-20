@@ -54,10 +54,10 @@ export function nextSideTurn(initiative: InitiativeState, inputs: SideTurnInputs
   }
 }
 
-/** The side before that acted, passing by sides nobody of acts in; nothing before the first side of round 1. */
+/** The side before that acted, passing by sides nobody of acts in; nothing before the first side of round 1, and nothing moves while no side can act. */
 export function previousSideTurn(initiative: InitiativeState, inputs: SideTurnInputs): void {
   const { sides } = initiative;
-  if (!sides) return;
+  if (!sides || !someSideCanAct(initiative, inputs)) return;
   for (let step = 0; step < 4; step++) {
     if (sides.active !== sides.first) {
       sides.active = sides.first;

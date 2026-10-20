@@ -67,6 +67,13 @@ export interface InitiativeEntry {
    * between equal totals and is never added to a roll; older versions ignore it.
    */
   rolledModifier?: number;
+
+  /**
+   * Set by Act Now: the tie-break of the combatant it acted before, with whose number it ties, so
+   * that a later sort keeps it right before that one. A roll or an edit of its own number or
+   * modifier clears it; older versions ignore it.
+   */
+  tieBreak?: number;
 }
 
 /**

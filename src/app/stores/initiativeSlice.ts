@@ -9,7 +9,7 @@ import { createDefaultInitiativeState } from '../types/initiativeTypes';
 import { DEFAULT_INITIATIVE_RULES } from '../gameSystems/initiativeRules';
 import { combatantModifier, ownModifier } from '../initiative/initiativeModifier';
 import { rollInitiativeDice } from '../initiative/turns';
-import { renumber } from '../initiative/turnOrder';
+import { removeCombatant, renumber } from '../initiative/turnOrder';
 import { sortCombatants } from '../initiative/sortCombatants';
 import { clearSittingOut } from '../initiative/rounds';
 import { createInitiativeTurnActions, type InitiativeTurnActions } from './initiativeTurnActions';
@@ -26,7 +26,8 @@ export interface InitiativeSlice extends InitiativeTurnActions {
   // Actions
   setInitiativeTrackerOpen: (open: boolean) => void;
   addToInitiative: (entry: Omit<InitiativeEntry, 'id' | 'order' | 'isActive'>) => string;
-  removeFromInitiative: (id: string) => void;
+  /** Removes a combatant; had it the turn in a fight in turn order, the turn passes on, past the `defeated`. */
+  removeFromInitiative: (id: string, defeated?: ReadonlySet<string>) => void;
   updateInitiativeEntry: (id: string, updates: Partial<InitiativeEntry>) => void;
   /**
    * Rolls `roll` (the collection's initiative dice; a d20 when left out) for every combatant, adding
@@ -87,6 +88,7 @@ interface RolledTotal {
 function applyRoll(entry: InitiativeEntry, { total, modifier }: RolledTotal): void {
   entry.initiative = total;
   entry.rolledModifier = modifier;
+  delete entry.tieBreak;
 }
 
 /** What a combatant rolls where the caller names no dice. */
@@ -126,29 +128,18 @@ export function createInitiativeActions(
       return id;
     },
 
-    removeFromInitiative: (id) => set((draft) => {
-      const index = draft.initiative.entries.findIndex(e => e.id === id);
-      if (index === -1) return;
-
-      const wasActive = draft.initiative.entries[index]!.isActive;
-      draft.initiative.entries.splice(index, 1);
-
-      renumber(draft.initiative.entries);
-
-      // If removed entry was active, activate the next or previous entry
-      if (wasActive && draft.initiative.entries.length > 0) {
-        const newActiveIndex = Math.min(index, draft.initiative.entries.length - 1);
-        draft.initiative.entries[newActiveIndex]!.isActive = true;
-        draft.initiative.currentIndex = newActiveIndex;
-      }
-
+    removeFromInitiative: (id, defeated = new Set()) => set((draft) => {
+      removeCombatant(draft.initiative, id, defeated);
     }),
 
     updateInitiativeEntry: (id, updates) => set((draft) => {
       const entry = draft.initiative.entries.find(e => e.id === id);
       if (entry) {
         const initiativeChanged = updates.initiative !== undefined && updates.initiative !== entry.initiative;
+        const modifierChanged = updates.initiativeModifier !== undefined && updates.initiativeModifier !== entry.initiativeModifier;
         Object.assign(entry, updates);
+        // A number or modifier of its own replaces where Act Now placed it
+        if (initiativeChanged || modifierChanged) delete entry.tieBreak;
 
         // Re-sort if initiative value changed and autoSort is enabled
         if (initiativeChanged && draft.initiative.config.autoSort) sortCombatants(draft.initiative);
