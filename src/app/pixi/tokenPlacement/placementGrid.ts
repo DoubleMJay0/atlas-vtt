@@ -3,13 +3,13 @@ import { createHexLayout, hexVertices, isHexGridType } from '../../grid/hexGeome
 import type { PlacementGrid } from './placementLayout';
 
 /**
- * The grid held tokens snap to and light the cells of: the grid as shown, where it is visible and
- * tokens snap to it (`snapToGrid`); null, so they are placed freely, otherwise.
+ * The grid held tokens snap to and light the cells of, wherever tokens snap to it (`snapToGrid`),
+ * shown or hidden, as a dragged token does; null, so they are placed freely, otherwise.
  */
 export function placementGridOf(grid: GridSystem | null, snapToGrid: boolean): PlacementGrid | null {
   if (!grid || !snapToGrid) return null;
-  const { type, size, offsetX = 0, offsetY = 0, enabled } = grid.getOptions();
-  if (enabled === false || !(size > 0)) return null;
+  const { type, size, offsetX = 0, offsetY = 0 } = grid.getOptions();
+  if (!(size > 0)) return null;
   const layout = isHexGridType(type) ? createHexLayout(type, size, offsetX, offsetY) : null;
   const half = size / 2;
   return {

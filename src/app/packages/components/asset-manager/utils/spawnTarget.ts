@@ -44,7 +44,7 @@ export interface SpawnTarget {
   view: AtlasView;
   viewport: ViewportLike;
   gridSystem: GridSystemLike | null;
-  /** Grid geometry for formation placement; null when the grid is off or unusable. */
+  /** Grid geometry for formation placement; null where tokens do not snap (`snapToGrid`) or the grid is unusable. */
   grid: FormationGrid | null;
   /** Spacing between spawned tokens. */
   pitch: number;
@@ -71,15 +71,16 @@ export async function getSpawnTarget(ctx: SpawnContext): Promise<SpawnTarget | n
 export function spawnTargetOf(view: AtlasView): SpawnTarget | null {
   const rendererService = view.serviceManager.getRendererService();
   const viewport = rendererService.getViewport() as ViewportLike | null;
-  const { mapPath, isMapLoading } = view.getStore().getState();
+  const { mapPath, isMapLoading, grid: gridState } = view.getStore().getState();
   if (!viewport || !mapPath || isMapLoading) {
     showNotice('The scene is still loading. Add the tokens once it is open.');
     return null;
   }
   const gridSystem = rendererService.getGridSystem() as GridSystemLike | null;
   const options = gridSystem?.getOptions();
-  const grid = formationGridFromOptions(options);
-  // A hidden grid still sizes the tokens, so it spaces them too
+  // Tokens snap to a hidden grid as to a shown one, as a dragged token does
+  const grid = (gridState?.snapToGrid ?? true) && options ? formationGridFromOptions({ ...options, enabled: true }) : null;
+  // A grid tokens do not snap to still sizes them, so it spaces them too
   const pitch = grid ? cellPitch(grid) : options && options.size > 0 ? options.size : FALLBACK_PITCH;
   return { view, viewport, gridSystem, grid, pitch, placer: rendererService.getRenderer()?.getTokenPlacer() ?? null };
 }
