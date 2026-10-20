@@ -16,6 +16,7 @@
 
 ## Fixed
 
+- The token art panel no longer flickers in a short window or while the window is resized.
 - The line that measures a dragged token's path is no longer darkened by dynamic lighting, and it now stops at the token's edge.
 - A player character dragged through the dark is shown exactly where it is drawn. Before, the lit circle around it trailed behind the token.
 - Dynamic lighting only gives the graphics card as much work as it keeps up with. On laptops with integrated graphics, placing or carrying a light or opening a scene with many lights could make the graphics driver reset, turning the map white until Obsidian was restarted. There, a scene's lights now appear over a few frames. The Balanced and Saver lighting qualities also make each light cheaper, with rougher soft shadow edges.
