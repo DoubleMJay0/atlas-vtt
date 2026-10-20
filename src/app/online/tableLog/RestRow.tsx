@@ -29,7 +29,7 @@ export const RestRow = memo(function RestRow({ entry, time, thread, api, ...flag
         <AuthorDisc who={entry.who} name={entry.name} size="row" />
         <div className="atlas-online-log__content">
           <div className="atlas-online-log__byline">
-            <span className="atlas-online-log__name">{`${entry.character} took a ${entry.button}`}</span>
+            <span className="atlas-online-log__name">{`${entry.character} · ${entry.button}`}</span>
             <span className="atlas-online-log__time">{time}</span>
           </div>
           <div className="atlas-online-log__rest">
