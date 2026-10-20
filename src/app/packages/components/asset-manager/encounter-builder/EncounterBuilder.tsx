@@ -186,27 +186,11 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
                   onCountChange={changeCount}
                   onClear={() => setPicks([])}
                   onSave={() => { void save(); }}
+                  onBring={(placement) => { void bring(placement); }}
                 />
               )}
             </AnimatePresence>
           </div>
-<<<<<<< HEAD
-=======
-          {renderFeed()}
-          <AnimatePresence>
-            {picks.length > 0 && (
-              <EncounterTray
-                picks={picks}
-                metrics={metrics}
-                saving={saving}
-                onCountChange={changeCount}
-                onClear={() => setPicks([])}
-                onSave={() => { void save(); }}
-                onBring={(placement) => { void bring(placement); }}
-              />
-            )}
-          </AnimatePresence>
->>>>>>> beta
         </PaneDiceRolls>
       </motion.div>
     </motion.div>
