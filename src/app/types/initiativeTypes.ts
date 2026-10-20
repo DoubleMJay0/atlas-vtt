@@ -55,6 +55,18 @@ export interface InitiativeEntry {
 
   /** Does not act in the running round (Cairn: a failed DEX save in round 1); cleared when the round ends. */
   sitsOut?: boolean;
+
+  /**
+   * Delayed its turn in a fight in turn order: it waits outside the order, and turns pass it by,
+   * until it acts again (`actNow`). Older versions read the entry at its place.
+   */
+  delayed?: true;
+
+  /**
+   * The modifier the last roll added (the GM's own, else the statblock's). It only breaks ties
+   * between equal totals and is never added to a roll; older versions ignore it.
+   */
+  rolledModifier?: number;
 }
 
 /**
@@ -81,6 +93,12 @@ export interface InitiativeState {
    * turn it is. A fight keeps the mode it was started in, whatever the collection's rules say since.
    */
   sides?: { first: InitiativeSide; active: InitiativeSide };
+
+  /**
+   * The combatants each round's start cleared `sitsOut` of, by that round, so that stepping back
+   * over the start puts their marks back. Only rounds that cleared something are kept.
+   */
+  satOut?: Record<string, string[]>;
 }
 
 /**

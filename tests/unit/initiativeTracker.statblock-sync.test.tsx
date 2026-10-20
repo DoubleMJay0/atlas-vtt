@@ -58,6 +58,8 @@ vi.mock('../../src/app/react/ViewStoreContext', () => ({
   useViewStoreHook: () => ({ getState: () => state }),
 }));
 
+vi.mock('../../src/app/resources/useMapResources', () => ({ useMapResources: () => [] }));
+
 vi.mock('../../src/app/initiative/useMapInitiativeRules', () => ({
   useMapInitiativeRules: () => ({ mode: 'turn-order', roll: '1d20', firstSide: 'players' }),
 }));

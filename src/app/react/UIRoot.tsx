@@ -25,6 +25,7 @@ import { usePresentedScene } from './hooks/usePresentedScene';
 import { canRunMapHotkeys, matchesMapHotkey } from '../keyboard/mapHotkeys';
 import { SettingsService } from '../services/SettingsService';
 import { HotkeyHelp } from '../keyboard/HotkeyHelp';
+import { defeatedOnMap } from '../initiative/defeatedOnMap';
 
 
 // Import the new context and hook
@@ -126,13 +127,13 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
       if (!isPlayerView && initiativeTrackerOpen && initiativeIsActive) {
         if (matchesMapHotkey(e, 'previousTurn', settings)) {
           e.preventDefault();
-          previousTurn();
+          previousTurn(defeatedOnMap(app, store.getState()));
           window.dispatchEvent(new CustomEvent('atlas-initiative-hotkey', { detail: 'prev' }));
           return;
         }
         if (matchesMapHotkey(e, 'nextTurn', settings)) {
           e.preventDefault();
-          nextTurn();
+          nextTurn(defeatedOnMap(app, store.getState()));
           window.dispatchEvent(new CustomEvent('atlas-initiative-hotkey', { detail: 'next' }));
           return;
         }
@@ -141,7 +142,7 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlayerView, initiativeTrackerOpen, initiativeIsActive, nextTurn, previousTurn, store, view, settings]);
+  }, [app, isPlayerView, initiativeTrackerOpen, initiativeIsActive, nextTurn, previousTurn, store, view, settings]);
 
   return (
     <AtlasUIContext.Provider value={contextValue}>
