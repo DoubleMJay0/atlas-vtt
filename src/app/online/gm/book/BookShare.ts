@@ -6,6 +6,7 @@ import { every } from '../companionTimers.ts';
 import { MoveRate } from '../moveCheck.ts';
 import { AskedAnswer } from './askedAnswer.ts';
 import { BookAssetDesk } from './bookAssetDesk.ts';
+import { BookRests } from './bookRests.ts';
 import type { NamedAssets } from './bookAssets.ts';
 import { bookItemOf } from './bookItem.ts';
 import type { BookShelf } from './BookShelf.ts';
@@ -50,6 +51,8 @@ const UNNAMED = 'Unnamed character';
  * was taken. A player
  * with a character whose note is a native statblock is sent it after their book, and again
  * whenever it changes (`StatblockShare`), and changes its values and abilities in the note. A
+ * player character's statblock carries its recovery buttons, and a rest the player asks for waits
+ * for the GM's answer (`BookRests`). A
  * player is served by hash what their book names (`BookAssetDesk`), and nobody another character's
  * artwork or statblock.
  */
@@ -63,6 +66,8 @@ export class BookShare implements LootRecipientSource {
   private readonly questPlaces = new QuestPlaces();
   private readonly assets: BookAssetDesk;
   private readonly statblocks: StatblockShare;
+  /** The characters' recovery buttons, and the rests players ask for. */
+  readonly rests: BookRests;
   private readonly rate = new MoveRate(BOOK_BURST, BOOK_WRITES_PER_SECOND);
   /** The world map as it was last known. */
   private worldMap: WorldMapFile | null = null;
@@ -93,6 +98,14 @@ export class BookShare implements LootRecipientSource {
       owe: (player) => this.whileRunning(() => this.owed.owe(player)),
     });
     this.assets = new BookAssetDesk(ports, (player) => this.namedAssets(player));
+    this.rests = new BookRests({
+      rests: ports.rests, cards: ports.cards, randomId: () => ports.randomId(),
+      answer: (player, request, outcome) => ports.send({ t: 'book-rest-answer', request, outcome }, player),
+      character: (player) => this.characters.of(player),
+      mayWrite: (player) => this.isOnline(player) && this.rate.take(player, ports.now()),
+      resend: (player) => this.whileRunning(() => this.resendStatblock(player)),
+      changed: () => ports.cardsChanged(),
+    });
   }
 
   start(): void {
@@ -104,6 +117,7 @@ export class BookShare implements LootRecipientSource {
     this.stopPoll?.();
     this.stopPoll = null;
     this.owed.stop();
+    this.rests.stop();
   }
 
   /** The world map may be another now (the campaign played, its world map or that map's artwork changed): it is asked for anew. */
@@ -121,6 +135,7 @@ export class BookShare implements LootRecipientSource {
   /** A character's statblock note may read otherwise (every note for null, a template changed): it is read and drawn again. */
   statblockChanged(path: string | null): void {
     this.statblocks.changed(path);
+    this.rests.changed();
     this.update();
   }
 
@@ -157,6 +172,7 @@ export class BookShare implements LootRecipientSource {
     this.sent.delete(player);
     this.statblocks.left(player);
     this.parts.delete(player);
+    this.rests.playerLeft(player);
   }
 
   /**
@@ -172,6 +188,10 @@ export class BookShare implements LootRecipientSource {
     }
     if (body.t === 'asset-request') return this.assets.receive(from, body);
     if (body.t === 'book-token') return this.follow(from, body);
+    if (body.t === 'book-rest') {
+      this.rests.receive(from, body);
+      return true;
+    }
     if (!isPlayerBookType(body.t)) return false;
     if (!this.write(from, body)) this.owed.owe(from);
     return true;
@@ -221,7 +241,7 @@ export class BookShare implements LootRecipientSource {
   /** Sends a player what changed of their book: the whole book for another character (or to a page that reads no parts), else each changed part alone. */
   private sync(player: string): void {
     const character = this.characters.of(player);
-    const drawn = this.statblocks.of(character);
+    const drawn = this.drawnFor(character);
     const now = sentOf(character, this.worldMap, this.quests, drawn);
     const last = this.sent.get(player);
     const update = bookUpdate(last, now, this.parts.has(player));
@@ -234,6 +254,11 @@ export class BookShare implements LootRecipientSource {
     if (update?.quests === true) this.ports.send({ t: 'book-quests', quests: now.quests }, player);
     if (update?.sheet === true) this.ports.send({ t: 'book-sheet', character: character?.sheet ?? null }, player);
     if (statblock) this.sendStatblock(player, drawn);
+  }
+
+  /** The statblock a character's player gets now, with the character's recovery buttons; undefined while it is read or drawn. */
+  private drawnFor(character: PlayedCharacter | null): DrawnStatblock | undefined {
+    return this.rests.withRest(character, this.statblocks.of(character));
   }
 
   /** The player's statblock, which their page holds until their next book. */
@@ -254,7 +279,7 @@ export class BookShare implements LootRecipientSource {
     if (!this.isOnline(player)) return;
     const character = this.characters.of(player);
     const { items, notes, pins, purse, slots, equipped } = character === null ? EMPTY_BOOK : this.shelf.of(character.key);
-    const drawn = this.statblocks.of(character);
+    const drawn = this.drawnFor(character);
     const sent = sentOf(character, this.worldMap, this.quests, drawn);
     const book: PlayerBook = { character: character?.sheet ?? null, worldMap: this.worldMap?.map ?? null, items, notes, pins, quests: sent.quests, purse, slots, equipped };
     this.sent.set(player, sent);

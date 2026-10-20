@@ -2,9 +2,12 @@ import type { ConnectionStats } from '../protocol/index.ts';
 import type { App, WorkspaceLeaf } from 'obsidian';
 import { showNotice } from '../../ui/notice';
 import { randomHex } from '../../utils/randomHex';
+import { ArmedCards } from './armedCards.ts';
 import { scaleInWindow } from './assetVariants.ts';
 import { ATLAS_VIEW_TYPE, type SceneStore } from './atlasView.ts';
+import type { BookRests } from './book/bookRests.ts';
 import type { BookShelf } from './book/BookShelf.ts';
+import { gatedRests } from './book/restGate.ts';
 import type { TableSeats } from './campaignSeats.ts';
 import { tableBook, type TableBook } from './book/tableBook.ts';
 import { companionTimers, every } from './companionTimers.ts';
@@ -12,6 +15,7 @@ import type { CreatedTable } from './createdTable.ts';
 import { ImageShare } from './image/ImageShare.ts';
 import { PAUSED_TEXT, TableGate, type GateSettings } from './joinGate.ts';
 import { gmRoll, type GmRollDraft, type GmRollRefusal } from './log/gmRolls.ts';
+import { restRecordOf } from './log/restEntry.ts';
 import { TableLog } from './log/TableLog.ts';
 import type { Ownership } from './ownership.ts';
 import { presentedScene, presentedSceneSource } from './presentedScene.ts';
@@ -42,12 +46,15 @@ export class OnlineTable {
   private readonly watch: TabWatch<SceneBinding>;
   private stopWatchTimer: () => void = () => undefined;
   private stopFollowingPresented: () => void = () => undefined;
+  private stopLoggingRests: () => void = () => undefined;
   private currentStatus: TableStatus = 'connecting';
   private closing: number | null = null;
   /** The closing time the GM was last told with a notice: a reconnect names the same one again. */
   private toldClosing: number | null = null;
   private readonly events: OnlineTableEvents;
   readonly ownership: Ownership;
+  /** The arming clock of the cards over the control: newcomers who knock, and players who ask for a rest. */
+  private readonly cards: ArmedCards;
   /** The table's gates: the join code, the two switches, and who waits for an answer. */
   readonly gate: TableGate;
   /** The players of the campaign the table runs on. */
@@ -69,6 +76,7 @@ export class OnlineTable {
     this.ownership = ownership;
     this.events = events;
     this.link = `${origin}/#${table.code}`;
+    this.cards = new ArmedCards(companionTimers());
     this.gate = new TableGate(gate, {
       send: (frame) => this.connection.sendGate(frame),
       answer: (id, admit) => this.connection.answer(id, admit),
@@ -77,6 +85,7 @@ export class OnlineTable {
       paused: () => showNotice(PAUSED_TEXT),
       timers: companionTimers(),
       taken: () => seats.codes(),
+      cards: this.cards,
     });
     const timers = companionTimers();
     this.log = new TableLog({
@@ -111,6 +120,8 @@ export class OnlineTable {
       scene: () => this.bound()?.book() ?? null,
       readImage: (path) => readVaultImage(app, path),
       tokenWrites: () => this.bound()?.resources ?? null,
+      cards: this.cards,
+      cardsChanged: () => events.changed(),
     });
     this.watch = new TabWatch<SceneBinding>({
       leaves: () => app.workspace.getLeavesOfType(ATLAS_VIEW_TYPE),
@@ -169,6 +180,16 @@ export class OnlineTable {
     this.stopOwnership = ownership.onChange(() => this.bound()?.share.ownersChanged());
   }
 
+  /** The players' rest requests waiting for the GM, and the GM's answers to them. */
+  get rests(): BookRests {
+    return this.books.share.rests;
+  }
+
+  /** The keys of the cards over the control, newcomers' and rest requests', in the order they came. */
+  cardOrder(): readonly string[] {
+    return this.cards.keys();
+  }
+
   /** The Atlas tab players see live: bound, and showing the presented scene now; null while there is none. */
   get sharedTab(): WorkspaceLeaf | null {
     const binding = this.watch.binding;
@@ -222,6 +243,8 @@ export class OnlineTable {
     this.connection.start();
     this.books.start();
     this.found.start();
+    // Every rest the GM's Atlas takes while the table runs is logged: approved requests and the GM's own.
+    this.stopLoggingRests = gatedRests.onRested((rest) => this.log.rested(restRecordOf(rest)));
     this.watch.check();
     this.stopWatchTimer = every(companionTimers(), WATCH_MS, () => this.watch.check());
     // Atlas presenting another scene is followed at once; the timer catches everything else
@@ -263,6 +286,7 @@ export class OnlineTable {
     this.gate.dispose();
     this.log.dispose();
     this.books.stop();
+    this.cards.dispose();
     this.closing = null;
     this.events.ended(end);
   }
@@ -279,6 +303,7 @@ export class OnlineTable {
   }
 
   private stopWatch(): void {
+    this.stopLoggingRests();
     this.found.stop();
     this.stopWatchTimer();
     this.stopFollowingPresented();

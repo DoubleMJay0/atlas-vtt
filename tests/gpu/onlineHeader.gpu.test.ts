@@ -13,7 +13,7 @@ vi.mock('events', async () => import('eventemitter3'));
 
 const SCENE = { isShared: true, tokens: {}, selected: [] };
 const GATE = { code: '123456', requireCode: true, askToJoin: false, paused: false, pausedAt: null, waiting: [] };
-const SNAPSHOT = { status: 'online', link: 'https://play.atlas-vtt.dev/#code', campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: GATE } as unknown as OnlineSnapshot;
+const SNAPSHOT = { status: 'online', link: 'https://play.atlas-vtt.dev/#code', campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: GATE, rests: [], cardOrder: [] } as unknown as OnlineSnapshot;
 const FEEDBACK = { open: false, diagnostics: false, state: 'idle', errorReports: false } as const;
 const actions = (): MenuActions & PanelActions => new Proxy({}, { get: () => vi.fn() }) as MenuActions & PanelActions;
 

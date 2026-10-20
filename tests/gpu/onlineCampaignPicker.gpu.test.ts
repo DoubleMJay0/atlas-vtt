@@ -17,7 +17,7 @@ vi.mock('events', async () => import('eventemitter3'));
  */
 
 const MARA = { id: 'acc_mara', handle: 'mara', name: 'Mara' };
-const SNAPSHOT: OnlineSnapshot = { status: 'idle', link: null, campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: null };
+const SNAPSHOT: OnlineSnapshot = { status: 'idle', link: null, campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: null, rests: [], cardOrder: [] };
 const CHOICES: CampaignChoice[] = [
   { id: 'a', name: 'Rise of the Blood Olms', activity: 'Played 2d ago', players: 4, art: paintedMap(30, 320, 200), hue: 30, playing: true },
   { id: 'b', name: 'The Witherwild, a campaign with a very long name indeed', activity: 'Played 9d ago', players: 1, art: paintedMap(140, 320, 200), hue: 140, playing: false },

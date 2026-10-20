@@ -14,7 +14,7 @@ const CAN_HOST: AccountView = { kind: 'can-host', account: MARA, access: { plan:
 const SCENE: SceneFacts = { isShared: true, tokens: {}, selected: [] };
 const CLOSES_AT = Date.UTC(2026, 9, 12, 14, 30);
 
-const snapshot = (over: Partial<OnlineSnapshot> = {}): OnlineSnapshot => ({ status: 'idle', link: null, campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: null, ...over });
+const snapshot = (over: Partial<OnlineSnapshot> = {}): OnlineSnapshot => ({ status: 'idle', link: null, campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [], playerTokens: [], seats: null, gate: null, rests: [], cardOrder: [], ...over });
 
 function actions(): MenuActions & { openAccountPage: ReturnType<typeof vi.fn<() => void>> } {
   return {

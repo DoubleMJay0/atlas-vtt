@@ -12,7 +12,7 @@ import { DockTooltip } from './dockTooltip.ts';
 import { FeedbackDraft } from './feedbackForm.ts';
 import { gateRowActions } from './gateRows.ts';
 import { InviteQr } from './inviteQr.ts';
-import { KNOCK_ROOM, KnockStack } from './knockStack.ts';
+import { KNOCK_ROOM, knockCards, KnockStack, restCards, stackCards } from './knockStack.ts';
 import { DockSurface } from './dockSurface.ts';
 import { playerCodeCopier } from './playerCodes.ts';
 import { PANEL_WIDTH, panelView, renderPanel, type PanelActions } from './OnlinePanel.ts';
@@ -35,7 +35,7 @@ export class Dock {
   private readonly deps: DockDeps;
   private readonly button: DockButton;
   private readonly tooltip: DockTooltip;
-  /** Who waits to be let in, as cards over the control. */
+  /** Who waits to be let in, and players' rest requests, as cards over the control. */
   private readonly knocks: KnockStack;
   /** The invite link as a QR code, on a card beside the control. */
   private readonly qr: InviteQr;
@@ -199,10 +199,11 @@ export class Dock {
     this.button.setBadge(badgeOf(snapshot, this.state.alert));
     this.button.setOpen(surface !== 'closed', surface === 'closed' ? null : this.surfaceId);
     // Who waits stands over the control, where the closed control's tooltip would.
-    const waiting = snapshot.gate?.waiting ?? [];
-    this.knocks.update(waiting, this.deps.api.gate);
+    const { api } = this.deps;
+    const cards = stackCards([...knockCards(snapshot.gate?.waiting ?? [], api.gate), ...restCards(snapshot.rests, api.rests)], snapshot.cardOrder);
+    this.knocks.update(cards, () => api.gate.moved());
     this.tooltip.setText(tooltipOf(snapshot));
-    this.tooltip.setEnabled(surface === 'closed' && waiting.length === 0);
+    this.tooltip.setEnabled(surface === 'closed' && cards.length === 0);
     const width = Math.min(surface === 'panel' ? PANEL_WIDTH : MENU_WIDTH, rowOf(this.container)?.clientWidth ?? Infinity);
     // Before the surface is drawn, whose button says whether the card is open: a table that stopped has closed it.
     this.qr.update(surface === 'closed' ? null : qrTableOf(snapshot), width);

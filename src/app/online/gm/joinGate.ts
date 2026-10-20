@@ -1,5 +1,6 @@
 import { newJoinCode } from '../../utils/joinCode.ts';
 import { JOIN_CODE_PATTERN, type PlayerInfo } from '../protocol/index.ts';
+import type { ArmedCards } from './armedCards.ts';
 import type { Timers } from './companionTimers.ts';
 import { ARM_MS, WaitingKnocks, type WaitingPlayer } from './waitingKnocks.ts';
 
@@ -92,6 +93,8 @@ export interface GatePorts {
   readonly random?: () => number;
   /** The campaign's players' own codes, which a new join code never is: they share the page's one field. */
   taken?(): ReadonlySet<string>;
+  /** The arming clock the knocks share with the other cards over the control; one of their own without it. */
+  readonly cards?: ArmedCards;
 }
 
 /**
@@ -110,7 +113,7 @@ export class TableGate implements GateActions {
   constructor(settings: GateSettings, ports: GatePorts) {
     this.current = settings;
     this.ports = ports;
-    this.knocks = new WaitingKnocks(ports.timers, () => ports.changed());
+    this.knocks = new WaitingKnocks(ports.timers, () => ports.changed(), ports.cards);
   }
 
   get settings(): GateSettings {

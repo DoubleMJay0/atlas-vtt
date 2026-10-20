@@ -145,13 +145,16 @@ function vaultPath(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' && value.length <= MAX_FACE_TEXT ? value : undefined;
 }
 
-/** Whether an entry takes reactions: what was said, rolled, shown, handed out or found. */
-export function takesReactions(entry: LogEntry): entry is Extract<LogEntry, { readonly kind: 'chat' | 'roll' | 'image' | 'loot' | 'found' }> {
-  return entry.kind === 'chat' || entry.kind === 'roll' || entry.kind === 'image' || entry.kind === 'loot' || entry.kind === 'found';
+/** The entries that take reactions: what was said, rolled, shown, handed out, rested or found. */
+export type ReactableEntry = Extract<LogEntry, { readonly kind: 'chat' | 'roll' | 'image' | 'loot' | 'rest' | 'found' }>;
+
+/** Whether an entry takes reactions: what was said, rolled, shown, handed out, rested or found. */
+export function takesReactions(entry: LogEntry): entry is ReactableEntry {
+  return entry.kind === 'chat' || entry.kind === 'roll' || entry.kind === 'image' || entry.kind === 'loot' || entry.kind === 'rest' || entry.kind === 'found';
 }
 
-/** Whether the GM may delete an entry: a chat message, an image shown, an item handed out, a note found (which may then be found again). */
-export const isRemovable = (entry: LogEntry): boolean => entry.kind === 'chat' || entry.kind === 'image' || entry.kind === 'loot' || entry.kind === 'found';
+/** Whether the GM may delete an entry: a chat message, an image shown, an item handed out, a rest, a note found (which may then be found again). */
+export const isRemovable = (entry: LogEntry): boolean => entry.kind === 'chat' || entry.kind === 'image' || entry.kind === 'loot' || entry.kind === 'rest' || entry.kind === 'found';
 
 /** A readable pin as kept with a found note's entry, or undefined. */
 function readFoundPin(value: unknown): FoundPin | undefined {

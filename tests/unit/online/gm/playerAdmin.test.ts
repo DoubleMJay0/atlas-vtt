@@ -13,7 +13,7 @@ const ANA = { id: 'a'.repeat(20), name: 'Ana', online: true };
 const SCENE: SceneFacts = { isShared: true, tokens: {}, selected: [] };
 const feedback = { open: false, diagnostics: false, state: 'idle', errorReports: false } as const;
 
-const snapshot = (over: Partial<OnlineSnapshot> = {}): OnlineSnapshot => ({ status: 'online', link: 'https://play.atlas-vtt.dev/#code', campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [ANA], playerTokens: [], seats: null, gate: null, ...over });
+const snapshot = (over: Partial<OnlineSnapshot> = {}): OnlineSnapshot => ({ status: 'online', link: 'https://play.atlas-vtt.dev/#code', campaignId: null, sharedLeaf: null, sharedName: null, sharedTokens: {}, players: [ANA], playerTokens: [], seats: null, gate: null, rests: [], cardOrder: [], ...over });
 
 function actions(): PanelActions {
   return {

@@ -1,6 +1,7 @@
 import { playerTone } from '../../protocol/index.ts';
 import type { WorkspaceLeaf } from 'obsidian';
 import type { AccountView } from '../account/accountView.ts';
+import type { RestCard } from '../book/restRequests.ts';
 import type { GateActions, GateView } from '../joinGate.ts';
 import { gateRowsOf, type GateRows } from './gateRows.ts';
 import type { OnlineControl } from '../OnlineControl.ts';
@@ -47,6 +48,10 @@ export interface OnlineSnapshot {
   readonly seats: number | null;
   /** The running table's gates: the join code, the two switches, who waits for an answer; null while none runs. */
   readonly gate: GateView | null;
+  /** Players' rest requests waiting for the GM, in the order they came; none while no table runs. */
+  readonly rests: readonly RestCard[];
+  /** The keys of every card over the control (`knockKey`, `restKey`), in the order they came. */
+  readonly cardOrder: readonly string[];
   /** Players are shown an image over the map ("Display on player view"); absent while they are shown none. */
   readonly imageShown?: boolean;
   /** How the last table ended, when the server ended it; absent once another was started. */
@@ -64,6 +69,12 @@ export interface AddedPlayer {
   readonly id: string;
   readonly name: string;
   readonly code: string;
+}
+
+/** What the GM does with a player's rest request: nothing while its card has not stood long enough to be meant. */
+export interface RestActions {
+  approve(key: string): void;
+  decline(key: string): void;
 }
 
 export interface OnlineApi {
@@ -94,6 +105,8 @@ export interface OnlineApi {
   hideImage(): void;
   /** The running table's gates; nothing happens while none runs. */
   readonly gate: GateActions;
+  /** The GM's answers to players' rest requests, by card key; nothing happens while no table runs. */
+  readonly rests: RestActions;
   onChange(listener: () => void): () => void;
 }
 
@@ -104,6 +117,8 @@ export type ControlSource = Pick<OnlineControl, 'onChange' | 'status' | 'link' |
     readonly sharedStore: { getState(): { readonly objects: { readonly tokens: Readonly<Record<string, SceneToken>> } } } | null;
     readonly presentedName: string | null;
     readonly gate: GateActions & { view(): GateView };
+    readonly rests: RestActions & { cards(): readonly RestCard[] };
+    cardOrder(): readonly string[];
     readonly image: { readonly isShown: boolean };
     readonly closesAt: number | null;
   } | null;
@@ -136,6 +151,8 @@ export function onlineApi(control: ControlSource, hideImage: () => void): Online
       playerTokens: control.playerTokens().map(({ tokenId, label, owner }) => ({ tokenId, label, ownerId: owner?.id ?? null })),
       seats: control.seats(),
       gate: control.table?.gate.view() ?? null,
+      rests: control.table?.rests.cards() ?? [],
+      cardOrder: control.table?.cardOrder() ?? [],
       ...(control.table?.image.isShown === true && { imageShown: true }),
     }),
     start: (leaf, campaignId) => void control.start(leaf, campaignId ?? undefined),
@@ -166,6 +183,10 @@ export function onlineApi(control: ControlSource, hideImage: () => void): Online
       admit: (id) => control.table?.gate.admit(id),
       decline: (id) => control.table?.gate.decline(id),
       moved: () => control.table?.gate.moved(),
+    },
+    rests: {
+      approve: (key) => control.table?.rests.approve(key),
+      decline: (key) => control.table?.rests.decline(key),
     },
     onChange: (listener) => control.onChange(listener),
   };
