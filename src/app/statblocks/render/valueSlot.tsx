@@ -1,6 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import type { ResourceValue } from '../../resources/resourceTypes';
-import type { CountersBlock, EntriesBlock, FieldKey, FieldValue, ScoresBlock, TemplateBlock } from '../model/templateTypes';
+import type { CountersBlock, EntriesBlock, FieldKey, FieldValue, ScoresBlock, TemplateBlock, TrackBlock } from '../model/templateTypes';
 import type { ShownCounters } from './blocks/CountersView';
 import type { TableLook } from './blocks/ScoresView';
 import type { ShownTable } from './values/shownTable';
@@ -51,6 +51,12 @@ export interface ValueEditing {
    * note panel's − and + around it, stepping the character's current value. Unset: `text` alone.
    */
   tracked?(field: FieldKey, value: ResourceValue, text: React.ReactNode): React.ReactNode;
+  /**
+   * What stands where a track shows the value of the token's resource `key` (a tracked number's, or the resource
+   * the track is bound to): the note panel's boxes to press, or its gauge between − and +, setting the character's
+   * current value. Unset: the track as the card draws it, its maximum inside the block's values.
+   */
+  track?(key: string, label: string, value: ResourceValue, look: TrackBlock['look'], labelId: string): React.ReactNode;
   /**
    * A tile not named yet is drawn as it will be once named (`provisionalSheet`): the template editor's tiles while
    * their name is asked for. Unset (a statblock's pane): such a block shows only its prompt, and no value of it is edited.

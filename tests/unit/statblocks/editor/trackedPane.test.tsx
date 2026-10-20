@@ -17,6 +17,12 @@ const TEMPLATE: StatblockTemplate = {
   layout: { maxColumns: 1, blocks: [{ id: 'title001', type: 'title', field: 'name', level: 1 }, { id: 'metric01', type: 'metric', fields: ['armor'] }] },
 };
 
+// The same number shown as a track of boxes
+const AS_BOXES: StatblockTemplate = {
+  ...TEMPLATE,
+  layout: { maxColumns: 1, blocks: [{ id: 'title001', type: 'title', field: 'name', level: 1 }, { id: 'track001', type: 'track', field: 'armor', look: 'boxes', counts: 'up' }] },
+};
+
 const library = vi.hoisted(() => ({ tokens: [] as unknown[] }));
 const place = vi.hoisted(() => ({ kept: true }));
 const writeCharacterResources = vi.hoisted(() => vi.fn());
@@ -51,9 +57,9 @@ afterEach(() => {
   for (const app of apps.splice(0)) TemplateLibrary.release(app);
 });
 
-async function pane(): Promise<PaneHarness> {
-  vi.spyOn(TemplateLibrary.prototype, 'get').mockReturnValue({ template: TEMPLATE, name: 'PC', status: 'ok', builtIn: false, path: 'Templates/PC.atlastemplate' });
-  const harness = await renderPane({ frontmatter: { statblock: true, 'atlas-template': TEMPLATE.id, name: 'Mira', armor: 4 } });
+async function pane(template: StatblockTemplate = TEMPLATE): Promise<PaneHarness> {
+  vi.spyOn(TemplateLibrary.prototype, 'get').mockReturnValue({ template, name: 'PC', status: 'ok', builtIn: false, path: 'Templates/PC.atlastemplate' });
+  const harness = await renderPane({ frontmatter: { statblock: true, 'atlas-template': template.id, name: 'Mira', armor: 4 } });
   apps.push(harness.app);
   return harness;
 }
@@ -88,5 +94,37 @@ describe('a tracked number beside a player character\'s note', () => {
     const harness = await pane();
     expect(stepper(harness)).toBeNull();
     expect(harness.result.container.textContent).toContain('0 / 4');
+  });
+});
+
+describe('a tracked number shown as boxes beside a player character\'s note', () => {
+  const boxes = (harness: PaneHarness): HTMLElement[] => [...harness.result.container.querySelectorAll<HTMLElement>('.atlas-sb-track-box')];
+
+  it('sets the character\'s current value up to the box pressed, and a press on the last one marked takes it back', async () => {
+    library.tokens = [MIRA];
+    const harness = await pane(AS_BOXES);
+    expect(boxes(harness)).toHaveLength(4);
+    await act(async () => { fireEvent.click(harness.result.getByRole('button', { name: 'Armor 3 of 4' })); });
+    expect(writeCharacterResources).toHaveBeenLastCalledWith(harness.app, expect.anything(), new Map([['armor', { current: 3, max: 4 }]]));
+    expect(harness.writer.patches()).toEqual([]);
+    // No value was kept yet, so the track still shows none marked: the first box marks one
+    await act(async () => { fireEvent.click(harness.result.getByRole('button', { name: 'Armor 1 of 4' })); });
+    expect(writeCharacterResources).toHaveBeenLastCalledWith(harness.app, expect.anything(), new Map([['armor', { current: 1, max: 4 }]]));
+    expect(harness.result.container.querySelector('.atlas-sb-pane-editor')).toBeNull();
+  });
+
+  it('shows the maximum before the boxes, where a click edits it', async () => {
+    library.tokens = [MIRA];
+    const harness = await pane(AS_BOXES);
+    const max = harness.result.container.querySelector<HTMLElement>('.atlas-sb-track-max');
+    expect(max?.textContent).toBe('4');
+    await act(async () => { fireEvent.click(max!); });
+    expect(harness.result.container.querySelector('.atlas-sb-pane-editor input')).not.toBeNull();
+  });
+
+  it('draws boxes to look at, not to press, beside a note no player character links', async () => {
+    const harness = await pane(AS_BOXES);
+    expect(boxes(harness).map((box) => box.tagName)).toEqual(['SPAN', 'SPAN', 'SPAN', 'SPAN']);
+    expect(harness.result.container.querySelector('.atlas-sb-track-max')?.textContent).toBe('4');
   });
 });
