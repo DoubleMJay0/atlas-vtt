@@ -157,7 +157,9 @@ function trackNode(build: SheetBuild, block: TrackBlock, display: BlockDisplay, 
     const counts = block.resource === undefined ? build.shown.tracked.get(block.field)?.counts ?? block.counts : block.counts;
     return track(block, label, held.current, held.max, resource ?? null, null, counts);
   }
-  if (max !== null && max > 0) return track(block, label, block.counts === 'down' ? Math.floor(max) : 0, Math.floor(max), null, field);
+  // The note holds a tracked number's maximum, which its boxes must never write
+  const writes = build.shown.tracked.has(block.field) ? null : field;
+  if (max !== null && max > 0) return track(block, label, block.counts === 'down' ? Math.floor(max) : 0, Math.floor(max), null, writes);
   const text = misfitText(build, block.field);
   return text === null ? null : { k: 'value', value: sheetValue(build, label, text, 'plain', field, null) };
 }

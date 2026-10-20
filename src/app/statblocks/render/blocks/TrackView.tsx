@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useContext, useId } from 'react';
 import type { ResourceValue } from '../../../resources/resourceTypes';
 import type { TrackBlock } from '../../model/templateTypes';
 import { numericValue } from '../../values/numberText';
@@ -8,7 +8,7 @@ import { useSheet } from '../sheetContext';
 import type { SheetState } from '../sheetState';
 import { LabelledLine } from '../values/LabelledLine';
 import { StandIn, ValueText } from '../values/ValueText';
-import { ValueSlot } from '../valueSlot';
+import { ValueEditingContext, ValueSlot } from '../valueSlot';
 import type { BlockViewProps } from './blockViewProps';
 import { MAX_TRACK_BOXES } from '../values/trackBoxes';
 import { trackedShown } from '../values/trackedShown';
@@ -60,9 +60,19 @@ function Gauge({ value, labelId }: { value: ResourceValue; labelId: string }): R
   );
 }
 
+/**
+ * Whether the track shows its tracked number's own value, which the surface's controls step (`ValueEditing.tracked`):
+ * not a resource of the token's, and counting the way the number counts.
+ */
+function showsTracked(block: TrackBlock, sheet: SheetState): boolean {
+  if (block.resource && sheet.token?.resources?.[block.resource]) return false;
+  return trackedShown(block.field, sheet) !== null && block.counts === sheet.tracked.get(block.field)?.counts;
+}
+
 /** A count of boxes or a gauge: the statblock's maximum, and with a token its current value. */
 export function TrackView({ block, display }: BlockViewProps<TrackBlock>): React.JSX.Element | null {
   const { state } = useSheet();
+  const editing = useContext(ValueEditingContext);
   const labelId = useId();
   const label = block.label ?? state.fields.get(block.field)?.label ?? block.field;
   const track = display.state === 'value' ? trackValue(block, state) : null;
@@ -73,12 +83,14 @@ export function TrackView({ block, display }: BlockViewProps<TrackBlock>): React
   if (display.state === 'value' && !track && !raw) return null;
 
   const boxes = block.look === 'boxes' && (track?.max ?? 0) <= MAX_TRACK_BOXES;
+  const drawn = track && (boxes ? <Boxes value={track} labelId={labelId} /> : <Gauge value={track} labelId={labelId} />);
+  const stepped = track && drawn && editing?.tracked && showsTracked(block, state) ? editing.tracked(block.field, track, drawn) : drawn;
   return (
     <LabelledLine label={label} className="atlas-sb-track" labelId={labelId}>
       <ValueSlot block={block}>
         {track && (
           <span className="atlas-sb-track-value">
-            {boxes ? <Boxes value={track} labelId={labelId} /> : <Gauge value={track} labelId={labelId} />}
+            {stepped}
           </span>
         )}
         {raw && <ValueText shown={{ text: valueText(value), problems: [] }} />}

@@ -40,7 +40,7 @@ export function isAbilityTabs(block: TemplateBlock): boolean {
 
 export function tileKind(block: TemplateBlock): TileKind {
   switch (block.type) {
-    case 'stat': case 'tags': case 'pairs': return 'value';
+    case 'stat': case 'tags': case 'pairs': case 'track': return 'value';
     case 'metric': return 'metric';
     case 'entries': return 'abilities';
     case 'scores': return 'table';
