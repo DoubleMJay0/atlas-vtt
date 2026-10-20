@@ -2,9 +2,6 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { AnimatePresence, motion } from 'framer-motion';
 import type { App } from 'obsidian';
 import type { AssetService } from '../../../../services/AssetService';
-import type { AtlasView } from '../../../../atlas-view';
-import { spawnTokenGroups } from '../utils/tokenSpawnService';
-import { saveEncounter } from '../../../../encounters/encounterSaveService';
 import { collectionResources } from '../../../../resources/collectionResources';
 import { useCreatureIndex } from '../../../../creatures/useCreatureIndex';
 import { linkedStatblockPaths } from '../../../../creatures/creatureFacts';
@@ -13,29 +10,27 @@ import { isShortcutScopeActive } from '../../../../utils/activeLeafGuard';
 import { dialogOverlayMotion, useDialogWindowVariants } from '../../primitives/dialogMotion';
 import { ActiveFilterBar } from '../components/search/ActiveFilterBar';
 import { t } from '../../../../i18n';
-import type { TokenAsset } from '../types';
+import type { EncounterAsset, TokenAsset } from '../types';
 import { EncounterTray } from './EncounterTray';
 import { RosterFeed } from './RosterFeed';
 import { EncounterSidebar } from './EncounterSidebar';
 import { StatblockFeeds } from '../../../../react/components/dm-screen/StatblockFeeds';
 import { StatblockSkeleton } from '../../../../react/components/statblock/StatblockSkeleton';
-import { countOf, encounterDrafts, withCount, type EncounterPick } from './encounterPicks';
+import { countOf, withCount } from './encounterPicks';
+import { useEncounterDraft } from './useEncounterDraft';
 import { encounterMetrics } from './encounterMetrics';
 import { useEncounterRoster } from './useEncounterRoster';
-import { diceRandom } from '../../../../services/offlineDiceInputs';
 
 const SKELETONS = ['a', 'b', 'c', 'd'];
 
 interface EncounterBuilderProps {
   app: App;
-  /** The view the asset manager belongs to, whose scene picks are brought into; null for the open one. */
-  view: AtlasView | null;
   assetService: AssetService | null;
   collectionId: string;
+  /** A saved encounter to change: the builder starts from its creatures and name and saves in its place. */
+  editEncounter?: EncounterAsset | null;
   onClose: () => void;
   onSaved: () => void;
-  /** The picks were brought into the scene: the asset manager makes way for the map. */
-  onBrought: () => void;
 }
 
 /**
@@ -43,10 +38,10 @@ interface EncounterBuilderProps {
  * the DM screen float over the asset manager, searched and filtered as the Characters tab is, and
  * the tray at the bottom holds what was picked until it is saved as an encounter.
  */
-export function EncounterBuilder({ app, view, assetService, collectionId, onClose, onSaved, onBrought }: EncounterBuilderProps): React.JSX.Element {
+export function EncounterBuilder({ app, assetService, collectionId, editEncounter = null, onClose, onSaved }: EncounterBuilderProps): React.JSX.Element {
   const roster = useEncounterRoster(app, assetService, collectionId, true);
-  const [picks, setPicks] = useState<EncounterPick[]>([]);
-  const [saving, setSaving] = useState(false);
+  const draft = useEncounterDraft(app, assetService, collectionId, editEncounter, roster);
+  const { picks, setPicks, saving } = draft;
   const windowRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const windowVariants = useDialogWindowVariants();
@@ -64,33 +59,21 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
   }, []);
   const countOfToken = useCallback((tokenId: string): number => countOf(picks, tokenId), [picks]);
 
-  const save = async (): Promise<void> => {
-    if (!assetService || picks.length === 0) return;
-    setSaving(true);
-    try {
-      const saved = await saveEncounter(app, assetService, collectionId, encounterDrafts(picks));
-      if (!saved) return;
-      app.workspace.trigger('atlas-vtt:refresh-assets');
-      onSaved();
-      onClose();
-    } finally {
-      setSaving(false);
-    }
+  // A creature of the tray shows its statblock; filters that hide it are cleared for it first.
+  const [reveal, setReveal] = useState<{ id: string; nonce: number } | null>(null);
+  const revealOf = (token: TokenAsset): (() => void) | null => {
+    if (!roster.all.some((creature) => creature.id === token.id)) return null;
+    return () => {
+      if (!roster.shown.some((creature) => creature.id === token.id)) roster.query.reset();
+      setReveal((current) => ({ id: token.id, nonce: (current?.nonce ?? 0) + 1 }));
+    };
   };
 
-  // A fight without saving an encounter first: the picks go into the open scene as they are
-  const bring = async (placement: 'beside' | 'fight'): Promise<void> => {
-    if (picks.length === 0) return;
-    setSaving(true);
-    try {
-      const groups = picks.map(({ token, count }) => ({ asset: token, count }));
-      const ids = await spawnTokenGroups({ app, view, assetService, random: diceRandom }, groups, placement);
-      if (ids.length === 0) return;
-      onClose();
-      onBrought();
-    } finally {
-      setSaving(false);
-    }
+  const save = async (): Promise<void> => {
+    if (!(await draft.save())) return;
+    app.workspace.trigger('atlas-vtt:refresh-assets');
+    onSaved();
+    onClose();
   };
 
   useEffect(() => {
@@ -132,6 +115,7 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
         refinement={roster.refinement}
         countOf={countOfToken}
         onCountChange={changeCount}
+        reveal={reveal}
       />
     );
   };
@@ -157,6 +141,7 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
           <EncounterSidebar
             app={app}
             titleId={titleId}
+            title={editEncounter ? t('encounter.builder.editTitle') : t('encounter.builder.title')}
             search={roster.search}
             onSearch={roster.setSearch}
             query={roster.query}
@@ -184,9 +169,12 @@ export function EncounterBuilder({ app, view, assetService, collectionId, onClos
                   metrics={metrics}
                   saving={saving}
                   onCountChange={changeCount}
+                  revealOf={revealOf}
                   onClear={() => setPicks([])}
+                  name={draft.name}
+                  defaultName={draft.defaultName}
+                  onNameChange={draft.setName}
                   onSave={() => { void save(); }}
-                  onBring={(placement) => { void bring(placement); }}
                 />
               )}
             </AnimatePresence>

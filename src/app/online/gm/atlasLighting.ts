@@ -33,6 +33,10 @@ export interface AtlasPlayerSettings {
   readonly showCursors: boolean;
   /** Whether the GM's initiative lists start at the turn during a fight (`initiativeLayout`); false when it cannot be read. */
   readonly initiativeFromTurn?: boolean;
+  /** Whether a turn change shows the turn banner (`initiativeTurnOptions`); on when it cannot be read. */
+  readonly turnBanner?: boolean;
+  /** Whether players move tokens that fight only on their turn (`initiativeTurnOptions`); off when it cannot be read. */
+  readonly movesOnTurn?: boolean;
 }
 
 /** A field of an object by name, unchecked; undefined for anything that has none. */
@@ -65,6 +69,8 @@ export function atlasPlayerSettings(app: App): AtlasPlayerSettings {
   const view: unknown = typeof playerView === 'function' ? (playerView as () => unknown).call(settings) : undefined;
   const readLayout = field(settings, 'initiativeLayout');
   const layout: unknown = typeof readLayout === 'function' ? (readLayout as () => unknown).call(settings) : undefined;
+  const readTurn = field(settings, 'initiativeTurnOptions');
+  const turn: unknown = typeof readTurn === 'function' ? (readTurn as () => unknown).call(settings) : undefined;
   return {
     dynamicLighting: typeof dynamicLighting === 'boolean' ? dynamicLighting : null,
     showNames: field(view, 'showTokenNameplates') === true,
@@ -73,6 +79,8 @@ export function atlasPlayerSettings(app: App): AtlasPlayerSettings {
     showWidgets: field(view, 'showWidgets') === true,
     showCursors: field(view, 'showCursors') === true,
     initiativeFromTurn: field(layout, 'fromTurn') === true,
+    turnBanner: field(turn, 'banner') !== false,
+    movesOnTurn: field(turn, 'movesOnTurn') === true,
   };
 }
 

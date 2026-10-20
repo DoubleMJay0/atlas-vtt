@@ -22,4 +22,13 @@ describe('the Atlas settings an online table follows', () => {
     expect(atlasPlayerSettings(app).initiativeFromTurn).toBe(false);
     expect(atlasPlayerSettings({} as App).initiativeFromTurn).toBe(false);
   });
+
+  it('reads the turn banner (on unless switched off) and moves only on the turn (off unless switched on)', () => {
+    const settingsService = new SettingsService({} as never);
+    const app = { plugins: { plugins: { 'atlas-vtt': { settingsService } } } } as unknown as App;
+    expect(atlasPlayerSettings(app)).toMatchObject({ turnBanner: true, movesOnTurn: false });
+    settingsService.setInitiativeTurnOptions({ banner: false, movesOnTurn: true });
+    expect(atlasPlayerSettings(app)).toMatchObject({ turnBanner: false, movesOnTurn: true });
+    expect(atlasPlayerSettings({} as App)).toMatchObject({ turnBanner: true, movesOnTurn: false });
+  });
 });

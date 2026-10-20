@@ -73,6 +73,13 @@ export interface SharedInitiative {
    * then a divider before the sides that act before it. Absent: the list in turn order.
    */
   readonly fromTurn?: true;
+  /** The GM switched the turn banner off: the page names no turn as it moves on. Absent from older GMs. */
+  readonly bannerOff?: true;
+  /**
+   * During a fight players move a token of theirs that fights only while it holds the turn (by
+   * sides: while its side does); the GM refuses other moves. Absent from older GMs.
+   */
+  readonly movesOnTurn?: true;
 }
 
 const isNumber = (value: unknown, limit: number): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit;
@@ -143,5 +150,7 @@ export function parseInitiative(value: unknown): SharedInitiative | null | undef
     ...(value.fromTurn === true ? { fromTurn: true as const } : {}),
     ...(sides ? { sides } : {}),
     ...(value.byCards === true ? { byCards: true as const } : {}),
+    ...(value.bannerOff === true ? { bannerOff: true as const } : {}),
+    ...(value.movesOnTurn === true ? { movesOnTurn: true as const } : {}),
   };
 }

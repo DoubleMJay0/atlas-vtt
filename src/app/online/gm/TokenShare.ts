@@ -7,6 +7,8 @@ import type { SeatSource } from './seatSource.ts';
 import { sharedTokens, snapGridOf } from './scenePicture.ts';
 import { SequencedList } from './sequencedList.ts';
 import { NO_TOKEN_RULES, numberShownTokens, type TokenRules } from './tokenUI.ts';
+import type { AtlasPlayerSettings } from './atlasLighting.ts';
+import { sharedTurnTokens, type TurnShareState } from './turnShare.ts';
 import { mapTokens } from '../../tokens/offMap';
 
 /** An image as read from the vault. */
@@ -27,6 +29,8 @@ export interface TokenSharePorts {
   tokenRules?(): TokenRules | null;
   /** Which tokens are player tokens; without it every token is the GM's. */
   seats?: Pick<SeatSource, 'claimOf'> | undefined;
+  /** Atlas's settings for the players' view: whether they are shown the initiative list, and so the turn. */
+  atlasSettings?(): Pick<AtlasPlayerSettings, 'showInitiative'>;
   randomId(): string;
   now(): number;
   setTimer(run: () => void, ms: number): number;
@@ -197,14 +201,19 @@ export class TokenShare {
     const shown = source.playerRollTokens(state.mapPath);
     const badges = numberShownTokens(this.numbers, mapTokens(state.objects), (id) => shown.has(id), state.tokenSettings?.showInstanceBadges ?? true);
     this.numbers = badges.numbers;
+    // The store holds the fight too: the scene's type names only what every share reads
+    const turnState: TurnShareState = state;
+    const rules = this.ports.tokenRules?.() ?? NO_TOKEN_RULES;
+    const turn = sharedTurnTokens(turnState, this.ports.atlasSettings?.().showInitiative === true, rules.resources);
     const tokens = sharedTokens({
       tokens: mapTokens(state.objects),
       shown,
       gridSize,
       showNames: this.ports.showNames(),
       claimOf: (id, token) => seats?.claimOf(mapPath, id, token) ?? null,
-      rules: this.ports.tokenRules?.() ?? NO_TOKEN_RULES,
+      rules,
       badge: (id) => badges.badge(id),
+      turn,
       art: (path) => {
         const ref = this.art.get(path);
         if (ref !== null) art.set(ref.hash, path);

@@ -126,13 +126,13 @@ export function ModalLayer({
       <AnimatePresence>
         {isOpen && crud.isEncounterBuilderOpen && (
           <EncounterBuilder
+            key={crud.editingEncounter?.id ?? 'new'}
             app={data.app}
-            view={data.view}
             assetService={data.assetService}
             collectionId={selectedCollection}
-            onClose={() => crud.setIsEncounterBuilderOpen(false)}
+            editEncounter={crud.editingEncounter}
+            onClose={crud.closeEncounterBuilder}
             onSaved={() => { if (activeTab === 'encounters') void reloadAfterCreator(); }}
-            onBrought={onClose}
           />
         )}
       </AnimatePresence>

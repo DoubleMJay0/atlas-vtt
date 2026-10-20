@@ -13,6 +13,7 @@ export interface EncounterRoster {
   /** The creatures that pass the search and filters, by rating, unrated last. */
   shown: TokenAsset[];
   /** Every creature of the collection, before searching. */
+  all: readonly TokenAsset[];
   total: number;
   loading: boolean;
   /** Changes whenever the search or a filter does. */
@@ -81,5 +82,5 @@ export function useEncounterRoster(app: App, assetService: AssetService | null, 
   );
 
   const refinement = [keywords.nameQuery, ...tagIds, creature.refinementKey].join('\n');
-  return { shown, total: tokens.length, loading, refinement, search, setSearch, query };
+  return { shown, all: tokens, total: tokens.length, loading, refinement, search, setSearch, query };
 }

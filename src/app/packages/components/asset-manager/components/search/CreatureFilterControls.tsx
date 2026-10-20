@@ -7,7 +7,7 @@ import { SegmentedControl } from '../../../primitives/SegmentedControl';
 import { Skeleton, SkeletonGroup } from '../../../primitives/Skeleton';
 import type { CreatureFilterPanel } from '../../hooks/useCreatureFilters';
 import { FilterSection } from './FilterSection';
-import { OptionChips } from './OptionChips';
+import { OptionFilter } from './OptionFilter';
 import { RangeFilter } from './RangeFilter';
 import { t } from '../../../../../i18n';
 
@@ -89,13 +89,12 @@ export function CreatureFilterControls({ panel, statblockFilter = true }: Creatu
       onChange={(range) => setSelection((current) => withRange(current, facet.definition.id, range))}
     />
   ) : (
-    <FilterSection key={facet.definition.id} title={facet.definition.label} active={isFacetActive(facet)}>
-      <OptionChips
-        label={facet.definition.label}
-        options={facet.options}
-        onChange={(key, state) => setSelection((current) => withOptionState(current, facet.definition.id, key, state))}
-      />
-    </FilterSection>
+    <OptionFilter
+      key={facet.definition.id}
+      title={facet.definition.label}
+      options={facet.options}
+      onChange={(key, state) => setSelection((current) => withOptionState(current, facet.definition.id, key, state))}
+    />
   ));
 
   return (
@@ -117,13 +116,11 @@ export function CreatureFilterControls({ panel, statblockFilter = true }: Creatu
       {options.filter((facet) => !fromTemplate(facet)).map(renderFacet)}
 
       {showLayouts && (
-        <FilterSection title={t('filters.template')} active={hasPicks(selection.layouts)}>
-          <OptionChips
-            label={t('filters.template')}
-            options={facets.layouts}
-            onChange={(layout, state) => setSelection((current) => withOptionState(current, LAYOUT_FACET, layout, state))}
-          />
-        </FilterSection>
+        <OptionFilter
+          title={t('filters.template')}
+          options={facets.layouts}
+          onChange={(layout, state) => setSelection((current) => withOptionState(current, LAYOUT_FACET, layout, state))}
+        />
       )}
 
       {templateFacets.length > 0 && (

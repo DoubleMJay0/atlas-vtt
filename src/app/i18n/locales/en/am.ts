@@ -27,6 +27,7 @@ export const am = {
   'am.manage.deleteItems': { one: 'Delete {count} item', other: 'Delete {count} items' },
   'am.menu.descending': 'Descending',
   'am.menu.editToken': 'Edit Token',
+  'am.menu.editEncounter': 'Edit Encounter',
   'am.menu.linkStatblock': 'Link Statblock',
   'am.menu.moveToCollection': 'Move to Collection',
   'am.menu.moveToFolder': 'Move to Folder',

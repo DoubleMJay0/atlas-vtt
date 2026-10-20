@@ -3,6 +3,7 @@ import { App as ObsidianApp } from 'obsidian';
 import type { ContextMenuEntry } from '../../../../react/components/context-menu/AtlasContextMenu';
 import type {
   AnyAsset,
+  EncounterAsset,
   CollectionOption,
   Folder,
   InputModalState,
@@ -35,6 +36,8 @@ export interface AssetContextMenuDeps {
   // State setters
   setEditingToken: (asset: AnyAsset | null) => void;
   setIsTokenCreatorOpen: (open: boolean) => void;
+  /** Opens the encounter builder on a saved encounter. */
+  editEncounter: (encounter: EncounterAsset) => void;
   setIsMoveModalOpen: (open: boolean) => void;
   openCreateScene: (prefill: CreateScenePrefill) => void;
   setInputModalState: (state: InputModalState) => void;
@@ -96,6 +99,14 @@ export function buildAssetContextMenuEntries(
   }
 
   // ── Edit / Rename ─────────────────────────────────────────────
+  if (asset.type === 'encounters' && selectedAssets.length <= 1) {
+    entries.push({
+      type: 'item',
+      label: t('am.menu.editEncounter'),
+      icon: 'swords',
+      onClick: () => deps.editEncounter(asset),
+    });
+  }
   if (asset.type === 'tokens') {
     entries.push({
       type: 'item',
