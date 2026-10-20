@@ -25,9 +25,9 @@ import {
 } from './recoveryTypes';
 
 /** The longest id or name a button, metric or field may have. */
-const MAX_RECOVERY_TEXT = 100;
+export const MAX_RECOVERY_TEXT = 100;
 /** The longest text an action has. */
-const MAX_ACTION_TEXT = 400;
+export const MAX_ACTION_TEXT = 400;
 /** The largest number a rule names (a minimum, a value to set, a cap, a step). */
 const MAX_RECOVERY_NUMBER = 1_000_000;
 

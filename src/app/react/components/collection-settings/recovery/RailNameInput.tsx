@@ -7,8 +7,8 @@ interface RailNameInputProps {
   onCancel: () => void;
 }
 
-/** The longest name a button takes (`parseRecovery` reads up to 100 characters). */
-const MAX_NAME_LENGTH = 40;
+/** The longest name a button or action takes (`parseRecovery` reads up to 100 characters). */
+export const MAX_NAME_LENGTH = 40;
 
 /**
  * A capsule of the rail being named: Enter or leaving the field keeps the name, Escape keeps the

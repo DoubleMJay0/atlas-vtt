@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   firstRule, kindFits, ruleFor, ruleOfKind, spendRule, withoutRule, withRule,
 } from '../../../../recovery/editor/recoveryEdits';
+import type { RuleScope } from '../../../../recovery/editor/recoveryScope';
 import type { RecoveryButton, RecoveryRule, RecoveryRuleKind, RecoveryTarget } from '../../../../recovery/recoveryTypes';
 
 /** A metric picked on the card: its spot and what a rule on it changes. */
@@ -15,7 +16,7 @@ export type EscapeStep = 'spending' | 'card' | 'metric';
 
 export interface RuleEditing {
   picked: PickedMetric | null;
-  /** The picked metric's rule under the selected button. */
+  /** The picked metric's rule in the selected button's scope. */
   rule: RecoveryRule | undefined;
   cardOpen: boolean;
   /** Waiting for the metric a Spend rule spends: the card makes way meanwhile. */
@@ -23,7 +24,7 @@ export interface RuleEditing {
   /** The card was opened from the keyboard: its chosen kind takes focus. */
   fromKeyboard: boolean;
   /**
-   * Adds the metric to the button where it is not in it yet and opens its card, or closes the card
+   * Adds the metric to the scope where it is not in it yet and opens its card, or closes the card
    * of the metric already picked; picks the source while spending.
    */
   pick: (spotId: string, target: RecoveryTarget, fromKeyboard: boolean) => 'picked' | 'source' | 'full' | 'ignored';
@@ -32,7 +33,7 @@ export interface RuleEditing {
   changeRule: (rule: RecoveryRule) => void;
   /** Spend: waits for another metric to spend. */
   pickSource: () => void;
-  /** Leaves the picked metric out of the button, and lets go of it. */
+  /** Leaves the picked metric out of the scope, and lets go of it. */
   remove: () => void;
   /** Takes back the innermost of picking a source, the card and the pick; null where nothing was. */
   escape: () => EscapeStep | null;
@@ -40,16 +41,16 @@ export interface RuleEditing {
 }
 
 /**
- * The picking of metrics on the card for one button, and the rules it sets: a metric picked is
- * added to the button with its first rule and opens its card, where the kind of rule and its
- * numbers are set. Every change goes to `onButton` at once.
+ * The picking of metrics on the card for one scope of a button (its own rules, or one action's),
+ * and the rules it sets: a metric picked is added to the scope with its first rule and opens its
+ * card, where the kind of rule and its numbers are set. Every change goes to `onButton` at once.
  */
-export function useRuleEditing(button: RecoveryButton | null, onButton: (button: RecoveryButton) => void): RuleEditing {
+export function useRuleEditing(button: RecoveryButton | null, scope: RuleScope, onButton: (button: RecoveryButton) => void): RuleEditing {
   const [picked, setPicked] = useState<PickedMetric | null>(null);
   const [cardOpen, setCardOpen] = useState(false);
   const [spending, setSpending] = useState(false);
   const [fromKeyboard, setFromKeyboard] = useState(false);
-  const rule = button && picked ? ruleFor(button, picked.target) : undefined;
+  const rule = button && picked ? ruleFor(button, picked.target, scope) : undefined;
 
   const closeAll = (): void => {
     setPicked(null);
@@ -58,7 +59,7 @@ export function useRuleEditing(button: RecoveryButton | null, onButton: (button:
   };
 
   const setRule = (next: RecoveryRule): boolean => {
-    const changed = button && withRule(button, next);
+    const changed = button && withRule(button, next, scope);
     if (changed) onButton(changed);
     return changed !== null;
   };
@@ -78,7 +79,7 @@ export function useRuleEditing(button: RecoveryButton | null, onButton: (button:
       setCardOpen(!cardOpen);
       return 'picked';
     }
-    if (!ruleFor(button, target) && !setRule(firstRule(target))) return 'full';
+    if (!ruleFor(button, target, scope) && !setRule(firstRule(target))) return 'full';
     setPicked({ spotId, target });
     setCardOpen(true);
     setSpending(false);
@@ -103,7 +104,7 @@ export function useRuleEditing(button: RecoveryButton | null, onButton: (button:
   };
 
   const remove = (): void => {
-    if (button && picked) onButton(withoutRule(button, picked.target));
+    if (button && picked) onButton(withoutRule(button, picked.target, scope));
     closeAll();
   };
 

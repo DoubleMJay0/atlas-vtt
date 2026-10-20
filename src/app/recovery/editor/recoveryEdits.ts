@@ -1,7 +1,8 @@
 /**
  * The edits the recovery editor makes to a template's buttons: add, rename, move and remove a
- * button, and set or remove the one rule a button has for a metric. Every edit returns new values
- * and leaves its input alone; one that would pass a limit returns null. Pure.
+ * button, and set or remove the one rule a button (or one of its actions, by scope) has for a
+ * metric. Every edit returns new values and leaves its input alone; one that would pass a limit
+ * returns null. Pure.
  */
 
 import type { TemplateId } from '../../statblocks/model/templateTypes';
@@ -17,6 +18,7 @@ import {
   type ResourceOrCounters,
 } from '../recoveryTypes';
 import { metricKey } from './recoveryMetrics';
+import { ALWAYS, rulesOf, withEachAction, withScopeRules, type RuleScope } from './recoveryScope';
 
 const NO_BUTTONS: readonly RecoveryButton[] = [];
 
@@ -31,13 +33,18 @@ export function withTemplateButtons(record: RecoveryRecord, templateId: Template
   return buttons.length > 0 ? { ...rest, [templateId]: buttons } : rest;
 }
 
-/** An id no button of `taken` has: it names the button for good, whatever it is renamed to. */
-export function newButtonId(taken: readonly RecoveryButton[], random: () => number = Math.random): string {
-  const ids = new Set(taken.map((button) => button.id));
+/** An id `<prefix>-xxxxxx` none of `taken` has: it names what it is given to for good, whatever it is renamed to. */
+export function newRecoveryId(prefix: string, taken: readonly { id: string }[], random: () => number = Math.random): string {
+  const ids = new Set(taken.map((each) => each.id));
   for (;;) {
-    const id = `rest-${Math.floor(random() * 36 ** 6).toString(36).padStart(6, '0')}`;
+    const id = `${prefix}-${Math.floor(random() * 36 ** 6).toString(36).padStart(6, '0')}`;
     if (!ids.has(id)) return id;
   }
+}
+
+/** An id no button of `taken` has. */
+export function newButtonId(taken: readonly RecoveryButton[], random: () => number = Math.random): string {
+  return newRecoveryId('rest', taken, random);
 }
 
 /** The buttons with a new one named `name` at their end; null where the template has as many as it may. */
@@ -68,41 +75,45 @@ export function withButtonMoved(buttons: readonly RecoveryButton[], id: string, 
   return next;
 }
 
+/** The rule without the button `id` among the rows it restores (counters only). */
+function withoutRow(rule: RecoveryRule, id: string): RecoveryRule {
+  if (rule.target.kind !== 'counters' || rule.target.rows === 'all' || !rule.target.rows.includes(id)) return rule;
+  return { ...rule, target: { ...rule.target, rows: rule.target.rows.filter((row) => row !== id) } } as RecoveryRule;
+}
+
 /**
- * The buttons without `id`. Counters rules that restored the rows set to it no longer name it, so
- * no rule points at a button that is gone.
+ * The buttons without `id`. Counters rules that restored the rows set to it, the buttons' own and
+ * their actions', no longer name it, so no rule points at a button that is gone.
  */
 export function withoutButton(buttons: readonly RecoveryButton[], id: string): RecoveryButton[] {
-  return buttons.filter((button) => button.id !== id).map((button) => ({
-    ...button,
-    rules: button.rules.map((rule) => {
-      if (rule.target.kind !== 'counters' || rule.target.rows === 'all' || !rule.target.rows.includes(id)) return rule;
-      return { ...rule, target: { ...rule.target, rows: rule.target.rows.filter((row) => row !== id) } } as RecoveryRule;
-    }),
-  }));
+  return buttons.filter((button) => button.id !== id).map((button) => withEachAction(
+    { ...button, rules: button.rules.map((rule) => withoutRow(rule, id)) },
+    (action) => ({ ...action, rules: action.rules.map((rule) => withoutRow(rule, id)) }),
+  ));
 }
 
-/** The rule a button has for a metric; a counters rule matches its field, whatever rows it restores. */
-export function ruleFor(button: RecoveryButton, target: RecoveryTarget): RecoveryRule | undefined {
+/** The rule a scope of the button has for a metric; a counters rule matches its field, whatever rows it restores. */
+export function ruleFor(button: RecoveryButton, target: RecoveryTarget, scope: RuleScope = ALWAYS): RecoveryRule | undefined {
   const key = metricKey(target);
-  return button.rules.find((rule) => metricKey(rule.target) === key);
+  return rulesOf(button, scope).find((rule) => metricKey(rule.target) === key);
 }
 
 /**
- * The button with `rule` in place of the one it had for the same metric, or after the others;
- * null where it would hold more rules than a button may.
+ * The button with `rule` in place of the one the scope had for the same metric, or after the
+ * others; null where the scope would hold more rules than it may.
  */
-export function withRule(button: RecoveryButton, rule: RecoveryRule): RecoveryButton | null {
+export function withRule(button: RecoveryButton, rule: RecoveryRule, scope: RuleScope = ALWAYS): RecoveryButton | null {
   const key = metricKey(rule.target);
-  const at = button.rules.findIndex((other) => metricKey(other.target) === key);
-  if (at < 0 && button.rules.length >= MAX_RECOVERY_RULES) return null;
-  const rules = at < 0 ? [...button.rules, rule] : button.rules.map((other, index) => (index === at ? rule : other));
-  return { ...button, rules };
+  const had = rulesOf(button, scope);
+  const at = had.findIndex((other) => metricKey(other.target) === key);
+  if (at < 0 && had.length >= MAX_RECOVERY_RULES) return null;
+  const rules = at < 0 ? [...had, rule] : had.map((other, index) => (index === at ? rule : other));
+  return withScopeRules(button, scope, rules);
 }
 
-export function withoutRule(button: RecoveryButton, target: RecoveryTarget): RecoveryButton {
+export function withoutRule(button: RecoveryButton, target: RecoveryTarget, scope: RuleScope = ALWAYS): RecoveryButton {
   const key = metricKey(target);
-  return { ...button, rules: button.rules.filter((rule) => metricKey(rule.target) !== key) };
+  return withScopeRules(button, scope, rulesOf(button, scope).filter((rule) => metricKey(rule.target) !== key));
 }
 
 /** Whether a metric takes a kind of rule: a condition only steps and clears, the others never do. */

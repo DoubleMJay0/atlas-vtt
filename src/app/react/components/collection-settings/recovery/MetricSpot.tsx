@@ -13,7 +13,7 @@ export interface SpotProps {
   label: string;
   /** The rule's badge, or null where the button leaves the metric alone. */
   badge: string | null;
-  /** The button the badge belongs to: another button's badge swaps in. */
+  /** The button and scope the badge belongs to: another button's or scope's badge swaps in. */
   badgeOf: string;
   /** Its place among the metrics, which staggers the badges one after the other. */
   order: number;
