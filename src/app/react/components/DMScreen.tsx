@@ -18,6 +18,7 @@ import { isOffMap } from '../../tokens/offMap';
 import { toTokenVitals } from '../../services/statblockVitalsSync';
 import { useMapResources } from '../../resources/useMapResources';
 import { useDMScreenStatblocks } from './dm-screen/useDMScreenStatblocks';
+import { useFightStatblocks } from './dm-screen/useFightStatblocks';
 import { runInBackground } from '../../utils/backgroundTask';
 import { t } from '../../i18n';
 
@@ -228,6 +229,7 @@ export default function DMScreen({ isOpen, onClose }: DMScreenProps) {
   const updateToken = useAtlasStore((state) => state.updateToken);
   const definitions = useMapResources();
   const { statblocks, loading } = useDMScreenStatblocks(isOpen, app, { viewId: view?.viewId, mapPath, mapLoaded, isMapLoading, tokens });
+  const { shown: shownStatblocks, scopeSwitch } = useFightStatblocks(statblocks, tokens);
   const [contentReady, setContentReady] = useState(false);
   const [closing, setClosing] = useState(false);
   const [isNoteFocused, setIsNoteFocused] = useState(false);
@@ -386,9 +388,10 @@ export default function DMScreen({ isOpen, onClose }: DMScreenProps) {
               <div className="atlas-dm-loading">{t('dashboard.loading')}</div>
             ) : (
               <div className="atlas-dm-statblocks-grid">
-                {statblocks.size > 0 && (
+                {scopeSwitch}
+                {shownStatblocks.length > 0 && (
                   <StatblockFeeds>
-                    {Array.from(statblocks.entries(), ([path, statblock]) => (
+                    {shownStatblocks.map(([path, statblock]) => (
                       <StatblockFeedMenu key={path} app={app} path={path} onOpened={handleClose}>
                         <LinkedStatblock
                           app={app}

@@ -15,8 +15,12 @@ import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { TokenPortrait } from '../../packages/components/shared/TokenPortrait';
 import { InitiativeNumber, type NumberStep } from './InitiativeNumber';
 import { CardResourceBars } from './CardResourceBars';
+import { CardConditions } from './CardConditions';
+import { useMapConditions } from '../hooks/useMapConditions';
+import { combatantConditions } from '../../utils/activeConditions';
 import { useCardPreviewHover } from './useCardPreviewHover';
 import { t } from '../../i18n';
+import { DealtCard } from './DealtCard';
 
 interface InitiativeCardProps {
   entry: InitiativeEntry;
@@ -24,8 +28,12 @@ interface InitiativeCardProps {
   isHoveredForPreview: boolean;
   /** The fight runs by sides: a combatant has no number there and never the turn by itself. */
   bySides?: boolean;
+  /** The fight runs by cards: the card dealt stands where the number does. */
+  byCards?: boolean;
   /** The GM chose to see names on the cards. */
   showName?: boolean;
+  /** The side tooltips open on: away from the edge the tracker stands at. */
+  tooltipSide?: 'left' | 'right';
   /** The card's number is being typed in place. */
   isEditingNumber?: boolean;
   onStartNumberEdit?: (entry: InitiativeEntry) => void;
@@ -49,7 +57,9 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   index,
   isHoveredForPreview,
   bySides = false,
+  byCards = false,
   showName = false,
+  tooltipSide = 'left',
   isEditingNumber = false,
   onStartNumberEdit = NOTHING,
   onCommitNumber = NOTHING,
@@ -73,9 +83,11 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
   // Read live from the token: the resources that defeat it (hit points), and whether one of them has
   const definitions = useMapResources();
+  const conditionDefinitions = useMapConditions();
   const token = tokens[entry.tokenId];
   const bars = token ? visibleResources(token, definitions, 'dm').filter(({ definition }) => definition.defeatedWhenSpent) : [];
   const defeated = combatantDefeated(token, definitions);
+  const conditions = combatantConditions(token, conditionDefinitions);
   // A hidden token's entry is left out of the players' list (`PlayerInitiativePanel`)
   const hiddenFromPlayers = token?.isHidden === true;
   // Kept beside the map: in the tracker only, until the GM places it
@@ -209,13 +221,13 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         )}
 
         {hiddenFromPlayers && (
-          <LabelTooltip label={t('initiative.hiddenFromPlayers')} side="left">
+          <LabelTooltip label={t('initiative.hiddenFromPlayers')} side={tooltipSide}>
             <span className="atlas-initiative-card__hidden-badge"><EyeOff /></span>
           </LabelTooltip>
         )}
 
         {offMap && (
-          <LabelTooltip label={t('initiative.offMap')} side="left">
+          <LabelTooltip label={t('initiative.offMap')} side={tooltipSide}>
             <span className="atlas-initiative-card__off-map-badge"><MapPinOff /></span>
           </LabelTooltip>
         )}
@@ -223,8 +235,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
       {showName && <span className="atlas-initiative-card__name" aria-hidden="true">{name}</span>}
 
-      {/* Initiative number, typed in place */}
-      {!bySides && (
+      {/* Initiative number, typed in place; in a fight by cards the card dealt, which nothing edits */}
+      {!bySides && (byCards ? <DealtCard card={entry.card} /> : (
         <InitiativeNumber
           value={entry.initiative}
           empty={!hasInitiative(entry)}
@@ -233,9 +245,11 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           onCommit={(text, step) => onCommitNumber(entry, text, step)}
           onCancel={onCancelNumberEdit}
         />
-      )}
+      ))}
 
       {bars.length > 0 && <CardResourceBars tokenId={entry.tokenId} bars={bars} />}
+
+      <CardConditions conditions={conditions} tooltipSide={tooltipSide} />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
-import { rollInitiativeDice } from '../../src/app/initiative/turns';
+import { rollInitiativeDice } from '../../src/app/initiative/initiativeDice';
 import type { InitiativeRules } from '../../src/app/types/initiativeRulesTypes';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 

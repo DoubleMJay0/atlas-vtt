@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Sprite } from 'pixi.js';
 import { createConditionBadge } from '../../src/app/pixi/token-renderer/ConditionBadge';
 import { ConditionBadgeRing, type ActiveCondition } from '../../src/app/pixi/token-renderer/ConditionBadgeRing';
-import { resolveActiveConditions } from '../../src/app/pixi/token-renderer/TokenConditionsUI';
+import { resolveActiveConditions } from '../../src/app/utils/activeConditions';
 import { getTokenRingCenterRadius } from '../../src/app/pixi/token-renderer/tokenRingMetrics';
 import { computeTokenPixelSize, computeTokenStrokeWidth } from '../../src/app/pixi/token-renderer/tokenSizing';
 import { conditionGlyph, isLightBadgeColor } from '../../src/app/utils/conditionGlyph';

@@ -3,8 +3,10 @@ import { trackedResources } from '../../../resources/trackedResources';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
 import { readerFor } from '../../../statblocks/values/fieldValues';
+import { withReferencesFilled } from '../../../statblocks/values/fillReferences';
+import { statblockLookup } from '../../../statblocks/values/statblockLookup';
 import { trackedMax, trackedValue } from '../../../statblocks/values/trackedNumbers';
-import { playerAccess } from './playerAccess.ts';
+import { playerAccess, shownRecord } from './playerAccess.ts';
 
 /** A tracked number of a character's statblock, as its sheet holds it. */
 export interface TrackedSheetValue {
@@ -27,7 +29,10 @@ export function trackedSheetValues(
 ): TrackedSheetValue[] {
   const template = resolved?.source.kind === 'atlas' ? resolved.template : null;
   if (!resolved || !template) return [];
-  const reader = readerFor(resolved.fields, withHeaderFields(template).fields);
+  const { fields } = withHeaderFields(template);
+  // Maximums as the card shows them, filled in from what the player may see alone
+  const visible = shownRecord(resolved.fields, template, fields);
+  const reader = readerFor(withReferencesFilled(visible, fields, statblockLookup(template, visible, fields)), fields);
   return trackedResources(template, definitions).flatMap(({ tracked, definition }): TrackedSheetValue[] => {
     // Its maximum shows too, so a field it reads that players may not see keeps it off their sheet
     if (playerAccess(template, tracked.field.key) === 'hidden' || playerAccess(template, tracked.maxField) === 'hidden') return [];
