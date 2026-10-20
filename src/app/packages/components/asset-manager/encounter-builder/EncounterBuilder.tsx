@@ -8,14 +8,13 @@ import { useCreatureIndex } from '../../../../creatures/useCreatureIndex';
 import { linkedStatblockPaths } from '../../../../creatures/creatureFacts';
 import { PaneDiceRolls } from '../../../../statblocks/editor/statblock-pane/PaneDiceRolls';
 import { isShortcutScopeActive } from '../../../../utils/activeLeafGuard';
-import { CloseButton } from '../../primitives/CloseButton';
 import { dialogOverlayMotion, useDialogWindowVariants } from '../../primitives/dialogMotion';
-import { HeaderSearch } from '../components/HeaderSearch';
 import { ActiveFilterBar } from '../components/search/ActiveFilterBar';
 import { t } from '../../../../i18n';
 import type { TokenAsset } from '../types';
 import { EncounterTray } from './EncounterTray';
 import { RosterFeed } from './RosterFeed';
+import { EncounterSidebar } from './EncounterSidebar';
 import { StatblockFeeds } from '../../../../react/components/dm-screen/StatblockFeeds';
 import { StatblockSkeleton } from '../../../../react/components/statblock/StatblockSkeleton';
 import { countOf, encounterDrafts, withCount, type EncounterPick } from './encounterPicks';
@@ -133,43 +132,42 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
         onClick={(event) => event.stopPropagation()}
       >
         <PaneDiceRolls app={app} collectionId={collectionId} coversMaps>
-          <header className="atlas-encounter-builder__bar">
-            <h2 id={titleId} className="atlas-encounter-builder__title">{t('encounter.builder.title')}</h2>
-            <HeaderSearch
-              app={app}
-              search={roster.search}
-              onSearch={roster.setSearch}
-              query={roster.query}
-              label={t('encounter.builder.search')}
-            />
-            <CloseButton onClick={onClose} />
-          </header>
-          {/* Its height is kept whether filters are active or not, so applying one never moves the feed. */}
-          <div className="atlas-encounter-builder__status">
-            <div className="atlas-encounter-builder__status-row">
-              {!roster.loading && roster.total > 0 && (
-                <span className="atlas-encounter-builder__total">
-                  {roster.shown.length === roster.total
-                    ? t('encounter.builder.count', { count: roster.total })
-                    : t('encounter.builder.shown', { shown: roster.shown.length, count: roster.total })}
-                </span>
-              )}
-              <ActiveFilterBar groups={roster.query.chips} onReset={roster.query.reset} />
+          <EncounterSidebar
+            app={app}
+            titleId={titleId}
+            search={roster.search}
+            onSearch={roster.setSearch}
+            query={roster.query}
+            onClose={onClose}
+          />
+          <div className="atlas-encounter-builder__main">
+            {/* Its height is kept whether filters are active or not, so applying one never moves the feed. */}
+            <div className="atlas-encounter-builder__status">
+              <div className="atlas-encounter-builder__status-row">
+                {!roster.loading && roster.total > 0 && (
+                  <span className="atlas-encounter-builder__total">
+                    {roster.shown.length === roster.total
+                      ? t('encounter.builder.count', { count: roster.total })
+                      : t('encounter.builder.shown', { shown: roster.shown.length, count: roster.total })}
+                  </span>
+                )}
+                <ActiveFilterBar groups={roster.query.chips} onReset={roster.query.reset} />
+              </div>
             </div>
+            {renderFeed()}
+            <AnimatePresence>
+              {picks.length > 0 && (
+                <EncounterTray
+                  picks={picks}
+                  metrics={metrics}
+                  saving={saving}
+                  onCountChange={changeCount}
+                  onClear={() => setPicks([])}
+                  onSave={() => { void save(); }}
+                />
+              )}
+            </AnimatePresence>
           </div>
-          {renderFeed()}
-          <AnimatePresence>
-            {picks.length > 0 && (
-              <EncounterTray
-                picks={picks}
-                metrics={metrics}
-                saving={saving}
-                onCountChange={changeCount}
-                onClear={() => setPicks([])}
-                onSave={() => { void save(); }}
-              />
-            )}
-          </AnimatePresence>
         </PaneDiceRolls>
       </motion.div>
     </motion.div>

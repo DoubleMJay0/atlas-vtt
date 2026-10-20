@@ -146,7 +146,7 @@
 
 // ── Filter panel: under the header, at its end ─────────────────────────────
 
-:is(.atlas-asset-manager-header, .atlas-encounter-builder__bar) .atlas-filter-panel {
+.atlas-asset-manager-header .atlas-filter-panel {
   position: absolute;
   top: calc(100% + #{$spacing-xs});
   right: $spacing-m;
@@ -270,7 +270,7 @@
   gap: $spacing-xs;
 }
 
-:is(.atlas-asset-manager-header, .atlas-encounter-builder__bar) .atlas-filter-chip.btn {
+:is(.atlas-asset-manager-header, .atlas-encounter-builder) .atlas-filter-chip.btn {
   @include atlas-flex-row($gap: $spacing-xs);
   height: 24px;
   padding: 0 $spacing-s;
@@ -319,7 +319,7 @@
   }
 }
 
-:is(.atlas-asset-manager-header, .atlas-encounter-builder__bar) .atlas-filter-chips__more {
+:is(.atlas-asset-manager-header, .atlas-encounter-builder) .atlas-filter-chips__more {
   height: 24px;
   padding: 0 $spacing-s;
   border-radius: $radius-full;
