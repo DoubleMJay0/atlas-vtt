@@ -9,6 +9,15 @@ import { showNotice } from '../ui/notice';
 import { ownModifier } from './initiativeModifier';
 import { readStatblockModifiers } from './statblockModifiers';
 
+/**
+ * Where the rules name a field and some linked statblocks hold no number there, the GM is told how
+ * many, the field, and where it is chosen: a field that reads nothing is the usual setup mistake.
+ */
+function noticeMissedModifiers(rules: InitiativeRules, missed: number): void {
+  const field = rules.modifier?.field ?? rules.modifierFallback?.field;
+  if (field) showNotice(t('initiative.modifierMissing', { count: missed, field }));
+}
+
 interface InitiativeRolls {
   /** Rolls every combatant, or the one of `entryId`, with their statblocks' modifiers. */
   roll: (entryId?: string) => void;
@@ -41,7 +50,7 @@ export function useInitiativeRolls(app: App, rules: InitiativeRules): Initiative
     const parsing = !isBestiaryResolved();
     const { modifiers, unread } = await readStatblockModifiers(entries, before.objects.tokens, rules, async (path) => {
       const read = await readStatblockRecord(app, path);
-      return read && { fields: read.record, meanings: read.meanings };
+      return read && { fields: read.record, meanings: read.meanings, labels: read.labels, fantasy: read.fantasy };
     });
 
     // Another scene, or the tracker gone, while the statblocks were read: nothing is rolled.
@@ -51,7 +60,9 @@ export function useInitiativeRolls(app: App, rules: InitiativeRules): Initiative
     else now.rollEntryInitiative(entryId, rules.roll, modifiers.get(entryId) ?? null);
     // A combatant with a modifier of the GM's own missed nothing
     const missed = entries.filter((entry) => ownModifier(entry) === undefined && unread.includes(entry.id)).length;
-    if (parsing && missed > 0) showNotice(t('initiative.statblocksLoading', { count: missed }));
+    if (missed === 0) return;
+    if (parsing) showNotice(t('initiative.statblocksLoading', { count: missed }));
+    else noticeMissedModifiers(rules, missed);
   }, [app, store, rules]);
 
   const roll = useCallback((entryId?: string): void => {

@@ -36,7 +36,9 @@ describe('an initiative modifier written in a statblock', () => {
   it('reads an ability score as the d20 rule\'s modifier', () => {
     expect([1, 8, 9, 10, 11, 12, 16, 20, 30].map(abilityScoreModifier)).toEqual([-5, -1, -1, 0, 0, 1, 3, 5, 10]);
     expect(statblockInitiativeModifier({ fields: { dex: '16' } }, { modifier: { field: 'dex', abilityScore: true } })).toBe(3);
-    expect(statblockInitiativeModifier({ fields: { dex: '+3' } }, { modifier: { field: 'dex', abilityScore: true } })).toBe(-4);
+    // A signed number is a modifier already, never a score of 3
+    expect(statblockInitiativeModifier({ fields: { dex: '+3' } }, { modifier: { field: 'dex', abilityScore: true } })).toBe(3);
+    expect(statblockInitiativeModifier({ fields: { dex: '16 (+3)' } }, { modifier: { field: 'dex', abilityScore: true } })).toBe(3);
   });
 
   it('reads the field the statblock\'s template means as initiative where none is chosen or the chosen one is missing', () => {
@@ -131,15 +133,33 @@ describe('reading the statblock modifiers of the combatants', () => {
 });
 
 describe('the fields offered for the initiative modifier', () => {
-  it('offers the templates\' initiative first, then their numbers, then the statblocks\' modifiers', async () => {
+  it('offers the templates\' initiative first, then their numbers, then the statblocks\' modifiers, each with what a statblock holds', async () => {
     const { initiativeFieldSuggestions } = await import('../../src/app/initiative/initiativeFieldSuggestions');
     const { BUILT_IN_TEMPLATES } = await import('../../src/app/statblocks/presets');
     const monster = BUILT_IN_TEMPLATES.find((t) => t.id === 'builtin:5e-2024-monster')!.template;
-    const offered = initiativeFieldSuggestions([monster], [{ init_bonus: '+2', name: 'Bandit', stats: [15, 16] }]);
+    const offered = initiativeFieldSuggestions([monster], [{ fields: { init_bonus: '+2', name: 'Bandit', stats: [15, 16] } }]);
     expect(offered[0]).toEqual({ path: 'initiative', label: 'Initiative' });
-    expect(offered.map((s) => s.path)).toContain('init_bonus');
-    expect(offered).toContainEqual({ path: 'stats.1', label: 'Dex' });
+    expect(offered).toContainEqual({ path: 'init_bonus', sample: '+2' });
+    // A score's slot is offered as a score, its sample the modifier it gives
+    expect(offered).toContainEqual({ path: 'stats.1', label: 'Dex', score: true, sample: '+3' });
     expect(offered.map((s) => s.path)).not.toContain('name');
     expect(new Set(offered.map((s) => s.path)).size).toBe(offered.length);
+  });
+
+  it('offers a field whatever its template\'s type where a statblock holds a modifier there, and not the entries inside it', async () => {
+    const { initiativeFieldSuggestions } = await import('../../src/app/initiative/initiativeFieldSuggestions');
+    const { labelsOf } = await import('../../src/app/initiative/modifierFields');
+    const fields = [{ key: 'perception', label: 'Perception', type: 'entries' as const }];
+    const template = { id: 'pf2e', fields } as unknown as Parameters<typeof initiativeFieldSuggestions>[0][number];
+    const goblin = { fields: { perception: [{ name: 'Perception', desc: 'Perception +5; darkvision' }] }, labels: labelsOf(fields) };
+    const offered = initiativeFieldSuggestions([template], [goblin]);
+    expect(offered).toEqual([{ path: 'perception', label: 'Perception', sample: '+5' }]);
+  });
+
+  it('offers the SRD\'s DEX as a score where Fantasy Statblocks\' statblocks keep the six scores', async () => {
+    const { initiativeFieldSuggestions } = await import('../../src/app/initiative/initiativeFieldSuggestions');
+    const offered = initiativeFieldSuggestions([], [{ fields: { name: 'Bandit Captain', stats: [15, 16, 14, 14, 11, 14], ac: 15 }, fantasy: true }]);
+    expect(offered).toContainEqual({ path: 'stats.1', label: 'Dex', score: true, sample: '+3' });
+    expect(offered.map((s) => s.path).filter((path) => path.startsWith('stats.'))).toEqual(['stats.1']);
   });
 });

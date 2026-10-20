@@ -31,6 +31,10 @@ const CAPTAIN = 'statblocks/Bandit Captain.md';
 const COMMONER = 'statblocks/Commoner.md';
 const WOLF = 'statblocks/Wolf.md';
 const SRD_CAPTAIN = 'statblocks/SRD Bandit Captain.md';
+// As Fantasy Statblocks' Pathfinder 2e import writes a creature into a note's properties
+const GOBLIN_PF2E = 'statblocks/Goblin Warrior.md';
+// A TTRPG CLI note: the statblock in a fence, the note's own properties beside it
+const GOBLIN_CLI = 'statblocks/Goblin.md';
 
 function setup(): { app: App; store: ViewAtlasStore } {
   const { app, files } = createInMemoryApp({ files: {
@@ -38,6 +42,10 @@ function setup(): { app: App; store: ViewAtlasStore } {
     [COMMONER]: '---\nstatblock: true\nname: Commoner\nhp: 4\n---\n',
     [WOLF]: '```statblock\ncreature: Wolf\n```\n',
     [SRD_CAPTAIN]: '```statblock\ncreature: Bandit Captain\n```\n',
+    [GOBLIN_PF2E]: '---\nstatblock: true\nlayout: Basic Pathfinder 2e Layout\nname: Goblin Warrior\nlevel: Creature -1\nmodifier: 5\n'
+      + 'perception:\n  - name: Perception\n    desc: "Perception +5; darkvision"\n---\n',
+    [GOBLIN_CLI]: '---\nstatblock: inline\ntags: [monster]\nstats: see below\n---\n'
+      + '```statblock\nname: Goblin\nstats: [8, 14, 10, 10, 8, 8]\n```\n',
   } });
   // The notes' properties, as Obsidian's metadata cache reads them
   app.metadataCache.getFileCache = (file) => ({ frontmatter: parseFrontmatter(files.get(file.path) ?? '') });
@@ -110,6 +118,49 @@ describe('rolling initiative with the statblocks\' modifiers', () => {
     expect(initiativeOf(store, wolf)).toBe(11);
     expect(initiativeOf(store, ownWolf)).toBe(14);
     expect(showNotice).toHaveBeenCalledWith(expect.stringMatching(/still reading the vault: 1 combatant rolled without its statblock/));
+  });
+
+  it('rolls with the Perception of a Fantasy Statblocks Pathfinder import, the field typed with a capital (Discord, 2026-10-16)', async () => {
+    rules.current = { mode: 'turn-order', roll: '1d20', firstSide: 'players', modifier: { field: 'Perception' } };
+    const { app, store } = setup();
+    let goblin = '';
+    act(() => { goblin = add(store, 'Goblin', GOBLIN_PF2E); });
+    show(app, store);
+
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Roll initiative' }));
+    await waitFor(() => expect(initiativeOf(store, goblin)).toBe(6));
+    expect(showNotice).not.toHaveBeenCalled();
+  });
+
+  it('rolls with the DEX of a fence statblock whose note holds other properties under the same keys', async () => {
+    rules.current = { mode: 'turn-order', roll: '1d20', firstSide: 'players', modifier: { field: 'stats.dex' } };
+    const { app, store } = setup();
+    let goblin = '';
+    act(() => { goblin = add(store, 'Goblin', GOBLIN_CLI); });
+    show(app, store);
+
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Roll initiative' }));
+    await waitFor(() => expect(initiativeOf(store, goblin)).toBe(3));
+  });
+
+  it('says how many combatants rolled without a modifier, which field it looked for and where to choose it', async () => {
+    rules.current = { mode: 'turn-order', roll: '1d20', firstSide: 'players', modifier: { field: 'perception' } };
+    const { app, store } = setup();
+    act(() => {
+      add(store, 'Captain', CAPTAIN);
+      add(store, 'Commoner', COMMONER);
+      add(store, 'Plain');
+    });
+    show(app, store);
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    fireEvent.click(screen.getByRole('button', { name: 'Roll initiative' }));
+    await waitFor(() => expect(showNotice).toHaveBeenCalledTimes(1));
+    expect(showNotice).toHaveBeenCalledWith(
+      '2 combatants rolled without a modifier: their statblocks have no number under "perception". Choose the field in Collection settings → Default Widgets',
+    );
   });
 
   it('rolls 1d20+3 for a 5e Bandit Captain of Fantasy Statblocks\' SRD (DEX 16) by the D&D 5e rules', async () => {

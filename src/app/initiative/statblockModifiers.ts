@@ -1,7 +1,7 @@
 /** Reading the initiative modifiers of the combatants from their linked statblocks before a roll. */
 
 import type { ModifierSources } from '../gameSystems/initiativeModifierSources';
-import type { StatblockFields } from '../resources/statblockResourceSync';
+import type { ModifierStatblock } from './modifierFields';
 import type { TokenEntity } from '../types';
 import type { InitiativeEntry } from '../types/initiativeTypes';
 import { statblockInitiativeModifier } from './initiativeModifier';
@@ -26,7 +26,7 @@ export async function readStatblockModifiers(
   entries: readonly InitiativeEntry[],
   tokens: Readonly<Record<string, TokenEntity>>,
   sources: ModifierSources,
-  read: (path: string) => Promise<StatblockFields | null>,
+  read: (path: string) => Promise<ModifierStatblock | null>,
 ): Promise<StatblockModifiers> {
   const notes = new Map(entries.flatMap((entry) => {
     const note = linkedNote(tokens[entry.tokenId]);

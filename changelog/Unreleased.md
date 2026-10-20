@@ -6,12 +6,16 @@
 - Recovery buttons: give a statblock template buttons such as Short rest and Long rest in the collection settings' Resources tab. Pick a value on the card and choose what each button does to it: back to full, back by a roll, half back, set to a number, or spent from something else, such as Hit Dice. The buttons sit on player characters' statblocks beside their notes and on their players' online sheets, and the GM approves a player's rest.
 - Statblock templates: a number can be tracked, such as Luck, Ki, Hit Dice or Inspiration. Choose Tracked in its Options: the note holds its maximum, or another number does (Hit Dice up to Level), and the card shows what is left, such as 2 / 3. Recovery buttons can give it back, the DM screen steps it, and players step it on their online sheet.
 - Online play: hand any item to your players, not only rolled ones. In a loot base, each item's name has a gift button. Its menu gives the item to one player or to all players at once, and sets how many copies, with − and + or by typing the number.
+- Damage or heal several tokens at once: with tokens selected, right-click one and choose Change HP of N tokens…, then type the change, such as -8 or +5. It applies to every selected token that has HP, and one undo takes it back.
 
 ## Improved
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
 - Online play: busy tables send far fewer messages. Cursors, lasers and measurements go out ten times a second and still move smoothly, and a changed quest or world map reaches players without their whole book being sent again.
 - Random tables: rename a table or remove it from the list from its menu (⋯ or right-click) in the Random tables window, and undo a removal from the message that follows. A new name shows only in Atlas and leaves the note as it is; you can also set it in the collection settings. A table whose note was deleted can now be removed too.
+- Type sums into a token's HP: -10-5 takes 15, -9/2 takes half of 9 rounded down, and -9*2 takes 18 (#495, #396).
+- Initiative modifiers are found more easily. The modifier field matches statblock fields in any capitalisation and by their name in the template, reads numbers written as +3, +3 (13), 16 (+3) or Perception +12, and reads statblocks from Fantasy Statblocks too: its own initiative modifier, a Pathfinder import's Perception and the six 5e scores (type dex). The field's suggestions show what a statblock holds, and the settings say how many statblocks the field reads a modifier from.
+- When a roll finds no modifier for some combatants, a notice says how many, which field was looked for and where to choose it.
 
 ## Fixed
 
@@ -27,3 +31,4 @@
 - Online play: the movement line of a dragged token shows for everyone at the table who sees the token, when the GM drags it and when a player does.
 - Statblocks from TTRPG Convert CLI import as tokens with their image. Atlas now reads image paths with encoded spaces, such as `/2.%20Mechanics/token.png`.
 - The grid settings set the unit of measurement where it applies, in the played campaign's game system too, and a collection's settings say when a played campaign's rules replace them.
+- A statblock in a note's statblock block now wins over the note's own properties of the same name when its values are read.

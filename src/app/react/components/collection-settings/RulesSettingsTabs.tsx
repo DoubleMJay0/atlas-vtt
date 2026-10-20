@@ -9,6 +9,7 @@ import type { SystemPresetService } from '../../../services/SystemPresetService'
 import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
 import type { SystemPreset } from '../../../types/systemPresetTypes';
 import type { FieldSuggestion } from '../../../resources/resourceFieldSuggestions';
+import type { NamedModifierStatblock } from '../../../initiative/modifierPreview';
 import type { DiceSets } from '../../hooks/useDiceSets';
 import { t } from '../../../i18n';
 import { ConditionsTab } from './ConditionsTab';
@@ -61,6 +62,8 @@ interface RulesSettingsTabsProps {
   fieldSuggestions: readonly FieldSuggestion[];
   /** The statblock fields the initiative modifier is offered (`initiativeFieldSuggestions`). */
   initiativeFieldSuggestions: readonly FieldSuggestion[];
+  /** The statblocks the initiative settings preview the modifier's field in. */
+  modifierStatblocks?: readonly NamedModifierStatblock[] | undefined;
   /** The content of a tab that is not one of the rules', such as a collection's loot. */
   renderOther?: (tab: SettingsTab) => React.ReactNode;
   /** A line above the rules' tabs (`RULES_TABS`), such as that a played campaign's rules apply in their place. */
@@ -75,7 +78,7 @@ interface RulesSettingsTabsProps {
  * kept; any other tab is the caller's (`renderOther`).
  */
 export function RulesSettingsTabs({
-  tabs, activeTab, onTabChange, draft, view, presets, diceSets, onDeletePreset, none, lightingOn, fieldSuggestions, initiativeFieldSuggestions, renderOther, rulesNotice,
+  tabs, activeTab, onTabChange, draft, view, presets, diceSets, onDeletePreset, none, lightingOn, fieldSuggestions, initiativeFieldSuggestions, modifierStatblocks, renderOther, rulesNotice,
   resourcesAside,
 }: RulesSettingsTabsProps): React.ReactElement {
   const shown = tabs.filter((tab) => tab !== 'vision' || lightingOn);
@@ -120,7 +123,7 @@ export function RulesSettingsTabs({
       case 'resources':
         return <ResourcesTab resources={draft.resources} onChange={draft.setResources} fieldSuggestions={fieldSuggestions} aside={resourcesAside} />;
       case 'initiative':
-        return <InitiativeFields initiative={view.initiative} onChange={initiativeEdit(draft, view)} fieldSuggestions={initiativeFieldSuggestions} />;
+        return <InitiativeFields initiative={view.initiative} onChange={initiativeEdit(draft, view)} fieldSuggestions={initiativeFieldSuggestions} modifierStatblocks={modifierStatblocks} />;
       default:
         return renderOther?.(activeTab);
     }
