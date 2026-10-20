@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import React from 'react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { createViewAtlasStore, type ViewAtlasStore } from '../../src/app/storeFactory';
 import { PartyReconciler } from '../../src/app/campaigns/partyValues/PartyReconciler';
 import { getHistoryStore } from '../../src/app/stores/history';
 import { selectionResources, selectionResourceUpdates } from '../../src/app/resources/selectionResourceChange';
 import { selectionResourceEntry, type OpenSelectionEditor } from '../../src/app/react/components/context-menu/selectionResourceMenu';
-import { openSelectionResourceEditor } from '../../src/app/pixi/selectionResourceEditor';
-import type { ContextMenuEntry } from '../../src/app/react/root/ContextMenuContext';
+import { SelectionResourceEditing } from '../../src/app/pixi/selectionResourceEditor';
+import { ContextMenuProvider, openContextMenuGlobal, type ContextMenuEntry } from '../../src/app/react/root/ContextMenuContext';
 import type { TokenInput } from '../../src/app/types/viewState';
 import { ARMOR, HP, STRESS } from '../mocks/resourceFixtures';
 
@@ -32,7 +34,19 @@ function choose(entry: ContextMenuEntry | null, name: string): void {
   void item.onClick();
 }
 
-afterEach(() => document.body.replaceChildren());
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
+});
 
 describe('one change for the resource of every selected token', () => {
   it('offers the resources the selection holds that change in play, with how many hold each', () => {
@@ -71,16 +85,29 @@ describe('one change for the resource of every selected token', () => {
     expect(several?.type === 'submenu' && several.children.map((child) => child.type === 'item' && child.label)).toEqual(['HP of 2 tokens', 'Stress of 1 token']);
   });
 
-  it('is one undo step for the whole selection, typed as a sum in its popover', () => {
+  it('is one undo step for the whole selection, typed as a sum in its popover, which takes focus from the menu', async () => {
     const { store, history } = scene();
     const [a, b] = store.getState().addTokens([creature(0, { hp: { current: 30, max: 30 } }), creature(70, { hp: { current: 12, max: 12 } })]);
     const canvas = document.body.createEl('canvas');
+    const editing = new SelectionResourceEditing(canvas);
     const steps = history.getState().pastStates.length;
     const entry = selectionResourceEntry(store, [a!, b!], DEFINITIONS, (definition, count, apply) => {
-      openSelectionResourceEditor({ anchorEl: canvas, at: { x: 10, y: 10 }, resourceName: definition.name, count, onCommit: apply });
+      editing.open({ at: { x: 10, y: 10 }, resourceName: definition.name, count, onCommit: apply });
     });
-    choose(entry, 'Change HP');
-    const input = document.querySelector<HTMLInputElement>('.atlas-token-value-editor__input')!;
+    render(<ContextMenuProvider><div /></ContextMenuProvider>);
+    act(() => openContextMenuGlobal([entry!], { x: 10, y: 10 }));
+    const item = await screen.findByRole('menuitem', { name: 'Change HP of 2 tokens…' });
+    act(() => { item.focus(); fireEvent.keyDown(item, { key: 'Enter' }); });
+
+    // The field keeps focus once the menu has let it go, so the change is typed at once
+    const input = await waitFor(() => {
+      const field = document.querySelector<HTMLInputElement>('.atlas-token-value-editor__input');
+      expect(field).not.toBeNull();
+      expect(document.activeElement).toBe(field);
+      return field!;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(input);
     const enter = (): void => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); };
 
     // A number alone would set every token to it: refused, the popover stays open
@@ -97,6 +124,23 @@ describe('one change for the resource of every selected token', () => {
 
     history.getState().undo();
     expect([hpOf(store, a!), hpOf(store, b!)]).toEqual([30, 12]);
+  });
+
+  it('opens in the document of the map it belongs to, and closes with the view', async () => {
+    const popout = document.implementation.createHTMLDocument('popout');
+    const canvas = popout.body.appendChild(popout.createElement('canvas'));
+    const editing = new SelectionResourceEditing(canvas);
+    editing.open({ at: { x: 0, y: 0 }, resourceName: 'HP', count: 3, onCommit: vi.fn() });
+    await waitFor(() => expect(popout.querySelector('.atlas-token-value-editor')).not.toBeNull());
+    expect(document.querySelector('.atlas-token-value-editor')).toBeNull();
+
+    editing.close();
+    expect(popout.querySelector('.atlas-token-value-editor')).toBeNull();
+    // Closed before it opened: it never opens
+    editing.open({ at: { x: 0, y: 0 }, resourceName: 'HP', count: 3, onCommit: vi.fn() });
+    editing.close();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(popout.querySelector('.atlas-token-value-editor')).toBeNull();
   });
 
   it('changes a player character\'s other tokens and the campaign\'s value with it, in the same step', () => {

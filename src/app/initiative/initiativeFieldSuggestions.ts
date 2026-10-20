@@ -11,7 +11,7 @@ import type { FieldSuggestion } from '../resources/resourceFieldSuggestions';
 import type { StatblockTemplate, TemplateField } from '../statblocks/model/templateTypes';
 import { t } from '../i18n';
 import { findModifierField, type ModifierStatblock } from './modifierFields';
-import { statblockModifierValue } from './modifierValue';
+import { holdsModifier, statblockModifierValue } from './modifierValue';
 
 /** Fantasy Statblocks' `stats` hold the six scores in order: DEX is the second. */
 const FANTASY_DEX = 'stats.1';
@@ -46,7 +46,11 @@ export function initiativeFieldSuggestions(
 
   fields.filter((field) => field.meaning === 'initiative').forEach(ofField);
   fields.filter((field) => field.type === 'number').forEach(ofField);
-  fields.filter((field) => field.type !== 'scores' && sampleAt(statblocks, field.key, false) !== undefined).forEach(ofField);
+  const holdsSomewhere = (field: TemplateField): boolean => statblocks.some((statblock) => {
+    const found = findModifierField(statblock, field.key);
+    return found !== undefined && holdsModifier(found.value);
+  });
+  fields.filter((field) => field.type !== 'scores' && holdsSomewhere(field)).forEach(ofField);
   const scores = new Set<string>();
   for (const field of fields) {
     if (field.type !== 'scores') continue;
@@ -59,7 +63,7 @@ export function initiativeFieldSuggestions(
   }
 
   // A field found holds what lies inside it: its entries and their texts are not offered again
-  const found = discoverFields(statblocks.map((statblock) => statblock.fields), (value) => statblockModifierValue(value) !== null);
+  const found = discoverFields(statblocks.map((statblock) => statblock.fields), holdsModifier);
   const within = (path: string, parent: string): boolean => path.startsWith(`${parent}.`);
   const kept: string[] = [];
   for (const path of found) {

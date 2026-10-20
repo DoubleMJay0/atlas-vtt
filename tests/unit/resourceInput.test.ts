@@ -54,6 +54,13 @@ describe('a typed resource value', () => {
     }
   });
 
+  it('takes a change of one number however large, as before sums were read', () => {
+    expect(applyResourceInput('-12000', { current: 50000, max: 50000 })).toEqual({ current: 38000, max: 50000 });
+    expect(applyResourceInput('+15000', { current: 0, max: 50000 })).toEqual({ current: 15000, max: 50000 });
+    expect(parseResourceInput('-0')).toEqual({ relative: true, amount: 0 });
+    expect(parseResourceInput('+99999999999999999999')).toBeNull();
+  });
+
   it('reads a number to set apart from an amount to add', () => {
     expect(parseResourceInput('12')).toEqual({ relative: false, value: 12 });
     expect(parseResourceInput('-12')).toEqual({ relative: true, amount: -12 });

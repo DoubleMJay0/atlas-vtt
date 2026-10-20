@@ -15,6 +15,8 @@ export type ResourceInput = { readonly relative: false; readonly value: number }
 const SIGNS: Readonly<Record<string, string>> = { '−': '-', '–': '-', '×': '*', '÷': '/' };
 
 const PLAIN_NUMBER = /^\d+$/;
+/** A change of one number (`-12000`): read whole, as the formula grammar caps its constants at four digits. */
+const PLAIN_CHANGE = /^[+-]\d+$/;
 
 /**
  * Reads a typed value; null where it is none. A number alone sets the value; a change starts with
@@ -27,6 +29,10 @@ export function parseResourceInput(raw: string): ResourceInput | null {
   if (PLAIN_NUMBER.test(text)) {
     const value = Number(text);
     return Number.isSafeInteger(value) ? { relative: false, value } : null;
+  }
+  if (PLAIN_CHANGE.test(text)) {
+    const amount = Number(text);
+    return Number.isSafeInteger(amount) ? { relative: true, amount: amount === 0 ? 0 : amount } : null;
   }
   if (!text.startsWith('+') && !text.startsWith('-')) return null;
   const parsed = parseFormula(text);

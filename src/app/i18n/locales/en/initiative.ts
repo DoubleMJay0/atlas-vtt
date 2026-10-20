@@ -25,6 +25,10 @@ export const initiative = {
     one: '{count} combatant rolled without a modifier: its statblock has no number under "{field}". Choose the field in Collection settings → Default Widgets',
     other: '{count} combatants rolled without a modifier: their statblocks have no number under "{field}". Choose the field in Collection settings → Default Widgets',
   },
+  'initiative.modifierMissingCampaign': {
+    one: '{count} combatant rolled without a modifier: its statblock has no number under "{field}". The campaign {campaign} sets the rules: choose the field in its Game System → Initiative',
+    other: '{count} combatants rolled without a modifier: their statblocks have no number under "{field}". The campaign {campaign} sets the rules: choose the field in its Game System → Initiative',
+  },
   'initiative.modifierPlaceholder': 'e.g. initiative',
   'initiative.modifierReadError': 'The combatants\' statblocks could not be read, so nothing was rolled',
   'initiative.remove': 'Remove from Initiative',

@@ -41,7 +41,7 @@ import { tokenLightingEntries } from '../../react/components/context-menu/tokenL
 import { mapLightPresets } from '../../services/mapCollectionRules';
 import { conditionsSubmenu } from '../../react/components/context-menu/conditionsMenu';
 import { selectionResourceEntry } from '../../react/components/context-menu/selectionResourceMenu';
-import { openSelectionResourceEditor } from '../selectionResourceEditor';
+import { SelectionResourceEditing } from '../selectionResourceEditor';
 import { placedPlayerCharacterEntry } from '../../react/components/context-menu/playerCharacterMenu';
 import { holdTokens } from '../../lighting/sightOnDrop';
 import { t } from '../../i18n';
@@ -102,6 +102,8 @@ export class InteractionController implements ITokenInteractionController {
   private dragRuler?: DragRuler;
   /** Where a lost pointer is heard while the pointer is down (`watchLostPointer`). */
   private lostPointerTargets: { canvas: HTMLElement; win: Window | null } | null = null;
+  /** The popover of a change for the selection's tokens, made with the first one (`selectionResourceEntry`). */
+  private selectionEditing: SelectionResourceEditing | null = null;
 
   constructor(
     viewport: Viewport,
@@ -726,10 +728,8 @@ export class InteractionController implements ITokenInteractionController {
     const selectionChange = this.isPlayerView ? null : selectionResourceEntry(
       this.store, this.contextMenuTargets(token.id), this.resourceDefsProvider(),
       (definition, count, apply) => {
-        openSelectionResourceEditor({
-          anchorEl: this.viewport.options.events.domElement, at: { x: e.clientX, y: e.clientY },
-          resourceName: definition.name, count, onCommit: apply,
-        });
+        this.selectionEditing ??= new SelectionResourceEditing(this.viewport.options.events.domElement);
+        this.selectionEditing.open({ at: { x: e.clientX, y: e.clientY }, resourceName: definition.name, count, onCommit: apply });
       },
     );
     if (selectionChange) entries.push(selectionChange);
@@ -873,6 +873,7 @@ export class InteractionController implements ITokenInteractionController {
     if (this.dragState.hasMoved) endHistoryTransaction(this.store);
     holdTokens(this.store, []);
     this.dragRuler?.end();
+    this.selectionEditing?.close();
 
     // Remove any active viewport listeners using the same cleanup method
     this.cleanupDragListeners();

@@ -100,9 +100,9 @@ describe('initiative read from the statblocks users brought (Discord, 2026-10-15
   it('reads a fence\'s own values over the note\'s properties, and a frontmatter statblock\'s properties over the bestiary\'s copy', () => {
     const fields = { name: 'Goblin', level: 'Creature -1', perception: '+5' };
     const frontmatter = { level: 3, perception: 'see body', tags: ['monster'] };
-    expect(recordOf({ fields, source: { kind: 'fs-fence', params: {} } }, frontmatter)).toEqual({ ...fields, tags: ['monster'] });
-    expect(recordOf({ fields, source: { kind: 'fs-frontmatter' } }, frontmatter)).toEqual({ name: 'Goblin', ...frontmatter });
-    expect(recordOf(null, frontmatter)).toEqual(frontmatter);
+    expect(recordOf(fields, frontmatter, true)).toEqual({ ...fields, tags: ['monster'] });
+    expect(recordOf(fields, frontmatter, false)).toEqual({ name: 'Goblin', ...frontmatter });
+    expect(recordOf(undefined, frontmatter, false)).toEqual(frontmatter);
   });
 });
 

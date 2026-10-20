@@ -57,9 +57,10 @@ export function openResourceEditor({ anchorEl, anchor, value, resourceLabel, onC
         },
         isDirty: () => currentInput.value !== String(value.current) || maxInput.value !== String(value.max),
         onKey: (e) => {
-          if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.target instanceof HTMLInputElement) {
+          const input = [currentInput, maxInput].find((field) => field === e.target);
+          if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && input) {
             e.preventDefault();
-            stepInput(e.target, (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
+            stepInput(input, (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
           }
         },
       };

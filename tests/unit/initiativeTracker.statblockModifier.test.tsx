@@ -11,6 +11,8 @@ vi.mock('../../src/app/initiative/useMapInitiativeRules', () => ({ useMapInitiat
 const showNotice = vi.hoisted(() => vi.fn());
 vi.mock('../../src/app/ui/notice', () => ({ showNotice }));
 vi.mock('../../src/app/resources/useMapResources', () => ({ useMapResources: () => [] }));
+const played = vi.hoisted(() => ({ campaign: null as { campaign: { name: string } } | null }));
+vi.mock('../../src/app/campaigns/usePlayedSystemCampaign', () => ({ usePlayedSystemCampaign: () => played.campaign }));
 vi.mock('../../src/app/pixi/utils/tokenHighlight', () => ({ zoomToTokenWithHighlight: vi.fn() }));
 vi.mock('../../src/app/react/components/StatblockHoverPreview', () => ({
   StatblockHoverPreview: () => null,
@@ -76,6 +78,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   rules.current = { mode: 'turn-order', roll: '1d20', firstSide: 'players', modifier: { field: 'initiative' } };
   showNotice.mockClear();
+  played.campaign = null;
   delete (window as Window & { FantasyStatblocks?: unknown }).FantasyStatblocks;
 });
 
@@ -152,6 +155,8 @@ describe('rolling initiative with the statblocks\' modifiers', () => {
       add(store, 'Captain', CAPTAIN);
       add(store, 'Commoner', COMMONER);
       add(store, 'Plain');
+      // A note that is gone holds no number under any field: it is no setup mistake and is not counted
+      add(store, 'Lost', 'statblocks/Deleted.md');
     });
     show(app, store);
 
@@ -160,6 +165,20 @@ describe('rolling initiative with the statblocks\' modifiers', () => {
     await waitFor(() => expect(showNotice).toHaveBeenCalledTimes(1));
     expect(showNotice).toHaveBeenCalledWith(
       '2 combatants rolled without a modifier: their statblocks have no number under "perception". Choose the field in Collection settings → Default Widgets',
+    );
+  });
+
+  it('points to the played campaign\'s game system where its rules apply', async () => {
+    rules.current = { mode: 'turn-order', roll: '1d20', firstSide: 'players', modifier: { field: 'perception' } };
+    played.campaign = { campaign: { name: 'Blue Mouth Caves' } };
+    const { app, store } = setup();
+    act(() => { add(store, 'Commoner', COMMONER); });
+    show(app, store);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll initiative' }));
+    await waitFor(() => expect(showNotice).toHaveBeenCalledTimes(1));
+    expect(showNotice).toHaveBeenCalledWith(
+      '1 combatant rolled without a modifier: its statblock has no number under "perception". The campaign Blue Mouth Caves sets the rules: choose the field in its Game System → Initiative',
     );
   });
 

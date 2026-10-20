@@ -113,7 +113,8 @@ describe('reading the statblock modifiers of the combatants', () => {
     const result = await readStatblockModifiers([entry('a'), entry('b'), entry('c'), entry('d')], tokens, { modifier: { field: 'initiative' } }, read);
     expect(read).toHaveBeenCalledTimes(2);
     expect([...result.modifiers]).toEqual([['a', 5], ['b', 5]]);
-    expect(result.unread).toEqual(['c']);
+    expect(result.without).toEqual(['c']);
+    expect(result.unread).toEqual([]);
   });
 
   it('counts a note that cannot be read as giving no modifier', async () => {
@@ -121,6 +122,7 @@ describe('reading the statblock modifiers of the combatants', () => {
     const result = await readStatblockModifiers([entry('a')], { a: token('a', 'x.md') }, {}, read);
     expect(result.modifiers.size).toBe(0);
     expect(result.unread).toEqual(['a']);
+    expect(result.without).toEqual([]);
   });
 
   it('reads nothing for entries without a linked statblock', async () => {
@@ -154,6 +156,17 @@ describe('the fields offered for the initiative modifier', () => {
     const goblin = { fields: { perception: [{ name: 'Perception', desc: 'Perception +5; darkvision' }] }, labels: labelsOf(fields) };
     const offered = initiativeFieldSuggestions([template], [goblin]);
     expect(offered).toEqual([{ path: 'perception', label: 'Perception', sample: '+5' }]);
+  });
+
+  it('offers no field of prose that starts with a number, such as a speed or hit points with their dice', async () => {
+    const { initiativeFieldSuggestions } = await import('../../src/app/initiative/initiativeFieldSuggestions');
+    const { holdsModifier } = await import('../../src/app/initiative/modifierValue');
+    const offered = initiativeFieldSuggestions([], [{ fields: {
+      speed: '30 ft.', hp: '45 (6d10+12)', initiative: '+2', dex: '14 (+2)', perception: [{ name: 'Perception', desc: 'Perception +5' }], ac: 15, notes: 'Initiative: 3',
+    } }]);
+    expect(offered.map((s) => s.path)).toEqual(['ac', 'dex', 'initiative', 'notes', 'perception']);
+    expect(['10 ft.', '45 (6d10+12)', [{ desc: '10 ft.' }]].map(holdsModifier)).toEqual([false, false, false]);
+    expect(['+3', '3', 3, '16 (+3)', 'Perception +12; darkvision', [{ desc: '+4' }]].map(holdsModifier)).toEqual([true, true, true, true, true, true]);
   });
 
   it('offers the SRD\'s DEX as a score where Fantasy Statblocks\' statblocks keep the six scores', async () => {

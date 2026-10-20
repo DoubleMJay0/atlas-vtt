@@ -8,7 +8,7 @@ import { TFile, type App } from 'obsidian';
 import { boundedFields } from '../../creatures/statblockValues';
 import { labelsOf, type FieldLabels } from '../../initiative/modifierFields';
 import { isBestiaryResolved } from '../../services/FantasyStatblocksService';
-import type { ResolvedStatblock } from '../model/resolvedTypes';
+import { statblockSourceOf } from '../notes/statblockSource';
 import { NO_MEANINGS, type FieldMeanings } from './fieldMeanings';
 import { readStatblock } from './readStatblock';
 
@@ -26,13 +26,14 @@ export interface StatblockRecord {
 const NO_LABELS: FieldLabels = Object.freeze({});
 
 /**
- * The fields and the note's frontmatter as one record. A fence's statblock is its YAML, and the
- * frontmatter around it is the note's (aliases, tags, a `level` of its own): the statblock wins
- * every key both hold. Frontmatter statblocks are the frontmatter, which the bestiary's copy may
- * lag behind: there the frontmatter wins.
+ * The fields and the note's frontmatter as one record. Where the note holds a fence (`inFence`),
+ * its statblock is the fence's YAML, and the frontmatter around it is the note's (aliases, tags, a
+ * `level` of its own): the statblock wins every key both hold. Anywhere else the frontmatter wins:
+ * a frontmatter statblock is the frontmatter, which the bestiary's copy may lag behind, and a note
+ * that holds no statblock but shares a bestiary creature's name keeps its own values.
  */
-export function recordOf(statblock: Pick<ResolvedStatblock, 'fields' | 'source'> | null, frontmatter: Record<string, unknown> | undefined): Record<string, unknown> {
-  return statblock?.source.kind === 'fs-fence' ? { ...frontmatter, ...statblock.fields } : { ...statblock?.fields, ...frontmatter };
+export function recordOf(fields: Readonly<Record<string, unknown>> | undefined, frontmatter: Record<string, unknown> | undefined, inFence: boolean): Record<string, unknown> {
+  return inFence ? { ...frontmatter, ...fields } : { ...fields, ...frontmatter };
 }
 
 /**
@@ -51,8 +52,10 @@ export async function readStatblockRecord(app: App, statblockPath: string, whole
   const statblock = await readStatblock(app, statblockPath);
   if (!frontmatter && !statblock) return null;
   if (wholeOnly && parsing && (!statblock || statblock.fields.extends !== undefined)) return null;
+  // The resolver names a creature found by the note's name a fence too: only the note itself says whether it holds one
+  const inFence = statblock?.source.kind === 'fs-fence' && (await statblockSourceOf(app, file))?.kind === 'fs-fence';
   return {
-    record: recordOf(statblock, frontmatter),
+    record: recordOf(statblock?.fields, frontmatter, inFence),
     meanings: statblock?.meanings ?? NO_MEANINGS,
     labels: statblock?.template && statblock.source.kind === 'atlas' ? labelsOf(statblock.template.fields) : NO_LABELS,
     fantasy: statblock !== null && statblock.source.kind !== 'atlas',

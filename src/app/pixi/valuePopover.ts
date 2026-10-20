@@ -43,8 +43,13 @@ export interface ValuePopover {
 const POPOVER_GAP = 6;
 const VIEWPORT_MARGIN = 8;
 
+/**
+ * Opens the popover in the anchor's own window (a map in a popout has its own document), and
+ * closes it when its content commits, Escape is pressed or `close` is called.
+ */
 export function openValuePopover({ anchorEl, anchor, label, className, build, onClose }: ValuePopoverOptions): ValuePopover {
-  const root = document.body.createDiv({
+  const { doc, win } = anchorEl;
+  const root = doc.body.createDiv({
     cls: ['atlas-vtt-plugin', 'atlas-token-value-editor', ...(className ? [className] : [])],
     attr: { role: 'dialog', 'aria-label': label },
   });
@@ -53,7 +58,7 @@ export function openValuePopover({ anchorEl, anchor, label, className, build, on
   const close = (): void => {
     if (closed) return;
     closed = true;
-    document.removeEventListener('pointerdown', onOutsidePointerDown, true);
+    doc.removeEventListener('pointerdown', onOutsidePointerDown, true);
     root.remove();
     onClose();
   };
@@ -63,7 +68,7 @@ export function openValuePopover({ anchorEl, anchor, label, className, build, on
     if (root.contains(e.target as Node)) return;
     if (!content.isDirty() || !content.commit()) close();
   };
-  document.addEventListener('pointerdown', onOutsidePointerDown, true);
+  doc.addEventListener('pointerdown', onOutsidePointerDown, true);
 
   root.addEventListener('keydown', (e) => {
     e.stopPropagation();
@@ -80,9 +85,9 @@ export function openValuePopover({ anchorEl, anchor, label, className, build, on
   const reposition = (next: BarAnchor): void => {
     const rect = anchorEl.getBoundingClientRect();
     const halfWidth = root.offsetWidth / 2;
-    const x = Math.min(Math.max(rect.left + next.x, VIEWPORT_MARGIN + halfWidth), window.innerWidth - VIEWPORT_MARGIN - halfWidth);
+    const x = Math.min(Math.max(rect.left + next.x, VIEWPORT_MARGIN + halfWidth), win.innerWidth - VIEWPORT_MARGIN - halfWidth);
     const below = rect.top + next.bottom + POPOVER_GAP;
-    const fitsBelow = below + root.offsetHeight <= window.innerHeight - VIEWPORT_MARGIN;
+    const fitsBelow = below + root.offsetHeight <= win.innerHeight - VIEWPORT_MARGIN;
     root.style.left = `${x}px`;
     root.style.top = `${fitsBelow ? below : rect.top + next.top - POPOVER_GAP - root.offsetHeight}px`;
   };
