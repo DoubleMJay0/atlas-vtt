@@ -1,0 +1,194 @@
+@use '../../../../../../styles/tokens' as *;
+@use '../../../../../../styles/mixins' as *;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Encounter builder: the DM screen's statblock feeds over the asset manager,
+// a search bar above them and the encounter's tray below, all floating on the
+// blurred backdrop without a window of their own.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.atlas-encounter-builder {
+  @include atlas-modal-overlay($z-atlas-modal);
+}
+
+.atlas-encounter-builder__window {
+  // Anchors the dice rolls (`.atlas-sb-pane-rolls`), which hang from its top right.
+  position: relative;
+  @include atlas-flex-col($spacing-m);
+  width: 100%;
+  height: 100%;
+  // Four feeds at their widest (dm-screen/feedLayout.ts).
+  max-width: calc(4 * 540px + 3 * 12px);
+  outline: none;
+}
+
+// The bar and the tray are the floating surfaces; the space between them is the backdrop's.
+.atlas-encounter-builder__bar,
+.atlas-encounter-tray {
+  @include atlas-elevated-surface;
+  @include atlas-panel-radius($radius-2xl);
+  padding: $spacing-s;
+  gap: $spacing-s;
+}
+
+.atlas-encounter-builder__bar {
+  // Anchors the filter panel (`_filter-search.scss`).
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+
+  .atlas-asset-manager-search {
+    width: min(420px, 50%);
+  }
+}
+
+.atlas-encounter-builder__title {
+  flex: 1;
+  margin: 0;
+  padding-inline-start: $spacing-s;
+  font-size: $font-ui-medium;
+  font-weight: var(--font-semibold);
+}
+
+.atlas-encounter-builder__feed {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.atlas-encounter-builder__notice {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: $font-ui-small;
+  text-align: center;
+}
+
+// ── A creature in the feed: its control above its statblock ──────────────────
+
+.atlas-encounter-card {
+  @include atlas-flex-col($spacing-xs);
+}
+
+.atlas-encounter-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.atlas-encounter-card__add svg {
+  width: $icon-s;
+  height: $icon-s;
+}
+
+.atlas-encounter-card[data-picked='true'] .atlas-encounter-stepper {
+  @include atlas-elevated-surface;
+}
+
+// ── Count stepper ──────────────────────────────────────────────────────────
+
+.atlas-encounter-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-xs;
+  border-radius: $radius-full;
+}
+
+.atlas-encounter-stepper__count {
+  min-width: 2ch;
+  font-size: $font-ui-small;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.atlas-encounter-stepper__button.btn {
+  width: 24px;
+  height: 24px;
+  border-radius: $radius-full;
+
+  svg {
+    width: $icon-s;
+    height: $icon-s;
+  }
+}
+
+// ── Tray ────────────────────────────────────────────────────────────────────
+
+.atlas-encounter-tray {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.atlas-encounter-tray__empty {
+  flex: 1;
+  margin: 0;
+  padding-inline-start: $spacing-s;
+  color: var(--text-muted);
+  font-size: $font-ui-small;
+}
+
+.atlas-encounter-tray__picks {
+  display: flex;
+  flex: 1;
+  gap: $spacing-s;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.atlas-encounter-tray__pick {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: $spacing-xs;
+  padding: $spacing-xs;
+  border-radius: $radius-full;
+  background: var(--background-modifier-hover);
+}
+
+.atlas-encounter-tray__portrait {
+  width: 28px;
+  height: 28px;
+}
+
+.atlas-encounter-tray__name {
+  max-width: 14em;
+  overflow: hidden;
+  font-size: $font-ui-small;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-encounter-tray__summary {
+  @include atlas-flex-row($spacing-s);
+  margin-inline-start: auto;
+}
+
+.atlas-encounter-tray__count,
+.atlas-encounter-tray__metric {
+  font-size: $font-ui-small;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.atlas-encounter-tray__metric {
+  display: inline-flex;
+  gap: $spacing-xs;
+  border-radius: $radius-s;
+}
+
+.atlas-encounter-tray__metric-label {
+  color: var(--text-muted);
+}
+
+.atlas-encounter-tray__actions {
+  @include atlas-flex-row($spacing-s);
+}

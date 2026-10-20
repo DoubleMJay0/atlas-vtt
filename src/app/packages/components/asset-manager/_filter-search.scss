@@ -146,7 +146,7 @@
 
 // ── Filter panel: under the header, at its end ─────────────────────────────
 
-.atlas-asset-manager-header .atlas-filter-panel {
+:is(.atlas-asset-manager-header, .atlas-encounter-builder__bar) .atlas-filter-panel {
   position: absolute;
   top: calc(100% + #{$spacing-xs});
   right: $spacing-m;
