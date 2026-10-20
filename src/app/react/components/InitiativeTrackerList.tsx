@@ -1,58 +1,50 @@
 import React, { useId } from 'react';
-import { SIDE_LABELS, sideOf, sidesInOrder } from '../../initiative/sides';
-import type { TokenEntity } from '../../types';
+import { SIDE_LABELS } from '../../initiative/sides';
+import type { ListSegment } from '../../initiative/listSegments';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
-import type { InitiativeSide } from '../../types/initiativeRulesTypes';
 import { t } from '../../i18n';
 
 interface InitiativeTrackerListProps {
-  /** Every combatant in turn order. */
-  entries: readonly InitiativeEntry[];
-  tokens: Readonly<Record<string, TokenEntity>>;
-  bySides: boolean;
-  firstSide: InitiativeSide;
-  /** The side whose turn it is in a fight by sides. */
-  activeSide: InitiativeSide | undefined;
-  /** Draws a card; `index` is its place among all combatants, which is what a drag reorders. */
-  card: (entry: InitiativeEntry, index: number) => React.ReactElement;
+  /** The list as it is drawn (`listSegments`). */
+  segments: readonly ListSegment<InitiativeEntry>[];
+  /** Draws a card. */
+  card: (entry: InitiativeEntry) => React.ReactElement;
 }
 
 /**
  * The tracker's combatants: under their side in a fight by sides, else in turn order, with
- * those that delayed their turn waiting below the order until they act.
+ * those that delayed their turn waiting below the order until they act. Where the list runs on
+ * into the next round a divider names it. The cards of the order are siblings, so the turn and the
+ * next ones can be scrolled into view together (`scrollWithin`).
  */
-export const InitiativeTrackerList: React.FC<InitiativeTrackerListProps> = ({ entries, tokens, bySides, firstSide, activeSide, card }) => {
+export const InitiativeTrackerList: React.FC<InitiativeTrackerListProps> = ({ segments, card }) => {
   const labelId = useId();
-  const placed = entries.map((entry, index) => ({ entry, index }));
 
-  if (bySides) {
-    return (
-      <>
-        {sidesInOrder(firstSide).map((side) => (
-          <section
-            key={side}
-            className={`atlas-initiative-side ${activeSide === side ? 'atlas-initiative-side--active' : ''}`}
-            aria-labelledby={`${labelId}-${side}`}
-            aria-current={activeSide === side || undefined}
-          >
-            <h4 id={`${labelId}-${side}`} className="atlas-initiative-side__label">{SIDE_LABELS[side]}</h4>
-            {placed.map(({ entry, index }) => sideOf(tokens[entry.tokenId]) === side && card(entry, index))}
-          </section>
-        ))}
-      </>
-    );
-  }
-
-  const delayed = placed.filter(({ entry }) => entry.delayed);
   return (
     <>
-      {placed.map(({ entry, index }) => !entry.delayed && card(entry, index))}
-      {delayed.length > 0 && (
-        <section className="atlas-initiative-side atlas-initiative-side--delayed" aria-labelledby={`${labelId}-delayed`}>
-          <h4 id={`${labelId}-delayed`} className="atlas-initiative-side__label">{t('initiative.delayed')}</h4>
-          {delayed.map(({ entry, index }) => card(entry, index))}
-        </section>
-      )}
+      {segments.map((segment) => {
+        if (segment.kind === 'round') {
+          const label = t('initiative.nextRound', { round: segment.round });
+          return (
+            <div key="round" className="atlas-initiative-round" role="separator" aria-label={label}>
+              <span className="atlas-initiative-round__label" aria-hidden="true">{label}</span>
+            </div>
+          );
+        }
+        const label = segment.side ? SIDE_LABELS[segment.side] : segment.delayed ? t('initiative.delayed') : null;
+        if (label === null) return <React.Fragment key={segment.key}>{segment.items.map(card)}</React.Fragment>;
+        const classes = [
+          'atlas-initiative-side',
+          segment.active && 'atlas-initiative-side--active',
+          segment.delayed && 'atlas-initiative-side--delayed',
+        ].filter(Boolean).join(' ');
+        return (
+          <section key={segment.key} className={classes} aria-labelledby={`${labelId}-${segment.key}`} aria-current={segment.active || undefined}>
+            <h4 id={`${labelId}-${segment.key}`} className="atlas-initiative-side__label">{label}</h4>
+            {segment.items.map(card)}
+          </section>
+        );
+      })}
     </>
   );
 };

@@ -24,6 +24,12 @@
   font-variant-numeric: tabular-nums;
   -webkit-app-region: no-drag;
 
+  // The GM docked the lists at the left edge
+  &--left {
+    right: auto;
+    left: $spacing-m;
+  }
+
   &__list {
     display: flex;
     flex-direction: column;
@@ -38,6 +44,28 @@
     display: flex;
     flex-direction: column;
     gap: $spacing-s;
+  }
+
+  // Where the list runs on into the next round: the round's name between two hairlines
+  &__next-round {
+    display: flex;
+    align-items: center;
+    gap: $spacing-xs;
+    color: var(--text-muted);
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--background-modifier-border);
+    }
+  }
+
+  &__next-round-label {
+    font-size: $font-ui-smaller;
+    font-weight: $font-weight-semibold;
+    white-space: nowrap;
   }
 
   &__side-label {
@@ -58,9 +86,11 @@
   }
 
   &__card {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
+    flex-shrink: 0;
     gap: $spacing-s;
     padding: $spacing-s;
     background: var(--background-modifier-hover);
@@ -89,7 +119,6 @@
 
     // Defeated, as the GM's card shows it: dimmed, with the skull over the portrait
     &--defeated {
-      position: relative;
       opacity: 0.45;
       filter: grayscale(70%);
     }
@@ -165,6 +194,19 @@
     width: 100%;
     height: $spacing-xs;
     accent-color: var(--color-green);
+  }
+
+  // The conditions the map shows players on the token, as the GM's card draws them
+  &__conditions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: $spacing-xs;
+    width: 100%;
+  }
+
+  &__condition {
+    display: flex;
   }
 
   &__round {

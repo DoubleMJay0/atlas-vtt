@@ -41,7 +41,10 @@ vi.mock('../../src/app/react/root/AtlasUIContext', async () => ({
   useAtlasUI: () => ({ app: null, view: { renderer: { canvasShowsToken: (id: string) => canvas.shows(id), getViewportInstance: () => null } } }),
 }));
 vi.mock('../../src/app/keyboard/useMapHotkeys', () => ({
-  useAtlasSettings: () => ({ showsInitiativeNames: () => settings.names, setInitiativeNames: settings.setInitiativeNames }),
+  useAtlasSettings: () => ({
+    showsInitiativeNames: () => settings.names, setInitiativeNames: settings.setInitiativeNames,
+    initiativeLayout: () => ({ fromTurn: false, dock: 'right', collapsed: false }), setInitiativeLayout: vi.fn(),
+  }),
 }));
 vi.mock('../../src/app/react/ViewStoreContext', () => ({
   useAtlasStore: (selector: (storeState: typeof state) => unknown) => selector(state),
