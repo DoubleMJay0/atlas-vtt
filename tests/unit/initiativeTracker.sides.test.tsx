@@ -287,3 +287,46 @@ describe('a fight in turn order', () => {
     expect(state.previousTurn).toHaveBeenCalledWith(new Set(['entry-rat']));
   });
 });
+
+describe('the initiative tracker of a collection whose sides roll for their order', () => {
+  it('heads each side with its roll, the highest first, and marks sides with equal rolls together', () => {
+    collection.rules = { mode: 'sides', roll: '1d20', firstSide: 'players', sides: [{ id: 'players' }, { id: 'side-allies', name: 'Allies' }, { id: 'opponents' }], sideRoll: '1d6' };
+    scene({
+      isActive: true, round: 2,
+      sides: { first: 'players', active: 'opponents', order: collection.rules.sides!, roll: '1d6', rolls: { 2: { players: 3, 'side-allies': 6, opponents: 6 } } },
+    });
+    state.objects.tokens.rat = token('rat', { side: 'side-allies' });
+    const { container } = render(<InitiativeTracker />);
+    expect(groups(container)).toEqual([
+      { label: 'Allies6', cards: 1, active: true },
+      { label: 'Opponents6', cards: 1, active: true },
+      { label: 'Players3', cards: 2, active: false },
+    ]);
+    expect(menuOf(container, 0)).not.toContain('Move to Players');
+    expect(opened.entries.some((entry) => entry.type === 'submenu' && entry.label === 'Move to Side')).toBe(true);
+  });
+});
+
+describe('the initiative tracker of a collection that deals cards', () => {
+  beforeEach(() => { collection.rules = { mode: 'cards', roll: '1d20', firstSide: 'players', deck: 3 }; });
+
+  it('shows the card dealt where the number stands, and has nothing to roll', () => {
+    scene({ isActive: true, round: 1, cards: { deck: 3 } });
+    state.initiative.entries[0] = entryOf('goblin', 0, { card: 2 });
+    const { container } = render(<InitiativeTracker />);
+    expect([...container.querySelectorAll('.atlas-initiative-card__dealt')].map((card) => card.firstChild?.textContent)).toEqual(['2', '–', '–', '–']);
+    expect(container.querySelector('.atlas-initiative-card__initiative')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Roll initiative' })).toBeNull();
+  });
+
+  it('starts no fight while the deck has too few cards for the combatants', () => {
+    render(<InitiativeTracker />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
+    expect(state.startCombat).not.toHaveBeenCalled();
+
+    collection.rules = { ...collection.rules, deck: 4 };
+    render(<InitiativeTracker />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Start combat' }).at(-1)!);
+    expect(state.startCombat).toHaveBeenCalledWith(collection.rules, new Set());
+  });
+});

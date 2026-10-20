@@ -2,7 +2,7 @@ import { mapResources } from '../resources/collectionResources';
 import { rulesLookup } from './mapRules';
 import type { App } from 'obsidian';
 import type { ViewAtlasState } from '../storeFactory';
-import { entryTokenOf, listedForPlayers, playerInitiativeList, renderPlayerInitiative, type EntryToken } from './playerInitiativeList';
+import { entryTokenOf, listedForPlayers, playerInitiativeList, renderPlayerInitiative, sideIdsOf, type EntryToken } from './playerInitiativeList';
 import { mapInitiativeRules } from './mapInitiativeRules';
 import { PlayerSceneOverlay, type PlayerSettings } from './PlayerSceneOverlay';
 import type { SettingsService } from './SettingsService';
@@ -38,7 +38,9 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       .filter((entry) => listedForPlayers(tokens?.[entry.tokenId]))
       .map((entry) => entry.tokenId)
       .join(TOKEN_ID_SEPARATOR);
-    const entryTokens = JSON.stringify(entries.map((entry): EntryToken => entryTokenOf(tokens?.[entry.tokenId], definitions)));
+    // A token's side counts where the fight or the rules know it
+    const sides = entries.length > 0 && initiative ? sideIdsOf(initiative, mapInitiativeRules(this.app, mapPath ?? null)) : undefined;
+    const entryTokens = JSON.stringify(entries.map((entry): EntryToken => entryTokenOf(tokens?.[entry.tokenId], definitions, sides)));
     return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, tokens: entryTokens };
   }
 

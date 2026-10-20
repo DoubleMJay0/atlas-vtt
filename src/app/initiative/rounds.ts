@@ -50,3 +50,12 @@ export function actsInTurn(entry: InitiativeEntry, defeated: ReadonlySet<string>
 export function canStillAct(entry: InitiativeEntry, defeated: ReadonlySet<string>): boolean {
   return !defeated.has(entry.id) && !entry.delayed;
 }
+
+/**
+ * What else a fight does where a round begins or is stepped back into, after the round's number
+ * and marks changed (a fight by cards deals or takes its kept cards up again).
+ */
+export interface RoundChanges {
+  began(initiative: InitiativeState): void;
+  steppedBack(initiative: InitiativeState): void;
+}

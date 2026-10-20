@@ -12,6 +12,7 @@ import { isModHeld, isModKey } from '../../keyboard/modKey';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { TokenPortrait } from '../../packages/components/shared/TokenPortrait';
 import { t } from '../../i18n';
+import { DealtCard } from './DealtCard';
 
 interface InitiativeCardProps {
   entry: InitiativeEntry;
@@ -19,6 +20,8 @@ interface InitiativeCardProps {
   isHoveredForPreview: boolean;
   /** The fight runs by sides: a combatant has no number there and never the turn by itself. */
   bySides?: boolean;
+  /** The fight runs by cards: the card dealt stands where the number does. */
+  byCards?: boolean;
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
   onDragEnd: () => void;
@@ -35,6 +38,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   index,
   isHoveredForPreview,
   bySides = false,
+  byCards = false,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -268,11 +272,11 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       </div>
 
       {/* Initiative number */}
-      {!bySides && (
+      {!bySides && (byCards ? <DealtCard card={entry.card} /> : (
         <span className="atlas-initiative-card__initiative">
           {entry.initiative}
         </span>
-      )}
+      ))}
 
       {/* Resource bars */}
       {bars.length > 0 && (

@@ -24,12 +24,11 @@ describe('the collection settings\' initiative fields', () => {
     expect(screen.getByLabelText('Initiative Roll').getAttribute('aria-invalid')).toBe('true');
   });
 
-  it('offers the side that acts first, and no roll, by sides', () => {
-    render(<InitiativeFields fieldSuggestions={[]} initiative={{ ...TURN_ORDER, mode: 'sides' }} onChange={vi.fn()} />);
+  it('lists the sides in the order they act, and no combatant\'s roll, by sides', () => {
+    render(<InitiativeFields fieldSuggestions={[]} initiative={{ ...TURN_ORDER, mode: 'sides', firstSide: 'opponents' }} onChange={vi.fn()} />);
 
     expect(screen.queryByLabelText('Initiative Roll')).toBeNull();
-    expect(screen.getByText('Acts First')).toBeDefined();
-    expect(screen.getByText(/Nothing is rolled/)).toBeDefined();
+    expect([...document.querySelectorAll('.atlas-csm-side__name')].map((name) => name.textContent)).toEqual(['Opponents', 'Players']);
   });
 
   it('passes on the statblock field typed for the modifier, and no field once it is cleared', () => {

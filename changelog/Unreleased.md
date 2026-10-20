@@ -10,8 +10,12 @@
 - Initiative: a combatant can delay its turn. It waits below the order until Act Now puts it right before the combatant whose turn it is.
 - Initiative: Sit Out This Round now works in turn order too.
 - Initiative: the tracker's ⋯ menu has an Auto sort switch.
+- Initiative by cards: each combatant is dealt a card from a numbered deck, and the lowest card acts first. Deal once when the fight starts or anew every round, let look-alikes share a card, and swap two combatants' cards from the card menu.
+- Initiative by sides: name more sides than players and opponents, such as Allies, set the order they act in, and move a token to any side from its card.
+- Initiative by sides: the sides can roll for their order at the start of every round. The highest acts first, and sides with equal rolls act at the same time.
 
 ## Improved
+- Old-School Essentials collections run initiative by sides, with each side rolling a d6 every round.
 - Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.
 - Initiative: combatants with the same number are ordered by their initiative modifier.
 - Initiative: Clear initiative asks before it removes every combatant. It is in the tracker's ⋯ menu.

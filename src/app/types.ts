@@ -1,7 +1,7 @@
 // types.ts
 // Shared interfaces and types for Atlas VTT
 
-import type { InitiativeSide } from './types/initiativeRulesTypes';
+import type { SideId } from './types/initiativeRulesTypes';
 import type { LightEmission, TokenVision } from './types/lightingTypes';
 
 /**
@@ -51,8 +51,11 @@ export interface BaseToken {
   conditionValues?: Record<string, number>;
   /** Whether the token is hidden (visible to DM but not players) */
   isHidden?: boolean;
-  /** The side the token fights on where initiative runs by sides. Read with `sideOf`: unset, a token that sees is the players'. */
-  side?: InitiativeSide;
+  /**
+   * The side the token fights on where initiative runs by sides: `players`, `opponents` or the id of
+   * a side the collection named. Read with `sideOf`: unset or unknown, a token that sees is the players'.
+   */
+  side?: SideId;
   /** How the token sees when the scene has dynamic lighting. */
   vision?: TokenVision;
   /** Light the token carries; it moves with the token. */

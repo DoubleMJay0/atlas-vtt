@@ -1,9 +1,10 @@
 import type { ResourceDefinition, ResourceValue } from '../resources/resourceTypes';
 import type { TokenEntity } from '../types';
 import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
-import type { InitiativeRules, InitiativeSide } from '../types/initiativeRulesTypes';
+import type { InitiativeRules, InitiativeSide, SideId } from '../types/initiativeRulesTypes';
 import { createTokenPortrait } from '../packages/components/shared/tokenPortraitElement';
-import { SIDE_LABELS, listedBySides, sideOf, sidesInOrder } from '../initiative/sides';
+import { firstBuiltInSide } from '../gameSystems/initiativeSideRules';
+import { listedByCards, listedBySides, listedSides, sideOf, type ListedSide } from '../initiative/sides';
 import { combatantDefeated } from '../initiative/defeated';
 import { scrollWithin } from '../utils/scrollWithin';
 import { setIcon } from 'obsidian';
@@ -16,13 +17,14 @@ export interface EntryToken {
   /** The map frames a token unless its ring is switched off. */
   showRing: boolean;
   ringColor?: string | undefined;
-  side: InitiativeSide;
+  /** The side the token fights on, of the sides the list knows (`sideIdsOf`). */
+  side: SideId;
   /** Defeated, as the GM's card shows it with its skull: shown dimmed and marked, never left out. */
   defeated: boolean;
 }
 
 /** What the players' list shows of an initiative entry. */
-export type PlayerInitiativeEntry = Pick<InitiativeEntry, 'tokenId' | 'name' | 'initiative' | 'isActive' | 'imagePath' | 'order' | 'sitsOut' | 'delayed'>;
+export type PlayerInitiativeEntry = Pick<InitiativeEntry, 'tokenId' | 'name' | 'initiative' | 'isActive' | 'imagePath' | 'order' | 'sitsOut' | 'delayed' | 'card'>;
 
 /** A combatant the players see, with what the list shows of its token. */
 export interface Combatant {
@@ -38,10 +40,14 @@ export interface PlayerInitiativeList {
   round: number;
   /** The combatants are grouped by side (`listedBySides`). */
   bySides: boolean;
-  /** The side that acts first in a round. */
+  /** A combatant's number is the card it was dealt (`listedByCards`): the lowest acts first. */
+  byCards: boolean;
+  /** The sides in the order they act this round, with their rolls and the side or sides with the turn. */
+  sides: ListedSide[];
+  /** Of the players and the opponents, the side that acts first in a round; what older pages read. */
   firstSide: InitiativeSide;
-  /** The side whose turn it is in a fight by sides. */
-  activeSide: InitiativeSide | null;
+  /** The side whose turn it is in a fight by sides (one of them where several act at once). */
+  activeSide: SideId | null;
 }
 
 /** How the list draws names and portraits. */
@@ -56,13 +62,21 @@ export function listedForPlayers(token: Pick<TokenEntity, 'isHidden'> | undefine
   return !!token && !token.isHidden;
 }
 
-/** What the players' list reads of a combatant's token; `definitions` are the map's resources, which say who is defeated. */
-export function entryTokenOf(token: TokenEntity | undefined, definitions: readonly ResourceDefinition[]): EntryToken {
+/** The ids of the sides the players' list groups by: the running fight's, else the rules'. */
+export function sideIdsOf(initiative: Pick<InitiativeState, 'isActive' | 'round' | 'sides'>, rules: InitiativeRules): SideId[] {
+  return listedSides(initiative, rules).map((side) => side.id);
+}
+
+/**
+ * What the players' list reads of a combatant's token; `definitions` are the map's resources, which
+ * say who is defeated, `sides` the ids of the sides the list knows (`sideIdsOf`).
+ */
+export function entryTokenOf(token: TokenEntity | undefined, definitions: readonly ResourceDefinition[], sides?: readonly SideId[]): EntryToken {
   return {
     hp: token?.resources?.hp ?? null,
     showRing: token?.showRing !== false,
     ringColor: token?.ringColor,
-    side: sideOf(token),
+    side: sideOf(token, sides),
     defeated: combatantDefeated(token, definitions),
   };
 }
@@ -73,7 +87,7 @@ export function entryTokenOf(token: TokenEntity | undefined, definitions: readon
  * show only where `hpVisible`.
  */
 export function playerInitiativeList(
-  initiative: Pick<InitiativeState, 'isActive' | 'round' | 'sides'> & { entries: readonly PlayerInitiativeEntry[] },
+  initiative: Pick<InitiativeState, 'isActive' | 'round' | 'sides' | 'cards'> & { entries: readonly PlayerInitiativeEntry[] },
   tokenOf: (entry: PlayerInitiativeEntry, index: number) => EntryToken | null,
   rules: InitiativeRules,
   hpVisible: boolean,
@@ -84,12 +98,15 @@ export function playerInitiativeList(
       return token ? [{ entry, token: hpVisible ? token : { ...token, hp: null } }] : [];
     })
     .sort((a, b) => a.entry.order - b.entry.order);
+  const sides = listedSides(initiative, rules);
   return {
     combatants,
     isActive: initiative.isActive,
     round: initiative.round,
     bySides: listedBySides(initiative, rules),
-    firstSide: initiative.sides?.first ?? rules.firstSide,
+    byCards: listedByCards(initiative, rules),
+    sides,
+    firstSide: initiative.sides?.first ?? firstBuiltInSide(sides),
     activeSide: initiative.sides?.active ?? null,
   };
 }
@@ -122,32 +139,38 @@ function renderTurnOrder(panel: HTMLElement, list: PlayerInitiativeList, look: P
   const entries = panel.createDiv({ cls: 'atlas-player-initiative__list', attr: { role: 'list' } });
   const delayed = list.combatants.filter(({ entry }) => entry.delayed);
   for (const combatant of list.combatants) {
-    if (!combatant.entry.delayed) renderEntry(entries, combatant, look, list.isActive);
+    if (!combatant.entry.delayed) renderEntry(entries, combatant, look, list.isActive, list.byCards ? 'card' : 'number');
   }
   if (!delayed.length) return;
   const group = entries.createDiv({ cls: 'atlas-player-initiative__side', attr: { role: 'list', 'aria-label': t('playerInit.delayed') } });
   group.createDiv({ cls: 'atlas-player-initiative__side-label', text: t('playerInit.delayed'), attr: { 'aria-hidden': 'true' } });
-  for (const combatant of delayed) renderEntry(group, combatant, look, false);
+  for (const combatant of delayed) renderEntry(group, combatant, look, false, 'number');
 }
 
 /** The combatants under their side, the side that acts first on top; a side the players see nobody of is left out. */
 function renderSides(panel: HTMLElement, list: PlayerInitiativeList, look: PlayerInitiativeLook): void {
   const sides = panel.createDiv({ cls: 'atlas-player-initiative__list' });
-  for (const side of sidesInOrder(list.firstSide)) {
-    const members = list.combatants.filter(({ token }) => token.side === side);
+  for (const side of list.sides) {
+    const members = list.combatants.filter(({ token }) => token.side === side.id);
     if (!members.length) continue;
-    const group = sides.createDiv({ cls: 'atlas-player-initiative__side', attr: { role: 'list', 'aria-label': SIDE_LABELS[side] } });
-    if (list.activeSide === side) {
+    const label = side.roll === null ? side.name : t('initRules.sideRolled', { side: side.name, roll: side.roll });
+    const group = sides.createDiv({ cls: 'atlas-player-initiative__side', attr: { role: 'list', 'aria-label': label } });
+    if (side.active) {
       group.addClass('atlas-player-initiative__side--active');
       group.setAttribute('aria-current', 'true');
     }
-    group.createDiv({ cls: 'atlas-player-initiative__side-label', text: SIDE_LABELS[side], attr: { 'aria-hidden': 'true' } });
+    const heading = group.createDiv({ cls: 'atlas-player-initiative__side-label', attr: { 'aria-hidden': 'true' } });
+    heading.createSpan({ text: side.name });
+    if (side.roll !== null) heading.createSpan({ cls: 'atlas-player-initiative__side-roll', text: String(side.roll) });
     // By sides the turn is the side's and there are no numbers
-    for (const member of members) renderEntry(group, member, look, false, false);
+    for (const member of members) renderEntry(group, member, look, false, 'none');
   }
 }
 
-function renderEntry(parent: HTMLElement, { entry, token }: Combatant, look: PlayerInitiativeLook, combatActive: boolean, showValue = true): void {
+/** What a combatant shows beside its portrait: its number, the card it was dealt, or nothing (by sides). */
+type EntryValue = 'number' | 'card' | 'none';
+
+function renderEntry(parent: HTMLElement, { entry, token }: Combatant, look: PlayerInitiativeLook, combatActive: boolean, value: EntryValue): void {
   const card = parent.createDiv({ cls: 'atlas-player-initiative__card', attr: { role: 'listitem' } });
   if (combatActive && entry.isActive) {
     card.addClass('atlas-player-initiative__card--active');
@@ -160,7 +183,8 @@ function renderEntry(parent: HTMLElement, { entry, token }: Combatant, look: Pla
     createTokenPortrait(card, { src, alt: look.showNames ? entry.name : '', cls: 'atlas-player-initiative__avatar', showRing: token.showRing, ringColor: token.ringColor });
   }
   if (token.defeated) renderDefeated(card, src !== null);
-  if (showValue) card.createSpan({ cls: 'atlas-player-initiative__value', text: String(entry.initiative) });
+  if (value === 'number') card.createSpan({ cls: 'atlas-player-initiative__value', text: String(entry.initiative) });
+  if (value === 'card') card.createSpan({ cls: 'atlas-player-initiative__value atlas-player-initiative__card-dealt', text: entry.card === undefined ? '–' : String(entry.card) });
   if (look.showNames) {
     card.createSpan({ cls: 'atlas-player-initiative__name', text: entry.name });
   }

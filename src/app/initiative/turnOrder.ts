@@ -4,7 +4,7 @@
  */
 
 import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
-import { actsInTurn, backToRoundBefore, beginRound, canStillAct } from './rounds';
+import { actsInTurn, backToRoundBefore, beginRound, canStillAct, type RoundChanges } from './rounds';
 import { tieBreakModifier } from './tieBreak';
 
 /** Updates every entry's `order` to its place in the list. */
@@ -30,10 +30,10 @@ export function firstTurn(initiative: InitiativeState, defeated: ReadonlySet<str
 }
 
 /**
- * The turn of the next combatant that acts; past the last one a new round begins. Nothing moves
- * while nobody can act in any round.
+ * The turn of the next combatant that acts; past the last one a new round begins (and `rounds`
+ * hears of it). Nothing moves while nobody can act in any round.
  */
-export function nextOrderTurn(initiative: InitiativeState, defeated: ReadonlySet<string>): void {
+export function nextOrderTurn(initiative: InitiativeState, defeated: ReadonlySet<string>, rounds?: RoundChanges): void {
   const { entries } = initiative;
   if (!entries.some((entry) => canStillAct(entry, defeated))) return;
   let index = turnIndex(initiative);
@@ -43,6 +43,7 @@ export function nextOrderTurn(initiative: InitiativeState, defeated: ReadonlySet
     if (index >= entries.length) {
       index = 0;
       beginRound(initiative);
+      rounds?.began(initiative);
     }
     if (actsInTurn(entries[index]!, defeated)) return giveTurn(initiative, index);
   }
@@ -52,7 +53,7 @@ export function nextOrderTurn(initiative: InitiativeState, defeated: ReadonlySet
  * The turn of the combatant before that acts; back past the first one into the round before,
  * whose marks come back. In round 1 the turn goes round to the last combatant.
  */
-export function previousOrderTurn(initiative: InitiativeState, defeated: ReadonlySet<string>): void {
+export function previousOrderTurn(initiative: InitiativeState, defeated: ReadonlySet<string>, rounds?: RoundChanges): void {
   const { entries } = initiative;
   if (!entries.some((entry) => canStillAct(entry, defeated))) return;
   let index = turnIndex(initiative);
@@ -60,7 +61,10 @@ export function previousOrderTurn(initiative: InitiativeState, defeated: Readonl
     index--;
     if (index < 0) {
       index = entries.length - 1;
-      backToRoundBefore(initiative);
+      if (initiative.round > 1) {
+        backToRoundBefore(initiative);
+        rounds?.steppedBack(initiative);
+      }
     }
     if (actsInTurn(entries[index]!, defeated)) return giveTurn(initiative, index);
   }
@@ -70,7 +74,7 @@ export function previousOrderTurn(initiative: InitiativeState, defeated: Readonl
  * A combatant leaves the fight. Had it the turn in a running fight in turn order, the turn passes
  * on as if it had ended (`nextOrderTurn`); otherwise the combatant now at its place takes the mark.
  */
-export function removeCombatant(initiative: InitiativeState, id: string, defeated: ReadonlySet<string>): void {
+export function removeCombatant(initiative: InitiativeState, id: string, defeated: ReadonlySet<string>, rounds?: RoundChanges): void {
   const { entries } = initiative;
   const index = entries.findIndex((entry) => entry.id === id);
   if (index === -1) return;
@@ -80,7 +84,7 @@ export function removeCombatant(initiative: InitiativeState, id: string, defeate
   if (!hadTurn || entries.length === 0) return;
   if (initiative.isActive && !initiative.sides) {
     initiative.currentIndex = index - 1;
-    nextOrderTurn(initiative, defeated);
+    nextOrderTurn(initiative, defeated, rounds);
     return;
   }
   giveTurn(initiative, Math.min(index, entries.length - 1));

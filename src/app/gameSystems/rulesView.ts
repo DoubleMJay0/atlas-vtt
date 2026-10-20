@@ -15,6 +15,8 @@ import type { SystemPreset, SystemRules } from '../types/systemPresetTypes';
 import { collectionDiceSet } from './diceSetResolution';
 import { diceRulesOfSet } from './diceSets';
 import { collectionInitiativeRules, isValidInitiativeRules } from './initiativeRules';
+import { sameTypedSideParts } from './initiativeSideRules';
+import { sameTypedCardParts } from './initiativeCardRules';
 import { sameTypedModifierSources } from './initiativeModifierSources';
 import { collectionLightPresets } from './lightPresetRules';
 import type { RulesSettings } from './mapRules';
@@ -41,7 +43,7 @@ export interface RulesView {
 /** Whether what was typed is the system's rules to the letter; a roll with a space or another case is kept as typed. */
 export function isSameAsTyped(typed: InitiativeRules, system: InitiativeRules): boolean {
   return typed.mode === system.mode && typed.firstSide === system.firstSide && typed.roll === system.roll
-    && sameTypedModifierSources(typed, system);
+    && sameTypedModifierSources(typed, system) && sameTypedSideParts(typed, system) && sameTypedCardParts(typed, system);
 }
 
 /** Rules as a dialog holds them: every part may be unset, or given as undefined. */

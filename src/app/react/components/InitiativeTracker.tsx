@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { useAtlasStore, useViewStoreHook } from '../ViewStoreContext';
 import { useAtlasUI } from '../root/AtlasUIContext';
-import { listedBySides } from '../../initiative/sides';
+import { listedByCards, listedBySides, listedSides } from '../../initiative/sides';
+import { useStartCombat } from './useStartCombat';
 import { defeatedCombatants } from '../../initiative/defeated';
 import { useMapResources } from '../../resources/useMapResources';
 import { useInitiativeTokenSync } from '../../initiative/useInitiativeTokenSync';
@@ -51,13 +52,13 @@ export const InitiativeTracker: React.FC = () => {
   const rules = useMapInitiativeRules();
   const { roll, rolling } = useInitiativeRolls(app, rules);
   const bySides = listedBySides(initiative, rules);
-  const firstSide = initiative.sides?.first ?? rules.firstSide;
+  const byCards = listedByCards(initiative, rules);
+  const sides = useMemo(() => listedSides(initiative, rules), [initiative, rules]);
 
   // Store actions
   const nextTurn = useAtlasStore((s) => s.nextTurn);
   const previousTurn = useAtlasStore((s) => s.previousTurn);
   const reorderInitiative = useAtlasStore((s) => s.reorderInitiative);
-  const startCombat = useAtlasStore((s) => s.startCombat);
   const endCombat = useAtlasStore((s) => s.endCombat);
   const updateInitiativeEntry = useAtlasStore((s) => s.updateInitiativeEntry);
   const resetInitiative = useAtlasStore((s) => s.resetInitiative);
@@ -70,6 +71,7 @@ export const InitiativeTracker: React.FC = () => {
     const { initiative: current, objects } = store.getState();
     return defeatedCombatants(current.entries, objects.tokens, definitions);
   }, [store, definitions]);
+  const startCombat = useStartCombat(rules, defeated);
 
   // Local state
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
@@ -141,7 +143,7 @@ export const InitiativeTracker: React.FC = () => {
     setEditValue(String(entry.initiative));
     setEditModifier(modifierText(entry));
   }, []);
-  const handleContextMenu = useInitiativeCardMenu({ tokens, bySides, fightRuns: initiative.isActive, roll, defeated, edit: openEdit });
+  const handleContextMenu = useInitiativeCardMenu({ tokens, bySides, sides, cards: initiative.cards !== undefined, fightRuns: initiative.isActive, roll, defeated, edit: openEdit });
 
   const openOptions = (event: React.MouseEvent<HTMLButtonElement>): void => {
     const button = event.currentTarget;
@@ -179,6 +181,7 @@ export const InitiativeTracker: React.FC = () => {
       entry={entry}
       index={index}
       bySides={bySides}
+      byCards={byCards}
       isHoveredForPreview={previewState.hoveredEntry?.entry.id === entry.id}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -192,8 +195,8 @@ export const InitiativeTracker: React.FC = () => {
     <div className="atlas-initiative-tracker">
       {/* Controls row: Roll + Combat + Clear */}
       <div className="atlas-initiative-tracker__controls">
-        {/* Nothing is rolled where the sides take turns */}
-        {!bySides && (
+        {/* Nothing is rolled where the sides take turns or cards are dealt */}
+        {!bySides && !byCards && (
           <LabelTooltip label="Roll initiative">
             <button
               className="clickable-icon atlas-initiative-tracker__btn"
@@ -209,7 +212,7 @@ export const InitiativeTracker: React.FC = () => {
           <LabelTooltip label="Start combat">
             <button
               className="clickable-icon atlas-initiative-tracker__btn"
-              onClick={() => startCombat(rules, defeated())}
+              onClick={startCombat}
               disabled={sortedEntries.length === 0}
             >
               <Swords />
@@ -247,8 +250,7 @@ export const InitiativeTracker: React.FC = () => {
             entries={sortedEntries}
             tokens={tokens}
             bySides={bySides}
-            firstSide={firstSide}
-            activeSide={initiative.sides?.active}
+            sides={sides}
             card={card}
           />
         )}
