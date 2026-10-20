@@ -22,6 +22,7 @@
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
 - Atlas' messages slide in at the top right with a light spring and lift away when they close, and the messages below them move up smoothly. They sit as far from the top as from the right edge, like the dice rolls.
+- Initiative: the GM and player lists scroll to keep the current combatant and the next two in view where space allows, so players can see their turns coming. Smaller panels keep the current combatant visible first.
 - Online play: busy tables send far fewer messages. Cursors, lasers and measurements go out ten times a second and still move smoothly, and a changed quest or world map reaches players without their whole book being sent again.
 - Random tables: rename a table or remove it from the list from its menu (⋯ or right-click) in the Random tables window, and undo a removal from the message that follows. A new name shows only in Atlas and leaves the note as it is; you can also set it in the collection settings. A table whose note was deleted can now be removed too.
 - Type sums into a token's HP: -10-5 takes 15, -9/2 takes half of 9 rounded down, and -9*2 takes 18 (#495, #396).

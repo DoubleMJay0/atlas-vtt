@@ -288,3 +288,46 @@ describe('a fight in turn order', () => {
     expect(state.previousTurn).toHaveBeenCalledWith(new Set(['entry-rat']));
   });
 });
+
+describe('the initiative tracker keeps the turn in view', () => {
+  const list = (container: HTMLElement): Element => container.querySelector('.atlas-initiative-tracker__content')!;
+
+  it('scrolls its list to the combatant whose turn it is and the next two when the turn moves on', () => {
+    collection.rules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
+    scene({ isActive: true, round: 1, currentIndex: 0 });
+    state.initiative.entries[0] = entryOf('goblin', 0, { isActive: true });
+    const { container, rerender } = render(<InitiativeTracker />);
+    scrolls.calls.length = 0;
+
+    state.initiative = { ...state.initiative, currentIndex: 2, entries: state.initiative.entries.map((entry, index) => ({ ...entry, isActive: index === 2 })) };
+    rerender(<InitiativeTracker />);
+
+    expect(scrolls.calls).toEqual([[list(container), container.querySelectorAll('.atlas-initiative-card')[2], 'nearest', 2]]);
+  });
+
+  it('scrolls its list to the top of the side whose turn it is', () => {
+    scene({ isActive: true, round: 1, sides: { first: 'players', active: 'players' } });
+    const { container, rerender } = render(<InitiativeTracker />);
+    scrolls.calls.length = 0;
+
+    state.initiative = { ...state.initiative, sides: { first: 'players', active: 'opponents' } };
+    rerender(<InitiativeTracker />);
+
+    expect(scrolls.calls).toEqual([[list(container), container.querySelectorAll('.atlas-initiative-side')[1], 'start']]);
+  });
+
+  it('leaves the list alone while nothing about the turn changes, and without a fight', () => {
+    scene({ isActive: true, round: 1, sides: { first: 'players', active: 'players' } });
+    const { rerender, unmount } = render(<InitiativeTracker />);
+    scrolls.calls.length = 0;
+
+    state.objects = { tokens: { ...state.objects.tokens } };
+    rerender(<InitiativeTracker />);
+    expect(scrolls.calls).toEqual([]);
+
+    unmount();
+    scene();
+    render(<InitiativeTracker />);
+    expect(scrolls.calls).toEqual([]);
+  });
+});

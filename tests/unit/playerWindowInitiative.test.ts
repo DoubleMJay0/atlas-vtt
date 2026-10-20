@@ -219,7 +219,7 @@ describe('player initiative panel', () => {
 
     store.setState({ initiative: { ...initiative, round: 2 } });
 
-    expect(scrolls.calls).toEqual([[doc.querySelector('.atlas-player-initiative__list'), doc.querySelector('.atlas-player-initiative__card--active'), 'nearest']]);
+    expect(scrolls.calls).toEqual([[doc.querySelector('.atlas-player-initiative__list'), doc.querySelector('.atlas-player-initiative__card--active'), 'nearest', 2]]);
     expect(scrolls.calls[0]?.[1]).not.toBeNull();
   });
 
