@@ -7,6 +7,7 @@ import { runInBackground } from '../utils/backgroundTask';
 import { getLocale, t } from '../i18n';
 import { showNotice } from '../ui/notice';
 import { createDialogShell } from '../ui/dialogShell';
+import { trashVaultItem } from '../utils/trashVaultItem';
 
 /** One token as it will be stored inside an encounter. */
 export type EncounterTokenDraft = EncounterAsset['tokens'][number];
@@ -89,6 +90,18 @@ async function saveThumbnailToVault(app: ObsidianApp, tokens: EncounterTokenDraf
   return '';
 }
 
+/**
+ * The thumbnail file an encounter's `thumbnailUrl` (the resource URL it was saved with) names, or
+ * null for one outside the encounter thumbnails' folder, which is never Atlas' to remove.
+ */
+function thumbnailFileOf(app: ObsidianApp, url: string | undefined): TFile | null {
+  if (!url) return null;
+  const withoutQuery = url.split('?')[0];
+  const folder = app.vault.getFolderByPath(THUMBNAIL_DIR);
+  const file = folder?.children.find((child) => child instanceof TFile && app.vault.getResourcePath(child).split('?')[0] === withoutQuery);
+  return file instanceof TFile ? file : null;
+}
+
 /** The name an encounter gets when none is typed: today's date. */
 export function defaultEncounterName(): string {
   return t('encounter.defaultName', { date: new Date().toLocaleDateString(getLocale()) });
@@ -150,13 +163,17 @@ export async function updateEncounter(
   try {
     const current = await assetService.getAssetById(encounterId);
     if (current?.type !== 'encounter') throw new Error(`No encounter ${encounterId}`);
-    const thumbnailUrl = (await saveThumbnailToVault(app, tokens)) || current.thumbnailUrl;
+    const fresh = await saveThumbnailToVault(app, tokens);
+    const thumbnailUrl = fresh || current.thumbnailUrl;
     await assetService.updateAsset(encounterId, {
       name,
       tokens,
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
       data: { ...current.data, tokens, description: t('encounter.description', { count: tokens.length }) },
     });
+    // The new thumbnail replaces the old one, which nothing else shows.
+    const replaced = fresh ? thumbnailFileOf(app, current.thumbnailUrl) : null;
+    if (replaced) await trashVaultItem(app, replaced);
     showNotice(t('encounter.saved', { name }));
     return true;
   } catch (error) {
