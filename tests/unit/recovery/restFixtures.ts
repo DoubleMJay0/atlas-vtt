@@ -32,10 +32,12 @@ export interface CharacterState {
   note?: Record<string, FieldValue>;
 }
 
-/** A character holding `state`: resources by key, conditions on its token (null: no token), the note's values. */
-export function character(state: CharacterState = {}): RestCharacter {
+/** A character holding `state`: resources by key, conditions on its token (null: no token), the note's values; Mira unless named. */
+export function character(state: CharacterState = {}, id = 'mira', name = 'Mira'): RestCharacter {
   const note = state.note ?? {};
   return {
+    id,
+    name,
     resources: RESOURCES,
     conditions: CONDITIONS,
     fields: new Map(FIELDS.map((field) => [field.key, field])),

@@ -16,7 +16,7 @@ function ruleText(planned: PlannedRule, choices: RestChoices): string | null {
     case 'share': return `${label} +${rule.share === 0.5 ? '½' : '¼'}`;
     case 'set': return `${label} → ${planned.to ?? 0}`;
     case 'spend': {
-      const units = choices.spends.get(planned.index) ?? 0;
+      const units = choices.spends.get(planned.ref) ?? 0;
       return units === 0 ? null : `${units} ${planned.spend?.label ?? label}`;
     }
     case 'step': return `${label} ${signed(rule.by)}`;

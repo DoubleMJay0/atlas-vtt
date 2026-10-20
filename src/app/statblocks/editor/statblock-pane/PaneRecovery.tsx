@@ -6,7 +6,7 @@ import { characterRestOf, type CharacterRest } from '../../../recovery/character
 import { readableFormula } from '../../../recovery/recoveryFormula';
 import type { RecoveryButton } from '../../../recovery/recoveryTypes';
 import { restOffers, type RestOffer } from '../../../recovery/restOffer';
-import type { RestRoller } from '../../../recovery/restTypes';
+import { alwaysRef, type RestRoller, type RuleRef } from '../../../recovery/restTypes';
 import type { CounterWriter } from '../../../recovery/restWrites';
 import { takeRest } from '../../../recovery/takeRest';
 import { rollStatblockDice, type OffMapRolls } from '../../../services/statblockRolls';
@@ -52,10 +52,10 @@ export function PaneRecoveryButtons({ recovery }: { recovery: PaneRecovery }): R
   const [offer, setOffer] = useState<RestOffer | null>(null);
   const [counts, setCounts] = useState<readonly number[]>([]);
 
-  const take = async (buttonId: string, spends: ReadonlyMap<number, number>): Promise<void> => {
+  const take = async (buttonId: string, spends: ReadonlyMap<RuleRef, number>): Promise<void> => {
     setBusy(true);
     try {
-      const taken = await takeRest(pane.app, restNow(pane, recovery), buttonId, { spends }, paneRoller(pane, recovery, offMap), paneCounterWriter(pane));
+      const taken = await takeRest(pane.app, restNow(pane, recovery), buttonId, { picks: [], spends }, paneRoller(pane, recovery, offMap), paneCounterWriter(pane));
       if (!taken) return;
       const { text } = taken.summary;
       showNotice(taken.problem === null ? text : `${text}\n${t('rest.failed', { problem: taken.problem })}`);
@@ -92,7 +92,7 @@ export function PaneRecoveryButtons({ recovery }: { recovery: PaneRecovery }): R
         canDecrement: count(index) > 0,
       },
     }));
-    const choices = new Map(spends.map((spend, index) => [spend.rule, count(index)]));
+    const choices = new Map(spends.map((spend, index) => [alwaysRef(spend.rule), count(index)]));
     const rest: ContextMenuEntry = { type: 'item', label: t('rest.take'), icon: 'rotate-ccw', onClick: () => take(button.id, choices) };
     return rows.length > 0 ? [...rows, MENU_SEPARATOR, rest] : [rest];
   };

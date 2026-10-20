@@ -1,14 +1,14 @@
 /**
- * The values a rest has changed so far, which each rule reads and moves on, and the changes they
- * add up to: per resource, per row of counters and per condition, from what the character held
- * before the rest to what it holds after, with the rolls that went into each. Pure.
+ * The values a rest has changed so far of one character, which each rule reads and moves on, and
+ * the changes they add up to: per resource, per row of counters and per condition, from what the
+ * character held before the rest to what it holds after, with the rolls that went into each. Pure.
  */
 
 import type { ResourceValue } from '../resources/resourceTypes';
 import type { FieldKey, FieldValue, TemplateField } from '../statblocks/model/templateTypes';
 import { shownCounterRows, type CounterRow } from '../statblocks/values/counterValues';
 import { spentRows } from './restCounters';
-import type { RestChange, RestChangeTarget, RestMetric, RestOutcome, RestRoll } from './restTypes';
+import type { CharacterChanges, RestChange, RestChangeTarget, RestCharacter, RestMetric, RestRoll } from './restTypes';
 
 type Metric<K extends RestMetric['kind']> = Extract<RestMetric, { kind: K }>;
 
@@ -23,10 +23,16 @@ export interface Ledger {
   setCondition(metric: Metric<'condition'>, next: number): void;
   /** Takes `units` from a Spend rule's source. */
   spend(source: RestMetric, units: number): void;
-  outcome(): Omit<RestOutcome, 'skipped'>;
+  outcome(): CharacterChanges & { readonly changes: readonly OrderedChange[] };
+}
+
+/** A change, with the place of its first touch among every change of the rest (`touched`), so the changes of several characters keep their order. */
+export interface OrderedChange extends RestChange {
+  readonly order: number;
 }
 
 interface Entry {
+  order: number;
   target: RestChangeTarget;
   label: string;
   from: number;
@@ -36,8 +42,8 @@ interface Entry {
 
 const left = (row: CounterRow): number => row.max - row.used;
 
-/** A new ledger, empty until a rule changes something. */
-export function metricChanges(): Ledger {
+/** A new ledger of `character`, empty until a rule changes something; `touched` gives each change its place in the rest. */
+export function metricChanges(character: Pick<RestCharacter, 'id' | 'name'>, touched: () => number): Ledger {
   const resources = new Map<string, ResourceValue>();
   const counters = new Map<FieldKey, { field: TemplateField; base: FieldValue | undefined; next: FieldValue }>();
   const conditions = new Map<string, number>();
@@ -46,9 +52,9 @@ export function metricChanges(): Ledger {
 
   const countersNow = (metric: Metric<'counters'>): FieldValue | undefined => (counters.has(metric.key) ? counters.get(metric.key)!.next : metric.value);
 
-  const entry = (id: string, made: () => Omit<Entry, 'rolls'>): Entry => {
+  const entry = (id: string, made: () => Omit<Entry, 'rolls' | 'order'>): Entry => {
     let found = entries.get(id);
-    if (!found) entries.set(id, found = { ...made(), rolls: [] });
+    if (!found) entries.set(id, found = { ...made(), order: touched(), rolls: [] });
     return found;
   };
 
@@ -101,7 +107,8 @@ export function metricChanges(): Ledger {
       }
     },
     outcome: () => {
-      const changes: RestChange[] = [...entries.values()].filter((each) => each.from !== each.to);
+      const who = { id: character.id, name: character.name };
+      const changes: OrderedChange[] = [...entries.values()].filter((each) => each.from !== each.to).map((each) => ({ ...each, character: who }));
       const changed = new Set(changes.map(({ target }) => `${target.kind}:${'key' in target ? target.key : target.id}`));
       const keep = <V>(map: Map<string, V>, kind: RestChangeTarget['kind']): Map<string, V> =>
         new Map([...map].filter(([key]) => changed.has(`${kind}:${key}`)));

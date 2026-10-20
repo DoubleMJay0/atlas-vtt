@@ -40,8 +40,8 @@ const TEMPLATE = templateOf(FIELDS, BLOCKS);
 const note = (name: string): string => ['---', 'statblock: true', `atlas-template: ${TEMPLATE.id}`, `name: ${name}`, 'speed: 30 ft.', '---', ''].join('\n');
 
 const OFFERS: RestOffer[] = [
-  { id: 'short', name: 'Short rest', spends: [{ rule: 0, label: 'Hit Dice', each: '1d8+(2)', max: 3 }] },
-  { id: 'long', name: 'Long rest', spends: [] },
+  { id: 'short', name: 'Short rest', spends: [{ rule: 0, label: 'Hit Dice', each: '1d8+(2)', max: 3 }], choices: [] },
+  { id: 'long', name: 'Long rest', spends: [], choices: [] },
 ];
 
 const SUMMARY: RestSummary = {

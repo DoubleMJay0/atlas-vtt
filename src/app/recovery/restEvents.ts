@@ -13,6 +13,9 @@ export interface RestSummary {
   readonly characterName: string;
   readonly notePath: string;
   readonly button: { readonly id: string; readonly name: string };
+  /** The actions picked in the rest's steps, by name, in the order picked. */
+  readonly picks: readonly string[];
+  /** Every change, each naming the character it was made to (the one resting, or one an action was taken for). */
   readonly changes: readonly RestChange[];
   readonly skipped: readonly SkippedRule[];
   /** The summary as the GM's notice said it. */

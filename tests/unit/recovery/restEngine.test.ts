@@ -2,17 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { restOutcome } from '../../../src/app/recovery/restOutcome';
 import { restPlan } from '../../../src/app/recovery/restPlan';
 import type { RecoveryRule } from '../../../src/app/recovery/recoveryTypes';
-import type { RestChoices, RestRoller } from '../../../src/app/recovery/restTypes';
+import type { CharacterChanges, RestChoices, RestOutcome, RestRoller } from '../../../src/app/recovery/restTypes';
 import { button, character, roller, row, type CharacterState } from './restFixtures';
 
 const HP = { kind: 'resource', key: 'hp' } as const;
 const STRESS = { kind: 'resource', key: 'stress' } as const;
 const HIT_DICE = { kind: 'resource', key: 'hitDice' } as const;
 const EXHAUSTION = { kind: 'condition', id: 'exhaustion' } as const;
-const NO_CHOICES: RestChoices = { spends: new Map() };
+/** What the rest changed of Mira. */
+const own = (outcome: RestOutcome): CharacterChanges => outcome.byCharacter.get('mira') ?? { resources: new Map(), counters: new Map(), conditions: new Map() };
+
+const NO_CHOICES: RestChoices = { picks: [], spends: new Map() };
 
 function rest(rules: RecoveryRule[], state: CharacterState, roll: RestRoller = roller(), choices: RestChoices = NO_CHOICES) {
-  return restOutcome(restPlan(button(rules), character(state)), choices, roll);
+  const who = character(state);
+  return restOutcome(restPlan(button(rules), who), who, choices, roll);
 }
 
 const summary = (outcome: ReturnType<typeof rest>) => outcome.changes.map(({ label, from, to, rolls }) => ({ label, from, to, rolls: rolls.map((roll) => roll.formula) }));
@@ -26,7 +30,7 @@ describe('resources', () => {
       { label: 'HP', from: 4, to: 20, rolls: [] },
       { label: 'Stress', from: 5, to: 0, rolls: [] },
     ]);
-    expect(outcome.resources.get('hp')).toEqual({ current: 20, max: 20 });
+    expect(own(outcome).resources.get('hp')).toEqual({ current: 20, max: 20 });
   });
 
   it('rolls an amount with dice towards the good end, clamped to the maximum', () => {
@@ -81,7 +85,7 @@ describe('spending', () => {
 
   it('rolls the units spent as one formula and takes them from the source', () => {
     const roll = roller(13);
-    const outcome = rest([spendRule], state, roll, { spends: new Map([[0, 2]]) });
+    const outcome = rest([spendRule], state, roll, { picks: [], spends: new Map([['always:0', 2]]) });
     expect(roll.rolled).toEqual([{ formula: '2d8+4', label: 'Hit Dice (Long rest)' }]);
     expect(summary(outcome)).toEqual([
       { label: 'Hit Dice', from: 3, to: 1, rolls: [] },
@@ -91,14 +95,14 @@ describe('spending', () => {
 
   it('never spends past the cap, and spends nothing unasked', () => {
     const roll = roller(4);
-    rest([spendRule], state, roll, { spends: new Map([[0, 9]]) });
+    rest([spendRule], state, roll, { picks: [], spends: new Map([['always:0', 9]]) });
     expect(roll.rolled[0]!.formula).toBe('2d8+4');
     expect(rest([spendRule], state).changes).toEqual([]);
   });
 
   it('spends from a filling source by raising it', () => {
     const stressSpend: RecoveryRule = { target: HP, does: 'spend', from: STRESS, each: '1d4' };
-    const outcome = rest([stressSpend], { resources: { hp: { current: 2, max: 30 }, stress: { current: 4, max: 6 } } }, roller(5), { spends: new Map([[0, 2]]) });
+    const outcome = rest([stressSpend], { resources: { hp: { current: 2, max: 30 }, stress: { current: 4, max: 6 } } }, roller(5), { picks: [], spends: new Map([['always:0', 2]]) });
     expect(summary(outcome)[0]).toEqual({ label: 'Stress', from: 4, to: 6, rolls: [] });
     expect(restPlan(button([stressSpend]), character({ resources: { hp: { current: 0, max: 1 }, stress: { current: 4, max: 6 } } })).rules[0]!.spend?.max).toBe(2);
   });
@@ -106,7 +110,7 @@ describe('spending', () => {
   it('spends uses of counters, from the first row with uses left', () => {
     const fromUses: RecoveryRule = { target: HP, does: 'spend', from: { kind: 'counters', field: 'uses', rows: 'all' }, each: '1d6' };
     const note = { uses: [row('Heal', 1, 1), row('Second wind', 2, 0)] };
-    const outcome = rest([fromUses], { resources: { hp: { current: 1, max: 10 } }, note }, roller(4), { spends: new Map([[0, 1]]) });
+    const outcome = rest([fromUses], { resources: { hp: { current: 1, max: 10 } }, note }, roller(4), { picks: [], spends: new Map([['always:0', 1]]) });
     expect(summary(outcome)).toEqual([
       { label: 'Uses Second wind', from: 2, to: 1, rolls: [] },
       { label: 'HP', from: 1, to: 5, rolls: ['1d6'] },
@@ -124,7 +128,7 @@ describe('counters', () => {
       { label: 'Uses Wand', from: 0, to: 3, rolls: [] },
       { label: 'Uses Ki', from: 2, to: 4, rolls: [] },
     ]);
-    expect(outcome.counters.get('uses')?.base).toBe(note.uses);
+    expect(own(outcome).counters.get('uses')?.base).toBe(note.uses);
   });
 
   it('rolls a row\'s own regained formula, and names the row the roll was for', () => {
@@ -153,7 +157,7 @@ describe('conditions', () => {
   it('steps a valued condition, removing it at 0', () => {
     expect(summary(rest([{ target: EXHAUSTION, does: 'step', by: -1 }], { conditions: { exhaustion: 2 } }))).toEqual([{ label: 'Exhaustion', from: 2, to: 1, rolls: [] }]);
     const gone = rest([{ target: EXHAUSTION, does: 'step', by: -3 }], { conditions: { exhaustion: 2 } });
-    expect(gone.conditions.get('exhaustion')).toBe(0);
+    expect(own(gone).conditions.get('exhaustion')).toBe(0);
   });
 
   it('clears a condition, and changes nothing where there is none', () => {

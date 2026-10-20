@@ -37,13 +37,13 @@ describe('what a rest request will do, as its card says it', () => {
     const plan = {
       button: { id: 'long', name: 'Long rest', rules: [] },
       rules: [
-        { index: 0, rule: { target: { kind: 'resource', key: 'hp' }, does: 'full' }, target: hp },
-        { index: 1, rule: { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'hd' }, each: '1d8' }, target: hp, spend: { label: 'Hit Dice', max: 3, each: '1d8' } },
-        { index: 2, rule: { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'sp' }, each: '1' }, target: hp, spend: { label: 'Spirit', max: 3, each: '1' } },
-        { index: 3, rule: { target: { kind: 'condition', id: 'ex' }, does: 'step', by: -1 }, target: exhaustion },
+        { index: 0, ref: 'always:0', rule: { target: { kind: 'resource', key: 'hp' }, does: 'full' }, target: hp },
+        { index: 1, ref: 'always:1', rule: { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'hd' }, each: '1d8' }, target: hp, spend: { label: 'Hit Dice', max: 3, each: '1d8' } },
+        { index: 2, ref: 'always:2', rule: { target: { kind: 'resource', key: 'hp' }, does: 'spend', from: { kind: 'resource', key: 'sp' }, each: '1' }, target: hp, spend: { label: 'Spirit', max: 3, each: '1' } },
+        { index: 3, ref: 'always:3', rule: { target: { kind: 'condition', id: 'ex' }, does: 'step', by: -1 }, target: exhaustion },
       ],
       skipped: [],
     } as unknown as RestPlan;
-    expect(restRulesText(plan, { spends: new Map([[1, 2], [2, 0]]) })).toEqual(['HP to full', '2 Hit Dice', 'Exhaustion −1']);
+    expect(restRulesText(plan, { picks: [], spends: new Map([['always:1', 2], ['always:2', 0]]) })).toEqual(['HP to full', '2 Hit Dice', 'Exhaustion −1']);
   });
 });

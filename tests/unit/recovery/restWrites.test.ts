@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterRest } from '../../../src/app/recovery/characterRest';
-import type { RestOutcome } from '../../../src/app/recovery/restTypes';
+import type { CharacterChanges, RestOutcome } from '../../../src/app/recovery/restTypes';
 import { writeRest, type CounterWrite } from '../../../src/app/recovery/restWrites';
 import { createViewAtlasStore } from '../../../src/app/storeFactory';
 import { getHistoryStore } from '../../../src/app/stores/history';
@@ -39,8 +39,9 @@ function setUp() {
   return { app, store, rest, record };
 }
 
-function outcome(parts: Partial<RestOutcome>): RestOutcome {
-  return { changes: [], skipped: [], resources: new Map(), counters: new Map(), conditions: new Map(), ...parts };
+/** A rest that changed Mira's values by `parts`. */
+function outcome(parts: Partial<CharacterChanges>): RestOutcome {
+  return { changes: [], skipped: [], byCharacter: new Map([['mira', { resources: new Map(), counters: new Map(), conditions: new Map(), ...parts }]]) };
 }
 
 describe('writeRest', () => {
