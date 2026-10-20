@@ -54,6 +54,7 @@
 - The toolbar editor and links to scenes and encounters in notes are now available in Russian.
 
 ## Fixed
+- Deleting an encounter also deletes its thumbnail picture, unless a copy of the encounter still uses it.
 - Statblocks in the DM screen no longer lie on top of each other after the creatures on the map change.
 
 - Initiative tracker: clicking a card selects its token, so its bars and their controls show, and brings it into view without zooming in further than needed.
