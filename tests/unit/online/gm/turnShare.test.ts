@@ -22,6 +22,8 @@ const fight = (active: string, changes: Partial<InitiativeState> = {}): Initiati
   entries: [entry('hero', 0, { isActive: active === 'hero' }), entry('ogre', 1, { isActive: active === 'ogre' })], ...changes,
 });
 const tokens = { hero: token('hero', { vision: { enabled: true } } as never), ogre: token('ogre'), cart: token('cart') };
+/** The GM keeps moves to the turn, and players are shown the list. */
+const ON = { movesOnTurn: true, showInitiative: true };
 const state = (initiative: InitiativeState | undefined, open = true): TurnShareState => ({ initiative, initiativeTrackerOpen: open, objects: { tokens } });
 
 describe('the turn players are told of', () => {
@@ -39,8 +41,8 @@ describe('the turn players are told of', () => {
     const sides = { initiative: fight('none', { sides: { first: 'opponents', active: 'opponents' } }), initiativeTrackerOpen: true, objects: { tokens: fallen } };
     expect([...sharedTurnTokens(sides, true)]).toEqual(['ogre']);
     expect(sharedTurnTokens(sides, true, [hp]).size).toBe(0);
-    expect(movesOutOfTurn(sides, true, 'ogre')).toBe(false);
-    expect(movesOutOfTurn(sides, true, 'ogre', [hp])).toBe(true);
+    expect(movesOutOfTurn(sides, ON, 'ogre')).toBe(false);
+    expect(movesOutOfTurn(sides, { ...ON, definitions: [hp] }, 'ogre')).toBe(true);
   });
 
   it('tells the page when the GM switched the banner off or keeps moves to the turn, and nothing otherwise', () => {
@@ -63,15 +65,18 @@ describe('the turn players are told of', () => {
 
 describe('players who move only on their turn', () => {
   it('may move a token that fights only while it holds the turn, and one outside the fight always', () => {
-    expect(movesOutOfTurn(state(fight('hero')), true, 'ogre')).toBe(true);
-    expect(movesOutOfTurn(state(fight('ogre')), true, 'ogre')).toBe(false);
-    expect(movesOutOfTurn(state(fight('hero')), true, 'cart')).toBe(false);
-    expect(movesOutOfTurn(state(fight('hero')), false, 'ogre')).toBe(false);
-    expect(movesOutOfTurn(state({ ...fight('hero'), isActive: false }), true, 'ogre')).toBe(false);
+    expect(movesOutOfTurn(state(fight('hero')), ON, 'ogre')).toBe(true);
+    expect(movesOutOfTurn(state(fight('ogre')), ON, 'ogre')).toBe(false);
+    expect(movesOutOfTurn(state(fight('hero')), ON, 'cart')).toBe(false);
+    expect(movesOutOfTurn(state(fight('hero')), { ...ON, movesOnTurn: false }, 'ogre')).toBe(false);
+    expect(movesOutOfTurn(state({ ...fight('hero'), isActive: false }), ON, 'ogre')).toBe(false);
     // By sides, while its side holds the turn
     const sides = fight('none', { sides: { first: 'players', active: 'players' } });
-    expect(movesOutOfTurn(state(sides), true, 'hero')).toBe(false);
-    expect(movesOutOfTurn(state(sides), true, 'ogre')).toBe(true);
+    expect(movesOutOfTurn(state(sides), ON, 'hero')).toBe(false);
+    expect(movesOutOfTurn(state(sides), ON, 'ogre')).toBe(true);
+    // A turn nobody is shown holds nobody: the player view's list off, or the GM's tracker closed
+    expect(movesOutOfTurn(state(fight('hero')), { ...ON, showInitiative: false }, 'ogre')).toBe(false);
+    expect(movesOutOfTurn(state(fight('hero'), false), ON, 'ogre')).toBe(false);
   });
 
   it('are refused by the move check, after ownership', () => {

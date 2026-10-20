@@ -27,6 +27,8 @@ export interface PictureInputs {
   badge(tokenId: string): number | null;
   /** The tokens players are told hold the turn (`sharedTurnTokens`); none without. */
   readonly turn?: ReadonlySet<string>;
+  /** The tokens that fight and may not move now, for they do not hold the turn (`movesOutOfTurn`); none without. */
+  readonly held?: ReadonlySet<string>;
 }
 
 const WHITE = '#ffffff';
@@ -89,6 +91,7 @@ export function sharedTokens(inputs: PictureInputs): SharedToken[] {
         // Atlas's player window shows nameplates by its own setting alone, player tokens included.
         ui: tokenUIOf(token, inputs.rules, inputs.showNames && name !== null),
         ...(inputs.turn?.has(id) ? { turn: true as const } : {}),
+        ...(inputs.held?.has(id) ? { held: true as const } : {}),
       },
     });
   }

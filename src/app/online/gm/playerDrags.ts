@@ -108,9 +108,9 @@ export class PlayerDrags {
   /**
    * The player's drop of a token: where it ended their drag (the drop's place, or before the first
    * wall on the way there), false when it was refused (the token went back, or the GM had taken the
-   * drag over), and null when no drag of theirs was under way.
+   * drag over), `turn` when it was refused for the token's turn, and null when no drag of theirs was under way.
    */
-  drop(from: string, move: PlayerMove): Point | false | null {
+  drop(from: string, move: PlayerMove): Point | false | 'turn' | null {
     const state = this.store.getState();
     const live = this.find(from, move.id);
     const context = this.context(state, live);
@@ -120,7 +120,7 @@ export class PlayerDrags {
     const verdict = checkMove(from, move, context);
     if (!verdict.ok || this.gmHolds(state)) {
       this.end([live], 'back');
-      return false;
+      return !verdict.ok && verdict.reason === 'turn' ? 'turn' : false;
     }
     const token = mapTokens(state.objects)[live.tokenId];
     const at = token === undefined ? { x: verdict.x, y: verdict.y } : landing(context, token, verdict);

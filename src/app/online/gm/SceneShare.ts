@@ -118,7 +118,10 @@ export class SceneShare {
         ownerOf,
         map: this.mapSize,
         walls: sceneWalls(store.getState().objects.walls, this.scene?.lit === true, this.mapSize),
-        outOfTurn: (tokenId) => movesOutOfTurn(store.getState(), ports.atlasSettings().movesOnTurn === true, tokenId, ports.tokenRules?.()?.resources ?? []),
+        outOfTurn: (tokenId) => {
+          const settings = ports.atlasSettings();
+          return movesOutOfTurn(store.getState(), { movesOnTurn: settings.movesOnTurn === true, showInitiative: settings.showInitiative, definitions: ports.tokenRules?.()?.resources ?? [] }, tokenId);
+        },
       }),
     });
     this.marks = new MarkShare({ ...ports, cursorsShown }, () => this.mapSize);

@@ -31,13 +31,26 @@ export function sharedTurnTokens(state: TurnShareState, showInitiative: boolean,
   return new Set(holders(state, definitions));
 }
 
+/** What decides whether players move only on their turn now. */
+export interface TurnMoveRules {
+  /** The GM's option: players move a token that fights only on its turn. */
+  readonly movesOnTurn: boolean;
+  /** The player view shows the initiative list (`showInitiative`); with the GM's tracker open, players are shown the turn. */
+  readonly showInitiative: boolean;
+  /** The map's resources, by which a combatant is defeated; none without. */
+  readonly definitions?: readonly ResourceDefinition[];
+}
+
 /**
- * Whether a player's move of `tokenId` is refused for being out of turn: the GM chose that players
- * move only on their turn (`movesOnTurn`), a fight runs, the token fights in it and does not hold
- * the turn (by sides: its side does not, or it is defeated by the map's resource `definitions`). A
- * token outside the fight moves freely.
+ * Whether a player's move of `tokenId` is refused for being out of turn, which the token list tells
+ * the page as `held`: the GM chose that players move only on their turn, players are shown the
+ * turn (the initiative list as `sharedInitiative` shows it: the player view's switch on and the
+ * GM's tracker open; a turn nobody is shown holds nobody), a fight runs, the token fights in it
+ * and does not hold the turn (by sides: its side does not, or it is defeated by the map's
+ * resource `definitions`). A token outside the fight moves freely.
  */
-export function movesOutOfTurn(state: TurnShareState, movesOnTurn: boolean, tokenId: string, definitions: readonly ResourceDefinition[] = []): boolean {
-  if (!movesOnTurn || !state.initiative?.isActive || !inFight(state.initiative, tokenId)) return false;
-  return !holders(state, definitions).includes(tokenId);
+export function movesOutOfTurn(state: TurnShareState, rules: TurnMoveRules, tokenId: string): boolean {
+  if (!rules.movesOnTurn || !rules.showInitiative || state.initiativeTrackerOpen !== true) return false;
+  if (!state.initiative?.isActive || !inFight(state.initiative, tokenId)) return false;
+  return !holders(state, rules.definitions ?? []).includes(tokenId);
 }

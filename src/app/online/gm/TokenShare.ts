@@ -8,7 +8,7 @@ import { sharedTokens, snapGridOf } from './scenePicture.ts';
 import { SequencedList } from './sequencedList.ts';
 import { NO_TOKEN_RULES, numberShownTokens, type TokenRules } from './tokenUI.ts';
 import type { AtlasPlayerSettings } from './atlasLighting.ts';
-import { sharedTurnTokens, type TurnShareState } from './turnShare.ts';
+import { movesOutOfTurn, sharedTurnTokens, type TurnShareState } from './turnShare.ts';
 import { isOffMap, mapTokens, sceneTokens } from '../../tokens/offMap';
 
 /** An image as read from the vault. */
@@ -30,7 +30,7 @@ export interface TokenSharePorts {
   /** Which tokens are player tokens; without it every token is the GM's. */
   seats?: Pick<SeatSource, 'claimOf'> | undefined;
   /** Atlas's settings for the players' view: whether they are shown the initiative list, and so the turn. */
-  atlasSettings?(): Pick<AtlasPlayerSettings, 'showInitiative'>;
+  atlasSettings?(): Pick<AtlasPlayerSettings, 'showInitiative' | 'movesOnTurn'>;
   /** The players' look-alike numbers changed (`badgeOf`): what shows them besides the token list is worked out again. */
   numbersChanged?(): void;
   randomId(): string;
@@ -224,7 +224,12 @@ export class TokenShare {
     // The store holds the fight too: the scene's type names only what every share reads
     const turnState: TurnShareState = state;
     const rules = this.ports.tokenRules?.() ?? NO_TOKEN_RULES;
-    const turn = sharedTurnTokens(turnState, this.ports.atlasSettings?.().showInitiative === true, rules.resources);
+    const settings = this.ports.atlasSettings?.();
+    const showInitiative = settings?.showInitiative === true;
+    const turn = sharedTurnTokens(turnState, showInitiative, rules.resources);
+    // The GM decides which tokens wait for their turn: the page never works it out itself
+    const moveRules = { movesOnTurn: settings?.movesOnTurn === true, showInitiative, definitions: rules.resources };
+    const held = new Set([...shown.keys()].filter((id) => movesOutOfTurn(turnState, moveRules, id)));
     const tokens = sharedTokens({
       tokens: mapTokens(state.objects),
       shown,
@@ -234,6 +239,7 @@ export class TokenShare {
       rules,
       badge: (id) => badges.badge(id),
       turn,
+      held,
       art: (path) => {
         const ref = this.art.get(path);
         if (ref !== null) art.set(ref.hash, path);
