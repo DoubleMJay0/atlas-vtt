@@ -118,6 +118,12 @@ export class Ownership {
     return owner === undefined || this.nameOf(owner) === null ? undefined : owner;
   }
 
+  /** The player of the campaign a character (a library token's id) was given to, if any. */
+  ownerOfCharacter(characterId: string): string | undefined {
+    const owner = this.characterOwners().get(characterId);
+    return owner === undefined || this.nameOf(owner) === null ? undefined : owner;
+  }
+
   /** Whether a token of the scene at `mapPath` is a player token: as the GM marked it, else by its side. */
   isPlayerToken(mapPath: string, tokenId: string, token: TokenEntity): boolean {
     return this.tokens()?.assignments().playerTokens[mapPath]?.[tokenId] ?? isPlayerSide(token);

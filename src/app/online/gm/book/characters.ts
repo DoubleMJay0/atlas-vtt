@@ -76,6 +76,11 @@ export class Characters {
     return true;
   }
 
+  /** The players who play the character `key` now. */
+  playersOf(key: string): string[] {
+    return [...this.played].flatMap(([player, character]) => (character.key === key ? [player] : []));
+  }
+
   /** The statblock notes of every character played. */
   statblockPaths(): Set<string> {
     return new Set([...this.played.values()].flatMap((character) => (character.statblockPath === null ? [] : [character.statblockPath])));

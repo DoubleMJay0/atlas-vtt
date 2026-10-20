@@ -197,6 +197,11 @@ export class BookShare implements LootRecipientSource {
     return true;
   }
 
+  /** The players who play a character (its library token's id) now. */
+  playersOf(character: string): string[] {
+    return this.characters.playersOf(character);
+  }
+
   recipients(): LootRecipient[] {
     return this.ports.players().filter((player) => player.online).map(({ id, name }) => {
       const character = this.characters.of(id);

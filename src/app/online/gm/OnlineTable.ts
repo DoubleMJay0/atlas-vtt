@@ -243,8 +243,11 @@ export class OnlineTable {
     this.connection.start();
     this.books.start();
     this.found.start();
-    // Every rest the GM's Atlas takes while the table runs is logged: approved requests and the GM's own.
-    this.stopLoggingRests = gatedRests.onRested((rest) => this.log.rested(restRecordOf(rest)));
+    // Every rest of a character of this table the GM's Atlas takes while it runs is logged: approved requests and the GM's own.
+    this.stopLoggingRests = gatedRests.onRested((rest) => {
+      const players = this.playersOfCharacter(rest.characterId);
+      if (players.length > 0) this.log.rested(restRecordOf(rest), players);
+    });
     this.watch.check();
     this.stopWatchTimer = every(companionTimers(), WATCH_MS, () => this.watch.check());
     // Atlas presenting another scene is followed at once; the timer catches everything else
@@ -266,6 +269,12 @@ export class OnlineTable {
   close(): void {
     this.stopWatch();
     this.connection.stop();
+  }
+
+  /** The players of a character (a library token's id): the campaign's player it was given to, and whoever plays it at the table now. */
+  private playersOfCharacter(characterId: string): string[] {
+    const owner = this.ownership.ownerOfCharacter(characterId);
+    return [...new Set([...(owner === undefined ? [] : [owner]), ...this.books.share.playersOf(characterId)])];
   }
 
   private setStatus(status: TableStatus): void {

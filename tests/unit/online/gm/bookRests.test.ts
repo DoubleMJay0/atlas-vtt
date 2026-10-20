@@ -264,4 +264,49 @@ describe('rests a player asks the GM for at a running table', () => {
     rests.announce(SUMMARY);
     expect(table?.log.entries().filter((entry) => entry.kind === 'rest')).toHaveLength(1);
   });
+
+  it('shows what a rest changed to the character\'s player and the GM alone, live and in the log a player is sent again', async () => {
+    const { online, socket, from } = await restingTable();
+    const since = delivered(socket).length;
+    rests.announce(SUMMARY);
+    await advance(100);
+    const rested = (player: string): Record<string, unknown> | undefined =>
+      ofType(delivered(socket).slice(since), 'log-entry').map(({ body, to }) => ({ entry: body.entry as Record<string, unknown>, to }))
+        .find(({ entry, to }) => entry.kind === 'rest' && (to === undefined || to === player))?.entry;
+    expect(rested(ANA)).toMatchObject({ character: 'Brannoch', button: 'Short rest', changes: [{ label: 'Hit Points' }, { label: 'Hit Dice' }], skipped: ['Exhaustion'] });
+    expect(rested(BEN)).toMatchObject({ character: 'Brannoch', button: 'Short rest' });
+    expect(rested(BEN)).not.toHaveProperty('changes');
+    expect(rested(BEN)).not.toHaveProperty('skipped');
+    // Nothing the GM's log keeps beside an entry goes out.
+    expect(JSON.stringify(delivered(socket))).not.toContain('restPlayers');
+    // The GM's own log has it whole.
+    expect(online.table?.log.entries().find((entry) => entry.kind === 'rest')).toMatchObject({ changes: [{ label: 'Hit Points' }, { label: 'Hit Dice' }] });
+
+    // A reaction sends the entry again, to each as they may see it.
+    const id = online.table?.log.entries().find((entry) => entry.kind === 'rest')?.id;
+    const reacted = delivered(socket).length;
+    from(BEN, { t: 'react', id, emoji: '👍', on: true });
+    await advance(100);
+    const again = ofType(delivered(socket).slice(reacted), 'log-entry').map(({ body, to }) => ({ entry: body.entry as Record<string, unknown>, to }));
+    expect(again.find(({ to }) => to === BEN)?.entry).not.toHaveProperty('changes');
+    expect(again.find(({ to }) => to === ANA)?.entry).toHaveProperty('changes');
+
+    // Coming back, each is sent the log as they may see it.
+    const back = delivered(socket).length;
+    socket.relay({ t: 'player-left', id: BEN });
+    socket.relay({ t: 'player-joined', id: BEN, name: 'Ben' });
+    await advance(100);
+    const log = ofType(delivered(socket).slice(back), 'log').filter(({ to }) => to === BEN).at(-1)?.body.entries as Record<string, unknown>[] | undefined;
+    const benRest = log?.find((entry) => entry.kind === 'rest');
+    expect(benRest).toMatchObject({ character: 'Brannoch' });
+    expect(benRest).not.toHaveProperty('changes');
+    online.stop();
+  });
+
+  it('logs no rest of a character nobody at the table plays', async () => {
+    const { online } = await restingTable();
+    rests.announce({ ...SUMMARY, characterId: 'npc-stranger', characterName: 'Stranger' });
+    expect(online.table?.log.entries().filter((entry) => entry.kind === 'rest')).toEqual([]);
+    online.stop();
+  });
 });

@@ -32,8 +32,16 @@ export interface FoundPin {
  * `speakerArt`: the vault path of the speaking token's artwork, which its viewers may be sent.
  * `imageFile`: the vault path of an image the GM showed, which players may be sent while it is logged.
  * `pin`: the readable pin a found note was found at.
+ * `restPlayers`: the players of a rest's character, who alone are sent what it changed.
  */
-export type GmLogEntry = LogEntry & { readonly hidden?: true; readonly face?: RollFace; readonly speakerArt?: string; readonly imageFile?: string; readonly pin?: FoundPin };
+export type GmLogEntry = LogEntry & {
+  readonly hidden?: true;
+  readonly face?: RollFace;
+  readonly speakerArt?: string;
+  readonly imageFile?: string;
+  readonly pin?: FoundPin;
+  readonly restPlayers?: readonly string[];
+};
 
 /** The token the GM's log names for an entry, when it holds one. */
 export function faceOf(entry: LogEntry): RollFace | undefined {
@@ -42,13 +50,18 @@ export function faceOf(entry: LogEntry): RollFace | undefined {
 
 /** An entry as players are sent it: without what only the GM's log has. */
 export function sharedEntry(entry: GmLogEntry): LogEntry {
-  const { hidden: _hidden, face: _face, speakerArt: _art, imageFile: _file, pin: _pin, ...shared } = entry;
+  const { hidden: _hidden, face: _face, speakerArt: _art, imageFile: _file, pin: _pin, restPlayers: _players, ...shared } = entry;
   return shared;
 }
 
-/** Whether an entry goes to everyone alike: no whisper, no private roll, nothing only the GM has. */
+/** Whether an entry goes to everyone alike: no whisper, no private roll, no rest (whose changes only its character's players see), nothing only the GM has. */
 export function isOpen(entry: GmLogEntry): boolean {
-  return entry.hidden !== true && !('to' in entry && entry.to !== undefined);
+  return entry.hidden !== true && entry.kind !== 'rest' && !('to' in entry && entry.to !== undefined);
+}
+
+/** Whether `viewer` is shown what a rest changed: the GM, and the players of the character who rested. */
+function seesRestChanges(entry: GmLogEntry, viewer: string): boolean {
+  return viewer === GM_AUTHOR || (entry.restPlayers?.includes(viewer) ?? false);
 }
 
 /** Who sees an entry whole: its author and its audience; everyone where it has none. */
@@ -62,11 +75,17 @@ export function seesWhole(entry: LogEntry, viewer: string): boolean {
 
 /**
  * An entry as one viewer is sent it (`'gm'` or a player's id): whole, a line that a roll was made
- * in private, or nothing (a whisper to others, a GM's roll players are not shown).
+ * in private, a rest without what it changed (to anyone but its character's players), or nothing
+ * (a whisper to others, a GM's roll players are not shown).
  */
 export function viewOf(entry: GmLogEntry, viewer: string): LogEntry | null {
   if (entry.hidden === true) return viewer === GM_AUTHOR ? sharedEntry(entry) : null;
-  if (seesWhole(entry, viewer)) return sharedEntry(entry);
+  const shared = sharedEntry(entry);
+  if (shared.kind === 'rest' && !seesRestChanges(entry, viewer)) {
+    const { changes: _changes, skipped: _skipped, ...title } = shared;
+    return title;
+  }
+  if (seesWhole(entry, viewer)) return shared;
   if (entry.kind !== 'roll' || entry.mode === undefined) return null;
   // Who spoke is no part of the line: a hidden NPC would be named by it.
   const { id, at, who, name, mode } = entry;
@@ -91,6 +110,13 @@ function readFace(value: unknown): RollFace | undefined {
   if (!isRecord(value) || typeof value.name !== 'string' || value.name === '' || value.name.length > MAX_FACE_TEXT) return undefined;
   const image = typeof value.image === 'string' && value.image !== '' && value.image.length <= MAX_FACE_TEXT ? value.image : null;
   return { name: value.name, image };
+}
+
+/** Players' ids as kept with an entry, each once; undefined where none reads. */
+function readPlayerIds(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = [...new Set(value.filter((id): id is string => typeof id === 'string' && PLAYER_ID_PATTERN.test(id)))].slice(0, MAX_PLAYERS);
+  return ids.length > 0 ? ids : undefined;
 }
 
 /** The log as kept with a table: its entries, and the players it counts as there (a line said they joined, none yet that they left). */
@@ -118,6 +144,7 @@ function readLogEntries(saved: unknown): GmLogEntry[] {
     const speakerArt = vaultPath(value.speakerArt);
     const imageFile = entry.kind === 'image' ? vaultPath(value.imageFile) : undefined;
     const pin = entry.kind === 'found' ? readFoundPin(value.pin) : undefined;
+    const restPlayers = entry.kind === 'rest' ? readPlayerIds(value.restPlayers) : undefined;
     entries.push({
       ...entry,
       ...(value.hidden === true && { hidden: true as const }),
@@ -125,6 +152,7 @@ function readLogEntries(saved: unknown): GmLogEntry[] {
       ...(speakerArt !== undefined && { speakerArt }),
       ...(imageFile !== undefined && { imageFile }),
       ...(pin !== undefined && { pin }),
+      ...(restPlayers !== undefined && { restPlayers }),
     });
   }
   return entries;
