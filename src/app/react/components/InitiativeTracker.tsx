@@ -18,6 +18,7 @@ import { useEditInitiativePopup } from './useEditInitiativePopup';
 import { InitiativeCard } from './InitiativeCard';
 import { useInitiativeCardMenu } from './useInitiativeCardMenu';
 import { initiativeTrackerOptions } from './initiativeTrackerOptions';
+import { DEFAULT_TURN_OPTIONS } from '../../initiative/turnOptions';
 import { InitiativeTrackerList } from './InitiativeTrackerList';
 import { InitiativeTrackerHeader } from './InitiativeTrackerHeader';
 import { InitiativeTurnControls } from './InitiativeTurnControls';
@@ -137,12 +138,14 @@ export const InitiativeTracker: React.FC = () => {
     const rect = button.getBoundingClientRect();
     const entries = initiativeTrackerOptions(
       // Cards keep the order they were dealt in, so the Auto sort switch is disabled there as by sides
-      { autoSort: initiative.config.autoSort, bySides: bySides || byCards, empty: initiative.entries.length === 0, showNames, fromTurn: layout.fromTurn, dock: layout.dock },
+      { autoSort: initiative.config.autoSort, bySides: bySides || byCards, empty: initiative.entries.length === 0, showNames, fromTurn: layout.fromTurn, dock: layout.dock,
+        turn: settings?.initiativeTurnOptions() ?? DEFAULT_TURN_OPTIONS, online: settings?.isExperimentalOn('onlinePlay') ?? false },
       {
         setAutoSort: (autoSort) => setInitiativeConfig({ autoSort }),
         setShowNames: (on) => settings?.setInitiativeNames(on),
         setFromTurn: (fromTurn) => setLayout({ fromTurn }),
         setDock: (dock) => setLayout({ dock }),
+        setTurn: (changes) => settings?.setInitiativeTurnOptions(changes),
         clear: resetInitiative,
       },
     );

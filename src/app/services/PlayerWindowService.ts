@@ -5,6 +5,7 @@ import type { SettingsService } from './SettingsService';
 import { playerWindowStore, resetPlayerWindowStore } from '../stores/playerWindowStore';
 import './player-window.scss';
 import { PlayerInitiativePanel } from './PlayerInitiativePanel';
+import { PlayerTurnBanner } from './PlayerTurnBanner';
 import type { PlayerOverlay } from './PlayerSceneOverlay';
 import { PlayerDiceRolls } from './PlayerDiceRolls';
 import { PlayerWidgetBar } from './PlayerWidgetBar';
@@ -233,6 +234,7 @@ export class PlayerWindowService {
       new PlayerWidgetBar(this.settingsService),
       new PlayerInitiativePanel(this.app, this.settingsService),
       new PlayerDiceRolls(this.app, this.settingsService),
+      new PlayerTurnBanner(this.app, this.settingsService),
     ];
     this.presentScene();
     this.setupPlayerWindow();

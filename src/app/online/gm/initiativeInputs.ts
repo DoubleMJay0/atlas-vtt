@@ -21,6 +21,10 @@ export interface InitiativeInputs {
   readonly showNames: boolean;
   /** The GM's choice that the lists start at the turn during a fight; off unless said. */
   readonly fromTurn?: boolean;
+  /** The GM switched the turn banner off; on unless said. */
+  readonly bannerOff?: boolean;
+  /** Players move tokens that fight only on their turn; off unless said. */
+  readonly movesOnTurn?: boolean;
   /** Where the map's rules are looked up; without it the default rules and no hit points. */
   readonly rules: RulesLookup | null;
   /** A portrait's artwork as players are sent it, by vault path; null while unknown. */
@@ -119,5 +123,7 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
     ...(list.byCards ? { byCards: true as const } : {}),
     combatants,
     ...(fromTurn ? { fromTurn: true } : {}),
+    ...(inputs.bannerOff === true ? { bannerOff: true } : {}),
+    ...(inputs.movesOnTurn === true ? { movesOnTurn: true } : {}),
   };
 }
