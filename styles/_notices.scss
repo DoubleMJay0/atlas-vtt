@@ -5,17 +5,11 @@
 @use './tokens' as *;
 @use './mixins' as *;
 
-@keyframes atlas-notice-in {
-  from {
-    opacity: 0;
-    transform: translateY(-#{$spacing-xs});
-  }
-}
-
 // Obsidian clips its notice container, which would cut the surface's shadow off at its padding,
-// and sets it 32 px from the top but 10 px from the right. Atlas' notices stand as far from both
+// and sets it 32 px from the top but 10 px from the right. From the first Atlas notice until it
+// empties it carries this class (`noticeMotion.ts`), and Atlas' notices stand as far from both
 // edges as the dice rolls from the map's (`.atlas-top-bar-row`).
-.notice-container:has(> .atlas-notice) {
+.notice-container.atlas-notice-host {
   top: 0;
   padding: $spacing-s;
   overflow: visible;
@@ -30,10 +24,13 @@
   color: var(--text-normal);
   font-size: $font-ui-small;
   line-height: var(--line-height-tight);
-  animation: atlas-notice-in $transition-normal $transition-ease-out;
+  // Atlas moves its notices itself (`noticeMotion.ts`). Obsidian slides them in from the right
+  // and out with transitions set inline, which would outrank those animations.
+  transition: none !important;
+  transform-origin: top right;
 
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
+  &.atlas-notice--leaving {
+    pointer-events: none;
   }
 
   a {
