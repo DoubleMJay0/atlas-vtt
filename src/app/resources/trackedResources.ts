@@ -57,11 +57,17 @@ export function recoverableResources(resources: readonly ResourceDefinition[]): 
 
 /**
  * The resource of the character a template field is, as a recovery rule names it: the number the
- * template tracks, else the collection's resource that counts and reads the field. Undefined where
- * it is neither (a static value, a number nothing tracks).
+ * template tracks, else the collection's resource that counts and reads the field, by its key or a
+ * key it had before (a renamed field keeps its resource). Undefined where it is neither (a number
+ * nothing tracks; a static value unless `staticToo`, which a rest names to say it changes none).
  */
-export function resourceOfField(template: StatblockTemplate, resources: readonly ResourceDefinition[]): (key: FieldKey) => ResourceDefinition | undefined {
+export function resourceOfField(
+  template: StatblockTemplate, resources: readonly ResourceDefinition[], staticToo = false,
+): (key: FieldKey) => ResourceDefinition | undefined {
   const tracked = new Map(trackedResources(template, resources).map((each) => [each.tracked.field.key, each.definition]));
-  const recoverable = recoverableResources(resources);
-  return (key) => tracked.get(key) ?? recoverable.find((resource) => readsTemplateField(resource, key));
+  const counting = recoverableResources(resources);
+  const keysOf = (key: FieldKey): FieldKey[] => [key, ...(template.fields.find((field) => field.key === key)?.formerKeys ?? [])];
+  const readerIn = (list: readonly ResourceDefinition[], key: FieldKey): ResourceDefinition | undefined =>
+    list.find((resource) => keysOf(key).some((each) => readsTemplateField(resource, each)));
+  return (key) => tracked.get(key) ?? readerIn(counting, key) ?? (staticToo ? readerIn(resources, key) : undefined);
 }

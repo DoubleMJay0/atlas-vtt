@@ -47,6 +47,12 @@ describe('the resource a rule names by its field', () => {
     expect(resourceOf('speed')).toBeUndefined();
   });
 
+  it('stays the collection\'s resource after the field is renamed, and a static one is found only when asked', () => {
+    const renamed = renameFieldKey(ADVENTURER, 'hp', 'hit_points');
+    expect(resourceOfField(renamed, RESOURCES)('hit_points')?.key).toBe('hp');
+    expect(resourceOfField(ADVENTURER, RESOURCES, true)('ac')?.key).toBe('ac');
+  });
+
   it('is the number the template tracks where no resource of the collection reads it, in any collection', () => {
     const tracked: StatblockTemplate = { ...ADVENTURER, fields: ADVENTURER.fields.map((field) => (field.key === 'con' ? { ...field, tracks: { counts: 'down' } } : field)) };
     expect(resourceOfField(tracked, RESOURCES)('con')?.name).toBe('CON modifier');

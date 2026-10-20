@@ -82,7 +82,9 @@ export function sheetMetrics(template: StatblockTemplate, resources: readonly Re
         offer(numberSpotId(block.id, key), block.id, key, isNumberField(template, key));
       }
     } else if (block.type === 'track') {
-      offer(block.id, block.id, block.field, true);
+      // A Track bound to a resource restores it by the path that resource reads, where its own field is none of it
+      const bound = block.resource ? resources.find((resource) => resource.key === block.resource) : undefined;
+      offer(block.id, block.id, !resourceOf(block.field) && bound ? bound.field.trim() : block.field, true);
     } else if (block.type !== 'section' && block.type !== 'row' && block.type !== 'tabs') {
       const keys = fieldsShownBy(block);
       offer(block.id, block.id, keys.find((key) => resourceOf(key) !== undefined), keys.some((key) => isNumberField(template, key)));

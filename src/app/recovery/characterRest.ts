@@ -14,7 +14,7 @@ import { PartySync } from '../campaigns/partyValues/PartySync';
 import { characterOf, libraryTokenOf } from '../characters/playerCharacters';
 import { playerCharacterOfNote } from '../characters/noteCharacter';
 import { collectionResources } from '../resources/collectionResources';
-import { readsTemplateField, resourceOfField, trackedResources } from '../resources/trackedResources';
+import { resourceOfField, trackedResources } from '../resources/trackedResources';
 import type { ResourceValue } from '../resources/resourceTypes';
 import { AssetService, type TokenAsset } from '../services/AssetService';
 import { openMapViews } from '../services/collectionScenes';
@@ -111,7 +111,6 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
   const fields = new Map(note.template.fields.map((field) => [field.key, field]));
 
   const collection = collectionResources(settings);
-  const ofField = resourceOfField(note.template, collection);
   const tracked = new Map(trackedResources(note.template, collection).map((each) => [each.definition.key, each]));
   const readIn = (record: FieldRecord) => (key: string): ReturnType<typeof readField>['value'] => {
     const field = fields.get(key);
@@ -152,7 +151,7 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
     name: asset.name,
     resources: [...collection, ...[...tracked.values()].map((each) => each.definition)],
     // A static resource is found too: the rest then says it changes none
-    resourceOf: (key) => ofField(key) ?? collection.find((resource) => readsTemplateField(resource, key)),
+    resourceOf: resourceOfField(note.template, collection, true),
     conditions: settings.conditions ?? [],
     fields,
     resourceValue,

@@ -43,6 +43,11 @@ describe('the metrics of a card', () => {
     expect(sheetMetrics(template, RESOURCES).metrics.find((metric) => metric.blockId === 'track001')?.target).toEqual({ kind: 'resource', field: 'stress' });
   });
 
+  it('offers a Track bound to a resource by the path that resource reads, where its own field is no resource', () => {
+    const bound: StatblockTemplate = { ...ADVENTURER, layout: { ...ADVENTURER.layout, blocks: [{ id: 'track002', type: 'track', field: 'speed', resource: 'hp', look: 'boxes', counts: 'down' }] } };
+    expect(sheetMetrics(bound, RESOURCES).metrics.find((metric) => metric.blockId === 'track002')?.target).toEqual({ kind: 'resource', field: 'hp' });
+  });
+
   it('offers the valued conditions only', () => {
     expect(conditionMetrics(CONDITIONS).map((chip) => chip.label)).toEqual(['Exhaustion', 'Frightened']);
   });

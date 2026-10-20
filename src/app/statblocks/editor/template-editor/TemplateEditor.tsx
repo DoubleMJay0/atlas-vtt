@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { App } from 'obsidian';
 import { useTemplateLibrary } from '../../library/useTemplateLibrary';
 import { deleteTemplate } from '../../library/templateActions';
@@ -141,6 +141,11 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
     editLabel, announce: state.announce, collectionId, collectionKeys, openOptions, playersRow, tableTyping,
   };
   // Focus goes back to the card: the selected tile, else the first thing on it.
+  // A template that turns read-only (reloaded as a newer format) shows its card again
+  const showRests = rests && !snapshot.readOnly;
+  // The card's stage comes back when the recovery buttons go: the overlays need its element
+  const [stage, setStage] = useState<HTMLDivElement | null>(null);
+  useLayoutEffect(() => setStage(stageRef.current), [showRests]);
   const toggleRests = (): void => {
     // Nothing of the card stays selected under the buttons
     if (!rests) state.select([]);
@@ -160,7 +165,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
         style={{ '--atlas-te-panel-width': `${room.width}px` } as React.CSSProperties}
         onKeyDown={(event) => {
           // The recovery buttons keep their keys; the view's scope still undoes
-          if (rests) return;
+          if (showRests) return;
           if (!handleShellKey(event.nativeEvent, () => openOptions()) && !onKey(event.nativeEvent)) return;
           event.preventDefault();
           event.stopPropagation();
@@ -202,7 +207,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
             noteCover={json ? <TemplateJsonEditor onDone={closeJson} /> : undefined}
             focusText={focusText}
             stateBars={<TemplateStateBars session={session} snapshot={snapshot} />}
-            card={rests && !snapshot.readOnly ? (
+            card={showRests ? (
               <TemplateRests app={app} session={session} snapshot={snapshot} collectionId={collectionId} onDone={toggleRests} />
             ) : (
               <Canvas
@@ -233,7 +238,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
               </>
             )}
           />
-          {room.editorWidth !== 'stacked' && !rests && (
+          {room.editorWidth !== 'stacked' && !showRests && (
             <EditorDock
               onAdd={snapshot.readOnly ? undefined : context.insert}
               canUndo={snapshot.canUndo || state.naming !== null}
@@ -246,7 +251,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
           <EditorOverlays
             app={app}
             layer={layer}
-            stage={stageRef.current}
+            stage={stage}
             snapshot={snapshot}
             state={state}
             target={target}
