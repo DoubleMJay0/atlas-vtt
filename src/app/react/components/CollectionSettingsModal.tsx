@@ -35,6 +35,7 @@ import { initiativeEdit, RulesSettingsTabs, type SettingsTab } from './collectio
 import { SettingsDialog } from './collection-settings/SettingsDialog';
 import { PlayedCampaignNotice } from './collection-settings/PlayedCampaignNotice';
 import { CampaignRulesDialog } from './dashboard/CampaignRulesDialog';
+import { CollectionRecoveryPane } from './collection-settings/recovery/CollectionRecoveryPane';
 import { usePlayedSystemCampaign } from '../../campaigns/usePlayedSystemCampaign';
 import { t } from '../../i18n';
 
@@ -247,6 +248,10 @@ export function CollectionSettingsModal({
         initiativeFieldSuggestions={initiativeFields}
         renderOther={renderOther}
         rulesNotice={playedNotice}
+        // Recovery buttons belong to a collection's templates, never to a campaign's rules
+        resourcesAside={app && statblockEditorOn ? (
+          <CollectionRecoveryPane app={app} assetService={assetService} collectionId={collectionId} draft={draft} presets={systemPresets.presets} />
+        ) : undefined}
       />
     </SettingsDialog>
   );
