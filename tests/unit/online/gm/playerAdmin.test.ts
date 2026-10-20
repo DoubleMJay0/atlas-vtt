@@ -218,6 +218,8 @@ describe('stopping the table', () => {
     expect(menus.opened).toHaveLength(0);
     layer.querySelector<HTMLButtonElement>('.atlas-online-header__stop')?.click();
     expect(does.stop).not.toHaveBeenCalled();
+    expect(layer.querySelector('.atlas-online-add-player')).toBeNull();
+    expect(layer.querySelector('.atlas-online-list')?.nextElementSibling?.matches('.atlas-online-confirm')).toBe(true);
     press(layer, 'Stop table');
     expect(does.stop).toHaveBeenCalledTimes(1);
   });

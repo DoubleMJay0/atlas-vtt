@@ -64,4 +64,15 @@ describe('a running table\'s header', () => {
     inOneRow(box);
     await page.screenshot({ path: '__screenshots__/atlas-online-header-panel.png', element: box });
   });
+
+  it('asks before stopping in the Add player row\'s place, so the panel keeps its height', async () => {
+    const box = surface();
+    const view = panelView({ ...SNAPSHOT, players: [{ id: 'a'.repeat(20), name: 'Ana', online: true }] }, SCENE, FEEDBACK);
+    renderPanel(box.createDiv({ cls: 'atlas-online-layer', attr: { id: 'panel' } }), view, actions());
+    const height = box.getBoundingClientRect().height;
+    box.querySelector<HTMLButtonElement>('.atlas-online-header__stop')!.click();
+    expect(box.querySelector('.atlas-online-confirm')).not.toBeNull();
+    expect(box.getBoundingClientRect().height).toBe(height);
+    await page.screenshot({ path: '__screenshots__/atlas-online-stop-confirm.png', element: box });
+  });
 });
