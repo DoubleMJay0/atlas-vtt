@@ -27,6 +27,8 @@ export const filters = {
   'filters.keyword.statblock': 'With or without a statblock: yes or no',
   'filters.keyword.layout': 'Statblock layout',
   'filters.keyword.template': 'Statblock template or layout',
+  'filters.keyword.text': 'Statblock text: words anywhere in it, like text:fire or text:"pack tactics"',
+  'filters.text': 'Text',
   'filters.exclude': 'Exclude',
   'filters.filterBy': 'Filter by',
   'filters.excludeField': 'Exclude {field}',
