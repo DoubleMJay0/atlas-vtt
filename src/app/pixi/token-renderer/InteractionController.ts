@@ -45,6 +45,7 @@ import { SelectionResourceEditing } from '../selectionResourceEditor';
 import { placedPlayerCharacterEntry } from '../../react/components/context-menu/playerCharacterMenu';
 import { holdTokens } from '../../lighting/sightOnDrop';
 import { t } from '../../i18n';
+import { mapTokens } from '../../tokens/offMap';
 
 interface DragState {
   isDragging: boolean;
@@ -149,14 +150,14 @@ export class InteractionController implements ITokenInteractionController {
     e.stopPropagation();
 
     if (e.button === 2) {
-      const token = this.store.getState().objects.tokens[tokenId];
+      const token = mapTokens(this.store.getState().objects)[tokenId];
       if (token && !this.isPlayerView) {
         this.showContextMenu(token, e);
       }
       return;
     }
 
-    const token = this.store.getState().objects.tokens[tokenId];
+    const token = mapTokens(this.store.getState().objects)[tokenId];
     if (!token) return;
     if (this.isPlayerView) {
       return;
@@ -179,7 +180,7 @@ export class InteractionController implements ITokenInteractionController {
     }
 
     // Use the first token as the reference for prepareInteraction (it will detect the multi-selection)
-    const firstToken = this.store.getState().objects.tokens[tokenIds[0]!];
+    const firstToken = mapTokens(this.store.getState().objects)[tokenIds[0]!];
     if (!firstToken) return;
 
     this.prepareInteraction(firstToken, e);
@@ -194,7 +195,7 @@ export class InteractionController implements ITokenInteractionController {
     if (prevId) {
       this.handleHoverEnd(prevId);
       // Emit hide preview for previous token
-      const prevToken = this.store.getState().objects.tokens[prevId];
+      const prevToken = mapTokens(this.store.getState().objects)[prevId];
       if (prevToken?.kind === 'character' && prevToken.statblockPath?.trim()) {
         this.eventBus.emit('pin-hide-preview', {
           pin: { id: prevToken.id, notePath: prevToken.statblockPath, x: prevToken.x, y: prevToken.y, type: 'token' },
@@ -207,7 +208,7 @@ export class InteractionController implements ITokenInteractionController {
     if (tokenId) {
       this.handleHoverStart(tokenId);
       // Emit hover preview for new token
-      const token = this.store.getState().objects.tokens[tokenId];
+      const token = mapTokens(this.store.getState().objects)[tokenId];
       if (token?.kind === 'character' && e && token.statblockPath?.trim()) {
         this.eventBus.emit('pin-hover-preview', {
           pin: {
@@ -478,7 +479,7 @@ export class InteractionController implements ITokenInteractionController {
       
       const tokenUpdates: Array<{id: string, x: number, y: number}> = [];
       const snapToGrid = this.store.getState().grid?.snapToGrid ?? true;
-      const tokens = this.store.getState().objects.tokens;
+      const tokens = mapTokens(this.store.getState().objects);
       
       for (const id of this.dragState.dragIds) {
         const initPos = this.dragState.initialPositions[id];
@@ -541,7 +542,7 @@ export class InteractionController implements ITokenInteractionController {
   private contextMenuTargets(tokenId: string): string[] {
     const { selectedIds, objects } = this.store.getState();
     if (!selectedIds.includes(tokenId)) return [tokenId];
-    return selectedIds.filter((id) => objects.tokens[id] !== undefined);
+    return selectedIds.filter((id) => mapTokens(objects)[id] !== undefined);
   }
 
   private showContextMenu(token: TokenEntity, e: FederatedPointerEvent): void {
@@ -556,14 +557,14 @@ export class InteractionController implements ITokenInteractionController {
     // Size
     entries.push(tokenSizeSubmenu(token.size, size => {
       const { grid, objects, updateToken } = this.store.getState();
-      const current = objects.tokens[token.id];
+      const current = mapTokens(objects)[token.id];
       if (!current) return;
       const center = resizedTokenCenter(current, current.size || 1, size, grid);
       updateToken(token.id, { size, x: center.x, y: center.y });
     }));
 
     // Hide/Show the selection in one undo step; the clicked token decides which way
-    const currentToken = this.store.getState().objects.tokens[token.id];
+    const currentToken = mapTokens(this.store.getState().objects)[token.id];
     const isHidden = currentToken?.isHidden || false;
     const hideTargets = this.contextMenuTargets(token.id);
     entries.push({
@@ -845,7 +846,7 @@ export class InteractionController implements ITokenInteractionController {
     for (const tokenId of tokenIds) {
       const { initiative, objects, addToInitiative, removeFromInitiative } = this.store.getState();
       const entry = initiative.entries.find((e) => e.tokenId === tokenId);
-      const token = objects.tokens[tokenId];
+      const token = mapTokens(objects)[tokenId];
       if (remove && entry) removeFromInitiative(entry.id);
       else if (!remove && !entry && token) addToInitiative(initiativeEntryForToken(token));
     }

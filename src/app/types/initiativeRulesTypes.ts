@@ -56,4 +56,10 @@ export interface InitiativeRules {
   dealEachRound?: true;
   /** Cards: combatants that are not on the players' side and look alike (the same art) share one card. */
   lookAlikesShare?: true;
+  /**
+   * A creature that joins a scene (placed from the library or an encounter, or added to the tracker
+   * beside the map) rolls its hit points from its statblock's hit dice instead of taking their
+   * average. Never a player character. Older versions ignore it.
+   */
+  rollHitPoints?: true;
 }

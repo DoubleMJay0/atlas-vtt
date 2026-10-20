@@ -14,6 +14,7 @@ import { StatblockFeeds } from './dm-screen/StatblockFeeds';
 import { Button } from '../../packages/components/primitives/button';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { addTokenHighlight, zoomToTokenWithHighlight } from '../../pixi/utils/tokenHighlight';
+import { isOffMap } from '../../tokens/offMap';
 import { toTokenVitals } from '../../services/statblockVitalsSync';
 import { useMapResources } from '../../resources/useMapResources';
 import { useDMScreenStatblocks } from './dm-screen/useDMScreenStatblocks';
@@ -404,7 +405,8 @@ export default function DMScreen({ isOpen, onClose }: DMScreenProps) {
                             onHoverToken: (id) => addTokenHighlight(view, id, { highlightDuration: 800 }),
                             onLocateToken: (id) => {
                               const token = tokens[id];
-                              if (!token) return;
+                              // A combatant kept beside the map has no place on it to show
+                              if (!token || isOffMap(token)) return;
                               zoomToTokenWithHighlight(view, id, { x: token.x, y: token.y });
                               handleClose();
                             },

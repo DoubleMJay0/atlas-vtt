@@ -2,6 +2,7 @@ import type { AtlasView } from '../atlas-view';
 import type { ViewAtlasState } from '../storeFactory';
 import { panToToken } from '../pixi/tokenFocus';
 import { addTokenHighlight } from '../pixi/utils/tokenHighlight';
+import { mapTokens } from '../tokens/offMap';
 
 /**
  * The selection after a click on a combatant's card, as a click on its token makes it: the token
@@ -17,7 +18,8 @@ export function cardClickSelection(selectedIds: readonly string[], tokenId: stri
  * their controls show, brings it into view at the GM's zoom (`panToToken`) and lets it glow. A token
  * the canvas does not show (the players' view, a peek, out of the players' sight) is not selected,
  * as the canvas itself drops it from the selection: its controls would float over empty map and
- * Delete or the arrow keys act on what nobody sees.
+ * Delete or the arrow keys act on what nobody sees. A combatant kept beside the map has nowhere to
+ * be brought to, and nothing happens.
  */
 export function focusCombatant(
   view: AtlasView | null,
@@ -25,7 +27,7 @@ export function focusCombatant(
   tokenId: string,
   additive: boolean,
 ): void {
-  const token = state.objects.tokens[tokenId];
+  const token = mapTokens(state.objects)[tokenId];
   if (!token) return;
   if (view?.renderer?.canvasShowsToken(tokenId)) state.setSelection(cardClickSelection(state.selectedIds, tokenId, additive));
   const viewport = view?.renderer?.getViewportInstance?.();

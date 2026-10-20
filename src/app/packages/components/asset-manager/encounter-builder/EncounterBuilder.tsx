@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { AnimatePresence, motion } from 'framer-motion';
 import type { App } from 'obsidian';
 import type { AssetService } from '../../../../services/AssetService';
+import type { AtlasView } from '../../../../atlas-view';
+import { spawnTokenGroups } from '../utils/tokenSpawnService';
 import { saveEncounter } from '../../../../encounters/encounterSaveService';
 import { collectionResources } from '../../../../resources/collectionResources';
 import { useCreatureIndex } from '../../../../creatures/useCreatureIndex';
@@ -20,15 +22,20 @@ import { StatblockSkeleton } from '../../../../react/components/statblock/Statbl
 import { countOf, encounterDrafts, withCount, type EncounterPick } from './encounterPicks';
 import { encounterMetrics } from './encounterMetrics';
 import { useEncounterRoster } from './useEncounterRoster';
+import { diceRandom } from '../../../../services/offlineDiceInputs';
 
 const SKELETONS = ['a', 'b', 'c', 'd'];
 
 interface EncounterBuilderProps {
   app: App;
+  /** The view the asset manager belongs to, whose scene picks are brought into; null for the open one. */
+  view: AtlasView | null;
   assetService: AssetService | null;
   collectionId: string;
   onClose: () => void;
   onSaved: () => void;
+  /** The picks were brought into the scene: the asset manager makes way for the map. */
+  onBrought: () => void;
 }
 
 /**
@@ -36,7 +43,7 @@ interface EncounterBuilderProps {
  * the DM screen float over the asset manager, searched and filtered as the Characters tab is, and
  * the tray at the bottom holds what was picked until it is saved as an encounter.
  */
-export function EncounterBuilder({ app, assetService, collectionId, onClose, onSaved }: EncounterBuilderProps): React.JSX.Element {
+export function EncounterBuilder({ app, view, assetService, collectionId, onClose, onSaved, onBrought }: EncounterBuilderProps): React.JSX.Element {
   const roster = useEncounterRoster(app, assetService, collectionId, true);
   const [picks, setPicks] = useState<EncounterPick[]>([]);
   const [saving, setSaving] = useState(false);
@@ -66,6 +73,21 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
       app.workspace.trigger('atlas-vtt:refresh-assets');
       onSaved();
       onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // A fight without saving an encounter first: the picks go into the open scene as they are
+  const bring = async (placement: 'beside' | 'fight'): Promise<void> => {
+    if (picks.length === 0) return;
+    setSaving(true);
+    try {
+      const groups = picks.map(({ token, count }) => ({ asset: token, count }));
+      const ids = await spawnTokenGroups({ app, view, assetService, random: diceRandom }, groups, placement);
+      if (ids.length === 0) return;
+      onClose();
+      onBrought();
     } finally {
       setSaving(false);
     }
@@ -168,6 +190,23 @@ export function EncounterBuilder({ app, assetService, collectionId, onClose, onS
               )}
             </AnimatePresence>
           </div>
+<<<<<<< HEAD
+=======
+          {renderFeed()}
+          <AnimatePresence>
+            {picks.length > 0 && (
+              <EncounterTray
+                picks={picks}
+                metrics={metrics}
+                saving={saving}
+                onCountChange={changeCount}
+                onClear={() => setPicks([])}
+                onSave={() => { void save(); }}
+                onBring={(placement) => { void bring(placement); }}
+              />
+            )}
+          </AnimatePresence>
+>>>>>>> beta
         </PaneDiceRolls>
       </motion.div>
     </motion.div>

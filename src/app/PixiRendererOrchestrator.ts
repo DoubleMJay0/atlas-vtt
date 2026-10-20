@@ -63,6 +63,7 @@ import { MapController } from './MapController';
 import { NO_STRETCH, readMapStretch, sameStretch, type MapStretch } from './grid/mapStretch';
 import { fitZoomRange } from './pixi/fitMapRect';
 import { viewCentreInClient, worldToClient, type ClientPoint } from './pixi/utils/worldToClient';
+import { mapTokens } from './tokens/offMap';
 
 export class PixiRendererOrchestrator { // Renamed class
   private _isDestroyed: boolean = false;
@@ -1138,7 +1139,7 @@ export class PixiRendererOrchestrator { // Renamed class
     if (!snapToGrid) return;
     
     // Handle position snapping
-    const tokens = state.objects?.tokens || {};
+    const tokens = mapTokens(state.objects);
     const tokenUpdates: Array<{id: string, x: number, y: number}> = [];
     
     for (const [id, token] of Object.entries(tokens)) {

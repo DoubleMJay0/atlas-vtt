@@ -5,6 +5,7 @@ import type { TokenEntity } from '../../types';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
 import type { SideId } from '../../types/initiativeRulesTypes';
 import { playerVision } from '../../characters/playerVision';
+import { isOffMap } from '../../tokens/offMap';
 import { t } from '../../i18n';
 
 interface CardMenuActions {
@@ -18,6 +19,9 @@ interface CardMenuActions {
   swapCard: (withId: string) => void;
   delay: () => void;
   actNow: () => void;
+  /** Puts a combatant kept beside the map on it. */
+  placeOnMap: () => void;
+  /** Takes the combatant out of the tracker; one kept beside the map goes with its token. */
   remove: () => void;
 }
 
@@ -43,7 +47,7 @@ export interface CardMenuMode {
  * The menu of a combatant's card. In turn order it rolls and edits the combatant's number; by
  * sides there is none, and the card moves to another side; in a fight by cards it swaps its card.
  * While a fight runs a combatant sits a round out, and in turn order delays its turn and acts
- * again when the GM says.
+ * again when the GM says. A combatant kept beside the map can be placed on it.
  */
 export function initiativeCardMenu(
   entry: InitiativeEntry,
@@ -98,6 +102,7 @@ export function initiativeCardMenu(
     ...(numbered ? [item(t('initiative.edit'), 'pencil', actions.edit)] : []),
     ...(mode.cards && entry.card !== undefined && mode.swapTargets.length > 0 ? [swapCard] : []),
     ...(mode.fightRuns ? [sitOut, ...(numbered ? [delay] : [])] : []),
+    ...(isOffMap(token) ? [item(t('initiative.placeOnMap'), 'map-pin', actions.placeOnMap)] : []),
     item(hidden ? t('initiative.showToPlayers') : t('initiative.hideFromPlayers'), hidden ? 'eye' : 'eye-off', () => actions.updateToken({ isHidden: !hidden })),
     { type: 'item', label: t('initiative.remove'), icon: 'trash-2', destructive: true, onClick: actions.remove },
   ];

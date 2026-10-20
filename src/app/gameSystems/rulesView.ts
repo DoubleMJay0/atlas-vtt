@@ -47,7 +47,8 @@ export interface RulesView {
 export function isSameAsTyped(typed: InitiativeRules, system: InitiativeRules): boolean {
   return typed.mode === system.mode && typed.roll === system.roll && sameTypedModifierSources(typed, system)
     && (typed.mode !== 'sides' || sameTypedSideParts(typed, system))
-    && (typed.mode !== 'cards' || sameTypedCardParts(typed, system));
+    && (typed.mode !== 'cards' || sameTypedCardParts(typed, system))
+    && Boolean(typed.rollHitPoints) === Boolean(system.rollHitPoints);
 }
 
 /** Rules as a dialog holds them: every part may be unset, or given as undefined. */
