@@ -9,7 +9,7 @@ import type { TokenPerception } from '../vision/tokenPerception';
 import { TokenExit } from './token-renderer/TokenExit';
 import { NOTHING_SEEN, PlayerSightTokens, seenByPlayers, seenTokens } from './token-renderer/PlayerSightTokens';
 import { PlayersViewWatch } from './token-renderer/PlayersViewWatch';
-import { PlayerInstanceBadges } from './token-renderer/PlayerInstanceBadges';
+import { PlayerInstanceBadges, type PlayerBadgeNumbers } from './token-renderer/PlayerInstanceBadges';
 import type { TokenSeen } from '../vision/measureOrigin';
 import { Sprite, Container, Graphics, Application, FederatedPointerEvent } from "pixi.js";
 import { Viewport } from "pixi-viewport";
@@ -624,6 +624,12 @@ export class TokenRenderer {
   /** Whether the canvas leaves `token` out: a hidden one in the players' perspective, and one the players' sight leaves out. */
   private hidesToken(token: TokenEntity, perception = this.playerSight.perception()): boolean {
     return ((token.isHidden ?? false) && this.isInPlayerMode()) || this.playerSight.hides(token.id, perception);
+  }
+
+  /** Whether the canvas shows the token: it is on the map and neither the players' perspective nor their sight leaves it out. */
+  public showsToken(tokenId: string): boolean {
+    const token = this.store.getState().objects.tokens[tokenId];
+    return token !== undefined && !this.hidesToken(token);
   }
 
   /** A token the canvas no longer shows cannot stay selected: its handles would float over nothing. */
@@ -1342,6 +1348,11 @@ export class TokenRenderer {
    */
   public playerFramePerception(lighting?: TokenPerception): TokenPerception | undefined {
     return this.playerSight.framePerception(lighting);
+  }
+
+  /** The numbers the players' instance badges show, as their last frame numbered them. */
+  public playerBadgeNumbers(): PlayerBadgeNumbers {
+    return this.playerBadges;
   }
 
   /** Whether the players see each token in their frame, by `lighting` with committed fog; never a hidden or missing one. */

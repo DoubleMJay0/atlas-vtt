@@ -16,6 +16,9 @@
 - Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.
 - Initiative: combatants with the same number are ordered by their initiative modifier.
 - Initiative: Clear initiative asks before it removes every combatant. It is in the tracker's ⋯ menu.
+- Initiative tracker: click a combatant's number to type it on the card. Tab goes on to the next card and Shift+Tab back, so you can type a whole table's initiative in a row. A combatant with no number yet shows an empty slot.
+- Initiative tracker: Show names in the tracker's ⋯ menu puts each combatant's name under its portrait, so two monsters of one kind can be told apart.
+- Initiative tracker: click a card's hit point bar to type a new value, as on the map's bar.
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
 - Atlas' messages slide in at the top right with a light spring and lift away when they close, and the messages below them move up smoothly. They sit as far from the top as from the right edge, like the dice rolls.
@@ -27,6 +30,9 @@
 
 ## Fixed
 
+- Initiative tracker: clicking a card selects its token, so its bars and their controls show, and brings it into view without zooming in further than needed.
+- The players' initiative list shows the number that tells look-alike monsters apart, as their badges on the map do.
+- With a pinned note open, an initiative card no longer shows its statblock without Ctrl (Cmd on macOS), and the statblock closes when the key is released or the pointer leaves the card.
 - Right-click menus on the map stay inside the map's pane and scroll when they are long, instead of running past its edge or moving while you point at their options. Submenus of a map in its own window open in that window. A menu closes when the window or pane is resized. Contributed by aecorn.
 - The token art panel no longer flickers in a short window or while the window is resized. Contributed by aecorn.
 - The line that measures a dragged token's path is no longer darkened by dynamic lighting, and it now stops at the token's edge.

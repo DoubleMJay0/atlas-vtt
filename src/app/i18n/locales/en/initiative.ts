@@ -15,6 +15,7 @@ export const initiative = {
   'initiative.delay': 'Delay Turn',
   'initiative.delayed': 'Delayed',
   'initiative.edit': 'Edit Initiative',
+  'initiative.editNumber': 'Initiative {value}, click to type',
   'initiative.editHint': 'Enter to save · Esc to cancel',
   'initiative.fantasyDex': 'Dex',
   'initiative.previewRead': {
@@ -45,6 +46,8 @@ export const initiative = {
   'initiative.remove': 'Remove from Initiative',
   'initiative.removeFallback': 'Remove fallback',
   'initiative.roll': 'Roll Initiative',
+  'initiative.showNames': 'Show names',
+  'initiative.showNamesHint': 'Puts each combatant\'s name on its card, so two of one kind can be told apart',
   'initiative.sitOut': 'Sit Out This Round',
   'initiative.statblocksLoading': {
     one: 'Fantasy Statblocks is still reading the vault: {count} combatant rolled without its statblock\'s modifier',
@@ -54,4 +57,5 @@ export const initiative = {
   'initiative.toBack': 'Move to Back',
   'initiative.toFront': 'Move to Front',
   'initiative.token': 'Token',
+  'initiative.typeNumber': 'No initiative yet, click to type',
 } as const satisfies Record<string, Message>;

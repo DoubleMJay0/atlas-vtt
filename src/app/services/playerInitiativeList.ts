@@ -6,6 +6,7 @@ import { createTokenPortrait } from '../packages/components/shared/tokenPortrait
 import { SIDE_LABELS, listedBySides, sideOf, sidesInOrder } from '../initiative/sides';
 import { combatantDefeated } from '../initiative/defeated';
 import { scrollWithin } from '../utils/scrollWithin';
+import { hasInitiative } from '../initiative/awaitingInitiative';
 import { setIcon } from 'obsidian';
 import './player-initiative.scss';
 import { t } from '../i18n';
@@ -22,7 +23,7 @@ export interface EntryToken {
 }
 
 /** What the players' list shows of an initiative entry. */
-export type PlayerInitiativeEntry = Pick<InitiativeEntry, 'tokenId' | 'name' | 'initiative' | 'isActive' | 'imagePath' | 'order' | 'sitsOut' | 'delayed'>;
+export type PlayerInitiativeEntry = Pick<InitiativeEntry, 'tokenId' | 'name' | 'initiative' | 'awaitingInitiative' | 'isActive' | 'imagePath' | 'order' | 'sitsOut' | 'delayed'>;
 
 /** A combatant the players see, with what the list shows of its token. */
 export interface Combatant {
@@ -49,6 +50,8 @@ export interface PlayerInitiativeLook {
   showNames: boolean;
   /** The address of an entry's portrait, or null to draw none. */
   portraitSrc(imagePath: string): string | null;
+  /** The number a combatant's badge shows the players on the map, which tells look-alikes apart; null for none. */
+  badgeNumber?(tokenId: string): number | null;
 }
 
 /** Whether players see a combatant: its token is on the map and not hidden. */
@@ -156,11 +159,14 @@ function renderEntry(parent: HTMLElement, { entry, token }: Combatant, look: Pla
   if (entry.sitsOut) card.addClass('atlas-player-initiative__card--sitting-out');
   if (entry.delayed) card.addClass('atlas-player-initiative__card--delayed');
   const src = entry.imagePath ? look.portraitSrc(entry.imagePath) : null;
-  if (src) {
-    createTokenPortrait(card, { src, alt: look.showNames ? entry.name : '', cls: 'atlas-player-initiative__avatar', showRing: token.showRing, ringColor: token.ringColor });
-  }
+  const portrait = src
+    ? createTokenPortrait(card, { src, alt: look.showNames ? entry.name : '', cls: 'atlas-player-initiative__avatar', showRing: token.showRing, ringColor: token.ringColor })
+    : null;
+  const badge = look.badgeNumber?.(entry.tokenId) ?? null;
+  if (badge !== null) (portrait ?? card).createSpan({ cls: 'atlas-player-initiative__badge', text: String(badge) });
   if (token.defeated) renderDefeated(card, src !== null);
-  if (showValue) card.createSpan({ cls: 'atlas-player-initiative__value', text: String(entry.initiative) });
+  // A combatant without a number yet shows a dash, not a 0 nobody rolled
+  if (showValue) card.createSpan({ cls: 'atlas-player-initiative__value', text: hasInitiative(entry) ? String(entry.initiative) : '–' });
   if (look.showNames) {
     card.createSpan({ cls: 'atlas-player-initiative__name', text: entry.name });
   }

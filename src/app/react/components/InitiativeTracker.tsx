@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { openContextMenuGlobal } from '../root/ContextMenuContext';
 import {
   Dices,
@@ -10,16 +9,17 @@ import {
 } from 'lucide-react';
 import { useAtlasStore, useViewStoreHook } from '../ViewStoreContext';
 import { useAtlasUI } from '../root/AtlasUIContext';
+import { useAtlasSettings } from '../../keyboard/useMapHotkeys';
+import { useNumberEditing } from './useNumberEditing';
 import { listedBySides } from '../../initiative/sides';
 import { defeatedCombatants } from '../../initiative/defeated';
 import { useMapResources } from '../../resources/useMapResources';
 import { useInitiativeTokenSync } from '../../initiative/useInitiativeTokenSync';
 import { useMapInitiativeRules } from '../../initiative/useMapInitiativeRules';
 import { useInitiativeRolls } from '../../initiative/useInitiativeRolls';
-import { initiativeEdit, modifierText } from '../../initiative/initiativeEdit';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { scrollWithin } from '../../utils/scrollWithin';
-import { EditInitiativePopup } from './EditInitiativePopup';
+import { useEditInitiativePopup } from './useEditInitiativePopup';
 import { InitiativeCard } from './InitiativeCard';
 import { useInitiativeCardMenu } from './useInitiativeCardMenu';
 import { initiativeTrackerOptions } from './initiativeTrackerOptions';
@@ -40,6 +40,8 @@ import './initiative-tracker.scss';
  */
 export const InitiativeTracker: React.FC = () => {
   const { app, view } = useAtlasUI();
+  const settings = useAtlasSettings();
+  const showNames = settings?.showsInitiativeNames() ?? false;
 
   // Store state
   const isOpen = useAtlasStore((s) => s.initiativeTrackerOpen);
@@ -75,10 +77,7 @@ export const InitiativeTracker: React.FC = () => {
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [hotkeyPressed, setHotkeyPressed] = useState<'prev' | 'next' | null>(null);
-  const [editingEntry, setEditingEntry] = useState<InitiativeEntry | null>(null);
-  const [editAnchorRect, setEditAnchorRect] = useState<DOMRect | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
-  const [editModifier, setEditModifier] = useState<string>('');
+  const { open: openEditPopup, popup: editPopup } = useEditInitiativePopup(updateInitiativeEntry);
 
   // The turn stays in view in a list longer than the panel: the combatant's card, or the top of its side
   const contentRef = useRef<HTMLDivElement>(null);
@@ -118,6 +117,13 @@ export const InitiativeTracker: React.FC = () => {
     return [...initiative.entries].sort((a, b) => a.order - b.order);
   }, [initiative.entries]);
 
+  // Numbers typed on the cards; Tab goes on down the list as it shows, the delayed below the order
+  const shownOrder = useMemo(
+    () => [...sortedEntries.filter((entry) => !entry.delayed), ...sortedEntries.filter((entry) => entry.delayed)],
+    [sortedEntries],
+  );
+  const numberEditing = useNumberEditing(shownOrder, updateInitiativeEntry);
+
   // Drag and drop handlers
   const handleDragStart = useCallback((index: number): void => {
     setDragFromIndex(index);
@@ -135,32 +141,30 @@ export const InitiativeTracker: React.FC = () => {
     setDragOverIndex(null);
   }, [dragFromIndex, dragOverIndex, reorderInitiative]);
 
-  const openEdit = useCallback((entry: InitiativeEntry, cardElement: HTMLElement): void => {
-    setEditingEntry(entry);
-    setEditAnchorRect(cardElement.getBoundingClientRect());
-    setEditValue(String(entry.initiative));
-    setEditModifier(modifierText(entry));
-  }, []);
-  const handleContextMenu = useInitiativeCardMenu({ tokens, bySides, fightRuns: initiative.isActive, roll, defeated, edit: openEdit });
+  const handleContextMenu = useInitiativeCardMenu({ tokens, bySides, fightRuns: initiative.isActive, roll, defeated, edit: openEditPopup });
 
   const openOptions = (event: React.MouseEvent<HTMLButtonElement>): void => {
     const button = event.currentTarget;
     const rect = button.getBoundingClientRect();
     const entries = initiativeTrackerOptions(
-      { autoSort: initiative.config.autoSort, bySides, empty: initiative.entries.length === 0 },
-      { setAutoSort: (autoSort) => setInitiativeConfig({ autoSort }), clear: resetInitiative },
+      { autoSort: initiative.config.autoSort, bySides, empty: initiative.entries.length === 0, showNames },
+      {
+        setAutoSort: (autoSort) => setInitiativeConfig({ autoSort }),
+        setShowNames: (on) => settings?.setInitiativeNames(on),
+        clear: resetInitiative,
+      },
     );
     openContextMenuGlobal(entries, { x: rect.left, y: rect.bottom }, { returnFocus: button, doc: button.ownerDocument });
   };
 
-  // Hover handler for statblock preview (CMD+hover)
-  // Preview stays open while CMD is held - only CMD release closes it
+  // Hover handler for statblock preview (Mod+hover): it lives while Mod is held, and a card left without Mod ends it
   const handleEntryHover = useCallback(
     (entry: InitiativeEntry | null, cardElement?: HTMLElement): void => {
-      // Ignore null entries - only CMD release closes the preview
-      if (!entry || !entry.statblockPath) {
+      if (!entry) {
+        previewActions.closePreview();
         return;
       }
+      if (!entry.statblockPath) return;
 
       // The scene this list was drawn from goes with the preview, whatever loads while it stays open
       const originContext = captureRollContext(view?.viewId, { mapPath, mapLoaded, isMapLoading, objects: { tokens } }, [entry.tokenId]);
@@ -179,6 +183,11 @@ export const InitiativeTracker: React.FC = () => {
       entry={entry}
       index={index}
       bySides={bySides}
+      showName={showNames}
+      isEditingNumber={numberEditing.editingId === entry.id}
+      onStartNumberEdit={numberEditing.start}
+      onCommitNumber={numberEditing.commit}
+      onCancelNumberEdit={numberEditing.cancel}
       isHoveredForPreview={previewState.hoveredEntry?.entry.id === entry.id}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -189,7 +198,7 @@ export const InitiativeTracker: React.FC = () => {
   );
 
   return (
-    <div className="atlas-initiative-tracker">
+    <div className={`atlas-initiative-tracker${showNames ? ' atlas-initiative-tracker--named' : ''}`}>
       {/* Controls row: Roll + Combat + Clear */}
       <div className="atlas-initiative-tracker__controls">
         {/* Nothing is rolled where the sides take turns */}
@@ -280,26 +289,7 @@ export const InitiativeTracker: React.FC = () => {
       </div>
 
       {/* Edit Initiative Popup - positioned like statblock preview */}
-      {editingEntry && editAnchorRect && createPortal(
-        <EditInitiativePopup
-          entry={editingEntry}
-          anchorRect={editAnchorRect}
-          value={editValue}
-          onChange={setEditValue}
-          modifier={editModifier}
-          onModifierChange={setEditModifier}
-          onConfirm={() => {
-            updateInitiativeEntry(editingEntry.id, initiativeEdit(editValue, editModifier));
-            setEditingEntry(null);
-            setEditAnchorRect(null);
-          }}
-          onCancel={() => {
-            setEditingEntry(null);
-            setEditAnchorRect(null);
-          }}
-        />,
-        document.body
-      )}
+      {editPopup}
     </div>
   );
 };

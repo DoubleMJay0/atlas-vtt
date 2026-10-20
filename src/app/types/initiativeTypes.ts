@@ -30,6 +30,12 @@ export interface InitiativeEntry {
   initiative: number;
 
   /**
+   * Added and not yet rolled or typed: `initiative` holds 0, which the tracker shows as an empty
+   * slot. Any write of `initiative` removes it (`setInitiative`); older versions leave it alone.
+   */
+  awaitingInitiative?: true;
+
+  /**
    * The GM's own modifier, added to every roll (`ownModifier`). Every version writes it, 0 where
    * there is none, and older ones add it to their rolls.
    */
