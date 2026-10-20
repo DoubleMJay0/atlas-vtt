@@ -58,6 +58,8 @@ interface DragState {
   pendingUpdate: boolean;
   hasMoved: boolean;
   clickToken?: TokenEntity;
+  /** The press grabbed a token outside the selection: it is selected on release if it never moved, and a drag leaves the selection as it was. */
+  selectsOnRelease?: boolean;
   /** Alt/Option was held at pointer down: the drag moves copies and leaves the originals. */
   copyOnDrag?: boolean;
   /** The token the pointer grabbed; the drag ruler measures its path. */
@@ -261,6 +263,7 @@ export class InteractionController implements ITokenInteractionController {
     this.dragState.clickToken = token;
     this.dragState.hasMoved = false;
     this.dragState.copyOnDrag = e.altKey;
+    this.dragState.selectsOnRelease = false;
     
     // Determine which tokens to potentially drag
     if (e.shiftKey) {
@@ -270,9 +273,7 @@ export class InteractionController implements ITokenInteractionController {
       this.dragState.dragIds = [...selectedIds];
     } else {
       this.dragState.dragIds = [token.id];
-      // Always select the clicked token immediately
-      // This ensures clicking on a different token switches selection
-      setSelection(this.dragState.dragIds);
+      this.dragState.selectsOnRelease = !isTokenSelected;
     }
 
     // Initialize drag state
@@ -289,7 +290,7 @@ export class InteractionController implements ITokenInteractionController {
     }
     
     this.dragState.isDragging = true;
-    // Tokens this press selects stay at rest until release, so a drag never grows their UI first
+    // Tokens outside the selection stay at rest until release, so a drag never grows their UI
     this.reportHeld(this.dragState.dragIds.filter((id) => !selectedIds.includes(id)));
     
     // Don't set isDragging in store yet - wait for actual movement
@@ -386,7 +387,7 @@ export class InteractionController implements ITokenInteractionController {
 
   /** Swaps the drag over to fresh copies of the dragged tokens, which then become the selection. */
   private dragCopiesInstead(): void {
-    const copies = copyDragSelection(this.store, this.dragState.dragIds, this.dragState.initialPositions);
+    const copies = copyDragSelection(this.store, this.dragState.dragIds, this.dragState.initialPositions, !this.dragState.selectsOnRelease);
     if (!copies) return;
     this.dragState.dragIds = copies.ids;
     this.dragState.initialPositions = copies.initialPositions;
@@ -450,10 +451,8 @@ export class InteractionController implements ITokenInteractionController {
       
       // Check if this was a click (no significant movement)
       if (!this.dragState.hasMoved && this.dragState.clickToken) {
-        // This was a click, not a drag
-        // Selection was already handled in prepareInteraction
-        
-        // Clean up and exit early - no drag occurred
+        // A click selects a token the press found outside the selection
+        if (this.dragState.selectsOnRelease) this.store.getState().setSelection([this.dragState.clickToken.id]);
         this.cleanupDragListeners();
         this.viewport.plugins.resume('drag');
         delete this.dragState.clickToken;
@@ -524,6 +523,7 @@ export class InteractionController implements ITokenInteractionController {
       this.dragState.pendingUpdate = false;
       this.dragState.hasMoved = false;
       delete this.dragState.clickToken;
+      this.dragState.selectsOnRelease = false;
       this.reportHeld([]);
     }
   }

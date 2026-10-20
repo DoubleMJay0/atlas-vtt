@@ -1829,8 +1829,8 @@ export class TokenRenderer {
     if (tokenId) {
       markHandled(e);
       this.interactionController.handleViewportTokenPointerDown(tokenId, e);
-      // Drawings selected alongside the token follow its drag
-      if (e.button === 0) this.drawingDragStartHandler?.(e);
+      // Drawings selected alongside the token follow its drag; a token from outside the selection moves alone
+      if (e.button === 0 && this.store.getState().selectedIds.includes(tokenId)) this.drawingDragStartHandler?.(e);
       return;
     }
 

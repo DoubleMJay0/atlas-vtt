@@ -636,7 +636,7 @@ describe('TokenRenderer Integration Tests', () => {
   });
 
   describe('Selection & Drag', () => {
-    it('should select a token on pointer down, drag it and commit the snapped position as one undo step', async () => {
+    it('should drag a token without selecting it and commit the snapped position as one undo step', async () => {
       store.getState().addToken(token({ id: 'token-1', x: 105, y: 105 }));
       await waitForTokens('token-1');
       expect(tokenRenderer.hitTestTokens(105, 105)).toBe('token-1');
@@ -644,13 +644,14 @@ describe('TokenRenderer Integration Tests', () => {
       const undoStepsBefore = getHistoryStore(store)!.getState().pastStates.length;
 
       viewport.emit('pointerdown', pointerEvent(105, 105));
-      expect(store.getState().selectedIds).toEqual(['token-1']);
+      expect(store.getState().selectedIds).toEqual([]);
 
       viewport.emit('pointermove', pointerEvent(180, 105));
       expect(tokenGroup('token-1').position).toMatchObject({ x: 180, y: 105 });
       expect(store.getState().isDragging).toBe(true);
 
       viewport.emit('pointerup', pointerEvent(180, 105));
+      expect(store.getState().selectedIds).toEqual([]);
 
       // 180 lies in the third 70px cell, whose centre is 175.
       expect(store.getState().objects.tokens['token-1']).toMatchObject({ x: 175, y: 105 });
@@ -661,6 +662,31 @@ describe('TokenRenderer Integration Tests', () => {
       expect(store.getState().isDragging).toBe(false);
       expect(selectionOverlayUpdater).toHaveBeenCalled();
       expect(getHistoryStore(store)!.getState().pastStates).toHaveLength(undoStepsBefore + 1);
+    });
+
+    it('should select a clicked token on release, and drag a token from outside the selection without what is selected', async () => {
+      store.getState().addToken(token({ id: 'token-1', x: 105, y: 105 }));
+      store.getState().addToken(token({ id: 'token-2', x: 315, y: 105 }));
+      await waitForTokens('token-1', 'token-2');
+      const drawingDrag = vi.fn();
+      tokenRenderer.setDrawingDragStartHandler(drawingDrag);
+
+      viewport.emit('pointerdown', pointerEvent(315, 105));
+      expect(store.getState().selectedIds).toEqual([]);
+      viewport.emit('pointerup', pointerEvent(315, 105));
+      expect(store.getState().selectedIds).toEqual(['token-2']);
+      expect(drawingDrag).not.toHaveBeenCalled();
+
+      viewport.emit('pointerdown', pointerEvent(105, 105));
+      viewport.emit('pointermove', pointerEvent(180, 105));
+      viewport.emit('pointerup', pointerEvent(180, 105));
+      expect(store.getState().selectedIds).toEqual(['token-2']);
+      expect(drawingDrag).not.toHaveBeenCalled();
+
+      // A selected token's press still takes the selected drawings along
+      viewport.emit('pointerdown', pointerEvent(315, 105));
+      expect(drawingDrag).toHaveBeenCalledTimes(1);
+      viewport.emit('pointerup', pointerEvent(315, 105));
     });
   });
 
@@ -1050,7 +1076,6 @@ describe('TokenRenderer Integration Tests', () => {
           seen = false;
           tokenRenderer.refreshPlayerSight();
           expect(tokenGroup('token-1').visible).toBe(true);
-          expect(store.getState().selectedIds).toEqual(['token-1']);
 
           viewport.emit('pointerup', pointerEvent(180, 105));
           expect(tokenGroup('token-1').visible).toBe(false);

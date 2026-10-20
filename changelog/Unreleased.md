@@ -55,6 +55,7 @@
 - Senses are now available in Russian: the sense editors in Edit Token and the collection settings' Vision tab, and the conditions' effect on sight.
 - The dice settings, the dice tray, the roll panel and part of the dice lab are now available in Russian.
 - The toolbar editor and links to scenes and encounters in notes are now available in Russian.
+- Dragging a token no longer selects it. Click a token and let go without moving it to select it; dragging one leaves the selection as it was.
 
 ## Fixed
 - Deleting an encounter also deletes its thumbnail picture, unless a copy of the encounter still uses it.

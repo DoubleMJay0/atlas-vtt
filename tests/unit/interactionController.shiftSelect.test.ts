@@ -50,10 +50,25 @@ describe('InteractionController shift-click selection', () => {
     expect(controller.isDraggingTokens()).toBe(false);
   });
 
-  it('plain click still replaces the selection', () => {
-    const { controller, setSelection } = makeController(['a']);
+  it('plain click replaces the selection once the button is released', () => {
+    const { controller, setSelection, viewport } = makeController(['a']);
     controller.handleViewportTokenPointerDown('b', plainClick);
+    expect(setSelection).not.toHaveBeenCalled();
+    const onUp = viewport.on.mock.calls.find(([name]: [string]) => name === 'pointerup')[1];
+    onUp({ global: { x: 0, y: 0 } });
     expect(setSelection).toHaveBeenCalledWith(['b']);
+  });
+
+  it('a drag of a token outside the selection leaves the selection as it was', () => {
+    const { controller, setSelection, viewport } = makeController(['a']);
+    controller.setTokenSpriteProvider(() => ({ position: { x: 35, y: 35, set: vi.fn() } }) as any);
+    (viewport.toWorld as ReturnType<typeof vi.fn>).mockImplementation((point: { x: number; y: number }) => point);
+    controller.handleViewportTokenPointerDown('b', { ...plainClick, global: { x: 35, y: 35 } });
+    const onMove = viewport.on.mock.calls.find(([name]: [string]) => name === 'pointermove')[1];
+    const onUp = viewport.on.mock.calls.find(([name]: [string]) => name === 'pointerup')[1];
+    onMove({ global: { x: 105, y: 35 } });
+    onUp({ global: { x: 105, y: 35 } });
+    expect(setSelection).not.toHaveBeenCalled();
   });
 });
 
