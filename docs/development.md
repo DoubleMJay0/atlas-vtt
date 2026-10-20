@@ -22,7 +22,7 @@ beta builds are unreachable from production installs.
 npm ci
 npx tsc --noEmit
 npm run lint
-npx vitest run
+npx vitest run --project unit
 npm run build:ci
 npm run preflight
 npm run release:prepare
@@ -30,6 +30,18 @@ npm run release:prepare
 
 `build:ci` builds without copying files into a local vault. CI runs these checks
 and every one of them blocks the merge, lint included.
+
+### Tests
+
+Unit tests run in Node. A test that needs a DOM (React, `document`, canvas
+elements) starts with `// @vitest-environment jsdom`; without it, it fails with
+`document is not defined`. Keep that line off tests that do not need it: jsdom
+adds about 0.4 s of CPU to every file that loads it.
+
+A test pays for every module its imports reach. Code that only looks for open
+maps reads `ATLAS_VIEW_TYPE` and `isAtlasView` from `atlasViewType.ts`, never
+the map view itself, which loads the whole app. `npm run test:gpu` runs the
+browser tests, locally only.
 
 ### Lint
 

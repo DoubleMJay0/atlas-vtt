@@ -1,10 +1,10 @@
+// @vitest-environment jsdom
 import React from 'react';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TFile } from 'obsidian';
 
 vi.mock('../../../../src/app/pixi/utils/tokenHighlight', () => ({ zoomToTokenWithHighlight: vi.fn(), addTokenHighlight: vi.fn() }));
-vi.mock('../../../../src/app/atlas-view', () => ({ ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 vi.mock('../../../../src/app/react/components/LinkedNotePicker', () => ({ default: () => null }));
 vi.mock('../../../../src/app/resources/useMapResources', () => ({ useMapResources: () => [] }));
 vi.mock('../../../../src/app/react/root/AtlasUIContext', async () => ({

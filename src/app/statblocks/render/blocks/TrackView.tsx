@@ -10,21 +10,24 @@ import { LabelledLine } from '../values/LabelledLine';
 import { StandIn, ValueText } from '../values/ValueText';
 import { ValueSlot } from '../valueSlot';
 import type { BlockViewProps } from './blockViewProps';
+import { MAX_TRACK_BOXES } from '../values/trackBoxes';
+import { trackedShown } from '../values/trackedShown';
 
-/** Above this many, a box track would fill the card: it shows as a gauge instead. */
-export const MAX_TRACK_BOXES = 36;
 
 type TrackStyle = React.CSSProperties & Record<`--${string}`, string | number>;
 
 /**
  * The value the track shows: the token's, where the statblock is shown for a
- * token that holds the resource; else where it starts, full when it counts
- * down and empty when it counts up. It is drawn in the theme's accent, as the
- * rest of the card is, never in the resource's colour on the map.
+ * token that holds the resource or the tracked number; else where it starts,
+ * full when it counts down and empty when it counts up. It is drawn in the
+ * theme's accent, as the rest of the card is, never in the resource's colour
+ * on the map.
  */
 function trackValue(block: TrackBlock, sheet: SheetState): ResourceValue | null {
   const held = block.resource ? sheet.token?.resources?.[block.resource] : undefined;
   if (held && held.max > 0) return held;
+  const tracked = trackedShown(block.field, sheet);
+  if (tracked) return { ...tracked, current: block.counts === sheet.tracked.get(block.field)?.counts ? tracked.current : tracked.max - tracked.current };
   const max = numericValue(sheet.reader(block.field));
   if (max === null || max <= 0) return null;
   const whole = Math.floor(max);

@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { parseCreatureFilters, parseHiddenCreatureFilters } from '../../../creatures/creatureFilterDefinitions';
+import { parseRecovery } from '../../../recovery/parseRecovery';
+import type { RecoveryRecord } from '../../../recovery/recoveryTypes';
+import { changedResourceKeys, withSavedResourceKeys } from '../../../recovery/editor/recoveryResourceKeys';
+import { savedResources } from '../../../resources/resourceDefinitions';
 import type { AssetService } from '../../../services/AssetService';
 import type { StatblockRole, StatblockRoleFolders } from '../../../statblocks/model/roleTypes';
 import {
@@ -37,6 +41,12 @@ export interface CollectionSettingsDraft extends Omit<RulesDraft, 'toSettings'> 
   /** The collection's own folder per role id; a preset neither sets nor clears them. */
   statblockRoleFolders: StatblockRoleFolders;
   setStatblockRoleFolders: (folders: StatblockRoleFolders) => void;
+  /** Unset while the collection takes the recovery buttons of its preset; read with `collectionRecovery`. */
+  recovery: RecoveryRecord | undefined;
+  /** Set only once the GM edits the buttons (`editedRecovery`), so an untouched collection keeps following its preset. */
+  setRecovery: (recovery: RecoveryRecord | undefined) => void;
+  /** The own buttons as saving stores them: rules on a resource added in the dialog aim at the key it is saved with. */
+  savedRecovery: () => RecoveryRecord | undefined;
   /** The draft as the settings to save. */
   toSettings: () => Partial<CollectionSettings>;
 }
@@ -56,6 +66,7 @@ export function useCollectionSettingsDraft(
   const [hiddenCreatureFilters, setHiddenCreatureFilters] = useState<string[]>([]);
   const [statblockRoles, setStatblockRoles] = useState<readonly StatblockRole[] | undefined>(undefined);
   const [statblockRoleFolders, setStatblockRoleFolders] = useState<StatblockRoleFolders>({});
+  const [recovery, setRecovery] = useState<RecoveryRecord | undefined>(undefined);
   const { load } = rules;
 
   useEffect(() => {
@@ -73,20 +84,27 @@ export function useCollectionSettingsDraft(
     const ownRoles = parseStatblockRoles(settings.statblockRoles);
     setStatblockRoles(ownRoles?.length ? ownRoles : undefined);
     setStatblockRoleFolders(parseStatblockRoleFolders(settings.statblockRoleFolders) ?? {});
+    setRecovery(parseRecovery(settings.recovery));
   }, [isOpen, collectionId, assetService, load]);
+
+  // Rules on a resource added in this dialog follow it to the key it is saved with.
+  const savedRecovery = (): RecoveryRecord | undefined =>
+    recovery && withSavedResourceKeys(recovery, changedResourceKeys(rules.resources, savedResources(rules.resources)));
 
   return {
     ...rules,
-    // The collection reads its preset's roles until they are edited.
+    // The collection reads its preset's roles and recovery buttons until they are edited.
     applyPreset: (preset: SystemPreset): void => {
       rules.applyPreset(preset);
       setStatblockRoles(undefined);
       setItemRarities(undefined);
+      setRecovery(undefined);
     },
     clearSystem: (): void => {
       rules.clearSystem();
       setStatblockRoles(undefined);
       setItemRarities(undefined);
+      setRecovery(undefined);
     },
     customCreatureFilters, setCustomCreatureFilters,
     hiddenCreatureFilters, setHiddenCreatureFilters,
@@ -96,17 +114,23 @@ export function useCollectionSettingsDraft(
     itemRarities, setItemRarities,
     statblockRoles, setStatblockRoles,
     statblockRoleFolders, setStatblockRoleFolders,
-    toSettings: () => ({
-      ...rules.toSettings(),
-      // Trimmed, with the field as label where none was typed.
-      customCreatureFilters: parseCreatureFilters(customCreatureFilters),
-      hiddenCreatureFilters,
-      lootBases,
-      lootCurrency: lootCurrency.trim() || undefined,
-      randomTables: randomTables.length > 0 ? [...randomTables] : undefined,
-      itemRarities,
-      statblockRoles: statblockRoles?.length ? savedStatblockRoles(statblockRoles) : undefined,
-      statblockRoleFolders: savedRoleFolders(statblockRoleFolders, statblockRoles),
-    }),
+    recovery, setRecovery,
+    savedRecovery,
+    toSettings: () => {
+      const system = rules.toSettings();
+      return {
+        ...system,
+        // Trimmed, with the field as label where none was typed.
+        customCreatureFilters: parseCreatureFilters(customCreatureFilters),
+        hiddenCreatureFilters,
+        lootBases,
+        lootCurrency: lootCurrency.trim() || undefined,
+        randomTables: randomTables.length > 0 ? [...randomTables] : undefined,
+        itemRarities,
+        statblockRoles: statblockRoles?.length ? savedStatblockRoles(statblockRoles) : undefined,
+        statblockRoleFolders: savedRoleFolders(statblockRoleFolders, statblockRoles),
+        recovery: savedRecovery(),
+      };
+    },
   };
 }

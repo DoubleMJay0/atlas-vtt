@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { App } from 'obsidian';
 import { atlasPlayerSettings } from '../../../../src/app/online/gm/atlasLighting.ts';

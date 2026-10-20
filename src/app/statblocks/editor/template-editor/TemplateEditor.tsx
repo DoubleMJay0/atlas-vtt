@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { App } from 'obsidian';
 import { useTemplateLibrary } from '../../library/useTemplateLibrary';
 import { deleteTemplate } from '../../library/templateActions';
+import { recoveryButtonsLost } from '../../library/templateRecovery';
 import { templateUsage, type TemplateUsage } from '../../library/templateUsage';
 import type { FieldRecord } from '../../values/fieldValues';
 import { TemplateDragAndDrop } from '../dnd/DndProvider';
@@ -20,6 +21,7 @@ import type { LabelPart } from './labelTargets';
 import { EditorOverlays } from './EditorOverlays';
 import { insertItems } from './insertItems';
 import { optionsKindOf } from './options/optionsKind';
+import { usePlayersRow } from './options/usePlayersRow';
 import { TemplateJsonEditor } from './json/TemplateJsonEditor';
 import { nameTakenIn, type SaveRequest } from './save/saveChoice';
 import { SaveTemplateDialog } from './save/SaveTemplateDialog';
@@ -68,7 +70,7 @@ const EMPTY_RECORD: FieldRecord = {};
  * The template editor (§2): the note view with its statblock, the template's
  * note (the text new statblocks start with, in Obsidian's own editor) on the
  * left and the card on the right at the width the user's notes give it, with
- * the dock of the six kinds over the note column. The card is the grid
+ * the dock of the seven kinds over the note column. The card is the grid
  * (`templateGrid`), drawn empty and unfolded: its tiles are selected, renamed
  * in place, configured through the toolbar under them and dragged by their
  * handle. Every change edits the session's draft, one undo step per action;
@@ -91,6 +93,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
   const [options, setOptions] = useState<{ focusKey?: string | undefined } | null>(null);
   const collectionId = useEditorCollection(app, props.collectionId);
   const collectionKeys = useCollectionFieldKeys(app, collectionId);
+  const playersRow = usePlayersRow(app);
   const library = useTemplateLibrary(app ?? null);
   const room = usePanelRoom(app, rowRef, previewRef);
   // A template just made, with no tile to select, opens with the cursor in its text.
@@ -133,7 +136,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
   const context: TemplateEditorContextValue = {
     app, session, snapshot, selection: state.selection, select: state.select,
     insert: (item) => state.insert(item),
-    editLabel, announce: state.announce, collectionId, collectionKeys, openOptions, tableTyping,
+    editLabel, announce: state.announce, collectionId, collectionKeys, openOptions, playersRow, tableTyping,
   };
   // Focus goes back to the card: the selected tile, else the first thing on it.
   const closeJson = (): void => {
@@ -269,6 +272,7 @@ export function TemplateEditor(props: TemplateEditorProps): React.JSX.Element {
             templateId={snapshot.id}
             usage={deleting}
             templates={library?.templates ?? []}
+            lostButtons={(replacement) => recoveryButtonsLost(app, snapshot.id, replacement)}
             onDelete={async (replacement) => {
               await deleteTemplate(app, snapshot.id, replacement);
               setDeleting(null);

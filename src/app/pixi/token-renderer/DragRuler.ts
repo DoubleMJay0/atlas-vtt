@@ -14,6 +14,13 @@ import { formatDistance, type MeasurementSettings } from '../../grid/measurement
 import type { ViewAtlasState } from '../../storeFactory';
 import type { LayerVisibility } from '../playerSafeFrame';
 import type { DragRulerView } from './DragRulerView';
+import { computeTokenPixelSize } from './tokenSizing';
+
+/** What a drag ruler measures: the token and the points it runs through (its start, each waypoint, its landing). */
+export interface DragRulerPath {
+  readonly tokenId: string;
+  readonly points: readonly Point[];
+}
 
 export class DragRuler {
   private tokenId: string | null = null;
@@ -55,6 +62,13 @@ export class DragRuler {
     this.view.clear();
   }
 
+  /** The path the ruler shows now, or null while it shows none (no drag, or one that has not left its start). */
+  path(): DragRulerPath | null {
+    const landing = this.landing;
+    if (!this.tokenId || !landing || this.waypoints.every(point => samePoint(point, landing))) return null;
+    return { tokenId: this.tokenId, points: [...this.waypoints, landing] };
+  }
+
   /** Players never see the ruler of a token hidden from them, or of one they do not see (`isSeen`, with dynamic lighting). */
   getPlayerViewLayers(isSeen: (tokenId: string) => boolean = () => true): LayerVisibility[] {
     const token = this.tokenId ? this.store.getState().objects.tokens[this.tokenId] : undefined;
@@ -87,17 +101,15 @@ export class DragRuler {
   };
 
   private redraw(): void {
-    const landing = this.landing;
-    if (!landing) return;
-    const points = [...this.waypoints, landing];
-    if (points.every(point => samePoint(point, landing))) {
+    const points = this.path()?.points;
+    if (!points) {
       this.view.clear();
       return;
     }
     const grid = this.gridSystem.getOptions();
     const settings = this.settingsProvider();
     const cells = pathLengthInCells(grid, this.cellPath(points, grid), settings.diagonalRule);
-    this.view.draw(points, formatDistance(cells, settings));
+    this.view.draw(points, formatDistance(cells, settings), computeTokenPixelSize(grid.size, this.tokenSize()) / 2);
     this.refreshVisibility();
   }
 

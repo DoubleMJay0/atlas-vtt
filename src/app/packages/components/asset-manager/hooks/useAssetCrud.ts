@@ -21,6 +21,7 @@ export interface CreateScenePrefill {
 export interface AssetCrudActions extends CollectionTransferActions {
   // Modal state
   isTokenCreatorOpen: boolean;
+  isEncounterBuilderOpen: boolean;
   isMapCreatorOpen: boolean;
   editingToken: AnyAsset | null;
   isCreateSceneModalOpen: boolean;
@@ -36,6 +37,7 @@ export interface AssetCrudActions extends CollectionTransferActions {
   inputModalState: InputModalState;
   // Setters
   setIsTokenCreatorOpen: (open: boolean) => void;
+  setIsEncounterBuilderOpen: (open: boolean) => void;
   setIsMapCreatorOpen: (open: boolean) => void;
   setEditingToken: (asset: AnyAsset | null) => void;
   setIsCreateSceneModalOpen: (open: boolean) => void;
@@ -83,6 +85,7 @@ export function useAssetCrud(
 ): AssetCrudActions {
 
   const [isTokenCreatorOpen, setIsTokenCreatorOpen] = useState(false);
+  const [isEncounterBuilderOpen, setIsEncounterBuilderOpen] = useState(false);
   const [isMapCreatorOpen, setIsMapCreatorOpen] = useState(false);
   const [editingToken, setEditingToken] = useState<AnyAsset | null>(null);
   const [isCreateSceneModalOpen, setIsCreateSceneModalOpen] = useState(false);
@@ -242,12 +245,12 @@ export function useAssetCrud(
   });
 
   return {
-    isTokenCreatorOpen, isMapCreatorOpen, editingToken,
+    isTokenCreatorOpen, isEncounterBuilderOpen, isMapCreatorOpen, editingToken,
     isCreateSceneModalOpen, createScenePrefill,
     isCreateFolderModalOpen, isMoveModalOpen,
     moveTargetFolderId, moveFolderSearch, moveFolderListOpen,
     targetFolderName, settingsModalCollectionId, isCreateCollectionModalOpen, inputModalState,
-    setIsTokenCreatorOpen, setIsMapCreatorOpen, setEditingToken,
+    setIsTokenCreatorOpen, setIsEncounterBuilderOpen, setIsMapCreatorOpen, setEditingToken,
     setIsCreateSceneModalOpen, openCreateSceneModalFromMap,
     setIsCreateFolderModalOpen, setIsMoveModalOpen,
     setMoveTargetFolderId, setMoveFolderSearch, setMoveFolderListOpen,

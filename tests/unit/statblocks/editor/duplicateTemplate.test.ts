@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
 import * as templateActions from '../../../../src/app/statblocks/library/templateActions';
+import * as templateRecovery from '../../../../src/app/statblocks/library/templateRecovery';
 import { duplicateTemplate } from '../../../../src/app/statblocks/editor/statblock-pane/duplicateTemplate';
 import type { PaneServices } from '../../../../src/app/statblocks/editor/paneServices';
 
@@ -16,19 +17,33 @@ afterEach(() => vi.restoreAllMocks());
 describe('Duplicate template', () => {
   it('copies the template of the note and switches the note to the copy, in one write of its template key', async () => {
     vi.spyOn(templateActions, 'copyTemplate').mockResolvedValue({ id: 'creature-copy-a1b2c3', path: 'Templates/Creature copy.atlastemplate' });
+    vi.spyOn(templateRecovery, 'copyRecoveryButtons').mockResolvedValue(undefined);
     const notes = writer({ problem: null, conflicts: [] });
-    const copy = await duplicateTemplate(APP, notes, 'Colossus.md', RECORD, 'builtin:generic-creature');
+    const copy = await duplicateTemplate(APP, notes, 'Colossus.md', RECORD, 'builtin:generic-creature', 'Marsh');
     expect(copy).toEqual({ id: 'creature-copy-a1b2c3', path: 'Templates/Creature copy.atlastemplate' });
     expect(templateActions.copyTemplate).toHaveBeenCalledWith(APP, 'builtin:generic-creature');
     expect(notes.write).toHaveBeenCalledTimes(1);
     expect(notes.write.mock.calls[0]?.[0]).toBe('Colossus.md');
+    // The copy offers the original's recovery buttons in the statblock's collection.
+    expect(templateRecovery.copyRecoveryButtons).toHaveBeenCalledWith(APP, 'Marsh', 'builtin:generic-creature', 'creature-copy-a1b2c3');
+  });
+
+  it('still switches the note to the copy where its recovery buttons could not be carried over, and carries none without a collection', async () => {
+    vi.spyOn(templateActions, 'copyTemplate').mockResolvedValue({ id: 'creature-copy-a1b2c3', path: 'x.atlastemplate' });
+    const carry = vi.spyOn(templateRecovery, 'copyRecoveryButtons').mockRejectedValue(new Error('no'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await duplicateTemplate(APP, writer({ problem: null, conflicts: [] }), 'Colossus.md', RECORD, 'builtin:generic-creature', 'Marsh')).not.toBeNull();
+    carry.mockClear();
+    await duplicateTemplate(APP, writer({ problem: null, conflicts: [] }), 'Colossus.md', RECORD, 'builtin:generic-creature', null);
+    expect(carry).not.toHaveBeenCalled();
   });
 
   it('gives nothing to open where the note could not switch or the copy failed', async () => {
     vi.spyOn(templateActions, 'copyTemplate').mockResolvedValue({ id: 'creature-copy-a1b2c3', path: 'x.atlastemplate' });
-    expect(await duplicateTemplate(APP, writer({ problem: 'locked', conflicts: [] }), 'Colossus.md', RECORD, 'builtin:generic-creature')).toBeNull();
+    vi.spyOn(templateRecovery, 'copyRecoveryButtons').mockResolvedValue(undefined);
+    expect(await duplicateTemplate(APP, writer({ problem: 'locked', conflicts: [] }), 'Colossus.md', RECORD, 'builtin:generic-creature', null)).toBeNull();
     vi.spyOn(templateActions, 'copyTemplate').mockRejectedValue(new Error('no'));
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(await duplicateTemplate(APP, writer({ problem: null, conflicts: [] }), 'Colossus.md', RECORD, 'builtin:generic-creature')).toBeNull();
+    expect(await duplicateTemplate(APP, writer({ problem: null, conflicts: [] }), 'Colossus.md', RECORD, 'builtin:generic-creature', null)).toBeNull();
   });
 });

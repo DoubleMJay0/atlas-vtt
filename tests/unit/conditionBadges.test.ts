@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Sprite } from 'pixi.js';
 import { createConditionBadge } from '../../src/app/pixi/token-renderer/ConditionBadge';

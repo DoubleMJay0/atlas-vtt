@@ -109,6 +109,7 @@ const COERCERS: Readonly<Record<FieldType, Coercer>> = {
   pairs: coercePairs,
   image: (text) => kept(text),
   spells: (text) => kept(text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '')),
+  counters: (_text, input) => refused(input, 'Counters are changed with their pips.'),
 };
 
 /**

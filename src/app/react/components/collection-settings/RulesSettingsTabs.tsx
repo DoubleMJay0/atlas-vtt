@@ -25,6 +25,9 @@ import { VisionTab } from './VisionTab';
 export type SettingsTab =
   'system' | 'dice' | 'grid' | 'vision' | 'widgets' | 'conditions' | 'resources' | 'initiative' | 'statblocks' | 'creatureFilters' | 'loot';
 
+/** The tabs of the game system's rules, which a played campaign's system replaces on every map. */
+export const RULES_TABS: readonly SettingsTab[] = ['system', 'dice', 'grid', 'vision', 'conditions', 'resources', 'initiative'];
+
 const TAB_LABELS: Record<SettingsTab, { label: string; icon: React.ReactNode }> = {
   system: { label: t('csm.tab.system'), icon: <Dices size={16} /> },
   dice: { label: 'Dice', icon: <Dice5 size={16} /> },
@@ -60,6 +63,10 @@ interface RulesSettingsTabsProps {
   initiativeFieldSuggestions: readonly FieldSuggestion[];
   /** The content of a tab that is not one of the rules', such as a collection's loot. */
   renderOther?: (tab: SettingsTab) => React.ReactNode;
+  /** A line above the rules' tabs (`RULES_TABS`), such as that a played campaign's rules apply in their place. */
+  rulesNotice?: React.ReactNode;
+  /** Shown beside the token's sockets in the Resources tab, which then takes the whole width (a collection's recovery buttons). */
+  resourcesAside?: React.ReactNode;
 }
 
 /**
@@ -68,7 +75,8 @@ interface RulesSettingsTabsProps {
  * kept; any other tab is the caller's (`renderOther`).
  */
 export function RulesSettingsTabs({
-  tabs, activeTab, onTabChange, draft, view, presets, diceSets, onDeletePreset, none, lightingOn, fieldSuggestions, initiativeFieldSuggestions, renderOther,
+  tabs, activeTab, onTabChange, draft, view, presets, diceSets, onDeletePreset, none, lightingOn, fieldSuggestions, initiativeFieldSuggestions, renderOther, rulesNotice,
+  resourcesAside,
 }: RulesSettingsTabsProps): React.ReactElement {
   const shown = tabs.filter((tab) => tab !== 'vision' || lightingOn);
 
@@ -110,7 +118,7 @@ export function RulesSettingsTabs({
       case 'conditions':
         return <ConditionsTab conditions={draft.conditions} onChange={draft.setConditions} />;
       case 'resources':
-        return <ResourcesTab resources={draft.resources} onChange={draft.setResources} fieldSuggestions={fieldSuggestions} />;
+        return <ResourcesTab resources={draft.resources} onChange={draft.setResources} fieldSuggestions={fieldSuggestions} aside={resourcesAside} />;
       case 'initiative':
         return <InitiativeFields initiative={view.initiative} onChange={initiativeEdit(draft, view)} fieldSuggestions={initiativeFieldSuggestions} />;
       default:
@@ -133,7 +141,10 @@ export function RulesSettingsTabs({
           </Button>
         ))}
       </nav>
-      <SettingsContent>{content()}</SettingsContent>
+      <SettingsContent wide={activeTab === 'resources' && resourcesAside !== undefined}>
+        {RULES_TABS.includes(activeTab) && rulesNotice}
+        {content()}
+      </SettingsContent>
     </div>
   );
 }

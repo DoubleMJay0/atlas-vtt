@@ -3,6 +3,7 @@
  * conditions) that can be applied to any collection.
  */
 
+import type { RecoveryRecord } from '../recovery/recoveryTypes';
 import type { ResourceDefinition } from '../resources/resourceTypes';
 import type { CollectionGridDefaults, ConditionDefinition } from './collectionSettingsTypes';
 import type { DiceRules } from './diceRulesTypes';
@@ -57,6 +58,12 @@ export interface SystemRules {
    * for a system that names none: its collections offer the generic roles (`collectionStatblockRoles`).
    */
   statblockRoles?: readonly StatblockRole[];
+  /**
+   * The recovery buttons the system gives each statblock template ("Long rest"). Unset for a
+   * system that names none: its collections offer no buttons until the GM sets some up
+   * (`collectionRecovery`).
+   */
+  recovery?: RecoveryRecord;
   /**
    * The words the system's items name their rarity with. Unset for a system without rarities:
    * its collections read the classic ladder (`collectionItemRarities`).
