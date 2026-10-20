@@ -28,6 +28,8 @@
 - Initiative modifiers are found more easily. The modifier field matches statblock fields in any capitalisation and by their name in the template, reads numbers written as +3, +3 (13), 16 (+3) or Perception +12, and reads statblocks from Fantasy Statblocks too: its own initiative modifier, a Pathfinder import's Perception and the six 5e scores (type dex). The field's suggestions show what a statblock holds, and the settings say how many statblocks the field reads a modifier from.
 - When a roll finds no modifier for some combatants, a notice says how many, which field was looked for and where to choose it.
 
+- The initiative tracker's buttons, card menu and sides, and the collection's initiative settings are now available in Russian.
+
 ## Fixed
 
 - Initiative tracker: clicking a card selects its token, so its bars and their controls show, and brings it into view without zooming in further than needed.
