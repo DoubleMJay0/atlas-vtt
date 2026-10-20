@@ -9,6 +9,7 @@ import type { SystemPresetService } from '../../../services/SystemPresetService'
 import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
 import type { SystemPreset } from '../../../types/systemPresetTypes';
 import type { FieldSuggestion } from '../../../resources/resourceFieldSuggestions';
+import type { NamedModifierStatblock } from '../../../initiative/modifierPreview';
 import type { DiceSets } from '../../hooks/useDiceSets';
 import { t } from '../../../i18n';
 import { ConditionsTab } from './ConditionsTab';
@@ -25,9 +26,12 @@ import { VisionTab } from './VisionTab';
 export type SettingsTab =
   'system' | 'dice' | 'grid' | 'vision' | 'widgets' | 'conditions' | 'resources' | 'initiative' | 'statblocks' | 'creatureFilters' | 'loot';
 
+/** The tabs of the game system's rules, which a played campaign's system replaces on every map. */
+export const RULES_TABS: readonly SettingsTab[] = ['system', 'dice', 'grid', 'vision', 'conditions', 'resources', 'initiative'];
+
 const TAB_LABELS: Record<SettingsTab, { label: string; icon: React.ReactNode }> = {
   system: { label: t('csm.tab.system'), icon: <Dices size={16} /> },
-  dice: { label: 'Dice', icon: <Dice5 size={16} /> },
+  dice: { label: t('diceSettings.dice'), icon: <Dice5 size={16} /> },
   grid: { label: t('csm.tab.grid'), icon: <Grid3X3 size={16} /> },
   vision: { label: t('csm.tab.vision'), icon: <Eye size={16} /> },
   widgets: { label: t('csm.tab.widgets'), icon: <LayoutGrid size={16} /> },
@@ -58,8 +62,12 @@ interface RulesSettingsTabsProps {
   fieldSuggestions: readonly FieldSuggestion[];
   /** The statblock fields the initiative modifier is offered (`initiativeFieldSuggestions`). */
   initiativeFieldSuggestions: readonly FieldSuggestion[];
+  /** The statblocks the initiative settings preview the modifier's field in. */
+  modifierStatblocks?: readonly NamedModifierStatblock[] | undefined;
   /** The content of a tab that is not one of the rules', such as a collection's loot. */
   renderOther?: (tab: SettingsTab) => React.ReactNode;
+  /** A line above the rules' tabs (`RULES_TABS`), such as that a played campaign's rules apply in their place. */
+  rulesNotice?: React.ReactNode;
 }
 
 /**
@@ -68,7 +76,7 @@ interface RulesSettingsTabsProps {
  * kept; any other tab is the caller's (`renderOther`).
  */
 export function RulesSettingsTabs({
-  tabs, activeTab, onTabChange, draft, view, presets, diceSets, onDeletePreset, none, lightingOn, fieldSuggestions, initiativeFieldSuggestions, renderOther,
+  tabs, activeTab, onTabChange, draft, view, presets, diceSets, onDeletePreset, none, lightingOn, fieldSuggestions, initiativeFieldSuggestions, modifierStatblocks, renderOther, rulesNotice,
 }: RulesSettingsTabsProps): React.ReactElement {
   const shown = tabs.filter((tab) => tab !== 'vision' || lightingOn);
 
@@ -112,7 +120,7 @@ export function RulesSettingsTabs({
       case 'resources':
         return <ResourcesTab resources={draft.resources} onChange={draft.setResources} fieldSuggestions={fieldSuggestions} />;
       case 'initiative':
-        return <InitiativeFields initiative={view.initiative} onChange={initiativeEdit(draft, view)} fieldSuggestions={initiativeFieldSuggestions} />;
+        return <InitiativeFields initiative={view.initiative} onChange={initiativeEdit(draft, view)} fieldSuggestions={initiativeFieldSuggestions} modifierStatblocks={modifierStatblocks} />;
       default:
         return renderOther?.(activeTab);
     }
@@ -133,7 +141,10 @@ export function RulesSettingsTabs({
           </Button>
         ))}
       </nav>
-      <SettingsContent>{content()}</SettingsContent>
+      <SettingsContent>
+        {RULES_TABS.includes(activeTab) && rulesNotice}
+        {content()}
+      </SettingsContent>
     </div>
   );
 }

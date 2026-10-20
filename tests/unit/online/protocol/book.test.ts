@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
   bookLine, bookText, fitsPlayerFrame, isQuestDone, MAX_BOOK_NOTES, MAX_RESOURCE_KEY, MAX_TOKEN_VALUE, MAX_BOOK_QUESTS, MAX_NOTE_BODY, MAX_QUEST_REWARDS, parseGmMessage, parsePlayerMessage, type BookItem, type BookQuest, type PlayerBook,
@@ -27,6 +26,17 @@ describe('book messages to a player', () => {
     expect(parseGmMessage({ t: 'book', book: BOOK })).toEqual({ t: 'book', book: BOOK });
     expect(parseGmMessage({ t: 'book-sheet', character: null })).toEqual({ t: 'book-sheet', character: null });
     expect(parseGmMessage({ t: 'book-item', item: ITEM })).toEqual({ t: 'book-item', item: ITEM });
+  });
+
+  it('read the world map or the quests alone, as a page that reads parts is sent them, and nothing malformed', () => {
+    expect(parseGmMessage({ t: 'book-map', worldMap: BOOK.worldMap })).toEqual({ t: 'book-map', worldMap: BOOK.worldMap });
+    expect(parseGmMessage({ t: 'book-map', worldMap: null })).toEqual({ t: 'book-map', worldMap: null });
+    expect(parseGmMessage({ t: 'book-quests', quests: [QUEST, { id: 'nope' }] })).toEqual({ t: 'book-quests', quests: [QUEST] });
+    expect(parseGmMessage({ t: 'book-quests', quests: [] })).toEqual({ t: 'book-quests', quests: [] });
+    for (const broken of [{ t: 'book-map' }, { t: 'book-map', worldMap: { width: 0, height: 1, image: ART } }, { t: 'book-quests' }, { t: 'book-quests', quests: {} }, { t: 'book-quests', quests: Array.from({ length: MAX_BOOK_QUESTS + 1 }, () => QUEST) }]) {
+      expect(parseGmMessage(broken), JSON.stringify(broken).slice(0, 80)).toBeNull();
+    }
+    expect(parsePlayerMessage({ t: 'book-parts' })).toEqual({ t: 'book-parts' });
   });
 
   it('read a book without character, map or entries', () => {
@@ -126,6 +136,14 @@ describe('what a player writes into their book', () => {
     }
     expect(parseGmMessage({ t: 'book-resource', key: 'hp', current: 1 })).toBeNull();
     expect(fitsPlayerFrame({ t: 'book-resource', key: 'k'.repeat(MAX_RESOURCE_KEY), current: -MAX_TOKEN_VALUE })).toBe(true);
+  });
+
+  it('reads the token a book follows, by the scene and the id the token list names it by, and refuses anything else', () => {
+    expect(parsePlayerMessage({ t: 'book-token', scene: 'scene-1', token: ID, extra: true })).toEqual({ t: 'book-token', scene: 'scene-1', token: ID });
+    for (const broken of [{ scene: 'scene-1' }, { token: ID }, { scene: 'scene-1', token: 'tok-brannoch' }, { scene: 'x'.repeat(65), token: ID }, { scene: 1, token: ID }, { scene: 'scene-1', token: null }]) {
+      expect(parsePlayerMessage({ t: 'book-token', ...broken }), JSON.stringify(broken)).toBeNull();
+    }
+    expect(parseGmMessage({ t: 'book-token', scene: 'scene-1', token: ID })).toBeNull();
   });
 
   it('refuses what is malformed or too long, and never takes a GM kind from a player', () => {

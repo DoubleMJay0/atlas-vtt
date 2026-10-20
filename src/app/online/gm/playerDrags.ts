@@ -6,6 +6,7 @@ import type { HeldTokens } from '../../types/viewUIState';
 import type { Point } from '../movement/index.ts';
 import { checkMove, landing, MoveRate, type MoveContext } from './moveCheck.ts';
 import type { MoveState, MoveStore } from './playerMoves.ts';
+import { mapTokens, sceneTokens } from '../../tokens/offMap';
 
 /** Drag messages a player may send: a burst of 40, then 40 a second (the browser sends about 30). */
 export const DRAG_BURST = 40;
@@ -71,6 +72,11 @@ export class PlayerDrags {
     return this.live.size > 0 ? state.heldTokens !== this.held : Object.keys(state.heldTokens).length > 0;
   }
 
+  /** Where each token under a drag was taken from, by GM token id. */
+  starts(): Map<string, Point> {
+    return new Map([...this.live.values()].map(({ tokenId, start }) => [tokenId, start]));
+  }
+
   /** A drag message: starts or moves the player's drag, or ends it when the token may no longer be theirs. */
   receive(from: string, drag: PlayerDrag): void {
     const state = this.store.getState();
@@ -83,7 +89,7 @@ export class PlayerDrags {
       return;
     }
     if (this.taken.has(key(from, verdict.tokenId))) return;
-    const token = state.objects.tokens[verdict.tokenId];
+    const token = mapTokens(state.objects)[verdict.tokenId];
     if (live === undefined && token !== undefined) this.begin({ from, alias: drag.id, tokenId: verdict.tokenId, start: { x: token.x, y: token.y }, lastAt: 0 });
     const current = this.live.get(verdict.tokenId);
     if (current === undefined || token === undefined) return;
@@ -91,7 +97,7 @@ export class PlayerDrags {
     // From where the last message left it, up to the first wall in the way.
     const at = landing(context, token, verdict);
     this.write((draft) => {
-      const moved = draft.objects.tokens[verdict.tokenId];
+      const moved = sceneTokens(draft.objects)[verdict.tokenId];
       if (moved === undefined) return;
       moved.x = at.x;
       moved.y = at.y;
@@ -102,9 +108,9 @@ export class PlayerDrags {
   /**
    * The player's drop of a token: where it ended their drag (the drop's place, or before the first
    * wall on the way there), false when it was refused (the token went back, or the GM had taken the
-   * drag over), and null when no drag of theirs was under way.
+   * drag over), `turn` when it was refused for the token's turn, and null when no drag of theirs was under way.
    */
-  drop(from: string, move: PlayerMove): Point | false | null {
+  drop(from: string, move: PlayerMove): Point | false | 'turn' | null {
     const state = this.store.getState();
     const live = this.find(from, move.id);
     const context = this.context(state, live);
@@ -114,9 +120,9 @@ export class PlayerDrags {
     const verdict = checkMove(from, move, context);
     if (!verdict.ok || this.gmHolds(state)) {
       this.end([live], 'back');
-      return false;
+      return !verdict.ok && verdict.reason === 'turn' ? 'turn' : false;
     }
-    const token = state.objects.tokens[live.tokenId];
+    const token = mapTokens(state.objects)[live.tokenId];
     const at = token === undefined ? { x: verdict.x, y: verdict.y } : landing(context, token, verdict);
     this.end([live], at);
     return at;
@@ -181,7 +187,7 @@ export class PlayerDrags {
       this.write((draft) => {
         if (outcome === 'back') {
           for (const { tokenId, start } of drags) {
-            const token = draft.objects.tokens[tokenId];
+            const token = sceneTokens(draft.objects)[tokenId];
             if (token !== undefined) Object.assign(token, start);
           }
           draft._audioDirty = true;
@@ -207,7 +213,7 @@ export class PlayerDrags {
   private endWhereTheyAre(drags: readonly LiveDrag[]): void {
     for (const live of drags) {
       const state = this.store.getState();
-      const token = state.objects.tokens[live.tokenId];
+      const token = mapTokens(state.objects)[live.tokenId];
       const context = this.context(state, live);
       const verdict = token === undefined || context.scene === null ? null : checkMove(live.from, { scene: context.scene, id: live.alias, x: token.x, y: token.y }, context);
       this.end([live], verdict?.ok === true ? { x: verdict.x, y: verdict.y } : 'back');
