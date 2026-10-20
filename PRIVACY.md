@@ -64,7 +64,7 @@ a daily keyed address hash for up to 24 hours, not the raw IP. It retains reques
 identifiers, report hashes and issue receipts to prevent duplicate submissions;
 it does not retain report bodies separately from GitHub. **Copy report** writes
 the report to your clipboard without sending it. See
-[docs/reporting-issues.md](docs/reporting-issues.md).
+[.github/reporting-issues.md](.github/reporting-issues.md).
 
 ## Clipboard and local storage
 
