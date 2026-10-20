@@ -40,10 +40,14 @@ export interface RulesView {
   isValid: boolean;
 }
 
-/** Whether what was typed is the system's rules to the letter; a roll with a space or another case is kept as typed. */
+/**
+ * Whether what was typed is the system's rules to the letter; a roll with a space or another case is
+ * kept as typed. Sides and cards count only in their own mode.
+ */
 export function isSameAsTyped(typed: InitiativeRules, system: InitiativeRules): boolean {
-  return typed.mode === system.mode && typed.firstSide === system.firstSide && typed.roll === system.roll
-    && sameTypedModifierSources(typed, system) && sameTypedSideParts(typed, system) && sameTypedCardParts(typed, system);
+  return typed.mode === system.mode && typed.roll === system.roll && sameTypedModifierSources(typed, system)
+    && (typed.mode !== 'sides' || sameTypedSideParts(typed, system))
+    && (typed.mode !== 'cards' || sameTypedCardParts(typed, system));
 }
 
 /** Rules as a dialog holds them: every part may be unset, or given as undefined. */

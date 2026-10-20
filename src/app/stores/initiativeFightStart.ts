@@ -9,9 +9,9 @@ import { cardRounds, dealCards } from '../initiative/cardDeal';
 import { dealGroupOf } from '../initiative/cardGroups';
 import { shuffledDeck } from '../initiative/initiativeDice';
 import type { RoundChanges } from '../initiative/rounds';
-import { enterSideRound, fightSideIds, rollSides, roundTurns } from '../initiative/sideOrder';
+import { enterSideRound, fightSideIds, rollSides } from '../initiative/sideOrder';
 import { sideOf } from '../initiative/sides';
-import type { SideTurnInputs } from '../initiative/turns';
+import { firstActingSide, type SideTurnInputs } from '../initiative/turns';
 import type { InitiativeRules, SideId } from '../types/initiativeRulesTypes';
 import type { CardsFight, InitiativeState, SidesFight } from '../types/initiativeTypes';
 import type { TokenEntity } from '../types';
@@ -58,20 +58,23 @@ export function roundChangesOf(draft: FightDraft, deck: readonly number[]): Roun
   return cardRounds(cards, { deck, groupOf: dealGroupOf(cards, draft.initiative.entries, draft.objects.tokens) });
 }
 
-function startSides(initiative: InitiativeState, rules: InitiativeRules, draws: FightDraws): void {
+function startSides(draft: FightDraft, rules: InitiativeRules, draws: FightDraws, defeated: ReadonlySet<string>): void {
   const order = sidesOfRules(rules);
   const first = firstBuiltInSide(order);
+  // A rolled order moves `first` from round to round, so the fight keeps its own list of sides
   const fight: SidesFight = {
     first,
     active: first,
-    ...(rules.sides && { order }),
+    ...((rules.sides || rules.sideRoll) && { order }),
     ...(rules.sideRoll && { roll: rules.sideRoll }),
   };
   enterSideRound(fight, 1, draws.sideRolls);
-  fight.active = roundTurns(fight, 1)[0]?.[0] ?? first;
-  initiative.sides = fight;
+  draft.initiative.sides = fight;
+  // The turn goes to the first side that acts: a named side without combatants takes none
+  const live = draft.initiative.sides;
+  live.active = firstActingSide(draft.initiative, live, sideInputs(draft, defeated));
   // By sides the turn belongs to a side, never to one combatant
-  initiative.currentIndex = -1;
+  draft.initiative.currentIndex = -1;
 }
 
 function startCards(draft: FightDraft, rules: InitiativeRules, draws: FightDraws): void {
@@ -88,13 +91,13 @@ function startCards(draft: FightDraft, rules: InitiativeRules, draws: FightDraws
  * Sets the fight up as `rules` say, on a draft whose fight has just begun. Returns whether the turn
  * is given (by sides it belongs to a side); otherwise the first combatant in order takes it.
  */
-export function startFight(draft: FightDraft, rules: InitiativeRules | undefined, draws: FightDraws): boolean {
+export function startFight(draft: FightDraft, rules: InitiativeRules | undefined, draws: FightDraws, defeated: ReadonlySet<string>): boolean {
   const { initiative } = draft;
   delete initiative.sides;
   delete initiative.cards;
   for (const entry of initiative.entries) delete entry.card;
   if (rules?.mode === 'sides') {
-    startSides(initiative, rules, draws);
+    startSides(draft, rules, draws, defeated);
     return true;
   }
   if (rules?.mode === 'cards') startCards(draft, rules, draws);

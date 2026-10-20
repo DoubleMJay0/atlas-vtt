@@ -3,7 +3,7 @@
  * this round's rolls, where sides with equal rolls act at the same time.
  */
 
-import { defaultSides } from '../gameSystems/initiativeSideRules';
+import { defaultSides, isBuiltInSide } from '../gameSystems/initiativeSideRules';
 import type { SideId } from '../types/initiativeRulesTypes';
 import type { SidesFight } from '../types/initiativeTypes';
 import { rollInitiativeDice } from './initiativeDice';
@@ -49,9 +49,13 @@ export function fightSideIds(fight: SidesFight): SideId[] {
 
 /**
  * A round begins or is taken up again: where the order is rolled and `round` has no rolls yet,
- * it takes `fresh` (rolled before, so the store's write stays free of chance).
+ * it takes `fresh` (rolled before, so the store's write stays free of chance). Where the round has
+ * rolls, `first` becomes the built-in side that leads it, so an older Atlas, which goes by `first`
+ * alone, gives the players and the opponents their turns in this round's order.
  */
 export function enterSideRound(fight: SidesFight, round: number, fresh: Record<SideId, number> | undefined): void {
-  if (!fight.roll || !fresh || fight.rolls?.[round]) return;
-  fight.rolls = { ...fight.rolls, [round]: fresh };
+  if (fight.roll && fresh && !fight.rolls?.[round]) fight.rolls = { ...fight.rolls, [round]: fresh };
+  if (!fight.roll || !fight.rolls?.[round]) return;
+  const lead = roundTurns(fight, round).flat().find(isBuiltInSide);
+  if (lead) fight.first = lead;
 }

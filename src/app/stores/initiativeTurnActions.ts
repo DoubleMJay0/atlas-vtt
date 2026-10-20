@@ -79,7 +79,7 @@ export function createInitiativeTurnActions(set: ImmerSet, get: () => TurnStoreS
         draft.initiative.entries.forEach((entry) => { entry.isActive = false; });
         clearSittingOut(draft.initiative);
         endDelays(draft.initiative);
-        if (startFight(draft, rules, draws)) return;
+        if (startFight(draft, rules, draws, defeated)) return;
         firstTurn(draft.initiative, defeated);
       });
     },

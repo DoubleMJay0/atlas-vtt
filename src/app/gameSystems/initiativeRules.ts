@@ -48,10 +48,20 @@ export function isValidInitiativeRules(rules: InitiativeRules): boolean {
   return areSidesValid(rules.sides) && (rules.sideRoll === undefined || isValidDefaultRoll(rules.sideRoll));
 }
 
-/** The rules as they are stored: the roll trimmed, and a d20 where it was left half typed behind another mode. */
+/**
+ * The rules as they are stored: the roll trimmed, and a d20 where it was left half typed behind
+ * another mode. Sides and cards are stored only in their own mode: what was set in another and
+ * left behind there is no rule of the collection's.
+ */
 export function savedInitiativeRules(rules: InitiativeRules): InitiativeRules {
   const roll = isValidDefaultRoll(rules.roll) ? rules.roll.trim() : DEFAULT_INITIATIVE_RULES.roll;
-  return { mode: rules.mode, roll, ...modifierSources(rules), ...savedSideParts(rules), ...cardParts(rules) };
+  return {
+    mode: rules.mode,
+    roll,
+    ...modifierSources(rules),
+    ...(rules.mode === 'sides' ? savedSideParts(rules) : { firstSide: rules.firstSide }),
+    ...(rules.mode === 'cards' ? cardParts(rules) : {}),
+  };
 }
 
 /**
@@ -71,9 +81,10 @@ export function collectionInitiativeRules(
 export function sameInitiativeRules(a: InitiativeRules | undefined, b: InitiativeRules | undefined): boolean {
   const left = a ?? DEFAULT_INITIATIVE_RULES;
   const right = b ?? DEFAULT_INITIATIVE_RULES;
+  // Sides and cards count only in their own mode, so parts left behind in another make no edit
   return left.mode === right.mode
-    && sameSideParts(left, right)
-    && sameCardParts(left, right)
+    && (left.mode !== 'sides' || sameSideParts(left, right))
+    && (left.mode !== 'cards' || sameCardParts(left, right))
     && sameModifierSources(left, right)
     && left.roll.trim().toLowerCase() === right.roll.trim().toLowerCase();
 }

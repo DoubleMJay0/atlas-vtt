@@ -96,6 +96,33 @@ describe('a fight by cards', () => {
     expect(cards(get())).toEqual([['a', 1], ['b', 2], ['c', 3]]);
   });
 
+  it('never changes a card dealt once when a newcomer makes look-alikes share, and leaves a newcomer the deck has no card for without one', () => {
+    const goblin = { imagePath: 'goblin.webp' };
+    const { actions, get } = setup([token('p', { vision: { enabled: true } }), token('g1', goblin), token('g2', goblin)]);
+    actions.startCombat({ ...CARDS, deck: 3 });
+    expect(cards(get())).toEqual([['p', 1], ['g1', 2], ['g2', 3]]);
+    actions.addToInitiative({ tokenId: 'z', name: 'z', initiative: 0, initiativeModifier: 0, imagePath: '', isNPC: true });
+    actions.nextTurn();
+    actions.nextTurn();
+    actions.nextTurn();
+    actions.nextTurn();
+    expect(get().initiative.round).toBe(2);
+    expect(cards(get())).toEqual([['p', 1], ['g1', 2], ['g2', 3], ['z', undefined]]);
+  });
+
+  it('gives a newcomer that looks like a combatant holding a card that card, where look-alikes share', () => {
+    const goblin = { imagePath: 'goblin.webp' };
+    const { actions, get } = setup([token('p', { vision: { enabled: true } }), token('g1', goblin), token('g2', goblin)]);
+    // g2 is on the map and joins after the deal
+    actions.removeFromInitiative('g2');
+    actions.startCombat({ ...CARDS, lookAlikesShare: true });
+    actions.addToInitiative({ tokenId: 'g2', name: 'g2', initiative: 0, initiativeModifier: 0, imagePath: '', isNPC: true });
+    actions.nextTurn();
+    actions.nextTurn();
+    actions.nextTurn();
+    expect(cards(get())).toEqual([['p', 1], ['g1', 2], ['g2', 2]]);
+  });
+
   it('deals anew every round where the rules say so, and stepping back and on shows each round\'s cards again', () => {
     // Round 1 deals 1, 2, 3 in order; every later deck is shuffled
     const { actions, get } = setup([token('a'), token('b'), token('c')], shufflesAfter(9));

@@ -72,25 +72,47 @@ export function nextSideTurn(initiative: InitiativeState, inputs: SideTurnInputs
   }
 }
 
+/** One step back: the turn before in the round, else the last turn of the round before, with its marks and rolls; none before round 1's first. */
+function stepBack(initiative: InitiativeState, fight: SidesFight): SideId[] | undefined {
+  const index = turnIndex(initiative, fight);
+  let turn: SideId[] | undefined;
+  if (index > 0) {
+    turn = roundTurns(fight, initiative.round)[index - 1];
+  } else if (initiative.round > 1) {
+    backToRoundBefore(initiative);
+    enterSideRound(fight, initiative.round, undefined);
+    turn = roundTurns(fight, initiative.round).at(-1);
+  }
+  if (turn) fight.active = turn[0]!;
+  return turn;
+}
+
+/** How many steps back the nearest turn that acts lies, walked on a copy; undefined where none does before round 1's first turn. */
+function stepsBackToActingTurn(initiative: InitiativeState, inputs: SideTurnInputs): number | undefined {
+  const trial = JSON.parse(JSON.stringify(initiative)) as InitiativeState;
+  const fight = trial.sides!;
+  for (let step = 1; step <= stepLimit(fight); step++) {
+    const turn = stepBack(trial, fight);
+    if (!turn) return undefined;
+    if (turnActs(trial, turn, inputs)) return step;
+  }
+  return undefined;
+}
+
 /**
- * The turn before that acted, passing by turns nobody acts in; back over a round's start into the
- * round before, with its rolls. Nothing before the first turn of round 1, and nothing moves while
- * no side can act.
+ * The turn before that acted, passing by turns nobody acts in (a named side without combatants
+ * among them); back over a round's start into the round before, with its rolls. Where no turn
+ * before acts, down to round 1's first, nothing moves, nor while no side can act.
  */
 export function previousSideTurn(initiative: InitiativeState, inputs: SideTurnInputs): void {
   const fight = initiative.sides;
   if (!fight || !someSideCanAct(initiative, fight, inputs)) return;
-  for (let step = 0; step < stepLimit(fight); step++) {
-    const index = turnIndex(initiative, fight);
-    let turn: SideId[] | undefined;
-    if (index > 0) {
-      turn = roundTurns(fight, initiative.round)[index - 1];
-    } else if (initiative.round > 1) {
-      backToRoundBefore(initiative);
-      turn = roundTurns(fight, initiative.round).at(-1);
-    }
-    if (!turn) return;
-    fight.active = turn[0]!;
-    if (turnActs(initiative, turn, inputs)) return;
-  }
+  const steps = stepsBackToActingTurn(initiative, inputs);
+  for (let step = 0; step < (steps ?? 0); step++) stepBack(initiative, fight);
+}
+
+/** Where a fight by sides starts: the first side of round 1 whose turn acts, else the first side. */
+export function firstActingSide(initiative: InitiativeState, fight: SidesFight, inputs: SideTurnInputs): SideId {
+  const turns = roundTurns(fight, initiative.round);
+  return (turns.find((turn) => turnActs(initiative, turn, inputs)) ?? turns[0])?.[0] ?? fight.first;
 }

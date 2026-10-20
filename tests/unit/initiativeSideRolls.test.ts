@@ -35,7 +35,8 @@ describe('sides that roll for their order every round', () => {
     const rules = { ...SIDES, sideRoll: '1d6' };
     const { actions, get } = setup(['players', 'opponents'], d6([2, 5]));
     actions.startCombat(rules);
-    expect(get().initiative.sides).toMatchObject({ first: 'players', active: 'opponents', roll: '1d6', rolls: { 1: { players: 2, opponents: 5 } } });
+    // `first` follows the round's lead, as older versions read it
+    expect(get().initiative.sides).toMatchObject({ first: 'opponents', active: 'opponents', roll: '1d6', rolls: { 1: { players: 2, opponents: 5 } } });
     expect(listedSides(get().initiative, rules).map((side) => [side.name, side.roll, side.active])).toEqual([['Opponents', 5, true], ['Players', 2, false]]);
   });
 
@@ -102,6 +103,58 @@ describe('more than two sides', () => {
     actions.startCombat(SIDES);
     actions.nextTurn();
     expect(turn(get(), SIDES)).toEqual([1, ['opponents']]);
+  });
+});
+
+describe('named sides without combatants', () => {
+  const NEUTRAL: InitiativeRules = { ...SIDES, sides: [{ id: 'side-neutral', name: 'Neutral' }, { id: 'players' }, { id: 'opponents' }] };
+
+  it('never take the turn as the fight starts', () => {
+    const { actions, get } = setup(['players', 'opponents'], d6([]));
+    actions.startCombat(NEUTRAL);
+    expect(turn(get(), NEUTRAL)).toEqual([1, ['players']]);
+  });
+
+  it('are passed by stepping back, and where no turn before acts the turn stays where it is', () => {
+    const { actions, get } = setup(['players', 'opponents'], d6([]));
+    actions.startCombat(NEUTRAL);
+    actions.nextTurn();
+    expect(turn(get(), NEUTRAL)).toEqual([1, ['opponents']]);
+    actions.previousTurn();
+    expect(turn(get(), NEUTRAL)).toEqual([1, ['players']]);
+    actions.previousTurn();
+    expect(turn(get(), NEUTRAL)).toEqual([1, ['players']]);
+    // From round 2 back over its start, past the empty side, into round 1's last turn
+    actions.nextTurn();
+    actions.nextTurn();
+    expect(turn(get(), NEUTRAL)).toEqual([2, ['players']]);
+    actions.previousTurn();
+    expect(turn(get(), NEUTRAL)).toEqual([1, ['opponents']]);
+  });
+
+  it('do not take a turn as a rolled round starts with them', () => {
+    const rules = { ...NEUTRAL, sideRoll: '1d6' };
+    // Neutral rolls highest in round 1
+    const { actions, get } = setup(['players', 'opponents'], d6([6, 2, 4]));
+    actions.startCombat(rules);
+    expect(turn(get(), rules)).toEqual([1, ['opponents']]);
+  });
+});
+
+describe('a rolled fight read by an older Atlas', () => {
+  it('names the built-in side that leads each round as the side that acts first, and the round before\'s again on stepping back', () => {
+    const rules = { ...SIDES, sideRoll: '1d6' };
+    // Round 1: players 5, opponents 2. Round 2 (drawn by the second step): players 1, opponents 6
+    const { actions, get } = setup(['players', 'opponents'], d6([5, 2, 9, 9, 1, 6]));
+    actions.startCombat(rules);
+    expect(get().initiative.sides?.first).toBe('players');
+    actions.nextTurn();
+    actions.nextTurn();
+    expect(get().initiative.sides).toMatchObject({ first: 'opponents', active: 'opponents' });
+    actions.previousTurn();
+    expect(get().initiative.sides).toMatchObject({ first: 'players', active: 'opponents' });
+    // The fight keeps its own list of sides, so a lead that changes moves no side
+    expect(get().initiative.sides?.order).toEqual([{ id: 'players' }, { id: 'opponents' }]);
   });
 });
 

@@ -90,6 +90,24 @@ describe('the sides of a collection', () => {
   });
 });
 
+describe('parts of another mode left behind', () => {
+  const TURN_ORDER: InitiativeRules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
+
+  it('are no edit and are not stored: a side roll or a deck set before switching back to turn order', () => {
+    const leftover = { ...TURN_ORDER, sideRoll: '1d6', sides: [{ id: 'players' }, ALLIES, { id: 'opponents' }], deck: 20, dealEachRound: true as const };
+    expect(sameInitiativeRules(TURN_ORDER, leftover)).toBe(true);
+    expect(isSameAsTyped(leftover, TURN_ORDER)).toBe(true);
+    expect(savedInitiativeRules(leftover)).toEqual(TURN_ORDER);
+  });
+
+  it('count in their own mode: cards by sides do not, sides by cards do not', () => {
+    expect(sameInitiativeRules(SIDES, { ...SIDES, deck: 20 })).toBe(true);
+    expect(sameInitiativeRules(CARDS, { ...CARDS, sideRoll: '1d6' })).toBe(true);
+    expect(savedInitiativeRules({ ...CARDS, sideRoll: '1d6', deck: 12 })).toEqual({ ...CARDS, deck: 12 });
+    expect(isSameAsTyped({ ...SIDES, sideRoll: '1d6' }, SIDES)).toBe(false);
+  });
+});
+
 describe('rules an older Atlas wrote', () => {
   it('read as they always did, and rules of a mode it does not know read as none', () => {
     expect(parseInitiativeRules({ mode: 'sides', roll: '1d20', firstSide: 'opponents' })).toEqual({ mode: 'sides', roll: '1d20', firstSide: 'opponents' });

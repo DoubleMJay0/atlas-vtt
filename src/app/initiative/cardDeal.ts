@@ -48,17 +48,20 @@ export function cardsNeeded(entries: readonly InitiativeEntry[], groupOf: CardGr
 
 /**
  * Deals cards: a group whose members hold none takes the next card of the deck that nobody holds,
- * a member joining a group that holds one takes that card. `anew` takes every card back first.
- * Where the deck runs out, the groups left get none and act after all others.
+ * a member joining a group that holds one takes that card. A card held is never taken or changed
+ * (a group that was dealt before its members shared keeps their cards); `anew` takes every card
+ * back first. Where the deck runs out, the combatants left get none and act after all others.
  */
 export function dealCards(initiative: InitiativeState, { deck, groupOf }: CardDealInputs, anew: boolean): void {
   if (anew) for (const entry of initiative.entries) delete entry.card;
   const held = new Set(initiative.entries.flatMap((entry) => (entry.card === undefined ? [] : [entry.card])));
   const free = deck.filter((card) => !held.has(card));
   for (const group of groupsOf(initiative.entries, groupOf)) {
+    const waiting = group.filter((entry) => entry.card === undefined);
+    if (waiting.length === 0) continue;
     const card = group.find((entry) => entry.card !== undefined)?.card ?? free.shift();
     if (card === undefined) continue;
-    for (const entry of group) entry.card = card;
+    for (const entry of waiting) entry.card = card;
   }
   sortByCards(initiative);
 }
