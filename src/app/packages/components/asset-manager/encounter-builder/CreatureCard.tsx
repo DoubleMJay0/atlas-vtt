@@ -8,6 +8,7 @@ import { t } from '../../../../i18n';
 import type { TokenAsset } from '../types';
 import { CountStepper } from './CountStepper';
 import { MAX_PICK_COUNT } from './encounterPicks';
+import { flashCard } from './flashCard';
 
 interface CreatureCardProps {
   app: App;
@@ -33,11 +34,13 @@ export function CreatureCard({ app, token, count, onCountChange }: CreatureCardP
     if (target.closest(OWN_CONTROLS) || target.closest('.atlas-encounter-card__notch')) return;
     // A drag that selected text is reading, not picking.
     if (!target.ownerDocument.getSelection()?.isCollapsed) return;
-    if (count < MAX_PICK_COUNT) onCountChange(token, count + 1);
+    if (count >= MAX_PICK_COUNT) return;
+    onCountChange(token, count + 1);
+    flashCard(event.currentTarget);
   };
 
   return (
-    <article className="atlas-encounter-card" data-picked={picked} onClick={handleClick}>
+    <article className="atlas-encounter-card" data-picked={picked} data-token-id={token.id} onClick={handleClick}>
       <div className="atlas-encounter-card__notch">
         {picked ? (
           <CountStepper name={token.name} count={count} onChange={(next) => onCountChange(token, next)} />

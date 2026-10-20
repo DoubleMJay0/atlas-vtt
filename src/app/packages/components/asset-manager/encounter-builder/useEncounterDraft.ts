@@ -14,7 +14,6 @@ export interface EncounterDraft {
   /** The name the encounter gets while none is typed. */
   defaultName: string;
   saving: boolean;
-  setSaving: (saving: boolean) => void;
   /** Saves a new encounter, or the edited one in its place; resolves with whether it was saved. */
   save: () => Promise<boolean>;
 }
@@ -72,5 +71,5 @@ export function useEncounterDraft(
     }
   };
 
-  return { picks, setPicks, name, setName, defaultName, saving, setSaving, save };
+  return { picks, setPicks, name, setName, defaultName, saving, save };
 }

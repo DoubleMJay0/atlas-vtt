@@ -21,6 +21,8 @@ export const filters = {
   'filters.linkHint': 'Link statblocks to these characters to filter them by challenge rating, type and more.',
   'filters.showFewer': 'Show fewer',
   'filters.showAll': 'Show all {count}',
+  'filters.searchOptions': 'Search {field}',
+  'filters.noOptionMatch': 'Nothing matches.',
   'filters.lowest': 'Lowest {label}',
   'filters.highest': 'Highest {label}',
   'filters.keyword.name': 'Part of the name',
