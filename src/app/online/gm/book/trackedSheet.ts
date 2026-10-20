@@ -10,6 +10,8 @@ import { playerAccess } from './playerAccess.ts';
 export interface TrackedSheetValue {
   readonly definition: ResourceDefinition;
   readonly value: ResourceValue;
+  /** Whether its player may step it: only where the template lets them change its field. */
+  readonly editable: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export function trackedSheetValues(
     // Its maximum shows too, so a field it reads that players may not see keeps it off their sheet
     if (playerAccess(template, tracked.field.key) === 'hidden' || playerAccess(template, tracked.maxField) === 'hidden') return [];
     const max = trackedMax(tracked, reader);
-    return max === null ? [] : [{ definition, value: trackedValue(tracked, max, held?.[definition.key]) }];
+    const editable = playerAccess(template, tracked.field.key) === 'edit';
+    return max === null ? [] : [{ definition, value: trackedValue(tracked, max, held?.[definition.key]), editable }];
   });
 }

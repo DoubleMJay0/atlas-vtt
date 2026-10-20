@@ -57,6 +57,14 @@ describe('tracked numbers on a player\'s sheet', () => {
     expect(statblock.blocks.find((node) => node.k === 'track')).toMatchObject({ resource: null, current: 0, max: 4 });
   });
 
+  it('may be stepped only where the template lets the player change the field', () => {
+    const readOnly: StatblockTemplate = { ...TEMPLATE, players: { secret: 'hidden', luck: 'read' } };
+    const values = trackedSheetValues(resolvedOf(readOnly, { name: 'Ana', luck: 3, stress: 4 }), [HP], {});
+    expect(values.map(({ definition, editable }) => [definition.key, editable])).toEqual([['luck', false], ['stress', true]]);
+    const sheet = sheetOf({ id: 'ana', name: 'Ana', imagePath: 'ana.png', showRing: false } as never, {}, [HP], () => null, values);
+    expect(sheet?.resources.find((resource) => resource.key === 'luck')?.editable).toBe(false);
+  });
+
   it('are resources of the sheet the player may change', () => {
     const shown = { id: 'ana', name: 'Ana', imagePath: 'ana.png', showRing: false, ringColor: undefined } as never;
     const sheet = sheetOf(shown, { resources: HELD }, [HP], () => null, tracked);

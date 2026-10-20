@@ -15,15 +15,16 @@ const isValue = (value: number): boolean => Number.isFinite(value) && Math.abs(v
  * viewer `owner`), bars and wheels alike, by name, then the numbers its statblock tracks. Hiding a
  * resource from players hides it on other tokens, never from the player whose character it is.
  * Each names its key, and the player may change every one but a fixed value (`static`), which the
- * statblock gives.
+ * statblock gives, and a tracked number whose field the template lets them only read.
  */
 function sheetResources(token: ResourceHolder, definitions: readonly ResourceDefinition[], tracked: readonly TrackedSheetValue[]): SheetResource[] {
-  return [...visibleResources(token, definitions, 'owner'), ...tracked].flatMap(({ definition, value }): SheetResource[] => {
+  const own = visibleResources(token, definitions, 'owner').map((shown) => ({ ...shown, editable: true }));
+  return [...own, ...tracked].flatMap(({ definition, value, editable }): SheetResource[] => {
     const name = clippedLine(definition.name, MAX_BOOK_TITLE);
     const colour = hexColour(definition.color);
     if (name === null || colour === null || !DIRECTIONS.includes(definition.direction) || !isValue(value.current) || !isValue(value.max)) return [];
     const key = isResourceKey(definition.key) ? definition.key : null;
-    return [{ key, name, colour, direction: definition.direction, current: value.current, max: value.max, editable: key !== null && definition.direction !== 'static' }];
+    return [{ key, name, colour, direction: definition.direction, current: value.current, max: value.max, editable: editable && key !== null && definition.direction !== 'static' }];
   }).slice(0, MAX_SHEET_RESOURCES);
 }
 
