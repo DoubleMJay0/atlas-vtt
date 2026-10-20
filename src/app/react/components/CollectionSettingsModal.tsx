@@ -231,6 +231,7 @@ export function CollectionSettingsModal({
       canSave={canSave}
       onSave={() => { void save(); }}
       onClose={onClose}
+      size="fullscreen"
     >
       <RulesSettingsTabs
         tabs={collectionTabs(statblockEditorOn)}
