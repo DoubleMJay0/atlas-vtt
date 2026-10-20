@@ -74,9 +74,19 @@ $sidebar-width: 320px;
   }
 }
 
-.atlas-encounter-builder__filters {
+.atlas-encounter-builder__filters-frame {
   flex: 1;
+}
+
+.atlas-encounter-builder__filters {
   padding-bottom: $spacing-l;
+}
+
+// The scrollbar lies over the filters' padding and takes no room (`OverlayScroll`); here it
+// shows only while the filters scroll or it is dragged, not merely under the pointer.
+.atlas-encounter-builder__filters-frame.atlas-overlay-scroll:hover:not(:has(> [data-scrolling])) > .atlas-overlay-scroll__track:not([data-dragging]) > .atlas-overlay-scroll__thumb {
+  opacity: 0;
+  transition-duration: $transition-slow;
 }
 
 // ── Main: the count and chips, the feed, the tray floating over its foot ────
@@ -187,6 +197,25 @@ $tray-room: 72px;
     border-color: var(--interactive-accent);
     box-shadow: 0 0 0 1px var(--interactive-accent), 0 0 24px -6px color-mix(in oklch, var(--interactive-accent) 60%, transparent);
   }
+
+  // Pressed, and for a moment after a click adds it or the tray asks for it: a ring that fades.
+  &:active .atlas-statblock {
+    border-color: var(--interactive-accent);
+  }
+
+  &[data-flash] .atlas-statblock {
+    animation: atlas-encounter-card-flash 700ms $transition-ease-out;
+  }
+}
+
+@keyframes atlas-encounter-card-flash {
+  from {
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--interactive-accent) 55%, transparent);
+  }
+
+  to {
+    box-shadow: 0 0 0 4px transparent;
+  }
 }
 
 .atlas-encounter-card__notch {
@@ -266,6 +295,7 @@ $tray-room: 72px;
   padding: 0;
   border-radius: $radius-full;
   color: var(--text-muted);
+  transition: background-color $transition-fast $transition-ease, color $transition-fast $transition-ease, scale $transition-fast $transition-ease;
 
   svg {
     width: 14px;
@@ -274,6 +304,13 @@ $tray-room: 72px;
 
   &:hover {
     color: var(--text-normal);
+    background: var(--background-modifier-active-hover);
+  }
+
+  &:active {
+    color: var(--text-accent);
+    background: color-mix(in oklch, var(--interactive-accent) 22%, transparent);
+    scale: 0.96;
   }
 }
 
@@ -325,6 +362,15 @@ input.atlas-encounter-tray__name-input {
   font-size: $font-ui-small;
 }
 
+.atlas-encounter-tray__picks-wrap {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: $spacing-xs;
+  min-width: 0;
+}
+
+// As many chips as fit; the rest are hidden (`TrayPicks`) and listed under "+N".
 .atlas-encounter-tray__picks {
   display: flex;
   flex: 1;
@@ -332,9 +378,8 @@ input.atlas-encounter-tray__name-input {
   min-width: 0;
   margin: 0;
   padding: 0;
-  overflow-x: auto;
+  overflow: hidden;
   list-style: none;
-  scrollbar-width: none;
 }
 
 .atlas-encounter-tray__pick {
@@ -346,6 +391,83 @@ input.atlas-encounter-tray__name-input {
   padding: $chip-inset;
   @include atlas-panel-inset-radius($spacing-s);
   background: var(--background-modifier-hover);
+  transition: background-color $transition-fast $transition-ease;
+
+  &[hidden] {
+    display: none;
+  }
+
+  // Its face shows the creature's statblock: the chip lights up under the pointer, and more when pressed.
+  &:has(> .atlas-encounter-tray__pick-face:hover) {
+    background: var(--background-modifier-active-hover);
+  }
+
+  &:has(> .atlas-encounter-tray__pick-face:active) {
+    background: color-mix(in oklch, var(--interactive-accent) 22%, var(--background-modifier-hover));
+  }
+}
+
+.atlas-encounter-tray__pick-face {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  height: 100%;
+  padding: 0 $spacing-xs 0 0;
+  border: none;
+  border-radius: $radius-full;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+
+  &:is(button) {
+    cursor: pointer;
+  }
+
+  &:is(button):hover,
+  &:is(button):active {
+    background: none;
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+  }
+}
+
+.atlas-encounter-tray__overflow.btn {
+  flex-shrink: 0;
+  height: $tray-control;
+  padding: 0 $spacing-m;
+  @include atlas-panel-inset-radius($spacing-s);
+  background: var(--background-modifier-hover);
+  font-size: $font-ui-small;
+  font-variant-numeric: tabular-nums;
+
+  &:hover,
+  &[aria-expanded='true'] {
+    background: var(--background-modifier-active-hover);
+  }
+}
+
+.atlas-encounter-tray__overflow-menu {
+  max-height: min(50vh, 420px);
+  padding: $spacing-xs;
+  overflow-y: auto;
+}
+
+.atlas-encounter-tray__overflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-xs;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  .atlas-encounter-tray__pick {
+    justify-content: space-between;
+  }
 }
 
 .atlas-encounter-tray__portrait {
