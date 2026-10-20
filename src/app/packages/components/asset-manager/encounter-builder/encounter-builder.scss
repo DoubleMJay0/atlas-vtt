@@ -98,14 +98,18 @@ $chip-height: 24px;
   white-space: nowrap;
 }
 
-// Room above the first row for the cards' notches, and below the last for the tray floating over it.
+// Room above the first row for the cards' notches and their shadow (the feed clips what scrolls),
+// and below the last for the tray floating over it.
 $notch-height: 28px;
+$notch-shadow-reach: 16px;
 $tray-room: 72px;
 
 .atlas-encounter-builder__feed {
   flex: 1;
   min-height: 0;
-  padding: calc(#{$notch-height} / 2) 0 $tray-room;
+  // The shadow's room takes the window's gap above the feed, so the cards hardly move down.
+  margin-top: -$spacing-s;
+  padding: calc(#{$notch-height} / 2 + #{$notch-shadow-reach}) 0 $tray-room;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -153,6 +157,8 @@ $tray-room: 72px;
   height: $notch-height;
   translate: -50% 0;
   @include atlas-elevated-surface;
+  // A control on the card's edge, not a panel: the menu shadow, which the feed's top padding holds.
+  box-shadow: $shadow-md;
   border-radius: $radius-full;
   cursor: default;
   opacity: 0;
