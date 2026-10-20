@@ -6,6 +6,8 @@ import type { FieldKey, FieldValue, StatblockTemplate, TemplateField } from '../
 import { startCountersValue } from '../values/counterValues';
 import { fieldLabels, readField, readerFor, type FieldRecord, type ValueReader } from '../values/fieldValues';
 import { startTableValue } from '../values/tableValues';
+import { withReferencesFilled } from '../values/fillReferences';
+import { statblockLookup } from '../values/statblockLookup';
 import type { SheetMode, StatblockTokenContext } from './sheetTypes';
 import type { ResourceDefinition } from '../../resources/resourceTypes';
 import { trackedResources } from '../../resources/trackedResources';
@@ -15,6 +17,7 @@ import { trackedNumbers, type TrackedNumber } from '../values/trackedNumbers';
 export interface SheetState {
   /** The note's fields as they are stored, a Table without a value holding its template's starting table. */
   record: FieldRecord;
+  /** Reads the values as the card shows them: `@` references filled in (`withReferencesFilled`). */
   reader: ValueReader;
   fields: ReadonlyMap<FieldKey, TemplateField>;
   /** Lookup tables and field labels for patterns and formulas. */
@@ -77,9 +80,11 @@ export function sheetState({ template, record: stored, lookups, mode, token, fol
   // A template not read from a file (one being made, a test's) may lack a header part's field: the part still has its name and prompt.
   const { fields } = withHeaderFields(template);
   const record = withStartingValues(stored, fields);
+  // What the card shows reads `@` references as the numbers they name; the record keeps what was written
+  const shown = withReferencesFilled(record, fields, statblockLookup(template, record, fields));
   return {
     record,
-    reader: readerFor(record, fields),
+    reader: readerFor(shown, fields),
     fields: new Map(fields.map((field) => [field.key, field])),
     context: {
       lookups: { ...template.lookups, ...lookups },

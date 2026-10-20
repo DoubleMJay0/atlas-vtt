@@ -3,7 +3,7 @@
  * statblocks of its note's template, its collection's resources and conditions, and where each of
  * its values is held now. A resource is read from the character's token on an open map (one on
  * screen first), else from the values the played campaign keeps of it; a condition from its token
- * on an open map; counters and `@field` numbers from the note. The template's tracked numbers are
+ * on an open map; counters and `@` references from the note (`statblockLookup`: `@level`, `@str.mod`). The template's tracked numbers are
  * resources too (`trackedResources`), whose maximum is always the note's and which start full or
  * empty where nothing holds them yet.
  */
@@ -14,7 +14,6 @@ import { PartySync } from '../campaigns/partyValues/PartySync';
 import { libraryTokenOf } from '../characters/playerCharacters';
 import { playerCharacterOfNote } from '../characters/noteCharacter';
 import { collectionResources } from '../resources/collectionResources';
-import { resolveField } from '../resources/resourceFields';
 import { trackedResources } from '../resources/trackedResources';
 import type { ResourceValue } from '../resources/resourceTypes';
 import { AssetService, type TokenAsset } from '../services/AssetService';
@@ -24,10 +23,11 @@ import type { ViewAtlasStore } from '../storeFactory';
 import type { StatblockTemplate, TemplateId } from '../statblocks/model/templateTypes';
 import { NoteSource } from '../statblocks/notes/noteSource';
 import { frontmatterSource } from '../statblocks/notes/statblockSource';
-import { meaningsOf, withFormerKeysAliased } from '../statblocks/resolve/fieldMeanings';
 import { libraryTemplates } from '../statblocks/resolve/readStatblock';
 import { resolveNative } from '../statblocks/resolve/resolveStatblock';
 import { readField, type FieldRecord } from '../statblocks/values/fieldValues';
+import { statblockLookup } from '../statblocks/values/statblockLookup';
+import { withReferencesFilled } from '../statblocks/values/fillReferences';
 import { trackedMax, trackedValue } from '../statblocks/values/trackedNumbers';
 import { conditionValue } from '../utils/conditionValues';
 import { collectionRecovery } from './collectionRecovery';
@@ -102,16 +102,19 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
   const holds = characterHolds(app, asset);
   const sync = PartySync.forApp(app);
   const campaignId = CampaignPlay.forApp(app).playing();
-  const aliased = withFormerKeysAliased(note.record, note.template.fields);
-  const meanings = meaningsOf(note.template.fields);
+  const lookup = statblockLookup(note.template, note.record);
   const fields = new Map(note.template.fields.map((field) => [field.key, field]));
 
   const collection = collectionResources(settings);
   const tracked = new Map(trackedResources(note.template, collection).map((each) => [each.definition.key, each]));
-  const read = (key: string): ReturnType<typeof readField>['value'] => {
+  const readIn = (record: FieldRecord) => (key: string): ReturnType<typeof readField>['value'] => {
     const field = fields.get(key);
-    return field ? readField(note.record, field).value : undefined;
+    return field ? readField(record, field).value : undefined;
   };
+  // What the note holds, which counter writes take as their base
+  const read = readIn(note.record);
+  // Numbers as the card shows them: a maximum written `@level` or `10 + @con.mod` is a number
+  const readShown = readIn(withReferencesFilled(note.record, note.template.fields, lookup));
 
   const partyValue = (key: string): ResourceValue | undefined => {
     const party = sync && campaignId !== null ? sync.value(campaignId, asset.id, key) : undefined;
@@ -134,7 +137,7 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
   const resourceValue = (key: string): ResourceValue | undefined => {
     const number = tracked.get(key)?.tracked;
     if (!number) return heldValue(key);
-    const max = trackedMax(number, read);
+    const max = trackedMax(number, readShown);
     return max === null ? undefined : trackedValue(number, max, heldValue(key));
   };
 
@@ -150,7 +153,7 @@ export function characterRestOf(app: App, asset: TokenAsset, note: RestNote): Ch
       return (token.conditions ?? []).includes(id) ? conditionValue(token, id) : 0;
     },
     fieldValue: read,
-    lookup: (path) => resolveField(aliased, path, meanings),
+    lookup,
   };
   return { asset, ...note, buttons, character, holds, resourcePlace };
 }

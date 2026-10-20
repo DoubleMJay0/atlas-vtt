@@ -57,6 +57,11 @@ describe('native statblocks reach tokens', () => {
     });
   });
 
+  it('places a token with hit points written as a sum that names another number of the statblock', async () => {
+    addNote(current, 'Bestiary/Iron Captain.md', { ...IRON_GUARD, name: 'Iron Captain', stamina: '20 + @level' });
+    expect((await loadStatblockOverrides(current.app, 'Bestiary/Iron Captain.md', [HP_RESOURCE]))?.resources).toEqual({ hp: { current: 23, max: 23 } });
+  });
+
   it('links a token to a native statblock with the same values, and never writes the note', async () => {
     const refusals = forbidWrites(current.app);
     const data = await linkService().extractStatblockData(GUARD);
