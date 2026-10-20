@@ -19,6 +19,7 @@ vi.mock('../../src/app/react/ViewStoreContext', () => ({
 }));
 vi.mock('../../src/app/pixi/utils/tokenHighlight', () => ({ zoomToTokenWithHighlight: vi.fn() }));
 vi.mock('../../src/app/resources/useMapResources', () => ({ useMapResources: () => [] }));
+vi.mock('../../src/app/react/hooks/useMapConditions', () => ({ useMapConditions: () => [] }));
 
 import { InitiativeCard } from '../../src/app/react/components/InitiativeCard';
 

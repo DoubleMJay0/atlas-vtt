@@ -34,6 +34,7 @@ const app = {
 };
 const state = {
   objects: { tokens: {} },
+  initiative: { entries: [], isActive: false, round: 0 },
   dmNotePath: NOTE,
   setDMNotePath: vi.fn(),
   updateToken: vi.fn(),

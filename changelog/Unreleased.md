@@ -11,8 +11,12 @@
 - Initiative: a combatant can delay its turn. It waits below the order until Act Now puts it right before the combatant whose turn it is.
 - Initiative: Sit Out This Round now works in turn order too.
 - Initiative: the tracker's ⋯ menu has an Auto sort switch.
+- Initiative: during a fight the list starts at whoever acts now and runs on into the next round below a Round divider, in the tracker and in the players' list. Switch it off with Turn on top in the tracker's ⋯ menu.
+- Initiative: each card shows its token's conditions as the map does, with the number of a valued condition. In the tracker, point at a badge to see its name.
+- Initiative tracker: Dock on the left in the ⋯ menu moves the tracker and the players' list to the left edge, and the toggle at the top of the tracker shows only the current turn and the next two.
 
 ## Improved
+- DM screen: during a fight it shows the statblocks of the creatures in the fight, with a switch to show every creature on the map.
 - Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.
 - Initiative: combatants with the same number are ordered by their initiative modifier.
 - Initiative: Clear initiative asks before it removes every combatant. It is in the tracker's ⋯ menu.

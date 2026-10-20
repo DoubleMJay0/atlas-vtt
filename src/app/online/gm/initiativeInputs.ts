@@ -1,9 +1,10 @@
 import { MAX_COMBATANTS, MAX_NAME, type AssetRef, type SharedCombatant, type SharedInitiative } from '../protocol/index.ts';
 import { BUILT_IN_SYSTEM_PRESETS } from '../../gameSystems/builtInPresets';
 import { collectionInitiativeRules, DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
-import { rulesForMap, type RulesLookup } from '../../gameSystems/mapRules';
+import { mapConditions, rulesForMap, type RulesLookup } from '../../gameSystems/mapRules';
 import { mapResources } from '../../resources/collectionResources';
-import { entryTokenOf, listedForPlayers, playerInitiativeList } from '../../services/playerInitiativeList';
+import { entryTokenOf, listedForPlayers, playerInitiativeList, playerSegments } from '../../services/playerInitiativeList';
+import { sharedConditions } from './tokenUI.ts';
 import type { TokenEntity } from '../../types';
 import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { ViewState } from '../../types/viewState';
@@ -17,6 +18,8 @@ export interface InitiativeInputs {
   readonly shown: boolean;
   /** The player view's nameplate switch: without it no name is sent. */
   readonly showNames: boolean;
+  /** The GM's choice that the lists start at the turn during a fight; off unless said. */
+  readonly fromTurn?: boolean;
   /** Where the map's rules are looked up; without it the default rules and no hit points. */
   readonly rules: RulesLookup | null;
   /** A portrait's artwork as players are sent it, by vault path; null while unknown. */
@@ -47,26 +50,35 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
   if (!inputs.shown || state.initiativeTrackerOpen !== true || initiative === undefined) return null;
   const tokens = state.objects.tokens;
   const definitions = rules !== null ? mapResources(rules, state.mapPath) : [];
+  const conditions = rules !== null ? mapConditions(rules, state.mapPath) : [];
   const hpVisible = definitions.some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
   const list = playerInitiativeList(
     initiative,
-    (entry) => (listedForPlayers(tokens[entry.tokenId]) ? entryTokenOf(tokens[entry.tokenId], definitions) : null),
+    (entry) => (listedForPlayers(tokens[entry.tokenId]) ? entryTokenOf(tokens[entry.tokenId], definitions, conditions) : null),
     initiativeRulesOf(rules, state.mapPath),
     hpVisible,
   );
-  const combatants = list.combatants.slice(0, MAX_COMBATANTS).map(({ entry, token }): SharedCombatant => ({
-    initiative: finite(entry.initiative) ? entry.initiative : 0,
-    name: inputs.showNames && typeof entry.name === 'string' ? entry.name.slice(0, MAX_NAME) : null,
-    turn: list.isActive && !list.bySides && entry.isActive === true,
-    sitsOut: entry.sitsOut === true,
-    ...(entry.delayed === true ? { delayed: true } : {}),
-    ...(token.defeated ? { defeated: true } : {}),
-    ...(hasInitiative(entry) ? {} : { unnumbered: true }),
-    art: typeof entry.imagePath === 'string' && entry.imagePath !== '' ? inputs.art(entry.imagePath) : null,
-    ring: token.showRing ? { colour: token.ringColor ? ringColour(token.ringColor) : null } : null,
-    side: token.side,
-    hp: token.hp !== null && finite(token.hp.current) && finite(token.hp.max) ? { current: token.hp.current, max: token.hp.max } : null,
-  }));
+  // Who acts in the next round, where the list starts at the turn
+  const fromTurn = inputs.fromTurn === true;
+  const nextRound = new Set(playerSegments(list, fromTurn).flatMap((segment) => (segment.kind === 'group' && segment.key === 'next' ? segment.items : [])));
+  const combatants = list.combatants.slice(0, MAX_COMBATANTS).map((combatant): SharedCombatant => {
+    const { entry, token } = combatant;
+    return {
+      initiative: finite(entry.initiative) ? entry.initiative : 0,
+      name: inputs.showNames && typeof entry.name === 'string' ? entry.name.slice(0, MAX_NAME) : null,
+      turn: list.isActive && !list.bySides && entry.isActive === true,
+      sitsOut: entry.sitsOut === true,
+      ...(entry.delayed === true ? { delayed: true } : {}),
+      ...(token.defeated ? { defeated: true } : {}),
+      ...(hasInitiative(entry) ? {} : { unnumbered: true }),
+      art: typeof entry.imagePath === 'string' && entry.imagePath !== '' ? inputs.art(entry.imagePath) : null,
+      ring: token.showRing ? { colour: token.ringColor ? ringColour(token.ringColor) : null } : null,
+      side: token.side,
+      hp: token.hp !== null && finite(token.hp.current) && finite(token.hp.max) ? { current: token.hp.current, max: token.hp.max } : null,
+      ...(nextRound.has(combatant) ? { nextRound: true } : {}),
+      ...(token.conditions?.length ? { conditions: sharedConditions(token.conditions) } : {}),
+    };
+  });
   return {
     isActive: list.isActive,
     round: finite(list.round) ? list.round : 0,
@@ -74,5 +86,6 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
     firstSide: list.firstSide,
     activeSide: list.bySides ? list.activeSide : null,
     combatants,
+    ...(fromTurn ? { fromTurn: true } : {}),
   };
 }

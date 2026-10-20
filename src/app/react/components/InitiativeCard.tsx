@@ -14,6 +14,9 @@ import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { TokenPortrait } from '../../packages/components/shared/TokenPortrait';
 import { InitiativeNumber, type NumberStep } from './InitiativeNumber';
 import { CardResourceBars } from './CardResourceBars';
+import { CardConditions } from './CardConditions';
+import { useMapConditions } from '../hooks/useMapConditions';
+import { combatantConditions } from '../../utils/activeConditions';
 import { useCardPreviewHover } from './useCardPreviewHover';
 import { t } from '../../i18n';
 
@@ -25,6 +28,8 @@ interface InitiativeCardProps {
   bySides?: boolean;
   /** The GM chose to see names on the cards. */
   showName?: boolean;
+  /** The side tooltips open on: away from the edge the tracker stands at. */
+  tooltipSide?: 'left' | 'right';
   /** The card's number is being typed in place. */
   isEditingNumber?: boolean;
   onStartNumberEdit?: (entry: InitiativeEntry) => void;
@@ -49,6 +54,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   isHoveredForPreview,
   bySides = false,
   showName = false,
+  tooltipSide = 'left',
   isEditingNumber = false,
   onStartNumberEdit = NOTHING,
   onCommitNumber = NOTHING,
@@ -72,9 +78,11 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
   // Read live from the token: the resources that defeat it (hit points), and whether one of them has
   const definitions = useMapResources();
+  const conditionDefinitions = useMapConditions();
   const token = tokens[entry.tokenId];
   const bars = token ? visibleResources(token, definitions, 'dm').filter(({ definition }) => definition.defeatedWhenSpent) : [];
   const defeated = combatantDefeated(token, definitions);
+  const conditions = combatantConditions(token, conditionDefinitions);
   // A hidden token's entry is left out of the players' list (`PlayerInitiativePanel`)
   const hiddenFromPlayers = token?.isHidden === true;
   const name = (token && tokenDisplayName(token)) || entry.name;
@@ -206,7 +214,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         )}
 
         {hiddenFromPlayers && (
-          <LabelTooltip label="Hidden from players" side="left">
+          <LabelTooltip label="Hidden from players" side={tooltipSide}>
             <span className="atlas-initiative-card__hidden-badge"><EyeOff /></span>
           </LabelTooltip>
         )}
@@ -227,6 +235,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
       )}
 
       {bars.length > 0 && <CardResourceBars tokenId={entry.tokenId} bars={bars} />}
+
+      <CardConditions conditions={conditions} tooltipSide={tooltipSide} />
     </div>
   );
 };

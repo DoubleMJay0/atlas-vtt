@@ -4,7 +4,7 @@ import type { TokenEntity } from '../../src/app/types';
 import { createDefaultInitiativeState, type InitiativeEntry } from '../../src/app/types/initiativeTypes';
 
 vi.mock('../../src/app/resources/collectionResources', () => ({ mapResources: () => [] }));
-vi.mock('../../src/app/gameSystems/mapRules', () => ({ rulesForMap: () => ({ settings: null }) }));
+vi.mock('../../src/app/gameSystems/mapRules', () => ({ rulesForMap: () => ({ settings: null }), mapConditions: () => [] }));
 
 import { sharedInitiative } from '../../src/app/online/gm/initiativeInputs';
 import { parseInitiative } from '../../src/app/online/protocol/initiative';

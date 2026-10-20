@@ -31,6 +31,8 @@ export interface AtlasPlayerSettings {
   readonly showWidgets: boolean;
   /** Whether everyone at the table sees everyone else's cursor (the player view's setting); false when it cannot be read. */
   readonly showCursors: boolean;
+  /** Whether the GM's initiative lists start at the turn during a fight (`initiativeLayout`); false when it cannot be read. */
+  readonly initiativeFromTurn?: boolean;
 }
 
 /** A field of an object by name, unchecked; undefined for anything that has none. */
@@ -61,6 +63,8 @@ export function atlasPlayerSettings(app: App): AtlasPlayerSettings {
   const playerView = field(settings, 'getLocalPlayerViewSettings');
   const dynamicLighting = typeof isOn === 'function' ? (isOn as (id: string) => unknown).call(settings, 'dynamicLighting') : undefined;
   const view: unknown = typeof playerView === 'function' ? (playerView as () => unknown).call(settings) : undefined;
+  const readLayout = field(settings, 'initiativeLayout');
+  const layout: unknown = typeof readLayout === 'function' ? (readLayout as () => unknown).call(settings) : undefined;
   return {
     dynamicLighting: typeof dynamicLighting === 'boolean' ? dynamicLighting : null,
     showNames: field(view, 'showTokenNameplates') === true,
@@ -68,6 +72,7 @@ export function atlasPlayerSettings(app: App): AtlasPlayerSettings {
     showInitiative: field(view, 'showInitiative') === true,
     showWidgets: field(view, 'showWidgets') === true,
     showCursors: field(view, 'showCursors') === true,
+    initiativeFromTurn: field(layout, 'fromTurn') === true,
   };
 }
 

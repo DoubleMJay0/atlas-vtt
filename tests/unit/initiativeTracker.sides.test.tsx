@@ -50,6 +50,10 @@ vi.mock('../../src/app/react/ViewStoreContext', () => ({
   useAtlasStore: (selector: (storeState: typeof state) => unknown) => selector(state),
   useViewStoreHook: () => ({ getState: () => state }),
 }));
+const layout = vi.hoisted(() => ({ fromTurn: false, dock: 'right' as 'left' | 'right', collapsed: false, set: vi.fn() }));
+vi.mock('../../src/app/initiative/useInitiativeLayout', () => ({
+  useInitiativeLayout: () => ({ layout: { fromTurn: layout.fromTurn, dock: layout.dock, collapsed: layout.collapsed }, setLayout: layout.set }),
+}));
 const resources = vi.hoisted(() => ({ definitions: [] as unknown[] }));
 vi.mock('../../src/app/resources/useMapResources', () => ({ useMapResources: () => resources.definitions }));
 vi.mock('../../src/app/pixi/utils/tokenHighlight', () => ({ zoomToTokenWithHighlight: vi.fn() }));
@@ -105,6 +109,7 @@ beforeEach(() => {
   confirm.asked = [];
   resources.definitions = [];
   scrolls.calls.length = 0;
+  Object.assign(layout, { fromTurn: false, dock: 'right', collapsed: false });
   collection.rules = { mode: 'sides', roll: '1d20', firstSide: 'players' };
   scene();
 });

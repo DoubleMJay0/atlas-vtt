@@ -1,6 +1,7 @@
 import { parseAsset, type AssetRef } from './asset.ts';
 import { isRecord } from './shape.ts';
 import { COLOUR_PATTERN, MAX_NAME } from './tokens.ts';
+import { MAX_TOKEN_CONDITIONS, parseCondition, type SharedCondition } from './tokenUI.ts';
 
 /** Combatants one `initiative` message may list. */
 export const MAX_COMBATANTS = 200;
@@ -21,6 +22,13 @@ export interface SharedCombatant {
   readonly defeated?: true;
   /** No number rolled or typed yet: an empty slot, not the 0 `initiative` holds. Absent from older GMs. */
   readonly unnumbered?: true;
+  /**
+   * In a list that starts at the turn (`SharedInitiative.fromTurn`), the combatant acts in the next
+   * round: it is drawn after the round's last, below a divider naming the next round. Absent from older GMs.
+   */
+  readonly nextRound?: true;
+  /** The condition badges the map shows players on the combatant's token, in order. Absent from older GMs. */
+  readonly conditions?: readonly SharedCondition[];
   /** The portrait's artwork, asked for by hash like the map. */
   readonly art: AssetRef | null;
   /** The ring around the portrait (`#rrggbb`, or null untinted); absent for an unframed token. */
@@ -38,6 +46,12 @@ export interface SharedInitiative {
   readonly firstSide: SharedSide;
   readonly activeSide: SharedSide | null;
   readonly combatants: readonly SharedCombatant[];
+  /**
+   * The GM's lists start at the turn during a fight: in turn order the combatants without
+   * `nextRound` first, then a divider, then those with it; by sides the side whose turn it is first,
+   * then a divider before the sides that act before it. Absent: the list in turn order.
+   */
+  readonly fromTurn?: true;
 }
 
 const isNumber = (value: unknown, limit: number): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit;
@@ -59,7 +73,21 @@ function parseCombatant(value: unknown): SharedCombatant | null {
     ...(value.delayed === true ? { delayed: true as const } : {}),
     ...(value.defeated === true ? { defeated: true as const } : {}),
     ...(value.unnumbered === true ? { unnumbered: true as const } : {}),
+    ...(value.nextRound === true ? { nextRound: true as const } : {}),
+    ...conditionsOf(value.conditions),
   };
+}
+
+/** Optional condition badges: a list of readable ones, else unset, so a page never fails on them. */
+function conditionsOf(value: unknown): { conditions?: SharedCondition[] } {
+  if (!Array.isArray(value) || value.length > MAX_TOKEN_CONDITIONS) return {};
+  const conditions: SharedCondition[] = [];
+  for (const entry of value) {
+    const condition = parseCondition(entry);
+    if (condition === null) return {};
+    conditions.push(condition);
+  }
+  return { conditions };
 }
 
 /** The list of an `initiative` message: null for none shown, undefined for anything malformed. */
@@ -74,5 +102,8 @@ export function parseInitiative(value: unknown): SharedInitiative | null | undef
     if (combatant === null) return undefined;
     combatants.push(combatant);
   }
-  return { isActive: value.isActive, round: value.round, bySides: value.bySides, firstSide: value.firstSide, activeSide: value.activeSide, combatants };
+  return {
+    isActive: value.isActive, round: value.round, bySides: value.bySides, firstSide: value.firstSide, activeSide: value.activeSide, combatants,
+    ...(value.fromTurn === true ? { fromTurn: true as const } : {}),
+  };
 }
