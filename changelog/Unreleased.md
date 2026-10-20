@@ -22,6 +22,10 @@
 - Initiative: during a fight the list starts at whoever acts now and runs on into the next round below a Round divider, in the tracker and in the players' list. Switch it off with Turn on top in the tracker's ⋯ menu.
 - Initiative: each card shows its token's conditions as the map does, with the number of a valued condition. In the tracker, point at a badge to see its name.
 - Initiative tracker: Dock on the left in the ⋯ menu moves the tracker and the players' list to the left edge, and the toggle at the top of the tracker shows only the current turn and the next two.
+- Initiative: the token whose turn it is wears a ring on the map, for you and, where they see the token, for your players.
+- Initiative: a short banner names whose turn it is each time the turn moves on, with the round when one begins. Players get it in the player window too. Turn banner in the tracker's ⋯ menu switches it off.
+- Initiative: Follow the turn in the tracker's ⋯ menu brings the token whose turn begins into view.
+- Online play: Players move only on their turn in the tracker's ⋯ menu stops players from moving a token in the fight until its turn comes. Tokens outside the fight move freely.
 - Simplified Chinese interface when Obsidian's language is 简体中文 or 繁體中文. Text that is not translated yet stays in English.
 
 ## Improved

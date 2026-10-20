@@ -49,7 +49,8 @@ describe('PlayerWindowService cleanup', () => {
 
     service.destroy();
 
-    expect(unsubscribe).toHaveBeenCalledTimes(2);
+    // The widget bar, the initiative list and the turn banner each followed the store
+    expect(unsubscribe).toHaveBeenCalledTimes(3);
     expect(PlayerWindowService.getInstance()).toBeNull();
   });
 });

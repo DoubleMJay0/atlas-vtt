@@ -44,6 +44,7 @@ vi.mock('../../src/app/keyboard/useMapHotkeys', () => ({
   useAtlasSettings: () => ({
     showsInitiativeNames: () => settings.names, setInitiativeNames: settings.setInitiativeNames,
     initiativeLayout: () => ({ fromTurn: false, dock: 'right', collapsed: false }), setInitiativeLayout: vi.fn(),
+    initiativeTurnOptions: () => ({ banner: true, followTurn: false, movesOnTurn: false }), setInitiativeTurnOptions: vi.fn(), isExperimentalOn: () => false,
   }),
 }));
 vi.mock('../../src/app/react/ViewStoreContext', () => ({

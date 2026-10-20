@@ -2,6 +2,7 @@ import type { Viewport } from 'pixi-viewport';
 import { panToToken } from '../pixi/tokenFocus';
 import type { TokenEntity } from '../types';
 import type { InitiativeState } from '../types/initiativeTypes';
+import { isOffMap } from '../tokens/offMap';
 import { turnTokenIds } from './turnHolders';
 
 /** What following the turn reads of a view. */
@@ -19,7 +20,7 @@ export interface FollowState {
 export function followedToken(state: FollowState, canvasShows: (tokenId: string) => boolean): TokenEntity | null {
   for (const tokenId of turnTokenIds(state.initiative, state.objects.tokens)) {
     const token = state.objects.tokens[tokenId];
-    if (token && canvasShows(tokenId)) return token;
+    if (token && !isOffMap(token) && canvasShows(tokenId)) return token;
   }
   return null;
 }

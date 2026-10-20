@@ -93,5 +93,8 @@ describe('following the turn', () => {
     expect(followedToken(state, () => true)?.id).toBe('ogre');
     expect(followedToken(state, (id) => id !== 'ogre')?.id).toBe('ghost');
     expect(followedToken(state, () => false)).toBeNull();
+    // A combatant beside the map has nothing to go to
+    state.objects.tokens.ogre = token('ogre', { offMap: true } as Partial<TokenEntity>);
+    expect(followedToken(state, () => true)?.id).toBe('ghost');
   });
 });

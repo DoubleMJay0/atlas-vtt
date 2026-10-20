@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { movesOutOfTurn, sharedTurnTokens, type TurnShareState } from '../../../../src/app/online/gm/turnShare.ts';
 import { checkMove } from '../../../../src/app/online/gm/moveCheck.ts';
 import { parseInitiative } from '../../../../src/app/online/protocol/initiative.ts';
+import { sharedInitiative } from '../../../../src/app/online/gm/initiativeInputs.ts';
 import { parseTokens } from '../../../../src/app/online/protocol/tokens.ts';
 import { TOKEN_INTERVAL_MS } from '../../../../src/app/online/gm/TokenShare.ts';
 import { boundOwnership } from './fakeSeats.ts';
@@ -30,6 +31,14 @@ describe('the turn players are told of', () => {
     expect(sharedTurnTokens(state(fight('ogre')), false).size).toBe(0);
     expect(sharedTurnTokens(state(fight('ogre'), false), true).size).toBe(0);
     expect(sharedTurnTokens(state({ ...fight('ogre'), isActive: false }), true).size).toBe(0);
+  });
+
+  it('tells the page when the GM switched the banner off or keeps moves to the turn, and nothing otherwise', () => {
+    const inputs = { state: { initiative: fight('ogre'), initiativeTrackerOpen: true, mapPath: null, objects: { tokens } }, shown: true, showNames: false, rules: null, art: () => null };
+    expect(sharedInitiative({ ...inputs, bannerOff: true, movesOnTurn: true })).toMatchObject({ bannerOff: true, movesOnTurn: true });
+    const plain = sharedInitiative(inputs);
+    expect(plain).not.toHaveProperty('bannerOff');
+    expect(plain).not.toHaveProperty('movesOnTurn');
   });
 
   it('reads the new flags back, and anything but true as unset', () => {

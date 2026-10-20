@@ -54,7 +54,7 @@ const order = (active: string): InitiativeState => ({
   ...createDefaultInitiativeState(), isActive: true, round: 1,
   entries: ['hero', 'ogre', 'ghost', 'away'].map((id, index) => entry(id, index, { isActive: id === active })),
 });
-const tokens = { hero: token('hero', { vision: { enabled: true } } as Partial<TokenEntity>), ogre: token('ogre'), ghost: token('ghost', { isHidden: true }), away: token('away') };
+const tokens = { hero: token('hero', { vision: { enabled: true } } as Partial<TokenEntity>), ogre: token('ogre'), ghost: token('ghost', { isHidden: true }), away: token('away', { offMap: true } as Partial<TokenEntity>) };
 const sprites = { hero: sprite(100, 100), ogre: sprite(300, 100), ghost: sprite(500, 100) };
 
 describe('the turn marker', () => {
@@ -80,12 +80,13 @@ describe('the turn marker', () => {
     const sides = { ...order('none'), sides: { first: 'players' as const, active: 'opponents' as const } };
     const { markers, set } = setup(sides, tokens, sprites);
     cleanups.push(() => markers.destroy());
-    expect(markers.tokenIds).toEqual(['ogre', 'ghost', 'away']);
+    // The combatant beside the map acts with its side but carries no marker
+    expect(markers.tokenIds).toEqual(['ogre', 'ghost']);
     set({ initiative: { ...sides, sides: { ...sides.sides, roll: '1d6', rolls: { 1: { players: 2, opponents: 2 } } } } });
-    expect(markers.tokenIds.sort()).toEqual(['away', 'ghost', 'hero', 'ogre']);
+    expect(markers.tokenIds.sort()).toEqual(['ghost', 'hero', 'ogre']);
   });
 
-  it('follows its token while it moves, and shows with it: none for a token beside the map', () => {
+  it('follows its token while it moves, and shows with it', () => {
     const { markers, follow } = setup({ ...order('none'), sides: { first: 'players', active: 'opponents' } }, tokens, sprites);
     cleanups.push(() => markers.destroy());
     follow();
@@ -102,7 +103,7 @@ describe('the turn marker', () => {
     sprites.ghost.alpha = 0.5;
     follow();
     expect(views.get('ghost')?.alpha).toBe(0.5);
-    expect(views.get('away')?.visible).toBe(false);
+    expect(views.has('away')).toBe(false);
   });
 
   it('shows players only the markers of tokens they see, while their list is shown', () => {
@@ -110,7 +111,7 @@ describe('the turn marker', () => {
     cleanups.push(() => markers.destroy());
     const seen = (id: string): boolean => id === 'ogre';
     const visible = markers.playerLayers(seen, true).map((layer) => layer.visible);
-    expect(visible).toEqual([true, false, false]);
+    expect(visible).toEqual([true, false]);
     expect(markers.playerLayers(seen, false).every((layer) => !layer.visible)).toBe(true);
     // A picture of the scene shows none
     expect(markers.pictureLayers()).toEqual([{ layer: markers.layer, visible: false }]);

@@ -4,6 +4,7 @@ import type { TokenEntity } from '../../../types';
 import type { GridState } from '../../../types/gridTypes';
 import type { InitiativeState } from '../../../types/initiativeTypes';
 import type { TokenSeen } from '../../../vision/measureOrigin';
+import { mapTokens, sceneTokens, type TokenHolder } from '../../../tokens/offMap';
 import { MAP_LAYER_Z } from '../../mapLayerOrder';
 import type { LayerVisibility } from '../../playerSafeFrame';
 import { cssColorToHexNumber, getObsidianAccentColor } from '../../utils/colorUtils';
@@ -23,7 +24,7 @@ const DRAW_SCALE = 8;
 /** What the markers read of a view's store. */
 export interface TurnMarkerState {
   readonly initiative: Pick<InitiativeState, 'isActive' | 'round' | 'entries' | 'sides'>;
-  readonly objects: { readonly tokens: Readonly<Record<string, TokenEntity>> };
+  readonly objects: TokenHolder<TokenEntity>;
   readonly grid?: Pick<GridState, 'size'> | null | undefined;
   readonly isMapLoading?: boolean | undefined;
 }
@@ -100,8 +101,8 @@ class TurnMarker {
 /**
  * The marker on each token that holds the turn of a running fight (`turnTokenIds`): drawn above
  * the lighting and below the tokens' bars, it grows in as the turn comes (not with reduced motion)
- * and then stands still; the ticker only moves it with its token. A token without a sprite (beside
- * the map) has none. What the players see of it is `playerLayers`, and pictures of the scene show none.
+ * and then stands still; the ticker only moves it with its token. A combatant beside the map has
+ * none. What the players see of it is `playerLayers`, and pictures of the scene show none.
  */
 export class TurnMarkers {
   /** The layer every marker stands in. */
@@ -157,11 +158,12 @@ export class TurnMarkers {
   private sync(state: TurnMarkerState, animate = true): void {
     const previous = this.last;
     this.last = state;
-    if (previous && previous.initiative === state.initiative && previous.objects.tokens === state.objects.tokens && previous.grid === state.grid) return;
-    const tokens = state.objects.tokens;
+    if (previous && previous.initiative === state.initiative && sceneTokens(previous.objects) === sceneTokens(state.objects) && previous.grid === state.grid) return;
     const turn = currentTurn(state.initiative);
     const key = turn ? turnKey(turn) : null;
-    const ids = new Set(turnTokenIds(state.initiative, tokens));
+    // Sides are read off every combatant's token; only those on the map carry a marker
+    const onMap = mapTokens(state.objects);
+    const ids = new Set(turnTokenIds(state.initiative, sceneTokens(state.objects)).filter((tokenId) => onMap[tokenId] !== undefined));
     const turnMoved = key !== this.shownKey;
     this.shownKey = key;
     const grow = animate && !state.isMapLoading && !this.deps.reducedMotion();
@@ -189,7 +191,7 @@ export class TurnMarkers {
   private drawMarker(tokenId: string, marker: TurnMarker, force = false): void {
     const state = this.deps.getState();
     const gridSize = state.grid?.size ?? 70;
-    const token = state.objects.tokens[tokenId];
+    const token = mapTokens(state.objects)[tokenId];
     const size = this.deps.spriteOf(tokenId)?.tokenSize ?? 0;
     if (!token || !(size > 0)) return;
     const outer = token.showRing === false ? size : getTokenRingOuterDiameter(size, computeTokenStrokeWidth(gridSize));
