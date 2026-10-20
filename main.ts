@@ -108,6 +108,13 @@ export default class AtlasVTTPlugin extends Plugin {
   }
 
   private onlinePlay: OnlinePlay | null = null;
+  /**
+   * Obsidian may unload Atlas while `onload` still awaits (a reload during startup, such as two
+   * builds landing at once): it then cleans up only what was registered so far. Whatever `onload`
+   * registered after its await would live on, unseen (a second statblock beside every note), so
+   * it stops there once this is set.
+   */
+  private unloaded = false;
 
   async onload(): Promise<void> {
     // Record errors from the very start so startup problems can be reported too.
@@ -172,11 +179,14 @@ export default class AtlasVTTPlugin extends Plugin {
 
     await storageReady;
     await this.settingsService.initialize();
+    if (this.unloaded) return;
     registerDiceLookSync(this, this.settingsService);
     this.registerStatblockPanels();
+    const installed = await existingInstallation;
+    if (this.unloaded) return;
     const changelogService = new ChangelogService(this.app, this.settingsService, {
       installedVersion: this.manifest.version,
-      existingInstallation: await existingInstallation,
+      existingInstallation: installed,
       releaseBuild: __ATLAS_RELEASE_BUILD__,
     });
     this.changelogService = changelogService;
@@ -211,6 +221,7 @@ export default class AtlasVTTPlugin extends Plugin {
     registerStatblockFileMenu(this);
 
     this.app.workspace.onLayoutReady(() => {
+      if (this.unloaded) return;
       registerColorSwatchIcons();
       this.imageDisplayService.registerContextMenu();
       registerStatusBarVisibility(this);
@@ -240,6 +251,7 @@ export default class AtlasVTTPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.unloaded = true;
     this.changelogService?.destroy();
     void this.settingsService?.saveSettingsNow();
     SystemPresetFiles.release(this.app);
