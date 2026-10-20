@@ -42,6 +42,11 @@ describe('formulas', () => {
   it('take a field at the caret, joined with a plus', () => {
     expect(withFieldReference('1d8', 'con')).toEqual({ text: '1d8+@con', caret: 8 });
     expect(withFieldReference('1d8+', 'con')).toEqual({ text: '1d8+@con', caret: 8 });
+    // A reference being typed is the one picked
+    expect(withFieldReference('1+@ar', 'armor')).toEqual({ text: '1+@armor', caret: 8 });
+    expect(withFieldReference('1+@', 'armor')).toEqual({ text: '1+@armor', caret: 8 });
+    expect(withFieldReference('@ar+2', 'armor', 3)).toEqual({ text: '@armor+2', caret: 6 });
+    expect(withFieldReference('1+@armxx+2', 'armor', 6)).toEqual({ text: '1+@armor+2', caret: 8 });
     expect(withFieldReference('', 'level')).toEqual({ text: '@level', caret: 6 });
     expect(withFieldReference('1d8 2', 'con', 3).text).toBe('1d8+@con+2');
   });

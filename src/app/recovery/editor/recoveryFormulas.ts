@@ -13,10 +13,25 @@ export function formulaReads(formula: string): boolean {
   return text !== '' && fillFormula(text, () => 1).ok;
 }
 
-/** The formula with `@key` put in at `caret` (or at its end), with the spaces a sum needs around it. */
+/** A reference being typed at the caret: its `@` and what follows it before the caret, and its rest after. */
+const TYPED_BEFORE = /@[\w.-]*$/;
+const TYPED_AFTER = /^[\w.-]*/;
+
+/**
+ * The formula with `@key` put in at `caret` (or at its end), with the `+` a sum needs around it. A
+ * reference being typed where the caret stands (`1+@ar`) is the one picked: it is replaced, never
+ * added to.
+ */
 export function withFieldReference(formula: string, key: string, caret: number = formula.length): { text: string; caret: number } {
-  const before = formula.slice(0, caret).trimEnd();
-  const after = formula.slice(caret).trimStart();
+  let head = formula.slice(0, caret);
+  let tail = formula.slice(caret);
+  const typed = TYPED_BEFORE.exec(head);
+  if (typed) {
+    head = head.slice(0, typed.index);
+    tail = tail.slice(TYPED_AFTER.exec(tail)![0].length);
+  }
+  const before = head.trimEnd();
+  const after = tail.trimStart();
   const joint = before === '' || /[+\-*/(]$/.test(before) ? '' : '+';
   const inserted = `${before}${joint}@${key}`;
   return { text: `${inserted}${after === '' || /^[+\-*/)]/.test(after) ? '' : '+'}${after}`, caret: inserted.length };
