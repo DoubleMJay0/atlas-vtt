@@ -1,15 +1,14 @@
 import type { TokenEntity } from '../types';
 import type { InitiativeEntry } from '../types/initiativeTypes';
-import type { InitiativeSide } from '../types/initiativeRulesTypes';
 import { COLLAPSED_CARDS } from './initiativeLayout';
 import { firstCards, listSegments, type ListSegment } from './listSegments';
-import { sideOf, sidesInOrder } from './sides';
+import { sideOf, type ListedSide } from './sides';
 
 /** What the GM's tracker draws its list by. */
 export interface TrackerListOptions {
   bySides: boolean;
-  firstSide: InitiativeSide;
-  activeSide: InitiativeSide | undefined;
+  /** The sides in the order they act this round (`listedSides`). */
+  sides: readonly ListedSide[];
   fightRuns: boolean;
   round: number;
   /** The GM's choice: the list starts at the turn during a fight. */
@@ -27,14 +26,14 @@ export function trackerSegments(
   tokens: Readonly<Record<string, TokenEntity>>,
   options: TrackerListOptions,
 ): ListSegment<InitiativeEntry>[] {
+  const known = options.sides.map((side) => side.id);
   const segments = listSegments(entries, {
     bySides: options.bySides,
-    sides: sidesInOrder(options.firstSide),
-    sideOf: (entry) => sideOf(tokens[entry.tokenId]),
+    sides: options.sides,
+    sideOf: (entry) => sideOf(tokens[entry.tokenId], known),
     delayed: (entry) => entry.delayed === true,
     fightRuns: options.fightRuns,
     round: options.round,
-    activeSide: options.activeSide,
     turnAt: entries.filter((entry) => !entry.delayed).findIndex((entry) => entry.isActive),
     fromTurn: options.fromTurn || options.collapsed,
     emptySides: true,

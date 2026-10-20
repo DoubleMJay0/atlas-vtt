@@ -4,7 +4,8 @@ import { useAtlasStore, useViewStoreHook } from '../ViewStoreContext';
 import { useAtlasUI } from '../root/AtlasUIContext';
 import { useAtlasSettings } from '../../keyboard/useMapHotkeys';
 import { useNumberEditing } from './useNumberEditing';
-import { listedBySides } from '../../initiative/sides';
+import { listedByCards, listedBySides, listedSides } from '../../initiative/sides';
+import { useStartCombat } from './useStartCombat';
 import { defeatedCombatants } from '../../initiative/defeated';
 import { shownItems } from '../../initiative/listSegments';
 import { trackerSegments } from '../../initiative/trackerSegments';
@@ -56,13 +57,13 @@ export const InitiativeTracker: React.FC = () => {
   const rules = useMapInitiativeRules();
   const { roll, rolling } = useInitiativeRolls(app, rules);
   const bySides = listedBySides(initiative, rules);
-  const firstSide = initiative.sides?.first ?? rules.firstSide;
+  const byCards = listedByCards(initiative, rules);
+  const sides = useMemo(() => listedSides(initiative, rules), [initiative, rules]);
 
   // Store actions
   const nextTurn = useAtlasStore((s) => s.nextTurn);
   const previousTurn = useAtlasStore((s) => s.previousTurn);
   const reorderInitiative = useAtlasStore((s) => s.reorderInitiative);
-  const startCombat = useAtlasStore((s) => s.startCombat);
   const endCombat = useAtlasStore((s) => s.endCombat);
   const updateInitiativeEntry = useAtlasStore((s) => s.updateInitiativeEntry);
   const resetInitiative = useAtlasStore((s) => s.resetInitiative);
@@ -75,6 +76,7 @@ export const InitiativeTracker: React.FC = () => {
     const { initiative: current, objects } = store.getState();
     return defeatedCombatants(current.entries, objects.tokens, definitions);
   }, [store, definitions]);
+  const startCombat = useStartCombat(rules, defeated);
 
   // Local state
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
@@ -94,10 +96,10 @@ export const InitiativeTracker: React.FC = () => {
   // The list as it is drawn: from the turn on where the GM chose so, only the next ones while collapsed
   const segments = useMemo(
     () => trackerSegments(sortedEntries, tokens, {
-      bySides, firstSide, activeSide: initiative.sides?.active, fightRuns: initiative.isActive, round: initiative.round,
+      bySides, sides, fightRuns: initiative.isActive, round: initiative.round,
       fromTurn: layout.fromTurn, collapsed: layout.collapsed,
     }),
-    [sortedEntries, tokens, bySides, firstSide, initiative.sides?.active, initiative.isActive, initiative.round, layout.fromTurn, layout.collapsed],
+    [sortedEntries, tokens, bySides, sides, initiative.isActive, initiative.round, layout.fromTurn, layout.collapsed],
   );
   const shownOrder = useMemo(() => shownItems(segments), [segments]);
   // A drag reorders by a card's place among all combatants, whatever place the list shows it at
@@ -128,13 +130,14 @@ export const InitiativeTracker: React.FC = () => {
     setDragOverIndex(null);
   }, [dragFromIndex, dragOverIndex, reorderInitiative]);
 
-  const handleContextMenu = useInitiativeCardMenu({ tokens, bySides, fightRuns: initiative.isActive, roll, defeated, edit: openEditPopup });
+  const handleContextMenu = useInitiativeCardMenu({ tokens, bySides, sides, cards: initiative.cards !== undefined, fightRuns: initiative.isActive, roll, defeated, edit: openEditPopup });
 
   const openOptions = (event: React.MouseEvent<HTMLButtonElement>): void => {
     const button = event.currentTarget;
     const rect = button.getBoundingClientRect();
     const entries = initiativeTrackerOptions(
-      { autoSort: initiative.config.autoSort, bySides, empty: initiative.entries.length === 0, showNames, fromTurn: layout.fromTurn, dock: layout.dock },
+      // Cards keep the order they were dealt in, so the Auto sort switch is disabled there as by sides
+      { autoSort: initiative.config.autoSort, bySides: bySides || byCards, empty: initiative.entries.length === 0, showNames, fromTurn: layout.fromTurn, dock: layout.dock },
       {
         setAutoSort: (autoSort) => setInitiativeConfig({ autoSort }),
         setShowNames: (on) => settings?.setInitiativeNames(on),
@@ -171,6 +174,7 @@ export const InitiativeTracker: React.FC = () => {
       entry={entry}
       index={placeOf.get(entry.id) ?? 0}
       bySides={bySides}
+      byCards={byCards}
       showName={showNames}
       tooltipSide={inward}
       isEditingNumber={numberEditing.editingId === entry.id}
@@ -196,8 +200,9 @@ export const InitiativeTracker: React.FC = () => {
 
   return (
     <div className={trackerClasses}>
+      {/* Nothing is rolled where the sides take turns or cards are dealt */}
       <InitiativeTrackerHeader
-        bySides={bySides}
+        rolls={!bySides && !byCards}
         fightRuns={initiative.isActive}
         empty={sortedEntries.length === 0}
         rolling={rolling}
@@ -205,7 +210,7 @@ export const InitiativeTracker: React.FC = () => {
         leftOut={sortedEntries.length - shownOrder.length}
         tooltipSide={inward}
         onRoll={() => roll()}
-        onStart={() => startCombat(rules, defeated())}
+        onStart={startCombat}
         onEnd={endCombat}
         onOptions={openOptions}
         onToggleCollapsed={() => setLayout({ collapsed: !layout.collapsed })}

@@ -5,7 +5,8 @@
  */
 
 import { shownCounterRows } from '../statblocks/values/counterValues';
-import { fillFormula, wholeNumber, type FormulaProblem } from './recoveryFormula';
+import { wholeNumber } from '../statblocks/values/references';
+import { fillFormula, type FormulaProblem } from './recoveryFormula';
 import type { RecoveryButton, RecoveryRule, RecoveryTarget } from './recoveryTypes';
 import { countersLeft } from './restCounters';
 import type { PlannedRule, RestCharacter, RestMetric, RestPlan, RestSkip, SkippedRule } from './restTypes';

@@ -5,8 +5,8 @@ import { EndCombatIcon } from './EndCombatIcon';
 import { t } from '../../i18n';
 
 interface InitiativeTrackerHeaderProps {
-  /** Nothing is rolled where the sides take turns. */
-  bySides: boolean;
+  /** The combatants roll for their numbers (turn order); by sides or by cards nothing is rolled. */
+  rolls: boolean;
   fightRuns: boolean;
   empty: boolean;
   rolling: boolean;
@@ -28,7 +28,7 @@ interface InitiativeTrackerHeaderProps {
  * tracker, so the toggle has a row of its own.
  */
 export function InitiativeTrackerHeader(props: InitiativeTrackerHeaderProps): React.ReactElement {
-  const { bySides, fightRuns, empty, rolling, collapsed, leftOut, tooltipSide } = props;
+  const { rolls, fightRuns, empty, rolling, collapsed, leftOut, tooltipSide } = props;
   const toggleLabel = collapsed ? t('initiative.expand') : t('initiative.collapse');
   return (
     <>
@@ -44,7 +44,7 @@ export function InitiativeTrackerHeader(props: InitiativeTrackerHeaderProps): Re
       </LabelTooltip>
 
       <div className="atlas-initiative-tracker__controls">
-        {!bySides && (
+        {rolls && (
           <LabelTooltip label={t('initiative.rollAll')}>
             <button className="clickable-icon atlas-initiative-tracker__btn" onClick={props.onRoll} disabled={empty || rolling}>
               <Dices />

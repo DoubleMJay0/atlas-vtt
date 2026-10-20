@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeFormula, fillFormula, readableFormula, wholeNumber, type FormulaFill } from '../../../src/app/recovery/recoveryFormula';
+import { computeFormula, fillFormula, readableFormula, type FormulaFill } from '../../../src/app/recovery/recoveryFormula';
+import { wholeNumber } from '../../../src/app/statblocks/values/references';
 import { spendFormula } from '../../../src/app/recovery/spendFormula';
 
 const NOTE: Record<string, unknown> = { level: 3, tier: '2', con: -1, big: 12000, many: 1200, half: 2.5, name: 'Mira', abilities: { con: 2 }, 'hit-dice': 4, 'con-mod': 1, stats: [{ 'max-hp': 9 }] };

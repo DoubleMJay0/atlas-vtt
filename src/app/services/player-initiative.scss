@@ -69,10 +69,26 @@
   }
 
   &__side-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-xs;
     text-align: center;
     color: var(--text-muted);
     font-size: $font-ui-smaller;
     font-weight: $font-weight-semibold;
+    overflow-wrap: anywhere;
+  }
+
+  // This round's roll of a side, where the sides roll for their order
+  &__side-roll {
+    min-width: 16px;
+    padding-inline: $spacing-xs;
+    border-radius: $radius-s;
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+    font-variant-numeric: tabular-nums;
   }
 
   // The side whose turn it is: its name and its combatants take the accent
@@ -154,6 +170,19 @@
 
   &__value {
     font-weight: $font-weight-semibold;
+  }
+
+  // The card dealt in a fight by cards: a small playing card where the number stands otherwise
+  &__card-dealt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 26px;
+    border: $border-width-s solid var(--background-modifier-border);
+    border-radius: $radius-s;
+    background: var(--background-primary);
+    font-variant-numeric: tabular-nums;
   }
 
   // The number the token's badge shows the players, in the same place and look as on the GM's card

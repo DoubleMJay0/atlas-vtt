@@ -27,6 +27,7 @@ import { gridModal } from './gridModal';
 import { history } from './history';
 import { importReview } from './importReview';
 import { initiative } from './initiative';
+import { initRules } from './initRules';
 import { loot } from './loot';
 import { tables } from './tables';
 import { lpv } from './lpv';
@@ -122,6 +123,7 @@ export const en = {
   ...history,
   ...importReview,
   ...initiative,
+  ...initRules,
   ...loot,
   ...tables,
   ...lpv,

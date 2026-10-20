@@ -1,9 +1,10 @@
-import { MAX_COMBATANTS, MAX_NAME, type AssetRef, type SharedCombatant, type SharedInitiative } from '../protocol/index.ts';
+import { MAX_COMBATANTS, MAX_NAME, type AssetRef, type SharedCombatant, type SharedInitiative, type SharedSide, type SharedSideTurn } from '../protocol/index.ts';
+import { isBuiltInSide } from '../../gameSystems/initiativeSideRules';
 import { BUILT_IN_SYSTEM_PRESETS } from '../../gameSystems/builtInPresets';
 import { collectionInitiativeRules, DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
 import { mapConditions, rulesForMap, type RulesLookup } from '../../gameSystems/mapRules';
 import { mapResources } from '../../resources/collectionResources';
-import { entryTokenOf, listedForPlayers, playerInitiativeList, playerSegments } from '../../services/playerInitiativeList';
+import { entryTokenOf, listedForPlayers, playerInitiativeList, playerSegments, sideIdsOf, type PlayerInitiativeList } from '../../services/playerInitiativeList';
 import { sharedConditions } from './tokenUI.ts';
 import type { TokenEntity } from '../../types';
 import type { InitiativeRules } from '../../types/initiativeRulesTypes';
@@ -29,6 +30,26 @@ export interface InitiativeInputs {
 /** A number players are sent: finite and within the protocol's bound. */
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1e9;
 
+/** The side older pages group a combatant under: the players', or the opponents' for every other side. */
+const legacySide = (side: string): SharedSide => (side === 'players' ? 'players' : 'opponents');
+
+/** The sides as the players' list heads its groups, in the order they act this round. */
+function sharedSides(list: PlayerInitiativeList): SharedSideTurn[] {
+  return list.sides.map((side) => ({
+    id: side.id,
+    name: side.name.slice(0, MAX_NAME),
+    roll: finite(side.roll) ? side.roll : null,
+    turn: list.isActive && side.active,
+  }));
+}
+
+/** The side with the turn as older pages read it: one of the built-in two, else none. */
+function legacyActiveSide(list: PlayerInitiativeList): SharedSide | null {
+  if (!list.bySides || !list.isActive) return null;
+  const active = list.sides.find((side) => side.active && isBuiltInSide(side.id));
+  return active ? legacySide(active.id) : null;
+}
+
 /**
  * The initiative rules the map plays by (`rulesForMap`): their own, else their built-in preset's,
  * else the default. A user preset's rules are not readable from here; such rules read as the default.
@@ -52,28 +73,37 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
   const definitions = rules !== null ? mapResources(rules, state.mapPath) : [];
   const conditions = rules !== null ? mapConditions(rules, state.mapPath) : [];
   const hpVisible = definitions.some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
+  const initiativeRules = initiativeRulesOf(rules, state.mapPath);
+  const sides = sideIdsOf(initiative, initiativeRules);
   const list = playerInitiativeList(
     initiative,
-    (entry) => (listedForPlayers(tokens[entry.tokenId]) ? entryTokenOf(tokens[entry.tokenId], definitions, conditions) : null),
-    initiativeRulesOf(rules, state.mapPath),
+    (entry) => (listedForPlayers(tokens[entry.tokenId]) ? entryTokenOf(tokens[entry.tokenId], definitions, conditions, sides) : null),
+    initiativeRules,
     hpVisible,
   );
+  const shownNumber = (entry: (typeof list.combatants)[number]['entry']): number => {
+    // A dealt card stands where the number does, so older pages show it too
+    const value = list.byCards ? entry.card ?? 0 : entry.initiative;
+    return finite(value) ? value : 0;
+  };
   // Who acts in the next round, where the list starts at the turn
   const fromTurn = inputs.fromTurn === true;
   const nextRound = new Set(playerSegments(list, fromTurn).flatMap((segment) => (segment.kind === 'group' && segment.key === 'next' ? segment.items : [])));
   const combatants = list.combatants.slice(0, MAX_COMBATANTS).map((combatant): SharedCombatant => {
     const { entry, token } = combatant;
     return {
-      initiative: finite(entry.initiative) ? entry.initiative : 0,
+      initiative: shownNumber(entry),
       name: inputs.showNames && typeof entry.name === 'string' ? entry.name.slice(0, MAX_NAME) : null,
       turn: list.isActive && !list.bySides && entry.isActive === true,
       sitsOut: entry.sitsOut === true,
       ...(entry.delayed === true ? { delayed: true } : {}),
       ...(token.defeated ? { defeated: true } : {}),
-      ...(hasInitiative(entry) ? {} : { unnumbered: true }),
+      // In a fight by cards a combatant is numbered once it holds a card
+      ...((list.byCards ? entry.card !== undefined : hasInitiative(entry)) ? {} : { unnumbered: true }),
       art: typeof entry.imagePath === 'string' && entry.imagePath !== '' ? inputs.art(entry.imagePath) : null,
       ring: token.showRing ? { colour: token.ringColor ? ringColour(token.ringColor) : null } : null,
-      side: token.side,
+      side: legacySide(token.side),
+      ...(isBuiltInSide(token.side) ? {} : { sideId: token.side }),
       hp: token.hp !== null && finite(token.hp.current) && finite(token.hp.max) ? { current: token.hp.current, max: token.hp.max } : null,
       ...(nextRound.has(combatant) ? { nextRound: true } : {}),
       ...(token.conditions?.length ? { conditions: sharedConditions(token.conditions) } : {}),
@@ -84,7 +114,9 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
     round: finite(list.round) ? list.round : 0,
     bySides: list.bySides,
     firstSide: list.firstSide,
-    activeSide: list.bySides ? list.activeSide : null,
+    activeSide: legacyActiveSide(list),
+    ...(list.bySides ? { sides: sharedSides(list) } : {}),
+    ...(list.byCards ? { byCards: true as const } : {}),
     combatants,
     ...(fromTurn ? { fromTurn: true } : {}),
   };

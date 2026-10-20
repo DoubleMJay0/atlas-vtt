@@ -6,10 +6,13 @@ interface Item { name: string; side?: InitiativeSide; delayed?: boolean }
 
 const items = (...names: string[]): Item[] => names.map((name) => ({ name, delayed: name.endsWith('*') }));
 
-function shape(extra: Partial<ListShape<Item>> = {}): ListShape<Item> {
+/** A list's shape; the sides given by id in acting order (`sides`), the one with the turn as `activeSide`. */
+function shape(extra: Partial<Omit<ListShape<Item>, 'sides'>> & { sides?: InitiativeSide[]; activeSide?: InitiativeSide | null } = {}): ListShape<Item> {
+  const { sides = ['players', 'opponents'], activeSide = null, ...rest } = extra;
   return {
-    bySides: false, sides: ['players', 'opponents'], sideOf: (item) => item.side ?? 'opponents', delayed: (item) => item.delayed === true,
-    fightRuns: true, round: 2, activeSide: null, turnAt: 0, fromTurn: true, emptySides: true, ...extra,
+    bySides: false, sideOf: (item) => item.side ?? 'opponents', delayed: (item) => item.delayed === true,
+    fightRuns: true, round: 2, turnAt: 0, fromTurn: true, emptySides: true, ...rest,
+    sides: sides.map((id) => ({ id, name: id, roll: null, active: id === activeSide })),
   };
 }
 
@@ -18,7 +21,7 @@ function drawn(segments: ListSegment<Item>[]): string[] {
   return segments.map((segment) => {
     if (segment.kind === 'round') return `|Round ${segment.round}|`;
     const names = segment.items.map((item) => item.name).join(' ');
-    const label = segment.side ?? (segment.delayed ? 'delayed' : null);
+    const label = segment.side?.name ?? (segment.delayed ? 'delayed' : null);
     return label ? `[${label}${segment.active ? '!' : ''}: ${names}]` : names;
   });
 }
@@ -54,6 +57,21 @@ describe('a list that starts at the turn', () => {
     const players = [{ name: 'hero', side: 'players' as const }];
     expect(drawn(listSegments(players, shape({ bySides: true, activeSide: 'opponents', emptySides: false })))).toEqual(['[players: hero]']);
     expect(drawn(listSegments(players, shape({ bySides: true, activeSide: 'opponents', emptySides: true })))).toEqual(['[opponents!: ]', '|Round 3|', '[players: hero]']);
+  });
+});
+
+describe('a list of sides that roll for their order', () => {
+  it('starts at the first of the sides with equal rolls that have the turn together, and keeps them together', () => {
+    const list: Item[] = [{ name: 'hero', side: 'players' }, { name: 'ally', side: 'side-allies' as InitiativeSide }, { name: 'rat' }];
+    const sides = [
+      { id: 'players', name: 'players', roll: 2, active: false },
+      { id: 'side-allies', name: 'allies', roll: 5, active: true },
+      { id: 'opponents', name: 'opponents', roll: 5, active: true },
+    ];
+    const segments = listSegments(list, { ...shape({ bySides: true }), sides: [sides[1]!, sides[2]!, sides[0]!] });
+    expect(drawn(segments)).toEqual(['[allies!: ally]', '[opponents!: rat]', '[players: hero]']);
+    expect(drawn(listSegments(list, { ...shape({ bySides: true }), sides: [sides[0]!, sides[1]!, sides[2]!] })))
+      .toEqual(['[allies!: ally]', '[opponents!: rat]', '|Round 3|', '[players: hero]']);
   });
 });
 

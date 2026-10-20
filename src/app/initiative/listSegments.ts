@@ -1,13 +1,14 @@
-import type { InitiativeSide } from '../types/initiativeRulesTypes';
+import type { SideId } from '../types/initiativeRulesTypes';
+import type { ListedSide } from './sides';
 
 /** Combatants drawn together: the order (unlabelled), a side under its name, or those that delayed their turn. */
 export interface CardGroup<T> {
   readonly kind: 'group';
   /** Stable among the groups of one list: `order`, `next`, `delayed` or the side. */
   readonly key: string;
-  /** A side's group, shown under the side's name. */
-  readonly side?: InitiativeSide;
-  /** The side whose turn it is. */
+  /** A side's group, shown under the side's name (and this round's roll, where the order is rolled). */
+  readonly side?: ListedSide;
+  /** The side has the turn; sides with equal rolls have it at once. */
   readonly active?: boolean;
   /** Those that delayed their turn, shown under "Delayed". */
   readonly delayed?: boolean;
@@ -27,15 +28,13 @@ export type ListSegment<T> = CardGroup<T> | RoundDivider;
 export interface ListShape<T> {
   /** The combatants act by sides (`listedBySides`): grouped under their side. */
   readonly bySides: boolean;
-  /** The sides in the order they act in a round (`sidesInOrder`). */
-  readonly sides: readonly InitiativeSide[];
-  sideOf(item: T): InitiativeSide;
+  /** The sides in the order they act this round, the side or sides with the turn marked (`listedSides`). */
+  readonly sides: readonly ListedSide[];
+  sideOf(item: T): SideId;
   delayed(item: T): boolean;
   /** A fight is running: the turn and the round are known. */
   readonly fightRuns: boolean;
   readonly round: number;
-  /** The side whose turn it is in a fight by sides. */
-  readonly activeSide: InitiativeSide | null | undefined;
   /**
    * In turn order, the place among the combatants that have not delayed where the rest of this
    * round begins (the combatant whose turn it is); -1 for none. Ignored by sides.
@@ -49,8 +48,8 @@ export interface ListShape<T> {
 
 /**
  * The list of a fight as it is drawn: in turn order, the delayed below it; by sides, each side
- * under its name. With `fromTurn` while a fight runs, the list starts with the combatant (or side)
- * whose turn it is and runs on to the round's end, then past a divider into the next round's first.
+ * under its name. With `fromTurn` while a fight runs, the list starts with the combatant (or the
+ * first side) whose turn it is and runs on to the round's end, then past a divider into the next round's first.
  */
 export function listSegments<T>(items: readonly T[], shape: ListShape<T>): ListSegment<T>[] {
   const rotate = shape.fightRuns && shape.fromTurn;
@@ -59,10 +58,10 @@ export function listSegments<T>(items: readonly T[], shape: ListShape<T>): ListS
   if (shape.bySides) {
     const groups = shape.sides.map((side): CardGroup<T> => ({
       kind: 'group',
-      key: side,
+      key: side.id,
       side,
-      active: shape.activeSide === side,
-      items: items.filter((item) => shape.sideOf(item) === side),
+      active: shape.fightRuns && side.active,
+      items: items.filter((item) => shape.sideOf(item) === side.id),
     }));
     const turnAt = rotate ? groups.findIndex((group) => group.active) : -1;
     const rotated = turnAt <= 0 ? groups : [...groups.slice(turnAt), nextRound, ...groups.slice(0, turnAt)];

@@ -6,17 +6,22 @@
 - Statblock templates: a Counters tile tracks anything with limited uses, such as spell slots per level, ki or a feature's uses per day. Each row shows its uses as pips.
 - Recovery buttons: give a statblock template buttons such as Short rest and Long rest in the collection settings' Resources tab. Pick a value on the card and choose what each button does to it: back to full, back by a roll, half back, set to a number, or spent from something else, such as Hit Dice. The buttons sit on player characters' statblocks beside their notes and on their players' online sheets, and the GM approves a player's rest.
 - Statblock templates: a number can be tracked, such as Luck, Ki, Hit Dice or Inspiration. Choose Tracked in its Options: the note holds its maximum, or another number does (Hit Dice up to Level), and the card shows what is left, such as 2 / 3. Recovery buttons can give it back, the DM screen steps it, and players step it on their online sheet.
+- Statblocks: a value can name another number of its statblock with `@`, such as `1d8 + @str.mod` or `10 + @dex.mod`. The card shows and rolls it with the number in (`1d8 + 3`), and a Number field shows the total. `@str` or `@strength` is a table's score, and `@str.mod` its worked-out row of that name. A name that matches nothing is flagged on the card and never rolled.
 - Online play: hand any item to your players, not only rolled ones. In a loot base, each item's name has a gift button. Its menu gives the item to one player or to all players at once, and sets how many copies, with − and + or by typing the number.
 - Damage or heal several tokens at once: with tokens selected, right-click one and choose Change HP of N tokens…, then type the change, such as -8 or +5. It applies to every selected token that has HP, and one undo takes it back.
 - Initiative: a combatant can delay its turn. It waits below the order until Act Now puts it right before the combatant whose turn it is.
 - Initiative: Sit Out This Round now works in turn order too.
 - Initiative: the tracker's ⋯ menu has an Auto sort switch.
+- Initiative by cards: each combatant is dealt a card from a numbered deck, and the lowest card acts first. Deal once when the fight starts or anew every round, let look-alikes share a card, and swap two combatants' cards from the card menu.
+- Initiative by sides: name more sides than players and opponents, such as Allies, set the order they act in, and move a token to any side from its card.
+- Initiative by sides: the sides can roll for their order at the start of every round. The highest acts first, and sides with equal rolls act at the same time.
 - Initiative: during a fight the list starts at whoever acts now and runs on into the next round below a Round divider, in the tracker and in the players' list. Switch it off with Turn on top in the tracker's ⋯ menu.
 - Initiative: each card shows its token's conditions as the map does, with the number of a valued condition. In the tracker, point at a badge to see its name.
 - Initiative tracker: Dock on the left in the ⋯ menu moves the tracker and the players' list to the left edge, and the toggle at the top of the tracker shows only the current turn and the next two.
 - Simplified Chinese interface when Obsidian's language is 简体中文 or 繁體中文. Text that is not translated yet stays in English.
 
 ## Improved
+- Old-School Essentials collections run initiative by sides, with each side rolling a d6 every round.
 - DM screen: during a fight it shows the statblocks of the creatures in the fight, with a switch to show every creature on the map.
 - Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.
 - Initiative: combatants with the same number are ordered by their initiative modifier.

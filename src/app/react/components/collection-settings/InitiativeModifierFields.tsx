@@ -23,11 +23,11 @@ interface InitiativeModifierFieldsProps {
 
 /** The rules with `modifier` and `fallback` as their sources, each absent where it is none. */
 function withSources(
-  { mode, roll, firstSide }: InitiativeRules,
+  { modifier: _modifier, modifierFallback: _fallback, ...rules }: InitiativeRules,
   modifier: InitiativeModifierSource | undefined,
   fallback: InitiativeModifierSource | undefined,
 ): InitiativeRules {
-  return { mode, roll, firstSide, ...(modifier?.field && { modifier }), ...(fallback && { modifierFallback: fallback }) };
+  return { ...rules, ...(modifier?.field && { modifier }), ...(fallback && { modifierFallback: fallback }) };
 }
 
 export function InitiativeModifierFields({ initiative, onChange, fieldSuggestions, statblocks }: InitiativeModifierFieldsProps): React.ReactElement {

@@ -19,6 +19,7 @@ import { useMapConditions } from '../hooks/useMapConditions';
 import { combatantConditions } from '../../utils/activeConditions';
 import { useCardPreviewHover } from './useCardPreviewHover';
 import { t } from '../../i18n';
+import { DealtCard } from './DealtCard';
 
 interface InitiativeCardProps {
   entry: InitiativeEntry;
@@ -26,6 +27,8 @@ interface InitiativeCardProps {
   isHoveredForPreview: boolean;
   /** The fight runs by sides: a combatant has no number there and never the turn by itself. */
   bySides?: boolean;
+  /** The fight runs by cards: the card dealt stands where the number does. */
+  byCards?: boolean;
   /** The GM chose to see names on the cards. */
   showName?: boolean;
   /** The side tooltips open on: away from the edge the tracker stands at. */
@@ -53,6 +56,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   index,
   isHoveredForPreview,
   bySides = false,
+  byCards = false,
   showName = false,
   tooltipSide = 'left',
   isEditingNumber = false,
@@ -222,8 +226,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
 
       {showName && <span className="atlas-initiative-card__name" aria-hidden="true">{name}</span>}
 
-      {/* Initiative number, typed in place */}
-      {!bySides && (
+      {/* Initiative number, typed in place; in a fight by cards the card dealt, which nothing edits */}
+      {!bySides && (byCards ? <DealtCard card={entry.card} /> : (
         <InitiativeNumber
           value={entry.initiative}
           empty={!hasInitiative(entry)}
@@ -232,7 +236,7 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
           onCommit={(text, step) => onCommitNumber(entry, text, step)}
           onCancel={onCancelNumberEdit}
         />
-      )}
+      ))}
 
       {bars.length > 0 && <CardResourceBars tokenId={entry.tokenId} bars={bars} />}
 

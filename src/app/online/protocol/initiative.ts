@@ -7,6 +7,9 @@ import { MAX_TOKEN_CONDITIONS, parseCondition, type SharedCondition } from './to
 export const MAX_COMBATANTS = 200;
 export const INITIATIVE_SIDES = ['players', 'opponents'] as const;
 export type SharedSide = (typeof INITIATIVE_SIDES)[number];
+/** Sides one `initiative` message may list, and the longest id of a side. */
+export const MAX_SIDES = 8;
+export const MAX_SIDE_ID = 64;
 
 /** A combatant on the players' initiative list: never one whose token is hidden. */
 export interface SharedCombatant {
@@ -33,9 +36,23 @@ export interface SharedCombatant {
   readonly art: AssetRef | null;
   /** The ring around the portrait (`#rrggbb`, or null untinted); absent for an unframed token. */
   readonly ring: { readonly colour: string | null } | null;
+  /** The players' side, or the opponents' for every other side (what older pages group by). */
   readonly side: SharedSide;
+  /** The id of a side the collection named (in `SharedInitiative.sides`), where the combatant fights on one. Absent from older GMs. */
+  readonly sideId?: string;
   /** Hit points, where the collection shows them to players. */
   readonly hp: { readonly current: number; readonly max: number } | null;
+}
+
+/** A side of a fight by sides as the players' list heads its group. */
+export interface SharedSideTurn {
+  /** `players`, `opponents`, or the id of a side the collection named. */
+  readonly id: string;
+  readonly name: string;
+  /** This round's roll, where the sides roll for their order. */
+  readonly roll: number | null;
+  /** The side has the turn; sides with equal rolls have it at once. */
+  readonly turn: boolean;
 }
 
 /** The players' initiative list, as Atlas's player window shows it. */
@@ -45,6 +62,10 @@ export interface SharedInitiative {
   readonly bySides: boolean;
   readonly firstSide: SharedSide;
   readonly activeSide: SharedSide | null;
+  /** By sides: every side in the order it acts this round. Absent from older GMs, which have the two of `firstSide`. */
+  readonly sides?: readonly SharedSideTurn[];
+  /** A fight by cards: each combatant's `initiative` is the card it was dealt, and the lowest acts first. Absent from older GMs. */
+  readonly byCards?: true;
   readonly combatants: readonly SharedCombatant[];
   /**
    * The GM's lists start at the turn during a fight: in turn order the combatants without
@@ -56,6 +77,19 @@ export interface SharedInitiative {
 
 const isNumber = (value: unknown, limit: number): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit;
 const isSide = (value: unknown): value is SharedSide => INITIATIVE_SIDES.includes(value as SharedSide);
+const isSideId = (value: unknown): value is string => typeof value === 'string' && value !== '' && value.length <= MAX_SIDE_ID;
+
+/** The sides of a message: undefined (left out) where they are no list of sides, so a page never fails on them. */
+function parseSides(value: unknown): SharedSideTurn[] | undefined {
+  if (!Array.isArray(value) || value.length > MAX_SIDES) return undefined;
+  const sides: SharedSideTurn[] = [];
+  for (const side of value) {
+    if (!isRecord(side) || !isSideId(side.id) || typeof side.name !== 'string' || side.name.length > MAX_NAME || typeof side.turn !== 'boolean') return undefined;
+    if (side.roll !== null && !isNumber(side.roll, 1e9)) return undefined;
+    sides.push({ id: side.id, name: side.name, roll: side.roll, turn: side.turn });
+  }
+  return sides;
+}
 
 function parseCombatant(value: unknown): SharedCombatant | null {
   if (!isRecord(value) || !isNumber(value.initiative, 1e9) || typeof value.turn !== 'boolean' || typeof value.sitsOut !== 'boolean' || !isSide(value.side)) return null;
@@ -75,6 +109,7 @@ function parseCombatant(value: unknown): SharedCombatant | null {
     ...(value.unnumbered === true ? { unnumbered: true as const } : {}),
     ...(value.nextRound === true ? { nextRound: true as const } : {}),
     ...conditionsOf(value.conditions),
+    ...(isSideId(value.sideId) ? { sideId: value.sideId } : {}),
   };
 }
 
@@ -102,8 +137,11 @@ export function parseInitiative(value: unknown): SharedInitiative | null | undef
     if (combatant === null) return undefined;
     combatants.push(combatant);
   }
+  const sides = parseSides(value.sides);
   return {
     isActive: value.isActive, round: value.round, bySides: value.bySides, firstSide: value.firstSide, activeSide: value.activeSide, combatants,
     ...(value.fromTurn === true ? { fromTurn: true as const } : {}),
+    ...(sides ? { sides } : {}),
+    ...(value.byCards === true ? { byCards: true as const } : {}),
   };
 }
