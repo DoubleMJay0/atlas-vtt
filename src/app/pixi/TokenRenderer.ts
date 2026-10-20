@@ -3,12 +3,13 @@ import { StatblockTokenSync } from '../plugin/StatblockTokenSync';
 import { TokenCollectionSync } from '../plugin/TokenCollectionSync';
 import type { ResourceDefsProvider } from '../resources/resourceTypes';
 import { fitTokenArtwork, syncTokenArtwork } from './token-renderer/tokenArtwork';
-import type { AtlasSettings } from '../services/SettingsService';
+import { SettingsService, type AtlasSettings } from '../services/SettingsService';
 import { HIDDEN_TOKEN_ALPHA, gmTokenLayers, type HideableLayer, type LayerVisibility } from './playerSafeFrame';
 import type { TokenPerception } from '../vision/tokenPerception';
 import { TokenExit } from './token-renderer/TokenExit';
 import { NOTHING_SEEN, PlayerSightTokens, seenByPlayers, seenTokens } from './token-renderer/PlayerSightTokens';
 import { PlayersViewWatch } from './token-renderer/PlayersViewWatch';
+import { TurnMarkers } from './token-renderer/turnMarker/TurnMarkers';
 import { PlayerInstanceBadges, type PlayerBadgeNumbers } from './token-renderer/PlayerInstanceBadges';
 import type { TokenSeen } from '../vision/measureOrigin';
 import { Sprite, Container, Graphics, Application, FederatedPointerEvent } from "pixi.js";
@@ -53,6 +54,7 @@ import type { LightPointerHandlers } from './lighting/LightInteraction';
 import { runInBackground } from '../utils/backgroundTask';
 import { isModHeld } from '../keyboard/modKey';
 import { mapTokens, sceneTokens } from '../tokens/offMap';
+import { defeatedCombatants } from '../initiative/defeated';
 
 /** What the lighting controller answers about a right-click on a door's badge. */
 export interface DoorMenuHandlers {
@@ -148,6 +150,8 @@ export class TokenRenderer {
   private readonly playerSight = new PlayerSightTokens({ tokens: () => mapTokens(this.store.getState().objects), sprites: () => this.tokenSprites, held: () => this.heldTokenIds });
   private readonly playersView = new PlayersViewWatch();
   private readonly playerBadges = new PlayerInstanceBadges({ state: () => this.store.getState(), sprites: () => this.tokenSprites });
+  /** The marker on the tokens whose turn it is. */
+  private turnMarkers!: TurnMarkers;
   private lightHandlers?: LightPointerHandlers;
   /** Tokens held by the pointer; lighting alone does not hide them until release. */
   private heldTokenIds: ReadonlySet<string> = new Set();
@@ -247,6 +251,16 @@ export class TokenRenderer {
       }
     });
     
+    // Before the collection's rules arrive: their refresh works the markers out again
+    this.turnMarkers = new TurnMarkers({
+      parent: this.viewport,
+      getState: () => this.store.getState(),
+      subscribe: (listener) => this.store.subscribe(listener),
+      spriteOf: (tokenId) => this.tokenSprites[tokenId] ?? null,
+      ticker: () => this.pixiApp?.ticker ?? null,
+      reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
+      defeated: (state) => defeatedCombatants(state.initiative.entries, sceneTokens(state.objects), this.resourceDefsProvider()),
+    });
     this.collectionSync = new TokenCollectionSync(obsApp, store.getState, {
       refreshRules: () => this.refreshCollectionRules(),
       refreshArt: (path) => this.refreshArt(path),
@@ -293,6 +307,7 @@ export class TokenRenderer {
     this.tokenContainer.zIndex = 0;
     this.viewport.addChild(this.tokenContainer);
     this.viewport.addChild(this.playerSight.outlineLayer);
+    this.watchCanvasTurn();
     this.playersView.listen(() => this.playerSight.whenSettled(() => this.syncCanvasBadges()));
 
     this.dragRuler = new DragRuler(
@@ -737,6 +752,7 @@ export class TokenRenderer {
     }
     this.playerSight.syncOutlines(perception);
     this.uiManager.setPlayersView(this.playerSight.showsPlayers() || this.isInPlayerMode());
+    this.syncCanvasTurn();
     this.dragRuler.refreshVisibility();
     this.notifyPlayersView();
   }
@@ -750,6 +766,33 @@ export class TokenRenderer {
     const seen = this.playerSight.sharesFrameSight() ? this.playersSeeOnCanvas() : null;
     if (!seen) this.playerBadges.syncCanvas(null);
     else if (!this.store.getState().isMapLoading) this.playerBadges.syncCanvas(this.playerSight.sightIsCurrent() ? seen : NOTHING_SEEN);
+  }
+
+  /**
+   * The turn markers on the canvas: while it shows the players' view (session view, the peek, the
+   * palette's player mode) only where the players are shown their initiative list, as their frame.
+   */
+  private syncCanvasTurn(): void {
+    const showsPlayers = this.playerSight.showsPlayers() || this.isInPlayerMode();
+    const view = SettingsService.forApp(this.obsApp)?.getLocalPlayerViewSettings();
+    this.turnMarkers.showOnCanvas(!showsPlayers || ((view?.showInitiative ?? false) && this.store.getState().initiativeTrackerOpen));
+  }
+
+  /** Keeps the canvas's turn markers in step with the players' view, the player view's settings and the tracker. */
+  private watchCanvasTurn(): void {
+    const stopView = this.playersView.listen(() => this.syncCanvasTurn());
+    const stopSettings = SettingsService.forApp(this.obsApp)?.onChange(() => this.syncCanvasTurn());
+    const stopStore = this.store.subscribe((state, previous) => {
+      if (state.initiativeTrackerOpen !== previous.initiativeTrackerOpen) this.syncCanvasTurn();
+    });
+    const earlier = this._unsubscribeFromStore;
+    this._unsubscribeFromStore = () => {
+      stopView();
+      stopSettings?.();
+      stopStore();
+      earlier?.();
+    };
+    this.syncCanvasTurn();
   }
 
   /** Tells whoever follows the players' view (`onPlayersViewChange`) which tokens they see now. */
@@ -1201,6 +1244,7 @@ export class TokenRenderer {
     this.dragRuler.destroy();
     this.glide.destroy();
     this.playerSight.destroy();
+    this.turnMarkers.destroy();
     
     // Clean up theme observer
     if (this.themeObserver) {
@@ -1268,6 +1312,7 @@ export class TokenRenderer {
   /** Redraws what tokens show of their collection's rules (conditions, resources) and starts the resources they lack. */
   private refreshCollectionRules(): void {
     if (this.isDestroyed) return;
+    this.turnMarkers.refresh();
     this.uiManager.refreshConditions();
     this.uiManager.refreshResources();
     this.fillMissingResources();
@@ -1287,6 +1332,7 @@ export class TokenRenderer {
           // Theme changed, update rotation and resize handles
           this.uiManager.getRotationUI()?.updateTheme();
           this.uiManager.getResizeUI()?.updateTheme();
+          this.turnMarkers.refreshTheme();
         }
       }
     });
@@ -1346,6 +1392,7 @@ export class TokenRenderer {
     this.pixiApp = app;
     this.setCanvasListeners(true);
     this.syncService.setPixiApp(app);
+    this.turnMarkers.followTicker();
     if (app) {
       this.textureCache.setPixiApp(app);
     }
@@ -1387,8 +1434,12 @@ export class TokenRenderer {
   public getPlayerViewLayers(settings: AtlasSettings['localPlayerView'], perception?: TokenPerception): LayerVisibility[] {
     perception = this.playerFramePerception(perception);
     const isSeen = seenTokens(perception);
-    this.playerBadges.pass(this.playerSight.sightIsCurrent() ? seenByPlayers(mapTokens(this.store.getState().objects), perception) : NOTHING_SEEN);
-    return [...this.playerSight.frameLayers(perception), ...this.uiManager.getPlayerViewLayers(settings, isSeen), ...this.playerBadges.layers(), ...this.dragRuler.getPlayerViewLayers(isSeen), ...this.exit.playerViewLayers()];
+    const state = this.store.getState();
+    this.playerBadges.pass(this.playerSight.sightIsCurrent() ? seenByPlayers(mapTokens(state.objects), perception) : NOTHING_SEEN);
+    // Players learn of the turn only where their initiative list shows it
+    const turnShown = settings.showInitiative && state.initiativeTrackerOpen;
+    return [...this.playerSight.frameLayers(perception), ...this.uiManager.getPlayerViewLayers(settings, isSeen), ...this.playerBadges.layers(), ...this.dragRuler.getPlayerViewLayers(isSeen), ...this.exit.playerViewLayers(),
+      ...this.turnMarkers.playerLayers(seenByPlayers(mapTokens(state.objects), perception), turnShown)];
   }
 
   /** How far a selected token's resources reach beyond its bottom, right and top edges, in world units. */
@@ -1403,7 +1454,7 @@ export class TokenRenderer {
 
   /** Tokens and their bars, nameplates and badges as the GM view shows them, whatever view the canvas is in: for a picture of the scene. */
   public getGmViewLayers(): LayerVisibility[] {
-    return [...gmTokenLayers(mapTokens(this.store.getState().objects), this.tokenSprites), ...this.uiManager.getGmViewLayers(), ...this.playerSight.gmLayers(), ...this.playerBadges.gmLayers()];
+    return [...gmTokenLayers(mapTokens(this.store.getState().objects), this.tokenSprites), ...this.uiManager.getGmViewLayers(), ...this.playerSight.gmLayers(), ...this.playerBadges.gmLayers(), ...this.turnMarkers.pictureLayers()];
   }
 
   /** Get all token sprites for external systems like SelectionManager. */

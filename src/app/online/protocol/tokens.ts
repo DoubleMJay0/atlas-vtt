@@ -48,6 +48,11 @@ export interface SharedToken {
   readonly badge: number | null;
   /** Bars, nameplate and conditions of a creature, as Atlas's player window draws them; null for other tokens. */
   readonly ui: SharedTokenUI | null;
+  /**
+   * The token holds the turn of the fight (by sides: it acts on the side with the turn): the page
+   * draws the turn marker on it. Sent only while the players' initiative list is shown. Absent from older GMs.
+   */
+  readonly turn?: true;
 }
 
 const isFiniteIn = (value: unknown, min: number, max: number): value is number => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
@@ -72,7 +77,7 @@ function parseToken(value: unknown): SharedToken | null {
   const badge = parseBadge(value.badge);
   const ui = parseTokenUI(value.ui);
   if (badge === undefined || ui === undefined) return null;
-  return { id: value.id, x, y, size, cells, rotation, art: asset, name, ring, claim: value.claim as Claim, badge, ui };
+  return { id: value.id, x, y, size, cells, rotation, art: asset, name, ring, claim: value.claim as Claim, badge, ui, ...(value.turn === true ? { turn: true as const } : {}) };
 }
 
 /** The tokens of a `tokens` message, or null when the list or any token in it is malformed. */

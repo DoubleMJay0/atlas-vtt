@@ -20,6 +20,7 @@ import { MarkShare, type MarkSharePorts } from './MarkShare.ts';
 import { sceneWalls, type MapSize } from './moveCheck.ts';
 import { ownerIn, type SeatSource } from './seatSource.ts';
 import { PlayerMoves } from './playerMoves.ts';
+import { movesOutOfTurn } from './turnShare.ts';
 import { RulesShare, type RulesSharePorts } from './RulesShare.ts';
 import { TOKEN_POLL_MS, TokenShare, type TokenSharePorts } from './TokenShare.ts';
 
@@ -116,6 +117,7 @@ export class SceneShare {
         ownerOf,
         map: this.mapSize,
         walls: sceneWalls(store.getState().objects.walls, this.scene?.lit === true, this.mapSize),
+        outOfTurn: (tokenId) => movesOutOfTurn(store.getState(), ports.atlasSettings().movesOnTurn === true, tokenId, ports.tokenRules?.()?.resources ?? []),
       }),
     });
     this.marks = new MarkShare({ ...ports, cursorsShown }, () => this.mapSize);

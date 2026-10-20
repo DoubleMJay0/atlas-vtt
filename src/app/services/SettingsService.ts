@@ -21,6 +21,7 @@ import {
 } from './atlasSettings';
 import { loadInitiativeCollapsed, loadInputMode, loadLightingQuality, saveInitiativeCollapsed, saveInputMode, saveLightingQuality } from './deviceSettings';
 import { readDock, type InitiativeLayout } from '../initiative/initiativeLayout';
+import type { InitiativeTurnOptions } from '../initiative/turnOptions';
 import type { LightingQualityLevel } from '../lighting/lightingQuality';
 
 export { TUTORIAL_IDS } from './atlasSettings';
@@ -277,6 +278,25 @@ export class SettingsService {
     }
     this.settings.initiativeFromTurn = fromTurn;
     this.settings.initiativeDock = dock;
+    this.commit();
+  }
+
+  /** What a turn change does: the banner is on unless the file says `false`, the others off unless it says `true`. */
+  initiativeTurnOptions(): InitiativeTurnOptions {
+    return {
+      banner: this.settings.initiativeBanner !== false,
+      followTurn: this.settings.initiativeFollowTurn === true,
+      movesOnTurn: this.settings.initiativeMovesOnTurn === true,
+    };
+  }
+
+  setInitiativeTurnOptions(changes: Partial<InitiativeTurnOptions>): void {
+    const next = { ...this.initiativeTurnOptions(), ...changes };
+    const current = this.initiativeTurnOptions();
+    if (next.banner === current.banner && next.followTurn === current.followTurn && next.movesOnTurn === current.movesOnTurn) return;
+    this.settings.initiativeBanner = next.banner;
+    this.settings.initiativeFollowTurn = next.followTurn;
+    this.settings.initiativeMovesOnTurn = next.movesOnTurn;
     this.commit();
   }
 

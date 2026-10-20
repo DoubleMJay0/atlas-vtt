@@ -4,6 +4,7 @@ import { confirmAction } from '../../ui/confirmDialog';
 import { runInBackground } from '../../utils/backgroundTask';
 import { t } from '../../i18n';
 import type { InitiativeDock } from '../../initiative/initiativeLayout';
+import type { InitiativeTurnOptions } from '../../initiative/turnOptions';
 
 interface TrackerOptionsState {
   autoSort: boolean;
@@ -17,6 +18,10 @@ interface TrackerOptionsState {
   fromTurn: boolean;
   /** The edge the tracker and the players' list stand at. */
   dock: InitiativeDock;
+  /** What a turn change does (Atlas' settings). */
+  turn: InitiativeTurnOptions;
+  /** Online play is switched on: the switch for players' moves shows. */
+  online: boolean;
 }
 
 interface TrackerOptionsActions {
@@ -24,6 +29,7 @@ interface TrackerOptionsActions {
   setShowNames: (showNames: boolean) => void;
   setFromTurn: (fromTurn: boolean) => void;
   setDock: (dock: InitiativeDock) => void;
+  setTurn: (changes: Partial<InitiativeTurnOptions>) => void;
   clear: () => void;
   /** Opens the library on its tokens, whose menu adds them to the tracker beside the map. */
   addCombatant: () => void;
@@ -46,7 +52,7 @@ export async function clearInitiativeAsking(empty: boolean, clear: () => void): 
   clear();
 }
 
-/** The menu behind the tracker's options button: how it sorts, what its cards show, how the lists are laid out, adding combatants and clearing it. */
+/** The menu behind the tracker's options button: how it sorts, what its cards show, how the lists are laid out, what a turn change does, adding combatants and clearing it. */
 export function initiativeTrackerOptions(state: TrackerOptionsState, actions: TrackerOptionsActions): ContextMenuEntry[] {
   return [
     {
@@ -82,6 +88,31 @@ export function initiativeTrackerOptions(state: TrackerOptionsState, actions: Tr
       description: t('initiative.dockLeftHint'),
       onClick: () => actions.setDock(state.dock === 'left' ? 'right' : 'left'),
     },
+    MENU_SEPARATOR,
+    {
+      type: 'item',
+      label: t('initiative.turnBanner'),
+      icon: 'flag',
+      checked: state.turn.banner,
+      description: t('initiative.turnBannerHint'),
+      onClick: () => actions.setTurn({ banner: !state.turn.banner }),
+    },
+    {
+      type: 'item',
+      label: t('initiative.followTurn'),
+      icon: 'locate-fixed',
+      checked: state.turn.followTurn,
+      description: t('initiative.followTurnHint'),
+      onClick: () => actions.setTurn({ followTurn: !state.turn.followTurn }),
+    },
+    ...(state.online ? [{
+      type: 'item' as const,
+      label: t('initiative.movesOnTurn'),
+      icon: 'footprints',
+      checked: state.turn.movesOnTurn,
+      description: t('initiative.movesOnTurnHint'),
+      onClick: () => actions.setTurn({ movesOnTurn: !state.turn.movesOnTurn }),
+    }] : []),
     MENU_SEPARATOR,
     {
       type: 'item',

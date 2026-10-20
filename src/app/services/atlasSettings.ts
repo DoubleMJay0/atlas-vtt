@@ -49,6 +49,12 @@ export interface AtlasSettings {
   initiativeFromTurn: boolean;
   /** The edge of the map the initiative lists stand at. Read with `initiativeLayout`. */
   initiativeDock: InitiativeDock;
+  /** Whether a turn change shows the turn banner. Read with `initiativeTurnOptions`. */
+  initiativeBanner: boolean;
+  /** Whether the GM's view pans to the combatant whose turn begins. Read with `initiativeTurnOptions`. */
+  initiativeFollowTurn: boolean;
+  /** Whether online players move their tokens in a fight only on their turn. Read with `initiativeTurnOptions`. */
+  initiativeMovesOnTurn: boolean;
   /** Experimental features the GM switched on. Read with `isExperimentalOn`. */
   experimental: Partial<Record<ExperimentalFeatureId, boolean>>;
   /** The GM's toolbar layout, only what differs from the default; read with `getToolbarLayout`. */
@@ -87,6 +93,9 @@ export const DEFAULT_SETTINGS: AtlasSettings = {
   initiativeNames: false,
   initiativeFromTurn: true,
   initiativeDock: 'right',
+  initiativeBanner: true,
+  initiativeFollowTurn: false,
+  initiativeMovesOnTurn: false,
   experimental: {},
   toolbar: {},
   localPlayerView: {

@@ -8,6 +8,8 @@
 export const MAP_LAYER_Z = {
   /** The hover, press and Shift-preview highlight of linked hexes (GM only). */
   hexLinks: 92,
+  /** The marker on the token whose turn it is: above the lighting, below the tokens' bars. */
+  turn: 96,
   /** Note pins (GM only). */
   pins: 98,
   /** The selection frame and the marquee or lasso being drawn. */

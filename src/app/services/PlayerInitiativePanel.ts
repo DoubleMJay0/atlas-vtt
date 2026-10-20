@@ -9,6 +9,7 @@ import { mapInitiativeRules } from './mapInitiativeRules';
 import { mapConditions } from '../gameSystems/mapRules';
 import { PlayerSceneOverlay, type PlayerSettings } from './PlayerSceneOverlay';
 import type { SettingsService } from './SettingsService';
+import { portraitSrc } from '../utils/portraitSrc';
 
 /** Separates token ids in `InitiativeScene.visibleTokenIds`. */
 const TOKEN_ID_SEPARATOR = '\n';
@@ -128,7 +129,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       fromTurn,
       dock,
       badgeNumber: (tokenId) => shown.get(tokenId) ?? null,
-      portraitSrc: (imagePath) => (/^(?:https?:|data:|blob:|app:)/.test(imagePath) ? imagePath : this.app.vault.adapter.getResourcePath(imagePath)),
+      portraitSrc: (imagePath) => portraitSrc(this.app, imagePath),
     });
   }
 }
