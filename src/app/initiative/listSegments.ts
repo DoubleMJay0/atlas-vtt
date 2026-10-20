@@ -88,7 +88,9 @@ export function listSegments<T>(items: readonly T[], shape: ListShape<T>): ListS
 
 /**
  * The first `count` combatants of a list, as a collapsed tracker shows them: the groups they
- * belong to and a divider they pass. Those that delayed their turn are not next and stay out.
+ * belong to and a divider they pass. Those that delayed their turn are not next and stay out. The
+ * side whose turn it is stays even with nobody in it (a GM may track only the opponents), so the
+ * turn still shows.
  */
 export function firstCards<T>(segments: readonly ListSegment<T>[], count: number): ListSegment<T>[] {
   const kept: ListSegment<T>[] = [];
@@ -99,12 +101,13 @@ export function firstCards<T>(segments: readonly ListSegment<T>[], count: number
       kept.push(segment);
       continue;
     }
-    if (segment.delayed || segment.items.length === 0) continue;
+    if (segment.delayed || (segment.items.length === 0 && !segment.active)) continue;
     const items = segment.items.slice(0, left);
     left -= items.length;
     kept.push({ ...segment, items });
   }
-  // A divider with nobody after it says nothing
+  // A divider with nobody before or after it says nothing
+  while (kept[0]?.kind === 'round') kept.shift();
   while (kept.at(-1)?.kind === 'round') kept.pop();
   return kept;
 }

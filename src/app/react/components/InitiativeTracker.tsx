@@ -46,6 +46,8 @@ export const InitiativeTracker: React.FC = () => {
 
   // Store state
   const isOpen = useAtlasStore((s) => s.initiativeTrackerOpen);
+  // The dice log opens at the left edge: a tracker docked there moves beside it
+  const diceLogOpen = useAtlasStore((s) => s.isDiceLogOpen);
   const initiative = useAtlasStore((s) => s.initiative);
   const tokens = useAtlasStore((s) => s.objects?.tokens) || {};
   const mapPath = useAtlasStore((s) => s.mapPath);
@@ -188,6 +190,7 @@ export const InitiativeTracker: React.FC = () => {
     'atlas-initiative-tracker',
     showNames && 'atlas-initiative-tracker--named',
     layout.dock === 'left' && 'atlas-initiative-tracker--left',
+    layout.dock === 'left' && diceLogOpen && 'atlas-initiative-tracker--beside-log',
     layout.collapsed && 'atlas-initiative-tracker--collapsed',
   ].filter(Boolean).join(' ');
 

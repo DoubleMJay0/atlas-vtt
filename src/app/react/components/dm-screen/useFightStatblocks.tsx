@@ -13,6 +13,12 @@ import { StatblockScopeSwitch } from './StatblockScopeSwitch';
 export function useFightStatblocks<T>(statblocks: ReadonlyMap<string, T>, tokens: Readonly<Record<string, TokenEntity>>): { shown: [string, T][]; scopeSwitch: React.ReactNode } {
   const initiative = useAtlasStore((state) => state.initiative);
   const [scope, setScope] = useState<StatblockScope>('fight');
+  // Every fight starts with its own statblocks: the screen stays mounted, so All would carry over
+  const [fightRan, setFightRan] = useState(initiative.isActive);
+  if (fightRan !== initiative.isActive) {
+    setFightRan(initiative.isActive);
+    if (initiative.isActive) setScope('fight');
+  }
   const fightPaths = useMemo(
     () => (initiative.isActive ? fightStatblockPaths(initiative.entries, tokens).filter((path) => statblocks.has(path)) : []),
     [initiative.isActive, initiative.entries, tokens, statblocks],

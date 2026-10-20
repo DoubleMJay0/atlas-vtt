@@ -255,6 +255,21 @@ describe('the DM screen during a fight', () => {
     expect(shownNames(container)[0]).toContain('Inline Creature');
   });
 
+  it('starts every fight with the fight\'s statblocks, whatever the last one was switched to', async () => {
+    state.initiative = { entries: [{ id: 'e', tokenId: '1', order: 0 }], isActive: true, round: 1 };
+    const { container, rerender } = showDMScreen([creaturePath, fencePath]);
+    await waitFor(() => expect(container.textContent).toContain('Inline Creature'));
+    fireEvent.click(screen.getByRole('radio', { name: 'All (2)' }));
+    await waitFor(() => expect(shownNames(container)).toHaveLength(2));
+
+    state.initiative = { ...state.initiative, isActive: false };
+    rerender(<DMScreen isOpen onClose={vi.fn()} />);
+    state.initiative = { ...state.initiative, isActive: true };
+    rerender(<DMScreen isOpen onClose={vi.fn()} />);
+    await waitFor(() => expect(shownNames(container)).toHaveLength(1));
+    expect(screen.getByRole('radio', { name: 'In this fight (1)' }).getAttribute('aria-checked')).toBe('true');
+  });
+
   it('shows every statblock and no switch without a fight, or where the fight uses every creature', async () => {
     const { container } = showDMScreen([creaturePath, fencePath]);
     await waitFor(() => expect(shownNames(container)).toHaveLength(2));

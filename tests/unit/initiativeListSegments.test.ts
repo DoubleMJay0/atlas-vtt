@@ -68,6 +68,16 @@ describe('a collapsed list', () => {
     expect(drawn(firstCards(segments, 2))).toEqual(['b c']);
   });
 
+  it('keeps the side whose turn it is while nobody in it is tracked, and no divider at its top', () => {
+    const opponents = [{ name: 'rat' }, { name: 'bat' }, { name: 'owl' }, { name: 'elk' }];
+    // The opponents act first and the players have the turn: the players' side holds nobody
+    const segments = listSegments(opponents, shape({ bySides: true, sides: ['opponents', 'players'], activeSide: 'players' }));
+    expect(drawn(firstCards(segments, 3))).toEqual(['[players!: ]', '|Round 3|', '[opponents: rat bat owl]']);
+    // Without a turn there is no side to keep: the list starts with the first combatant, never a divider
+    const leading: ListSegment<Item>[] = [{ kind: 'round', round: 3 }, { kind: 'group', key: 'order', items: opponents }];
+    expect(drawn(firstCards(leading, 2))).toEqual(['rat bat']);
+  });
+
   it('keeps the groups of the sides it shows', () => {
     const list = [{ name: 'hero', side: 'players' as const }, { name: 'rat' }, { name: 'bat' }, { name: 'owl' }];
     const segments = listSegments(list, shape({ bySides: true, activeSide: 'opponents' }));

@@ -57,9 +57,9 @@ const entryOf = (index: number, turn: number): InitiativeEntry => ({
   imagePath: portrait(FILLS[index]!, NAMES[index]![0]!), isActive: index === turn, isNPC: true, order: index,
 });
 
-interface GmView { names?: boolean; layout?: Partial<InitiativeLayout>; sides?: boolean; turn?: number }
+interface GmView { names?: boolean; layout?: Partial<InitiativeLayout>; sides?: boolean; turn?: number; diceLog?: boolean }
 
-async function showTracker({ names = false, layout = {}, sides = false, turn = 3 }: GmView = {}): Promise<HTMLElement> {
+async function showTracker({ names = false, layout = {}, sides = false, turn = 3, diceLog = false }: GmView = {}): Promise<HTMLElement> {
   document.body.innerHTML = '';
   await page.viewport(1200, 900);
   const { app } = createInMemoryApp({ files: {} });
@@ -70,6 +70,7 @@ async function showTracker({ names = false, layout = {}, sides = false, turn = 3
   store.setState({
     persistenceEnabled: false,
     initiativeTrackerOpen: true,
+    isDiceLogOpen: diceLog,
     objects: { ...store.getState().objects, tokens: Object.fromEntries([0, 1, 2, 3, 4].map((index) => [`t${index}`, creature(index)])) },
     initiative: {
       ...createDefaultInitiativeState(), isActive: true, round: 2, currentIndex: turn,
@@ -200,6 +201,9 @@ describe('the GM\'s initiative tracker', () => {
     const left = await showTracker({ layout: { dock: 'left' } });
     expect(box(left).left).toBe(12);
     await page.screenshot({ path: `${SHOTS}/gm-docked-left.png`, element: left });
+
+    // Beside the dice log (360 px wide, 12 px from the edge) while it is open, a gap of 8 px between them
+    expect(box(await showTracker({ layout: { dock: 'left' }, diceLog: true })).left).toBe(12 + 360 + 8);
   });
 
   it('goes by sides as groups, the side whose turn it is on top', async () => {

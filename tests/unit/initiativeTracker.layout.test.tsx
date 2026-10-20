@@ -10,6 +10,7 @@ import type { ContextMenuEntry } from '../../src/app/react/components/context-me
 
 const state = vi.hoisted(() => ({
   initiativeTrackerOpen: true,
+  isDiceLogOpen: false,
   initiative: { entries: [], isActive: false, round: 0 } as unknown as InitiativeState,
   objects: { tokens: {} as Record<string, unknown> },
   tokenSettings: { showInstanceBadges: true },
@@ -79,6 +80,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   opened.entries = [];
   conditions.definitions = [];
+  state.isDiceLogOpen = false;
   Object.assign(layout, { fromTurn: true, dock: 'right', collapsed: false });
   collection.rules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
   fight();
@@ -122,6 +124,17 @@ describe('a collapsed tracker', () => {
     expect(container.querySelector('.atlas-initiative-tracker__left-out')?.textContent).toBe('+2');
   });
 
+  it('keeps the side whose turn it is in a fight by sides, while nobody in it is tracked', () => {
+    layout.collapsed = true;
+    collection.rules = { mode: 'sides', roll: '1d20', firstSide: 'opponents' };
+    state.initiative = { ...state.initiative, entries: state.initiative.entries.map((entry) => ({ ...entry, isActive: false })), sides: { first: 'opponents', active: 'players' } };
+    const { container } = render(<InitiativeTracker />);
+    const order = [...container.querySelectorAll('.atlas-initiative-side__label, .atlas-initiative-round')].map((element) => element.textContent);
+    expect(order).toEqual(['Players', 'Round 3', 'Opponents']);
+    expect(container.querySelector('.atlas-initiative-side--active .atlas-initiative-side__label')?.textContent).toBe('Players');
+    expect(container.querySelectorAll('.atlas-initiative-card')).toHaveLength(3);
+  });
+
   it('is collapsed and expanded with the toggle at its head', () => {
     const { container, rerender } = render(<InitiativeTracker />);
     const toggle = container.querySelector<HTMLButtonElement>('.atlas-initiative-tracker__collapse')!;
@@ -145,6 +158,18 @@ describe('where the tracker stands', () => {
     layout.dock = 'left';
     rerender(<InitiativeTracker />);
     expect(container.querySelector('.atlas-initiative-tracker--left')).not.toBeNull();
+  });
+
+  it('moves beside the dice log while it is open at the same edge, and only there', () => {
+    state.isDiceLogOpen = true;
+    const { container, rerender } = render(<InitiativeTracker />);
+    expect(container.querySelector('.atlas-initiative-tracker--beside-log')).toBeNull();
+    layout.dock = 'left';
+    rerender(<InitiativeTracker />);
+    expect(container.querySelector('.atlas-initiative-tracker--beside-log')).not.toBeNull();
+    state.isDiceLogOpen = false;
+    rerender(<InitiativeTracker />);
+    expect(container.querySelector('.atlas-initiative-tracker--beside-log')).toBeNull();
   });
 });
 

@@ -46,11 +46,11 @@ $collapse-height: 24px;
     right: auto;
     left: $spacing-m;
   }
-}
 
-// The dice log opens at the left edge: a tracker docked there moves beside it
-.atlas-ui:has(.dice-roll-log) .atlas-initiative-tracker--left {
-  left: calc(#{$spacing-m} + #{$dice-log-width} + #{$spacing-s});
+  // The dice log opens at the left edge: a tracker docked there moves beside it
+  &--beside-log {
+    left: calc(#{$spacing-m} + #{$dice-log-width} + #{$spacing-s});
+  }
 }
 
 // Collapses the tracker to the turn and the next combatants; a ghost control the width of the panel,
