@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { setLocale } from '../../src/app/i18n';
+import { TRANSLATIONS } from '../../src/app/i18n/languages';
 import { describeSense, newSense, senseNameProblem, senseProblem } from '../../src/app/gameSystems/senseEditing';
 import { granting } from '../../src/app/gameSystems/senses/senseHelpers';
 import type { SenseDefinition } from '../../src/app/types/senseTypes';
@@ -9,7 +10,7 @@ const seeing = (dim: SenseDefinition['sees']['dim'], dark: SenseDefinition['sees
   ({ sees: { bright: 'normal', dim, dark, magicalDark: 'none' } });
 
 describe('describeSense', () => {
-  afterEach(() => setLocale('en'));
+  afterEach(() => setLocale('en', TRANSLATIONS));
 
   it('says what a sense that shows the map sees, and how', () => {
     expect(describeSense(sense())).toBe('Sees in darkness as dim light, in grey, within its range.');
@@ -33,7 +34,7 @@ describe('describeSense', () => {
   });
 
   it('words the line in the active language', () => {
-    setLocale('ru');
+    setLocale('ru', TRANSLATIONS);
     expect(describeSense(sense({ lineOfSight: false }))).toBe('Видит во тьме как в тусклом свете, в оттенках серого, в пределах своего радиуса, сквозь стены.');
     expect(describeSense(sense({ reveals: 'creatures', range: 'unlimited', precise: false }))).toBe('Чувствует существ. Они показываются очертаниями.');
   });
