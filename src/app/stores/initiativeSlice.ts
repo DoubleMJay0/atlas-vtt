@@ -179,6 +179,10 @@ export function createInitiativeActions(
       set((draft) => {
         const current = draft.initiative.entries.find(e => e.id === id);
         if (current) current.initiative = total;
+        if (draft.initiative.config.autoSort) {
+          draft.initiative.entries.sort((a, b) => b.initiative - a.initiative);
+          updateEntryOrders(draft.initiative.entries);
+        }        
       });
     },
 
