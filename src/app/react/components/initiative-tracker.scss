@@ -201,6 +201,11 @@ $tracker-width: 96px;
     opacity: 0.45;
   }
 
+  // Delayed its turn: waits below the order, without the card's fill until it acts
+  &--delayed {
+    background: transparent;
+  }
+
   // Hidden from the players: translucent, like its token on the map
   &--hidden .atlas-initiative-card__portrait {
     opacity: 0.5;

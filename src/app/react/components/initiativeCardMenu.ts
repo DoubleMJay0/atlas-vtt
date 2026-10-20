@@ -14,6 +14,8 @@ interface CardMenuActions {
   edit: () => void;
   updateToken: (changes: TokenUpdates) => void;
   setSitsOut: (sitsOut: boolean) => void;
+  delay: () => void;
+  actNow: () => void;
   remove: () => void;
 }
 
@@ -25,7 +27,8 @@ function sideChanges(token: TokenEntity | undefined, side: InitiativeSide): Toke
 
 /**
  * The menu of a combatant's card. In turn order it rolls and edits the combatant's number; by
- * sides there is none, and the card moves to the other side or sits a round of the fight out.
+ * sides there is none, and the card moves to the other side. While a fight runs a combatant
+ * sits a round out, and in turn order delays its turn and acts again when the GM says.
  */
 export function initiativeCardMenu(
   entry: InitiativeEntry,
@@ -36,19 +39,21 @@ export function initiativeCardMenu(
   const hidden = token?.isHidden ?? false;
   const other = otherSide(sideOf(token));
   const item = (label: string, icon: string, onClick: () => void): ContextMenuEntry => ({ type: 'item', label, icon, onClick });
+  const sitOut = entry.sitsOut
+    ? item(t('initiative.actThisRound'), 'play', () => actions.setSitsOut(false))
+    : item(t('initiative.sitOut'), 'pause', () => actions.setSitsOut(true));
+  const delay = entry.delayed
+    ? item(t('initiative.actNow'), 'step-forward', actions.actNow)
+    : item(t('initiative.delay'), 'hourglass', actions.delay);
 
   return [
     ...(mode.bySides ? [] : [item(t('initiative.roll'), 'dice', actions.roll)]),
     item(t('initiative.toFront'), 'arrow-up-to-line', actions.moveToFront),
     item(t('initiative.toBack'), 'arrow-down-to-line', actions.moveToBack),
     ...(mode.bySides
-      ? [
-        item(`Move to ${SIDE_LABELS[other]}`, 'arrow-left-right', () => actions.updateToken(sideChanges(token, other))),
-        ...(mode.fightRuns
-          ? [item(entry.sitsOut ? 'Act This Round' : 'Sit Out This Round', entry.sitsOut ? 'play' : 'pause', () => actions.setSitsOut(!entry.sitsOut))]
-          : []),
-      ]
+      ? [item(`Move to ${SIDE_LABELS[other]}`, 'arrow-left-right', () => actions.updateToken(sideChanges(token, other)))]
       : [item(t('initiative.edit'), 'pencil', actions.edit)]),
+    ...(mode.fightRuns ? [sitOut, ...(mode.bySides ? [] : [delay])] : []),
     item(hidden ? 'Show to Players' : 'Hide from Players', hidden ? 'eye' : 'eye-off', () => actions.updateToken({ isHidden: !hidden })),
     { type: 'item', label: t('initiative.remove'), icon: 'trash-2', destructive: true, onClick: actions.remove },
   ];
