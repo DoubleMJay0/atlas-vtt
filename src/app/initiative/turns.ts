@@ -1,80 +1,118 @@
 /**
- * Steps of a fight in the initiative tracker that do not depend on the store:
- * the turn of a side, and the roll of a combatant.
+ * Turns of a fight by sides, without the store: the sides act in turns, one side or several at
+ * once (equal rolls), in the fight's order or this round's rolled order.
  */
 
-import { parseDefaultRoll } from '../gameSystems/diceRules';
-import { INITIATIVE_SIDES } from '../gameSystems/initiativeRules';
-import type { InitiativeSide } from '../types/initiativeRulesTypes';
-import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
+import { isBuiltInSide } from '../gameSystems/initiativeSideRules';
+import type { SideId } from '../types/initiativeRulesTypes';
+import type { InitiativeEntry, InitiativeState, SidesFight } from '../types/initiativeTypes';
 import { actsInTurn, backToRoundBefore, beginRound, canStillAct } from './rounds';
-import { otherSide } from './sides';
+import { enterSideRound, fightSideIds, roundTurns } from './sideOrder';
 
 /** How a fight by sides reads its combatants: the side each fights on, and who is defeated. */
 export interface SideTurnInputs {
-  sideOf: (entry: InitiativeEntry) => InitiativeSide;
+  sideOf: (entry: InitiativeEntry) => SideId;
   defeated: ReadonlySet<string>;
+  /** A roll for every side, rolled before the write: taken by a round that begins without rolls of its own. */
+  fresh?: Record<SideId, number>;
 }
 
 /**
- * Whether a side takes its turn: a side without combatants in the tracker always does (the GM may
- * track only one side), one with combatants only while one of them `acts`.
+ * Whether a side takes its turn: the players or the opponents without combatants in the tracker
+ * always do (the GM may track only one side), a named side without combatants never, and a side
+ * with combatants only while one of them `acts`.
  */
-function sideActs(initiative: InitiativeState, side: InitiativeSide, inputs: SideTurnInputs, acts = actsInTurn): boolean {
+function sideActs(initiative: InitiativeState, side: SideId, inputs: SideTurnInputs, acts = actsInTurn): boolean {
   const members = initiative.entries.filter((entry) => inputs.sideOf(entry) === side);
-  return members.length === 0 || members.some((entry) => acts(entry, inputs.defeated));
+  return members.length === 0 ? isBuiltInSide(side) : members.some((entry) => acts(entry, inputs.defeated));
 }
 
-/** Whether either side can take a turn in some round: marks clear when a round begins, defeats do not. */
-function someSideCanAct(initiative: InitiativeState, inputs: SideTurnInputs): boolean {
-  return INITIATIVE_SIDES.some((side) => sideActs(initiative, side, inputs, canStillAct));
+function turnActs(initiative: InitiativeState, turn: readonly SideId[], inputs: SideTurnInputs): boolean {
+  return turn.some((side) => sideActs(initiative, side, inputs));
 }
 
-/** One step: the other side's turn; after the second side a new round begins with the first. */
-function stepForward(initiative: InitiativeState, sides: { first: InitiativeSide; active: InitiativeSide }): void {
-  if (sides.active === sides.first) {
-    sides.active = otherSide(sides.first);
-    return;
+/** Whether some side can take a turn in some round: marks clear when a round begins, defeats do not. */
+function someSideCanAct(initiative: InitiativeState, fight: SidesFight, inputs: SideTurnInputs): boolean {
+  return fightSideIds(fight).some((side) => sideActs(initiative, side, inputs, canStillAct));
+}
+
+function turnIndex(initiative: InitiativeState, fight: SidesFight): number {
+  return roundTurns(fight, initiative.round).findIndex((turn) => turn.includes(fight.active));
+}
+
+/** One step: the next turn of the round; after the last a new round begins with its first. */
+function stepForward(initiative: InitiativeState, fight: SidesFight, inputs: SideTurnInputs): SideId[] {
+  const turns = roundTurns(fight, initiative.round);
+  const next = turns[turnIndex(initiative, fight) + 1];
+  if (next) {
+    fight.active = next[0]!;
+    return next;
   }
-  sides.active = sides.first;
   beginRound(initiative);
+  enterSideRound(fight, initiative.round, inputs.fresh);
+  const first = roundTurns(fight, initiative.round)[0] ?? [fight.first];
+  fight.active = first[0]!;
+  return first;
+}
+
+/** The turns two rounds can hold: within two rounds every mark has cleared once. */
+function stepLimit(fight: SidesFight): number {
+  return 2 * fightSideIds(fight).length + 1;
 }
 
 /**
- * The next side that acts; a side whose combatants are all defeated or sit the round out is
- * passed by. Nothing moves while no side can act in any round.
+ * The next turn that acts; a turn whose sides' combatants are all defeated or sit the round out
+ * is passed by. Nothing moves while no side can act in any round.
  */
 export function nextSideTurn(initiative: InitiativeState, inputs: SideTurnInputs): void {
-  const { sides } = initiative;
-  if (!sides || !someSideCanAct(initiative, inputs)) return;
-  // Within two rounds every mark has cleared once, so a side that can act has come
-  for (let step = 0; step < 4; step++) {
-    stepForward(initiative, sides);
-    if (sideActs(initiative, sides.active, inputs)) return;
+  const fight = initiative.sides;
+  if (!fight || !someSideCanAct(initiative, fight, inputs)) return;
+  for (let step = 0; step < stepLimit(fight); step++) {
+    if (turnActs(initiative, stepForward(initiative, fight, inputs), inputs)) return;
   }
 }
 
-/** The side before that acted, passing by sides nobody of acts in; nothing before the first side of round 1, and nothing moves while no side can act. */
+/** One step back: the turn before in the round, else the last turn of the round before, with its marks and rolls; none before round 1's first. */
+function stepBack(initiative: InitiativeState, fight: SidesFight): SideId[] | undefined {
+  const index = turnIndex(initiative, fight);
+  let turn: SideId[] | undefined;
+  if (index > 0) {
+    turn = roundTurns(fight, initiative.round)[index - 1];
+  } else if (initiative.round > 1) {
+    backToRoundBefore(initiative);
+    enterSideRound(fight, initiative.round, undefined);
+    turn = roundTurns(fight, initiative.round).at(-1);
+  }
+  if (turn) fight.active = turn[0]!;
+  return turn;
+}
+
+/** How many steps back the nearest turn that acts lies, walked on a copy; undefined where none does before round 1's first turn. */
+function stepsBackToActingTurn(initiative: InitiativeState, inputs: SideTurnInputs): number | undefined {
+  const trial = JSON.parse(JSON.stringify(initiative)) as InitiativeState;
+  const fight = trial.sides!;
+  for (let step = 1; step <= stepLimit(fight); step++) {
+    const turn = stepBack(trial, fight);
+    if (!turn) return undefined;
+    if (turnActs(trial, turn, inputs)) return step;
+  }
+  return undefined;
+}
+
+/**
+ * The turn before that acted, passing by turns nobody acts in (a named side without combatants
+ * among them); back over a round's start into the round before, with its rolls. Where no turn
+ * before acts, down to round 1's first, nothing moves, nor while no side can act.
+ */
 export function previousSideTurn(initiative: InitiativeState, inputs: SideTurnInputs): void {
-  const { sides } = initiative;
-  if (!sides || !someSideCanAct(initiative, inputs)) return;
-  for (let step = 0; step < 4; step++) {
-    if (sides.active !== sides.first) {
-      sides.active = sides.first;
-    } else if (initiative.round > 1) {
-      sides.active = otherSide(sides.first);
-      backToRoundBefore(initiative);
-    } else {
-      return;
-    }
-    if (sideActs(initiative, sides.active, inputs)) return;
-  }
+  const fight = initiative.sides;
+  if (!fight || !someSideCanAct(initiative, fight, inputs)) return;
+  const steps = stepsBackToActingTurn(initiative, inputs);
+  for (let step = 0; step < (steps ?? 0); step++) stepBack(initiative, fight);
 }
 
-/** The total of a dice group such as `1d20` or `2d6`; a d20 when `roll` is none. */
-export function rollInitiativeDice(roll: string, random: () => number): number {
-  const { count, sides } = parseDefaultRoll(roll) ?? { count: 1, sides: 20 };
-  let total = 0;
-  for (let die = 0; die < count; die++) total += Math.floor(random() * sides) + 1;
-  return total;
+/** Where a fight by sides starts: the first side of round 1 whose turn acts, else the first side. */
+export function firstActingSide(initiative: InitiativeState, fight: SidesFight, inputs: SideTurnInputs): SideId {
+  const turns = roundTurns(fight, initiative.round);
+  return (turns.find((turn) => turnActs(initiative, turn, inputs)) ?? turns[0])?.[0] ?? fight.first;
 }

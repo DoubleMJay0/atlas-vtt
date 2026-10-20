@@ -8,11 +8,12 @@ import type { InitiativeState, InitiativeEntry, InitiativeConfig } from '../type
 import { createDefaultInitiativeState } from '../types/initiativeTypes';
 import { DEFAULT_INITIATIVE_RULES } from '../gameSystems/initiativeRules';
 import { combatantModifier, ownModifier } from '../initiative/initiativeModifier';
-import { rollInitiativeDice } from '../initiative/turns';
+import { rollInitiativeDice } from '../initiative/initiativeDice';
 import { removeCombatant, renumber } from '../initiative/turnOrder';
 import { sortCombatants } from '../initiative/sortCombatants';
 import { clearSittingOut } from '../initiative/rounds';
 import { createInitiativeTurnActions, type InitiativeTurnActions } from './initiativeTurnActions';
+import { fightDraws, roundChangesOf } from './initiativeFightStart';
 import { setInitiative } from '../initiative/awaitingInitiative';
 
 /**
@@ -108,7 +109,7 @@ export function createInitiativeActions(
   random: () => number,
 ): Omit<InitiativeSlice, 'initiative' | 'initiativeTrackerOpen'> {
   return {
-    ...createInitiativeTurnActions(set),
+    ...createInitiativeTurnActions(set, get, random),
 
     setInitiativeTrackerOpen: (open) => set((draft) => {
       draft.initiativeTrackerOpen = open;
@@ -129,9 +130,12 @@ export function createInitiativeActions(
       return id;
     },
 
-    removeFromInitiative: (id, defeated = new Set()) => set((draft) => {
-      removeCombatant(draft.initiative, id, defeated);
-    }),
+    removeFromInitiative: (id, defeated = new Set()) => {
+      const { deck } = fightDraws(get().initiative, random);
+      set((draft) => {
+        removeCombatant(draft.initiative, id, defeated, roundChangesOf(draft, deck));
+      });
+    },
 
     updateInitiativeEntry: (id, updates) => set((draft) => {
       const entry = draft.initiative.entries.find(e => e.id === id);
@@ -228,6 +232,7 @@ export function createInitiativeActions(
       draft.initiative.round = 0;
       draft.initiative.currentIndex = -1;
       delete draft.initiative.sides;
+      delete draft.initiative.cards;
       clearSittingOut(draft.initiative);
     }),
 

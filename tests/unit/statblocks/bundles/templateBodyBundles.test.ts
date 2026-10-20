@@ -70,10 +70,15 @@ async function importInto({ vault, assets }: Vault, blob: Blob): Promise<void> {
 
 const idIn = (text: string | undefined): string => (JSON.parse(text ?? '{}') as { id: string }).id;
 
-beforeEach(() => { AssetService.resetInstance(); });
+beforeEach(() => {
+  AssetService.resetInstance();
+  // The template library gives the browser turns on the main window's timers, which Obsidian always has.
+  vi.stubGlobal('window', { setTimeout });
+});
 afterEach(() => {
   for (const app of apps.splice(0)) TemplateLibrary.release(app);
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('a template\'s note in a collection bundle', () => {

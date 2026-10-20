@@ -1,17 +1,20 @@
-// Initiative Tracker - Modern Minimal Design
-// Compact vertical cards: avatar, initiative number, HP bar
-// Panel background matches toolbar styling (atlas-elevated-surface)
+// Initiative Tracker: a column of cards (portrait, number, bars, conditions) at the right
+// or left edge of the map, on the elevated surface the toolbar has
 @use '../../../../styles/tokens' as *;
 @use '../../../../styles/mixins' as *;
 
 $tracker-width: 96px;
 // Wide enough for a name of two short words a line, which the portrait column alone is not
 $tracker-width-named: 168px;
+// Where the tracker stands while the dice log is open at the same edge: beside it
+$dice-log-width: 360px;
+// The collapse toggle: as tall as a card's number slot
+$collapse-height: 24px;
 
 .atlas-initiative-tracker {
   position: fixed;
   top: 50%;
-  right: 12px;
+  right: $spacing-m;
   transform: translateY(-50%);
   width: $tracker-width;
   // Centred panel: symmetric clearance keeps its top below the top bar row
@@ -20,8 +23,8 @@ $tracker-width-named: 168px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 8px;
+  gap: $spacing-s;
+  padding: $spacing-s;
   z-index: 50;
   font-family: var(--font-interface);
   pointer-events: auto;
@@ -33,9 +36,44 @@ $tracker-width-named: 168px;
 
   overflow: hidden;
 
-  // The GM's cards show names (the tracker's Show Names on Cards)
+  // The GM's cards show names (the tracker's Show names)
   &--named {
     width: $tracker-width-named;
+  }
+
+  // Docked at the left edge (the tracker's Dock on the left)
+  &--left {
+    right: auto;
+    left: $spacing-m;
+  }
+
+  // The dice log opens at the left edge: a tracker docked there moves beside it
+  &--beside-log {
+    left: calc(#{$spacing-m} + #{$dice-log-width} + #{$spacing-s});
+  }
+}
+
+// Collapses the tracker to the turn and the next combatants; a ghost control the width of the panel,
+// in the panel's top corners
+.atlas-initiative-tracker .atlas-initiative-tracker__collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
+  width: 100%;
+  height: $collapse-height;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: $radius-l;
+  @include atlas-panel-inset-radius($spacing-s, top-left, top-right);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+
+  svg {
+    width: 14px;
+    height: 14px;
   }
 }
 
@@ -60,23 +98,18 @@ $tracker-width-named: 168px;
   min-width: 0;
 }
 
-// The first and last rows sit 8px inside the border: their outer buttons'
-// outer corners run concentric with the panel's.
-.atlas-initiative-tracker__controls > .atlas-initiative-tracker__btn {
-  &:first-child { @include atlas-panel-inset-radius($spacing-s, top-left); }
-  &:last-child { @include atlas-panel-inset-radius($spacing-s, top-right); }
-}
-
+// The last row sits 8px inside the border: its outer buttons' outer corners run concentric with
+// the panel's. Each button is followed by its tooltip's hidden label, hence `of-type`.
 .atlas-initiative-tracker__turn-controls > .atlas-initiative-tracker__btn {
-  &:first-child { @include atlas-panel-inset-radius($spacing-s, bottom-left); }
-  &:last-child { @include atlas-panel-inset-radius($spacing-s, bottom-right); }
+  &:first-of-type { @include atlas-panel-inset-radius($spacing-s, bottom-left); }
+  &:last-of-type { @include atlas-panel-inset-radius($spacing-s, bottom-right); }
 }
 
 .atlas-initiative-tracker__btn {
   flex: 1;
   height: 36px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: $radius-l;
   transition: all 0.15s ease;
 
   &:disabled {
@@ -105,7 +138,7 @@ $tracker-width-named: 168px;
 .atlas-initiative-tracker__content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: $spacing-s;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -136,16 +169,56 @@ $tracker-width-named: 168px;
 .atlas-initiative-side {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: $spacing-s;
+}
+
+// Where the list runs on into the next round: the round's name between two hairlines
+.atlas-initiative-round {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  color: var(--text-muted);
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--background-modifier-border);
+  }
+}
+
+.atlas-initiative-round__label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .atlas-initiative-side__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-xs;
   margin: 0;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.4;
   color: var(--text-muted);
   text-align: center;
+  overflow-wrap: anywhere;
+}
+
+// This round's roll of a side, where the sides roll for their order
+.atlas-initiative-side__roll {
+  min-width: 16px;
+  padding-inline: $spacing-xs;
+  border-radius: $radius-s;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
 }
 
 // The side whose turn it is: its name and its combatants take the accent
@@ -165,12 +238,13 @@ $tracker-width-named: 168px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
+  gap: $spacing-s;
+  padding: $spacing-s;
   width: 100%;
+  flex-shrink: 0;
   background: var(--background-modifier-hover);
   border: 1.5px solid color-mix(in oklch, var(--mono-100) 6%, transparent);
-  border-radius: 8px;
+  border-radius: $radius-l;
   cursor: grab;
   transition: all 0.2s ease;
   position: relative;
@@ -412,6 +486,35 @@ $tracker-width-named: 168px;
   overflow: hidden;
 }
 
+// The card dealt in a fight by cards: a small playing card where the number stands otherwise
+.atlas-initiative-card__dealt {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // As tall as the number slot it stands in for, so a card is the same height in every fight
+  min-width: 20px;
+  height: 24px;
+  padding: 0 2px;
+  border: $border-width-s solid var(--background-modifier-border);
+  border-radius: $radius-s;
+  background: var(--background-primary);
+  font-family: var(--font-interface);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-initiative-card__dealt--none {
+  color: var(--text-faint);
+}
+
+.atlas-initiative-card__dealt-label {
+  @include atlas-visually-hidden;
+}
+
 // HP Bar — full width
 // One thin bar per resource of the token, in the collection's order; a click edits it
 .atlas-initiative-card__resources {
@@ -458,6 +561,19 @@ $tracker-width-named: 168px;
   transition: width 0.3s ease;
 }
 
+// The combatant's conditions as its token shows them (`CardConditions`), each named by its tooltip
+.atlas-initiative-card__conditions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: $spacing-xs;
+  width: 100%;
+}
+
+.atlas-initiative-card__condition {
+  display: flex;
+}
+
 // Note: Statblock preview styles are in statblock-hover-preview.scss (shared component)
 
 // Edit Initiative Popup — minimal floating input
@@ -474,6 +590,11 @@ $tracker-width-named: 168px;
   align-items: center;
   gap: 8px;
   animation: atlas-initiative-popup-slide-in 0.15s ease-out;
+
+  // Beside a tracker docked on the left it slides in from the card on its left
+  &--right {
+    animation-name: atlas-initiative-popup-slide-in-right;
+  }
 
   &__input {
     width: 80px;
@@ -554,6 +675,17 @@ $tracker-width-named: 168px;
     padding: 4px;
     border-radius: 4px;
     white-space: nowrap;
+  }
+}
+
+@keyframes atlas-initiative-popup-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
   }
 }
 

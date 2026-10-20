@@ -3,6 +3,7 @@ import { MENU_SEPARATOR } from './context-menu/AtlasContextMenu';
 import { confirmAction } from '../../ui/confirmDialog';
 import { runInBackground } from '../../utils/backgroundTask';
 import { t } from '../../i18n';
+import type { InitiativeDock } from '../../initiative/initiativeLayout';
 
 interface TrackerOptionsState {
   autoSort: boolean;
@@ -12,11 +13,17 @@ interface TrackerOptionsState {
   empty: boolean;
   /** The GM's cards show names (Atlas' setting, the same in every scene). */
   showNames: boolean;
+  /** During a fight the lists start at the turn (Atlas' setting, followed by the players' list). */
+  fromTurn: boolean;
+  /** The edge the tracker and the players' list stand at. */
+  dock: InitiativeDock;
 }
 
 interface TrackerOptionsActions {
   setAutoSort: (autoSort: boolean) => void;
   setShowNames: (showNames: boolean) => void;
+  setFromTurn: (fromTurn: boolean) => void;
+  setDock: (dock: InitiativeDock) => void;
   clear: () => void;
 }
 
@@ -37,7 +44,7 @@ export async function clearInitiativeAsking(empty: boolean, clear: () => void): 
   clear();
 }
 
-/** The menu behind the tracker's options button: how it sorts, what its cards show, and clearing it. */
+/** The menu behind the tracker's options button: how it sorts, what its cards show, how the lists are laid out, and clearing it. */
 export function initiativeTrackerOptions(state: TrackerOptionsState, actions: TrackerOptionsActions): ContextMenuEntry[] {
   return [
     {
@@ -56,6 +63,22 @@ export function initiativeTrackerOptions(state: TrackerOptionsState, actions: Tr
       checked: state.showNames,
       description: t('initiative.showNamesHint'),
       onClick: () => actions.setShowNames(!state.showNames),
+    },
+    {
+      type: 'item',
+      label: t('initiative.fromTurn'),
+      icon: 'list-start',
+      checked: state.fromTurn,
+      description: t('initiative.fromTurnHint'),
+      onClick: () => actions.setFromTurn(!state.fromTurn),
+    },
+    {
+      type: 'item',
+      label: t('initiative.dockLeft'),
+      icon: 'panel-left',
+      checked: state.dock === 'left',
+      description: t('initiative.dockLeftHint'),
+      onClick: () => actions.setDock(state.dock === 'left' ? 'right' : 'left'),
     },
     MENU_SEPARATOR,
     {

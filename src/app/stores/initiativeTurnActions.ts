@@ -1,5 +1,5 @@
 /**
- * The actions that run a fight: who has the turn, rounds, sitting a round out, delaying.
+ * The actions that run a fight: who has the turn, rounds, sitting a round out, delaying, cards.
  * Spread into the initiative actions (`createInitiativeActions`).
  */
 
@@ -7,9 +7,10 @@ import type { TokenEntity } from '../types';
 import type { InitiativeState } from '../types/initiativeTypes';
 import type { InitiativeRules } from '../types/initiativeRulesTypes';
 import { clearSittingOut } from '../initiative/rounds';
-import { sideOf } from '../initiative/sides';
 import { nextSideTurn, previousSideTurn, type SideTurnInputs } from '../initiative/turns';
 import { actNow, delayTurn, endDelays, firstTurn, nextOrderTurn, previousOrderTurn } from '../initiative/turnOrder';
+import { swapCards } from '../initiative/cardDeal';
+import { fightDraws, roundChangesOf, sideInputs, startFight, type FightDraws } from './initiativeFightStart';
 
 /** Entry ids whose combatant is defeated (the card's skull): turns pass them by. */
 export type DefeatedCombatants = ReadonlySet<string>;
@@ -28,9 +29,11 @@ export interface InitiativeTurnActions {
   delayInitiativeTurn: (id: string, defeated?: DefeatedCombatants) => void;
   /** The delayed combatant acts now, before the combatant whose turn it is. */
   actNowInInitiative: (id: string) => void;
+  /** Two combatants of a fight by cards swap their cards; the turn stays with the card that had it. */
+  swapInitiativeCards: (id: string, withId: string) => void;
 }
 
-interface TurnStoreState {
+export interface TurnStoreState {
   initiative: InitiativeState;
   objects: { tokens: Record<string, TokenEntity> };
 }
@@ -39,39 +42,47 @@ type ImmerSet = (fn: (draft: TurnStoreState) => void) => void;
 
 const NOBODY: DefeatedCombatants = new Set();
 
-function sideInputs(draft: TurnStoreState, defeated: DefeatedCombatants): SideTurnInputs {
-  return { sideOf: (entry) => sideOf(draft.objects.tokens[entry.tokenId]), defeated };
+function step(draft: TurnStoreState, defeated: DefeatedCombatants, draws: FightDraws, forward: boolean): void {
+  const { initiative } = draft;
+  if (initiative.sides) {
+    const inputs: SideTurnInputs = sideInputs(draft, defeated, draws.sideRolls);
+    if (forward) nextSideTurn(initiative, inputs);
+    else previousSideTurn(initiative, inputs);
+    return;
+  }
+  const rounds = roundChangesOf(draft, draws.deck);
+  if (forward) nextOrderTurn(initiative, defeated, rounds);
+  else previousOrderTurn(initiative, defeated, rounds);
 }
 
-export function createInitiativeTurnActions(set: ImmerSet): InitiativeTurnActions {
+/**
+ * The turn actions. Chance (a fresh deck, the sides' rolls) is drawn with `random` before each
+ * write that may begin a round, so the store's write itself stays free of it.
+ */
+export function createInitiativeTurnActions(set: ImmerSet, get: () => TurnStoreState, random: () => number): InitiativeTurnActions {
   return {
-    nextTurn: (defeated = NOBODY) => set((draft) => {
-      if (draft.initiative.sides) nextSideTurn(draft.initiative, sideInputs(draft, defeated));
-      else nextOrderTurn(draft.initiative, defeated);
-    }),
+    nextTurn: (defeated = NOBODY) => {
+      const draws = fightDraws(get().initiative, random);
+      set((draft) => step(draft, defeated, draws, true));
+    },
 
-    previousTurn: (defeated = NOBODY) => set((draft) => {
-      if (draft.initiative.sides) previousSideTurn(draft.initiative, sideInputs(draft, defeated));
-      else previousOrderTurn(draft.initiative, defeated);
-    }),
+    previousTurn: (defeated = NOBODY) => {
+      const draws = fightDraws(get().initiative, random);
+      set((draft) => step(draft, defeated, draws, false));
+    },
 
-    startCombat: (rules, defeated = NOBODY) => set((draft) => {
-      draft.initiative.isActive = true;
-      draft.initiative.round = 1;
-      draft.initiative.entries.forEach((entry) => { entry.isActive = false; });
-      clearSittingOut(draft.initiative);
-      endDelays(draft.initiative);
-
-      // By sides the turn belongs to a side, never to one combatant
-      if (rules?.mode === 'sides') {
-        draft.initiative.sides = { first: rules.firstSide, active: rules.firstSide };
-        draft.initiative.currentIndex = -1;
-        return;
-      }
-
-      delete draft.initiative.sides;
-      firstTurn(draft.initiative, defeated);
-    }),
+    startCombat: (rules, defeated = NOBODY) => {
+      const draws = fightDraws(get().initiative, random, rules);
+      set((draft) => {
+        draft.initiative.isActive = true;
+        draft.initiative.round = 1;
+        draft.initiative.entries.forEach((entry) => { entry.isActive = false; });
+        clearSittingOut(draft.initiative);
+        endDelays(draft.initiative);
+        if (startFight(draft, rules, draws, defeated)) return;
+        firstTurn(draft.initiative, defeated);
+      });
+    },
 
     endCombat: () => set((draft) => {
       draft.initiative.isActive = false;
@@ -79,6 +90,8 @@ export function createInitiativeTurnActions(set: ImmerSet): InitiativeTurnAction
       draft.initiative.currentIndex = -1;
       draft.initiative.entries.forEach((entry) => { entry.isActive = false; });
       delete draft.initiative.sides;
+      delete draft.initiative.cards;
+      for (const entry of draft.initiative.entries) delete entry.card;
       clearSittingOut(draft.initiative);
       endDelays(draft.initiative);
     }),
@@ -96,6 +109,10 @@ export function createInitiativeTurnActions(set: ImmerSet): InitiativeTurnAction
 
     actNowInInitiative: (id) => set((draft) => {
       actNow(draft.initiative, id);
+    }),
+
+    swapInitiativeCards: (id, withId) => set((draft) => {
+      if (draft.initiative.cards) swapCards(draft.initiative, id, withId);
     }),
   };
 }

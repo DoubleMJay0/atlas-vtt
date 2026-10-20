@@ -5,6 +5,7 @@ import type { DiceDisplay } from '../dice3d/diceDisplay';
 import type { ExperimentalFeatureId } from '../experimental/experimentalFeatures';
 import { DEFAULT_DICE_LOOK, type DiceColour, type DiceFont } from '../dice3d/diceLook';
 import { readToolbarLayout, type StoredToolbarLayout } from '../toolbar/toolbarLayout';
+import type { InitiativeDock } from '../initiative/initiativeLayout';
 
 /**
  * How wheel events drive the map viewport.
@@ -44,6 +45,10 @@ export interface AtlasSettings {
   diceFont: DiceFont;
   /** Whether the GM's initiative cards show each combatant's name. Read with `showsInitiativeNames`. */
   initiativeNames: boolean;
+  /** Whether the initiative lists start at the turn during a fight. Read with `initiativeLayout`. */
+  initiativeFromTurn: boolean;
+  /** The edge of the map the initiative lists stand at. Read with `initiativeLayout`. */
+  initiativeDock: InitiativeDock;
   /** Experimental features the GM switched on. Read with `isExperimentalOn`. */
   experimental: Partial<Record<ExperimentalFeatureId, boolean>>;
   /** The GM's toolbar layout, only what differs from the default; read with `getToolbarLayout`. */
@@ -80,6 +85,8 @@ export const DEFAULT_SETTINGS: AtlasSettings = {
   diceColour: DEFAULT_DICE_LOOK.colour,
   diceFont: DEFAULT_DICE_LOOK.font,
   initiativeNames: false,
+  initiativeFromTurn: true,
+  initiativeDock: 'right',
   experimental: {},
   toolbar: {},
   localPlayerView: {
