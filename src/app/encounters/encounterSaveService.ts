@@ -8,11 +8,11 @@ import { getLocale, t } from '../i18n';
 import { showNotice } from '../ui/notice';
 import { createDialogShell } from '../ui/dialogShell';
 import { trashVaultItem } from '../utils/trashVaultItem';
+import { ENCOUNTER_THUMBNAIL_DIR, encounterThumbnailFile } from './encounterThumbnailFile';
 
 /** One token as it will be stored inside an encounter. */
 export type EncounterTokenDraft = EncounterAsset['tokens'][number];
 
-const THUMBNAIL_DIR = 'atlas-vtt/assets/encounter-thumbnails';
 
 /**
  * Asks for the encounter's name in Atlas' own dialog, which stacks above the asset
@@ -79,8 +79,8 @@ async function saveThumbnailToVault(app: ObsidianApp, tokens: EncounterTokenDraf
 
   try {
     const pngData = base64ToArrayBuffer(dataUrl.slice(dataUrl.indexOf(',') + 1));
-    try { await app.vault.createFolder(THUMBNAIL_DIR); } catch { /* exists */ }
-    const path = `${THUMBNAIL_DIR}/encounter-${Date.now()}.png`;
+    try { await app.vault.createFolder(ENCOUNTER_THUMBNAIL_DIR); } catch { /* exists */ }
+    const path = `${ENCOUNTER_THUMBNAIL_DIR}/encounter-${Date.now()}.png`;
     await app.vault.createBinary(path, pngData);
     const file = app.vault.getAbstractFileByPath(path);
     if (file instanceof TFile) return app.vault.getResourcePath(file);
@@ -88,18 +88,6 @@ async function saveThumbnailToVault(app: ObsidianApp, tokens: EncounterTokenDraf
     console.error('[encounterSaveService] Error saving thumbnail:', error);
   }
   return '';
-}
-
-/**
- * The thumbnail file an encounter's `thumbnailUrl` (the resource URL it was saved with) names, or
- * null for one outside the encounter thumbnails' folder, which is never Atlas' to remove.
- */
-function thumbnailFileOf(app: ObsidianApp, url: string | undefined): TFile | null {
-  if (!url) return null;
-  const withoutQuery = url.split('?')[0];
-  const folder = app.vault.getFolderByPath(THUMBNAIL_DIR);
-  const file = folder?.children.find((child) => child instanceof TFile && app.vault.getResourcePath(child).split('?')[0] === withoutQuery);
-  return file instanceof TFile ? file : null;
 }
 
 /** The name an encounter gets when none is typed: today's date. */
@@ -172,7 +160,7 @@ export async function updateEncounter(
       data: { ...current.data, tokens, description: t('encounter.description', { count: tokens.length }) },
     });
     // The new thumbnail replaces the old one, which nothing else shows.
-    const replaced = fresh ? thumbnailFileOf(app, current.thumbnailUrl) : null;
+    const replaced = fresh ? encounterThumbnailFile(app, current.thumbnailUrl) : null;
     if (replaced) await trashVaultItem(app, replaced);
     showNotice(t('encounter.saved', { name }));
     return true;
