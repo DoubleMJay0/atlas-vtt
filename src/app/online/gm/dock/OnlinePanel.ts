@@ -6,7 +6,7 @@ import { gateEntries, gateRowsOf, renderCodeRow, renderPausedRow, type GateRowAc
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
 import { closingOf, groupsOf, seatsNoteOf, selectionBarOf, statusOf, type OnlinePlayer, type OnlineSnapshot, type PlayerGroup, type SceneFacts, type SelectionBar, type Tone } from './panelModel.ts';
 import { renderPlayerList, type ListActions } from './playerList.ts';
-import { addPlayerRow, confirmPrompt, forgetGonePlayerPrompt, linkEntries, namePrompt, openPrompt, renderPlayerPrompt, renderPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
+import { addPlayerRow, confirmPrompt, forgetGonePlayerPrompt, linkEntries, namePrompt, openPrompt, renderPlayerPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
 import { renderSelectionBar, type SelectionActions } from './selectionBar.ts';
 
 /** The panel's width; it never grows wider than the row it hangs from. */
@@ -97,8 +97,9 @@ function listActions(layer: HTMLElement, actions: PanelActions, redraw: () => vo
  * The online panel: the working surface while players are at the table. A header with the title, the
  * status as a dot, "…" (Send feedback, the gates' New code and two switches), Stop and
  * Close; the line of a table that closes for want of access; the line of a pause; the line of a shown image; Copy invite link (with
- * its menu) and the join code; the players with their tokens and Add player; the bar for the selected tokens or to show this map; the
- * feedback form and the question or field the GM is answering (Stop, a new link, renaming, removing, a new player's code) while open. Redrawn whole on every change, keeping focus and the list's scroll position.
+ * its menu) and the join code; the players with their tokens and Add player, or in its place the question or field the GM is answering
+ * (Stop, a new link, a new player's name and code; renaming and removing stand in the player's row); the bar for the selected tokens
+ * or to show this map; the feedback form while open. Redrawn whole on every change, keeping focus and the list's scroll position.
  */
 export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelActions): void {
   const kept = keep(layer);
@@ -123,6 +124,5 @@ export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelA
   addPlayerRow(layer, actions, redraw);
   if (view.bar !== null) renderSelectionBar(layer, view.bar, view.players, actions, !hadBar);
   if (view.feedback.open) renderFeedback(layer, view.feedback, actions);
-  renderPrompt(layer, redraw);
   restore(layer, kept);
 }

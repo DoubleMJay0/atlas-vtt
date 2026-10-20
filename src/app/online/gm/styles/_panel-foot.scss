@@ -1,5 +1,5 @@
 // The panel's foot: the bar for the tokens selected on the map (or Show this map to players), and
-// the questions (Stop's confirmation; a player's stand in their row).
+// the questions, which stand in the Add player row (a player's in their row).
 @use '../../../../../styles/tokens' as *;
 @use '../../../../../styles/mixins' as *;
 @use 'online' as *;
@@ -43,13 +43,14 @@
     @include atlas-panel-inset-radius($spacing-s, bottom-left, bottom-right);
   }
 
-  // Stop's confirmation: the question on the text edge, Cancel and Stop at the row's end.
+  // Stop's confirmation: the question on the text edge, Cancel and Stop at the row's end; its answer
+  // takes the bottom corner only where nothing follows the row.
   .atlas-online-confirm {
     display: flex;
     align-items: center;
     gap: $spacing-xs;
 
-    > .atlas-online-corner-button:last-child {
+    &:last-child > .atlas-online-corner-button:last-child {
       @include atlas-panel-inset-radius($spacing-s, bottom-right);
     }
   }
@@ -63,8 +64,8 @@
     overflow-wrap: anywhere;
   }
 
-  // Add player under the list, and the field or the code that follows it: one row each, the controls
-  // $spacing-xs apart as in the confirmation.
+  // Add player under the list, and the field or the code that takes its place: one row each, the
+  // controls $spacing-xs apart as in the confirmation.
   .atlas-online-add-player {
     display: flex;
     flex: none;
@@ -83,7 +84,7 @@
       flex: none;
     }
 
-    > .atlas-online-corner-button:last-child {
+    &:last-child > .atlas-online-corner-button:last-child {
       @include atlas-panel-inset-radius($spacing-s, bottom-right);
     }
   }

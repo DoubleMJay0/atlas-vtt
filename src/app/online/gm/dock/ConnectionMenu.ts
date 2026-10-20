@@ -6,7 +6,7 @@ import { inviteRow, surfaceHeader, textButton } from './controls.ts';
 import { gateEntries, renderCodeRow, renderPausedRow, type GateRowActions } from './gateRows.ts';
 import { renderImageRow, type ImageRowActions } from './imageRow.ts';
 import type { MenuModel } from './panelModel.ts';
-import { addPlayerRow, linkEntries, renderPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
+import { addPlayerRow, linkEntries, type AddPlayerActions, type LinkActions } from './prompts.ts';
 
 /** What the menu's buttons do. */
 export interface MenuActions extends AccountActions, GateRowActions, ImageRowActions, AddPlayerActions, LinkActions {
@@ -61,6 +61,5 @@ export function renderMenu(layer: HTMLElement, model: MenuModel, actions: MenuAc
     share.dataset.focusKey = 'share';
     share.addClass('atlas-online-corner-button');
   }
-  renderPrompt(layer, redraw);
   restore();
 }

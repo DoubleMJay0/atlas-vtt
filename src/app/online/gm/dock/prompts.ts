@@ -6,8 +6,9 @@ import type { AddedPlayer } from './panelModel.ts';
 
 /**
  * A question or a field the GM answers before anything happens: in place of the player's row where it
- * is about one (`playerId`), else at the foot of the panel or the menu. Kept apart from the DOM, which
- * every redraw replaces, so a change at the table never takes it away; only the player leaving does.
+ * is about one (`playerId`), else in place of the Add player row, so the surface keeps its height. Kept
+ * apart from the DOM, which every redraw replaces, so a change at the table never takes it away; only
+ * the player leaving does.
  */
 export type Prompt = ConfirmPrompt | NamePrompt | CodePrompt;
 
@@ -73,8 +74,9 @@ export function namePrompt(key: string, label: string, confirm: string, draft: s
 
 export const codePrompt = (player: AddedPlayer): Prompt => ({ kind: 'code', player });
 
-/** "Add player": a name, then the new player's code, shown once. */
+/** "Add player": a name, then the new player's code, shown once. A question not about a player (Stop, a new link) stands here instead. */
 export function addPlayerRow(layer: HTMLElement, actions: AddPlayerActions, redraw: () => void): void {
+  if (renderPrompt(layer, redraw)) return;
   const ask = (): void => openPrompt(layer, namePrompt('add-player', 'Add a player', 'Add', '', (name) => {
     const added = actions.addPlayer(name);
     if (added !== null) openPrompt(layer, codePrompt(added), redraw);
@@ -97,14 +99,15 @@ const closer = (layer: HTMLElement, redraw: () => void) => (): void => {
   redraw();
 };
 
-/** The prompt `layer` shows at its foot, if any: one about a player stands in their row instead. */
-export function renderPrompt(layer: HTMLElement, redraw: () => void): void {
+/** Draws the prompt `layer` shows that is about no player, if any; one about a player stands in their row instead. */
+function renderPrompt(layer: HTMLElement, redraw: () => void): boolean {
   const prompt = prompts.get(layer);
-  if (prompt === undefined || playerOf(prompt) !== null) return;
+  if (prompt === undefined || playerOf(prompt) !== null) return false;
   const close = closer(layer, redraw);
   if (prompt.kind === 'confirm') confirmRow(layer, prompt, close, false);
   else if (prompt.kind === 'name') nameRow(layer, prompt, close, false);
   else codeRows(layer, prompt.player, close);
+  return true;
 }
 
 /** Draws the prompt about `playerId` into `parent`, in place of their row; false where `layer` has none about them. */
