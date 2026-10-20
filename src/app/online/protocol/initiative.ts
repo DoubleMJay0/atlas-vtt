@@ -1,7 +1,7 @@
 import { parseAsset, type AssetRef } from './asset.ts';
 import { isRecord } from './shape.ts';
 import { COLOUR_PATTERN, MAX_NAME } from './tokens.ts';
-import { MAX_TOKEN_CONDITIONS, parseCondition, type SharedCondition } from './tokenUI.ts';
+import { MAX_INSTANCE_NUMBER, MAX_TOKEN_CONDITIONS, parseCondition, type SharedCondition } from './tokenUI.ts';
 
 /** Combatants one `initiative` message may list. */
 export const MAX_COMBATANTS = 200;
@@ -42,6 +42,11 @@ export interface SharedCombatant {
   readonly sideId?: string;
   /** Hit points, where the collection shows them to players. */
   readonly hp: { readonly current: number; readonly max: number } | null;
+  /**
+   * The number the combatant's look-alike badge shows the players, as their own picture numbers
+   * look-alikes they see (and those beside the map their list shows); absent without a badge. Absent from older GMs.
+   */
+  readonly instance?: number;
 }
 
 /** A side of a fight by sides as the players' list heads its group. */
@@ -80,10 +85,13 @@ export interface SharedInitiative {
    * sides: while its side does); the GM refuses other moves. Absent from older GMs.
    */
   readonly movesOnTurn?: true;
+  /** The GM docked the lists at the left edge of the map; absent, they stand at the right. Absent from older GMs. */
+  readonly dock?: 'left';
 }
 
 const isNumber = (value: unknown, limit: number): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit;
 const isSide = (value: unknown): value is SharedSide => INITIATIVE_SIDES.includes(value as SharedSide);
+const isInstance = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_INSTANCE_NUMBER;
 const isSideId = (value: unknown): value is string => typeof value === 'string' && value !== '' && value.length <= MAX_SIDE_ID;
 
 /** The sides of a message: undefined (left out) where they are no list of sides, so a page never fails on them. */
@@ -117,6 +125,7 @@ function parseCombatant(value: unknown): SharedCombatant | null {
     ...(value.nextRound === true ? { nextRound: true as const } : {}),
     ...conditionsOf(value.conditions),
     ...(isSideId(value.sideId) ? { sideId: value.sideId } : {}),
+    ...(isInstance(value.instance) ? { instance: value.instance } : {}),
   };
 }
 
@@ -152,5 +161,6 @@ export function parseInitiative(value: unknown): SharedInitiative | null | undef
     ...(value.byCards === true ? { byCards: true as const } : {}),
     ...(value.bannerOff === true ? { bannerOff: true as const } : {}),
     ...(value.movesOnTurn === true ? { movesOnTurn: true as const } : {}),
+    ...(value.dock === 'left' ? { dock: 'left' as const } : {}),
   };
 }

@@ -1,4 +1,4 @@
-import { MAX_COMBATANTS, MAX_NAME, type AssetRef, type SharedCombatant, type SharedInitiative, type SharedSide, type SharedSideTurn } from '../protocol/index.ts';
+import { MAX_COMBATANTS, MAX_INSTANCE_NUMBER, MAX_NAME, type AssetRef, type SharedCombatant, type SharedInitiative, type SharedSide, type SharedSideTurn } from '../protocol/index.ts';
 import { isBuiltInSide } from '../../gameSystems/initiativeSideRules';
 import { BUILT_IN_SYSTEM_PRESETS } from '../../gameSystems/builtInPresets';
 import { collectionInitiativeRules, DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
@@ -25,6 +25,10 @@ export interface InitiativeInputs {
   readonly bannerOff?: boolean;
   /** Players move tokens that fight only on their turn; off unless said. */
   readonly movesOnTurn?: boolean;
+  /** The edge the GM docked the lists at; the right one unless said. */
+  readonly dock?: 'left' | 'right';
+  /** The number a combatant's look-alike badge shows the players, or null without one; none are sent without it. */
+  badge?(tokenId: string): number | null;
   /** Where the map's rules are looked up; without it the default rules and no hit points. */
   readonly rules: RulesLookup | null;
   /** A portrait's artwork as players are sent it, by vault path; null while unknown. */
@@ -33,6 +37,11 @@ export interface InitiativeInputs {
 
 /** A number players are sent: finite and within the protocol's bound. */
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1e9;
+
+/** A look-alike number as players are sent it: a whole number within the protocol's bound, else none. */
+function instanceOf(badge: number | null): { instance?: number } {
+  return badge !== null && Number.isInteger(badge) && badge >= 1 && badge <= MAX_INSTANCE_NUMBER ? { instance: badge } : {};
+}
 
 /** The side older pages group a combatant under: the players', or the opponents' for every other side. */
 const legacySide = (side: string): SharedSide => (side === 'players' ? 'players' : 'opponents');
@@ -111,6 +120,7 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
       hp: token.hp !== null && finite(token.hp.current) && finite(token.hp.max) ? { current: token.hp.current, max: token.hp.max } : null,
       ...(nextRound.has(combatant) ? { nextRound: true } : {}),
       ...(token.conditions?.length ? { conditions: sharedConditions(token.conditions) } : {}),
+      ...instanceOf(inputs.badge?.(entry.tokenId) ?? null),
     };
   });
   return {
@@ -125,5 +135,6 @@ export function sharedInitiative(inputs: InitiativeInputs): SharedInitiative | n
     ...(fromTurn ? { fromTurn: true } : {}),
     ...(inputs.bannerOff === true ? { bannerOff: true } : {}),
     ...(inputs.movesOnTurn === true ? { movesOnTurn: true } : {}),
+    ...(inputs.dock === 'left' ? { dock: 'left' as const } : {}),
   };
 }

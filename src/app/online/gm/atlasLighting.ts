@@ -33,6 +33,8 @@ export interface AtlasPlayerSettings {
   readonly showCursors: boolean;
   /** Whether the GM's initiative lists start at the turn during a fight (`initiativeLayout`); false when it cannot be read. */
   readonly initiativeFromTurn?: boolean;
+  /** The edge the GM docked the initiative lists at (`initiativeLayout`); the right one when it cannot be read. */
+  readonly initiativeDock?: 'left' | 'right';
   /** Whether a turn change shows the turn banner (`initiativeTurnOptions`); on when it cannot be read. */
   readonly turnBanner?: boolean;
   /** Whether players move tokens that fight only on their turn (`initiativeTurnOptions`); off when it cannot be read. */
@@ -79,6 +81,7 @@ export function atlasPlayerSettings(app: App): AtlasPlayerSettings {
     showWidgets: field(view, 'showWidgets') === true,
     showCursors: field(view, 'showCursors') === true,
     initiativeFromTurn: field(layout, 'fromTurn') === true,
+    initiativeDock: field(layout, 'dock') === 'left' ? 'left' : 'right',
     turnBanner: field(turn, 'banner') !== false,
     movesOnTurn: field(turn, 'movesOnTurn') === true,
   };
