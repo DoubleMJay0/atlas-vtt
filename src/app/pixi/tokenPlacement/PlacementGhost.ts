@@ -50,6 +50,8 @@ type GhostState = 'held' | 'landing' | 'vanishing';
  */
 export class PlacementGhost {
   readonly root = new Container();
+  /** The token and its shadow, which fade together; the facing mark beside them stays solid. */
+  private readonly body = new Container();
   private readonly shadow: Sprite;
   private readonly x: Spring;
   private readonly y: Spring;
@@ -72,7 +74,8 @@ export class PlacementGhost {
     this.shadow.eventMode = 'none';
     this.root.eventMode = 'none';
     this.mark = facingMark(preview.diameter / 2, accent);
-    this.root.addChild(this.shadow, preview.group, this.mark);
+    this.body.addChild(this.shadow, preview.group);
+    this.root.addChild(this.body, this.mark);
     preview.group.position.set(0, 0);
     this.x = new Spring(start.x, FOLLOW);
     this.y = new Spring(start.y, FOLLOW);
@@ -163,7 +166,7 @@ export class PlacementGhost {
   }
 
   destroy(): void {
-    this.root.removeChild(this.preview.group);
+    this.body.removeChild(this.preview.group);
     this.preview.release();
     destroyTree(this.root);
   }
@@ -190,7 +193,7 @@ export class PlacementGhost {
     const scale = Math.max(0.01, this.scale.value);
     this.root.position.set(this.x.value, this.y.value);
     this.preview.group.scale.set(scale);
-    this.root.alpha = Math.min(1, Math.max(0, this.alpha.value));
+    this.body.alpha = Math.min(1, Math.max(0, this.alpha.value));
     this.preview.rotate(((this.facing.value % 360) + 360) % 360);
     this.mark.rotation = (this.facing.value * Math.PI) / 180;
     this.mark.scale.set(scale);

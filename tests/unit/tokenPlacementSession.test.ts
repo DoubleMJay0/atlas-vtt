@@ -70,13 +70,27 @@ describe('cycling the queue', () => {
     expect(cycled([1, 2, 3], 5)).toEqual([3, 1, 2]);
   });
 
-  it('steps once per mouse wheel notch and once per stretch of a trackpad glide, sideways too', () => {
+  it('steps once per notch of a mouse wheel, however few pixels it scrolls, sideways too', () => {
     const steps = new WheelSteps();
-    expect(steps.take({ deltaX: 0, deltaY: 100, deltaMode: 0 })).toBe(1);
-    expect(steps.take({ deltaX: -100, deltaY: 0, deltaMode: 0 })).toBe(-1);
-    expect(steps.take({ deltaX: 0, deltaY: 3, deltaMode: 1 })).toBe(1);
-    expect([10, 10, 10, 10, 10, 10, 10, 10].map((deltaY) => steps.take({ deltaX: 0, deltaY, deltaMode: 0 }))).toEqual([0, 0, 0, 1, 0, 0, 0, 1]);
-    expect(steps.take({ deltaX: 0, deltaY: -10, deltaMode: 0 })).toBe(0);
+    const notch = (deltaY: number, wheelDeltaY: number, at: number): number => steps.take({ deltaX: 0, deltaY, deltaMode: 0, wheelDeltaY, wheelDeltaX: 0 } as WheelEvent, at);
+    // Chromium on macOS: a notch scrolls 4 pixels, its wheelDelta says 120; notches turned quickly come close together
+    expect([0, 30, 60, 90].map((at) => notch(4, -120, at))).toEqual([1, 1, 1, 1]);
+    expect(notch(-4, 120, 120)).toBe(-1);
+    expect(steps.take({ deltaX: 100, deltaY: 0, deltaMode: 0 }, 1000)).toBe(1);
+    expect(steps.take({ deltaX: 0, deltaY: 3, deltaMode: 1 }, 1010)).toBe(1);
+  });
+
+  it('steps once when a smoothed or trackpad scroll begins, and again as it goes on', () => {
+    const steps = new WheelSteps();
+    const glide = (deltaY: number, at: number): number => steps.take({ deltaX: 0, deltaY, deltaMode: 0, wheelDeltaY: -3 * deltaY, wheelDeltaX: 0 } as WheelEvent, at);
+    // One notch of a wheel its driver smooths: many small events in a row
+    expect([0, 16, 32, 48, 64].map((at) => glide(6, at))).toEqual([1, 0, 0, 0, 0]);
+    // The next notch, after a pause
+    expect(glide(6, 300)).toBe(1);
+    // A long trackpad glide steps on every 100 pixels, a 40 pixel event no notch for all its wheelDelta of 120
+    expect([316, 332, 348, 364, 380].map((at) => glide(40, at))).toEqual([0, 0, 1, 0, 1]);
+    // Turning back starts a new scroll
+    expect(glide(-6, 396)).toBe(-1);
   });
 });
 
