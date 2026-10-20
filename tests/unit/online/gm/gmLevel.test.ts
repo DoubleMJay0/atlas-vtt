@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLOSE, GM_LEVEL } from '../../../../src/app/online/protocol/index.ts';
-import { isOutdated, knownMinLevel, OUTDATED_TEXT } from '../../../../src/app/online/gm/gmLevel.ts';
+import { isOutdated, knownMinLevel, OUTDATED_TEXT, rememberMinLevel } from '../../../../src/app/online/gm/gmLevel.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { tableEndOf } from '../../../../src/app/online/gm/tableEnd.ts';
@@ -92,10 +92,23 @@ describe('a GM whose Atlas is older than the player page needs', () => {
   });
 
   it('reads an updated Atlas as current at once', () => {
-    localStorage.set('atlas-vtt:online-min-level', GM_LEVEL);
+    rememberMinLevel(app as never, GM_LEVEL);
     expect(isOutdated(app as never)).toBe(false);
     localStorage.set('atlas-vtt:online-min-level', 'garbage');
     expect(isOutdated(app as never)).toBe(false);
     expect(tableEndOf(CLOSE.version)).toBe('outdated');
+  });
+
+  it('lets the relay answer again after an hour, so a relay rolled back lets the GM start', () => {
+    rememberMinLevel(app as never, GM_LEVEL + 1);
+    vi.advanceTimersByTime(59 * 60 * 1000);
+    expect(isOutdated(app as never)).toBe(true);
+    vi.advanceTimersByTime(2 * 60 * 1000);
+    expect(isOutdated(app as never)).toBe(false);
+  });
+
+  it('counts only what this build\'s relay asked for', () => {
+    localStorage.set('atlas-vtt:online-min-level', { origin: 'https://play-staging.example', level: GM_LEVEL + 1, at: Date.now() });
+    expect(isOutdated(app as never)).toBe(false);
   });
 });
