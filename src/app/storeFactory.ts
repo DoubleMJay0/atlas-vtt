@@ -202,6 +202,7 @@ export interface ViewAtlasState extends ViewState {
   insertMapObjects: MapObjectsSlice['insertMapObjects'];
   duplicateMapObjects: MapObjectsSlice['duplicateMapObjects'];
   removeMapObjects: MapObjectsSlice['removeMapObjects'];
+  placeOffMapToken: MapObjectsSlice['placeOffMapToken'];
 
   // Map state management
   deleteMapObject: (type: 'token' | 'fog' | 'pin' | 'text' | 'drawing' | 'wall' | 'light' | 'audio', id: string) => void;

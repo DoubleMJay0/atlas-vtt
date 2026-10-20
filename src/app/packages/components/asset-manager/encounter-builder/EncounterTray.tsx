@@ -17,6 +17,8 @@ interface EncounterTrayProps {
   onCountChange: (token: TokenAsset, count: number) => void;
   onClear: () => void;
   onSave: () => void;
+  /** Brings the picks into the open scene: into the tracker beside the map, or onto the map and into the tracker. */
+  onBring: (placement: 'beside' | 'fight') => void;
 }
 
 function Metric({ label, value, hint }: { label: string; value: string; hint: string }): React.JSX.Element {
@@ -31,7 +33,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint: st
 }
 
 /** The encounter being built, floating over the feed once it holds a creature: its creatures with their counts, what can be said of it in any system, and Save. */
-export function EncounterTray({ picks, metrics, saving, onCountChange, onClear, onSave }: EncounterTrayProps): React.JSX.Element {
+export function EncounterTray({ picks, metrics, saving, onCountChange, onClear, onSave, onBring }: EncounterTrayProps): React.JSX.Element {
   const still = useReducedMotion();
   const away = still ? { opacity: 0 } : { opacity: 0, y: 12 };
   return (
@@ -61,6 +63,12 @@ export function EncounterTray({ picks, metrics, saving, onCountChange, onClear, 
         ))}
         <div className="atlas-encounter-tray__actions">
           <Button variant="ghost" disabled={saving} onClick={onClear}>{t('encounter.builder.clear')}</Button>
+          <LabelTooltip label={t('encounter.builder.addBesideHint')}>
+            <Button variant="ghost" disabled={saving} onClick={() => onBring('beside')}>{t('encounter.builder.addBeside')}</Button>
+          </LabelTooltip>
+          <LabelTooltip label={t('encounter.builder.startFightHint')}>
+            <Button variant="ghost" disabled={saving} onClick={() => onBring('fight')}>{t('encounter.builder.startFight')}</Button>
+          </LabelTooltip>
           <Button variant="default" disabled={saving} onClick={onSave}>{t('encounter.builder.save')}</Button>
         </div>
       </div>

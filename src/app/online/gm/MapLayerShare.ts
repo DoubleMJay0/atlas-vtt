@@ -12,6 +12,7 @@ import { sharedAnnotations, sharedDoors, sharedGrid } from './mapLayerInputs.ts'
 import { ReadablePins, type ListedPin } from './pins/ReadablePins.ts';
 import type { VaultImage } from './TokenShare.ts';
 import { WidgetShare } from './WidgetShare.ts';
+import { mapTokens } from '../../tokens/offMap';
 
 export interface MapLayerSharePorts extends PacerClock {
   send(body: GmMessage, to?: string): void;
@@ -142,7 +143,7 @@ export class MapLayerShare {
     if (!scene.lit) return;
     const seen = source.doorsSeen(state.objects.walls, fog);
     if (seen !== null) this.publish({ t: 'doors', scene: scene.id, doors: sharedDoors(state.objects.walls, seen) });
-    const sensed = source.sensed(state.objects.tokens);
+    const sensed = source.sensed(mapTokens(state.objects));
     if (sensed !== null) this.publish({ t: 'sensed', scene: scene.id, tokens: sensed });
   }
 

@@ -1,6 +1,7 @@
 import type { StoreApi } from 'zustand';
 import type { ViewAtlasState } from '../../storeFactory';
 import { collectMapObjects } from '../../clipboard/mapObjectContent';
+import { mapTokens } from '../../tokens/offMap';
 
 type Positions = Record<string, { x: number; y: number }>;
 
@@ -21,7 +22,7 @@ export function copyDragSelection(
   initialPositions: Positions,
 ): { ids: string[]; initialPositions: Positions } | null {
   const state = store.getState();
-  const tokenIds = dragIds.filter((id) => state.objects.tokens[id] && initialPositions[id]);
+  const tokenIds = dragIds.filter((id) => mapTokens(state.objects)[id] && initialPositions[id]);
   if (tokenIds.length === 0) return null;
   const drawingIds = state.selectedIds.filter((id) => state.objects.drawings[id]);
 

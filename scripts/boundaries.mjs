@@ -78,6 +78,7 @@ export const BOUNDARIES = {
       "src/app/stores/history/**/*.ts",
       "src/app/stores/exploredEditHistory.ts",
       "src/app/stores/tokenStacking.ts",
+      "src/app/tokens/offMap.ts",
       "src/app/pixi/lighting/LightingRenderer.ts",
       "src/app/pixi/lighting/ExploredMemory.ts",
       "src/app/pixi/lighting/ExploredSaveScheduler.ts",

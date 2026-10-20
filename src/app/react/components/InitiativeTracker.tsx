@@ -23,6 +23,7 @@ import { useEditInitiativePopup } from './useEditInitiativePopup';
 import { InitiativeCard } from './InitiativeCard';
 import { useInitiativeCardMenu } from './useInitiativeCardMenu';
 import { initiativeTrackerOptions } from './initiativeTrackerOptions';
+import { clearCombatants } from '../../initiative/offMapCombatants';
 import { InitiativeTrackerList } from './InitiativeTrackerList';
 import { EndCombatIcon } from './EndCombatIcon';
 import { useStatblockHoverPreview } from './StatblockHoverPreview';
@@ -62,7 +63,7 @@ export const InitiativeTracker: React.FC = () => {
   const startCombat = useAtlasStore((s) => s.startCombat);
   const endCombat = useAtlasStore((s) => s.endCombat);
   const updateInitiativeEntry = useAtlasStore((s) => s.updateInitiativeEntry);
-  const resetInitiative = useAtlasStore((s) => s.resetInitiative);
+  const openAssetManager = useAtlasStore((s) => s.openAssetManager);
   const setInitiativeConfig = useAtlasStore((s) => s.setInitiativeConfig);
 
   // Turns pass defeated combatants by, as their cards show them now
@@ -151,7 +152,8 @@ export const InitiativeTracker: React.FC = () => {
       {
         setAutoSort: (autoSort) => setInitiativeConfig({ autoSort }),
         setShowNames: (on) => settings?.setInitiativeNames(on),
-        clear: resetInitiative,
+        clear: () => clearCombatants(store),
+        addCombatant: () => openAssetManager('tokens'),
       },
     );
     openContextMenuGlobal(entries, { x: rect.left, y: rect.bottom }, { returnFocus: button, doc: button.ownerDocument });

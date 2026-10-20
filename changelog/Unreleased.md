@@ -11,6 +11,9 @@
 - Initiative: a combatant can delay its turn. It waits below the order until Act Now puts it right before the combatant whose turn it is.
 - Initiative: Sit Out This Round now works in turn order too.
 - Initiative: the tracker's ⋯ menu has an Auto sort switch.
+- Initiative: add combatants without placing them on the map, for tables that play with miniatures or in the theatre of the mind. Right-click a token in the asset manager and choose Add to Initiative with how many, or Add to initiative in a statblock note's file menu. Each copy gets its own hit points, conditions and number, and Hide from Players decides whether players see it in their list. Place on Map in its card's menu puts it on the map, and removing it from the tracker deletes it (#450, #305).
+- Encounters: Start Fight places an encounter and adds all its creatures to initiative, and Add to Initiative Without Placing adds them beside the map. Both are in the encounter's menu in the asset manager, under ⋯ on an encounter embedded in a note, and in the encounter builder's tray (#450).
+- Roll hit points: switch it on in a collection's initiative settings, and creatures placed from the library or an encounter, or added to initiative, roll their statblock's hit dice instead of taking the average. Player characters keep theirs (#286).
 
 ## Improved
 - Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.

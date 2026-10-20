@@ -2,7 +2,7 @@ import { useMapResources } from '../../resources/useMapResources';
 import { combatantDefeated } from '../../initiative/defeated';
 import { visibleResources } from '../../resources/visibleResources';
 import React, { useCallback, useRef, useState } from 'react';
-import { EyeOff, GripVertical, Skull, User, Bot } from 'lucide-react';
+import { EyeOff, GripVertical, MapPinOff, Skull, User, Bot } from 'lucide-react';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
 import { useAtlasUI } from '../root/AtlasUIContext';
 import { useAtlasStore, useViewStoreHook } from '../ViewStoreContext';
@@ -10,6 +10,7 @@ import { focusCombatant } from '../../initiative/focusCombatant';
 import { cardInstanceNumber } from '../../initiative/cardInstanceNumber';
 import { hasInitiative } from '../../initiative/awaitingInitiative';
 import { tokenDisplayName } from '../../pixi/token-renderer/tokenDisplayName';
+import { isOffMap } from '../../tokens/offMap';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
 import { TokenPortrait } from '../../packages/components/shared/TokenPortrait';
 import { InitiativeNumber, type NumberStep } from './InitiativeNumber';
@@ -77,6 +78,8 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
   const defeated = combatantDefeated(token, definitions);
   // A hidden token's entry is left out of the players' list (`PlayerInitiativePanel`)
   const hiddenFromPlayers = token?.isHidden === true;
+  // Kept beside the map: in the tracker only, until the GM places it
+  const offMap = isOffMap(token);
   const name = (token && tokenDisplayName(token)) || entry.name;
 
   // Get image URL from vault path
@@ -208,6 +211,12 @@ export const InitiativeCard: React.FC<InitiativeCardProps> = ({
         {hiddenFromPlayers && (
           <LabelTooltip label="Hidden from players" side="left">
             <span className="atlas-initiative-card__hidden-badge"><EyeOff /></span>
+          </LabelTooltip>
+        )}
+
+        {offMap && (
+          <LabelTooltip label={t('initiative.offMap')} side="left">
+            <span className="atlas-initiative-card__off-map-badge"><MapPinOff /></span>
           </LabelTooltip>
         )}
       </div>

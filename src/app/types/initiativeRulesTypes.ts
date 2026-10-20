@@ -29,4 +29,10 @@ export interface InitiativeRules {
   modifierFallback?: InitiativeModifierSource;
   /** Sides: the side that acts first in every round. */
   firstSide: InitiativeSide;
+  /**
+   * A creature that joins a scene (placed from the library or an encounter, or added to the tracker
+   * beside the map) rolls its hit points from its statblock's hit dice instead of taking their
+   * average. Never a player character. Older versions ignore it.
+   */
+  rollHitPoints?: true;
 }

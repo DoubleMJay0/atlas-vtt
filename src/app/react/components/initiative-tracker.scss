@@ -272,7 +272,8 @@ $tracker-width-named: 168px;
 }
 
 .atlas-initiative-card__instance-badge,
-.atlas-initiative-card__hidden-badge {
+.atlas-initiative-card__hidden-badge,
+.atlas-initiative-card__off-map-badge {
   position: absolute;
   bottom: -2px;
   left: -4px;
@@ -300,6 +301,19 @@ $tracker-width-named: 168px;
   right: -4px;
   bottom: auto;
   left: auto;
+  padding: 0;
+  pointer-events: auto;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+// A combatant kept beside the map: the third corner, with its tooltip
+.atlas-initiative-card__off-map-badge {
+  top: -2px;
+  bottom: auto;
   padding: 0;
   pointer-events: auto;
 

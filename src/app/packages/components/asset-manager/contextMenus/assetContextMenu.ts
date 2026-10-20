@@ -8,13 +8,8 @@ import type {
   InputModalState,
   Tag as TagType,
 } from '../types';
-import {
-  spawnEncounterTokens,
-  spawnSelectedTokens,
-  spawnTokenAsset,
-  type SpawnContext,
-} from '../utils/tokenSpawnService';
-import { SPAWN_MULTIPLE_COUNTS } from '../utils/spawnCount';
+import type { SpawnContext } from '../utils/tokenSpawnService';
+import { spawnMenuEntries } from './spawnMenuEntries';
 import type { AssetService } from '../../../../services/AssetService';
 import { renameScene } from '../../../../services/sceneRename';
 import { TagSearchModal } from '../TagSearchModal';
@@ -85,47 +80,8 @@ export function buildAssetContextMenuEntries(
     });
   }
 
-  // ── Spawn Encounter ───────────────────────────────────────────
-  if (asset.type === 'encounters') {
-    entries.push({
-      type: 'item',
-      label: t('am.menu.spawnEncounter'),
-      icon: 'target',
-      onClick: async () => {
-        const ids = await spawnEncounterTokens(spawnCtx, asset);
-        if (ids.length > 0) deps.onClose();
-      },
-    });
-  }
-
-  // ── Spawn Token(s) on Map ─────────────────────────────────────
-  if (asset.type === 'tokens') {
-    const spawnCount = selectedAssets.filter((a) => a.type === 'tokens').length;
-    entries.push({
-      type: 'item',
-      label: spawnCount > 1 ? t('am.menu.spawnTokens', { count: spawnCount }) : t('am.menu.spawn'),
-      icon: 'map-pin',
-      onClick: async () => {
-        const ids = await spawnSelectedTokens(spawnCtx, selectedAssets);
-        if (ids.length > 0) deps.onClose();
-      },
-    });
-    if (spawnCount <= 1) {
-      entries.push({
-        type: 'submenu',
-        label: t('am.menu.spawnMultiple'),
-        icon: 'copy-plus',
-        children: SPAWN_MULTIPLE_COUNTS.map((count) => ({
-          type: 'item' as const,
-          label: t('am.menu.nTokens', { count }),
-          onClick: async (): Promise<void> => {
-            const ids = await spawnTokenAsset(spawnCtx, asset, count);
-            if (ids.length > 0) deps.onClose();
-          },
-        })),
-      });
-    }
-  }
+  // ── Spawn: on the map, or into the initiative tracker ─────────
+  entries.push(...spawnMenuEntries(asset, selectedAssets, spawnCtx, deps.onClose));
 
   // ── Save as Encounter (multi-select tokens) ───────────────────
   if (asset.type === 'tokens' && selectedAssets.length > 1) {

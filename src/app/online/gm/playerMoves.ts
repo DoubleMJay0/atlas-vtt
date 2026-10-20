@@ -3,6 +3,7 @@ import { placeTokens, type PlacedTokensState } from '../../stores/tokenStacking'
 import type { ViewState } from '../../types/viewState';
 import { checkMove, insideMap, landing, MoveRate, type MoveContext } from './moveCheck.ts';
 import { PlayerDrags } from './playerDrags.ts';
+import { mapTokens } from '../../tokens/offMap';
 
 /** What player moves read and write of an Atlas tab's store. */
 export type MoveState = PlacedTokensState & Pick<ViewState, 'objects' | 'mapLoaded' | 'isMapLoading' | 'isDragging' | 'heldTokens'>;
@@ -107,7 +108,7 @@ export class PlayerMoves {
     if (!this.drags.gmHolds(state)) return this.apply(from, verdict.tokenId, move);
     const earlier = this.waiting.get(verdict.tokenId);
     if (earlier !== undefined && earlier.from !== from) this.refuse(earlier.from, earlier.move);
-    const token = state.objects.tokens[verdict.tokenId];
+    const token = mapTokens(state.objects)[verdict.tokenId];
     this.waiting.set(verdict.tokenId, { from, move, x: token?.x ?? Number.NaN, y: token?.y ?? Number.NaN });
   }
 
@@ -128,7 +129,7 @@ export class PlayerMoves {
     for (const { from, move, x, y } of waiting) {
       const now = this.store.getState();
       const verdict = now.mapLoaded && !now.isMapLoading ? checkMove(from, move, this.context(now)) : null;
-      const token = verdict?.ok === true ? now.objects.tokens[verdict.tokenId] : undefined;
+      const token = verdict?.ok === true ? mapTokens(now.objects)[verdict.tokenId] : undefined;
       if (verdict?.ok !== true || token === undefined || token.x !== x || token.y !== y) this.refuse(from, move);
       else this.apply(from, verdict.tokenId, move);
     }
@@ -141,7 +142,7 @@ export class PlayerMoves {
    */
   private apply(from: string, tokenId: string, move: PlayerMove): void {
     const state = this.store.getState();
-    const token = state.objects.tokens[tokenId];
+    const token = mapTokens(state.objects)[tokenId];
     const at = token === undefined ? move : landing(this.context(state), token, move);
     const stopped = at.x !== move.x || at.y !== move.y;
     if (!stopped || at.x !== token?.x || at.y !== token.y) this.store.setState((draft) => placeTokens(draft, [{ id: tokenId, x: at.x, y: at.y }]));
@@ -153,12 +154,12 @@ export class PlayerMoves {
     const state = this.store.getState();
     const context = this.context(state);
     const tokenId = context.scene === move.scene ? context.listedToken(move.id) : undefined;
-    const token = tokenId === undefined ? undefined : state.objects.tokens[tokenId];
+    const token = tokenId === undefined ? undefined : mapTokens(state.objects)[tokenId];
     const seen = token !== undefined && token.isHidden !== true && insideMap(token.x, token.y, null);
     this.ports.send({ t: 'move-refused', scene: move.scene, id: move.id, x: seen ? token.x : null, y: seen ? token.y : null }, from);
   }
 
   private context(state: MoveState): MoveContext {
-    return { ...this.ports.context(), tokens: state.objects.tokens };
+    return { ...this.ports.context(), tokens: mapTokens(state.objects) };
   }
 }

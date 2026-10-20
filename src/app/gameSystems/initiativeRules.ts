@@ -18,10 +18,10 @@ export const INITIATIVE_SIDES: readonly InitiativeSide[] = ['players', 'opponent
 /** Stored initiative rules, or undefined when they are none. */
 export function parseInitiativeRules(raw: unknown): InitiativeRules | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
-  const { mode, roll, firstSide, modifier, modifierFallback } = raw as Record<string, unknown>;
+  const { mode, roll, firstSide, modifier, modifierFallback, rollHitPoints } = raw as Record<string, unknown>;
   if (!INITIATIVE_MODES.includes(mode as InitiativeMode) || !INITIATIVE_SIDES.includes(firstSide as InitiativeSide)) return undefined;
   if (typeof roll !== 'string' || !isValidDefaultRoll(roll)) return undefined;
-  return { mode: mode as InitiativeMode, roll: roll.trim(), firstSide: firstSide as InitiativeSide, ...modifierSources({ modifier, modifierFallback }) };
+  return { mode: mode as InitiativeMode, roll: roll.trim(), firstSide: firstSide as InitiativeSide, ...modifierSources({ modifier, modifierFallback }), ...hitPointRolls(rollHitPoints) };
 }
 
 /**
@@ -35,7 +35,12 @@ export function isValidInitiativeRules(rules: InitiativeRules): boolean {
 /** The rules as they are stored: the roll trimmed, and a d20 where it was left half typed behind another mode. */
 export function savedInitiativeRules(rules: InitiativeRules): InitiativeRules {
   const roll = isValidDefaultRoll(rules.roll) ? rules.roll.trim() : DEFAULT_INITIATIVE_RULES.roll;
-  return { mode: rules.mode, roll, firstSide: rules.firstSide, ...modifierSources(rules) };
+  return { mode: rules.mode, roll, firstSide: rules.firstSide, ...modifierSources(rules), ...hitPointRolls(rules.rollHitPoints) };
+}
+
+/** The hit point switch as it is stored: present only where it is on. */
+function hitPointRolls(raw: unknown): Pick<InitiativeRules, 'rollHitPoints'> {
+  return raw === true ? { rollHitPoints: true } : {};
 }
 
 /**
@@ -58,5 +63,6 @@ export function sameInitiativeRules(a: InitiativeRules | undefined, b: Initiativ
   return left.mode === right.mode
     && left.firstSide === right.firstSide
     && sameModifierSources(left, right)
+    && Boolean(left.rollHitPoints) === Boolean(right.rollHitPoints)
     && left.roll.trim().toLowerCase() === right.roll.trim().toLowerCase();
 }

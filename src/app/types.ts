@@ -67,6 +67,12 @@ export interface BaseToken {
   layer?: number;
   /** Instance number for distinguishing multiple tokens of the same type (same imagePath) */
   instanceNumber?: number;
+  /**
+   * A combatant kept beside the map (`tokens/offMap.ts`): in the scene and the initiative tracker,
+   * never drawn, seen, lit or shared on the map. Its place lies left of the map image, where an
+   * older version, which draws it, shows it off to the side. `undefined` clears it when patched.
+   */
+  offMap?: true | undefined;
 }
 
 /**
@@ -98,7 +104,7 @@ export type TokenEntity = Token | Character;
  * Everything about a token except its identity and map position.
  * Saved with encounters so spawning reproduces the exact token state.
  */
-export type TokenStateSnapshot = Omit<TokenEntity, 'id' | 'x' | 'y' | 'instanceNumber'>;
+export type TokenStateSnapshot = Omit<TokenEntity, 'id' | 'x' | 'y' | 'instanceNumber' | 'offMap'>;
 
 /**
  * Text element object for map annotations
