@@ -21,6 +21,8 @@ import { MARKER_GROW_FROM, MARKER_GROW_MS, turnMarkerStrokes } from './turnMarke
  */
 const DRAW_SCALE = 8;
 
+const readAccent = (): number => cssColorToHexNumber(getObsidianAccentColor());
+
 /** What the markers read of a view's store. */
 export interface TurnMarkerState {
   readonly initiative: Pick<InitiativeState, 'isActive' | 'round' | 'entries' | 'sides'>;
@@ -112,6 +114,8 @@ export class TurnMarkers {
   private following: Ticker | null = null;
   private shownKey: string | null = null;
   private last: TurnMarkerState | null = null;
+  /** The theme's accent, read when the turn changes or the theme does: never on a frame, where reading styles costs a layout. */
+  private accent = 0;
 
   constructor(private readonly deps: TurnMarkerDeps) {
     deps.parent.addChild(this.layer);
@@ -131,6 +135,7 @@ export class TurnMarkers {
 
   /** Draws every marker anew: the theme's accent may have changed. */
   refreshTheme(): void {
+    this.accent = readAccent();
     for (const [tokenId, marker] of this.markers) this.drawMarker(tokenId, marker, true);
   }
 
@@ -166,6 +171,7 @@ export class TurnMarkers {
     const ids = new Set(turnTokenIds(state.initiative, sceneTokens(state.objects)).filter((tokenId) => onMap[tokenId] !== undefined));
     const turnMoved = key !== this.shownKey;
     this.shownKey = key;
+    if (turnMoved) this.accent = readAccent();
     const grow = animate && !state.isMapLoading && !this.deps.reducedMotion();
     for (const [tokenId, marker] of this.markers) {
       if (ids.has(tokenId)) continue;
@@ -195,7 +201,7 @@ export class TurnMarkers {
     const size = this.deps.spriteOf(tokenId)?.tokenSize ?? 0;
     if (!token || !(size > 0)) return;
     const outer = token.showRing === false ? size : getTokenRingOuterDiameter(size, computeTokenStrokeWidth(gridSize));
-    marker.draw(outer / 2, restingTokenUIScale(gridSize), cssColorToHexNumber(getObsidianAccentColor()), force);
+    marker.draw(outer / 2, restingTokenUIScale(gridSize), this.accent, force);
   }
 
   /** Each frame the markers take their tokens' places, visibility and size; PIXI renders only what changed. */
