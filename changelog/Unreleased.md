@@ -6,8 +6,14 @@
 - Recovery buttons: give a statblock template buttons such as Short rest and Long rest in the collection settings' Resources tab. Pick a value on the card and choose what each button does to it: back to full, back by a roll, half back, set to a number, or spent from something else, such as Hit Dice. The buttons sit on player characters' statblocks beside their notes and on their players' online sheets, and the GM approves a player's rest.
 - Statblock templates: a number can be tracked, such as Luck, Ki, Hit Dice or Inspiration. Choose Tracked in its Options: the note holds its maximum, or another number does (Hit Dice up to Level), and the card shows what is left, such as 2 / 3. Recovery buttons can give it back, the DM screen steps it, and players step it on their online sheet.
 - Online play: hand any item to your players, not only rolled ones. In a loot base, each item's name has a gift button. Its menu gives the item to one player or to all players at once, and sets how many copies, with − and + or by typing the number.
+- Initiative: a combatant can delay its turn. It waits below the order until Act Now puts it right before the combatant whose turn it is.
+- Initiative: Sit Out This Round now works in turn order too.
+- Initiative: the tracker's ⋯ menu has an Auto sort switch.
 
 ## Improved
+- Initiative: next and previous turn skip defeated combatants, and the players' list marks them with a skull.
+- Initiative: combatants with the same number are ordered by their initiative modifier.
+- Initiative: Clear initiative asks before it removes every combatant. It is in the tracker's ⋯ menu.
 - Deleted tokens no longer blink out. They shrink a little and fade, and tokens deleted together leave in a quick ripple from the middle outward.
 - Atlas tells you when a new version is out, once per version, with Update and What's new. Update opens the plugin page, where Obsidian installs it. Settings → Updates shows whether you are up to date and has a switch to stop the check.
 - Online play: busy tables send far fewer messages. Cursors, lasers and measurements go out ten times a second and still move smoothly, and a changed quest or world map reaches players without their whole book being sent again.
@@ -27,4 +33,5 @@
 - Online play: the movement line of a dragged token shows for everyone at the table who sees the token, when the GM drags it and when a player does.
 - Statblocks from TTRPG Convert CLI import as tokens with their image. Atlas now reads image paths with encoded spaces, such as `/2.%20Mechanics/token.png`.
 - The grid settings set the unit of measurement where it applies, in the played campaign's game system too, and a collection's settings say when a played campaign's rules replace them.
-- Initiative: automatically update initiative order when rolling initiative for a single token.
+- Initiative: rolling one combatant sorts the order again while Auto sort is on. Contributed by young-george.
+- Initiative: stepping back to an earlier round brings back who sat that round out.
