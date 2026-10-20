@@ -1,6 +1,7 @@
 import { ATLAS_GITHUB_URL } from '../support/communityLinks';
 import { t } from '../i18n';
 import { showNotice } from '../ui/notice';
+import atlasIconUrl from '../assets/brand/atlas-icon.webp';
 
 /** Obsidian's page of Atlas, which reads the published manifest afresh and offers Update at once. */
 const PLUGIN_PAGE_URL = 'obsidian://show-plugin?id=atlas-vtt';
@@ -17,18 +18,20 @@ export function openUpdate(): void {
 /** Says that `version` is out, with Update and What's new; it stays until it is clicked. */
 export function announceUpdate(version: string): void {
   const message = createFragment();
-  message.append(`${t('settings.updates.notice', { version })} `);
-  const update = createEl('a', { text: t('settings.updates.update'), href: '#' });
-  const notes = createEl('a', { text: t('settings.updates.whatsNew'), href: '#' });
-  message.append(update, ' · ', notes);
+  const card = message.createDiv({ cls: 'atlas-update-notice' });
+  card.createEl('img', { cls: 'atlas-update-notice__icon', attr: { src: atlasIconUrl, alt: '' } });
+  const body = card.createDiv({ cls: 'atlas-update-notice__body' });
+  body.createDiv({ cls: 'atlas-update-notice__title', text: t('settings.updates.noticeTitle') });
+  body.createDiv({ cls: 'atlas-update-notice__text', text: t('settings.updates.notice', { version }) });
+  const actions = body.createDiv({ cls: 'atlas-update-notice__actions' });
+  const update = actions.createEl('button', { cls: 'mod-cta', text: t('settings.updates.update') });
+  const notes = actions.createEl('button', { text: t('settings.updates.whatsNew') });
   const notice = showNotice(message, 0);
-  update.addEventListener('click', (event) => {
-    event.preventDefault();
+  update.addEventListener('click', () => {
     notice.hide();
     openUpdate();
   });
-  notes.addEventListener('click', (event) => {
-    event.preventDefault();
+  notes.addEventListener('click', () => {
     notice.hide();
     window.open(releaseNotesUrl(version));
   });
