@@ -16,20 +16,11 @@ import type { ResourceDefsProvider, ResourceViewer, VisibleResource } from '../r
 import { isDefeated, isSpent } from '../resources/resourceValues';
 import { shapeOf, visibleResources } from '../resources/visibleResources';
 import { destroyTree } from './utils/destroyTree';
-import { computeTokenStrokeWidth, NAMEPLATE_HEIGHT, restingTokenUIScale, selectedTokenUIScale } from './token-renderer/tokenSizing';
+import { computeTokenStrokeWidth, NAMEPLATE_HEIGHT, NAMEPLATE_TEXT, restingTokenUIScale, selectedTokenUIScale, TOKEN_TEXT_RESOLUTION, tokenTextResolution } from './token-renderer/tokenSizing';
 import { getTokenRingCenterRadius } from './token-renderer/tokenRingMetrics';
 import { ValueTransition } from './utils/ValueTransition';
 import { MOTION_SLOW_MS, prefersReducedMotion } from '../utils/motion';
 import { t } from '../i18n';
-
-/**
- * Text is drawn at scale 0.333 and the viewport zooms to at most 5x, so a
- * resolution of 3 keeps glyphs crisp on HiDPI screens for a medium token without
- * rasterising every nameplate at eight times its size. Larger grids scale the
- * UI up, so its text resolution grows with it.
- */
-const TEXT_RESOLUTION = 3;
-const MAX_TEXT_RESOLUTION = 12;
 
 /**
  * Every token's UI lies in one layer. A selected token's lies above the others,
@@ -37,10 +28,6 @@ const MAX_TEXT_RESOLUTION = 12;
  */
 const RESTING_Z_INDEX = 10;
 const SELECTED_Z_INDEX = 11;
-
-function textResolutionFor(uiScale: number): number {
-  return Math.min(TEXT_RESOLUTION * Math.max(1, uiScale), MAX_TEXT_RESOLUTION);
-}
 
 export class TokenUIRenderer {
   private container: Container;
@@ -146,7 +133,7 @@ export class TokenUIRenderer {
         fill: 0xffffff,
         fontWeight: 'bold'
       }),
-      resolution: TEXT_RESOLUTION,
+      resolution: TOKEN_TEXT_RESOLUTION,
     });
     // Event mode not set - let events propagate naturally
     
@@ -164,15 +151,15 @@ export class TokenUIRenderer {
     this.nameText = new Text({
       text: '',
       style: new TextStyle({
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial',
-        fontSize: 24, // Base font size for 70px token
+        fontFamily: NAMEPLATE_TEXT.fontFamily,
+        fontSize: NAMEPLATE_TEXT.fontSize,
         fill: 0xffffff,
-        fontWeight: '600'
+        fontWeight: NAMEPLATE_TEXT.fontWeight
         // No stroke for cleaner look in the badge.
       })
     });
-    this.nameText.scale.set(0.333);
-    this.nameText.resolution = TEXT_RESOLUTION;
+    this.nameText.scale.set(NAMEPLATE_TEXT.textScale);
+    this.nameText.resolution = TOKEN_TEXT_RESOLUTION;
     this.nameText.zIndex = 2; // Name text above name badge background
     
     // Add click handler to name badge
@@ -408,12 +395,12 @@ export class TokenUIRenderer {
       // In PIXI v8, text updates automatically when setting the text property
       const textBounds = this.nameText.getLocalBounds();
       
-      this.nameText.alpha = 0.85;
+      this.nameText.alpha = NAMEPLATE_TEXT.alpha;
       
       // Badge dimensions - use fixed sizes  
-      const scaledTextScale = 0.333; // Fixed text scale
+      const scaledTextScale = NAMEPLATE_TEXT.textScale;
       const scaledWidth = textBounds.width * scaledTextScale;
-      const padding = 6; // Fixed padding
+      const padding = NAMEPLATE_TEXT.padding;
       const badgeWidth = Math.max(scaledWidth + padding * 2, 40); // Fixed min width
       const badgeHeight = NAMEPLATE_HEIGHT;
       this.nameplateHalfWidth = badgeWidth / 2;
@@ -434,7 +421,7 @@ export class TokenUIRenderer {
       // Position text in center of badge
       this.nameText.anchor.set(0.5, 0.5);
       this.nameText.position.set(0, nameY);
-      this.nameText.scale.set(0.333); // Fixed text scale
+      this.nameText.scale.set(NAMEPLATE_TEXT.textScale);
     }
     
     // Hide unused elements (but respect resize and rotation hidden state)
@@ -598,7 +585,7 @@ export class TokenUIRenderer {
     this.besideToken.position.set(anchor.x, anchor.y);
     this.leftOfToken.position.set(-anchor.x, anchor.y);
     // A selected token's text keeps a constant screen size, which the resting resolution covers
-    this.setTextResolution(textResolutionFor(resting));
+    this.setTextResolution(tokenTextResolution(resting));
     this.onScaleChange?.(scale);
   }
 
@@ -841,9 +828,9 @@ export class TokenUIRenderer {
       const textBounds = this.nameText.getLocalBounds();
       
       // Badge dimensions (same as normal badge) - use fixed sizes
-      const scaledTextScale = 0.333; // Fixed text scale
+      const scaledTextScale = NAMEPLATE_TEXT.textScale;
       const scaledTextWidth = textBounds.width * scaledTextScale;
-      const padding = 6; // Fixed padding
+      const padding = NAMEPLATE_TEXT.padding;
       const badgeWidth = Math.max(scaledTextWidth + padding * 2, 40); // Fixed min width
       const badgeHeight = 14; // Fixed height
       const badgeRadius = badgeHeight / 2;

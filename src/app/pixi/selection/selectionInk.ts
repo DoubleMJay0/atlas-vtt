@@ -1,23 +1,6 @@
 import type { Graphics } from 'pixi.js';
+import { CANVAS_INK, INK_SHADE } from '../utils/canvasInk';
 import { HIGHLIGHT_EDGE, SELECTION_LOOK, grownPath, openRuns, outlinePoints, type HighlightPath, type Notch, type RoundedBox } from './selectionGeometry';
-
-/** The dark line's opacity on either side of the accent: enough to hold it on parchment, nothing on a dark map. */
-const KEYLINE_ALPHA = 0.3;
-
-/**
- * A soft dark falloff outside the highlight, as bands of `width` screen pixels beyond its edge. Bands
- * of one pixel fading evenly: wider steps showed as stripes along a straight edge and made a box's
- * frame read heavier than a token's ring.
- */
-const SHADE: ReadonlyArray<{ readonly width: number; readonly alpha: number }> = [
-  { width: 1, alpha: 0.1 },
-  { width: 1, alpha: 0.065 },
-  { width: 1, alpha: 0.04 },
-  { width: 1, alpha: 0.02 },
-];
-
-/** How far the shade reaches beyond the highlight's edge, in screen pixels. */
-export const SHADE_REACH = SHADE.reduce((sum, band) => sum + band.width, 0);
 
 /** The group frame's accent opacity: present, never louder than a highlight. */
 const GROUP_ALPHA = 0.55;
@@ -52,11 +35,11 @@ function strokeBand(graphics: Graphics, path: HighlightPath, handles: readonly N
  */
 export function drawHighlight(graphics: Graphics, path: HighlightPath, handles: readonly Notch[], accent: number): void {
   let edge = HIGHLIGHT_EDGE;
-  for (const band of SHADE) {
+  for (const band of INK_SHADE) {
     strokeBand(graphics, grownPath(path, edge + band.width / 2), handles, band.width, 0x000000, band.alpha);
     edge += band.width;
   }
-  strokeBand(graphics, path, handles, SELECTION_LOOK.stroke + 2 * SELECTION_LOOK.keyline, 0x000000, KEYLINE_ALPHA);
+  strokeBand(graphics, path, handles, SELECTION_LOOK.stroke + 2 * SELECTION_LOOK.keyline, 0x000000, CANVAS_INK.keylineAlpha);
   strokeBand(graphics, path, handles, SELECTION_LOOK.stroke, accent, 1);
 }
 

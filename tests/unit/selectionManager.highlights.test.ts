@@ -5,7 +5,7 @@ import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { SelectionManager } from '../../src/app/pixi/SelectionManager';
 import { HIGHLIGHT_EDGE, SELECTION_LOOK } from '../../src/app/pixi/selection/selectionGeometry';
-import { SHADE_REACH } from '../../src/app/pixi/selection/selectionInk';
+import { INK_SHADE_REACH as SHADE_REACH } from '../../src/app/pixi/utils/canvasInk';
 import type { BarsSpan } from '../../src/app/pixi/token-renderer/types';
 
 /** A token group at (x, y) with art 70 px wide and the ring every token has by default (78 px across). */
