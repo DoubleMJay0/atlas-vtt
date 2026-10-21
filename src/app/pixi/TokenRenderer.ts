@@ -16,6 +16,9 @@ import { Sprite, Container, Graphics, Application, FederatedPointerEvent } from 
 import { Viewport } from "pixi-viewport";
 import { App as ObsidianApp } from 'obsidian';
 import type { TokenEntity } from "../types";
+import type { GroupTurnHost } from "./selection/GroupRotation";
+import { gridPivot } from "./selection/groupTurn";
+import { isHexGridType } from "../grid/hexGeometry";
 import type { TokenGestureEventDetail } from '../types/atlasWindowEvents';
 import type { GridSystem } from "../grid/GridSystem";
 import type { ViewAtlasStore } from '../storeFactory';
@@ -70,6 +73,8 @@ export class TokenRenderer {
   private gridSystem: GridSystem;
   private tokenContainer: Container;
   private tokenSprites: Record<string, TokenGroupContainer | null> = {};
+  /** The ways the tokens of a group being turned face until it is put down (`showFacings`). */
+  private groupFacings: ReadonlyMap<string, number> | null = null;
   private tokenRings: Record<string, Graphics | Sprite> = {};
   private _unsubscribeFromStore?: () => void;
   private _unsubscribeFromViewport?: () => void;
@@ -722,6 +727,38 @@ export class TokenRenderer {
     return (!!token.isHidden && !!prevToken.isHidden) || (alwaysSeen(token) && alwaysSeen(prevToken));
   }
 
+  /** The way a token faces on the canvas: as a turn under way shows it, else as the store has it. */
+  private shownRotation(token: TokenEntity): number {
+    return this.uiManager.getRotationUI()?.getTemporaryRotation(token.id) ?? this.groupFacings?.get(token.id) ?? token.rotation ?? 0;
+  }
+
+  /** What a group turned from the button above its selection frame asks of the tokens (`GroupRotation`). */
+  public groupTurnHost(): GroupTurnHost {
+    return {
+      pivot: (middle) => {
+        if (!(this.store.getState().grid?.snapToGrid ?? true)) return middle;
+        const hex = isHexGridType(this.gridSystem.getOptions().type);
+        return gridPivot(middle, hex, (point, size) => this.gridSystem.snapTokenCenter(point.x, point.y, size));
+      },
+      showFacings: (facings) => this.showFacings(facings),
+    };
+  }
+
+  /** Shows the tokens of a group being turned facing these ways until it is put down; null shows them as the store has them. */
+  private showFacings(facings: ReadonlyMap<string, number> | null): void {
+    const turned = facings ?? this.groupFacings;
+    this.groupFacings = facings;
+    if (!turned) return;
+    const tokens = mapTokens(this.store.getState().objects);
+    for (const id of turned.keys()) {
+      const group = this.tokenSprites[id];
+      const token = tokens[id];
+      if (group && token) this.spriteFactory.updateTokenRotation(group, this.shownRotation(token));
+    }
+    // Art shown without a ring is outlined as it turns
+    this.selectionOverlayUpdater();
+  }
+
   /** Takes along what stands with a token's sprite as it glides: its UI, its controls and the selection frame. */
   private followToken(tokenId: string, x: number, y: number): void {
     this.uiManager.syncUIPosition(tokenId, x, y);
@@ -906,8 +943,7 @@ export class TokenRenderer {
         
         // Update rotation if it changed or if there's a temporary rotation
         const tempRotation = this.uiManager.getRotationUI()?.getTemporaryRotation(token.id);
-        const displayRotation = tempRotation !== undefined ? tempRotation : (token.rotation || 0);
-        this.spriteFactory.updateTokenRotation(existingTokenGroup, displayRotation);
+        this.spriteFactory.updateTokenRotation(existingTokenGroup, this.shownRotation(token));
         
         // Update rotation handle positions when token rotates
         if (!prevToken || prevToken.rotation !== token.rotation || tempRotation !== undefined) {

@@ -1,3 +1,7 @@
+## New
+
+- Several selected tokens can be turned together with the button above their selection
+
 ## Improved
 
 - Resource wheels stay beside their token when it is selected, instead of rising above it
