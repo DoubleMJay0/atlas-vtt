@@ -100,8 +100,8 @@ export class SelectionManager {
     
     // Listen for map load events to clear selection
     this.mapLoadedHandler = () => {
-      // A group turned on the scene that was there is put back, not dropped into this one
-      this.groupRotation.cancel();
+      // A group turned on the scene that was there is let go of: nothing of it is written into this one
+      this.groupRotation.drop();
       // Clear selection state
       this.store.getState().clearSelection();
       // Clear any active marquee

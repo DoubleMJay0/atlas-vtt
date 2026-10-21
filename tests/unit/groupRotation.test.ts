@@ -1,14 +1,12 @@
 // @vitest-environment jsdom
-import { EventEmitter } from 'events';
 import { describe, expect, it, vi } from 'vitest';
-import { Container, Sprite } from 'pixi.js';
+import { Container } from 'pixi.js';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { getHistoryStore } from '../../src/app/stores/history';
 import { snapTokenCenter } from '../../src/app/grid/gridPlacement';
 import { GroupRotation, type GroupTurnHost } from '../../src/app/pixi/selection/GroupRotation';
 import { gridPivot } from '../../src/app/pixi/selection/groupTurn';
 import type { DrawingStroke, TokenEntity } from '../../src/app/types';
-import { SelectionManager } from '../../src/app/pixi/SelectionManager';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 // jsdom draws no glyphs: the button's rotate glyph never arrives
@@ -183,5 +181,46 @@ describe('GroupRotation', () => {
     handle.emit('pointerdown', { button: 2, global: { x: 105, y: -30 }, stopPropagation: vi.fn() } as never);
     viewport.emit('pointermove', { button: 2, global: { x: 170, y: 35 } } as never);
     expect(plugins.pause).not.toHaveBeenCalled();
+  });
+
+  it('lets go of a turn without writing when another scene loads, and ignores moves while it loads', () => {
+    const { store, history, rotation, press, move, release, facings, turnFrame, plugins } = setup();
+    press(105, -30);
+    move(170, 35);
+    store.setState({ isMapLoading: true });
+    const loading = store.getState().objects;
+    move(40, 35);
+    expect(store.getState().objects).toBe(loading);
+
+    // The next scene arrives with history cleared, as a load leaves it
+    store.setState({ objects: { ...store.getState().objects, tokens: { x: token('x', 35, 35) }, drawings: {} } });
+    history.getState().clear();
+    const loaded = store.getState().objects;
+    const writes = vi.fn();
+    const stop = store.subscribe(writes);
+    rotation.drop();
+    store.setState({ isMapLoading: false });
+    stop();
+
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(store.getState().objects).toBe(loaded);
+    expect(facings.at(-1)).toBeNull();
+    expect(turnFrame).toHaveBeenLastCalledWith(null);
+    expect(plugins.resume).toHaveBeenCalledWith('drag');
+    release();
+    expect(rotation.cancel()).toBe(false);
+    // No transaction is left open: the next edit is a step of its own
+    store.getState().updateTokens([{ id: 'x', changes: { x: 105 } }]);
+    expect(history.getState().pastStates).toHaveLength(1);
+  });
+
+  it('writes nothing when the pointer is let go while a scene loads', () => {
+    const { store, press, move, release } = setup();
+    press(105, -30);
+    move(170, 35);
+    store.setState({ isMapLoading: true });
+    const loading = store.getState().objects;
+    release();
+    expect(store.getState().objects).toBe(loading);
   });
 });

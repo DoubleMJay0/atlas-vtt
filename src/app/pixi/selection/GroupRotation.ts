@@ -102,6 +102,18 @@ export class GroupRotation {
     return true;
   }
 
+  /**
+   * Lets go of a turn under way without writing anything: another scene has loaded, whose store holds
+   * none of the turned group and whose history was cleared with the turn's open step.
+   */
+  drop(): void {
+    const turn = this.turn;
+    if (!turn) return;
+    this.release(turn);
+    turn.host.showFacings(null);
+    this.settle();
+  }
+
   destroy(): void {
     this.cancel();
     this.button.destroy();
@@ -141,7 +153,8 @@ export class GroupRotation {
 
   private readonly onMove = (event: FederatedPointerEvent): void => {
     const turn = this.turn;
-    if (!turn) return;
+    // A scene loading writes the store in steps; the turn waits for it, and `drop` follows
+    if (!turn || this.deps.store.getState().isMapLoading) return;
     const degrees = snapTurn(pointerTurn(turn.centre, turn.from, this.deps.viewport.toWorld(event.global)), event.shiftKey);
     if (degrees === turn.degrees) return;
     if (!turn.started) {
@@ -180,14 +193,28 @@ export class GroupRotation {
   private end(commit: boolean): void {
     const turn = this.turn;
     if (!turn) return;
-    this.turn = null;
-    this.listen(false);
-    this.deps.viewport.plugins.resume('drag');
-    this.button.setHeld(false);
+    if (this.deps.store.getState().isMapLoading) {
+      this.drop();
+      return;
+    }
+    this.release(turn);
     if (turn.started) {
       if (commit && turn.degrees !== 0) this.putDown(turn);
       else this.putBack(turn);
     }
+    this.settle();
+  }
+
+  /** Stops following the pointer for `turn`. */
+  private release(turn: Turn): void {
+    if (this.turn === turn) this.turn = null;
+    this.listen(false);
+    this.deps.viewport.plugins.resume('drag');
+    this.button.setHeld(false);
+  }
+
+  /** The frame follows the selection again and everything is shown as it now stands. */
+  private settle(): void {
     this.deps.turnFrame(null);
     this.deps.refresh();
   }
