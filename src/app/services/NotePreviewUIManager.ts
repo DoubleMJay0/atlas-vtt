@@ -15,6 +15,7 @@ import { isModHeld } from '../keyboard/modKey';
 import type { ViewAtlasStore } from '../storeFactory';
 import type { TokenRollContext } from '../types/diceRollOrigin';
 import { captureRollContext } from '../tools/diceRollOrigins';
+import { followWindow } from '../utils/followWindow';
 
 /**
  * A hovered token presented to the preview system like a pin on its linked
@@ -83,6 +84,8 @@ export class NotePreviewUIManager {
   private boundHandleKeyDown!: (e: KeyboardEvent) => void;
   private boundHandleKeyUp!: (e: KeyboardEvent) => void;
   private boundHandleFocus!: () => void;
+  /** Removes the key, focus and blur listeners from the window they are on. */
+  private unlistenWindow: () => void = (): void => undefined;
   private activeLeafChangeRef: EventRef | null = null;
   private zIndexCounter = 5; // stay below asset manager (50) and Obsidian overlays (~1000)
 
@@ -148,12 +151,7 @@ export class NotePreviewUIManager {
       this.isModifierKeyDown = false;
     };
     
-    document.addEventListener('keydown', this.boundHandleKeyDown);
-    document.addEventListener('keyup', this.boundHandleKeyUp);
-    window.addEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
-    
-    // Reset modifier key state when window gains focus to avoid stuck state
-    window.addEventListener('focus', this.boundHandleFocus);
+    this.unlistenWindow = this.listenOn(window);
 
     // The pin's note opens in the workspace, which replaces its preview
     this.eventBus.on('close-active-preview', (notePath: string) => {
@@ -446,11 +444,32 @@ export class NotePreviewUIManager {
     this.activePreviews.forEach((preview) => preview.element?.show());
   }
 
+  /**
+   * Hears the modifier key, focus and blur in the window `containerEl` (the map view) is in,
+   * which follows the view into a popout and back. Until then, the main window's.
+   */
+  public followView(containerEl: HTMLElement): void {
+    this.unlistenWindow();
+    this.unlistenWindow = followWindow(containerEl, (win) => this.listenOn(win));
+  }
+
+  private listenOn(win: Window): () => void {
+    win.document.addEventListener('keydown', this.boundHandleKeyDown);
+    win.document.addEventListener('keyup', this.boundHandleKeyUp);
+    win.addEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
+    // Reset modifier key state when window gains focus to avoid stuck state
+    win.addEventListener('focus', this.boundHandleFocus);
+    return (): void => {
+      win.document.removeEventListener('keydown', this.boundHandleKeyDown);
+      win.document.removeEventListener('keyup', this.boundHandleKeyUp);
+      win.removeEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
+      win.removeEventListener('focus', this.boundHandleFocus);
+    };
+  }
+
   public destroy(): void {
-    document.removeEventListener('keydown', this.boundHandleKeyDown);
-    document.removeEventListener('keyup', this.boundHandleKeyUp);
-    window.removeEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
-    window.removeEventListener('focus', this.boundHandleFocus);
+    this.unlistenWindow();
+    this.unlistenWindow = (): void => undefined;
     if (this.activeLeafChangeRef) {
       this.app.workspace.offref(this.activeLeafChangeRef);
       this.activeLeafChangeRef = null;

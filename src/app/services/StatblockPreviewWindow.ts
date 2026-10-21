@@ -48,7 +48,8 @@ export class StatblockPreviewWindow {
     this.manager = manager;
     this.initialPos = initialPos;
 
-    this.element = document.body.createDiv({ cls: 'atlas-statblock-preview-window' });
+    // The focused window's: a token hovered in a popout shows its statblock there
+    this.element = activeDocument.body.createDiv({ cls: 'atlas-statblock-preview-window' });
     this.element.setAttribute('tabindex', '-1');
 
     if (initialPos) {
@@ -88,8 +89,8 @@ export class StatblockPreviewWindow {
   setPosition(x: number, y: number) {
     if (!this.element) return;
 
-    const winWidth = window.innerWidth;
-    const winHeight = window.innerHeight;
+    const winWidth = this.element.win.innerWidth;
+    const winHeight = this.element.win.innerHeight;
     // A theme that draws around the preview asks for more room than this.
     const gaps = previewEdgeGaps(this.element.ownerDocument, 20);
 
