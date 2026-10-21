@@ -64,6 +64,8 @@ export class GroupRotation {
   private readonly button: GroupRotateButton;
   private turn: Turn | null = null;
   private zoom = 1;
+  /** Stops waiting for a load to finish before letting go of the tokens a dropped turn held. */
+  private stopWaiting: (() => void) | null = null;
 
   constructor(private readonly deps: GroupRotationDeps) {
     this.button = new GroupRotateButton({
@@ -103,8 +105,8 @@ export class GroupRotation {
   }
 
   /**
-   * Lets go of a turn under way without writing anything: another scene has loaded, whose store holds
-   * none of the turned group and whose history was cleared with the turn's open step.
+   * Lets go of a turn under way without writing the scene: another scene has loaded, whose history was
+   * cleared with the turn's open step. Only the held tokens are let go of, once the load is done.
    */
   drop(): void {
     const turn = this.turn;
@@ -112,11 +114,37 @@ export class GroupRotation {
     this.release(turn);
     turn.host.showFacings(null);
     this.settle();
+    this.letGoAfterLoad(new Set(turn.tokens.map(({ id }) => id)));
   }
 
   destroy(): void {
     this.cancel();
+    this.stopWaiting?.();
     this.button.destroy();
+  }
+
+  /**
+   * Once the scene has loaded, the tokens the dropped turn held are held no longer, so sight on drop
+   * keeps none of them where the turn took them (a reloaded scene has the same tokens). Pointer state
+   * only: never saved, never an undo step. Others' held tokens stay held.
+   */
+  private letGoAfterLoad(turned: ReadonlySet<string>): void {
+    const { store } = this.deps;
+    const letGo = (): void => {
+      this.stopWaiting = null;
+      holdTokens(store, Object.keys(store.getState().heldTokens).filter((id) => !turned.has(id)));
+    };
+    this.stopWaiting?.();
+    if (!store.getState().isMapLoading) {
+      letGo();
+      return;
+    }
+    const stop = store.subscribe((state) => {
+      if (state.isMapLoading) return;
+      stop();
+      letGo();
+    });
+    this.stopWaiting = stop;
   }
 
   private press(event: FederatedPointerEvent): void {

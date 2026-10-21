@@ -204,7 +204,9 @@ describe('GroupRotation', () => {
     store.setState({ isMapLoading: false });
     stop();
 
-    expect(writes).toHaveBeenCalledTimes(1);
+    // The load finishing, then letting go of the held tokens: the scene itself is not written
+    expect(writes).toHaveBeenCalledTimes(2);
+    expect(store.getState().heldTokens).toEqual({});
     expect(store.getState().objects).toBe(loaded);
     expect(facings.at(-1)).toBeNull();
     expect(turnFrame).toHaveBeenLastCalledWith(null);
@@ -214,6 +216,23 @@ describe('GroupRotation', () => {
     // No transaction is left open: the next edit is a step of its own
     store.getState().updateTokens([{ id: 'x', changes: { x: 105 } }]);
     expect(history.getState().pastStates).toHaveLength(1);
+  });
+
+  it('lets go of the held tokens once the same scene has loaded again, writing nothing else', () => {
+    const { store, rotation, press, move } = setup();
+    press(105, -30);
+    move(170, 35);
+    expect(Object.keys(store.getState().heldTokens).sort()).toEqual(['a', 'b']);
+    store.setState({ isMapLoading: true });
+    // The same scene comes back: the same tokens where its file has them
+    const reloaded = { ...store.getState().objects, tokens: { a: token('a', 35, 35), b: token('b', 175, 35) } };
+    store.setState({ objects: reloaded });
+    rotation.drop();
+    expect(Object.keys(store.getState().heldTokens).sort()).toEqual(['a', 'b']);
+    store.setState({ isMapLoading: false });
+
+    expect(store.getState().heldTokens).toEqual({});
+    expect(store.getState().objects).toBe(reloaded);
   });
 
   it('writes nothing when the pointer is let go while a scene loads', () => {
