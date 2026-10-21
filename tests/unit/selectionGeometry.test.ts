@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SELECTION_LOOK, boxOutline, groupFrame, highlightBox, highlightPath, openRuns, outlinePoints, tokenOutline,
+  SELECTION_LOOK, boxOutline, groupFrame, highlightBox, highlightPath, openRuns, outlinePoints, roundedBoxContains, tokenOutline,
   type HighlightPath, type Point,
 } from '../../src/app/pixi/selection/selectionGeometry';
 
@@ -91,5 +91,17 @@ describe('openRuns', () => {
     }
     const covered = runs.flat().every((point) => handles.every((handle) => distance(point, handle) >= 10 - 1e-6));
     expect(covered).toBe(true);
+  });
+});
+
+describe('roundedBoxContains', () => {
+  const box = { x: 0, y: 0, width: 100, height: 60, radius: 12 };
+
+  it('takes the inside and the line, and leaves out what lies past a rounded corner', () => {
+    expect(roundedBoxContains(box, { x: 50, y: 30 })).toBe(true);
+    expect(roundedBoxContains(box, { x: 100.4, y: 30 }, 1)).toBe(true);
+    expect(roundedBoxContains(box, { x: 100.6, y: 30 }, 1)).toBe(false);
+    expect(roundedBoxContains(box, { x: 1, y: 1 })).toBe(false);
+    expect(roundedBoxContains(box, { x: 12, y: 1 })).toBe(true);
   });
 });

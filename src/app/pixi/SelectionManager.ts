@@ -353,6 +353,11 @@ export class SelectionManager {
     return false;
   }
 
+  /** Whether a press at the world point lands inside the frame drawn around a selection of two or more. */
+  public groupFrameContains(worldX: number, worldY: number): boolean {
+    return this.highlights.groupFrameContains(worldX, worldY);
+  }
+
   /** DM selection feedback that must not reach the mirrored player frame. */
   public getPlayerViewLayers(): LayerVisibility[] {
     return [this.highlights.layer, this.marqueeGraphics].map(layer => ({ layer, visible: false }));

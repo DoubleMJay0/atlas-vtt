@@ -5,6 +5,7 @@ import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { SelectionManager } from '../../src/app/pixi/SelectionManager';
 import { HIGHLIGHT_EDGE, SELECTION_LOOK } from '../../src/app/pixi/selection/selectionGeometry';
+import { SHADE_REACH } from '../../src/app/pixi/selection/selectionInk';
 
 /** A token group at (x, y) with art 70 px wide and the ring every token has by default (78 px across). */
 function token(x: number, y: number): Container {
@@ -50,7 +51,7 @@ describe('SelectionManager highlights', () => {
       const view = highlights()[0]!;
       const bounds = view.children[0]!.getLocalBounds();
       // The outermost band's edge lies HIGHLIGHT_EDGE plus the shade beyond the accent's middle
-      return bounds.width / 2 - HIGHLIGHT_EDGE - 5;
+      return bounds.width / 2 - HIGHLIGHT_EDGE - SHADE_REACH;
     };
     expect(accentRadius()).toBeCloseTo(39 + ACCENT_OFFSET, 0);
     viewport.scale.set(3);
@@ -69,5 +70,25 @@ describe('SelectionManager highlights', () => {
     expect(maxX).toBeCloseTo(300 + 50 + pad, 0);
     expect(minY).toBeCloseTo(100 - 39 - ACCENT_OFFSET - HIGHLIGHT_EDGE - pad, 0);
     expect(maxY).toBeCloseTo(100 + 35 + 24 + pad, 0);
+  });
+
+  it('takes hold of the group exactly where its frame is drawn, padded on screen and holding the bars', () => {
+    const { viewport, manager } = setup(['goblin', 'orc']);
+    const pad = SELECTION_LOOK.groupGap + SELECTION_LOOK.groupStroke;
+    // Between the tokens, and under them where only their bars are
+    expect(manager.groupFrameContains(200, 100)).toBe(true);
+    expect(manager.groupFrameContains(200, 100 + 35 + 24 + pad - 0.2)).toBe(true);
+    expect(manager.groupFrameContains(200, 100 + 35 + 24 + pad + 0.2)).toBe(false);
+    expect(manager.groupFrameContains(100 - 50 - pad - 0.2, 100)).toBe(false);
+    // Zoomed out, the same screen padding reaches further into the world
+    viewport.scale.set(0.5);
+    viewport.emit('zoomed', {});
+    expect(manager.groupFrameContains(200, 100 + 35 + 24 + 2 * pad - 0.4)).toBe(true);
+    expect(manager.groupFrameContains(200, 100 + 35 + 24 + 2 * pad + 0.4)).toBe(false);
+  });
+
+  it('gives a single selection no frame to take hold of', () => {
+    const { manager } = setup(['goblin']);
+    expect(manager.groupFrameContains(100, 100)).toBe(false);
   });
 });

@@ -145,6 +145,23 @@ export function groupFrame(boxes: readonly Box[]): RoundedBox | null {
   return { x: union.x - pad, y: union.y - pad, width: union.width + 2 * pad, height: union.height + 2 * pad, radius: SELECTION_LOOK.groupRadius };
 }
 
+/**
+ * Whether `point` lies inside `box` or on its line, rounded corners included: what a press inside the
+ * group frame takes hold of.
+ */
+export function roundedBoxContains(box: RoundedBox, point: { x: number; y: number }, line = 0): boolean {
+  const half = line / 2;
+  const left = box.x - half;
+  const top = box.y - half;
+  const right = box.x + box.width + half;
+  const bottom = box.y + box.height + half;
+  if (point.x < left || point.x > right || point.y < top || point.y > bottom) return false;
+  const radius = Math.min(box.radius + half, (right - left) / 2, (bottom - top) / 2);
+  const cx = Math.min(Math.max(point.x, left + radius), right - radius);
+  const cy = Math.min(Math.max(point.y, top + radius), bottom - radius);
+  return Math.hypot(point.x - cx, point.y - cy) <= radius;
+}
+
 /** A point in screen pixels, relative to a highlight's middle. */
 export interface Point {
   readonly x: number;

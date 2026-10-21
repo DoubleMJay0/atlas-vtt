@@ -982,6 +982,7 @@ export class PixiRendererOrchestrator { // Renamed class
       this.selectionManager.setHitTestTokensProvider(
         (x, y) => this.tokenRenderer!.hitTestTokens(x, y)
       );
+      this.tokenRenderer.setGroupFrameHitTest((x, y) => this.selectionManager?.groupFrameContains(x, y) ?? false);
     }
 
     this.lightingFeature?.wire(this.tokenRenderer);

@@ -5,7 +5,7 @@ import { destroyTree } from '../utils/destroyTree';
 import { ValueTransition } from '../utils/ValueTransition';
 import { MAP_LAYER_Z } from '../mapLayerOrder';
 import {
-  SELECTION_LOOK, groupFrame, highlightBox, highlightPath, unionBox,
+  SELECTION_LOOK, groupFrame, highlightBox, highlightPath, roundedBoxContains, unionBox,
   type Box, type HighlightPath, type Notch, type RoundedBox, type SelectionOutline,
 } from './selectionGeometry';
 import { drawGroupFrame, drawHighlight } from './selectionInk';
@@ -100,6 +100,9 @@ export class SelectionHighlights {
   private readonly group = new Graphics({ label: 'selectionGroupFrame' });
   private readonly groupFade = new ValueTransition(1, MOTION_NORMAL_MS, (value) => { this.group.alpha = value; });
   private groupDrawn = '';
+  /** The group frame as drawn, in screen pixels at `frameZoom`; null while there is none. */
+  private frame: RoundedBox | null = null;
+  private frameZoom = 1;
   private targets: readonly SelectionTarget[] = [];
   private zoom = 1;
   private accent = 0;
@@ -147,6 +150,12 @@ export class SelectionHighlights {
     this.showGroup(groupFrame(boxes), animate);
   }
 
+  /** Whether the world point lies inside the group frame as it is drawn; false while none is. */
+  groupFrameContains(worldX: number, worldY: number): boolean {
+    if (!this.frame) return false;
+    return roundedBoxContains(this.frame, { x: worldX * this.frameZoom, y: worldY * this.frameZoom }, SELECTION_LOOK.groupStroke);
+  }
+
   /** Reads the theme's accent again and redraws what is shown in it. */
   refreshTheme(): void {
     if (this.targets.length === 0) return;
@@ -176,6 +185,8 @@ export class SelectionHighlights {
 
   /** The group frame lies in screen pixels about the world's origin, scaled back like the highlights. */
   private showGroup(frame: RoundedBox | null, animate: () => boolean): void {
+    this.frame = frame;
+    this.frameZoom = this.zoom;
     const key = frame ? `${JSON.stringify(frame)}|${this.accent}` : '';
     if (key === this.groupDrawn) return;
     const appearing = this.groupDrawn === '' && frame !== null;

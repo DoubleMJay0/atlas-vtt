@@ -18,7 +18,6 @@ import { App as ObsidianApp } from 'obsidian';
 import type { TokenEntity } from "../types";
 import type { TokenGestureEventDetail } from '../types/atlasWindowEvents';
 import type { GridSystem } from "../grid/GridSystem";
-import { getDrawingBounds } from "./drawingGeometry";
 import type { ViewAtlasStore } from '../storeFactory';
 import { EventEmitter } from 'events';
 import { AssetValidationService } from '../services/AssetValidationService';
@@ -135,6 +134,8 @@ export class TokenRenderer {
   private fogHitTestProvider?: (worldX: number, worldY: number) => string | null;
   private fogClickHandler?: (fogId: string, e: FederatedPointerEvent) => void;
   private drawingHitTestProvider?: (worldX: number, worldY: number) => string | null;
+  /** Whether a world point lies inside the frame drawn around a selection of two or more. */
+  private groupFrameHitTest?: (worldX: number, worldY: number) => boolean;
   private drawingClickHandler?: (drawingId: string, e: FederatedPointerEvent) => void;
   private drawingDragStartHandler?: (e: FederatedPointerEvent) => void;
 
@@ -1493,6 +1494,10 @@ export class TokenRenderer {
     this.fogClickHandler = fn;
   }
 
+  public setGroupFrameHitTest(fn: (worldX: number, worldY: number) => boolean): void {
+    this.groupFrameHitTest = fn;
+  }
+
   public setDrawingHitTestProvider(fn: (worldX: number, worldY: number) => string | null): void {
     this.drawingHitTestProvider = fn;
   }
@@ -1652,7 +1657,6 @@ export class TokenRenderer {
     return topId;
   }
 
-  /** Returns true if (worldX, worldY) is within the bounding box of the given selected tokens. */
   /** Drag the selected tokens; a no-op when the selection holds none. */
   private startTokenGroupDrag(e: FederatedPointerEvent): void {
     const { selectedIds, objects } = this.store.getState();
@@ -1665,51 +1669,6 @@ export class TokenRenderer {
     e.stopPropagation();
     this.startTokenGroupDrag(e);
     this.drawingDragStartHandler?.(e);
-  }
-
-  private isPointInSelectionBounds(worldX: number, worldY: number, selectedIds: string[]): boolean {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let found = false;
-    const drawings = this.store.getState().objects.drawings;
-
-    for (const id of selectedIds) {
-      const drawing = drawings[id];
-      const drawingBounds = drawing && getDrawingBounds(drawing);
-      if (drawingBounds) {
-        minX = Math.min(minX, drawingBounds.x);
-        minY = Math.min(minY, drawingBounds.y);
-        maxX = Math.max(maxX, drawingBounds.x + drawingBounds.width);
-        maxY = Math.max(maxY, drawingBounds.y + drawingBounds.height);
-        found = true;
-        continue;
-      }
-
-      const tokenGroup = this.tokenSprites[id];
-      if (!tokenGroup || !tokenGroup.visible) continue;
-
-      // Match SelectionManager.updateSelectionOverlay bounds calculation:
-      // use actual sprite dimensions, not grid size
-      const sprite = tokenGroup.children[0];
-      if (!sprite || !('width' in sprite)) continue;
-
-      const halfW = sprite.width / 2;
-      const halfH = sprite.height / 2;
-      const x = tokenGroup.position.x;
-      const y = tokenGroup.position.y;
-
-      if (x - halfW < minX) minX = x - halfW;
-      if (y - halfH < minY) minY = y - halfH;
-      if (x + halfW > maxX) maxX = x + halfW;
-      if (y + halfH > maxY) maxY = y + halfH;
-      found = true;
-    }
-
-    if (!found) return false;
-
-    // Same 12px padding as the selection overlay
-    const pad = 12;
-    return worldX >= minX - pad && worldX <= maxX + pad &&
-           worldY >= minY - pad && worldY <= maxY + pad;
   }
 
   /** Set up viewport-level pointer handlers. Called once during init. */
@@ -1846,14 +1805,11 @@ export class TokenRenderer {
       return;
     }
 
-    // 2. Hit-test selection bounding box (drag from within the selected group; shift is picking, not dragging)
-    if (e.button === 0 && !e.shiftKey) {
-      const selectedIds = this.store.getState().selectedIds;
-      if (selectedIds.length > 1 && this.isPointInSelectionBounds(worldPos.x, worldPos.y, selectedIds)) {
-        markHandled(e);
-        this.startGroupDrag(e);
-        return;
-      }
+    // 2. Hit-test the frame drawn around a selection of two or more (drag the group; shift is picking, not dragging)
+    if (e.button === 0 && !e.shiftKey && this.groupFrameHitTest?.(worldPos.x, worldPos.y)) {
+      markHandled(e);
+      this.startGroupDrag(e);
+      return;
     }
 
     // 3. Hit-test drawings (select + drag, or context menu; tokens selected alongside follow a drag)

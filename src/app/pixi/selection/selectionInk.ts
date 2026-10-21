@@ -2,14 +2,22 @@ import type { Graphics } from 'pixi.js';
 import { HIGHLIGHT_EDGE, SELECTION_LOOK, grownPath, openRuns, outlinePoints, type HighlightPath, type Notch, type RoundedBox } from './selectionGeometry';
 
 /** The dark line's opacity on either side of the accent: enough to hold it on parchment, nothing on a dark map. */
-const KEYLINE_ALPHA = 0.45;
+const KEYLINE_ALPHA = 0.3;
 
-/** A soft dark falloff outside the highlight, as bands of `width` screen pixels beyond its edge. */
+/**
+ * A soft dark falloff outside the highlight, as bands of `width` screen pixels beyond its edge. Bands
+ * of one pixel fading evenly: wider steps showed as stripes along a straight edge and made a box's
+ * frame read heavier than a token's ring.
+ */
 const SHADE: ReadonlyArray<{ readonly width: number; readonly alpha: number }> = [
-  { width: 1.5, alpha: 0.16 },
-  { width: 1.5, alpha: 0.08 },
-  { width: 2, alpha: 0.035 },
+  { width: 1, alpha: 0.1 },
+  { width: 1, alpha: 0.065 },
+  { width: 1, alpha: 0.04 },
+  { width: 1, alpha: 0.02 },
 ];
+
+/** How far the shade reaches beyond the highlight's edge, in screen pixels. */
+export const SHADE_REACH = SHADE.reduce((sum, band) => sum + band.width, 0);
 
 /** The group frame's accent opacity: present, never louder than a highlight. */
 const GROUP_ALPHA = 0.55;
