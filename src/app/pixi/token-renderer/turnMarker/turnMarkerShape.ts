@@ -19,12 +19,15 @@ export const TURN_LOOK = {
   /** The wide pool beneath it. */
   poolAlpha: 0.38,
   poolWidth: 12,
-  /** How strongly the glow tints the map under it, and how much light it adds to it. */
-  glowTint: 0.7,
-  glowLight: 0.55,
+  /**
+   * How strongly the glow tints the map under it, which carries a light map, and how much light it
+   * adds, a little only: enough to lift a dark map, where more washed parchment out to a white bloom.
+   */
+  glowTint: 1,
+  glowLight: 0.15,
   /** The arcs: how many, how much of the circle each spans, their middle's distance from the token's edge and their width there. */
   arcs: 4,
-  arcSpan: (60 * Math.PI) / 180,
+  arcSpan: (72 * Math.PI) / 180,
   arcGap: 5,
   arcWidth: 2.25,
   /** The fewest screen pixels an arc is wide, so a map zoomed far out keeps it a line. */
@@ -138,9 +141,13 @@ function arcSteps(radius: number, angle: number): number {
   return Math.max(2, Math.ceil(angle / (2 * Math.acos(1 - 0.05 / radius))));
 }
 
-/** How wide an arc is at `along` (-1 at one end, 1 at the other) as a share of its middle: a brush stroke tapering to points. */
+/**
+ * How wide an arc is at `along` (-1 at one end, 1 at the other) as a share of its middle: a brush
+ * stroke thinning all the way to fine points. A flatter profile kept its width almost to the end and
+ * stopped in a blunt cut across the arc.
+ */
 export function arcTaper(along: number): number {
-  return Math.max(0, 1 - along * along) ** 0.6;
+  return Math.max(0, 1 - along * along) ** 1.25;
 }
 
 /**

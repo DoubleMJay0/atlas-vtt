@@ -29,7 +29,8 @@ describe('the turn marker on a lit map', () => {
     while (cleanup.length) cleanup.pop()!();
   });
 
-  async function scene(zoom: number): Promise<{ app: Application; markers: TurnMarkers; world: Container; centre: { x: number; y: number }; outer: number }> {
+  /** `glow: false` leaves the glow out, so what is accent is the arcs alone. */
+  async function scene(zoom: number, glow = true): Promise<{ app: Application; markers: TurnMarkers; world: Container; centre: { x: number; y: number }; outer: number }> {
     document.body.style.setProperty('--interactive-accent', '#7f6df2');
     forgetObsidianAccentColor();
     const app = new Application();
@@ -57,7 +58,8 @@ describe('the turn marker on a lit map', () => {
       objects: { tokens: { ogre: { id: 'ogre', kind: 'character', x: 160, y: 160, imagePath: '' } as TokenEntity } },
       grid: { size: GRID },
     };
-    const markers = new TurnMarkers({ parent: world, getState: () => state, subscribe: () => () => undefined, spriteOf: () => sprite, ticker: () => app.ticker, reducedMotion: () => true });
+    const glows = glow ? undefined : { take: () => ({ key: 'none', texture: null }), release: () => undefined, destroy: () => undefined };
+    const markers = new TurnMarkers({ parent: world, getState: () => state, subscribe: () => () => undefined, spriteOf: () => sprite, ticker: () => app.ticker, reducedMotion: () => true, glows });
     cleanup.push(() => markers.destroy());
     app.ticker.update();
     app.render();
@@ -102,5 +104,33 @@ describe('the turn marker on a lit map', () => {
       }
     }
     await page.screenshot({ path: `${SHOTS}/marker-zoomed.png`, element: app.canvas });
+  });
+
+  it('draws each arc out to its tapered points, at zoom 1 and 1.5', async () => {
+    for (const zoom of [1, 1.5]) {
+      const { app, centre, outer } = await scene(zoom, false);
+      const arc = arcLayout(outer, 1, zoom);
+      const background = copiedPixel(app.canvas, 4, 4)[2]!;
+      for (let index = 0; index < TURN_LOOK.arcs; index += 1) {
+        const middle = Math.PI / 4 + (index * Math.PI) / 2;
+        // Near either end, past where a blunt arc of 60 degrees used to stop
+        for (const along of [-0.85, 0.85]) {
+          const angle = middle + (along * TURN_LOOK.arcSpan) / 2;
+          // The token's bar stands over the tips next to the bottom
+          const world = { x: 160 + Math.cos(angle) * (outer + TURN_LOOK.arcGap), y: 160 + Math.sin(angle) * (outer + TURN_LOOK.arcGap) };
+          if (world.x > 128 && world.x < 192 && world.y > 158 + outer) continue;
+          let accent = 0;
+          for (let offset = -2; offset <= 2; offset += 0.5) {
+            const x = Math.round(centre.x + Math.cos(angle) * (arc.radius + offset));
+            const y = Math.round(centre.y + Math.sin(angle) * (arc.radius + offset));
+            accent = Math.max(accent, copiedPixel(app.canvas, x, y)[2]! - background);
+          }
+          expect(accent, `zoom ${zoom}, arc ${index}, end ${along}`).toBeGreaterThan(40);
+        }
+      }
+      cleanup.pop()!();
+      cleanup.pop()!();
+      cleanup.pop()!();
+    }
   });
 });

@@ -45,15 +45,15 @@ describe('the turn glow', () => {
 });
 
 describe('the turn arcs', () => {
-  it('lie on the diagonals, clear of the handles at the top and sides and of the bars below', () => {
+  it('lie on the diagonals, leaving the top, bottom and sides open', () => {
     const polygons = arcPolygons(60, 3);
     expect(polygons).toHaveLength(TURN_LOOK.arcs);
     for (const polygon of polygons) {
       for (const { x, y } of polygon) {
         const angle = Math.atan2(y, x);
-        // Every cardinal direction keeps a gap of about 15 degrees either side
+        // Every cardinal direction keeps a gap of 9 degrees either side
         const fromCardinal = Math.min(...[0, Math.PI / 2, Math.PI, -Math.PI / 2, -Math.PI].map((cardinal) => Math.abs(angle - cardinal)));
-        expect(fromCardinal).toBeGreaterThan((14 * Math.PI) / 180);
+        expect(fromCardinal).toBeGreaterThan((8.9 * Math.PI) / 180);
         expect(Math.hypot(x, y)).toBeGreaterThanOrEqual(60 - 1.5 - 1e-9);
         expect(Math.hypot(x, y)).toBeLessThanOrEqual(60 + 1.5 + 1e-9);
       }

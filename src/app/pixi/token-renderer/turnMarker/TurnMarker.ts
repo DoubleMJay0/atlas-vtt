@@ -72,7 +72,7 @@ export class TurnMarker {
     this.arcs.scale.set(1 / zoom);
     const { radius, width, keyline } = arcLayout(outerRadius, unit, zoom);
     this.ink.clear();
-    tracePolygons(this.ink, arcPolygons(radius, width + 2 * keyline, keyline));
+    tracePolygons(this.ink, arcPolygons(radius, width + 2 * keyline));
     this.ink.fill({ color: 0x000000, alpha: TURN_LOOK.keylineAlpha });
     tracePolygons(this.ink, arcPolygons(radius, width));
     this.ink.fill({ color: accent });
