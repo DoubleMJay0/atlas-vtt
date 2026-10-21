@@ -15,8 +15,8 @@ export interface WheelAnchorInput {
   uiScale: number;
   /** Where the lowest shown bar ends below the token's bottom edge, in UI units; 0 without bars. */
   barsBottom: number;
-  /** The bars have their +/- buttons beside them: the token is selected, so the controls may show them. */
-  barButtons: boolean;
+  /** Share of the bars' +/- buttons' room to keep: 1 while the token's controls show them, 0 without. */
+  barButtons: number;
   /** Half the nameplate's width, in UI units; 0 without a nameplate. */
   nameplateHalfWidth: number;
 }
@@ -36,7 +36,7 @@ export function wheelAnchor(input: WheelAnchorInput): { x: number; y: number } {
   const resizeButton = ringRadius + (RESIZE_HANDLE_SIZE / 2) * tokenUIScale(spriteSize);
   const conditionBadge = ringRadius + (CONDITION_BADGE_RADIUS + 1) * restingTokenUIScale(gridSize);
   const { width, gap } = barDimensions.token;
-  const bars = barsBottom > 0 ? width / 2 + (barButtons ? gap + BAR_BUTTON_SIZE : 0) : 0;
+  const bars = barsBottom > 0 ? width / 2 + barButtons * (gap + BAR_BUTTON_SIZE) : 0;
   const belowToken = Math.max(bars, nameplateHalfWidth) * uiScale;
   return {
     x: Math.max(resizeButton, conditionBadge, belowToken),

@@ -183,6 +183,7 @@ describe('resource wheels on a token', () => {
     try {
       ui.update({ ...hero, name: 'Gargoyle', showNameplate: true }, 62);
       ui.setSelectionState(true);
+      ui.setBarButtonsShown(true);
       settle();
       const scale = beside(ui).scale.x;
       const [upper, lower] = wheelSlots(ui);
@@ -259,6 +260,7 @@ describe('resource wheels on a token', () => {
       expect(leftOf(ui).position.y).toBeCloseTo(beside(ui).position.y);
       expect((leftOf(ui).children[0] as Container).visible).toBe(false);
       ui.setSelectionState(true);
+      ui.setBarButtonsShown(true);
       settle();
       expect((leftOf(ui).children[0] as Container).visible).toBe(true);
       expect(leftOf(ui).scale.x).toBeCloseTo(beside(ui).scale.x);
@@ -298,6 +300,7 @@ describe('resource wheels on a token', () => {
     controls.slotsProvider = () => ui.getResourceSlots();
     controls.wheelAnchorProvider = () => ui.getWheelAnchor();
     ui.onScaleChange = (scale) => controls.setScaleFor('hero', scale);
+    controls.onBarButtonsChange = (tokenId) => ui.setBarButtonsShown(tokenId === 'hero');
     try {
       ui.update(veteran, 62);
       controls.show('hero', 0, 0, 62, ui.getUIScale());
@@ -342,6 +345,7 @@ describe('resource wheels on a token', () => {
     controls.slotsProvider = () => ui.getResourceSlots();
     controls.wheelAnchorProvider = () => ui.getWheelAnchor();
     ui.onScaleChange = (scale) => controls.setScaleFor('hero', scale);
+    controls.onBarButtonsChange = (tokenId) => ui.setBarButtonsShown(tokenId === 'hero');
     try {
       ui.update(hero, 62);
       // As the app does: the controls are shown when the selection changes, before the UI has grown

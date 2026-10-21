@@ -57,6 +57,8 @@ export class TokenControlsUI {
   public slotsProvider: (tokenId: string) => readonly ResourceSlot[] = () => [];
   /** Where a token's right wheels hang from, from its `TokenUIRenderer` (`wheelAnchor`); the left ones hang from the mirror. */
   public wheelAnchorProvider: (tokenId: string) => { x: number; y: number } | null = () => null;
+  /** Hears which token's bars have their +/- buttons shown, null for none, so its wheels make room for them. */
+  public onBarButtonsChange: ((tokenId: string | null) => void) | null = null;
 
   private readonly DANGER_COLOR = colors.health.critical;
 
@@ -276,7 +278,8 @@ export class TokenControlsUI {
     this.setScale(uiScale);
 
     // Update button visibility and handlers
-    this.updateButtons(token);
+    const barButtons = this.updateButtons(token);
+    this.onBarButtonsChange?.(barButtons ? tokenId : null);
     
     // Make container visible (unless hidden during resize or rotation)
     this.container.visible = !this.isHiddenDuringResize && !this.isHiddenDuringRotation;
@@ -287,6 +290,7 @@ export class TokenControlsUI {
     this.container.visible = false;
     this.editor?.close();
     for (const control of this.resourceControls.values()) this.hideControl(control);
+    this.onBarButtonsChange?.(null);
   }
 
   public updatePosition(worldX: number, worldY: number, tokenSize: number): void {
@@ -341,9 +345,11 @@ export class TokenControlsUI {
     return { bar: this.below, wheel: this.beside, 'wheel-left': this.leftOf }[slot.kind];
   }
 
-  private updateButtons(token: Character): void {
+  /** Binds the controls of every resource `token` shows; whether a bar got +/- buttons. */
+  private updateButtons(token: Character): boolean {
     for (const control of this.resourceControls.values()) this.hideControl(control);
-    if (!this.currentTokenId) return;
+    if (!this.currentTokenId) return false;
+    let barButtons = false;
 
     // Same resources and places as TokenUIRenderer drew them, so each overlay sits on its resource
     const slots = this.slotsProvider(this.currentTokenId);
@@ -364,7 +370,9 @@ export class TokenControlsUI {
       this.bindResource(this.controlFor(definition), slot, value, definition.name,
         (delta) => edit((stored) => withCurrent(stored, stored.current + delta)),
         (next) => edit(() => next));
+      barButtons ||= slot.kind === 'bar';
     }
+    return barButtons;
   }
 
   /** The controls of `definition`, in its colour; created once per resource key. */

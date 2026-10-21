@@ -13,7 +13,7 @@ const { width: BAR_WIDTH, height: BAR_HEIGHT, gap: BAR_GAP } = barDimensions.tok
 const overlaps = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 const square = (x: number, y: number, radius: number): Box => ({ left: x - radius, top: y - radius, right: x + radius, bottom: y + radius });
 
-/** Everything of a token's UI the wheels must not cover, in world units from its centre, laid out as the token UI draws it. */
+/** Everything of a token's UI the wheels must not cover (the bars' buttons only while shown, room 1), in world units from its centre, laid out as the token UI draws it. */
 function obstacles(input: WheelAnchorInput, bars: number): Box[] {
   const { spriteSize, uiScale: s, barButtons, nameplateHalfWidth } = input;
   const bottom = spriteSize / 2;
@@ -24,7 +24,7 @@ function obstacles(input: WheelAnchorInput, bars: number): Box[] {
   for (let bar = 0; bar < bars; bar++) {
     const top = bottom + (2 + bar * (BAR_HEIGHT + BAR_GAP)) * s;
     boxes.push({ left: (-BAR_WIDTH / 2) * s, right: (BAR_WIDTH / 2) * s, top, bottom: top + BAR_HEIGHT * s });
-    if (barButtons) {
+    if (barButtons === 1) {
       const buttonX = (BAR_WIDTH / 2 + BAR_GAP + BAR_BUTTON_SIZE / 2) * s;
       for (const x of [buttonX, -buttonX]) boxes.push(square(x, top + (BAR_HEIGHT / 2) * s, (BAR_BUTTON_SIZE / 2) * s));
     }
@@ -47,7 +47,7 @@ const barsBottomOf = (bars: number): number => (bars === 0 ? 0 : 2 + bars * BAR_
 
 function input(bars: number, uiScale: number, overrides: Partial<WheelAnchorInput> = {}): WheelAnchorInput {
   return { spriteSize: computeTokenPixelSize(GRID, 1), gridSize: GRID, ringScale: 1, uiScale, barsBottom: barsBottomOf(bars),
-    barButtons: uiScale > 1, nameplateHalfWidth: 20, ...overrides };
+    barButtons: uiScale > 1 ? 1 : 0, nameplateHalfWidth: 20, ...overrides };
 }
 
 describe('wheelAnchor', () => {
@@ -56,7 +56,7 @@ describe('wheelAnchor', () => {
 
   it.each(scales.flatMap((scale) => [0, 1, 2].map((bars) => [scale, bars])))('covers nothing of the token UI at scale %s with %s bars', (scale, bars) => {
     for (const nameplateHalfWidth of [0, 20, 48]) {
-      for (const barButtons of [false, true]) {
+      for (const barButtons of [0, 0.5, 1]) {
         const layout = input(bars, scale, { nameplateHalfWidth, barButtons });
         const covered = obstacles(layout, bars);
         for (const wheel of wheels(layout)) expect(covered.some((box) => overlaps(wheel, box))).toBe(false);
@@ -93,7 +93,7 @@ describe('wheelAnchor', () => {
 
   it('moves out with the bars\' buttons as the token is selected and with a long nameplate', () => {
     const scale = selectedTokenUIScale(1, 1);
-    const resting = wheelAnchor(input(2, scale, { barButtons: false })).x;
+    const resting = wheelAnchor(input(2, scale, { barButtons: 0 })).x;
     const selected = wheelAnchor(input(2, scale)).x;
     expect(selected).toBeCloseTo(resting + (BAR_GAP + BAR_BUTTON_SIZE) * scale);
     expect(wheelAnchor(input(2, scale, { nameplateHalfWidth: 80 })).x).toBeCloseTo(80 * scale);

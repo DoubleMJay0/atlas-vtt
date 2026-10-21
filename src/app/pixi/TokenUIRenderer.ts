@@ -51,6 +51,11 @@ export class TokenUIRenderer {
   private belowToken: Container;
   /** Eases the UI between its resting scale (0) and a selected token's on-screen size (1). */
   private emphasis: ValueTransition;
+  /**
+   * Room the wheels leave beside the bars for their +/- buttons: 1 from the moment this token's
+   * controls show them, easing to 0 with the shrinking UI once they go.
+   */
+  private barButtonRoom: ValueTransition;
   /** The resources of the bar slots, one view per resource. */
   private resources: ResourceStack;
   /** Anchor of the right wheels' column (`wheelAnchor`), scaled like `belowToken`; holds the wheels of the right side. */
@@ -124,6 +129,7 @@ export class TokenUIRenderer {
     // Conditions come last, so the hover card lies above this token's own bars and wheels
     this.container.addChild(this.belowToken, this.besideToken, this.leftOfToken, this.conditionUI.container);
     this.emphasis = new ValueTransition(0, MOTION_SLOW_MS, () => this.layoutUIScale());
+    this.barButtonRoom = new ValueTransition(0, MOTION_SLOW_MS, () => this.layoutUIScale());
     
     this.resources = new ResourceStack(ticker);
     this.resources.view.zIndex = 10; // Above the nameplate, below the defeated overlay
@@ -579,7 +585,7 @@ export class TokenUIRenderer {
       ringScale: state?.tokenSettings?.tokenRingSize ?? 1,
       uiScale: scale,
       barsBottom: this.barsBottom(),
-      barButtons: this.isSelected,
+      barButtons: this.barButtonRoom.value,
       nameplateHalfWidth: this.nameplateHalfWidth,
     });
     this.besideToken.position.set(anchor.x, anchor.y);
@@ -617,8 +623,6 @@ export class TokenUIRenderer {
     this.isSelected = selected;
     this.container.zIndex = selected ? SELECTED_Z_INDEX : RESTING_Z_INDEX;
     this.updateEmphasis();
-    // The controls show the bars' buttons from the moment of selection: the wheels make room at once
-    if (this.currentTokenSize > 0) this.layoutUIScale();
     this.updateConditionCard();
     this.updateTextVisibility();
   }
@@ -633,6 +637,15 @@ export class TokenUIRenderer {
     if (!this.currentToken || this.currentTokenSize <= 0) return;
     this.lastUpdateData = '';
     this.update(this.currentToken, this.currentTokenSize);
+  }
+
+  /**
+   * Whether this token's controls show the bars' +/- buttons. The wheels make room at once, so
+   * they never cover a button, and give it back as the UI shrinks.
+   */
+  public setBarButtonsShown(shown: boolean): void {
+    if (shown || prefersReducedMotion(document.body)) this.barButtonRoom.jumpTo(shown ? 1 : 0);
+    else this.barButtonRoom.animateTo(0);
   }
 
   /** Shows or hides the wheels of both sides, e.g. during a resize. */
@@ -690,6 +703,7 @@ export class TokenUIRenderer {
     // End any active editing
     this.endNameEdit();
     this.emphasis.cancel();
+    this.barButtonRoom.cancel();
     this.resources.destroy();
     this.wheels.destroy();
     
@@ -826,6 +840,9 @@ export class TokenUIRenderer {
       const badgeWidth = Math.max(scaledTextWidth + padding * 2, 40); // Fixed min width
       const badgeHeight = 14; // Fixed height
       const badgeRadius = badgeHeight / 2;
+      // A longer name pushes the wheels out, and their controls with them
+      this.nameplateHalfWidth = badgeWidth / 2;
+      this.layoutUIScale();
       
       // Get current name badge position
       const nameY = this.nameText.position.y;
