@@ -313,7 +313,7 @@ export class BookShare implements LootRecipientSource {
     if (message.t === 'book-resource') return this.editResource(from, character, message);
     // Recovery buttons replaced refills; a page of an older Atlas may still ask for one.
     if (message.t === 'book-refill') return false;
-    if (message.t === 'book-field' || message.t === 'book-ability') return this.statblocks.write(from, character, message);
+    if (message.t === 'book-field' || message.t === 'book-ability' || message.t === 'book-list') return this.statblocks.write(from, character, message);
     const quests = new Set(this.quests.map((quest) => quest.id));
     const written = applyBookMessage(this.shelf.of(character.key), message, this.ports.clock(), quests);
     if (written === null) return false;

@@ -6,8 +6,9 @@
  * 1: everything up to the campaign players' codes (2026-10-18).
  * 2: rest requests from a player character's recovery buttons (`book-rest`, `book-rest-answer`) and the `rest` log entry (2026-10-20).
  * 3: rest steps: actions picked in a rest, for oneself or another character (2026-10-20).
+ * 4: entries added to or taken out of a character's list values (`book-list`: words, labels with values) (2026-10-21).
  */
-export const GM_LEVEL = 3;
+export const GM_LEVEL = 4;
 
 /** The level of a GM that names none: one from before levels, which serves level 1. */
 export const UNNAMED_GM_LEVEL = 1;
