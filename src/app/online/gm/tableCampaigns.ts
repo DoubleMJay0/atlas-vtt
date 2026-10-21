@@ -12,6 +12,8 @@ export interface TableCampaigns {
   play(campaignId: string): void;
   /** This device plays no campaign from now on. */
   stop(): void;
+  /** Calls `listener` whenever another campaign, or none, is played; returns the way to stop. */
+  onChange(listener: () => void): () => void;
   /**
    * The players of the campaign `campaignId` once the players files were read and the campaign is
    * ready for a table (the books an older Atlas kept carried into it); null where there are none to read.
@@ -50,6 +52,7 @@ export function appCampaigns(app: App, bound: (campaignId: string | null) => voi
     playing: () => CampaignPlay.forApp(app).playing(),
     play: (campaignId) => CampaignPlay.forApp(app).play(campaignId),
     stop: () => CampaignPlay.forApp(app).stop(),
+    onChange: (listener) => CampaignPlay.forApp(app).onChange(listener),
     open: async (campaignId) => {
       const players = CampaignPlayers.forApp(app);
       if (players === undefined) return null;

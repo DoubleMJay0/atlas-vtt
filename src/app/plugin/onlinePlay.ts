@@ -41,15 +41,17 @@ export function registerOnlinePlay(plugin: Plugin, settings: SettingsService): O
       toldTooOld = true;
       showNotice(`Online play needs Obsidian ${SECRET_STORAGE_VERSION} or newer.`);
     }
+    if (on !== (feature !== null)) {
+      if (feature !== null) plugin.removeChild(feature);
+      setWorldMapGate(on ? campaignWorldMapGate(plugin.app) : null);
+      setQuestGate(on ? campaignQuestGate(plugin.app) : null);
+      setStatblockGate(on ? characterStatblockGate(plugin.app) : null);
+      setRestGate(on ? characterRestGate(plugin.app) : null);
+      feature = on ? plugin.addChild(new OnlineFeature(plugin, onlineDataFile(plugin.app))) : null;
+    }
     // A campaign is played only while its online table runs, and none runs while online play is off.
+    // Only once the table's connection is closed, so players are never sent a book without the campaign first.
     if (!on) CampaignPlay.forApp(plugin.app).stop();
-    if (on === (feature !== null)) return;
-    if (feature !== null) plugin.removeChild(feature);
-    setWorldMapGate(on ? campaignWorldMapGate(plugin.app) : null);
-    setQuestGate(on ? campaignQuestGate(plugin.app) : null);
-    setStatblockGate(on ? characterStatblockGate(plugin.app) : null);
-    setRestGate(on ? characterRestGate(plugin.app) : null);
-    feature = on ? plugin.addChild(new OnlineFeature(plugin, onlineDataFile(plugin.app))) : null;
   };
   // Registered once: a command asks whichever feature is loaded, and is not offered while none is.
   for (const { id, name } of ONLINE_COMMANDS) {

@@ -41,6 +41,8 @@ export class OnlineControl {
   private readonly account: HostAccount;
   /** Atlas told that players see its presented scene online, while a table runs. */
   private shown: ShownElsewhere | null = null;
+  /** Stops following what is played, which only matters while a table runs. */
+  private unwatch = (): void => undefined;
   /** The running table's log, kept with it and told to its panels. */
   readonly logs: LogKeeper;
 
@@ -110,12 +112,11 @@ export class OnlineControl {
   }
 
   /**
-   * Starts a table of the campaign `campaignId` (the played one by default) from the Atlas tab `leaf`
-   * (the active one by default), on the campaign's lasting link; tells the GM with a notice why it
-   * cannot. Once it runs, this device plays that campaign until the table ends. Players see the scene
-   * Atlas presents to its player view.
+   * Starts a table of the campaign `campaignId` from the Atlas tab `leaf`, on the campaign's lasting
+   * link; tells the GM with a notice why it cannot. Once it runs, this device plays that campaign
+   * until the table ends. Players see the scene Atlas presents to its player view.
    */
-  start(leaf: WorkspaceLeaf | null = activeAtlasLeaf(this.app), campaignId: string | null = this.campaigns.playing()): Promise<OnlineTable | null> {
+  start(leaf: WorkspaceLeaf | null, campaignId: string | null): Promise<OnlineTable | null> {
     return this.startFor(leaf, campaignId);
   }
 
@@ -210,7 +211,12 @@ export class OnlineControl {
     if (this.current === null) return;
     // The campaign stays played across the restart, unless no table runs after it.
     this.end();
-    if ((await this.startFor(leaf, campaignId)) === null) this.campaigns.stop();
+    let restarted: OnlineTable | null = null;
+    try {
+      restarted = await this.startFor(leaf, campaignId);
+    } finally {
+      if (restarted === null) this.campaigns.stop();
+    }
   }
 
   /** The player tokens of the shared scene as players see it (of the active Atlas tab while none is shared), with who has each. */
@@ -280,8 +286,6 @@ export class OnlineControl {
   private run(given: SavedTable, seats: TableSeats, savedLog?: unknown): OnlineTable {
     // A join code that is now a player's own (made on another device since) is made anew: the page's one field takes both.
     const saved = { ...given, gate: freeGate(given.gate, seats.codes()) };
-    // The table's campaign is the one played while it runs: its rules, quests and world map are what players get.
-    this.campaigns.play(saved.campaignId);
     this.ended = null;
     this.keep(saved);
     this.ownership.bind(seats);
@@ -315,6 +319,12 @@ export class OnlineControl {
         if (end === 'no-access') void this.account.refresh(true);
       },
     }, this.shelf, savedLog);
+    // The table's campaign is the one played while it runs: its rules, quests and world map are what players get.
+    this.campaigns.play(saved.campaignId);
+    // A campaign deleted while its table runs is played no longer (`recordCampaignPlay`, the campaign page), and takes its table with it.
+    this.unwatch = this.campaigns.onChange(() => {
+      if (this.current === table && this.campaigns.playing() !== saved.campaignId) this.stop();
+    });
     this.current = table;
     table.start();
     this.changed();
@@ -329,6 +339,8 @@ export class OnlineControl {
 
   /** No table runs: nobody plays, and the books stay in memory. */
   private unbind(): void {
+    this.unwatch();
+    this.unwatch = (): void => undefined;
     this.ownership.bind(null);
     this.campaigns.bound(null);
   }

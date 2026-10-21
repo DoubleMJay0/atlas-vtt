@@ -87,7 +87,7 @@ async function gm(players: string | null = playersText(), play = true): Promise<
 /** A table started for the campaign and welcomed by the relay with `connected` at it. */
 async function hosting(players?: string, connected: readonly { id: string; name: string }[] = []): Promise<Awaited<ReturnType<typeof gm>> & { socket: FakeSocket; frames: () => Frame[] }> {
   const made = await gm(players);
-  await made.online.start(made.leaf);
+  await made.online.start(made.leaf, 'c1');
   await advance(0);
   const socket = FakeSocket.all.at(-1);
   if (socket === undefined) throw new Error('no socket');
@@ -121,7 +121,7 @@ describe('a table of the played campaign', () => {
   it('waits for the players file, and asks the relay for the campaign\'s own link', async () => {
     const { online, vault, files, leaf, bound } = await gm();
     expect(files.isLoaded()).toBe(false);
-    const table = await online.start(leaf);
+    const table = await online.start(leaf, 'c1');
     expect(table).not.toBeNull();
     expect(files.isLoaded()).toBe(true);
     expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${LINK}","gmLevel":${GM_LEVEL}}`]);
@@ -135,7 +135,7 @@ describe('a table of the played campaign', () => {
 
   it('makes the campaign\'s link once, and keeps it in the players file', async () => {
     const { online, vault, files, leaf } = await gm(null);
-    await online.start(leaf);
+    await online.start(leaf, 'c1');
     await files.flush();
     const link = (JSON.parse(vault.files.get(PLAYERS) ?? '{}') as { link?: string }).link;
     expect(link).toMatch(/^[a-z2-7]{26}$/);
@@ -145,7 +145,7 @@ describe('a table of the played campaign', () => {
 
   it('is not started without a campaign: no request, and the GM is told', async () => {
     const { online, leaf } = await gm(playersText(), false);
-    expect(await online.start(leaf)).toBeNull();
+    expect(await online.start(leaf, null)).toBeNull();
     expect(seen.requests).toEqual([]);
     expect(seen.notices).toEqual(['Choose a campaign first.']);
   });
@@ -153,7 +153,7 @@ describe('a table of the played campaign', () => {
   it('is not started where the link belongs to another account', async () => {
     const { online, leaf } = await gm();
     seen.created = { status: 409, json: { error: 'link-taken' } };
-    expect(await online.start(leaf)).toBeNull();
+    expect(await online.start(leaf, 'c1')).toBeNull();
     expect(seen.notices).toEqual(['This campaign\'s link belongs to another account. Make a new link.']);
   });
 
@@ -161,7 +161,7 @@ describe('a table of the played campaign', () => {
     const { online, leaf, bound } = await gm();
     const stray = 'z'.repeat(26);
     seen.created = { status: 201, json: { code: stray, secret: 'x'.repeat(43), maxPlayers: 12 } };
-    expect(await online.start(leaf)).toBeNull();
+    expect(await online.start(leaf, 'c1')).toBeNull();
     expect(online.table).toBeNull();
     expect(bound).toEqual([]);
     expect(seen.notices).toEqual(['The server could not open this campaign\'s link. Try again later.']);
@@ -278,9 +278,8 @@ describe('the GM\'s players', () => {
     online.stop();
   });
 
-  it('keep their campaign while the GM plays another, and are nobody\'s once the table ends', async () => {
-    const { online, app, files } = await hosting();
-    CampaignPlay.forApp(app).play('c2');
+  it('keep their campaign, and are nobody\'s once the table ends', async () => {
+    const { online, files } = await hosting();
     online.addPlayer('Cal');
     expect(files.of('c1').players.map((player) => player.name).sort()).toEqual(['Ana', 'Cal']);
     online.stop();
@@ -387,7 +386,7 @@ describe('the played campaign', () => {
     expect(playing(app)).toBeNull();
     expect(await online.start(leaf, 'c1')).not.toBeNull();
     expect(playing(app)).toBe('c1');
-    expect(app.loadLocalStorage('atlas-vtt:playing-campaign')).toBe('c1');
+    expect(app.loadLocalStorage('atlas-vtt:table-campaign')).toBe('c1');
     online.stop();
     expect(playing(app)).toBeNull();
   });
@@ -435,6 +434,35 @@ describe('the played campaign', () => {
     const online = new OnlineControl(app, new Ownership(), campaigns, () => undefined, signedIn);
     expect(await online.resume(SAVED)).toBeNull();
     expect(playing(app)).toBeNull();
+  });
+
+  it('ends with the table where the new link\'s restart fails or throws', async () => {
+    for (const fails of ['refused', 'throws'] as const) {
+      seen.created = { status: 201, json: { secret: 's'.repeat(43), maxPlayers: 12 } };
+      const { online, app, frames } = await hosting();
+      if (fails === 'refused') seen.created = { status: 500, json: null };
+      // The account's token can be read for the check before the restart, and no more after it.
+      let reads = 0;
+      const token = vi.spyOn(signedIn, 'token').mockImplementation(() => {
+        reads += 1;
+        if (fails === 'throws' && reads > 1) throw new Error('keychain');
+        return 'account-token';
+      });
+      await online.newLink().catch(() => undefined);
+      token.mockRestore();
+      expect(frames().at(-1), fails).toEqual({ v: 1, t: 'end' });
+      expect(online.table, fails).toBeNull();
+      expect(playing(app), fails).toBeNull();
+    }
+  });
+
+  it('ends its table when the campaign is deleted while the table runs', async () => {
+    const { online, app, frames, saves } = await hosting();
+    // What the campaign page and `recordCampaignPlay` do once the campaign is gone.
+    CampaignPlay.forApp(app).stop();
+    expect(online.table).toBeNull();
+    expect(frames().at(-1)).toEqual({ v: 1, t: 'end' });
+    expect(saves.at(-1)).toBeNull();
   });
 
   it('stays the same while a new link starts the table again', async () => {
