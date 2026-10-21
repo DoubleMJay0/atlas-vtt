@@ -9,6 +9,7 @@ import { sheetState } from '../../../statblocks/render/sheetState';
 import { readerFor } from '../../../statblocks/values/fieldValues';
 import { shownRecord } from './playerAccess.ts';
 import { placedSheetValues } from './placedResources.ts';
+import { sheetReferences } from './sheetReferences.ts';
 import { trackedSheetValues } from './trackedSheet.ts';
 import { SheetBudget } from './sheetBudget.ts';
 import type { SheetBuild } from './sheetFields.ts';
@@ -108,6 +109,8 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
   const blocks = fittedNodes(build.budget, head.description ? [head.description, ...nodes] : nodes);
   const abilities = fittedAbilities(build.budget, walk.abilities);
   const hitPoints = head.hitPoints !== null && build.budget.takeNode(head.hitPoints) ? head.hitPoints : null;
+  // What the player's references read, for what they write before this statblock is drawn again
+  const references = editable ? sheetReferences(template, shown, fields) : undefined;
   if (build.budget.droppedNodes > 0) console.warn(`[Atlas] The statblock ${input.resolved.path} is larger than a player's page takes: its last ${build.budget.droppedNodes} blocks are left out.`);
   return {
     editable,
@@ -117,6 +120,7 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
     abilities,
     card: sheetCard(template, input.panelWidth, head.description !== null && blocks[0] === head.description),
     ...(hitPoints !== null && { hitPoints }),
+    ...(references !== undefined && { references }),
   };
 }
 

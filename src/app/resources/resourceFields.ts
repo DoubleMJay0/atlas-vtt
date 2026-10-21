@@ -6,7 +6,8 @@ import type { ResourceValue } from './resourceTypes';
 /** A statblock key without case, spaces, underscores and hyphens: `Max Stress` and `max_stress` are one field. */
 export const normalizedKey = (key: string): string => key.toLowerCase().replace(/[\s_-]/g, '');
 
-const HIT_POINT_KEYS = ['hp', 'health', 'hitpoints'];
+/** The usual names of hit points, without case or separators. */
+export const HIT_POINT_KEYS: readonly string[] = ['hp', 'health', 'hitpoints'];
 
 /** Whether a statblock key or label ("hp", "Hit Points:", "Health") names hit points. */
 export function isHitPointsKey(key: string): boolean {
