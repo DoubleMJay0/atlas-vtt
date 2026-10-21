@@ -3,8 +3,9 @@
  * before a rename (the note's value under either), a dotted index into it (`stats.0`, `saves.dex`), a Table's slot by its name or
  * key in any Table field (`@str`, `@strength`, `@stats.str`) with a worked-out row of the Table
  * after it (`@str.mod`, `@str.save`: the row's own entry for the slot, else its formula over the
- * score), else what the statblock's meanings and loose key matching find (`@hp`). Only a single
- * value is read: a list or a record is no number. Pure.
+ * score), else what the statblock's meanings and loose key matching find (`@hp`), else a field by its
+ * label (`@str` for a field labelled "Str"; `fieldsByLabel`). Only a single value is read: a list or
+ * a record is no number. Pure.
  */
 
 import { normalizedKey, resolveField } from '../../resources/resourceFields';
@@ -34,6 +35,33 @@ const MAX_EXPANSIONS = 256;
 const NOTHING_READ: ReadonlySet<string> = new Set();
 
 const isSingle = (value: unknown): value is string | number | boolean => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+
+/** A name as a label and a reference's part are compared by: lower case, letters and digits only. */
+const plainName = (text: string): string => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+/**
+ * The fields a reference may also name by their label ("Str" for `strength`), keyed by the label in
+ * lower case without spaces or punctuation: only a label one field alone holds, and that no field's
+ * key, former key or Table slot is named by, so a label never stands for two fields nor for a name
+ * the statblock reads already.
+ */
+export function fieldsByLabel(fields: readonly TemplateField[]): Map<string, TemplateField> {
+  const claimed = new Set<string>();
+  const labelled = new Map<string, TemplateField | null>();
+  for (const field of fields) {
+    for (const key of [field.key, ...(field.formerKeys ?? [])]) claimed.add(plainName(key));
+    if (field.type === 'scores') {
+      (field.slots ?? []).forEach((name, index) => {
+        for (const each of [name, slotKeyOf(field, index)]) if (each !== undefined) claimed.add(plainName(each));
+      });
+    }
+    const label = plainName(field.label);
+    if (label !== '') labelled.set(label, labelled.has(label) ? null : field);
+  }
+  const fieldsOf = new Map<string, TemplateField>();
+  for (const [label, field] of labelled) if (field !== null && !claimed.has(label)) fieldsOf.set(label, field);
+  return fieldsOf;
+}
 
 /** The worked-out rows of the first Table block drawing each Table field. */
 export function tableColumns(template: StatblockTemplate): Map<FieldKey, readonly ScoreColumn[]> {
@@ -104,8 +132,7 @@ export function statblockLookup(template: StatblockTemplate, record: FieldRecord
     return key === undefined ? path : [key, ...rest].join('.');
   };
 
-  const read = (written: string): string | number | boolean | undefined => {
-    const path = current(written);
+  const readAt = (path: string): string | number | boolean | undefined => {
     const direct = reader(path);
     if (isSingle(direct)) return direct;
     const slot = slotValue(path);
@@ -113,6 +140,18 @@ export function statblockLookup(template: StatblockTemplate, record: FieldRecord
     loose ??= { record: withFormerKeysAliased(record, fields), meanings: meaningsOf(fields) };
     const found = resolveField(loose.record, path, loose.meanings);
     return isSingle(found) ? found : undefined;
+  };
+
+  // A path whose first part is a field's label (`@str` for "Str") reads that field, once nothing else answers
+  let labels: Map<string, TemplateField> | null = null;
+  const read = (written: string): string | number | boolean | undefined => {
+    const path = current(written);
+    const found = readAt(path);
+    if (found !== undefined) return found;
+    const [first, ...rest] = path.split('.');
+    labels ??= fieldsByLabel(fields);
+    const field = first === undefined ? undefined : labels.get(plainName(first));
+    return field === undefined ? undefined : readAt([field.key, ...rest].join('.'));
   };
 
   // A value that names references itself (`ac: 10 + @dex.mod`) reads as what it comes to, a few steps

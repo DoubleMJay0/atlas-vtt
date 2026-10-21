@@ -45,6 +45,26 @@ describe('the numbers a player\'s references read on their sheet', () => {
     expect(fillReferences('1d20 + @int.mod', lookup).text).toBe('1d20 - 1');
   });
 
+  it('names a field by its label too, as the card reads it, never one the player may not see', () => {
+    const fields: TemplateField[] = [
+      { key: 'name', label: 'Name', type: 'text' },
+      { key: 'agility', label: 'Agi', type: 'number' },
+      { key: 'strength', label: 'Str', type: 'number' },
+      { key: 'luck', label: 'Lck', type: 'number' },
+      { key: 'background', label: 'Background', type: 'markdown' },
+    ];
+    const template: StatblockTemplate = {
+      ...templateOf(fields, [{ id: 'traits01', type: 'metric', fields: ['agility', 'strength', 'luck'] }, { id: 'back0001', type: 'text', field: 'background' }]),
+      players: { luck: 'hidden' },
+    };
+    const note = { name: 'Kestrel Vane', agility: 1, strength: 2, luck: 777, background: 'It feels pretty good 2d8+@str' };
+    const references = statblockSheet({ resolved: resolvedOf(template, note, 'ok'), definitions: [], resources: undefined })!.references;
+    expect(references).toMatchObject({ agi: 1, str: 2, agility: 1, strength: 2 });
+    expect(references).not.toHaveProperty('lck');
+    expect(references).not.toHaveProperty('luck');
+    expect(fillReferences('2d8+@str', (path) => referenceNumber(references, path)).text).toBe('2d8+2');
+  });
+
   it('names nothing of a field the player may not see', () => {
     const statblock = drawn()!;
     expect(statblock.references).not.toHaveProperty('secret');
