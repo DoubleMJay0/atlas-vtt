@@ -42,14 +42,15 @@ export class StatblockPreviewWindow {
     viewId?: string,
     /** The view, scene and token a token on a map was hovered in; none for a token in a list. */
     originContext?: TokenRollContext,
+    /** The document of the window the token was hovered in, which may be a popout's. */
+    doc: Document = document,
   ) {
     this.notePath = notePath;
     this.originatingPin = 'type' in originatingToken ? originatingToken : null;
     this.manager = manager;
     this.initialPos = initialPos;
 
-    // The focused window's: a token hovered in a popout shows its statblock there
-    this.element = activeDocument.body.createDiv({ cls: 'atlas-statblock-preview-window' });
+    this.element = doc.body.createDiv({ cls: 'atlas-statblock-preview-window' });
     this.element.setAttribute('tabindex', '-1');
 
     if (initialPos) {
@@ -96,7 +97,7 @@ export class StatblockPreviewWindow {
 
     this.element.classList.add('atlas-statblock-preview-window--measuring');
 
-    window.requestAnimationFrame(() => {
+    this.element.win.requestAnimationFrame(() => {
       if (!this.element) return;
 
       // Cap the window to the viewport first, so the measurement below is of

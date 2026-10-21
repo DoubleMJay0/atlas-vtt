@@ -59,20 +59,40 @@ describe('bridgePopoutPointer', () => {
     expect(typeof prototype._onPointerUp).toBe('function');
   });
 
-  it("hands the popout's pointer moves and releases to PIXI until stopped", () => {
+  it("moves PIXI's move and release listeners to the popout, and back when stopped", () => {
     const win = popout();
-    const handlers = { _onPointerMove: vi.fn(), _onPointerUp: vi.fn() };
-    const stop = bridgePopoutPointer(handlers as unknown as EventSystem, win);
-    win.document.dispatchEvent(new win.MouseEvent('pointermove'));
-    win.dispatchEvent(new win.MouseEvent('pointerup'));
-    expect(handlers._onPointerMove).toHaveBeenCalledTimes(1);
-    expect(handlers._onPointerUp).toHaveBeenCalledTimes(1);
+    const events = { _onPointerMove: vi.fn(), _onPointerUp: vi.fn(), domElement: document.createElement('canvas') };
+    // As PIXI's `_addEvents` binds them on the main window
+    document.addEventListener('pointermove', events._onPointerMove, true);
+    window.addEventListener('pointerup', events._onPointerUp, true);
+    const moveIn = (target: Window): void => {
+      target.document.dispatchEvent(new target.MouseEvent('pointermove'));
+      target.dispatchEvent(new target.MouseEvent('pointerup'));
+    };
+
+    const stop = bridgePopoutPointer(events as unknown as EventSystem, win);
+    moveIn(window);
+    expect(events._onPointerMove).not.toHaveBeenCalled();
+    moveIn(win);
+    expect(events._onPointerMove).toHaveBeenCalledTimes(1);
+    expect(events._onPointerUp).toHaveBeenCalledTimes(1);
 
     stop();
-    win.document.dispatchEvent(new win.MouseEvent('pointermove'));
-    win.dispatchEvent(new win.MouseEvent('pointerup'));
-    expect(handlers._onPointerMove).toHaveBeenCalledTimes(1);
-    expect(handlers._onPointerUp).toHaveBeenCalledTimes(1);
+    moveIn(win);
+    moveIn(window);
+    expect(events._onPointerMove).toHaveBeenCalledTimes(2);
+    expect(events._onPointerUp).toHaveBeenCalledTimes(2);
+    document.removeEventListener('pointermove', events._onPointerMove, true);
+    window.removeEventListener('pointerup', events._onPointerUp, true);
+  });
+
+  it('leaves the main window alone when PIXI let go of its listeners meanwhile', () => {
+    const events = { _onPointerMove: vi.fn(), _onPointerUp: vi.fn(), domElement: document.createElement('canvas') as HTMLCanvasElement | null };
+    const stop = bridgePopoutPointer(events as unknown as EventSystem, popout());
+    events.domElement = null;
+    stop();
+    document.dispatchEvent(new MouseEvent('pointermove'));
+    expect(events._onPointerMove).not.toHaveBeenCalled();
   });
 });
 
