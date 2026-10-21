@@ -13,7 +13,7 @@ import { ValueTransition } from '../../utils/ValueTransition';
 import { getTokenRingOuterDiameter } from '../tokenRingMetrics';
 import { computeTokenStrokeWidth, restingTokenUIScale } from '../tokenSizing';
 import type { TokenGroupContainer } from '../types';
-import { MARKER_GROW_FROM, MARKER_GROW_MS, turnMarkerStrokes } from './turnMarkerShape';
+import { MARKER_GROW_FROM, MARKER_GROW_MS, MARKER_REACH_UNITS, turnMarkerStrokes } from './turnMarkerShape';
 
 /**
  * Curves are drawn this many times larger and scaled down: PIXI builds a circle from a number of
@@ -43,6 +43,8 @@ export interface TurnMarkerDeps {
   reducedMotion(): boolean;
   /** The entry ids of the defeated combatants, which hold no turn of their side; none without. */
   defeated?(state: TurnMarkerState): ReadonlySet<string>;
+  /** Called once a token gains or loses its marker. */
+  onMarkedChange?(): void;
 }
 
 /** The marker on one token: the drawn rings in a container that grows in and follows the token. */
@@ -131,6 +133,12 @@ export class TurnMarkers {
     return [...this.markers.keys()];
   }
 
+  /** How far the marker on `tokenId` reaches beyond the token's edge, in world units; 0 for a token without one. */
+  reach(tokenId: string): number {
+    if (!this.markers.has(tokenId)) return 0;
+    return MARKER_REACH_UNITS * restingTokenUIScale(this.deps.getState().grid?.size ?? 70);
+  }
+
   /** Follows the tokens by the ticker there is now (the app's, once the renderer has one). */
   followTicker(): void {
     if (this.markers.size > 0) this.startFollowing();
@@ -195,15 +203,18 @@ export class TurnMarkers {
     this.shownKey = key;
     if (turnMoved) this.accent = readAccent();
     const grow = animate && !state.isMapLoading && !this.deps.reducedMotion();
+    let marked = false;
     for (const [tokenId, marker] of this.markers) {
       if (ids.has(tokenId)) continue;
       marker.destroy();
       this.markers.delete(tokenId);
+      marked = true;
     }
     for (const tokenId of ids) {
       let marker = this.markers.get(tokenId);
       const isNew = marker === undefined;
       if (!marker) {
+        marked = true;
         marker = new TurnMarker();
         this.markers.set(tokenId, marker);
         this.layer.addChild(marker.view);
@@ -214,6 +225,7 @@ export class TurnMarkers {
     }
     if (this.markers.size > 0) this.startFollowing();
     else this.stopFollowing();
+    if (marked) this.deps.onMarkedChange?.();
   }
 
   private drawMarker(tokenId: string, marker: TurnMarker, force = false): void {

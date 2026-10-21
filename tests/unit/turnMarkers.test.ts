@@ -24,6 +24,7 @@ function sprite(x: number, y: number): TokenGroupContainer {
 function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>, sprites: Record<string, TokenGroupContainer>, reduced = true, defeated: ReadonlySet<string> = new Set()) {
   let state: TurnMarkerState = { initiative, objects: { tokens }, grid: { size: 70 }, isMapLoading: false };
   const listeners = new Set<(next: TurnMarkerState) => void>();
+  const marked = { count: 0 };
   const world = new Container();
   const ticker = new Ticker();
   const markers = new TurnMarkers({
@@ -37,13 +38,14 @@ function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>,
     ticker: () => ticker,
     reducedMotion: () => reduced,
     defeated: () => defeated,
+    onMarkedChange: () => { marked.count += 1; },
   });
   const set = (changes: Partial<TurnMarkerState>): void => {
     state = { ...state, ...changes };
     for (const listener of listeners) listener(state);
   };
   const follow = (): void => ticker.update(performance.now() + 16);
-  return { markers, world, set, follow, get: () => state };
+  return { markers, world, set, follow, marked, get: () => state };
 }
 
 const cleanups: (() => void)[] = [];
@@ -172,5 +174,17 @@ describe('the turn marker', () => {
     expect(strokes.map((stroke) => [stroke.radius, stroke.width, stroke.ink])).toEqual([[37.5, 1, 'dark'], [39.5, 3, 'accent'], [44, 6, 'accent']]);
     const halo = strokes[2]!;
     expect(halo.radius + halo.width / 2).toBe(35 + MARKER_REACH_UNITS);
+  });
+
+  it('tells how far its marker reaches, and when a token gains or loses one, so a selection can stand outside it', () => {
+    const { markers, set, marked } = setup(order('ogre'), tokens, sprites);
+    cleanups.push(() => markers.destroy());
+    expect(markers.reach('ogre')).toBe(MARKER_REACH_UNITS);
+    expect(markers.reach('hero')).toBe(0);
+    const before = marked.count;
+    set({ initiative: order('ogre'), grid: { size: 70 } });
+    expect(marked.count).toBe(before);
+    set({ initiative: order('hero') });
+    expect(marked.count).toBe(before + 1);
   });
 });

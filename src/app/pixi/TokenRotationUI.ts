@@ -3,7 +3,7 @@ import { Viewport } from 'pixi-viewport';
 import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
 import { getTokenRingCenterRadius } from './token-renderer/tokenRingMetrics';
-import { computeTokenPixelSize, computeTokenStrokeWidth, tokenUIScale } from './token-renderer/tokenSizing';
+import { computeTokenPixelSize, computeTokenStrokeWidth, TOKEN_HANDLE_LABEL, tokenUIScale } from './token-renderer/tokenSizing';
 import { toError } from '../utils/errors';
 import type { TokenGestureEventDetail } from '../types/atlasWindowEvents';
 import type { TokenHandleContainer } from './token-renderer/types';
@@ -238,7 +238,7 @@ export class TokenRotationUI {
     // Get theme colors - matching status badges
     const isDarkMode = document.body.classList.contains('theme-dark');
     const bg = new Graphics();
-    const handle: TokenHandleContainer = Object.assign(new Container(), { bg, isDarkMode });
+    const handle: TokenHandleContainer = Object.assign(new Container({ label: TOKEN_HANDLE_LABEL }), { bg, isDarkMode });
     handle.eventMode = 'static';
     handle.interactive = true;
     handle.cursor = 'grab';
