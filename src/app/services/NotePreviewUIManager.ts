@@ -2,7 +2,7 @@ import { App, WorkspaceLeaf, TFile, EventRef } from 'obsidian';
 import { EventEmitter } from 'events';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { NotePin } from '../types';
-import type { TokenVitals } from './statblockVitalsSync';
+import { toTokenVitals, type TokenVitals } from './statblockVitalsSync';
 import { NotePreviewWindow } from './NotePreviewWindow';
 import { StatblockPreviewWindow } from './StatblockPreviewWindow';
 import { isStatblockNote, statblockNoteKnown, unparsedFrontmatterStatblock } from '../statblocks/resolve/statblockNote';
@@ -15,6 +15,7 @@ import { isModHeld } from '../keyboard/modKey';
 import type { ViewAtlasStore } from '../storeFactory';
 import type { TokenRollContext } from '../types/diceRollOrigin';
 import { captureRollContext } from '../tools/diceRollOrigins';
+import { mapTokens } from '../tokens/offMap';
 
 /**
  * A hovered token presented to the preview system like a pin on its linked
@@ -352,6 +353,11 @@ export class NotePreviewUIManager {
         );
         
         if (statblockPreview.element) {
+          // A pinned preview stays open while the token changes on the map.
+          statblockPreview.followVitals((show) => this.store.subscribe(
+            (state) => mapTokens(state.objects)[pin.id],
+            (token) => { if (token) show(toTokenVitals(token)); },
+          ));
           const previewKey = `${pin.notePath}::${pin.id}`;
           this.activePreviews.set(previewKey, statblockPreview);
           this.raiseZIndex(statblockPreview);

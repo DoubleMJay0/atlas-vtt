@@ -2,6 +2,11 @@
   "version": "0.9.1-beta.0",
   "releases": [
     {
+      "version": "0.9.1-beta.0",
+      "title": "Coming in 0.9.1",
+      "markdown": "## Fixed\n- Statblock previews on the map can be moved and pinned again, and their images shown to players"
+    },
+    {
       "version": "0.9.0",
       "date": "2026-10-20",
       "title": "Encounter builder, recovery actions and a new initiative tracker",
