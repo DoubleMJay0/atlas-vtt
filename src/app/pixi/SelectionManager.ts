@@ -13,6 +13,8 @@ import { prefersReducedMotion } from '../utils/motion';
 import type { LayerVisibility } from './playerSafeFrame';
 import { MAP_LAYER_Z } from './mapLayerOrder';
 import { pointInPolygon } from '../vision/visibility';
+import { GroupRotation, type GroupTurnHost } from './selection/GroupRotation';
+import { mapTokens } from '../tokens/offMap';
 
 export class SelectionManager {
   private viewport: Viewport;
@@ -25,6 +27,8 @@ export class SelectionManager {
   private hitTestTokensProvider?: (worldX: number, worldY: number) => string | null;
 
   private readonly highlights: SelectionHighlights;
+  private readonly groupRotation: GroupRotation;
+  private groupTurnHost: GroupTurnHost | null = null;
   private marqueeGraphics: Graphics;
   private selectionStart: { x: number; y: number } | null = null;
   private selectionMode: 'box' | 'lasso' = 'box';
@@ -68,6 +72,17 @@ export class SelectionManager {
     });
     // Beneath the marquee
     this.viewport.addChildAt(this.highlights.layer, this.viewport.getChildIndex(this.marqueeGraphics));
+    this.groupRotation = new GroupRotation({
+      viewport,
+      store,
+      host: () => this.groupTurnHost,
+      frame: () => this.highlights.groupFrameBox(),
+      turnFrame: (turn) => this.highlights.turnGroup(turn),
+      refresh: () => this.updateSelectionOverlay(),
+      accent: () => cssColorToHexNumber(getObsidianAccentColor()),
+      reducedMotion: () => typeof window === 'undefined' || prefersReducedMotion(viewport.options?.events?.domElement ?? document.body),
+    });
+    this.viewport.addChild(this.groupRotation.layer);
 
     this.marqueeDownHandler = this.handleMarqueeStart.bind(this);
     this.marqueeMoveHandler = this.handleMarqueeMove.bind(this);
@@ -87,6 +102,8 @@ export class SelectionManager {
     
     // Listen for map load events to clear selection
     this.mapLoadedHandler = () => {
+      // A group turned on the scene that was there is put back, not dropped into this one
+      this.groupRotation.cancel();
       // Clear selection state
       this.store.getState().clearSelection();
       // Clear any active marquee
@@ -102,6 +119,17 @@ export class SelectionManager {
 
   public setHitTestTokensProvider(fn: (worldX: number, worldY: number) => string | null): void {
     this.hitTestTokensProvider = fn;
+  }
+
+  /** What turns the tokens of a group turned from the button above its frame; without one there is no button. */
+  public setGroupTurnHost(host: GroupTurnHost): void {
+    this.groupTurnHost = host;
+    this.updateSelectionOverlay();
+  }
+
+  /** Escape cancels a group being turned; whether it did. */
+  public handleEscape(): boolean {
+    return this.groupRotation.cancel();
   }
 
   private subscribeToStoreChanges(): void {
@@ -141,6 +169,8 @@ export class SelectionManager {
           }
           this.selectionStart = null; // Clear selection state if tool changes
         }
+        // The group's rotate button is offered with the tools that move the selection
+        this.updateSelectionOverlay();
       },
       { fireImmediately: true }
     );
@@ -178,6 +208,7 @@ export class SelectionManager {
     if (this.selectionMode === 'lasso') {
       this.lassoPoints = [{ x: worldPos.x, y: worldPos.y }];
     }
+    this.updateSelectionOverlay();
   }
 
   private handleMarqueeMove(e: FederatedPointerEvent): void {
@@ -319,13 +350,13 @@ export class SelectionManager {
       }
     }
     
-    this.store.getState().setSelection(selectedIds);
     if (this.marqueeGraphics && !this.marqueeGraphics.destroyed) {
       this.marqueeGraphics.clear();
     }
     this.selectionStart = null;
     this.lassoPoints = [];
-    // updateSelectionOverlay will be called by the store subscription
+    // The store subscription shows the new selection, now without a marquee under way
+    this.store.getState().setSelection(selectedIds);
   }
   
   private getDrawingBoundsById(): Array<[string, DrawingBounds]> {
@@ -361,21 +392,25 @@ export class SelectionManager {
 
   /** DM selection feedback that must not reach the mirrored player frame. */
   public getPlayerViewLayers(): LayerVisibility[] {
-    return [this.highlights.layer, this.marqueeGraphics].map(layer => ({ layer, visible: false }));
+    return [this.highlights.layer, this.marqueeGraphics, this.groupRotation.layer].map(layer => ({ layer, visible: false }));
   }
 
   /** Draws the selection as the canvas shows it now: called when it or a selected thing changes. */
   public updateSelectionOverlay(): void {
     if (this.highlights.layer.destroyed) return;
     const { selectedIds, objects } = this.store.getState();
-    this.highlights.show(selectionTargets(selectedIds, {
+    const targets = selectionTargets(selectedIds, {
       world: this.viewport,
       tokens: this.tokenRendererProvider(),
       drawings: objects.drawings,
       fog: this.fogSpriteProvider(),
       bars: this.barsProvider,
       markReach: this.markReachProvider,
-    }));
+    });
+    this.highlights.show(targets);
+    const tokens = mapTokens(objects);
+    const tokenIds = this.groupTurnHost ? targets.filter((target) => tokens[target.id]).map((target) => target.id) : [];
+    this.groupRotation.follow(this.highlights.groupFrameBox(), tokenIds, this.selectionStart !== null);
   }
 
   /** Re-registers viewport event listeners, pushing them to the end of the listener queue.
@@ -411,6 +446,8 @@ export class SelectionManager {
       this.eventBus.off('map-loaded', this.mapLoadedHandler);
       this.mapLoadedHandler = null;
     }
+
+    this.groupRotation.destroy();
 
     // Destroy graphics objects
     if (this.marqueeGraphics && !this.marqueeGraphics.destroyed) {

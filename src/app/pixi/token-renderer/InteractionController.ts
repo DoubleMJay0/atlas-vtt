@@ -477,20 +477,13 @@ export class InteractionController implements ITokenInteractionController {
       const dy = worldPos.y - this.dragState.dragStartPointer.y;
       
       const tokenUpdates: Array<{id: string, x: number, y: number}> = [];
-      const snapToGrid = this.store.getState().grid?.snapToGrid ?? true;
       const tokens = mapTokens(this.store.getState().objects);
       
       for (const id of this.dragState.dragIds) {
         const initPos = this.dragState.initialPositions[id];
         if (!initPos) continue;
         
-        const newX = initPos.x + dx;
-        const newY = initPos.y + dy;
-        
-        // Snap to grid if enabled
-        const finalPos = snapToGrid 
-          ? this.gridSystem.snapTokenCenter(newX, newY, tokens[id]?.size || 1)
-          : { x: newX, y: newY };
+        const finalPos = this.landing({ x: initPos.x + dx, y: initPos.y + dy }, tokens[id]?.size || 1);
         
         // The token, with its resource bars and nameplate, glides from the pointer to where it snaps
         this.settleToken?.(id, finalPos.x, finalPos.y);
@@ -526,6 +519,12 @@ export class InteractionController implements ITokenInteractionController {
       this.dragState.selectsOnRelease = false;
       this.reportHeld([]);
     }
+  }
+
+  /** Where the centre of a token of `size` let go at `point` comes to rest: on the grid where the scene snaps to it. */
+  public landing(point: { x: number; y: number }, size: number): { x: number; y: number } {
+    const snapToGrid = this.store.getState().grid?.snapToGrid ?? true;
+    return snapToGrid ? this.gridSystem.snapTokenCenter(point.x, point.y, size) : point;
   }
 
   /** The store notes where the held tokens stand (`holdTokens`: sight waits there for the drop); then the token UI. */

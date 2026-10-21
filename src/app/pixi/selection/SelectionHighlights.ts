@@ -9,6 +9,7 @@ import {
   type Box, type HighlightPath, type Notch, type RoundedBox, type SelectionOutline,
 } from './selectionGeometry';
 import { drawGroupFrame, drawHighlight } from './selectionInk';
+import type { FrameTurn } from './GroupRotation';
 
 /** One selected thing as the highlights see it, in world units. */
 export interface SelectionTarget {
@@ -115,6 +116,8 @@ export class SelectionHighlights {
   private frame: RoundedBox | null = null;
   private frameZoom = 1;
   private targets: readonly SelectionTarget[] = [];
+  /** While a group is turned as one, its frame turns with it and holds still otherwise. */
+  private turn: FrameTurn | null = null;
   private zoom = 1;
   private accent = 0;
   private readonly themeObserver: MutationObserver | null;
@@ -167,6 +170,30 @@ export class SelectionHighlights {
     return roundedBoxContains(this.frame, { x: worldX * this.frameZoom, y: worldY * this.frameZoom }, SELECTION_LOOK.groupStroke);
   }
 
+  /** The group frame as drawn, in world units; null while there is none. */
+  groupFrameBox(): Box | null {
+    const frame = this.frame;
+    if (!frame) return null;
+    return { x: frame.x / this.frameZoom, y: frame.y / this.frameZoom, width: frame.width / this.frameZoom, height: frame.height / this.frameZoom };
+  }
+
+  /**
+   * Turns the group frame `degrees` about `centre` (world units) as the group turns, keeping it as it
+   * was drawn; null lets it follow what it holds again.
+   */
+  turnGroup(turn: FrameTurn | null): void {
+    this.turn = turn;
+    if (turn) {
+      this.group.pivot.set(turn.centre.x * this.frameZoom, turn.centre.y * this.frameZoom);
+      this.group.position.set(turn.centre.x, turn.centre.y);
+      this.group.rotation = (turn.degrees * Math.PI) / 180;
+      return;
+    }
+    this.group.pivot.set(0, 0);
+    this.group.position.set(0, 0);
+    this.group.rotation = 0;
+  }
+
   /** Reads the theme's accent again and redraws what is shown in it. */
   refreshTheme(): void {
     if (this.targets.length === 0) return;
@@ -196,6 +223,7 @@ export class SelectionHighlights {
 
   /** The group frame lies in screen pixels about the world's origin, scaled back like the highlights. */
   private showGroup(frame: RoundedBox | null, animate: () => boolean): void {
+    if (this.turn) return;
     this.frame = frame;
     this.frameZoom = this.zoom;
     const key = frame ? `${JSON.stringify(frame)}|${this.accent}` : '';

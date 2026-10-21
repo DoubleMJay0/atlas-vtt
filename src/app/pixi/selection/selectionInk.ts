@@ -66,3 +66,11 @@ export function drawGroupFrame(graphics: Graphics, frame: RoundedBox, accent: nu
     .roundRect(frame.x, frame.y, frame.width, frame.height, frame.radius)
     .stroke({ width: SELECTION_LOOK.groupStroke, color: accent, alpha: GROUP_ALPHA });
 }
+
+/** The stem that carries a group's rotate handle, from the group frame's top edge (`from`) to the handle (`to`): the frame's own line. */
+export function drawGroupStem(graphics: Graphics, from: number, to: number, accent: number): void {
+  graphics
+    .moveTo(0, from)
+    .lineTo(0, to)
+    .stroke({ width: SELECTION_LOOK.groupStroke, color: accent, alpha: GROUP_ALPHA });
+}
