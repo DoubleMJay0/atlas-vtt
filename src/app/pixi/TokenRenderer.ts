@@ -271,8 +271,6 @@ export class TokenRenderer {
       ticker: () => this.pixiApp?.ticker ?? null,
       reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
       defeated: (state) => defeatedCombatants(state.initiative.entries, sceneTokens(state.objects), this.resourceDefsProvider()),
-      // A selected token's highlight steps outside the marker that comes or goes
-      onMarkedChange: () => this.selectionOverlayUpdater(),
     });
     this.collectionSync = new TokenCollectionSync(obsApp, store.getState, {
       refreshRules: () => this.refreshCollectionRules(),
@@ -1493,11 +1491,6 @@ export class TokenRenderer {
   /** How far a selected token's bars stand out from it, in world units. */
   public bars(tokenId: string): BarsSpan {
     return this.uiManager.bars(tokenId);
-  }
-
-  /** How far the token's turn marker reaches beyond its edge, in world units; 0 for a token without one. */
-  public turnMarkerReach(tokenId: string): number {
-    return this.turnMarkers.reach(tokenId);
   }
 
   /** What the ruler of the drag under way measures, or null while it shows none. */

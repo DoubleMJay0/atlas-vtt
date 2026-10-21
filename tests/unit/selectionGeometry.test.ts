@@ -13,11 +13,6 @@ describe('tokenOutline', () => {
     expect(tokenOutline(ringed)).toEqual({ kind: 'circle', radius: 35 });
   });
 
-  it('steps outside the turn marker of the token whose turn it is', () => {
-    expect(tokenOutline(ringed, 12)).toEqual({ kind: 'circle', radius: 47 });
-    expect(tokenOutline({ ...ringed, ringDiameter: null }, 12)).toEqual({ kind: 'circle', radius: 31 + 12 });
-  });
-
   it('follows the art of a token shown without a ring, turned with it', () => {
     const art = { width: 62, height: 40, rotation: 0.5 };
     expect(tokenOutline({ ...ringed, ringDiameter: null, art })).toEqual({ kind: 'rect', width: 62, height: 40, rotation: 0.5, cornerRadius: 0 });

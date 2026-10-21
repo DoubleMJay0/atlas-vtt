@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TurnMarkers, type TurnMarkerState } from '../../src/app/pixi/token-renderer/turnMarker/TurnMarkers';
 import { MAP_LAYER_Z } from '../../src/app/pixi/mapLayerOrder';
 import { TOKEN_UI_Z_INDEX } from '../../src/app/pixi/TokenControlsUI';
-import { turnMarkerStrokes, MARKER_REACH_UNITS } from '../../src/app/pixi/token-renderer/turnMarker/turnMarkerShape';
+import type { GlowTextureSource } from '../../src/app/pixi/token-renderer/turnMarker/TurnMarker';
+import { TurnGlowTextures } from '../../src/app/pixi/token-renderer/turnMarker/turnGlowTextures';
 import type { TokenGroupContainer } from '../../src/app/pixi/token-renderer/types';
 import type { TokenEntity } from '../../src/app/types';
 import { createDefaultInitiativeState, type InitiativeEntry, type InitiativeState } from '../../src/app/types/initiativeTypes';
@@ -20,11 +21,30 @@ function sprite(x: number, y: number): TokenGroupContainer {
   return group;
 }
 
+/** Glow textures held per shape, without a canvas to paint them on. */
+function countingGlows(): GlowTextureSource & { held: Map<string, number> } {
+  const held = new Map<string, number>();
+  return {
+    held,
+    take: (extent) => {
+      const key = `${extent.radius}`;
+      held.set(key, (held.get(key) ?? 0) + 1);
+      return { key, texture: null };
+    },
+    release: (key) => {
+      const users = (held.get(key) ?? 0) - 1;
+      if (users > 0) held.set(key, users);
+      else held.delete(key);
+    },
+    destroy: () => held.clear(),
+  };
+}
+
 /** A store and the markers over it; `sprites` are the tokens on the map (one beside the map has none). */
-function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>, sprites: Record<string, TokenGroupContainer>, reduced = true, defeated: ReadonlySet<string> = new Set()) {
+function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>, sprites: Record<string, TokenGroupContainer>, reduced = true, defeated: ReadonlySet<string> = new Set(), glowSource?: GlowTextureSource) {
   let state: TurnMarkerState = { initiative, objects: { tokens }, grid: { size: 70 }, isMapLoading: false };
   const listeners = new Set<(next: TurnMarkerState) => void>();
-  const marked = { count: 0 };
+  const glows = countingGlows();
   const world = new Container();
   const ticker = new Ticker();
   const markers = new TurnMarkers({
@@ -38,14 +58,14 @@ function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>,
     ticker: () => ticker,
     reducedMotion: () => reduced,
     defeated: () => defeated,
-    onMarkedChange: () => { marked.count += 1; },
+    glows: glowSource ?? glows,
   });
   const set = (changes: Partial<TurnMarkerState>): void => {
     state = { ...state, ...changes };
     for (const listener of listeners) listener(state);
   };
   const follow = (): void => ticker.update(performance.now() + 16);
-  return { markers, world, set, follow, marked, get: () => state };
+  return { markers, world, set, follow, glows, get: () => state };
 }
 
 const cleanups: (() => void)[] = [];
@@ -113,10 +133,10 @@ describe('the turn marker', () => {
     const { markers } = setup({ ...order('none'), sides: { first: 'players', active: 'opponents' } }, tokens, sprites);
     cleanups.push(() => markers.destroy());
     const seen = (id: string): boolean => id === 'ogre';
-    const visible = markers.playerLayers(seen, true).map((layer) => layer.visible);
+    const markerLayers = (shown: boolean): boolean[] => markers.playerLayers(seen, shown).filter(({ layer }) => layer.label !== 'turnArcs').map(({ visible }) => visible);
     // The layer, then the ogre's and the ghost's markers
-    expect(visible).toEqual([true, true, false]);
-    expect(markers.playerLayers(seen, false).every((layer) => !layer.visible)).toBe(true);
+    expect(markerLayers(true)).toEqual([true, true, false]);
+    expect(markerLayers(false).every((visible) => !visible)).toBe(true);
     // A picture of the scene shows none
     expect(markers.pictureLayers()).toEqual([{ layer: markers.layer, visible: false }]);
   });
@@ -143,8 +163,8 @@ describe('the turn marker', () => {
     expect(markers.tokenIds).toEqual(['ghost']);
   });
 
-  it('grows in as the turn comes, unless motion is reduced, and then stands still', () => {
-    // The grow runs on animation frames: here they wait to be called
+  it('lands as the turn comes, unless motion is reduced, and then stands still', () => {
+    // The landing runs on animation frames: here they wait to be called
     const frames: FrameRequestCallback[] = [];
     vi.stubGlobal('window', { requestAnimationFrame: (run: FrameRequestCallback) => frames.push(run), cancelAnimationFrame: () => undefined });
     cleanups.push(() => vi.unstubAllGlobals());
@@ -153,10 +173,10 @@ describe('the turn marker', () => {
     // The first look at a running fight draws it as it stands
     expect(markers.layer.children[0]?.scale.x).toBe(1);
     set({ initiative: order('hero') });
-    expect(markers.layer.children[0]?.scale.x).toBeLessThan(1);
+    expect(markers.layer.children[0]?.scale.x).toBeGreaterThan(1);
     // Players see it fade in as the canvas does
-    const [, growing] = markers.playerLayers(() => true, true);
-    expect(growing?.alpha).toBe(0);
+    const [, landing] = markers.playerLayers(() => true, true);
+    expect(landing?.alpha).toBe(0);
     vi.spyOn(performance, 'now').mockReturnValue(Number.MAX_SAFE_INTEGER);
     cleanups.push(() => vi.restoreAllMocks());
     frames.shift()?.(0);
@@ -169,22 +189,46 @@ describe('the turn marker', () => {
     expect(reduced.markers.layer.children[0]?.scale.x).toBe(1);
   });
 
-  it('rings the token outside its own ring, as the look spec gives it', () => {
-    const strokes = turnMarkerStrokes(35, 1);
-    expect(strokes.map((stroke) => [stroke.radius, stroke.width, stroke.ink])).toEqual([[37.5, 1, 'dark'], [39.5, 3, 'accent'], [44, 6, 'accent']]);
-    const halo = strokes[2]!;
-    expect(halo.radius + halo.width / 2).toBe(35 + MARKER_REACH_UNITS);
+  it('leaves its crisp edge to the selection while the GM has the token selected, never in the players\' frame', () => {
+    const { markers, set } = setup(order('ogre'), tokens, sprites);
+    cleanups.push(() => markers.destroy());
+    const arcs = (): Container => markers.layer.children[0]!.getChildByLabel('turnArcs')!;
+    expect(arcs().alpha).toBe(1);
+    set({ selectedIds: ['ogre'] });
+    expect(arcs().alpha).toBe(0);
+    // Players see no selection: the arcs stay theirs
+    expect(markers.playerLayers(() => true, true)).toContainEqual({ layer: arcs(), visible: true, alpha: 1 });
+    set({ selectedIds: [] });
+    expect(arcs().alpha).toBe(1);
   });
 
-  it('tells how far its marker reaches, and when a token gains or loses one, so a selection can stand outside it', () => {
-    const { markers, set, marked } = setup(order('ogre'), tokens, sprites);
-    cleanups.push(() => markers.destroy());
-    expect(markers.reach('ogre')).toBe(MARKER_REACH_UNITS);
-    expect(markers.reach('hero')).toBe(0);
-    const before = marked.count;
-    set({ initiative: order('ogre'), grid: { size: 70 } });
-    expect(marked.count).toBe(before);
-    set({ initiative: order('hero') });
-    expect(marked.count).toBe(before + 1);
+  it('paints one glow for markers of one shape and lets it go with the last of them', () => {
+    const sides = { ...order('none'), sides: { first: 'players' as const, active: 'opponents' as const } };
+    const { markers, set, glows } = setup(sides, tokens, sprites);
+    // The ogre and the ghost are alike: one glow held twice
+    expect([...glows.held.values()]).toEqual([2]);
+    set({ initiative: { ...sides, isActive: false } });
+    expect(glows.held.size).toBe(0);
+    markers.destroy();
+  });
+
+  it('paints a glow once as the turn passes on and comes back, whatever the tokens\' sizes', () => {
+    const painted: number[] = [];
+    const textures = new TurnGlowTextures((size) => { painted.push(size); return null; });
+    // The hero is as large as the ogre: the glow passes from one marker to the next unpainted
+    const alike = setup(order('ogre'), tokens, sprites, true, new Set(), textures);
+    alike.set({ initiative: order('hero') });
+    alike.set({ initiative: order('ogre') });
+    expect(painted).toHaveLength(1);
+    alike.markers.destroy();
+    // A huge ogre: its glow waits while the hero has the turn, and is there again when it comes back
+    painted.length = 0;
+    const huge = { ...sprites, ogre: Object.assign(sprite(300, 100), { tokenSize: 186 }) };
+    const sizes = setup(order('ogre'), tokens, huge, true, new Set(), new TurnGlowTextures((size) => { painted.push(size); return null; }));
+    sizes.set({ initiative: order('hero') });
+    sizes.set({ initiative: order('ogre') });
+    sizes.set({ initiative: order('hero') });
+    expect(painted).toHaveLength(2);
+    sizes.markers.destroy();
   });
 });

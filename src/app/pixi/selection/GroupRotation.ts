@@ -66,7 +66,12 @@ export class GroupRotation {
   private zoom = 1;
 
   constructor(private readonly deps: GroupRotationDeps) {
-    this.button = new GroupRotateButton({ accent: () => deps.accent(), reducedMotion: () => deps.reducedMotion(), press: (event) => this.press(event) });
+    this.button = new GroupRotateButton({
+      accent: () => deps.accent(),
+      gridSize: () => deps.store.getState().grid?.size || 70,
+      reducedMotion: () => deps.reducedMotion(),
+      press: (event) => this.press(event),
+    });
   }
 
   /** The button's layer, which neither players nor thumbnails show. */

@@ -21,8 +21,6 @@ export class SelectionManager {
   private tokenRendererProvider: () => ({ [id: string]: Container });
   /** How far a selected token's bars stand out from it, in world units; a group's frame encloses them. */
   public barsProvider: (tokenId: string) => BarsSpan = () => NO_BARS;
-  /** How far a token's turn marker reaches beyond its edge, in world units: its highlight lies outside it. */
-  public markReachProvider: (tokenId: string) => number = () => 0;
   private fogSpriteProvider: () => ({ [id: string]: Container });
   private hitTestTokensProvider?: (worldX: number, worldY: number) => string | null;
 
@@ -405,7 +403,6 @@ export class SelectionManager {
       drawings: objects.drawings,
       fog: this.fogSpriteProvider(),
       bars: this.barsProvider,
-      markReach: this.markReachProvider,
     });
     this.highlights.show(targets);
     const tokens = mapTokens(objects);

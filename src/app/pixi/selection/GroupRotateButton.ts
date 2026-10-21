@@ -1,10 +1,10 @@
-import { Circle, Container, Graphics, Sprite, Texture, type FederatedPointerEvent, type Text } from 'pixi.js';
+import { Circle, Container, Graphics, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js';
 import { MOTION_NORMAL_MS } from '../../utils/motion';
 import { MAP_LAYER_Z } from '../mapLayerOrder';
 import { paintRotateHandle, rotateIconTexture, ROTATE_ICON_SHARE } from '../rotateHandleLook';
 import { destroyTree } from '../utils/destroyTree';
 import { isDarkTheme } from '../utils/canvasBadgeColors';
-import { createMeasureLabelText, drawMeasureLabel } from '../utils/measureDrawing';
+import { MeasureLabel } from '../utils/measureLabel';
 import { ValueTransition } from '../utils/ValueTransition';
 import type { Box } from './selectionGeometry';
 import { drawGroupStem } from './selectionInk';
@@ -31,6 +31,8 @@ export interface ButtonTurn {
 export interface GroupRotateButtonDeps {
   /** The theme's accent, in which the stem is drawn. */
   accent(): number;
+  /** The grid's cell size, by which the angle is sized as a measurement's distance is. */
+  gridSize(): number;
   reducedMotion(): boolean;
   /** A primary press on the button. */
   press(event: FederatedPointerEvent): void;
@@ -51,15 +53,12 @@ export class GroupRotateButton {
   private readonly handle = new Container({ label: 'groupRotateHandle', eventMode: 'static', cursor: 'grab' });
   private readonly disc = new Graphics();
   private readonly glyph = new Sprite();
-  private readonly label = new Container({ visible: false });
-  private readonly pill = new Graphics();
-  /** Made when an angle is first shown: a text reads the theme. */
-  private text: Text | null = null;
+  /** The angle while turning, as a measurement shows its distance; made when first shown, since its text reads the theme. */
+  private label: MeasureLabel | null = null;
   private readonly fade = new ValueTransition(1, MOTION_NORMAL_MS, (value) => { this.layer.alpha = value; });
   private hovered = false;
   private held = false;
   private drawn = '';
-  private labelDrawn = '';
   private accent = 0;
   private glyphDark: boolean | null = null;
   private destroyed = false;
@@ -68,8 +67,7 @@ export class GroupRotateButton {
     this.handle.hitArea = new Circle(0, 0, LOOK.radius + LOOK.reach);
     this.glyph.anchor.set(0.5);
     this.handle.addChild(this.disc, this.glyph);
-    this.label.addChild(this.pill);
-    this.mount.addChild(this.stem, this.handle, this.label);
+    this.mount.addChild(this.stem, this.handle);
     this.arm.addChild(this.mount);
     this.layer.addChild(this.arm);
     this.handle.on('pointerover', () => this.setHovered(true));
@@ -108,29 +106,43 @@ export class GroupRotateButton {
     const radians = ((turn?.degrees ?? 0) * Math.PI) / 180;
     this.arm.rotation = radians;
     this.handle.rotation = -radians;
-    this.label.rotation = -radians;
 
     const top = (frame.y - pivot.y) * zoom;
     const handleY = top - LOOK.stem - LOOK.radius;
     this.handle.position.set(0, handleY);
-    this.label.visible = turn !== null;
-    const label = turn === null ? '' : turnLabel(turn.degrees);
-    if (label !== '' && label !== this.labelDrawn) {
-      const text = this.text ?? this.label.addChild(this.text = createMeasureLabelText());
-      text.text = label;
-      drawMeasureLabel(this.pill, text, { x: 0, y: 0 }, 1);
-    }
-    this.labelDrawn = label;
-    // The angle stands outward of the disc, upright: as far out as the pill reaches along the arm's way
-    const { width, height } = this.pill.getLocalBounds();
-    const reach = (Math.abs(Math.sin(radians)) * width + Math.abs(Math.cos(radians)) * height) / 2;
-    this.label.position.set(0, handleY - LOOK.radius - LOOK.labelGap - reach);
+    this.showAngle(turn, pivot, zoom, radians, { x: this.mount.x, y: handleY });
     const key = `${top}|${this.accent}`;
     if (key !== this.drawn) {
       this.drawn = key;
       this.stem.clear();
       drawGroupStem(this.stem, top, top - LOOK.stem, this.accent);
     }
+  }
+
+  /**
+   * The angle beside the disc, outward of it along the arm and upright, in the measurement label's
+   * look and size (`MeasureLabel`). `disc` is the disc's middle in the arm's screen pixels.
+   */
+  private showAngle(turn: ButtonTurn | null, pivot: { x: number; y: number }, zoom: number, radians: number, disc: { x: number; y: number }): void {
+    if (!turn) {
+      if (this.label) this.label.view.visible = false;
+      return;
+    }
+    const label = this.label ?? (this.label = new MeasureLabel());
+    if (!label.view.parent) this.layer.addChild(label.view);
+    label.view.visible = true;
+    const text = turnLabel(turn.degrees);
+    const gridSize = this.deps.gridSize();
+    const toWorld = (x: number, y: number): { x: number; y: number } => ({
+      x: pivot.x + (x * Math.cos(radians) - y * Math.sin(radians)) / zoom,
+      y: pivot.y + (x * Math.sin(radians) + y * Math.cos(radians)) / zoom,
+    });
+    label.show(text, { over: toWorld(disc.x, disc.y) }, zoom, gridSize);
+    // Measured as drawn, then moved out until the pill clears the disc along the arm's way
+    const width = label.view.width * zoom;
+    const height = label.view.height * zoom;
+    const reach = (Math.abs(Math.sin(radians)) * width + Math.abs(Math.cos(radians)) * height) / 2;
+    label.show(text, { over: toWorld(disc.x, disc.y - LOOK.radius - LOOK.labelGap - reach) }, zoom, gridSize);
   }
 
   /** Whether the button is held while it turns the group: it keeps its pressed look until let go. */
@@ -146,7 +158,7 @@ export class GroupRotateButton {
     const emphasised = this.hovered || this.held;
     paintRotateHandle(this.disc, LOOK.radius, emphasised);
     this.handle.scale.set(this.held ? 0.94 : 1);
-    this.labelDrawn = '';
+    if (this.label) this.label.view.visible = false;
     const dark = isDarkTheme();
     if (dark !== this.glyphDark) {
       this.glyphDark = dark;

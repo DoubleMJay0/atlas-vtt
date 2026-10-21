@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Bounds, Container, Text } from 'pixi.js';
+import { EventEmitter } from 'events';
+import { describe, expect, it, vi } from 'vitest';
+import { Container, Sprite } from 'pixi.js';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { getHistoryStore } from '../../src/app/stores/history';
 import { snapTokenCenter } from '../../src/app/grid/gridPlacement';
 import { GroupRotation, type GroupTurnHost } from '../../src/app/pixi/selection/GroupRotation';
 import { gridPivot } from '../../src/app/pixi/selection/groupTurn';
 import type { DrawingStroke, TokenEntity } from '../../src/app/types';
+import { SelectionManager } from '../../src/app/pixi/SelectionManager';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 // jsdom draws no glyphs: the button's rotate glyph never arrives
@@ -15,9 +17,17 @@ vi.mock('../../src/app/pixi/rotateHandleLook', async (importOriginal) => ({
   rotateIconTexture: () => new Promise(() => undefined),
 }));
 
-beforeEach(() => {
-  // jsdom cannot measure text; the angle's pill plays no part here
-  vi.spyOn(Text.prototype, 'getLocalBounds').mockReturnValue(new Bounds(0, 0, 40, 18));
+// jsdom cannot measure text: the angle is shown on a label that records what it was given
+vi.mock('../../src/app/pixi/utils/measureLabel', async () => {
+  const { Container: View } = await import('pixi.js');
+  return {
+    MeasureLabel: class {
+      readonly view = new View();
+      text = '';
+      show(text: string): void { this.text = text; }
+      destroy(): void { this.view.destroy(); }
+    },
+  };
 });
 
 const CELL = 70;

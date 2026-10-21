@@ -4,14 +4,15 @@
  * at every zoom: `zoom` is screen pixels per world unit.
  */
 
+import { CANVAS_INK } from '../utils/canvasInk';
+
 /** The look of a selection, in screen pixels. */
 export const SELECTION_LOOK = {
   /** Map left showing between what is selected and its highlight. */
   gap: 4,
-  /** The accent line. */
-  stroke: 2,
-  /** The dark line on either side of the accent, which keeps it readable on a light map. */
-  keyline: 1,
+  /** The accent line and the dark line on either side of it: the ink of every mark Atlas draws on the map. */
+  stroke: CANVAS_INK.stroke,
+  keyline: CANVAS_INK.keyline,
   /** The corner of a highlight around something without corners of its own (a drawing), at the accent's middle. */
   frameRadius: 6,
   /** Room between the highlights and the frame around a selection of two or more. */
@@ -59,14 +60,9 @@ export interface TokenShape {
   readonly art: { readonly width: number; readonly height: number; readonly rotation: number };
 }
 
-/**
- * A token's outline: the circle of its ring, or the box of its art where it shows none. A token
- * that carries a round mark `beyond` world units outside its edge (the turn marker, which takes
- * its art's diameter for the edge of a token without a ring) is outlined around that mark instead.
- */
-export function tokenOutline(shape: TokenShape, beyond = 0): SelectionOutline {
-  if (shape.ringDiameter !== null) return { kind: 'circle', radius: shape.ringDiameter / 2 + beyond };
-  if (beyond > 0) return { kind: 'circle', radius: shape.tokenSize / 2 + beyond };
+/** A token's outline: the circle of its ring, or the box of its art where it shows none. */
+export function tokenOutline(shape: TokenShape): SelectionOutline {
+  if (shape.ringDiameter !== null) return { kind: 'circle', radius: shape.ringDiameter / 2 };
   const { width, height, rotation } = shape.art;
   return { kind: 'rect', width, height, rotation, cornerRadius: 0 };
 }
