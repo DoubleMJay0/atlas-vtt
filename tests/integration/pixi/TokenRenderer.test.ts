@@ -1389,16 +1389,16 @@ describe('TokenRenderer Integration Tests', () => {
       store.getState().setActiveTool('measure');
       viewport.emit('pointerdown', pointerEvent(105, 105));
       viewport.emit('pointermove', pointerEvent(105, 400));
-      expect(onCanvas()).toEqual([true, true, true]);
-      expect(inFrame()).toEqual([false, false, false]);
+      expect(onCanvas()).toEqual([true, true]);
+      expect(inFrame()).toEqual([false, false]);
       store.getState().setGMView(false);
-      expect(onCanvas()).toEqual([false, false, false]);
+      expect(onCanvas()).toEqual([false, false]);
       const picture = captureSceneFrame({ gmViewLayers: [...tokenRenderer.getGmViewLayers(), ...measure.getGmViewLayers()], markerLayers: [], lighting: undefined },
         {} as never, () => onCanvas());
-      expect(picture).toEqual([true, true, true]);
-      expect(onCanvas()).toEqual([false, false, false]);
+      expect(picture).toEqual([true, true]);
+      expect(onCanvas()).toEqual([false, false]);
       store.getState().setGMView(true);
-      expect(onCanvas()).toEqual([true, true, true]);
+      expect(onCanvas()).toEqual([true, true]);
     });
 
     it('hides a kept ruler during the peek while its token is out of the players\' sight', async () => {
@@ -1406,13 +1406,13 @@ describe('TokenRenderer Integration Tests', () => {
       await waitForTokens('goblin');
       keepRuler(105);
       perception = () => 'unseen';
-      expect(onCanvas()).toEqual([true, false, false, true, true, true]);
+      expect(onCanvas()).toEqual([true, false, true, true]);
       peeking = true;
       tokenRenderer.refreshPlayerSight();
-      expect(onCanvas()).toEqual([true, false, false, false, false, false]);
+      expect(onCanvas()).toEqual([true, false, false, false]);
       perception = () => 'seen';
       tokenRenderer.refreshPlayerSight();
-      expect(onCanvas()).toEqual([true, false, false, true, true, true]);
+      expect(onCanvas()).toEqual([true, false, true, true]);
       peeking = false;
       tokenRenderer.refreshPlayerSight();
     });
@@ -1424,15 +1424,15 @@ describe('TokenRenderer Integration Tests', () => {
       keepRuler(105);
       keepRuler(315);
       store.getState().setGMView(false);
-      expect(onCanvas()).toEqual([true, false, false, true, true, true, true, true, true]);
+      expect(onCanvas()).toEqual([true, false, true, true, true, true]);
       store.getState().deleteToken('goblin');
-      expect(onCanvas()).toEqual([true, false, false, false, false, false, true, true, true]);
+      expect(onCanvas()).toEqual([true, false, false, false, true, true]);
       store.setState((state) => ({ mapPath: 'maps/other.atlasmap', objects: { ...state.objects, tokens: {} } }));
       eventBus.emit('map-loaded');
-      expect(onCanvas()).toEqual([true, false, false, false, false, false, false, false, false]);
-      expect(inFrame()).toEqual([true, false, false, false, false, false, false, false, false]);
+      expect(onCanvas()).toEqual([true, false, false, false, false, false]);
+      expect(inFrame()).toEqual([true, false, false, false, false, false]);
       store.getState().setGMView(true);
-      expect(onCanvas()).toEqual([true, false, false, true, true, true, true, true, true]);
+      expect(onCanvas()).toEqual([true, false, true, true, true, true]);
     });
   });
 

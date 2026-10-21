@@ -16,7 +16,10 @@ const measure = (live: SharedMeasure | null, kept: readonly SharedMeasure[] = []
 describe('RemoteMeasures', () => {
   let measures: RemoteMeasures;
   /** The labels drawn, in the order of their measurements: where each stands and what it says. */
-  const labels = (): { x: number; text: string }[] => measures.container.children.filter((child): child is Text => child instanceof Text).map((text) => ({ x: text.position.x, text: text.text }));
+  const labels = (): { x: number; text: string }[] => measures.container.children.flatMap((label) => {
+    const text = label.children.find((child): child is Text => child instanceof Text);
+    return text ? [{ x: label.position.x, text: text.text }] : [];
+  });
   /** Draws a frame every `FRAME` ms from `from` to `to`; returns where the last label stood in each. */
   const run = (from: number, to: number): { x: number; text: string }[] => {
     const seen: { x: number; text: string }[] = [];

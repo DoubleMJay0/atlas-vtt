@@ -2,6 +2,7 @@
 
 - Resource wheels stay beside their token when it is selected, instead of rising above it
 - Selected tokens are outlined by their own shape, crisp at any zoom, with a light frame around a group
+- Rulers, templates and drag rulers are drawn as one clean line in the selection's style, with a sharp distance label at every zoom
 
 ## Fixed
 

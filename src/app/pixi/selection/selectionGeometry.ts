@@ -4,14 +4,15 @@
  * at every zoom: `zoom` is screen pixels per world unit.
  */
 
+import { CANVAS_INK } from '../utils/canvasInk';
+
 /** The look of a selection, in screen pixels. */
 export const SELECTION_LOOK = {
   /** Map left showing between what is selected and its highlight. */
   gap: 4,
-  /** The accent line. */
-  stroke: 2,
-  /** The dark line on either side of the accent, which keeps it readable on a light map. */
-  keyline: 1,
+  /** The accent line and the dark line on either side of it: the ink of every mark Atlas draws on the map. */
+  stroke: CANVAS_INK.stroke,
+  keyline: CANVAS_INK.keyline,
   /** The corner of a highlight around something without corners of its own (a drawing), at the accent's middle. */
   frameRadius: 6,
   /** Room between the highlights and the frame around a selection of two or more. */
