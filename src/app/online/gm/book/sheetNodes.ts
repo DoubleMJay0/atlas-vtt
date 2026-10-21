@@ -130,14 +130,14 @@ function blockNodes(build: SheetBuild, block: TemplateBlock, depth: number, plac
 
 /**
  * The Heading blocks that head nothing once the abilities left: a heading whose run (the blocks
- * after it up to the next heading or the list's end) held an ability component and now draws
+ * after it up to the next heading, Section or the list's end) held an ability component and now draws
  * nothing but rules.
  */
 function emptiedHeadings(blocks: readonly TemplateBlock[], draws: (block: TemplateBlock) => boolean): ReadonlySet<string> {
   const emptied = new Set<string>();
   blocks.forEach((block, index) => {
     if (block.type !== 'heading') return;
-    const end = blocks.findIndex((later, at) => at > index && later.type === 'heading');
+    const end = blocks.findIndex((later, at) => at > index && (later.type === 'heading' || later.type === 'section'));
     const run = blocks.slice(index + 1, end === -1 ? blocks.length : end);
     // A rule heads nothing: it is drawn or dropped by the card's own rule afterwards
     if (run.some(isAbilityBlock) && !run.some((later) => later.type !== 'divider' && draws(later))) emptied.add(block.id);

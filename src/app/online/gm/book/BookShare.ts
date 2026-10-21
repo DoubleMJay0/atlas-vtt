@@ -11,6 +11,7 @@ import type { NamedAssets } from './bookAssets.ts';
 import { bookItemOf } from './bookItem.ts';
 import type { BookShelf } from './BookShelf.ts';
 import { sheetOf } from './bookSheet.ts';
+import { placedSheetValues } from './placedResources.ts';
 import { trackedSheetValues } from './trackedSheet.ts';
 import { applyBookMessage, EMPTY_BOOK, withItem } from './bookStore.ts';
 import { Characters, type PlayedCharacter } from './characters.ts';
@@ -233,10 +234,12 @@ export class BookShare implements LootRecipientSource {
     this.characters.update(scene, {
       ownerOf: (tokenId) => this.ports.ownerOf(tokenId, scene.tokens[tokenId]),
       isKnown: (player) => known.has(player),
-      sheet: (shown, token, statblockPath) => sheetOf(
-        shown, token, scene.resources, (path) => this.art.get(path),
-        trackedSheetValues(statblockPath === null ? null : this.statblocks.resolved(statblockPath), scene.resources, token.resources),
-      ),
+      sheet: (shown, token, statblockPath) => {
+        const resolved = statblockPath === null ? null : this.statblocks.resolved(statblockPath);
+        // Beside the token's own: the numbers its statblock tracks, and the gauges its template places for resources it holds none of
+        const extra = [...trackedSheetValues(resolved, scene.resources, token.resources), ...placedSheetValues(resolved, scene.resources, token.resources)];
+        return sheetOf(shown, token, scene.resources, (path) => this.art.get(path), extra);
+      },
       libraryStatblock: (placed) => this.ports.libraryStatblock(placed),
     });
   }

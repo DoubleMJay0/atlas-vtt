@@ -1,7 +1,6 @@
 import { MAX_ABILITY_COMPONENTS, MAX_ABILITY_TABS, parseComponent, type AbilityComponent } from './bookAbilities.ts';
 import { isResourceKey } from './bookCharacter.ts';
 import { parseStatblockRest, type StatblockRest } from './bookRest.ts';
-import { MAX_FORMULA } from './dice.ts';
 import { MAX_COUNTERS, parseCounter, parseRefills, type CounterRefill, type SheetCounter } from './sheetCounters.ts';
 import { bookLine, MAX_BOOK_TITLE } from './bookText.ts';
 import { isRecord } from './shape.ts';
@@ -10,6 +9,7 @@ import {
   type SheetBudget, type SheetField, type SheetText,
 } from './sheetValues.ts';
 import { parseSheetCard, parseSheetFrame, type SheetCard, type SheetFrame } from './sheetLayout.ts';
+import { parseCellRolls, parseRoll } from './sheetRolls.ts';
 import { MAX_TOKEN_VALUE } from './tokenUI.ts';
 
 /** What a drawn statblock holds at most. */
@@ -94,6 +94,8 @@ export interface BookStatblock extends StatblockRest {
   readonly refills?: readonly CounterRefill[];
   /** The GM's card the sheet is laid out on; an older GM's Atlas sends none. */
   readonly card?: SheetCard;
+  /** The header's hit points where the template draws them as a track (`sigils.hp` says them as a number for an older page). */
+  readonly hitPoints?: SheetNode;
 }
 
 /** Sent to one player after every `book` and whenever it changes; null: their character has no statblock they get. */
@@ -105,25 +107,6 @@ export interface BookStatblockMessage {
 const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_TOKEN_VALUE;
 const optionalResource = (value: unknown): string | null | undefined => (value === null || value === undefined ? null : isResourceKey(value) ? value : undefined);
 const LOOKS: readonly unknown[] = ['plain', 'markdown', 'words', 'pairs'];
-
-/** A roll a value offers: undefined for none, null when it is malformed. */
-function parseRoll(value: unknown): string | null | undefined {
-  return value === undefined ? undefined : bookLine(value, MAX_FORMULA);
-}
-
-/** The rolls of a table's cells, shaped as its cells (null for a cell that rolls nothing); undefined for none, null when malformed. */
-function parseCellRolls(value: unknown, cells: readonly (readonly unknown[])[]): (string | null)[][] | null | undefined {
-  if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.length !== cells.length) return null;
-  const rows: (string | null)[][] = [];
-  for (const [index, row] of value.entries()) {
-    if (!Array.isArray(row) || row.length !== cells[index]?.length) return null;
-    const rolls = row.map((roll) => (roll === null ? null : parseRoll(roll) ?? undefined));
-    if (rolls.some((roll) => roll === undefined)) return null;
-    rows.push(rolls as (string | null)[]);
-  }
-  return rows;
-}
 
 function parsePair(value: unknown): SheetPair | null {
   if (!isRecord(value)) return null;
@@ -291,9 +274,10 @@ export function parseBookStatblock(value: unknown): BookStatblock | null | undef
   if (new Set(abilities.map((entry) => entry.id)).size !== abilities.length) return undefined;
   const refills = parseRefills(value.refills, budget);
   const card = parseSheetCard(value.card);
-  if (refills === null || card === null) return undefined;
+  const hitPoints = value.hitPoints === undefined ? undefined : parseNodes([value.hitPoints], 0, budget)?.[0] ?? null;
+  if (refills === null || card === null || hitPoints === null) return undefined;
   return {
-    editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }), ...(card !== undefined && { card }),
+    editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }), ...(card !== undefined && { card }), ...(hitPoints !== undefined && { hitPoints }),
     ...parseStatblockRest(value, budget),
   };
 }

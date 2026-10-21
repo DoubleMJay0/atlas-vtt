@@ -8,6 +8,7 @@ import type { StatblockTemplate } from '../../../statblocks/model/templateTypes'
 import { sheetState } from '../../../statblocks/render/sheetState';
 import { readerFor } from '../../../statblocks/values/fieldValues';
 import { shownRecord } from './playerAccess.ts';
+import { placedSheetValues } from './placedResources.ts';
 import { trackedSheetValues } from './trackedSheet.ts';
 import { SheetBudget } from './sheetBudget.ts';
 import type { SheetBuild } from './sheetFields.ts';
@@ -29,14 +30,15 @@ export interface StatblockSheetInput {
 /** The template's column width where it sets none (`StatblockSheet`). */
 const DEFAULT_COLUMN_WIDTH_EM = 22;
 
-const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+/** A number within its range; `fallback` where it is none (a template or setting a newer Atlas wrote), so a card is never refused whole. */
+const clamp = (value: number, min: number, max: number, fallback = min): number => (Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback);
 
 /** The GM's card as the note panel lays it out: its width, the template's columns, and whether the header's description leads the sheet. */
 function sheetCard(template: StatblockTemplate, panelWidth: number | undefined, description: boolean): SheetCard {
-  const maxColumns = clamp(template.layout.maxColumns, 1, MAX_CARD_COLUMNS);
+  const maxColumns = Math.round(clamp(template.layout.maxColumns, 1, MAX_CARD_COLUMNS, 1));
   return {
-    width: clamp(paneCardWidth(panelWidth ?? FALLBACK_PANEL_WIDTH, maxColumns), MIN_CARD_WIDTH, MAX_CARD_WIDTH),
-    columnWidth: clamp(template.layout.columnWidth ?? DEFAULT_COLUMN_WIDTH_EM, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH),
+    width: clamp(paneCardWidth(Number.isFinite(panelWidth) ? panelWidth ?? FALLBACK_PANEL_WIDTH : FALLBACK_PANEL_WIDTH, maxColumns), MIN_CARD_WIDTH, MAX_CARD_WIDTH, paneCardWidth(FALLBACK_PANEL_WIDTH, maxColumns)),
+    columnWidth: clamp(template.layout.columnWidth ?? DEFAULT_COLUMN_WIDTH_EM, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH, DEFAULT_COLUMN_WIDTH_EM),
     maxColumns,
     description,
   };
@@ -86,12 +88,14 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
   const reader = readerFor(record, fields);
   // The numbers the template tracks are resources of the character too, held or where they start
   const tracked = trackedSheetValues(input.resolved, input.definitions, input.resources);
+  const placed = placedSheetValues(input.resolved, input.definitions, input.resources);
   const build: SheetBuild = {
     template, record, editable, texts,
     shown: sheetState({ template, record: shown, mode: 'view', resources: input.definitions }),
     editing: sheetState({ template, record: shown, mode: 'editing', resources: input.definitions }),
     definitions: [...input.definitions, ...tracked.map((each) => each.definition)],
-    resources: { ...input.resources, ...Object.fromEntries(tracked.map((each) => [each.definition.key, each.value])) },
+    // Gauges the template places for resources the token holds no value of start where the statblock starts them
+    resources: { ...input.resources, ...Object.fromEntries([...tracked, ...placed].map((each) => [each.definition.key, each.value])) },
     budget: new SheetBudget(),
     holds: (block) => block.showWhen === undefined || evaluateCondition(block.showWhen, reader),
   };
@@ -100,14 +104,19 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
   const nodes = sheetNodes(build, template.layout.blocks, 0, { section: null, row: false }, walk);
   const sigils: { -readonly [K in keyof SheetSigils]: SheetValue } = {};
   for (const [id, sigil] of head.sigils) if (build.budget.takeValue(sigil)) sigils[id] = sigil;
+  build.budget.reserveForAbilities(walk.abilities.length > 0);
   const blocks = fittedNodes(build.budget, head.description ? [head.description, ...nodes] : nodes);
+  const abilities = fittedAbilities(build.budget, walk.abilities);
+  const hitPoints = head.hitPoints !== null && build.budget.takeNode(head.hitPoints) ? head.hitPoints : null;
+  if (build.budget.droppedNodes > 0) console.warn(`[Atlas] The statblock ${input.resolved.path} is larger than a player's page takes: its last ${build.budget.droppedNodes} blocks are left out.`);
   return {
     editable,
     displayName: head.displayName,
     sigils,
     blocks,
-    abilities: fittedAbilities(build.budget, walk.abilities),
+    abilities,
     card: sheetCard(template, input.panelWidth, head.description !== null && blocks[0] === head.description),
+    ...(hitPoints !== null && { hitPoints }),
   };
 }
 

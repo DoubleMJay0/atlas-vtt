@@ -5,7 +5,8 @@ import { TEMPLATE_FORMAT, type EntryExtraShape, type StatblockTemplate, type Tem
  * with the name and token art, a line of values, two gauges side by side, a row of dice values
  * around a boxed number, four boxed numbers, words, a skills section in two columns, and ability
  * lists: three tabs, a section of three tabs, a list with parts, and six tabs of armour pieces.
- * Every name is made up for tests.
+ * The header's hit points are drawn as a gauge of Encumbrance beside the art. Every name is made up
+ * for tests.
  */
 
 const ABILITY = (key: string, label: string, extras?: EntryExtraShape[]): TemplateField => ({
@@ -25,6 +26,7 @@ const FIELDS: TemplateField[] = [
   { key: 'name', label: 'Name', type: 'text' },
   { key: 'image', label: 'Token art', type: 'image' },
   { key: 'description', label: 'Description', type: 'markdown', meaning: 'description' },
+  { key: 'encumbrance', label: 'Encumbrance', type: 'number', meaning: 'hit-points' },
   { key: 'personality', label: 'Personality & Quirk', type: 'text', prompt: 'Add personality' },
   { key: 'calling', label: 'Path', type: 'choice', options: ['Arcanist', 'Warden', 'Seeker'] },
   { key: 'kin', label: 'Kin', type: 'choice', options: ['Imp', 'Human', 'Elf'] },
@@ -94,7 +96,8 @@ export const EMBER_KEEPER: StatblockTemplate = {
   version: 1,
   id: 'ember-keeper-a1b2c3',
   fields: FIELDS,
-  header: { hidden: ['level', 'type', 'hp'] },
+  // The header's hit points are the character's Encumbrance, a gauge beside the art bound to the `burden` resource
+  header: { hidden: ['level', 'type'], hitPoints: { look: 'gauge', counts: 'up', resource: 'burden' } },
   layout: { maxColumns: 1, blocks: LAYOUT },
 };
 
@@ -110,6 +113,7 @@ export const EMBER_KEEPER_NOTE: Record<string, unknown> = {
   guard: 'd6',
   evade: 'd8',
   ward: 15,
+  encumbrance: 12,
   resist: 'd4',
   grip: 'd4',
   luck: 2,

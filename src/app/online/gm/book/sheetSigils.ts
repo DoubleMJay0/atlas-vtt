@@ -17,6 +17,8 @@ export interface SheetHead {
   /** In the order the page's parser reads them. */
   readonly sigils: readonly (readonly [keyof SheetSigils, SheetValue])[];
   readonly description: SheetNode | null;
+  /** The hit points as the track the template draws them as, where it does. */
+  readonly hitPoints: SheetNode | null;
 }
 
 /** The character's resource whose maximum is the hit points the header shows, where the token holds it. */
@@ -58,9 +60,12 @@ export function sheetHead(build: SheetBuild): SheetHead {
     return part ? partSigil(build, part) : null;
   };
   const sigils: [keyof SheetSigils, SheetValue | null][] = [['hp', sigilOf('hp')], ['level', sigilOf('level')], ['type', sigilOf('type')]];
+  const hp = parts.get('hp');
+  const hpDisplay = hp?.block.type === 'track' && blockAccess(build.template, hp.block) !== 'hidden' ? sheetDisplay(build, hp.block) : null;
   return {
     displayName: nameDisplay && nameDisplay.state !== 'prompt' ? clippedLine(displayText(nameDisplay), MAX_BOOK_TITLE) : null,
     sigils: sigils.flatMap(([id, sigil]) => (sigil ? [[id, sigil] as const] : [])),
     description: description && descriptionDisplay ? framedLeaf(build, description.block, descriptionDisplay) : null,
+    hitPoints: hp && hpDisplay ? framedLeaf(build, hp.block, hpDisplay) : null,
   };
 }
