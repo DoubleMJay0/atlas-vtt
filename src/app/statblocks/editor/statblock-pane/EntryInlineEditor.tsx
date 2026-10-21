@@ -34,7 +34,8 @@ export interface EntryInlineEditorProps {
  * name or a part goes on to the next part or the text; Enter in the text (or
  * Mod+Enter) writes the ability, parts picked included, and starts the next;
  * Shift+Enter breaks the line; Backspace in an empty ability deletes it, as
- * does leaving it with name and text emptied; Alt+↑/↓ move it and Mod+D
+ * does leaving it with name and text emptied (a held Backspace stops once the
+ * ability is empty, and never reaches the one before); Alt+↑/↓ move it and Mod+D
  * duplicates it, each one write to the note that takes what is typed along.
  */
 export function EntryInlineEditor({ block, field, editing }: EntryInlineEditorProps): React.JSX.Element {
@@ -55,6 +56,8 @@ export function EntryInlineEditor({ block, field, editing }: EntryInlineEditorPr
   const textNow = useRef(startText);
   const textTyped = (): string => (textRef.current?.isConnected ? textOf(textRef.current) : textNow.current);
   const finished = useRef(false);
+  /** Whether a key was pressed (not only held) while this editor was open. */
+  const pressedHere = useRef(false);
   const noun = singular(field.label) || 'Entry';
   const nameStyle = block.nameStyle ?? 'run-in';
 
@@ -187,6 +190,12 @@ export function EntryInlineEditor({ block, field, editing }: EntryInlineEditorPr
   const onKeyDown = (event: React.KeyboardEvent<HTMLElement>): void => {
     // A part's dropdown that took the key (picked, closed, removed a pick) keeps it.
     if (handledByAnotherControl(event.nativeEvent)) return;
+    if (!event.repeat) pressedHere.current = true;
+    // Backspace held since before this editor opened deleted the ability after this one: it erases nothing here.
+    if (event.key === 'Backspace' && event.repeat && !pressedHere.current) {
+      event.preventDefault();
+      return;
+    }
     const inText = event.target === textRef.current;
     const inName = event.target === nameRef.current;
     const inPart = !inText && !inName && (event.target as Partial<Element>).hasAttribute?.(ENTRY_PART_CONTROL) === true;
@@ -221,6 +230,8 @@ export function EntryInlineEditor({ block, field, editing }: EntryInlineEditorPr
       pane.move(field.key, event.shiftKey ? -1 : 1);
     } else if (event.key === 'Backspace' && (inName || inText) && !nameDraft.value && !textTyped()) {
       event.preventDefault();
+      // Only a fresh press deletes: a held one stops once the ability is empty.
+      if (event.repeat) return;
       finished.current = true;
       if (editing.kind === 'edit') write([removeEntryPatch(listKey(), editing.item)]);
       const before = editing.shown - 1;
