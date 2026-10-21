@@ -1,6 +1,7 @@
 ## Improved
 
 - Resource wheels stay beside their token when it is selected, instead of rising above it
+- Selected tokens are outlined by their own shape, crisp at any zoom, with a light frame around a group
 
 ## Fixed
 

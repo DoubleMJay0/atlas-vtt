@@ -6,6 +6,10 @@ import { isHandled } from "./utils/handledEvents";
 import type { ViewAtlasState, ViewAtlasStore } from '../storeFactory';
 import { EventEmitter } from 'events';
 import { getDrawingBounds, type DrawingBounds } from './drawingGeometry';
+import { SelectionHighlights } from './selection/SelectionHighlights';
+import { NO_BARS, selectionTargets } from './selection/selectionTargets';
+import type { BarsSpan } from './token-renderer/types';
+import { prefersReducedMotion } from '../utils/motion';
 import type { LayerVisibility } from './playerSafeFrame';
 import { MAP_LAYER_Z } from './mapLayerOrder';
 import { pointInPolygon } from '../vision/visibility';
@@ -13,12 +17,14 @@ import { pointInPolygon } from '../vision/visibility';
 export class SelectionManager {
   private viewport: Viewport;
   private tokenRendererProvider: () => ({ [id: string]: Container });
-  /** How far a selected token's bars reach below it, in world units; the frame encloses them. */
-  public barsReachProvider: (tokenId: string) => number = () => 0;
+  /** How far a selected token's bars stand out from it, in world units; a group's frame encloses them. */
+  public barsProvider: (tokenId: string) => BarsSpan = () => NO_BARS;
+  /** How far a token's turn marker reaches beyond its edge, in world units: its highlight lies outside it. */
+  public markReachProvider: (tokenId: string) => number = () => 0;
   private fogSpriteProvider: () => ({ [id: string]: Container });
   private hitTestTokensProvider?: (worldX: number, worldY: number) => string | null;
 
-  private selectionOverlay: Graphics;
+  private readonly highlights: SelectionHighlights;
   private marqueeGraphics: Graphics;
   private selectionStart: { x: number; y: number } | null = null;
   private selectionMode: 'box' | 'lasso' = 'box';
@@ -54,17 +60,13 @@ export class SelectionManager {
     this.marqueeGraphics.zIndex = MAP_LAYER_Z.selection;
     this.viewport.addChild(this.marqueeGraphics);
 
-    this.selectionOverlay = new Graphics();
-    this.selectionOverlay.eventMode = 'none'; // Make overlay non-interactive
-    this.selectionOverlay.interactiveChildren = false;
-    this.selectionOverlay.zIndex = MAP_LAYER_Z.selection;
-    // Add overlay beneath marquee, or simply to viewport if marquee isn't always first
-    const marqueeIndex = this.viewport.getChildIndex(this.marqueeGraphics);
-    if (marqueeIndex !== -1) {
-        this.viewport.addChildAt(this.selectionOverlay, marqueeIndex);
-    } else {
-        this.viewport.addChild(this.selectionOverlay); // Fallback
-    }
+    this.highlights = new SelectionHighlights({
+      viewport,
+      reducedMotion: () => typeof window === 'undefined' || prefersReducedMotion(viewport.options?.events?.domElement ?? document.body),
+      accent: () => cssColorToHexNumber(getObsidianAccentColor()),
+    });
+    // Beneath the marquee
+    this.viewport.addChildAt(this.highlights.layer, this.viewport.getChildIndex(this.marqueeGraphics));
 
     this.marqueeDownHandler = this.handleMarqueeStart.bind(this);
     this.marqueeMoveHandler = this.handleMarqueeMove.bind(this);
@@ -203,8 +205,7 @@ export class SelectionManager {
         this.marqueeGraphics.lineTo(p.x, p.y);
       }
       this.marqueeGraphics.closePath();
-      this.marqueeGraphics.stroke({ width: 2, color: accentHex, alpha: 0.6 });
-      this.marqueeGraphics.fill({ color: accentHex, alpha: 0.15 });
+      this.paintMarquee(accentHex);
     } else {
       // Box selection mode
       const sx = Math.min(this.selectionStart.x, worldPos.x);
@@ -212,10 +213,19 @@ export class SelectionManager {
       const sw = Math.abs(worldPos.x - this.selectionStart.x);
       const sh = Math.abs(worldPos.y - this.selectionStart.y);
       
-      this.marqueeGraphics.roundRect(sx, sy, sw, sh, 8);
-      this.marqueeGraphics.stroke({ width: 2, color: accentHex, alpha: 0.6 });
-      this.marqueeGraphics.fill({ color: accentHex, alpha: 0.15 });
+      this.marqueeGraphics.roundRect(sx, sy, sw, sh, 4 / this.zoom());
+      this.paintMarquee(accentHex);
     }
+  }
+
+  private zoom(): number {
+    return this.viewport.scale.x || 1;
+  }
+
+  /** The marquee and lasso in the selection's language: a thin accent line of one screen pixel over a faint wash. */
+  private paintMarquee(accent: number): void {
+    this.marqueeGraphics.fill({ color: accent, alpha: 0.08 });
+    this.marqueeGraphics.stroke({ width: 1 / this.zoom(), color: accent, alpha: 0.9 });
   }
 
   private handleMarqueeEnd(e: FederatedPointerEvent): void {
@@ -345,110 +355,22 @@ export class SelectionManager {
 
   /** DM selection feedback that must not reach the mirrored player frame. */
   public getPlayerViewLayers(): LayerVisibility[] {
-    return [this.selectionOverlay, this.marqueeGraphics].map(layer => ({ layer, visible: false }));
+    return [this.highlights.layer, this.marqueeGraphics].map(layer => ({ layer, visible: false }));
   }
 
+  /** Draws the selection as the canvas shows it now: called when it or a selected thing changes. */
   public updateSelectionOverlay(): void {
-    // Safety check - ensure graphics objects exist and haven't been destroyed
-    if (!this.selectionOverlay || this.selectionOverlay.destroyed) {
-      console.warn('[SelectionManager] Selection overlay graphics not available or has been destroyed');
-      return;
-    }
-    
-    this.selectionOverlay.clear();
-    const selectedIds = this.store.getState().selectedIds;
-    if (selectedIds.length === 0) return;
-
-    const tokenSprites = this.tokenRendererProvider();
-    const fogSprites = this.fogSpriteProvider();
-    const drawings = this.store.getState().objects.drawings;
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let foundSelectedSprite = false;
-
-    for (const id of selectedIds) {
-      const tokenGroup = tokenSprites[id];
-      if (tokenGroup?.visible) {
-        // Get the actual sprite from the tokenGroup (should be the first child)
-        const sprite = tokenGroup.children[0];
-        if (sprite && sprite.width && sprite.height) {
-          // Since sprites have anchor.set(0.5) and are positioned at 0,0 within the group,
-          // we use the tokenGroup's position and the sprite's dimensions
-          const halfWidth = sprite.width / 2;
-          const halfHeight = sprite.height / 2;
-          const spriteLeft = tokenGroup.position.x - halfWidth;
-          const spriteTop = tokenGroup.position.y - halfHeight;
-          const spriteRight = tokenGroup.position.x + halfWidth;
-          // The selection reaches around the bars below the token; its wheels stand outside
-          const spriteBottom = tokenGroup.position.y + halfHeight + this.barsReachProvider(id);
-          
-          minX = Math.min(minX, spriteLeft);
-          minY = Math.min(minY, spriteTop);
-          maxX = Math.max(maxX, spriteRight);
-          maxY = Math.max(maxY, spriteBottom);
-          foundSelectedSprite = true;
-        }
-      }
-
-      const drawing = drawings[id];
-      const drawingBounds = drawing && getDrawingBounds(drawing);
-      if (drawingBounds) {
-        minX = Math.min(minX, drawingBounds.x);
-        minY = Math.min(minY, drawingBounds.y);
-        maxX = Math.max(maxX, drawingBounds.x + drawingBounds.width);
-        maxY = Math.max(maxY, drawingBounds.y + drawingBounds.height);
-        foundSelectedSprite = true;
-      }
-
-      // Check fog sprites
-      const fogSprite = fogSprites[id];
-      if (fogSprite && !fogSprite.destroyed) {
-        const bounds = fogSprite.getBounds();
-        minX = Math.min(minX, bounds.x);
-        minY = Math.min(minY, bounds.y);
-        maxX = Math.max(maxX, bounds.x + bounds.width);
-        maxY = Math.max(maxY, bounds.y + bounds.height);
-        foundSelectedSprite = true;
-      }
-    }
-
-    if (!foundSelectedSprite) {
-      return;
-    }
-
-    const pad = 12; // Increased padding for a more spacious look
-    const finalMinX = minX - pad;
-    const finalMinY = minY - pad;
-    const finalMaxX = maxX + pad;
-    const finalMaxY = maxY + pad;
-    
-
-    const width = finalMaxX - finalMinX;
-    const height = finalMaxY - finalMinY;
-    const radius = 16; // Larger radius for smoother corners
-
-    const accent = getObsidianAccentColor();
-    const accentHex = cssColorToHexNumber(accent);
-
-    // Draw outer glow/shadow
-    this.selectionOverlay.roundRect(finalMinX - 2, finalMinY - 2, width + 4, height + 4, radius);
-    this.selectionOverlay.fill({ color: 0x000000, alpha: 0.1 });
-
-    // Draw main selection box with gradient-like effect
-    this.selectionOverlay.roundRect(finalMinX, finalMinY, width, height, radius);
-    this.selectionOverlay.fill({ color: accentHex, alpha: 0.08 });
-    
-    // Draw inner stroke
-    this.selectionOverlay.roundRect(finalMinX + 1, finalMinY + 1, width - 2, height - 2, radius - 1);
-    this.selectionOverlay.stroke({ width: 1.5, color: accentHex, alpha: 0.8 });
-
-    // Draw outer stroke
-    this.selectionOverlay.roundRect(finalMinX, finalMinY, width, height, radius);
-    this.selectionOverlay.stroke({ width: 2.5, color: accentHex, alpha: 0.4 });
-
-    
+    if (this.highlights.layer.destroyed) return;
+    const { selectedIds, objects } = this.store.getState();
+    this.highlights.show(selectionTargets(selectedIds, {
+      world: this.viewport,
+      tokens: this.tokenRendererProvider(),
+      drawings: objects.drawings,
+      fog: this.fogSpriteProvider(),
+      bars: this.barsProvider,
+      markReach: this.markReachProvider,
+    }));
   }
-
 
   /** Re-registers viewport event listeners, pushing them to the end of the listener queue.
    *  Call after adding other viewport pointerdown handlers to ensure correct firing order. */
@@ -488,8 +410,6 @@ export class SelectionManager {
     if (this.marqueeGraphics && !this.marqueeGraphics.destroyed) {
       this.marqueeGraphics.destroy();
     }
-    if (this.selectionOverlay && !this.selectionOverlay.destroyed) {
-      this.selectionOverlay.destroy();
-    }
+    this.highlights.destroy();
   }
 } 

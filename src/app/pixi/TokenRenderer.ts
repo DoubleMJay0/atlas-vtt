@@ -45,7 +45,7 @@ import { requestRender } from './RenderScheduler';
 import { normalizeImagePath } from '../utils/pathUtils';
 import { prefersReducedMotion } from '../utils/motion';
 import { destroyTree } from './utils/destroyTree';
-import type { TokenGroupContainer } from './token-renderer/types';
+import type { BarsSpan, TokenGroupContainer } from './token-renderer/types';
 import type { TokenPreview } from './tokenPlacement/PlacementGhost';
 import type { TokenInput } from '../types/viewState';
 import { setCanvasCursor } from './utils/canvasCursor';
@@ -219,6 +219,7 @@ export class TokenRenderer {
     
     // Provide token sprite access to UI manager
     this.uiManager.setTokenSpriteProvider((tokenId: string) => this.tokenSprites[tokenId] || null);
+    this.uiManager.onSelectionUIChange = () => this.selectionOverlayUpdater();
     
     // Initialize interaction controller
     this.interactionController = new InteractionController(
@@ -264,6 +265,8 @@ export class TokenRenderer {
       ticker: () => this.pixiApp?.ticker ?? null,
       reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
       defeated: (state) => defeatedCombatants(state.initiative.entries, sceneTokens(state.objects), this.resourceDefsProvider()),
+      // A selected token's highlight steps outside the marker that comes or goes
+      onMarkedChange: () => this.selectionOverlayUpdater(),
     });
     this.collectionSync = new TokenCollectionSync(obsApp, store.getState, {
       refreshRules: () => this.refreshCollectionRules(),
@@ -436,6 +439,8 @@ export class TokenRenderer {
           this.uiManager.updateHandlePositions();
         }
       }
+      // Art shown without a ring is outlined as it turns
+      this.selectionOverlayUpdater();
     };
 
     window.addEventListener('atlas-tokens-rotation-update', this._handleRotationUpdate);
@@ -450,6 +455,7 @@ export class TokenRenderer {
         // Show resize handles for all selected tokens
         this.uiManager.getResizeUI()?.showHandles(selectedIds, this.getTokenSprites());
       }
+      this.selectionOverlayUpdater();
     });
 
     // Listen for resize end events to re-show rotation handles
@@ -462,6 +468,7 @@ export class TokenRenderer {
         // Show rotation handles for all selected tokens
         this.uiManager.getRotationUI()?.showHandles(selectedIds, this.getTokenSprites());
       }
+      this.selectionOverlayUpdater();
     });
 
     window.addEventListener('atlas-token-rotation-ended', this._handleRotationEnded);
@@ -1446,9 +1453,14 @@ export class TokenRenderer {
       ...this.turnMarkers.playerLayers(seenByPlayers(mapTokens(state.objects), perception), turnShown)];
   }
 
-  /** How far a selected token's resources reach beyond its bottom, right and top edges, in world units. */
-  public barsReach(tokenId: string): number {
-    return this.uiManager.barsReach(tokenId);
+  /** How far a selected token's bars stand out from it, in world units. */
+  public bars(tokenId: string): BarsSpan {
+    return this.uiManager.bars(tokenId);
+  }
+
+  /** How far the token's turn marker reaches beyond its edge, in world units; 0 for a token without one. */
+  public turnMarkerReach(tokenId: string): number {
+    return this.turnMarkers.reach(tokenId);
   }
 
   /** What the ruler of the drag under way measures, or null while it shows none. */

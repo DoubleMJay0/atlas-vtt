@@ -466,13 +466,20 @@ export class TokenUIRenderer {
   }
 
   /**
-   * How far this token's bars reach below it while it is selected, in world units; the
-   * selection frame encloses them. The wheels stand outside the frame. Taken at the selected
-   * size itself, not at the size the UI is still growing from, so the frame drawn when the
-   * selection changes fits.
+   * How far this token's bars reach below it while it is selected, in world units; the frame
+   * around a selection of two or more encloses them. The wheels stand outside the frame. Taken at
+   * the selected size itself, not at the size the UI is still growing from, so the frame drawn
+   * when the selection changes fits.
    */
   public getBarsReach(): number {
     return (this.resources.view.visible ? this.barsBottom() : 0) * this.selectedScale();
+  }
+
+  /** How far this token's bars reach to either side of its centre while it is selected, in world units; 0 without bars. */
+  public getBarsHalfWidth(): number {
+    if (!this.resources.view.visible) return 0;
+    const half = Math.max(0, ...this.resources.layout().map((slot) => Math.max(Math.abs(slot.left), Math.abs(slot.left + slot.width))));
+    return half * this.selectedScale();
   }
 
   /** Where the lowest bar ends below the token's bottom edge, in UI units; 0 without bars. */

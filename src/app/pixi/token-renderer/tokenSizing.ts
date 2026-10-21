@@ -70,6 +70,9 @@ export function tokenUIScale(spriteSize: number): number {
 /** Diameter of a resize or rotate handle before `tokenUIScale`; what sits beside the token must clear it. */
 export const RESIZE_HANDLE_SIZE = 20;
 
+/** The label of a resize or rotate handle in its token's group, by which the selection highlight finds it. */
+export const TOKEN_HANDLE_LABEL = 'tokenHandle';
+
 /** Height of the nameplate, which lies on the token's bottom edge, in UI units. */
 export const NAMEPLATE_HEIGHT = 14;
 
