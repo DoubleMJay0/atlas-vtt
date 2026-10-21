@@ -1,3 +1,7 @@
+## Improved
+
+- Resource wheels stay beside their token when it is selected, instead of rising above it
+
 ## Fixed
 
 - Maps work in a scene moved to its own window
