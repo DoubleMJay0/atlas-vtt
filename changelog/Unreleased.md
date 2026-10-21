@@ -16,3 +16,4 @@
 ## Atlas Online
 
 - A campaign is played only while its online table is open: choose it when you start the table
+- The token whose turn it is stands in a soft pool of light with four fine arcs, sharp at any zoom, and no longer shows two rings when selected

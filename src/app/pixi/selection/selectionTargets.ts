@@ -19,8 +19,6 @@ export interface SelectionSources {
   readonly fog: Readonly<Record<string, Container>>;
   /** How far a token's bars stand out from it, in world units. */
   bars(tokenId: string): BarsSpan;
-  /** How far a round mark on the token (its turn marker) reaches beyond its edge, in world units. */
-  markReach(tokenId: string): number;
 }
 
 /** What the canvas shows of each selected thing, in the order of `ids`; a token it hides has none. */
@@ -56,7 +54,7 @@ function tokenTarget(id: string, group: Partial<TokenGroupContainer> & Container
     tokenSize,
     ringDiameter: framed ? (ring?.width || getTokenRingOuterDiameter(tokenSize, group.strokeWidth)) : null,
     art: { width: art.width, height: art.height, rotation: art.rotation },
-  }, sources.markReach(id));
+  });
   const { x, y } = group.position;
   const bars = sources.bars(id);
   const halfWidth = Math.max(tokenSize / 2, bars.halfWidth);
