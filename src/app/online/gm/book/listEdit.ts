@@ -58,29 +58,39 @@ const sameLabel = (a: string, b: string): boolean => a.trim().toLowerCase() === 
 /**
  * A new entry of a list of pairs in the shape its entries have: a name with a description where
  * they are such, a line ("Stealth +5") where every entry is one and the value a number, else a map
- * of the label to the value, as the note pane writes pairs. Any shape that would not read back as
- * this pair is the map.
+ * of the label to the value, as the note pane writes pairs. A line that would not read back as this
+ * pair is the map; whether the map does is `pairAdded`'s to check.
  */
 function newPairItem(items: readonly FieldValue[], pair: SheetPairItem): FieldValue {
   const plain: FieldValue = { [pair.label]: pair.value };
-  const described = items.some((item) => isFieldMap(item) && item.desc !== undefined);
-  const lines = items.length > 0 && items.every((item) => typeof item === 'string');
-  const shaped: FieldValue = described ? { name: pair.label, desc: pair.value } : lines && typeof pair.value === 'number' ? `${pair.label} ${formatSigned(pair.value)}` : plain;
-  const read = normalisePairs([shaped]);
-  return read.length === 1 && read[0] !== undefined && isPair(read[0], pair) ? shaped : plain;
+  if (items.some((item) => isFieldMap(item) && item.desc !== undefined)) return { name: pair.label, desc: pair.value };
+  if (items.length === 0 || !items.every((item) => typeof item === 'string') || typeof pair.value !== 'number') return plain;
+  const line = `${pair.label} ${formatSigned(pair.value)}`;
+  return reads(normalisePairs([line]), [{ key: pair.label, value: pair.value }]) ? line : plain;
 }
 
-/** A pair added to a Labels and values value: a key of a map, or an entry at the end of a list; never a label the value holds already. */
+/** Whether pairs read as exactly these labels and values, in this order. */
+const reads = (pairs: readonly { key: string; value: FieldValue }[], wanted: readonly { key: string; value: FieldValue }[]): boolean =>
+  pairs.length === wanted.length && pairs.every((held, at) => held.key === wanted[at]?.key && deepEqual(held.value, wanted[at]?.value));
+
+/**
+ * A pair added to a Labels and values value: a key of a map, or an entry at the end of a list;
+ * never a label the value holds already, and only where the value then reads as the pairs it held
+ * and this one after them (a label such as `desc` would make a map or an entry read as another pair).
+ */
 function pairAdded(read: FieldRead, key: string, pair: SheetPairItem): ListChange | null {
   const stored = read.value;
   const pairs = normalisePairs(stored);
   if (pairs.length >= MAX_SHEET_LIST || pairs.some((held) => sameLabel(held.key, pair.label))) return null;
+  let change: ListChange;
   if (isFieldMap(stored)) {
     if (Object.keys(stored).length >= MAX_SHEET_KEYS) return null;
-    return { patches: [{ op: 'set', path: [read.key, pair.label], base: undefined, next: pair.value }], value: { ...stored, [pair.label]: pair.value } };
+    change = { patches: [{ op: 'set', path: [read.key, pair.label], base: undefined, next: pair.value }], value: { ...stored, [pair.label]: pair.value } };
+  } else {
+    const items = stored === undefined || stored === null ? [] : Array.isArray(stored) ? stored : [stored];
+    change = appended(read, key, items, newPairItem(items, pair));
   }
-  const items = stored === undefined || stored === null ? [] : Array.isArray(stored) ? stored : [stored];
-  return appended(read, key, items, newPairItem(items, pair));
+  return reads(normalisePairs(change.value), [...pairs, { key: pair.label, value: pair.value }]) ? change : null;
 }
 
 /** A pair taken out of a Labels and values value: its key of a map, its entry of a list, or its key of an entry that holds others. */

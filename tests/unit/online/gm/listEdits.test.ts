@@ -121,6 +121,16 @@ describe('a player adding to or taking from a list value of their own statblock'
     expect(valueOf(written(none.text, checkListEdit(none.inputs, add('xp', { label: 'Smuggler', value: null }))), 'xp')).toEqual([{ Smuggler: null }]);
   });
 
+  it('refuses a label that would make the value read as other pairs: desc in a map or a list of maps, a name taken as none', () => {
+    const note = noteOf();
+    expect(checkListEdit(note.inputs, add('saves', { label: 'desc', value: 2 }))).toBeNull();
+    expect(checkListEdit(note.inputs, add('xp', { label: 'desc', value: 2 }))).toBeNull();
+    const described = noteOf(NOTE.replace('  - Bounty Hunter: 2\n  - Sailor: 1\n', '  - name: Bounty Hunter\n    desc: 2\n'));
+    expect(checkListEdit(described.inputs, add('xp', { label: '_hidden', value: 2 }))).toBeNull();
+    // A label that reads as itself is taken, `name` among them.
+    expect(valueOf(written(note.text, checkListEdit(note.inputs, add('xp', { label: 'name', value: 1 }))), 'xp')).toEqual([{ 'Bounty Hunter': 2 }, { Sailor: 1 }, { name: 1 }]);
+  });
+
   it('takes a pair out of its list, its map, or the entry that holds it with others', () => {
     const note = noteOf();
     expect(valueOf(written(note.text, checkListEdit(note.inputs, remove('xp', { label: 'Sailor', value: 1 }))), 'xp')).toEqual([{ 'Bounty Hunter': 2 }]);
