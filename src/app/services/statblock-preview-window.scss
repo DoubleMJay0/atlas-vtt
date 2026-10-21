@@ -36,6 +36,12 @@ $controls-end-radius: atlas-panel-inset-radius-value($controls-inset, $control *
 
   &.is-dragging {
     cursor: grabbing;
+    user-select: none;
+  }
+
+  // A map's preview also moves by its card's top (StatblockPreviewWindow.ts).
+  &--movable:not(.is-dragging) :is(.atlas-sb-header, .atlas-sb-heading-row) {
+    cursor: grab;
   }
 }
 

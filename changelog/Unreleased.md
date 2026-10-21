@@ -17,6 +17,7 @@
 - Holding Backspace in a statblock's ability no longer erases the ability above it
 - Random tables from notes can be added when a collection already has tables
 - Statblock previews on the map can be moved and pinned again, and their images shown to players
+- Pinned previews can no longer be dragged out of reach, and statblock previews also move by their name
 
 ## Atlas Online
 

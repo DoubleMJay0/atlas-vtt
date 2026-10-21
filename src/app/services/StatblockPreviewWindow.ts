@@ -8,8 +8,16 @@ import type { NotePreviewUIManager, PreviewAnchorRef, TokenPreviewAnchor } from 
 import './statblock-preview-window.scss';
 import { previewEdgeGaps } from '../react/components/statblock/previewEdgeGap';
 import type { TokenRollContext } from '../types/diceRollOrigin';
-import { createPinButton, showPinState, startPreviewWindowDrag } from './previewWindowControls';
+import { createPinButton, keepPreviewReachable, showPinState, startPreviewWindowDrag, type PreviewWindowReach } from './previewWindowControls';
+import { previewReach } from './previewWindowLayout';
+import { viewFrame } from '../packages/components/primitives/useKeepInView';
+import { observeResize } from '../utils/observeResize';
 import { t } from '../i18n';
+
+/** The card's top, which moves a map's preview: the name and title row of an Atlas statblock or a Fantasy Statblocks layout. */
+const CARD_HEADER = '.atlas-sb-header, .atlas-sb-heading-row';
+/** How far the pointer goes on the card's top before the window moves, so a click on a roll there stays a click. */
+const HEADER_DRAG_THRESHOLD = 4;
 
 /** A statblock note that is not in the vault, such as a note of a collection being imported. */
 export interface OutsideNote {
@@ -46,6 +54,8 @@ export class StatblockPreviewWindow {
   private statblockProps: Omit<LinkedStatblockProps, 'tokens'>;
   private stopFollowing: (() => void) | null = null;
   private stopDrag: (() => void) | null = null;
+  private reach: PreviewWindowReach | null = null;
+  private stopFollowingFrame: (() => void) | null = null;
 
   constructor(
     private app: ObsidianApp,
@@ -69,7 +79,7 @@ export class StatblockPreviewWindow {
     this.element = doc.body.createDiv({ cls: 'atlas-statblock-preview-window' });
     this.element.setAttribute('tabindex', '-1');
     // Only a map's preview, which its manager keeps, can stay open.
-    if (manager) this.addControls(this.element);
+    if (manager) this.addControls(this.element, manager);
 
     if (initialPos) {
       this.setPosition(initialPos.x, initialPos.y);
@@ -112,12 +122,34 @@ export class StatblockPreviewWindow {
 
   /**
    * The pin and close buttons, in a capsule above the card's top right edge
-   * that also moves the window. It shows while the pointer or focus is in the
-   * window and while the window is pinned (`statblock-preview-window.scss`).
+   * that also moves the window, as does the card's top. It shows while the
+   * pointer or focus is in the window and while the window is pinned
+   * (`statblock-preview-window.scss`). Neither can be moved out of the map's
+   * view, nor left outside it when the view shrinks.
    */
-  private addControls(element: HTMLElement): void {
+  private addControls(element: HTMLElement, manager: NotePreviewUIManager): void {
+    element.classList.add('atlas-statblock-preview-window--movable');
     const controls = element.createDiv({ cls: 'atlas-vtt-plugin atlas-statblock-preview-window__controls' });
     this.controls = controls;
+    // The map's view, when the window hangs in its document, else the window.
+    const mapView = manager.mapViewElement();
+    const frameEl = mapView?.ownerDocument === element.ownerDocument ? mapView : null;
+    const reach: PreviewWindowReach = {
+      reach: () => previewReach(
+        controls.getBoundingClientRect(),
+        element.querySelector(CARD_HEADER)?.getBoundingClientRect() ?? null,
+      ),
+      frame: () => viewFrame(frameEl ?? element),
+    };
+    this.reach = reach;
+    const stopObserving = frameEl ? observeResize([frameEl], () => this.reposition()) : (): void => undefined;
+    const onWindowResize = (): void => this.reposition();
+    element.win.addEventListener('resize', onWindowResize);
+    this.stopFollowingFrame = (): void => {
+      stopObserving();
+      element.win.removeEventListener('resize', onWindowResize);
+    };
+    const dragEnded = (): void => { this.stopDrag = null; };
     const grip = controls.createDiv({ cls: 'atlas-statblock-preview-window__grip' });
     setIcon(grip, 'grip-vertical');
     this.pinButton = createPinButton(controls, 'atlas-statblock-preview-window__button', () => this.setPinned(!this.pinned));
@@ -128,11 +160,15 @@ export class StatblockPreviewWindow {
     close.onclick = (): void => this.hide(true);
 
     controls.addEventListener('mousedown', (e) => {
-      this.stopDrag = startPreviewWindowDrag(element, e, () => { this.stopDrag = null; });
+      this.stopDrag = startPreviewWindowDrag(element, e, reach, dragEnded);
     });
-    // As in a note preview, using the window keeps it open: a press anywhere in it but on a button pins it.
     element.addEventListener('mousedown', (e) => {
-      if (!this.pinned && !(e.target as HTMLElement | null)?.closest('button')) this.setPinned(true);
+      const target = e.target as HTMLElement | null;
+      // As in a note preview, using the window keeps it open: a press anywhere in it but on a button pins it.
+      if (!this.pinned && !target?.closest('button')) this.setPinned(true);
+      if (e.button === 0 && target?.closest(CARD_HEADER)) {
+        this.stopDrag = startPreviewWindowDrag(element, e, reach, dragEnded, HEADER_DRAG_THRESHOLD);
+      }
     });
   }
 
@@ -144,9 +180,12 @@ export class StatblockPreviewWindow {
     if (this.pinButton) showPinState(this.pinButton, pinned);
   }
 
+  /** Follows the pointer it opened at, or, once placed by the user, keeps its controls in view. */
   private reposition(): void {
     if (this.initialPos) {
       this.setPosition(this.initialPos.x, this.initialPos.y);
+    } else if (this.element && this.reach) {
+      keepPreviewReachable(this.element, this.reach);
     }
   }
 
@@ -219,6 +258,8 @@ export class StatblockPreviewWindow {
     this.stopFollowing = null;
     this.stopDrag?.();
     this.stopDrag = null;
+    this.stopFollowingFrame?.();
+    this.stopFollowingFrame = null;
 
     // Unmount asynchronously: React forbids unmounting while it is rendering,
     // which happens when destroy() runs from inside an effect.
