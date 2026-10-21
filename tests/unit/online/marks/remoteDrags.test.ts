@@ -82,13 +82,14 @@ describe('RemoteDrags', () => {
   it('draws a path and its distance for each drag, and takes them away when they end', () => {
     drags.update([drag([[35, 35], [245, 35]]), drag([[35, 105], [35, 245], [105, 245]], { key: 'bear' })]);
     expect(labels()).toEqual([cells(3), cells(3)]);
-    expect(drags.paths.children).toHaveLength(2);
+    expect(drags.labels.children).toHaveLength(2);
     drags.update([drag([[35, 35], [315, 35]])]);
     expect(labels()).toEqual([cells(4)]);
     expect(drags.showing).toBe(true);
     drags.update([]);
     expect(labels()).toEqual([]);
-    expect(drags.paths.children).toHaveLength(0);
+    expect(drags.labels.children).toHaveLength(0);
+    expect(drags.paths.getLocalBounds().width).toBe(0);
     expect(drags.showing).toBe(false);
   });
 
@@ -108,7 +109,7 @@ describe('RemoteDrags', () => {
     drags.update([drag([[35, 35], [245, 35]])]);
     const rim = computeTokenPixelSize(GRID.size, 1) / 2;
     // Half the widest band of a measure path's ink lies past its end.
-    expect(drags.paths.children[0]!.getLocalBounds().maxX).toBeCloseTo(245 - rim + darkBands(CANVAS_INK.stroke)[0]!.width / 2, 0);
+    expect(drags.paths.getLocalBounds().maxX).toBeCloseTo(245 - rim + darkBands(CANVAS_INK.stroke)[0]!.width / 2, 0);
   });
 
   it('shows nothing before the scene\'s rules are known', () => {

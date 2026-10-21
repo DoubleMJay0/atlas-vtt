@@ -1,4 +1,4 @@
-import { FederatedPointerEvent } from "pixi.js";
+import { Container, FederatedPointerEvent } from "pixi.js";
 import { Viewport } from "pixi-viewport";
 import type { StoreApi } from 'zustand/vanilla';
 import { getObsidianAccentColor, cssColorToHexNumber } from "./utils/colorUtils";
@@ -9,7 +9,8 @@ import type { SceneSource } from '../host/sceneSource';
 import type { ViewState } from '../types/viewState';
 import { isHandled } from './utils/handledEvents';
 import { drawMeasurement, measureLabelTarget, type MeasureRecord, type MeasureShape } from './utils/measureDrawing';
-import { MeasureInk } from './utils/measureInk';
+import { MeasureInk, MeasureInkLayer } from './utils/measureInk';
+import { destroyTree } from './utils/destroyTree';
 import { MeasureLabel, watchMeasureLabelTheme } from './utils/measureLabel';
 import { MAP_LAYER_Z } from './mapLayerOrder';
 import { MeasurePartsVisibility, type MeasurePlayersView } from './measurePartsVisibility';
@@ -52,7 +53,10 @@ export class MeasureRenderer {
   private gridSystem: MeasureGrid;
   
   /** The measurement being drawn, or showing after its release. */
-  private readonly liveShape = new MeasureInk();
+  /** Every measurement's shape, composed in one pass; every label above all of them. */
+  private readonly shapes = new MeasureInkLayer();
+  private readonly labels = new Container({ label: 'measure-labels', eventMode: 'none', interactiveChildren: false });
+  private readonly liveShape = new MeasureInk(this.shapes);
   private readonly liveLabel = new MeasureLabel();
   /** The zoom everything is drawn at: shapes and labels keep their size on screen. */
   private drawnZoom = 1;
@@ -100,8 +104,12 @@ export class MeasureRenderer {
     this.store = store;
     this.gridSystem = gridSystem;
     
-    this.addToMap(this.liveShape, this.liveLabel);
-    this.parts = new MeasurePartsVisibility({ shape: this.liveShape.view, label: this.liveLabel.view }, () => this.playersView);
+    // Same zIndex, labels added after: the stable sort keeps every label above every shape.
+    this.shapes.view.zIndex = MAP_LAYER_Z.measure;
+    this.labels.zIndex = MAP_LAYER_Z.measure;
+    this.viewport.addChild(this.shapes.view, this.labels);
+    this.labels.addChild(this.liveLabel.view);
+    this.parts = new MeasurePartsVisibility({ shape: this.liveShape.shape, label: this.liveLabel.view }, () => this.playersView);
     
     this.setupViewportScaleListener();
     this.stopThemeWatch = watchMeasureLabelTheme(() => this.redrawAll());
@@ -162,13 +170,6 @@ export class MeasureRenderer {
     this.viewport.on('zoomed', this._viewportScaleHandler);
     this.viewport.on('zoomed-end', this._viewportScaleHandler);
     this.viewport.on('moved', this._viewportScaleHandler);
-  }
-
-  /** Puts a measurement's shape and label on the map, the label above every shape. */
-  private addToMap(shape: MeasureInk, label: MeasureLabel): void {
-    shape.view.zIndex = MAP_LAYER_Z.measure;
-    label.view.zIndex = MAP_LAYER_Z.measure;
-    this.viewport.addChild(shape.view, label.view);
   }
 
   /** Draws every measurement again at the current zoom and in the current theme. */
@@ -323,10 +324,10 @@ export class MeasureRenderer {
     const live = this.current.live;
     if (!live) return;
     const record: MeasureRecord = { shape: this.measureShape, start: live.start, end: live.end };
-    const measurement: DrawnMeasurement = { record, shape: new MeasureInk(), label: new MeasureLabel() };
+    const measurement: DrawnMeasurement = { record, shape: new MeasureInk(this.shapes), label: new MeasureLabel() };
     this.draw(measurement);
-    this.parts.keep({ shape: measurement.shape.view, label: measurement.label.view });
-    this.addToMap(measurement.shape, measurement.label);
+    this.labels.addChild(measurement.label.view);
+    this.parts.keep({ shape: measurement.shape.shape, label: measurement.label.view });
     this.persistentMeasurements.push(measurement);
     this.setMeasurements({ ...this.current, kept: [...this.current.kept, record] });
   }
@@ -379,8 +380,8 @@ export class MeasureRenderer {
     this.clearAllPersistentMeasurements();
     
     this.disableMeasureTool();
-    this.liveShape.destroy();
-    this.liveLabel.destroy();
+    this.shapes.destroy();
+    destroyTree(this.labels);
     this.listeners.clear();
   }
 }

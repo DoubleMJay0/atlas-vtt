@@ -7,7 +7,7 @@ import { destroyTree } from '../../pixi/utils/destroyTree';
 import { MAP_LAYER_Z } from '../../pixi/mapLayerOrder';
 import { computeTokenPixelSize } from '../../pixi/token-renderer/tokenSizing';
 import { drawMeasurePath, drawMeasurePoint, shortenPathEnd } from '../../pixi/utils/measureDrawing';
-import { MeasureInk } from '../../pixi/utils/measureInk';
+import { MeasureInk, MeasureInkLayer } from '../../pixi/utils/measureInk';
 import { MeasureLabel } from '../../pixi/utils/measureLabel';
 import type { MeasureRules } from './RemoteMeasures.ts';
 
@@ -57,7 +57,9 @@ export function dragPathCells({ grid, measurement }: MeasureRules, path: readonl
  * dragged token's rim; `labels` above the tokens' bars and nameplates.
  */
 export class RemoteDrags {
-  readonly paths = new Container({ label: 'remote-drag-paths', zIndex: MAP_LAYER_Z.measure, eventMode: 'none', interactiveChildren: false });
+  /** Every drag's path, composed in one pass. */
+  private readonly layer = new MeasureInkLayer('remote-drag-paths');
+  readonly paths: Container = this.layer.view;
   readonly labels = new Container({ label: 'remote-drag-labels', zIndex: LABEL_Z_INDEX, eventMode: 'none', interactiveChildren: false });
   private readonly zoom: () => number;
   private readonly rules: () => MeasureRules | null;
@@ -67,6 +69,7 @@ export class RemoteDrags {
   constructor(zoom: () => number, rules: () => MeasureRules | null) {
     this.zoom = zoom;
     this.rules = rules;
+    this.paths.zIndex = MAP_LAYER_Z.measure;
   }
 
   /** Whether any ruler shows. */
@@ -109,13 +112,12 @@ export class RemoteDrags {
 
   destroy(): void {
     this.clear();
-    destroyTree(this.paths);
+    this.layer.destroy();
     destroyTree(this.labels);
   }
 
   private add(key: string): Drawn {
-    const drawn: Drawn = { path: new MeasureInk(), label: new MeasureLabel(), key: '' };
-    this.paths.addChild(drawn.path.view);
+    const drawn: Drawn = { path: new MeasureInk(this.layer), label: new MeasureLabel(), key: '' };
     this.labels.addChild(drawn.label.view);
     this.drawn.set(key, drawn);
     return drawn;

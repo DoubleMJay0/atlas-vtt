@@ -10,7 +10,7 @@ import type { Point } from '../../grid/hexGeometry';
 import type { HideableLayer } from '../playerSafeFrame';
 import { cssColorToHexNumber, getObsidianAccentColor } from '../utils/colorUtils';
 import { drawMeasurePath, drawMeasurePoint } from '../utils/measureDrawing';
-import { MeasureInk } from '../utils/measureInk';
+import { MeasureInk, MeasureInkLayer } from '../utils/measureInk';
 import { MeasureLabel, watchMeasureLabelTheme } from '../utils/measureLabel';
 
 /** Above token UI (100) and text (500), below drawings, vision and fog. */
@@ -24,7 +24,8 @@ interface Drawn {
 }
 
 export class DragRulerView {
-  private readonly path = new MeasureInk();
+  private readonly layer = new MeasureInkLayer('drag-ruler-path');
+  private readonly path = new MeasureInk(this.layer);
   private readonly label = new MeasureLabel();
   /** What the ruler shows; a zoom or theme change draws it again. */
   private drawn: Drawn | null = null;
@@ -37,8 +38,8 @@ export class DragRulerView {
   constructor(private readonly viewport: Viewport, tokenLayer: Container) {
     this.label.view.zIndex = LABEL_Z_INDEX;
     // Same zIndex as the token layer, inserted right before it, so it stays above the map and grid.
-    this.path.view.zIndex = tokenLayer.zIndex;
-    this.viewport.addChildAt(this.path.view, this.viewport.getChildIndex(tokenLayer));
+    this.layer.view.zIndex = tokenLayer.zIndex;
+    this.viewport.addChildAt(this.layer.view, this.viewport.getChildIndex(tokenLayer));
     this.viewport.addChild(this.label.view);
     this.viewport.on('zoomed', this.onZoom);
     this.viewport.on('zoomed-end', this.onZoom);
@@ -53,26 +54,26 @@ export class DragRulerView {
     if (points.length === 0) return;
     this.drawn = { points, distance, tokenRadius, gridSize };
     this.redraw();
-    this.path.view.visible = true;
+    this.layer.view.visible = true;
     this.label.view.visible = true;
   }
 
   clear(): void {
     this.drawn = null;
     this.path.clear();
-    this.path.view.visible = false;
+    this.layer.view.visible = false;
     this.label.view.visible = false;
   }
 
   get layers(): HideableLayer[] {
-    return [this.path.view, this.label.view];
+    return [this.layer.view, this.label.view];
   }
 
   destroy(): void {
     this.stopThemeWatch();
     this.viewport.off('zoomed', this.onZoom);
     this.viewport.off('zoomed-end', this.onZoom);
-    this.path.destroy();
+    this.layer.destroy();
     this.label.destroy();
   }
 

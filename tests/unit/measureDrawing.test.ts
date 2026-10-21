@@ -3,14 +3,26 @@ import { describe, expect, it } from 'vitest';
 import { Container, Graphics, type Circle } from 'pixi.js';
 import { CANVAS_INK, INK_SHADE } from '../../src/app/pixi/utils/canvasInk';
 import { drawMeasureCircle, drawMeasureCone, drawMeasurement, measureLabelTarget, type MeasureRecord } from '../../src/app/pixi/utils/measureDrawing';
-import { MeasureInk, darkBands } from '../../src/app/pixi/utils/measureInk';
+import { MeasureInk, MeasureInkLayer, darkBands } from '../../src/app/pixi/utils/measureInk';
 
 
-/** The ink's three drawings: the area beneath, the dark bands and the accent. */
-function layers(ink: MeasureInk): { area: Graphics; dark: Graphics; accent: Graphics; inkLayer: Container } {
-  const [area, inkLayer] = ink.view.children as [Graphics, Container];
-  const [dark, accent] = inkLayer.children as [Graphics, Graphics];
-  return { area, dark, accent, inkLayer };
+/** A measurement's three drawings on its layer: the area beneath, the dark bands and the accent. */
+function layers(ink: MeasureInk): { area: Graphics; dark: Graphics; accent: Graphics; line: Container } {
+  const layer = surfaces.get(ink)!;
+  const area = layer.areas.children[0] as Graphics;
+  const line = layer.lines.children[0] as Container;
+  const [dark, accent] = line.children as [Graphics, Graphics];
+  return { area, dark, accent, line };
+}
+
+const surfaces = new Map<MeasureInk, MeasureInkLayer>();
+
+/** A measurement alone on a layer of its own. */
+function newInk(): MeasureInk {
+  const layer = new MeasureInkLayer();
+  const ink = new MeasureInk(layer);
+  surfaces.set(ink, layer);
+  return ink;
 }
 
 type Step = { action: string; data: unknown[] };
@@ -48,28 +60,47 @@ describe('darkBands', () => {
 
 describe('MeasureInk', () => {
   it('draws at its size on screen: a zoom of 2 doubles the points and halves the drawing back', () => {
-    const ink = new MeasureInk();
+    const ink = newInk();
     ink.begin(2);
     drawMeasurement(ink, ACCENT, { shape: 'line', start: { x: 0, y: 0 }, end: { x: 100, y: 0 } }, 90);
-    expect(ink.view.scale.x).toBe(0.5);
+    expect(layers(ink).line.scale.x).toBe(0.5);
+    expect(layers(ink).area.scale.x).toBe(0.5);
     const [line] = drawn(layers(ink).accent);
     expect(line!.path.map((step) => step.data.slice(0, 2))).toEqual([[0, 0], [200, 0]]);
     ink.destroy();
   });
 
-  it('composes its dark bands and accent in a layer of their own, the bands max-blended', () => {
-    const ink = new MeasureInk();
-    const { dark, accent, inkLayer } = layers(ink);
-    expect(inkLayer.filters).toHaveLength(1);
-    expect(dark.blendMode).toBe('max');
-    expect(accent.blendMode).not.toBe('max');
-    ink.destroy();
+  it('composes the lines of every measurement on a layer in one pass, the dark bands max-blended', () => {
+    const layer = new MeasureInkLayer();
+    const inks = [new MeasureInk(layer), new MeasureInk(layer), new MeasureInk(layer)];
+    expect(layer.lines.filters).toHaveLength(1);
+    expect(layer.lines.children).toHaveLength(3);
+    expect(layer.lines.children.every((line) => !line.filters || line.filters.length === 0)).toBe(true);
+    const [dark, accent] = (layer.lines.children[0] as Container).children as Graphics[];
+    expect(dark!.blendMode).toBe('max');
+    expect(accent!.blendMode).not.toBe('max');
+    // The areas lie beneath every line.
+    expect(layer.view.children).toEqual([layer.areas, layer.lines]);
+    inks[1]!.destroy();
+    expect(layer.lines.children).toHaveLength(2);
+    expect(layer.areas.children).toHaveLength(2);
+    layer.destroy();
+  });
+
+  it('shows or hides one measurement, area and line together, and leaves the others', () => {
+    const layer = new MeasureInkLayer();
+    const [first, second] = [new MeasureInk(layer), new MeasureInk(layer)];
+    first!.shape.visible = false;
+    expect(layer.areas.children.map((area) => area.visible)).toEqual([false, true]);
+    expect(layer.lines.children.map((line) => line.visible)).toEqual([false, true]);
+    expect([first!.shape.visible, second!.shape.visible]).toEqual([false, true]);
+    layer.destroy();
   });
 });
 
 describe('drawMeasurement', () => {
   it('strokes a line once in the accent, opaque and with round ends, and marks its start with a ring and its end with a dot', () => {
-    const ink = new MeasureInk();
+    const ink = newInk();
     ink.begin(1);
     drawMeasurement(ink, ACCENT, { shape: 'line', start, end: { x: 315, y: 175 } }, 90);
     const strokes = drawn(layers(ink).accent).filter((step) => step.action === 'stroke');
@@ -82,7 +113,7 @@ describe('drawMeasurement', () => {
   });
 
   it('draws a circle as one wash inside one outline', () => {
-    const ink = new MeasureInk();
+    const ink = newInk();
     ink.begin(1);
     drawMeasurement(ink, ACCENT, { shape: 'circle', start, end: { x: 245, y: 35 } }, 90);
     expect(drawn(layers(ink).area).map((step) => step.action)).toEqual(['fill']);
@@ -93,7 +124,7 @@ describe('drawMeasurement', () => {
 
   it('draws a sphere as the circle of the same reach', () => {
     const shapes = (['circle', 'sphere'] as const).map((shape) => {
-      const ink = new MeasureInk();
+      const ink = newInk();
       ink.begin(1);
       drawMeasurement(ink, ACCENT, { shape, start, end: { x: 105, y: 245 } }, 90);
       const outline = (graphics: Graphics): unknown[] => drawn(graphics).map(({ action, path }) => [action, path.map((step) => step.action)]);
@@ -104,7 +135,7 @@ describe('drawMeasurement', () => {
 
   // Canvas 2D (the renderer without WebGL) throws on a negative arc radius, which stops the map from rendering.
   it('draws no area before the pointer has moved, only the start', () => {
-    const ink = new MeasureInk();
+    const ink = newInk();
     ink.begin(1);
     drawMeasureCircle(ink, ACCENT, start, 0);
     drawMeasureCone(ink, ACCENT, start, start, 90);
@@ -114,7 +145,7 @@ describe('drawMeasurement', () => {
   });
 
   it('outlines a cone as one closed path whose arc runs on from the apex, opened by the angle it is given', () => {
-    const ink = new MeasureInk();
+    const ink = newInk();
     ink.begin(1);
     drawMeasureCone(ink, ACCENT, start, { x: 315, y: 35 }, 60);
     const strokes = drawn(layers(ink).accent).filter((step) => step.action === 'stroke');

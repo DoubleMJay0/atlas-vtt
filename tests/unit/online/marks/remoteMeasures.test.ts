@@ -134,9 +134,11 @@ describe('RemoteMeasures', () => {
   it('forgets a sender who has no measurements left or is not named', () => {
     measures.update([measure(line(700))], 0);
     measures.update([measure(null)], 10);
-    expect(measures.container.children).toHaveLength(0);
+    // Only the layer every sender's shapes are composed in stays, empty.
+    const empty = (): boolean => measures.container.children.length === 1 && measures.container.getLocalBounds().width === 0;
+    expect(empty()).toBe(true);
     measures.update([measure(line(700))], 20);
     measures.update([], 30);
-    expect(measures.container.children).toHaveLength(0);
+    expect(empty()).toBe(true);
   });
 });

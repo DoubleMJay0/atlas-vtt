@@ -2,6 +2,7 @@ import { AlphaFilter, Container, Graphics } from 'pixi.js';
 import type { Point } from '../../grid/hexGeometry';
 import { CANVAS_INK, INK_SHADE, type InkBand } from './canvasInk';
 import { destroyTree } from './destroyTree';
+import type { HideableLayer } from '../playerSafeFrame';
 
 /** Opacity of a measured area's fill: present, never hiding the map. */
 const AREA_ALPHA = 0.14;
@@ -24,33 +25,69 @@ export function darkBands(stroke: number): InkBand[] {
 }
 
 /**
- * A measurement drawn in the ink of the selection highlight, at its size on screen: `begin` scales it
- * to the zoom, and the drawing calls take world points. Three layers keep translucent pieces from
- * adding up where they meet (at a joint, where a dot sits on the line, where a cone's edges join its
- * arc): an area's fill is one shape beneath; the dark bands are drawn with max blending, so a pixel
- * takes the darkest band over it and never their sum; the accent above them is opaque. Max blending
- * needs an empty surface, so the bands and the accent are composed in a layer of their own (a
- * pass-through filter) and laid onto the map as one, as the laser is.
+ * The surface measurements are drawn on: their areas' washes beneath, and their lines composed in
+ * one layer (a pass-through filter) laid onto the map as one, as the laser is. Max blending needs an
+ * empty surface, and one layer for every measurement on it costs one pass however many there are.
+ */
+export class MeasureInkLayer {
+  readonly view: Container;
+  readonly areas = new Container({ label: 'measure-areas' });
+  readonly lines = new Container({ label: 'measure-lines' });
+  private readonly composite = new AlphaFilter({ alpha: 1, resolution: 'inherit', antialias: 'inherit' });
+
+  constructor(label = 'measures') {
+    this.view = new Container({ label, eventMode: 'none', interactiveChildren: false });
+    this.lines.filters = [this.composite];
+    this.view.addChild(this.areas, this.lines);
+  }
+
+  destroy(): void {
+    destroyTree(this.view);
+    this.composite.destroy();
+  }
+}
+
+/** Shows or hides several display objects as one. */
+class LinkedLayers implements HideableLayer {
+  constructor(private readonly layers: readonly HideableLayer[]) {}
+
+  get visible(): boolean {
+    return this.layers.every((layer) => layer.visible);
+  }
+
+  set visible(visible: boolean) {
+    for (const layer of this.layers) layer.visible = visible;
+  }
+}
+
+/**
+ * A measurement drawn in the ink of the selection highlight on a `MeasureInkLayer`, at its size on
+ * screen: `begin` scales it to the zoom, and the drawing calls take world points. Its pieces never add
+ * up where they meet (at a joint, where a dot sits on the line, where a cone's edges join its arc):
+ * an area's wash is one shape beneath; the dark bands are drawn with max blending, so a pixel takes
+ * the darkest band over it, of this measurement or another, and never their sum; the accent above
+ * them is opaque. `shape` shows or hides the measurement alone.
  */
 export class MeasureInk {
-  readonly view = new Container({ label: 'measure', eventMode: 'none', interactiveChildren: false });
+  readonly shape: HideableLayer;
   private readonly area = new Graphics({ label: 'measure-area' });
-  private readonly layer = new Container({ label: 'measure-ink' });
+  private readonly line = new Container({ label: 'measure-line' });
   private readonly dark = new Graphics({ label: 'measure-dark', blendMode: 'max' });
   private readonly accent = new Graphics({ label: 'measure-accent' });
-  private readonly composite = new AlphaFilter({ alpha: 1, resolution: 'inherit', antialias: 'inherit' });
   private zoom = 1;
 
-  constructor() {
-    this.layer.filters = [this.composite];
-    this.layer.addChild(this.dark, this.accent);
-    this.view.addChild(this.area, this.layer);
+  constructor(layer: MeasureInkLayer) {
+    this.line.addChild(this.dark, this.accent);
+    layer.areas.addChild(this.area);
+    layer.lines.addChild(this.line);
+    this.shape = new LinkedLayers([this.area, this.line]);
   }
 
   /** Clears the drawing and sizes what follows for `zoom` (screen pixels per world unit). */
   begin(zoom: number): void {
     this.zoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
-    this.view.scale.set(1 / this.zoom);
+    this.area.scale.set(1 / this.zoom);
+    this.line.scale.set(1 / this.zoom);
     this.clear();
   }
 
@@ -66,7 +103,7 @@ export class MeasureInk {
   }
 
   /** Strokes `trace` as the accent line, held by its dark bands. */
-  line(trace: InkTrace, color: number): void {
+  stroke(trace: InkTrace, color: number): void {
     for (const band of darkBands(CANVAS_INK.stroke)) {
       trace(this.dark);
       this.dark.stroke({ width: band.width, color: 0x000000, alpha: band.alpha, cap: 'round', join: 'round' });
@@ -92,8 +129,9 @@ export class MeasureInk {
     this.area.fill({ color, alpha: AREA_ALPHA });
   }
 
+  /** Takes the measurement off its layer. */
   destroy(): void {
-    destroyTree(this.view);
-    this.composite.destroy();
+    destroyTree(this.area);
+    destroyTree(this.line);
   }
 }

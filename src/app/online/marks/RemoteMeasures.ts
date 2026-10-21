@@ -4,7 +4,7 @@ import { pathLengthInCells, type GridGeometry } from '../../grid/gridDistance';
 import { formatDistance, type MeasurementSettings } from '../../grid/measurementFormat';
 import { MAP_LAYER_Z } from '../../pixi/mapLayerOrder';
 import { drawMeasurement, measureLabelTarget, type MeasureRecord } from '../../pixi/utils/measureDrawing';
-import { MeasureInk } from '../../pixi/utils/measureInk';
+import { MeasureInk, MeasureInkLayer } from '../../pixi/utils/measureInk';
 import { MeasureLabel } from '../../pixi/utils/measureLabel';
 import { destroyTree } from '../../pixi/utils/destroyTree';
 import { PointerTrack } from './PointerTrack.ts';
@@ -55,6 +55,8 @@ const liveRecord = ({ told, end }: Live): MeasureRecord => ({ shape: told.shape,
  */
 export class RemoteMeasures {
   readonly container = new Container({ label: 'remote-measures', zIndex: MAP_LAYER_Z.measure, eventMode: 'none', interactiveChildren: false });
+  /** Every sender's shapes, composed in one pass; their labels follow in the container, above them all. */
+  private readonly shapes = new MeasureInkLayer('remote-measure-shapes');
   private readonly drawn = new Map<string, Drawn>();
   private readonly zoom: () => number;
   private readonly rules: () => MeasureRules | null;
@@ -66,6 +68,7 @@ export class RemoteMeasures {
     this.zoom = zoom;
     this.rules = rules;
     this.interval = interval;
+    this.container.addChild(this.shapes.view);
   }
 
   /** Every sender's measurements as they are now (`now` in ms, the clock `tick` runs on); a sender missing from them has none. */
@@ -132,12 +135,12 @@ export class RemoteMeasures {
 
   destroy(): void {
     this.clear();
+    this.shapes.destroy();
     destroyTree(this.container);
   }
 
   private add(who: string): Drawn {
-    const drawn: Drawn = { keptShapes: new MeasureInk(), liveShape: new MeasureInk(), labels: [], kept: [], live: null, colour: 0 };
-    this.container.addChild(drawn.keptShapes.view, drawn.liveShape.view);
+    const drawn: Drawn = { keptShapes: new MeasureInk(this.shapes), liveShape: new MeasureInk(this.shapes), labels: [], kept: [], live: null, colour: 0 };
     this.drawn.set(who, drawn);
     return drawn;
   }

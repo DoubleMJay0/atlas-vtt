@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Text } from 'pixi.js';
+import { Container, Text } from 'pixi.js';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { TokenFootprint } from '../../src/app/vision/measureOrigin';
 import type { MeasurePlayersView } from '../../src/app/pixi/measurePartsVisibility';
@@ -70,6 +70,24 @@ describe('MeasureRenderer in the GM view', () => {
       [true, false],
       [true, false],
     ]);
+  });
+});
+
+describe('MeasureRenderer layers', () => {
+  it('keeps every distance label above every measurement shape, kept ones included', () => {
+    const s = scene();
+    s.bus.emit('measure-persistence-changed', true);
+    s.store.getState().setActiveTool('measure');
+    measureFrom(s, 100, 100);
+    s.bus.emit('measure-shape-changed', 'circle');
+    measureFrom(s, 300, 300);
+    const labels = s.parts().filter((_, index) => index % 2 === 1) as Container[];
+    const shapes = s.viewport.children.find((child) => child.label === 'measures')!;
+    s.viewport.sortChildren();
+    for (const label of labels) {
+      expect(label.parent).toBe(labels[0]!.parent);
+      expect(s.viewport.getChildIndex(label.parent!)).toBeGreaterThan(s.viewport.getChildIndex(shapes));
+    }
   });
 });
 
@@ -172,8 +190,8 @@ describe('MeasureRenderer and the players\' picture', () => {
     s.pointer('pointerdown', 100, 100);
     s.pointer('pointermove', 300, 100);
     const label = s.parts()[1];
-    const text = label?.children.find((child) => child instanceof Text);
-    if (!label || !(text instanceof Text)) throw new Error('Expected the live label');
+    const text = label instanceof Container ? label.children.find((child) => child instanceof Text) : undefined;
+    if (!(label instanceof Container) || !(text instanceof Text)) throw new Error('Expected the live label');
     expect(label.visible).toBe(false);
     s.viewport.scale.set(0.5);
     s.viewport.emit('zoomed', { viewport: s.viewport, type: 'wheel' });

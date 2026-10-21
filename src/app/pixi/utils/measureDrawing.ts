@@ -23,7 +23,7 @@ export function drawMeasurePath(ink: MeasureInk, color: number, points: readonly
   const screen = points.map((point) => ink.screen(point));
   const [first, ...rest] = screen;
   if (!first || rest.length === 0) return;
-  ink.line((g) => {
+  ink.stroke((g) => {
     g.moveTo(first.x, first.y);
     for (const point of rest) g.lineTo(point.x, point.y);
   }, color);
@@ -53,7 +53,7 @@ export function drawMeasureCircle(ink: MeasureInk, color: number, center: Point,
   if (!(r > 0)) return;
   const trace: InkTrace = (g) => { g.circle(x, y, r); };
   ink.fill(trace, color);
-  ink.line(trace, color);
+  ink.stroke(trace, color);
 }
 
 /** The cone from `start` towards `end` in screen pixels: as long as the distance between them and `coneAngle` degrees wide. */
@@ -78,7 +78,7 @@ export function drawMeasureCone(ink: MeasureInk, color: number, start: Point, en
   const trace = coneTrace(ink.screen(start), ink.screen(end), coneAngle);
   if (!trace) return;
   ink.fill(trace, color);
-  ink.line(trace, color);
+  ink.stroke(trace, color);
 }
 
 /**
