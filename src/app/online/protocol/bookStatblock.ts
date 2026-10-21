@@ -9,6 +9,7 @@ import {
   type SheetBudget, type SheetField, type SheetText,
 } from './sheetValues.ts';
 import { parseSheetCard, parseSheetFrame, type SheetCard, type SheetFrame } from './sheetLayout.ts';
+import { parseSheetReferences, type SheetReferences } from './sheetReferences.ts';
 import { parseCellRolls, parseRoll } from './sheetRolls.ts';
 import { MAX_TOKEN_VALUE } from './tokenUI.ts';
 
@@ -96,6 +97,12 @@ export interface BookStatblock extends StatblockRest {
   readonly card?: SheetCard;
   /** The header's hit points where the template draws them as a track (`sigils.hp` says them as a number for an older page). */
   readonly hitPoints?: SheetNode;
+  /**
+   * The numbers the player's `@` references name (`SheetReferences`), for what the player writes
+   * into the sheet before the GM's Atlas has drawn it; an older GM's Atlas sends none, and then
+   * what they write is filled in once the GM's next statblock comes.
+   */
+  readonly references?: SheetReferences;
 }
 
 /** Sent to one player after every `book` and whenever it changes; null: their character has no statblock they get. */
@@ -275,9 +282,11 @@ export function parseBookStatblock(value: unknown): BookStatblock | null | undef
   const refills = parseRefills(value.refills, budget);
   const card = parseSheetCard(value.card);
   const hitPoints = value.hitPoints === undefined ? undefined : parseNodes([value.hitPoints], 0, budget)?.[0] ?? null;
-  if (refills === null || card === null || hitPoints === null) return undefined;
+  const references = parseSheetReferences(value.references);
+  if (refills === null || card === null || hitPoints === null || references === null) return undefined;
   return {
     editable: value.editable, displayName, sigils, blocks, abilities, ...(value.refills !== undefined && { refills }), ...(card !== undefined && { card }), ...(hitPoints !== undefined && { hitPoints }),
+    ...(references !== undefined && { references }),
     ...parseStatblockRest(value, budget),
   };
 }

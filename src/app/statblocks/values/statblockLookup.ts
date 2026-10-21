@@ -36,7 +36,7 @@ const NOTHING_READ: ReadonlySet<string> = new Set();
 const isSingle = (value: unknown): value is string | number | boolean => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
 /** The worked-out rows of the first Table block drawing each Table field. */
-function tableColumns(template: StatblockTemplate): Map<FieldKey, readonly ScoreColumn[]> {
+export function tableColumns(template: StatblockTemplate): Map<FieldKey, readonly ScoreColumn[]> {
   const columns = new Map<FieldKey, readonly ScoreColumn[]>();
   const blocks = [...headerParts(template).map((part) => part.block), ...flattenReadingOrder(template.layout.blocks)];
   for (const block of blocks) {
