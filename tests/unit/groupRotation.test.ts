@@ -5,6 +5,7 @@ import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { getHistoryStore } from '../../src/app/stores/history';
 import { snapTokenCenter } from '../../src/app/grid/gridPlacement';
 import { GroupRotation, type GroupTurnHost } from '../../src/app/pixi/selection/GroupRotation';
+import { gridPivot } from '../../src/app/pixi/selection/groupTurn';
 import type { DrawingStroke, TokenEntity } from '../../src/app/types';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
@@ -45,9 +46,8 @@ function setup(activeTool: 'select' | 'draw-pen' = 'select') {
   const viewport = Object.assign(new Container(), { toWorld: (point: { x: number; y: number }) => ({ x: point.x, y: point.y }), plugins, options: { events: { domElement: canvas } } });
   const facings: Array<ReadonlyMap<string, number> | null> = [];
   const host: GroupTurnHost = {
-    land: (point, size) => snapTokenCenter(point, size, 'square', CELL, squareCell),
+    pivot: (middle) => gridPivot(middle, false, (point, size) => snapTokenCenter(point, size, 'square', CELL, squareCell)),
     showFacings: (shown) => facings.push(shown),
-    settle: vi.fn(),
   };
   const frame = { x: 0, y: 0, width: 210, height: 70 };
   const turnFrame = vi.fn();
@@ -68,7 +68,7 @@ function setup(activeTool: 'select' | 'draw-pen' = 'select') {
 }
 
 describe('GroupRotation', () => {
-  it('turns the group a quarter turn about the frame centre and puts it down as one undo step', () => {
+  it('turns the group a quarter turn about its pivot onto cells and puts it down as one undo step', () => {
     const { store, history, press, move, release, tokens, plugins } = setup();
     press(105, -30);
     move(170, 35);
@@ -91,6 +91,20 @@ describe('GroupRotation', () => {
     expect(tokens().a).toMatchObject({ x: 35, y: 35 });
     expect(tokens().a!.rotation).toBeUndefined();
     expect(store.getState().objects.drawings.pen!.points).toEqual([{ x: 105, y: 0 }]);
+  });
+
+  it('puts the tokens down exactly where the last step of the turn showed them, off the grid at 45°', () => {
+    const { store, press, move, release, tokens } = setup();
+    press(105, -30);
+    move(105 + 65 * Math.sin(Math.PI / 4), 35 - 65 * Math.cos(Math.PI / 4));
+    const shown = { a: { ...tokens().a! }, b: { ...tokens().b! } };
+    release();
+    expect(tokens().a).toMatchObject({ x: shown.a.x, y: shown.a.y, rotation: 45 });
+    expect(tokens().b).toMatchObject({ x: shown.b.x, y: shown.b.y, rotation: 45 });
+    // Turned about the pivot (105, 35): still a cell and a half apart, now along the diagonal
+    expect(tokens().a!.x).toBeCloseTo(105 - 70 * Math.SQRT1_2, 9);
+    expect(Math.hypot(tokens().a!.x - tokens().b!.x, tokens().a!.y - tokens().b!.y)).toBeCloseTo(140, 9);
+    expect(store.getState().heldTokens).toEqual({});
   });
 
   it('snaps the angle to 15°, or 45° with Shift', () => {

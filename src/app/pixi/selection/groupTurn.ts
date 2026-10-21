@@ -1,6 +1,7 @@
 /**
  * Turning a selection as one rigid group, as pure geometry in world units. Angles are degrees and
- * turn clockwise on screen (y grows downwards), as a token's `rotation` does.
+ * turn clockwise on screen (y grows downwards), as a token's `rotation` does. A turn is rigid: the
+ * tokens land where it shows them, so a formation that does not overlap never comes to.
  */
 
 export interface Point {
@@ -13,8 +14,6 @@ export interface TokenAtStart extends Point {
   readonly id: string;
   /** Degrees it faces; unset faces up. */
   readonly rotation: number | undefined;
-  /** Its size in cells, which decides where it snaps. */
-  readonly size: number;
 }
 
 /** Where a token stands and which way it faces after a turn. */
@@ -77,20 +76,39 @@ export function turnPoints(points: readonly Point[], centre: Point, degrees: num
   return points.map((point) => orbit(point, centre, degrees));
 }
 
+/** A box in world units. */
+export interface Footprint extends Point {
+  readonly width: number;
+  readonly height: number;
+}
+
+/** The middle of what is turned: of the box around every token's footprint and every drawing. */
+export function formationMiddle(footprints: readonly Footprint[]): Point | null {
+  if (footprints.length === 0) return null;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const { x, y, width, height } of footprints) {
+    left = Math.min(left, x);
+    top = Math.min(top, y);
+    right = Math.max(right, x + width);
+    bottom = Math.max(bottom, y + height);
+  }
+  return { x: (left + right) / 2, y: (top + bottom) / 2 };
+}
+
 /**
- * The turned tokens put down as a drop puts them: `land` gives where the centre of a token of a
- * size comes to rest (the grid's snap, or the point itself where the scene does not snap).
+ * Where a group turns about on a grid, near `middle`, so that its clean turns map the grid onto
+ * itself and a formation standing on cells lands on cells: on a square grid the nearer of the
+ * closest cell centre and the closest cell corner (a quarter turn about either maps centres to
+ * centres and corners to corners), on a hex grid the closest hex centre (a sixth of a turn about
+ * it maps the grid onto itself). `snap` is where a token of a size snaps (`snapTokenCenter`):
+ * size 1 a cell's centre, 1.5 (two cells across) a square grid's corner.
  */
-export function landTokens(
-  tokens: readonly TokenAtStart[],
-  centre: Point,
-  degrees: number,
-  land: (point: Point, size: number) => Point,
-): TurnedToken[] {
-  return tokens.map((token) => {
-    const place = land(orbit(token, centre, degrees), token.size);
-    return { id: token.id, x: place.x, y: place.y, rotation: turnedFacing(token.rotation, degrees) };
-  });
+export function gridPivot(middle: Point, hex: boolean, snap: (point: Point, size: number) => Point): Point {
+  const centre = snap(middle, 1);
+  if (hex) return centre;
+  const corner = snap(middle, 1.5);
+  const away = (point: Point): number => Math.hypot(point.x - middle.x, point.y - middle.y);
+  return away(corner) < away(centre) ? corner : centre;
 }
 
 /** The angle as the turn shows it beside its handle: whole degrees, a minus sign for anticlockwise. */

@@ -22,6 +22,12 @@ const LOOK = {
   labelGap: 6,
 } as const;
 
+/** A turn under way: `degrees` about `pivot`, in world units. */
+export interface ButtonTurn {
+  readonly pivot: { readonly x: number; readonly y: number };
+  readonly degrees: number;
+}
+
 export interface GroupRotateButtonDeps {
   /** The theme's accent, in which the stem is drawn. */
   accent(): number;
@@ -39,6 +45,8 @@ export interface GroupRotateButtonDeps {
 export class GroupRotateButton {
   readonly layer = new Container({ label: 'groupRotate', zIndex: MAP_LAYER_Z.groupRotate, visible: false });
   private readonly arm = new Container();
+  /** Above the frame's top middle, which need not lie straight above the pivot the arm turns about. */
+  private readonly mount = new Container();
   private readonly stem = new Graphics();
   private readonly handle = new Container({ label: 'groupRotateHandle', eventMode: 'static', cursor: 'grab' });
   private readonly disc = new Graphics();
@@ -61,7 +69,8 @@ export class GroupRotateButton {
     this.glyph.anchor.set(0.5);
     this.handle.addChild(this.disc, this.glyph);
     this.label.addChild(this.pill);
-    this.arm.addChild(this.stem, this.handle, this.label);
+    this.mount.addChild(this.stem, this.handle, this.label);
+    this.arm.addChild(this.mount);
     this.layer.addChild(this.arm);
     this.handle.on('pointerover', () => this.setHovered(true));
     this.handle.on('pointerout', () => this.setHovered(false));
@@ -73,10 +82,10 @@ export class GroupRotateButton {
   }
 
   /**
-   * Stands above `frame` (world units) at `zoom`, turned `turn` degrees about the frame's centre
-   * with the angle shown, or upright without one; hidden for a null frame.
+   * Stands above `frame` (world units) at `zoom`, turned with the group about its pivot with the
+   * angle shown, or upright without a turn; hidden for a null frame.
    */
-  show(frame: Box | null, zoom: number, turn: number | null = null): void {
+  show(frame: Box | null, zoom: number, turn: ButtonTurn | null = null): void {
     if (!frame) {
       this.layer.visible = false;
       this.fade.cancel();
@@ -92,18 +101,20 @@ export class GroupRotateButton {
       this.accent = this.deps.accent();
       this.paint();
     }
-    this.arm.position.set(frame.x + frame.width / 2, frame.y + frame.height / 2);
+    const pivot = turn?.pivot ?? { x: frame.x + frame.width / 2, y: frame.y };
+    this.arm.position.set(pivot.x, pivot.y);
     this.arm.scale.set(1 / zoom);
-    const radians = ((turn ?? 0) * Math.PI) / 180;
+    this.mount.position.set((frame.x + frame.width / 2 - pivot.x) * zoom, 0);
+    const radians = ((turn?.degrees ?? 0) * Math.PI) / 180;
     this.arm.rotation = radians;
     this.handle.rotation = -radians;
     this.label.rotation = -radians;
 
-    const top = -(frame.height * zoom) / 2;
+    const top = (frame.y - pivot.y) * zoom;
     const handleY = top - LOOK.stem - LOOK.radius;
     this.handle.position.set(0, handleY);
     this.label.visible = turn !== null;
-    const label = turn === null ? '' : turnLabel(turn);
+    const label = turn === null ? '' : turnLabel(turn.degrees);
     if (label !== '' && label !== this.labelDrawn) {
       const text = this.text ?? this.label.addChild(this.text = createMeasureLabelText());
       text.text = label;

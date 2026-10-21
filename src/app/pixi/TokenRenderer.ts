@@ -17,6 +17,8 @@ import { Viewport } from "pixi-viewport";
 import { App as ObsidianApp } from 'obsidian';
 import type { TokenEntity } from "../types";
 import type { GroupTurnHost } from "./selection/GroupRotation";
+import { gridPivot } from "./selection/groupTurn";
+import { isHexGridType } from "../grid/hexGeometry";
 import type { TokenGestureEventDetail } from '../types/atlasWindowEvents';
 import type { GridSystem } from "../grid/GridSystem";
 import type { ViewAtlasStore } from '../storeFactory';
@@ -735,9 +737,12 @@ export class TokenRenderer {
   /** What a group turned from the button above its selection frame asks of the tokens (`GroupRotation`). */
   public groupTurnHost(): GroupTurnHost {
     return {
-      land: (point, size) => this.interactionController.landing(point, size),
+      pivot: (middle) => {
+        if (!(this.store.getState().grid?.snapToGrid ?? true)) return middle;
+        const hex = isHexGridType(this.gridSystem.getOptions().type);
+        return gridPivot(middle, hex, (point, size) => this.gridSystem.snapTokenCenter(point.x, point.y, size));
+      },
       showFacings: (facings) => this.showFacings(facings),
-      settle: (tokenId, x, y) => this.glide.to(tokenId, x, y),
     };
   }
 

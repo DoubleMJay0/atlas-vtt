@@ -4,18 +4,18 @@ import type { ViewAtlasStore } from '../../storeFactory';
 import { abandonHistoryTransaction, beginHistoryTransaction, endHistoryTransaction } from '../../stores/history';
 import { holdTokens } from '../../lighting/sightOnDrop';
 import { mapTokens } from '../../tokens/offMap';
+import { getDrawingBounds } from '../drawingGeometry';
+import { tokenDiameterInCells } from '../token-renderer/tokenSizing';
 import { GroupRotateButton } from './GroupRotateButton';
-import { landTokens, pointerTurn, snapTurn, turnPoints, turnTokens, type Point, type TokenAtStart } from './groupTurn';
+import { formationMiddle, pointerTurn, snapTurn, turnPoints, turnTokens, type Footprint, type Point, type TokenAtStart } from './groupTurn';
 import type { Box } from './selectionGeometry';
 
 /** What the tokens' renderer does for a group being turned. */
 export interface GroupTurnHost {
-  /** Where the centre of a token of `size` comes to rest when put down at `point`, as a dropped token does. */
-  land(point: Point, size: number): Point;
+  /** Where a group whose middle is `middle` turns about: on the scene's grid where it snaps (`gridPivot`), else its middle. */
+  pivot(middle: Point): Point;
   /** Shows the tokens facing these ways while the turn lasts; null shows them as the store has them. */
   showFacings(facings: ReadonlyMap<string, number> | null): void;
-  /** Takes a token from where it shows to the place it is put down, as a drop does. */
-  settle(tokenId: string, x: number, y: number): void;
 }
 
 /** The turn of the group frame: it turns about `centre` with the group and stops following what it holds. */
@@ -52,9 +52,12 @@ interface Turn {
 
 /**
  * Turns a selection of two or more as one rigid group from the button above its frame: every
- * token orbits the frame's centre and faces as much further round, drawings turn their points.
- * The angle snaps as a single token's does. Releasing puts the tokens down as a drop does (each
- * snapped where a dropped token of its size snaps, on top of the others), as one undo step;
+ * token orbits the pivot and faces as much further round, drawings turn their points. The pivot is
+ * the middle of the tokens' footprints and the drawings, put on the grid so that a quarter turn
+ * (a sixth on hexes) lands a formation standing on cells on cells (`gridPivot`); other angles
+ * leave it off the grid, as Owlbear Rodeo does. The angle snaps as a single token's does.
+ * Releasing puts the tokens down where the turn showed them, through a drop (on top of the
+ * others, sight worked out once), as one undo step;
  * Escape, a cancelled pointer and the window losing focus put everything back and leave none.
  */
 export class GroupRotation {
@@ -79,7 +82,7 @@ export class GroupRotation {
     this.zoom = this.deps.viewport.scale.x || 1;
     const turn = this.turn;
     if (turn) {
-      this.button.show(turn.frame, this.zoom, turn.started ? turn.degrees : null);
+      this.button.show(turn.frame, this.zoom, turn.started ? { pivot: turn.centre, degrees: turn.degrees } : null);
       return;
     }
     const { isPlayerView, isDragging, activeTool } = this.deps.store.getState();
@@ -104,18 +107,27 @@ export class GroupRotation {
     const host = this.deps.host();
     const frame = this.deps.frame();
     if (this.turn || !host || !frame) return;
-    const { selectedIds, objects } = store.getState();
+    const { selectedIds, objects, grid } = store.getState();
     const tokens = mapTokens(objects);
+    const footprints: Footprint[] = [];
     const starts = selectedIds.flatMap((id) => {
       const token = tokens[id];
-      return token ? [{ id, x: token.x, y: token.y, rotation: token.rotation, size: token.size || 1 }] : [];
+      if (!token) return [];
+      const across = (grid?.size || 70) * tokenDiameterInCells(token.size || 1);
+      footprints.push({ x: token.x - across / 2, y: token.y - across / 2, width: across, height: across });
+      return [{ id, x: token.x, y: token.y, rotation: token.rotation }];
     });
     if (starts.length === 0) return;
     const drawings = selectedIds.flatMap((id) => {
       const drawing = objects.drawings[id];
-      return drawing ? [{ id, points: drawing.points.map(({ x, y }) => ({ x, y })) }] : [];
+      const bounds = drawing ? getDrawingBounds(drawing) : null;
+      if (!drawing || !bounds) return [];
+      footprints.push(bounds);
+      return [{ id, points: drawing.points.map(({ x, y }) => ({ x, y })) }];
     });
-    const centre = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
+    const middle = formationMiddle(footprints);
+    if (!middle) return;
+    const centre = host.pivot(middle);
     this.turn = { host, frame, centre, from: viewport.toWorld(event.global), tokens: starts, drawings, degrees: 0, started: false };
     viewport.plugins.pause('drag');
     this.listen(true);
@@ -156,7 +168,7 @@ export class GroupRotation {
     if (turn.drawings.length > 0) {
       store.getState().placeDrawings(Object.fromEntries(turn.drawings.map(({ id, points }) => [id, turnPoints(points, turn.centre, degrees)])));
     }
-    this.button.show(turn.frame, this.zoom, degrees);
+    this.button.show(turn.frame, this.zoom, { pivot: turn.centre, degrees });
   }
 
   /** Ends the turn: a release that turned the group puts it down as one undo step, anything else puts it back. */
@@ -177,9 +189,8 @@ export class GroupRotation {
 
   private putDown(turn: Turn): void {
     const { store } = this.deps;
-    const landed = landTokens(turn.tokens, turn.centre, turn.degrees, (point, size) => turn.host.land(point, size));
-    for (const { id, x, y } of landed) turn.host.settle(id, x, y);
-    store.getState().dropTokens(landed);
+    // Exactly where the turn showed them: the pivot keeps a clean turn on the grid
+    store.getState().dropTokens(turnTokens(turn.tokens, turn.centre, turn.degrees));
     turn.host.showFacings(null);
     endHistoryTransaction(store);
   }
