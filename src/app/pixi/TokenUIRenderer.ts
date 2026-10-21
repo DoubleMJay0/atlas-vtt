@@ -53,9 +53,9 @@ export class TokenUIRenderer {
   private emphasis: ValueTransition;
   /** The resources of the bar slots, one view per resource. */
   private resources: ResourceStack;
-  /** Anchor past the right resize button on the token's bottom edge (`wheelAnchor`), scaled like `belowToken`; holds the wheels of the right side. */
+  /** Anchor of the right wheels' column (`wheelAnchor`), scaled like `belowToken`; holds the wheels of the right side. */
   private besideToken: Container;
-  /** The mirror of `besideToken` past the left resize button; holds the wheels of the left side. */
+  /** The mirror of `besideToken` on the token's left; holds the wheels of the left side. */
   private leftOfToken: Container;
   /** The resources of the wheel slots, shown on hover and selection; in the players' view at rest. */
   private wheels = new ResourceWheels();
@@ -63,6 +63,8 @@ export class TokenUIRenderer {
   private playersView = false;
   /** The wheels stand at rest instead of answering hover and selection: the players' view has neither. */
   private wheelsAtRest = false;
+  /** Half the width of the nameplate shown, in UI units; 0 without one. The wheels stand clear of it. */
+  private nameplateHalfWidth = 0;
   private difficultyBadge: Container;
   private difficultyText: Text;
   private defeatedOverlay: Graphics;
@@ -348,6 +350,7 @@ export class TokenUIRenderer {
     this.defeatedOverlay.clear();
     this.nameBadge.clear();
     this.nameText.text = '';
+    this.nameplateHalfWidth = 0;
     
     // Check if we have any data to display
     const hasResources = bars.length > 0 || wheels.length > 0;
@@ -361,10 +364,6 @@ export class TokenUIRenderer {
 
     // Anchor the UI on the token's edges; everything below is laid out from there in UI units
     this.belowToken.position.set(0, spriteWidth / 2);
-    const anchor = this.wheelAnchor();
-    this.besideToken.position.set(anchor.x, anchor.y);
-    this.leftOfToken.position.set(-anchor.x, anchor.y);
-    this.layoutUIScale();
     this.refreshConditions();
     this.conditionUI.setHidden(this.isHiddenDuringResize || this.isHiddenDuringRotation);
 
@@ -377,7 +376,10 @@ export class TokenUIRenderer {
 
     this.hasContent = hasResources || showNameplate || hasConditions;
     this.container.visible = this.hasContent && !this.hiddenWithToken;
-    if (!this.hasContent) return;
+    if (!this.hasContent) {
+      this.layoutUIScale();
+      return;
+    }
 
     // A defeated token's first defeating bar is darkened
     const defeatedSlot = defeated ? this.defeatedSlot(shown) : undefined;
@@ -408,6 +410,7 @@ export class TokenUIRenderer {
       const padding = 6; // Fixed padding
       const badgeWidth = Math.max(scaledWidth + padding * 2, 40); // Fixed min width
       const badgeHeight = NAMEPLATE_HEIGHT;
+      this.nameplateHalfWidth = badgeWidth / 2;
       const badgeRadius = badgeHeight / 2;
       
       // Position the name badge so its bottom edge aligns with the token's bottom edge
@@ -437,6 +440,8 @@ export class TokenUIRenderer {
     const hasDisplayName = showNameplate && !!displayName;
     this.nameBadge.visible = hasDisplayName && !isHidden; // Only show if enabled, has name, and not hidden
     this.nameText.visible = hasDisplayName && !isHidden; // Only show if enabled, has name, and not hidden
+    // The wheels stand clear of the bars and nameplate just drawn
+    this.layoutUIScale();
   }
   
   /** The bar of the first shown resource whose spending defeated the token. */
@@ -461,8 +466,17 @@ export class TokenUIRenderer {
    * selection changes fits.
    */
   public getBarsReach(): number {
-    const bars = this.resources.view.visible ? this.resources.layout() : [];
-    return Math.max(0, ...bars.map((slot) => slot.top + slot.height)) * this.selectedScale();
+    return (this.resources.view.visible ? this.barsBottom() : 0) * this.selectedScale();
+  }
+
+  /** Where the lowest bar ends below the token's bottom edge, in UI units; 0 without bars. */
+  private barsBottom(): number {
+    return Math.max(0, ...this.resources.layout().map((slot) => slot.top + slot.height));
+  }
+
+  /** Where the right wheels' column hangs from, in world units from the token's centre; the left one is its mirror. */
+  public getWheelAnchor(): { x: number; y: number } {
+    return { x: this.besideToken.position.x, y: this.besideToken.position.y };
   }
 
   private canAnimateValues(): boolean {
@@ -509,11 +523,6 @@ export class TokenUIRenderer {
     return getTokenRingCenterRadius(this.currentTokenSize * ringScale, computeTokenStrokeWidth(state?.grid?.size ?? 70), ringScale);
   }
 
-  private wheelAnchor(): { x: number; y: number } {
-    const state = this.store?.getState();
-    return wheelAnchor(this.currentTokenSize, state?.grid?.size ?? 70, state?.tokenSettings?.tokenRingSize ?? 1);
-  }
-
   /**
    * The canvas leaves the token out (hidden, or unseen by the players in session view): its UI
    * stays hidden through every `update`, until the token shows again.
@@ -552,15 +561,29 @@ export class TokenUIRenderer {
   }
 
   /**
-   * Scales both anchors between `restingTokenUIScale` and `selectedTokenUIScale` by the
-   * current emphasis. The selected size follows the zoom, so it is recomputed on every call.
+   * Scales the anchors between `restingTokenUIScale` and `selectedTokenUIScale` by the
+   * current emphasis, and moves the wheels' columns clear of what grew. The selected size
+   * follows the zoom, so it is recomputed on every call.
    */
   private layoutUIScale(): void {
-    const resting = restingTokenUIScale(this.store?.getState().grid?.size ?? 70);
+    const state = this.store?.getState();
+    const gridSize = state?.grid?.size ?? 70;
+    const resting = restingTokenUIScale(gridSize);
     const scale = resting + (this.selectedScale() - resting) * this.emphasis.value;
     this.belowToken.scale.set(scale);
     this.besideToken.scale.set(scale);
     this.leftOfToken.scale.set(scale);
+    const anchor = wheelAnchor({
+      spriteSize: this.currentTokenSize,
+      gridSize,
+      ringScale: state?.tokenSettings?.tokenRingSize ?? 1,
+      uiScale: scale,
+      barsBottom: this.barsBottom(),
+      barButtons: this.isSelected,
+      nameplateHalfWidth: this.nameplateHalfWidth,
+    });
+    this.besideToken.position.set(anchor.x, anchor.y);
+    this.leftOfToken.position.set(-anchor.x, anchor.y);
     // A selected token's text keeps a constant screen size, which the resting resolution covers
     this.setTextResolution(textResolutionFor(resting));
     this.onScaleChange?.(scale);
@@ -594,6 +617,8 @@ export class TokenUIRenderer {
     this.isSelected = selected;
     this.container.zIndex = selected ? SELECTED_Z_INDEX : RESTING_Z_INDEX;
     this.updateEmphasis();
+    // The controls show the bars' buttons from the moment of selection: the wheels make room at once
+    if (this.currentTokenSize > 0) this.layoutUIScale();
     this.updateConditionCard();
     this.updateTextVisibility();
   }

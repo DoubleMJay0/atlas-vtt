@@ -82,6 +82,7 @@ export class UIManager implements ITokenUIManager {
       this.tokenControlsUI = new TokenControlsUI(this.viewport, this.store);
       this.tokenControlsUI.resourceDefsProvider = () => this.resourceDefsProvider();
       this.tokenControlsUI.slotsProvider = (tokenId) => this.tokenUIs[tokenId]?.getResourceSlots() ?? [];
+      this.tokenControlsUI.wheelAnchorProvider = (tokenId) => this.tokenUIs[tokenId]?.getWheelAnchor() ?? null;
       this.tokenRotationUI = new TokenRotationUI(this.viewport, this.store);
       this.tokenResizeUI = new TokenResizeUI(this.viewport, this.store);
       
