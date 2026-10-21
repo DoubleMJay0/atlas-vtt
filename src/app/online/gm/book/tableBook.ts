@@ -79,6 +79,7 @@ export function tableBook(ports: TableBookPorts): TableBook {
     libraryStatblock: (placed) => gatedStatblocks.libraryStatblock(placed),
     readStatblock: (path) => gatedStatblocks.read(path),
     writeStatblock: (path, patches) => gatedStatblocks.write(path, patches),
+    statblockPanelWidth: () => gatedStatblocks.panelWidth?.(),
     rests: gatedRests,
     cards: ports.cards,
     cardsChanged: () => ports.cardsChanged(),

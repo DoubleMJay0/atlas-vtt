@@ -26,6 +26,15 @@ export interface ComponentPlace {
   readonly section: SectionBlock | null;
 }
 
+/**
+ * Where the GM's card shows a component: the heading over it (a Tabs block's above its strip, a
+ * list's own), and that of the Section it stands in; null where the card shows none.
+ */
+function cardPlace(build: SheetBuild, outer: TabsBlock | EntriesBlock | SpellsBlock, place: ComponentPlace): Pick<AbilityComponent, 'heading' | 'section'> {
+  const section = place.section ? sectionHeading(place.section, build.shown) : '';
+  return { heading: clippedLine(outer.heading?.trim() || null, MAX_BOOK_TITLE), section: clippedLine(section.trim() || null, MAX_BOOK_TITLE) };
+}
+
 function componentId(id: string): string {
   return BLOCK_ID.test(id) ? id : (sheetItemKeys([id])[0] ?? '0~0').split('~')[0] ?? '0';
 }
@@ -106,7 +115,7 @@ export function abilityComponent(build: SheetBuild, block: TabsBlock | EntriesBl
   }).filter((tab) => isFieldKey(tab.list) && (access === 'edit' || tab.entries.length > 0));
   if (tabs.length === 0) return null;
   const keys = { nameKey: first?.entry?.nameKey ?? 'name', textKey: first?.entry?.textKey ?? 'desc' };
-  return { id: componentId(block.id), name: componentName(build, block, place), access, parts, tabs, ...keys };
+  return { id: componentId(block.id), name: componentName(build, block, place), access, parts, tabs, ...keys, ...cardPlace(build, block, place) };
 }
 
 /** One level line of a spell list as a tab, its spells by name. */
@@ -125,7 +134,7 @@ function levelTab(list: string, line: SpellLine): AbilityTab {
  * A group's header line ("casts spells using Wisdom (save DC 12)") opens its first level's tab, as
  * the card shows it above its levels; a group without levels is a tab of its header line alone.
  */
-export function spellsComponent(build: SheetBuild, block: SpellsBlock): AbilityComponent | null {
+export function spellsComponent(build: SheetBuild, block: SpellsBlock, place: ComponentPlace): AbilityComponent | null {
   const name = valueText(build.shown.reader('name')) || 'The creature';
   const groups = spellGroups(spellEntries(build.shown.reader(block.field)), `${name} knows the following spells:`, (value) => valueText(toFieldValue(value)));
   const tabs = groups.flatMap((group): AbilityTab[] => {
@@ -136,5 +145,5 @@ export function spellsComponent(build: SheetBuild, block: SpellsBlock): AbilityC
   if (tabs.length === 0 || !isFieldKey(block.field)) return null;
   const label = build.shown.fields.get(block.field)?.label;
   const heading = clippedLine(block.heading?.trim() || label || 'Spells', MAX_BOOK_TITLE) ?? 'Spells';
-  return { id: componentId(block.id), name: heading, access: 'read', parts: [], tabs, spells: true };
+  return { id: componentId(block.id), name: heading, access: 'read', parts: [], tabs, spells: true, ...cardPlace(build, block, place) };
 }

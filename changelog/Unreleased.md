@@ -22,3 +22,4 @@
 ## Atlas Online
 
 - A campaign is played only while its online table is open: choose it when you start the table
+- A player's character sheet online is laid out as the GM's statblock card: the same rows, columns and boxes at the GM's card width, scaled to fit, with every ability list on its own heading or tab in the Abilities tab

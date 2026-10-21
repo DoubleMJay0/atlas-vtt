@@ -13,6 +13,8 @@ export interface StatblockSharePorts {
   read(path: string): Promise<ResolvedStatblock | null>;
   write(path: string, patches: readonly NotePatch[]): Promise<StatblockWriteOutcome>;
   now(): number;
+  /** The width of the GM's statblock panel, which the players' cards are laid out at; unset, a default. */
+  panelWidth?(): number | undefined;
   /** A statblock was read or drawn anew, or an edit is under way: the books are looked at again. */
   changed(): void;
   /** A player's edit was taken: they are sent their statblock again, whether or not it reads otherwise. */

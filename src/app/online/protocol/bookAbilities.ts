@@ -53,6 +53,13 @@ export interface AbilityComponent {
   /** The keys an ability of the note keeps its name and text under; unset, `name` and `desc`. An ability written from the page is `{ [nameKey]: name, [textKey]: text, ...parts }`, without empty values. */
   readonly nameKey?: string;
   readonly textKey?: string;
+  /**
+   * Where the GM's card shows the component: `heading` is the heading over the component itself and
+   * `section` that of the Section it stands in, null where the card shows none. An older GM's Atlas
+   * sends neither, and `name` stands for both.
+   */
+  readonly heading?: string | null;
+  readonly section?: string | null;
 }
 
 function parsePart(value: unknown): AbilityPart | null {
@@ -93,10 +100,14 @@ export function parseComponent(value: unknown, budget: SheetBudget): AbilityComp
   if (name === null || parts === null || tabs === null || parts.some((part) => part === null) || tabs.some((tab) => tab === null)) return null;
   const spells = value.spells === true;
   const keyOk = (key: unknown): boolean => key === undefined || isFieldKey(key);
-  if (!keyOk(value.nameKey) || !keyOk(value.textKey)) return null;
+  const heading = value.heading === undefined ? undefined : optionalSheetLine(value.heading);
+  const section = value.section === undefined ? undefined : optionalSheetLine(value.section);
+  if (!keyOk(value.nameKey) || !keyOk(value.textKey) || (value.heading !== undefined && heading === undefined) || (value.section !== undefined && section === undefined)) return null;
+  if (!spendText(budget, (heading ?? '') + (section ?? ''))) return null;
   return {
     id: value.id, name, access: spells ? 'read' : value.access, parts: parts as AbilityPart[], tabs: tabs as AbilityTab[], ...(spells && { spells: true }),
     ...(isFieldKey(value.nameKey) && { nameKey: value.nameKey }), ...(isFieldKey(value.textKey) && { textKey: value.textKey }),
+    ...(heading !== undefined && { heading }), ...(section !== undefined && { section }),
   };
 }
 

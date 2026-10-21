@@ -21,6 +21,7 @@ export * from './bookStatblock.ts';
 export * from './bookStatblockEdits.ts';
 export * from './questText.ts';
 export * from './sheetCounters.ts';
+export * from './sheetLayout.ts';
 export * from './sheetValues.ts';
 
 /** What a player's book holds at most. */

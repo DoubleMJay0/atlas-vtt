@@ -1,6 +1,7 @@
 import type { BookResourceMessage } from '../../protocol/index.ts';
 import type { PlacedTokenSource } from '../../../characters/playerCharacters';
 import type { ResourceDefinition, ResourceHolder, ResourceValue } from '../../../resources/resourceTypes';
+import { holdsValue } from '../../../resources/resourceValues';
 import { visibleResources } from '../../../resources/visibleResources';
 import type { BookScene } from './bookScene.ts';
 import type { PlayedCharacter } from './characters.ts';
@@ -40,9 +41,12 @@ export function checkResourceEdit(
   if (character === null || offered === undefined) return null;
   const { key, current } = message;
   const token = scene === null ? undefined : scene.tokens[character.tokenId];
-  // No resource of the collection: a number the statblock tracks
+  // No resource of the collection (a number the statblock tracks), or one the token holds no value of
+  // (a gauge its template places): it starts at the value its sheet offered, where nothing holds one
   const definitions = scene?.resources ?? character.drawnWith.definitions;
-  const tracked = definitions.some((definition) => definition.key === key) ? undefined : { current: offered.current, max: offered.max };
+  const definition = definitions.find((each) => each.key === key);
+  const holding = token?.resources?.[key];
+  const tracked = definition !== undefined && holding !== undefined && holdsValue(definition, holding) ? undefined : { current: offered.current, max: offered.max };
   if (scene === null || token === undefined) return { kind: 'character', from, placed: character.placed, key, current, ...(tracked && { tracked }) };
   if (ownerOf(character.tokenId) !== from || (!tracked && editableValue(token, scene.resources, key) === null)) return null;
   return { kind: 'token', from, tokenId: character.tokenId, key, current, ...(tracked && { tracked }) };
