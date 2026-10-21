@@ -152,13 +152,11 @@ export function arcTaper(along: number): number {
 
 /**
  * The arcs as closed polygons about the token's middle, in screen pixels: centred on the diagonals,
- * `radius` from the middle, `width` across at their middle and tapering to points, each lengthened
- * by `extend` pixels at both ends (the keyline around an arc is the arc grown by its width).
+ * `radius` from the middle, `width` across at their middle and tapering to points.
  */
-export function arcPolygons(radius: number, width: number, extend = 0): ArcPoint[][] {
+export function arcPolygons(radius: number, width: number): ArcPoint[][] {
   const { arcs, arcSpan } = TURN_LOOK;
-  const span = arcSpan + (2 * extend) / Math.max(radius, 1);
-  const steps = arcSteps(radius + width / 2, span);
+  const steps = arcSteps(radius + width / 2, arcSpan);
   const polygons: ArcPoint[][] = [];
   for (let arc = 0; arc < arcs; arc += 1) {
     const middle = Math.PI / 4 + (arc * 2 * Math.PI) / arcs;
@@ -166,7 +164,7 @@ export function arcPolygons(radius: number, width: number, extend = 0): ArcPoint
     const inner: ArcPoint[] = [];
     for (let step = 0; step <= steps; step += 1) {
       const along = (2 * step) / steps - 1;
-      const angle = middle + (along * span) / 2;
+      const angle = middle + (along * arcSpan) / 2;
       const half = (width / 2) * arcTaper(along);
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);

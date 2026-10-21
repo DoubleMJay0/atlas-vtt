@@ -44,13 +44,24 @@ interface Held {
   users: number;
 }
 
+/** Paints the glow for a texture `size` texels across; null where it cannot. */
+export type GlowPainter = (size: number, extent: Pick<GlowExtent, 'edgeShare' | 'unitShare' | 'spread'>) => Texture | null;
+
+/** How many glows no marker holds stay painted, so the turn passing between tokens of a few sizes paints none again. */
+const IDLE_LIMIT = 4;
+
 /**
  * The glow textures the markers show, one per shape (a token's size on the grid) and shared by
- * every marker of that shape: a side of look-alikes paints one. A texture goes once no marker
- * holds it.
+ * every marker of that shape: a side of look-alikes paints one. A glow no marker holds stays for
+ * the next few shapes (`IDLE_LIMIT`), and goes when more are let go after it or on `destroy`.
+ * Painting a large glow takes tens of milliseconds, which would fall on the turn's change.
  */
 export class TurnGlowTextures {
   private readonly held = new Map<string, Held>();
+  /** Glows no marker holds, the least recently let go first. */
+  private readonly idle = new Map<string, Texture | null>();
+
+  constructor(private readonly paint: GlowPainter = paintGlow) {}
 
   /** The texture for a glow of `extent`, held until `release(key)`; its key names it. */
   take(extent: GlowExtent): { key: string; texture: Texture | null } {
@@ -58,7 +69,9 @@ export class TurnGlowTextures {
     const key = `${size}|${extent.edgeShare.toFixed(4)}|${extent.unitShare.toFixed(5)}|${extent.spread.toFixed(3)}`;
     let entry = this.held.get(key);
     if (!entry) {
-      entry = { texture: paintGlow(size, extent), users: 0 };
+      const kept = this.idle.has(key);
+      entry = { texture: kept ? this.idle.get(key) ?? null : this.paint(size, extent), users: 0 };
+      this.idle.delete(key);
       this.held.set(key, entry);
     }
     entry.users += 1;
@@ -71,11 +84,18 @@ export class TurnGlowTextures {
     entry.users -= 1;
     if (entry.users > 0) return;
     this.held.delete(key);
-    entry.texture?.destroy(true);
+    this.idle.set(key, entry.texture);
+    for (const [oldest, texture] of this.idle) {
+      if (this.idle.size <= IDLE_LIMIT) break;
+      this.idle.delete(oldest);
+      texture?.destroy(true);
+    }
   }
 
   destroy(): void {
     for (const entry of this.held.values()) entry.texture?.destroy(true);
+    for (const texture of this.idle.values()) texture?.destroy(true);
     this.held.clear();
+    this.idle.clear();
   }
 }

@@ -4,6 +4,7 @@ import { TurnMarkers, type TurnMarkerState } from '../../src/app/pixi/token-rend
 import { MAP_LAYER_Z } from '../../src/app/pixi/mapLayerOrder';
 import { TOKEN_UI_Z_INDEX } from '../../src/app/pixi/TokenControlsUI';
 import type { GlowTextureSource } from '../../src/app/pixi/token-renderer/turnMarker/TurnMarker';
+import { TurnGlowTextures } from '../../src/app/pixi/token-renderer/turnMarker/turnGlowTextures';
 import type { TokenGroupContainer } from '../../src/app/pixi/token-renderer/types';
 import type { TokenEntity } from '../../src/app/types';
 import { createDefaultInitiativeState, type InitiativeEntry, type InitiativeState } from '../../src/app/types/initiativeTypes';
@@ -40,7 +41,7 @@ function countingGlows(): GlowTextureSource & { held: Map<string, number> } {
 }
 
 /** A store and the markers over it; `sprites` are the tokens on the map (one beside the map has none). */
-function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>, sprites: Record<string, TokenGroupContainer>, reduced = true, defeated: ReadonlySet<string> = new Set()) {
+function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>, sprites: Record<string, TokenGroupContainer>, reduced = true, defeated: ReadonlySet<string> = new Set(), glowSource?: GlowTextureSource) {
   let state: TurnMarkerState = { initiative, objects: { tokens }, grid: { size: 70 }, isMapLoading: false };
   const listeners = new Set<(next: TurnMarkerState) => void>();
   const glows = countingGlows();
@@ -57,7 +58,7 @@ function setup(initiative: InitiativeState, tokens: Record<string, TokenEntity>,
     ticker: () => ticker,
     reducedMotion: () => reduced,
     defeated: () => defeated,
-    glows,
+    glows: glowSource ?? glows,
   });
   const set = (changes: Partial<TurnMarkerState>): void => {
     state = { ...state, ...changes };
@@ -209,5 +210,25 @@ describe('the turn marker', () => {
     set({ initiative: { ...sides, isActive: false } });
     expect(glows.held.size).toBe(0);
     markers.destroy();
+  });
+
+  it('paints a glow once as the turn passes on and comes back, whatever the tokens\' sizes', () => {
+    const painted: number[] = [];
+    const textures = new TurnGlowTextures((size) => { painted.push(size); return null; });
+    // The hero is as large as the ogre: the glow passes from one marker to the next unpainted
+    const alike = setup(order('ogre'), tokens, sprites, true, new Set(), textures);
+    alike.set({ initiative: order('hero') });
+    alike.set({ initiative: order('ogre') });
+    expect(painted).toHaveLength(1);
+    alike.markers.destroy();
+    // A huge ogre: its glow waits while the hero has the turn, and is there again when it comes back
+    painted.length = 0;
+    const huge = { ...sprites, ogre: Object.assign(sprite(300, 100), { tokenSize: 186 }) };
+    const sizes = setup(order('ogre'), tokens, huge, true, new Set(), new TurnGlowTextures((size) => { painted.push(size); return null; }));
+    sizes.set({ initiative: order('hero') });
+    sizes.set({ initiative: order('ogre') });
+    sizes.set({ initiative: order('hero') });
+    expect(painted).toHaveLength(2);
+    sizes.markers.destroy();
   });
 });

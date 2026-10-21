@@ -140,11 +140,7 @@ export class TurnMarkers {
     if (turnMoved) this.accent = readAccent();
     const motion = animate && !state.isMapLoading && !this.deps.reducedMotion();
     const selected = new Set(state.selectedIds ?? []);
-    for (const [tokenId, marker] of this.markers) {
-      if (ids.has(tokenId)) continue;
-      marker.destroy();
-      this.markers.delete(tokenId);
-    }
+    // New markers first: one that takes the shape of a marker going takes its glow over, unpainted
     for (const tokenId of ids) {
       let marker = this.markers.get(tokenId);
       const isNew = marker === undefined;
@@ -157,6 +153,11 @@ export class TurnMarkers {
       if (isNew || turnMoved) marker.growIn(motion);
       marker.select(selected.has(tokenId), motion && !isNew);
       marker.follow(this.deps.spriteOf(tokenId));
+    }
+    for (const [tokenId, marker] of this.markers) {
+      if (ids.has(tokenId)) continue;
+      marker.destroy();
+      this.markers.delete(tokenId);
     }
     if (this.markers.size > 0) this.startFollowing();
     else this.stopFollowing();
