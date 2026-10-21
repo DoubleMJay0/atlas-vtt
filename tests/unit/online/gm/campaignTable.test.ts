@@ -4,11 +4,11 @@ import { CampaignFiles } from '../../../../src/app/campaigns/CampaignFiles';
 import { CampaignPlay } from '../../../../src/app/campaigns/campaignPlay';
 import { CAMPAIGNS_FOLDER } from '../../../../src/app/campaigns/campaignPaths';
 import { CampaignPlayers } from '../../../../src/app/campaigns/players/CampaignPlayers';
-import { GM_LEVEL, MAX_CAMPAIGN_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
+import { CLOSE, GM_LEVEL, MAX_CAMPAIGN_PLAYERS } from '../../../../src/app/online/protocol/index.ts';
 import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
 import { Ownership } from '../../../../src/app/online/gm/ownership.ts';
 import type { SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
-import { appCampaigns } from '../../../../src/app/online/gm/tableCampaigns.ts';
+import { appCampaigns, playSavedTable } from '../../../../src/app/online/gm/tableCampaigns.ts';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { app as fakeApp, atlasTab, FakeSocket, workspace } from './fakeTable.ts';
 import { sceneState } from './shareHarness.ts';
@@ -143,11 +143,11 @@ describe('a table of the played campaign', () => {
     online.stop();
   });
 
-  it('is not started while no campaign is played: no request, and the GM is told', async () => {
+  it('is not started without a campaign: no request, and the GM is told', async () => {
     const { online, leaf } = await gm(playersText(), false);
     expect(await online.start(leaf)).toBeNull();
     expect(seen.requests).toEqual([]);
-    expect(seen.notices).toEqual(['Play a campaign first.']);
+    expect(seen.notices).toEqual(['Choose a campaign first.']);
   });
 
   it('is not started where the link belongs to another account', async () => {
@@ -375,5 +375,76 @@ describe('a new link', () => {
     expect(seen.requests.map((request) => request.body)).toEqual([`{"code":"${LINK}","gmLevel":${GM_LEVEL}}`, `{"code":"${link}","gmLevel":${GM_LEVEL}}`]);
     expect(online.table).not.toBeNull();
     online.stop();
+  });
+});
+
+describe('the played campaign', () => {
+  const SAVED: SavedTable = { code: LINK, secret: 's'.repeat(43), maxPlayers: 12, campaignId: 'c1', mapPath: null, gate: { code: '123456', requireCode: true, askToJoin: true } };
+  const playing = (app: App): string | null => CampaignPlay.forApp(app).playing();
+
+  it('is the campaign chosen for the table from its start, and none once the GM stops it', async () => {
+    const { online, app, leaf } = await gm(playersText(), false);
+    expect(playing(app)).toBeNull();
+    expect(await online.start(leaf, 'c1')).not.toBeNull();
+    expect(playing(app)).toBe('c1');
+    expect(app.loadLocalStorage('atlas-vtt:playing-campaign')).toBe('c1');
+    online.stop();
+    expect(playing(app)).toBeNull();
+  });
+
+  it('is none where the table could not start', async () => {
+    const { online, app, leaf } = await gm(playersText(), false);
+    seen.created = { status: 409, json: { error: 'link-taken' } };
+    expect(await online.start(leaf, 'c1')).toBeNull();
+    expect(playing(app)).toBeNull();
+  });
+
+  it('ends when the server closes the table, or another Obsidian takes it over', async () => {
+    for (const code of [CLOSE.ended, CLOSE.replaced]) {
+      const { online, app, socket } = await hosting();
+      expect(playing(app), String(code)).toBe('c1');
+      socket.closeWith(code);
+      expect(online.table, String(code)).toBeNull();
+      expect(playing(app), String(code)).toBeNull();
+    }
+  });
+
+  it('stays while the table closes for a reload, and is the saved table\'s again once it comes back', async () => {
+    const { online, app } = await hosting();
+    online.close();
+    expect(playing(app)).toBe('c1');
+    CampaignPlay.forApp(app).stop();
+    expect(await online.resume(SAVED)).not.toBeNull();
+    expect(playing(app)).toBe('c1');
+    online.stop();
+  });
+
+  it('is the saved table\'s while it comes back after a reload, and none without one', async () => {
+    const { app } = await gm(playersText(), false);
+    const campaigns = appCampaigns(app);
+    playSavedTable(campaigns, SAVED);
+    expect(playing(app)).toBe('c1');
+    // An older Atlas played campaigns without a table: such a play ends at the next start.
+    playSavedTable(campaigns, null);
+    expect(playing(app)).toBeNull();
+  });
+
+  it('ends where the table cannot come back because its players cannot be read', async () => {
+    const { app } = await gm();
+    const campaigns = { ...appCampaigns(app), open: (): Promise<null> => Promise.resolve(null) };
+    const online = new OnlineControl(app, new Ownership(), campaigns, () => undefined, signedIn);
+    expect(await online.resume(SAVED)).toBeNull();
+    expect(playing(app)).toBeNull();
+  });
+
+  it('stays the same while a new link starts the table again', async () => {
+    const { online, app } = await hosting();
+    const changes: (string | null)[] = [];
+    CampaignPlay.forApp(app).onChange(() => void changes.push(playing(app)));
+    await online.newLink();
+    expect(online.table).not.toBeNull();
+    expect(changes).toEqual([]);
+    online.stop();
+    expect(changes).toEqual([null]);
   });
 });

@@ -6,8 +6,10 @@ const STORAGE_KEY = 'atlas-vtt:playing-campaign';
 type DeviceStorage = Pick<App, 'loadLocalStorage' | 'saveLocalStorage'>;
 
 /**
- * The campaign this device is playing, or none. Which campaign a table plays is a fact about this
- * device, never about the vault, so it is kept in the vault's local storage and never synced.
+ * The campaign this device is playing, or none: the campaign of the online table this device runs,
+ * set and cleared by online play alone (`OnlineControl`), so no campaign is played without its table.
+ * Which campaign a table plays is a fact about this device, never about the vault, so it is kept in
+ * the vault's local storage, where a table that comes back after a reload finds it, and never synced.
  */
 export class CampaignPlay {
   private static readonly instances = new WeakMap<DeviceStorage, CampaignPlay>();

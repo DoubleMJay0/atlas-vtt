@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import type { Plugin } from 'obsidian';
 import { describe, expect, it, vi } from 'vitest';
+import { CampaignPlay } from '../../../src/app/campaigns/campaignPlay';
 import { registerOnlinePlay } from '../../../src/app/plugin/onlinePlay';
 import type { SettingsService } from '../../../src/app/services/SettingsService';
 
@@ -17,8 +18,9 @@ function host(): { plugin: Plugin; settings: SettingsService; children: Set<unkn
   const commands = new Map<string, (checking: boolean) => boolean>();
   let on = false;
   let changed = (): void => undefined;
+  const local = new Map<string, unknown>([['atlas-vtt:playing-campaign', 'a'.repeat(24)]]);
   const plugin = {
-    app: { vault: { adapter: {} } },
+    app: { vault: { adapter: {} }, loadLocalStorage: (key: string): unknown => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown): void => void local.set(key, value) },
     register: (): void => undefined,
     addCommand: (command: { id: string; checkCallback: (checking: boolean) => boolean }): void => void commands.set(command.id, command.checkCallback),
     addChild: <T>(child: T): T => (children.add(child), child),
@@ -49,6 +51,18 @@ describe('online play behind its experimental switch', () => {
     flip(false);
     expect(children.size).toBe(0);
     expect(online.settingsSections()).toEqual([]);
+  });
+
+  it('plays no campaign while it is off: none from before at start, and none once switched off', () => {
+    const { plugin, settings, flip } = host();
+    const play = CampaignPlay.forApp(plugin.app);
+    expect(play.playing()).toBe('a'.repeat(24));
+    registerOnlinePlay(plugin, settings);
+    expect(play.playing()).toBeNull();
+    flip(true);
+    play.play('b'.repeat(24));
+    flip(false);
+    expect(play.playing()).toBeNull();
   });
 
   it('registers its commands once and offers them only while it is loaded', () => {

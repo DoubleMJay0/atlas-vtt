@@ -1,4 +1,5 @@
 import { requireApiVersion, type Plugin } from 'obsidian';
+import { CampaignPlay } from '../campaigns/campaignPlay';
 import { SECRET_STORAGE_VERSION } from '../online/gm/account/tokenStore.ts';
 import { ONLINE_COMMANDS } from '../online/gm/onlineCommands.ts';
 import { setQuestGate } from '../online/gm/book/questGate.ts';
@@ -26,8 +27,9 @@ export interface OnlinePlay {
 
 /**
  * Online play runs only while the GM has its experimental switch on: switching it on loads it,
- * switching it off closes the table's connection and takes its controls away. Off, Atlas does no
- * work for it and connects to nothing. It needs the Obsidian that keeps the account token safe.
+ * switching it off closes the table's connection, ends the play of its campaign and takes its
+ * controls away. Off, Atlas does no work for it and connects to nothing. It needs the Obsidian that
+ * keeps the account token safe.
  */
 export function registerOnlinePlay(plugin: Plugin, settings: SettingsService): OnlinePlay {
   let feature: OnlineFeature | null = null;
@@ -39,6 +41,8 @@ export function registerOnlinePlay(plugin: Plugin, settings: SettingsService): O
       toldTooOld = true;
       showNotice(`Online play needs Obsidian ${SECRET_STORAGE_VERSION} or newer.`);
     }
+    // A campaign is played only while its online table runs, and none runs while online play is off.
+    if (!on) CampaignPlay.forApp(plugin.app).stop();
     if (on === (feature !== null)) return;
     if (feature !== null) plugin.removeChild(feature);
     setWorldMapGate(on ? campaignWorldMapGate(plugin.app) : null);
