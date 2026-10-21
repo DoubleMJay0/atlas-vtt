@@ -1,13 +1,15 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { App as ObsidianApp } from 'obsidian';
-import { LinkedStatblock } from '../statblocks/render/LinkedStatblock';
+import { App as ObsidianApp, setIcon } from 'obsidian';
+import { LinkedStatblock, type LinkedStatblockProps } from '../statblocks/render/LinkedStatblock';
 import type { LibraryTemplate } from '../statblocks/model/resolvedTypes';
 import { toTokenVitals, type TokenVitals } from './statblockVitalsSync';
 import type { NotePreviewUIManager, PreviewAnchorRef, TokenPreviewAnchor } from './NotePreviewUIManager';
 import './statblock-preview-window.scss';
 import { previewEdgeGaps } from '../react/components/statblock/previewEdgeGap';
 import type { TokenRollContext } from '../types/diceRollOrigin';
+import { createPinButton, showPinState, startPreviewWindowDrag } from './previewWindowControls';
+import { t } from '../i18n';
 
 /** A statblock note that is not in the vault, such as a note of a collection being imported. */
 export interface OutsideNote {
@@ -17,9 +19,16 @@ export interface OutsideNote {
 }
 
 /**
+ * Keeps a statblock on its token's current values: calls `show` on each change,
+ * with null once the token is gone, and returns how to stop.
+ */
+export type FollowVitals = (show: (vitals: TokenVitals | null) => void) => () => void;
+
+/**
  * Floating CMD+hover preview window for token statblocks: of a token placed on
  * a map, which its map's preview manager tracks, or of a token in a list (the
- * library, a collection being exported or imported).
+ * library, a collection being exported or imported). A map's preview can be
+ * pinned, so it stays open, and moved by its controls, as note previews can.
  */
 export class StatblockPreviewWindow {
   public notePath: string;
@@ -30,6 +39,13 @@ export class StatblockPreviewWindow {
   private reactRoot: Root | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private closing = false;
+  private pinned = false;
+  private pinButton: HTMLButtonElement | null = null;
+  private controls: HTMLElement | null = null;
+  /** The statblock's props but its tokens, which `followVitals` replaces. */
+  private statblockProps: Omit<LinkedStatblockProps, 'tokens'>;
+  private stopFollowing: (() => void) | null = null;
+  private stopDrag: (() => void) | null = null;
 
   constructor(
     private app: ObsidianApp,
@@ -52,26 +68,26 @@ export class StatblockPreviewWindow {
 
     this.element = doc.body.createDiv({ cls: 'atlas-statblock-preview-window' });
     this.element.setAttribute('tabindex', '-1');
+    // Only a map's preview, which its manager keeps, can stay open.
+    if (manager) this.addControls(this.element);
 
     if (initialPos) {
       this.setPosition(initialPos.x, initialPos.y);
     }
 
+    this.statblockProps = {
+      viewId,
+      originContext,
+      app: this.app,
+      path: notePath,
+      noteText: outsideNote?.text,
+      bundleTemplates: outsideNote?.templates,
+      variant: 'hover',
+    };
+    const content = this.element.createDiv({ cls: 'atlas-statblock-preview-window__content' });
+    this.reactRoot = createRoot(content);
     // The hovered token's vitals; the statblock mirrors them.
-    const vitals = [toTokenVitals(originatingToken)];
-    this.reactRoot = createRoot(this.element);
-    this.reactRoot.render(
-      React.createElement(LinkedStatblock, {
-        viewId,
-        originContext,
-        app: this.app,
-        path: notePath,
-        noteText: outsideNote?.text,
-        bundleTemplates: outsideNote?.templates,
-        variant: 'hover',
-        tokens: vitals,
-      }),
-    );
+    this.renderStatblock(toTokenVitals(originatingToken));
 
     // The statblock mounts after this constructor returns, so the window only
     // reaches its final size later. Re-clamp on every size change, otherwise
@@ -79,6 +95,53 @@ export class StatblockPreviewWindow {
     // hanging off the edge of the screen.
     this.resizeObserver = new ResizeObserver(() => this.reposition());
     this.resizeObserver.observe(this.element);
+  }
+
+  private renderStatblock(vitals: TokenVitals): void {
+    this.reactRoot?.render(React.createElement(LinkedStatblock, { ...this.statblockProps, tokens: [vitals] }));
+  }
+
+  /** Keeps the statblock on the token's values while the window is open, which a pinned one may be for long; closes with the token. */
+  followVitals(follow: FollowVitals): void {
+    this.stopFollowing?.();
+    this.stopFollowing = follow((vitals) => {
+      if (vitals) this.renderStatblock(vitals);
+      else this.hide(true);
+    });
+  }
+
+  /**
+   * The pin and close buttons, in a capsule above the card's top right edge
+   * that also moves the window. It shows while the pointer or focus is in the
+   * window and while the window is pinned (`statblock-preview-window.scss`).
+   */
+  private addControls(element: HTMLElement): void {
+    const controls = element.createDiv({ cls: 'atlas-vtt-plugin atlas-statblock-preview-window__controls' });
+    this.controls = controls;
+    const grip = controls.createDiv({ cls: 'atlas-statblock-preview-window__grip' });
+    setIcon(grip, 'grip-vertical');
+    this.pinButton = createPinButton(controls, 'atlas-statblock-preview-window__button', () => this.setPinned(!this.pinned));
+    const close = controls.createEl('button', { cls: 'atlas-statblock-preview-window__button' });
+    close.type = 'button';
+    setIcon(close, 'x');
+    close.setAttribute('aria-label', t('preview.close'));
+    close.onclick = (): void => this.hide(true);
+
+    controls.addEventListener('mousedown', (e) => {
+      this.stopDrag = startPreviewWindowDrag(element, e, () => { this.stopDrag = null; });
+    });
+    // As in a note preview, using the window keeps it open: a press anywhere in it but on a button pins it.
+    element.addEventListener('mousedown', (e) => {
+      if (!this.pinned && !(e.target as HTMLElement | null)?.closest('button')) this.setPinned(true);
+    });
+  }
+
+  private setPinned(pinned: boolean): void {
+    this.pinned = pinned;
+    // A pinned window stays where it is, however its statblock grows.
+    if (pinned) this.initialPos = undefined;
+    this.element?.classList.toggle('is-pinned', pinned);
+    if (this.pinButton) showPinState(this.pinButton, pinned);
   }
 
   private reposition(): void {
@@ -94,6 +157,8 @@ export class StatblockPreviewWindow {
     const winHeight = this.element.win.innerHeight;
     // A theme that draws around the preview asks for more room than this.
     const gaps = previewEdgeGaps(this.element.ownerDocument, 20);
+    // The controls hang above the window, so they need room above it too.
+    const above = this.controls?.offsetHeight ?? 0;
 
     this.element.classList.add('atlas-statblock-preview-window--measuring');
 
@@ -102,7 +167,7 @@ export class StatblockPreviewWindow {
 
       // Cap the window to the viewport first, so the measurement below is of
       // the clamped box; the card body scrolls when the statblock is taller.
-      this.element.style.maxHeight = `${winHeight - gaps.block * 2}px`;
+      this.element.style.maxHeight = `${winHeight - gaps.block * 2 - above}px`;
 
       const rect = this.element.getBoundingClientRect();
       const elementWidth = rect.width || 400;
@@ -120,13 +185,13 @@ export class StatblockPreviewWindow {
 
       if (finalY + elementHeight > winHeight - gaps.block) {
         finalY = y - elementHeight - 15;
-        if (finalY < gaps.block) {
+        if (finalY < gaps.block + above) {
           finalY = winHeight - elementHeight - gaps.block;
         }
       }
 
       finalX = Math.max(gaps.inline, finalX);
-      finalY = Math.max(gaps.block, finalY);
+      finalY = Math.max(gaps.block + above, finalY);
 
       this.element.style.left = `${finalX}px`;
       this.element.style.top = `${finalY}px`;
@@ -134,8 +199,8 @@ export class StatblockPreviewWindow {
     });
   }
 
-  hide(_force?: boolean): void {
-    if (this.closing) return;
+  hide(force?: boolean): void {
+    if (this.closing || (this.pinned && !force)) return;
     this.closing = true;
     if (this.element) {
       this.element.classList.add('atlas-statblock-preview-window--closing');
@@ -150,6 +215,10 @@ export class StatblockPreviewWindow {
   destroy(): void {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.stopFollowing?.();
+    this.stopFollowing = null;
+    this.stopDrag?.();
+    this.stopDrag = null;
 
     // Unmount asynchronously: React forbids unmounting while it is rendering,
     // which happens when destroy() runs from inside an effect.
@@ -166,6 +235,6 @@ export class StatblockPreviewWindow {
   }
 
   getIsPinned(): boolean {
-    return false;
+    return this.pinned;
   }
 }

@@ -66,9 +66,9 @@ export function parseResourceValue(value: unknown, spent = false): ResourceValue
   if (typeof value === 'string') {
     const fraction = value.trim().match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
     if (fraction) return parseResourceValue({ current: fraction[1], max: fraction[2] });
-    // Common HP notation: average followed by its hit-dice formula.
-    const average = value.trim().match(/^(\d+)\s*\(\s*\d+d\d+(?:\s*[+-]\s*\d+)?\s*\)$/i);
-    if (average) value = average[1];
+    // A number with a note in brackets: hit points and their hit dice ("45 (6d10+12)"), an armour class and its armour ("15 (natural armor)").
+    const noted = value.trim().match(/^(\d+(?:\.\d+)?)\s*\([^()]*\)$/);
+    if (noted) value = noted[1];
   }
   const max = numeric(value);
   return max === null ? null : { current: spent ? 0 : max, max };
