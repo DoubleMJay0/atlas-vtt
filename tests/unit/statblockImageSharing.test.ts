@@ -68,6 +68,20 @@ describe('the image menu on a statblock preview', () => {
     images.destroy();
   });
 
+  it('resolves only a statblock picture from the vault, so a picture from the web leaves the statblock\'s own menu', () => {
+    const images = service();
+    const { picture, name } = statblockCard(document.body.createDiv());
+    picture.src = `app://local/${ART}`;
+    expect(images.statblockImageFileAt(picture)?.file.path).toBe(ART);
+    expect(images.statblockImageFileAt(name)).toBeNull();
+
+    picture.src = 'https://example.com/goblin.png';
+    expect(images.statblockImageFileAt(picture)).toBeNull();
+    expect(rightClick(picture).defaultPrevented).toBe(false);
+    expect(openContextMenuGlobal).not.toHaveBeenCalled();
+    images.destroy();
+  });
+
   it('keeps out of a statblock menu that took the click, and of Atlas\' own images', () => {
     const images = service();
     const { picture } = statblockCard(document.body.createDiv());

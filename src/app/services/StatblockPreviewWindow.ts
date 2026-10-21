@@ -18,8 +18,11 @@ export interface OutsideNote {
   templates?: readonly LibraryTemplate[] | undefined;
 }
 
-/** Keeps a statblock on its token's current values: calls `show` on each change, returns how to stop. */
-export type FollowVitals = (show: (vitals: TokenVitals) => void) => () => void;
+/**
+ * Keeps a statblock on its token's current values: calls `show` on each change,
+ * with null once the token is gone, and returns how to stop.
+ */
+export type FollowVitals = (show: (vitals: TokenVitals | null) => void) => () => void;
 
 /**
  * Floating CMD+hover preview window for token statblocks: of a token placed on
@@ -96,10 +99,13 @@ export class StatblockPreviewWindow {
     this.reactRoot?.render(React.createElement(LinkedStatblock, { ...this.statblockProps, tokens: [vitals] }));
   }
 
-  /** Keeps the statblock on the token's values while the window is open, which a pinned one may be for long. */
+  /** Keeps the statblock on the token's values while the window is open, which a pinned one may be for long; closes with the token. */
   followVitals(follow: FollowVitals): void {
     this.stopFollowing?.();
-    this.stopFollowing = follow((vitals) => this.renderStatblock(vitals));
+    this.stopFollowing = follow((vitals) => {
+      if (vitals) this.renderStatblock(vitals);
+      else this.hide(true);
+    });
   }
 
   /**

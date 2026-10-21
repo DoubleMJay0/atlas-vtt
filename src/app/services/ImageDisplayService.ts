@@ -156,11 +156,10 @@ export class ImageDisplayService {
                             target.closest('.markdown-reading-view');
     if (isInMarkdownView) return;
 
-    // A statblock's picture, in a preview, the DM screen or beside its note; unless a menu of its own took the click
-    const statblockImage = statblockImageAt(target);
+    // A statblock's picture in a statblock preview or the DM screen, unless a menu of its own took the click
+    const statblockImage = this.statblockImageFileAt(target);
     if (statblockImage) {
-      const file = this.imageFileOf(statblockImage);
-      if (file && !event.defaultPrevented) this.openImageMenu(event, file, statblockImage);
+      if (!event.defaultPrevented) this.openImageMenu(event, statblockImage.file, statblockImage.imgElement);
       return;
     }
 
@@ -189,6 +188,17 @@ export class ImageDisplayService {
     }
 
     if (imageFile) this.openImageMenu(event, imageFile, imgElement);
+  }
+
+  /**
+   * The vault image of a statblock's picture under a right-click, which this
+   * service's menu offers to show to the players; null for anything else, a
+   * picture from the web included.
+   */
+  public statblockImageFileAt(target: Element): { file: TFile; imgElement: HTMLImageElement } | null {
+    const imgElement = statblockImageAt(target);
+    const file = imgElement ? this.imageFileOf(imgElement) : null;
+    return imgElement && file ? { file, imgElement } : null;
   }
 
   /** The vault image an `<img>` shows, or null for one from elsewhere. */

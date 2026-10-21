@@ -48,13 +48,22 @@ describe('pinning a statblock preview of a token on the map', () => {
   let manager: NotePreviewUIManager;
   let eventBus: EventEmitter;
   let store: ViewAtlasStore;
+  /** Whether the map's tab is the one shown, and the workspace events the manager listens to. */
+  let mapShown: boolean;
+  let workspaceEvents: Map<string, (leaf?: unknown) => void>;
+  const mapLeaf = { view: { viewId: VIEW_ID, getViewType: (): string => 'atlas-vtt', containerEl: { isShown: (): boolean => mapShown } } };
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal('ResizeObserver', class { observe(): void {} disconnect(): void {} });
     Platform.isMacOS = true;
     const { app } = createInMemoryApp({ files: { [NOTE_PATH]: '# Goblin' } });
-    Object.assign(app.workspace, { getLeavesOfType: () => [], on: () => ({}) });
+    mapShown = true;
+    workspaceEvents = new Map();
+    Object.assign(app.workspace, {
+      getLeavesOfType: (type: string) => (type === 'atlas-vtt' ? [mapLeaf] : []),
+      on: (name: string, callback: (leaf?: unknown) => void) => { workspaceEvents.set(name, callback); return {}; },
+    });
     eventBus = new EventEmitter();
     store = createViewAtlasStore(app, VIEW_ID);
     manager = new NotePreviewUIManager(app, eventBus, store, VIEW_ID);
@@ -120,17 +129,53 @@ describe('pinning a statblock preview of a token on the map', () => {
     expect(windows()).toEqual([preview]);
   });
 
-  it('follows the token\'s values while it stays open', () => {
-    const tokens = (hp: number): object => ({
-      'token-1': { id: 'token-1', kind: 'character', name: 'Goblin', x: 0, y: 0, imagePath: '', resources: { hp: { current: hp, max: 7 } } },
+  describe('following its token', () => {
+    const unhurt = { hp: { current: 7, max: 7 } };
+    const goblin = (changes: object = {}): object => ({
+      id: 'token-1', kind: 'character', name: 'Goblin', x: 0, y: 0, imagePath: '', resources: unhurt, ...changes,
     });
-    store.setState({ objects: { ...store.getState().objects, tokens: tokens(7) } as never });
-    hoverToken(eventBus);
-    buttonsOf(windows()[0]!)[0]!.click();
+    const holdTokens = (tokens: object): void => {
+      act(() => { store.setState({ objects: { ...store.getState().objects, tokens } as never }); });
+    };
 
-    act(() => { store.setState({ objects: { ...store.getState().objects, tokens: tokens(3) } as never }); });
-    const last = statblockProps[statblockProps.length - 1] as { tokens: Array<{ resources: unknown }> };
-    expect(last.tokens[0]!.resources).toEqual({ hp: { current: 3, max: 7 } });
+    beforeEach(() => {
+      holdTokens({ 'token-1': goblin() });
+      hoverToken(eventBus);
+      buttonsOf(windows()[0]!)[0]!.click();
+    });
+
+    it('shows the token\'s values as they change', () => {
+      holdTokens({ 'token-1': goblin({ resources: { hp: { current: 3, max: 7 } } }) });
+      const last = statblockProps[statblockProps.length - 1] as { tokens: Array<{ resources: unknown }> };
+      expect(last.tokens[0]!.resources).toEqual({ hp: { current: 3, max: 7 } });
+    });
+
+    it('draws nothing anew while the token only moves', () => {
+      const drawn = statblockProps.length;
+      holdTokens({ 'token-1': goblin({ x: 70, y: 140 }) });
+      expect(statblockProps).toHaveLength(drawn);
+    });
+
+    it('closes once the token is gone', () => {
+      holdTokens({});
+      vi.advanceTimersByTime(FADE_MS);
+      expect(windows()).toHaveLength(0);
+    });
+  });
+
+  it('hides a pinned preview while another tab covers its map, and shows it with the map', () => {
+    hoverToken(eventBus);
+    const [preview] = windows();
+    buttonsOf(preview!)[0]!.click();
+
+    mapShown = false;
+    workspaceEvents.get('active-leaf-change')?.({ view: { getViewType: (): string => 'markdown' } });
+    expect(preview!.style.display).toBe('none');
+
+    mapShown = true;
+    workspaceEvents.get('active-leaf-change')?.(mapLeaf);
+    expect(preview!.style.display).toBe('');
+    expect(windows()).toEqual([preview]);
   });
 
   it('has no controls on a preview from a list, which only lives while Mod is held', () => {

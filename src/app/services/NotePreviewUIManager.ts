@@ -16,6 +16,7 @@ import type { ViewAtlasStore } from '../storeFactory';
 import type { TokenRollContext } from '../types/diceRollOrigin';
 import { captureRollContext } from '../tools/diceRollOrigins';
 import { mapTokens } from '../tokens/offMap';
+import { shallow } from 'zustand/vanilla/shallow';
 
 /**
  * A hovered token presented to the preview system like a pin on its linked
@@ -85,6 +86,7 @@ export class NotePreviewUIManager {
   private boundHandleKeyUp!: (e: KeyboardEvent) => void;
   private boundHandleFocus!: () => void;
   private activeLeafChangeRef: EventRef | null = null;
+  private layoutChangeRef: EventRef | null = null;
   private zIndexCounter = 5; // stay below asset manager (50) and Obsidian overlays (~1000)
 
   constructor(app: App, eventBus: EventEmitter, store: ViewAtlasStore, viewId: string) {
@@ -186,7 +188,25 @@ export class NotePreviewUIManager {
       if (viewType !== 'atlas-vtt' && viewType !== 'atlas-vtt-player') {
         this.hideAllUnpinnedPreviews();
       }
+      this.showStatblocksWithMap();
     });
+    // A closed or moved tab can show or hide the map without another leaf becoming active
+    this.layoutChangeRef = this.app.workspace.on('layout-change', () => this.showStatblocksWithMap());
+  }
+
+  /**
+   * Statblock previews hang in the document, not in the map's leaf, so a pinned
+   * one shows only while its map does, as a pinned note in the leaf would.
+   */
+  private showStatblocksWithMap(): void {
+    const statblocks = [...this.activePreviews.values()].filter((preview) => preview instanceof StatblockPreviewWindow);
+    if (statblocks.length === 0) return;
+    const mapShown = !this.suspended
+      && findAtlasLeafByViewId(this.app.workspace, this.viewId)?.view.containerEl.isShown() === true;
+    for (const preview of statblocks) {
+      if (mapShown) preview.element?.show();
+      else preview.element?.hide();
+    }
   }
 
   /**
@@ -353,10 +373,14 @@ export class NotePreviewUIManager {
         );
         
         if (statblockPreview.element) {
-          // A pinned preview stays open while the token changes on the map.
+          // A pinned preview stays open while the token changes on the map; a move changes nothing it shows.
           statblockPreview.followVitals((show) => this.store.subscribe(
-            (state) => mapTokens(state.objects)[pin.id],
-            (token) => { if (token) show(toTokenVitals(token)); },
+            (state) => {
+              const token = mapTokens(state.objects)[pin.id];
+              return token ? toTokenVitals(token) : null;
+            },
+            show,
+            { equalityFn: shallow },
           ));
           const previewKey = `${pin.notePath}::${pin.id}`;
           this.activePreviews.set(previewKey, statblockPreview);
@@ -450,6 +474,7 @@ export class NotePreviewUIManager {
   public resumePreviews(): void {
     this.suspended = false;
     this.activePreviews.forEach((preview) => preview.element?.show());
+    this.showStatblocksWithMap();
   }
 
   public destroy(): void {
@@ -460,6 +485,10 @@ export class NotePreviewUIManager {
     if (this.activeLeafChangeRef) {
       this.app.workspace.offref(this.activeLeafChangeRef);
       this.activeLeafChangeRef = null;
+    }
+    if (this.layoutChangeRef) {
+      this.app.workspace.offref(this.layoutChangeRef);
+      this.layoutChangeRef = null;
     }
     this.closeAllPreviews();
   }
