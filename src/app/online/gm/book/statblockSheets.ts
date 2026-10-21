@@ -5,11 +5,17 @@ import { deepEqual } from '../../../statblocks/notes/listIdentity';
 import { readField, type FieldRead, type KeyedField } from '../../../statblocks/values/fieldValues';
 import { drawnStatblock, type DrawnStatblock } from './statblockSheet.ts';
 
-/** A value this GM side wrote into a note: the key it stands under now, the keys it was taken from, and the value (undefined: deleted). */
+/**
+ * A value this GM side wrote into a note: the key it stands under now, the keys it was taken from,
+ * and the value (undefined: deleted). `readsBack` says whether the note, as read, holds the write
+ * where it may hold more than this side knew of (an entry added to a list the GM changed meanwhile);
+ * unset, it holds the write where it reads exactly `value`.
+ */
 export interface WrittenValue {
   readonly key: string;
   readonly cleared: readonly string[];
   readonly value: FieldValue | undefined;
+  readonly readsBack?: (stored: FieldValue | undefined) => boolean;
 }
 
 export interface StatblockSheetPorts {
@@ -201,7 +207,8 @@ export class StatblockSheets {
     const fields = entry.resolved?.fields;
     if (fields === undefined) return;
     for (const [key, held] of [...entry.written]) {
-      if (deepEqual(storedRead(fields, { key }).value, held.value)) entry.written.delete(key);
+      const stored = storedRead(fields, { key }).value;
+      if (held.readsBack === undefined ? deepEqual(stored, held.value) : held.readsBack(stored)) entry.written.delete(key);
     }
   }
 

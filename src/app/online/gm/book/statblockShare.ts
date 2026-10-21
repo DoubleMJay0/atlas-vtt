@@ -1,10 +1,11 @@
-import type { BookAbilityMessage, BookFieldMessage } from '../../protocol/index.ts';
+import type { BookAbilityMessage, BookFieldMessage, BookListMessage } from '../../protocol/index.ts';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import type { NotePatch } from '../../../statblocks/notes/patchTypes';
 import { checkAbilityEdit } from './abilityEdit.ts';
 import type { PlayedCharacter } from './characters.ts';
 import { checkFieldEdit } from './fieldEdit.ts';
-import type { EditInputs } from './statblockChecks.ts';
+import { checkListEdit } from './listEdit.ts';
+import type { CheckedEdit, EditInputs } from './statblockChecks.ts';
 import type { StatblockWriteOutcome } from './statblockGate.ts';
 import type { DrawnStatblock } from './statblockSheet.ts';
 import { NO_STATBLOCK, StatblockSheets } from './statblockSheets.ts';
@@ -23,12 +24,24 @@ export interface StatblockSharePorts {
   owe(player: string): void;
 }
 
+/** A player's edit of their character's statblock: a value, an entry of a list, or an ability. */
+type StatblockEditMessage = BookFieldMessage | BookAbilityMessage | BookListMessage;
+
+/** A player's edit checked by the check for its kind. */
+function checkedEdit(inputs: EditInputs, message: StatblockEditMessage): CheckedEdit | null {
+  switch (message.t) {
+    case 'book-field': return checkFieldEdit(inputs, message);
+    case 'book-list': return checkListEdit(inputs, message);
+    case 'book-ability': return checkAbilityEdit(inputs, message);
+  }
+}
+
 /**
  * The players' own characters' statblocks: each character's note drawn as its player is sent it,
- * the whole texts it names served to that player alone, and the player's edits of its values and
- * abilities checked against what they were last sent and what the note holds now, then written
- * into the note through Atlas's note writer. A statblock edit is never a step of the map's undo
- * history: it is the note's.
+ * the whole texts it names served to that player alone, and the player's edits of its values,
+ * lists and abilities checked against what they were last sent and what the note holds now, then
+ * written into the note through Atlas's note writer. A statblock edit is never a step of the map's
+ * undo history: it is the note's.
  */
 export class StatblockShare {
   private readonly sheets: StatblockSheets;
@@ -77,14 +90,14 @@ export class StatblockShare {
   }
 
   /** A player's edit of their own character's statblock: false when it is refused at once. */
-  write(from: string, character: PlayedCharacter, message: BookFieldMessage | BookAbilityMessage): boolean {
+  write(from: string, character: PlayedCharacter, message: StatblockEditMessage): boolean {
     const path = character.statblockPath;
     // While the note may have changed (a template restricting a field) it is read again first: nothing is checked against the old one.
     if (path === null || !this.sheets.checkable(path)) return false;
     const sent = this.sentTo.get(from);
     // What the player was sent counts only while it is of this note (the GM may have linked another since).
     const inputs: EditInputs = { resolved: this.sheets.resolved(path), sent: sent?.path === path ? sent.drawn.statblock : null, read: (field) => this.sheets.read(path, field) };
-    const checked = message.t === 'book-field' ? checkFieldEdit(inputs, message) : checkAbilityEdit(inputs, message);
+    const checked = checkedEdit(inputs, message);
     if (checked === null) return false;
     if (checked.patches.length === 0) {
       this.ports.answered(from);
