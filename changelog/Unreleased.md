@@ -2,6 +2,7 @@
 
 - Resource wheels stay beside their token when it is selected, instead of rising above it
 - Selected tokens are outlined by their own shape, crisp at any zoom, with a light frame around a group
+- The token whose turn it is stands in a soft pool of light with four fine arcs, sharp at any zoom, and no longer shows two rings when selected
 
 ## Fixed
 

@@ -394,7 +394,6 @@ export class PixiRendererOrchestrator { // Renamed class
         this.eventBus
     );
     this.selectionManager.barsProvider = (tokenId) => this.tokenRenderer?.bars(tokenId) ?? NO_BARS;
-    this.selectionManager.markReachProvider = (tokenId) => this.tokenRenderer?.turnMarkerReach(tokenId) ?? 0;
 
     // Initialize FogOfWarRenderer after pins so it can be on top when active
     this.fogRenderer = new FogOfWarRenderer(viewport, this.app, this.eventBus, this.store, () => this.getMapRect());

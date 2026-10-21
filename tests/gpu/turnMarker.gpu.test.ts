@@ -2,7 +2,7 @@ import { Application, Container, Graphics } from 'pixi.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { page } from 'vitest/browser';
 import { TurnMarkers, type TurnMarkerState } from '../../src/app/pixi/token-renderer/turnMarker/TurnMarkers';
-import { turnMarkerStrokes } from '../../src/app/pixi/token-renderer/turnMarker/turnMarkerShape';
+import { TURN_LOOK, arcLayout } from '../../src/app/pixi/token-renderer/turnMarker/turnMarkerShape';
 import { LIGHTING_Z_INDEX } from '../../src/app/pixi/lighting/LightingRenderer';
 import { TOKEN_UI_Z_INDEX } from '../../src/app/pixi/TokenControlsUI';
 import { getTokenRingOuterDiameter } from '../../src/app/pixi/token-renderer/tokenRingMetrics';
@@ -68,31 +68,38 @@ describe('the turn marker on a lit map', () => {
 
   it('stands above the lighting in the accent, under the token\'s bar, and players see it only where they see the token', async () => {
     const { app, markers, centre, outer } = await scene(1);
-    const ring = turnMarkerStrokes(outer, 1)[1]!;
-    // Left of the token, on the ring: the accent, undimmed by the veil
-    expect(near(copiedPixel(app.canvas, Math.round(centre.x - ring.radius), centre.y), ACCENT)).toBe(true);
-    // The token itself lies under the lighting: dark
+    const arc = arcLayout(outer, 1, 1);
+    // Half a pixel out from the arc's middle line lies a pixel the arc covers whole
+    const onArc = (angle: number, radius = arc.radius + 0.5): [number, number] => [Math.round(centre.x + Math.cos(angle) * radius), Math.round(centre.y + Math.sin(angle) * radius)];
+    // Up and left of the token, on an arc: the accent, undimmed by the veil
+    expect(near(copiedPixel(app.canvas, ...onArc(-0.75 * Math.PI)), ACCENT)).toBe(true);
+    // Left of it, between two arcs, the glow lights the veiled floor in the accent's hue
+    const glow = copiedPixel(app.canvas, ...onArc(Math.PI, outer + 3));
+    expect(glow[2]!).toBeGreaterThan(90);
+    expect(glow[2]!).toBeGreaterThan(glow[1]! + 30);
+    // The token itself lies under the lighting, and the glow leaves it alone: dark
     expect(copiedPixel(app.canvas, centre.x, centre.y).every((value) => value < 60)).toBe(true);
-    // Below the token the bar stands over the ring
-    expect(copiedPixel(app.canvas, centre.x, Math.round(centre.y + ring.radius))).toEqual([255, 255, 255]);
+    // Below the token the bar stands over the glow
+    expect(copiedPixel(app.canvas, centre.x, Math.round(centre.y + outer + 4))).toEqual([255, 255, 255]);
     await page.screenshot({ path: `${SHOTS}/marker-gm.png`, element: app.canvas });
 
     for (const { layer, visible } of markers.playerLayers(() => false, true)) layer.visible = visible;
     app.render();
-    expect(near(copiedPixel(app.canvas, Math.round(centre.x - ring.radius), centre.y), ACCENT)).toBe(false);
+    expect(near(copiedPixel(app.canvas, ...onArc(-0.75 * Math.PI)), ACCENT)).toBe(false);
   });
 
-  it('stays a smooth ring when the map is zoomed in', async () => {
+  it('keeps its arcs smooth curves when the map is zoomed in', async () => {
     const { app, centre, outer } = await scene(4);
-    const ring = turnMarkerStrokes(outer, 1)[1]!;
-    // Every eighth of a turn, on the ring's middle line, is the accent: no corner cuts the ring
-    for (let step = 0; step < 8; step += 1) {
-      const angle = (step / 8) * Math.PI * 2 + 0.3;
-      const x = Math.round(centre.x + Math.cos(angle) * ring.radius * 4);
-      const y = Math.round(centre.y + Math.sin(angle) * ring.radius * 4);
-      // The token's bar stands over the ring's bottom
-      if (x < 0 || y < 0 || x >= SIZE || y >= SIZE || Math.sin(angle) > 0.5) continue;
-      expect(near(copiedPixel(app.canvas, x, y), ACCENT), `at ${x},${y}`).toBe(true);
+    const arc = arcLayout(outer, 1, 4);
+    // Along the middle line of the upper arcs, away from their tapered ends, is the accent: no corner cuts them
+    for (const middle of [-0.75 * Math.PI, -0.25 * Math.PI]) {
+      for (let step = -4; step <= 4; step += 1) {
+        const angle = middle + (step / 4) * (TURN_LOOK.arcSpan / 2) * 0.6;
+        const x = Math.round(centre.x + Math.cos(angle) * arc.radius);
+        const y = Math.round(centre.y + Math.sin(angle) * arc.radius);
+        if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) continue;
+        expect(near(copiedPixel(app.canvas, x, y), ACCENT), `at ${x},${y}`).toBe(true);
+      }
     }
     await page.screenshot({ path: `${SHOTS}/marker-zoomed.png`, element: app.canvas });
   });

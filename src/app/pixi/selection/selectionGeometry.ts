@@ -59,14 +59,9 @@ export interface TokenShape {
   readonly art: { readonly width: number; readonly height: number; readonly rotation: number };
 }
 
-/**
- * A token's outline: the circle of its ring, or the box of its art where it shows none. A token
- * that carries a round mark `beyond` world units outside its edge (the turn marker, which takes
- * its art's diameter for the edge of a token without a ring) is outlined around that mark instead.
- */
-export function tokenOutline(shape: TokenShape, beyond = 0): SelectionOutline {
-  if (shape.ringDiameter !== null) return { kind: 'circle', radius: shape.ringDiameter / 2 + beyond };
-  if (beyond > 0) return { kind: 'circle', radius: shape.tokenSize / 2 + beyond };
+/** A token's outline: the circle of its ring, or the box of its art where it shows none. */
+export function tokenOutline(shape: TokenShape): SelectionOutline {
+  if (shape.ringDiameter !== null) return { kind: 'circle', radius: shape.ringDiameter / 2 };
   const { width, height, rotation } = shape.art;
   return { kind: 'rect', width, height, rotation, cornerRadius: 0 };
 }
