@@ -21,11 +21,22 @@ export interface SelectionTarget {
   readonly extent?: Box | undefined;
   /** Handles standing on the highlight, relative to the thing's middle: the highlight passes behind them. */
   readonly handles?: readonly Notch[] | undefined;
+  /**
+   * Whether a group drag moves the thing, so the group frame holds it (tokens, drawings). A fog area
+   * keeps its outline but neither widens the frame nor counts towards one: the frame is what a press
+   * takes hold of.
+   */
+  readonly grouped: boolean;
 }
 
 export interface SelectionHighlightDeps {
   /** The world the highlights stand in; its scale is the zoom. */
   readonly viewport: Viewport;
+  /**
+   * Shows the selection again from what the canvas holds now: what is selected may measure differently
+   * at another zoom (a selected token's bars keep their size on screen).
+   */
+  refresh(): void;
   reducedMotion(): boolean;
   /** The theme's accent. */
   accent(): number;
@@ -90,8 +101,8 @@ class Highlight {
 
 /**
  * The GM's selection on the map: a highlight following the shape of each selected thing (a token's
- * ring, its art where it has none, the box of a drawing or fog area), and a quiet frame around them
- * all once two or more are selected. Everything is redrawn only when the selection, a selected
+ * ring, its art where it has none, the box of a drawing or fog area), and a quiet frame around what a
+ * group drag moves once two or more such are selected. Everything is redrawn only when the selection, a selected
  * thing, the zoom or the theme changes; a newly selected thing lands with a short motion.
  */
 export class SelectionHighlights {
@@ -145,7 +156,7 @@ export class SelectionHighlights {
       const handles = (target.handles ?? []).map((handle) => ({ x: handle.x * this.zoom, y: handle.y * this.zoom, radius: handle.radius * this.zoom }));
       highlight.draw(path, handles, this.accent);
       if (isNew) highlight.enter(animate());
-      boxes.push(this.screenBox(target, path));
+      if (target.grouped) boxes.push(this.screenBox(target, path));
     }
     this.showGroup(groupFrame(boxes), animate);
   }
@@ -160,7 +171,7 @@ export class SelectionHighlights {
   refreshTheme(): void {
     if (this.targets.length === 0) return;
     this.accent = this.deps.accent();
-    this.show(this.targets);
+    this.deps.refresh();
   }
 
   destroy(): void {
@@ -199,6 +210,6 @@ export class SelectionHighlights {
   }
 
   private readonly onViewChange = (): void => {
-    if (this.targets.length > 0 && this.deps.viewport.scale.x !== this.zoom) this.show(this.targets);
+    if (this.targets.length > 0 && this.deps.viewport.scale.x !== this.zoom) this.deps.refresh();
   };
 }

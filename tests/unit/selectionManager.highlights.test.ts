@@ -6,6 +6,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { SelectionManager } from '../../src/app/pixi/SelectionManager';
 import { HIGHLIGHT_EDGE, SELECTION_LOOK } from '../../src/app/pixi/selection/selectionGeometry';
 import { SHADE_REACH } from '../../src/app/pixi/selection/selectionInk';
+import type { BarsSpan } from '../../src/app/pixi/token-renderer/types';
 
 /** A token group at (x, y) with art 70 px wide and the ring every token has by default (78 px across). */
 function token(x: number, y: number): Container {
@@ -18,15 +19,25 @@ function token(x: number, y: number): Container {
   return group;
 }
 
-function setup(selectedIds: string[]) {
+/** A fog operation covering 600..700 × 300..400 of the world. */
+function fogArea(viewport: Container): Container {
+  const sprite = viewport.addChild(new Sprite());
+  sprite.position.set(600, 300);
+  sprite.width = 100;
+  sprite.height = 100;
+  return sprite;
+}
+
+function setup(selectedIds: string[], bars: (zoom: number) => BarsSpan = () => ({ halfWidth: 50, reach: 24 })) {
   const tokens = { goblin: token(100, 100), orc: token(300, 100) };
   const viewport = Object.assign(new Container(), { toWorld: (point: { x: number; y: number }) => point });
+  const fog = { smoke: fogArea(viewport) };
   const store = createStore(subscribeWithSelector(() => ({
     selectedIds, activeTool: 'select', selectionMode: 'box',
     objects: { tokens: { goblin: { id: 'goblin' }, orc: { id: 'orc' } }, drawings: {} },
   })));
-  const manager = new SelectionManager(viewport as never, () => tokens, () => ({}), store as never, new EventEmitter());
-  manager.barsProvider = () => ({ halfWidth: 50, reach: 24 });
+  const manager = new SelectionManager(viewport as never, () => tokens, () => fog, store as never, new EventEmitter());
+  manager.barsProvider = () => bars(viewport.scale.x);
   manager.updateSelectionOverlay();
   const layer = manager.getPlayerViewLayers()[0]!.layer as Container;
   const highlights = (): Container[] => layer.children.filter((child) => child.label === 'selectionHighlight');
@@ -90,5 +101,29 @@ describe('SelectionManager highlights', () => {
   it('gives a single selection no frame to take hold of', () => {
     const { manager } = setup(['goblin']);
     expect(manager.groupFrameContains(100, 100)).toBe(false);
+  });
+
+  it('measures the bars again on zoom, since a selected token keeps their size on screen', () => {
+    // Bars 100 by 24 screen pixels below the token's edge, whatever the zoom
+    const { viewport, manager } = setup(['goblin', 'orc'], (zoom) => ({ halfWidth: 50 / zoom, reach: 24 / zoom }));
+    viewport.scale.set(1.5);
+    viewport.emit('zoomed', {});
+    viewport.scale.set(0.5);
+    viewport.emit('zoomed', {});
+    // The goblin's bars now reach 100 world units to its left and 48 below its edge
+    expect(manager.groupFrameContains(100 - 99, 100 + 35 + 47)).toBe(true);
+    expect(manager.groupFrameContains(200, 100 + 35 + 48 + 2 * SELECTION_LOOK.groupGap - 1)).toBe(true);
+  });
+
+  it('outlines selected fog but frames and grabs only what a group drag moves', () => {
+    const withFog = setup(['goblin', 'orc', 'smoke']);
+    expect(withFog.highlights()).toHaveLength(3);
+    expect(withFog.manager.groupFrameContains(200, 100)).toBe(true);
+    expect(withFog.manager.groupFrameContains(650, 350)).toBe(false);
+    const oneToken = setup(['goblin', 'smoke']);
+    expect(oneToken.highlights()).toHaveLength(2);
+    expect(oneToken.group.context.instructions).toHaveLength(0);
+    expect(oneToken.manager.groupFrameContains(650, 350)).toBe(false);
+    expect(oneToken.manager.groupFrameContains(100, 100)).toBe(false);
   });
 });

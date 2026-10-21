@@ -64,6 +64,7 @@ export class SelectionManager {
       viewport,
       reducedMotion: () => typeof window === 'undefined' || prefersReducedMotion(viewport.options?.events?.domElement ?? document.body),
       accent: () => cssColorToHexNumber(getObsidianAccentColor()),
+      refresh: () => this.updateSelectionOverlay(),
     });
     // Beneath the marquee
     this.viewport.addChildAt(this.highlights.layer, this.viewport.getChildIndex(this.marqueeGraphics));

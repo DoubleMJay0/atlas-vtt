@@ -36,11 +36,11 @@ export function selectionTargets(ids: readonly string[], sources: SelectionSourc
     const drawing = sources.drawings[id];
     const drawingBounds = drawing ? getDrawingBounds(drawing) : null;
     if (drawingBounds) {
-      targets.push(boxTarget(id, drawingBounds));
+      targets.push(boxTarget(id, drawingBounds, true));
       continue;
     }
     const fog = sources.fog[id];
-    if (fog && !fog.destroyed) targets.push(boxTarget(id, worldBounds(fog, sources.world)));
+    if (fog && !fog.destroyed) targets.push(boxTarget(id, worldBounds(fog, sources.world), false));
   }
   return targets;
 }
@@ -64,11 +64,11 @@ function tokenTarget(id: string, group: Partial<TokenGroupContainer> & Container
   const handles = group.children
     .filter((child) => child.label === TOKEN_HANDLE_LABEL && child.visible)
     .map((handle) => ({ x: handle.x, y: handle.y, radius: Math.max(handle.width, handle.height) / 2 }));
-  return { id, x, y, outline, extent, handles };
+  return { id, x, y, outline, extent, handles, grouped: true };
 }
 
-function boxTarget(id: string, box: Box): SelectionTarget {
-  return { id, x: box.x + box.width / 2, y: box.y + box.height / 2, outline: boxOutline(box) };
+function boxTarget(id: string, box: Box, grouped: boolean): SelectionTarget {
+  return { id, x: box.x + box.width / 2, y: box.y + box.height / 2, outline: boxOutline(box), grouped };
 }
 
 /** `node`'s bounds in the coordinates of `world`, which neither turns nor skews. */
