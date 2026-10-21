@@ -1,11 +1,12 @@
 import { App, WorkspaceLeaf, TFile, ItemView, MarkdownRenderer, MarkdownView, Component, setIcon } from 'obsidian';
-import { createPinButton, showPinState, startPreviewWindowDrag } from './previewWindowControls';
+import { createPinButton, showPinState, startPreviewWindowDrag, type PreviewWindowReach } from './previewWindowControls';
 import { getActiveWorkspaceLeaf, suppressActiveLeaf } from '../utils/embeddedLeafFocus';
 import { runInBackground } from '../utils/backgroundTask';
 import { openDetachedNoteLeaf } from './detachedNoteLeaf';
 import type { NotePreviewUIManager, PreviewAnchorRef } from './NotePreviewUIManager';
 import type { NoteViewState, PinnedNotePreview } from '../stores/pinnedNotePreviewSlice';
-import { PreviewWindowPlacement } from './previewWindowLayout';
+import { PreviewWindowPlacement, previewReach } from './previewWindowLayout';
+import { viewFrame } from '../packages/components/primitives/useKeepInView';
 import { NOTE_PREVIEW_LAYER_CLASS } from './uiLayers';
 import { applyNoteScroll, readNoteViewState, toOpenViewState } from './noteViewState';
 import { t } from '../i18n';
@@ -125,9 +126,14 @@ export class NotePreviewWindow {
     this.parentComponent.register(() => placement.destroy());
 
     const header = this.element.createDiv({ cls: 'atlas-note-preview-header' });
-    header.addEventListener('mousedown', this.onDragStart.bind(this));
     this.titleElement = header.createSpan({ cls: 'atlas-note-preview-title', text: t('preview.loading') });
     const controlsDiv = header.createDiv({ cls: 'atlas-note-preview-controls' });
+    const element = this.element;
+    const reach: PreviewWindowReach = {
+      reach: () => previewReach(controlsDiv.getBoundingClientRect(), header.getBoundingClientRect()),
+      frame: () => viewFrame(element),
+    };
+    header.addEventListener('mousedown', (e) => this.onDragStart(e, reach));
     this.pinButton = createPinButton(controlsDiv, 'atlas-note-preview-pin-btn', () => this.togglePin());
     
     // Open File Button
@@ -453,9 +459,9 @@ export class NotePreviewWindow {
     this.placement?.placeNearPointer(x, y);
   }
 
-  private onDragStart(e: MouseEvent): void {
+  private onDragStart(e: MouseEvent, reach: PreviewWindowReach): void {
     if (!this.element) return;
-    this.stopDrag = startPreviewWindowDrag(this.element, e, () => {
+    this.stopDrag = startPreviewWindowDrag(this.element, e, reach, () => {
       this.stopDrag = null;
       this.placement?.recordMove();
       this.saveStateNow();

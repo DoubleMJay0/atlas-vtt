@@ -394,7 +394,6 @@ export class PixiRendererOrchestrator { // Renamed class
         this.eventBus
     );
     this.selectionManager.barsProvider = (tokenId) => this.tokenRenderer?.bars(tokenId) ?? NO_BARS;
-    this.selectionManager.markReachProvider = (tokenId) => this.tokenRenderer?.turnMarkerReach(tokenId) ?? 0;
 
     // Initialize FogOfWarRenderer after pins so it can be on top when active
     this.fogRenderer = new FogOfWarRenderer(viewport, this.app, this.eventBus, this.store, () => this.getMapRect());
@@ -877,6 +876,11 @@ export class PixiRendererOrchestrator { // Renamed class
       const settings = SettingsService.forApp(this.obsApp);
       // Escape key
       if (matchesMapHotkey(e, 'cancel', settings)) {
+        // A group being turned is put back; the selection stays
+        if (this.selectionManager?.handleEscape()) {
+          e.preventDefault();
+          return;
+        }
         if (this.lighting?.handleEscape()) {
           e.preventDefault();
           return;
@@ -983,6 +987,7 @@ export class PixiRendererOrchestrator { // Renamed class
         (x, y) => this.tokenRenderer!.hitTestTokens(x, y)
       );
       this.tokenRenderer.setGroupFrameHitTest((x, y) => this.selectionManager?.groupFrameContains(x, y) ?? false);
+      this.selectionManager.setGroupTurnHost(this.tokenRenderer.groupTurnHost());
     }
 
     this.lightingFeature?.wire(this.tokenRenderer);

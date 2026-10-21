@@ -1,4 +1,4 @@
-import { Container, Graphics, type Ticker } from 'pixi.js';
+import { Container, type Ticker } from 'pixi.js';
 import { turnKey, currentTurn, turnTokenIds } from '../../../initiative/turnHolders';
 import type { TokenEntity } from '../../../types';
 import type { GridState } from '../../../types/gridTypes';
@@ -9,17 +9,11 @@ import { MAP_LAYER_Z } from '../../mapLayerOrder';
 import type { LayerVisibility } from '../../playerSafeFrame';
 import { cssColorToHexNumber, getObsidianAccentColor } from '../../utils/colorUtils';
 import { destroyTree } from '../../utils/destroyTree';
-import { ValueTransition } from '../../utils/ValueTransition';
 import { getTokenRingOuterDiameter } from '../tokenRingMetrics';
 import { computeTokenStrokeWidth, restingTokenUIScale } from '../tokenSizing';
 import type { TokenGroupContainer } from '../types';
-import { MARKER_GROW_FROM, MARKER_GROW_MS, MARKER_REACH_UNITS, turnMarkerStrokes } from './turnMarkerShape';
-
-/**
- * Curves are drawn this many times larger and scaled down: PIXI builds a circle from a number of
- * straight pieces that follows its radius, and a ring zoomed in on screen would show corners.
- */
-const DRAW_SCALE = 8;
+import { TurnGlowTextures } from './turnGlowTextures';
+import { TurnMarker, type GlowTextureSource } from './TurnMarker';
 
 const readAccent = (): number => cssColorToHexNumber(getObsidianAccentColor());
 
@@ -29,6 +23,8 @@ export interface TurnMarkerState {
   readonly objects: TokenHolder<TokenEntity>;
   readonly grid?: Pick<GridState, 'size'> | null | undefined;
   readonly isMapLoading?: boolean | undefined;
+  /** What the GM has selected: a selected token's marker leaves its crisp edge to the selection. */
+  readonly selectedIds?: readonly string[] | undefined;
 }
 
 export interface TurnMarkerDeps {
@@ -43,79 +39,23 @@ export interface TurnMarkerDeps {
   reducedMotion(): boolean;
   /** The entry ids of the defeated combatants, which hold no turn of their side; none without. */
   defeated?(state: TurnMarkerState): ReadonlySet<string>;
-  /** Called once a token gains or loses its marker. */
-  onMarkedChange?(): void;
-}
-
-/** The marker on one token: the drawn rings in a container that grows in and follows the token. */
-class TurnMarker {
-  readonly view = new Container({ label: 'turnMarker', eventMode: 'none' });
-  private readonly rings = new Graphics();
-  private drawn = '';
-  /** How far the marker has grown in, 0 to 1: its scale and its opacity follow it. */
-  growth = 1;
-  private readonly grow: ValueTransition;
-
-  constructor() {
-    this.rings.scale.set(1 / DRAW_SCALE);
-    this.view.addChild(this.rings);
-    this.grow = new ValueTransition(1, MARKER_GROW_MS, (value) => {
-      this.growth = value;
-      this.view.scale.set(MARKER_GROW_FROM + (1 - MARKER_GROW_FROM) * value);
-    });
-  }
-
-  /** Draws the rings for a token whose outer edge lies `outerRadius` from its centre; nothing when unchanged. */
-  draw(outerRadius: number, unit: number, accent: number, force = false): void {
-    const key = `${outerRadius}|${unit}|${accent}`;
-    if (!force && key === this.drawn) return;
-    this.drawn = key;
-    this.rings.clear();
-    for (const stroke of turnMarkerStrokes(outerRadius, unit)) {
-      this.rings.circle(0, 0, stroke.radius * DRAW_SCALE).stroke({
-        width: stroke.width * DRAW_SCALE,
-        color: stroke.ink === 'accent' ? accent : 0x000000,
-        alpha: stroke.alpha,
-      });
-    }
-  }
-
-  growIn(animate: boolean): void {
-    if (!animate) {
-      this.grow.jumpTo(1);
-      return;
-    }
-    this.grow.jumpTo(0);
-    this.grow.animateTo(1);
-  }
-
-  /** Stands where `sprite` stands, shown with it, as translucent as it is and as far grown in as it is. */
-  follow(sprite: TokenGroupContainer | null): void {
-    const visible = sprite !== null && sprite.visible;
-    if (this.view.visible !== visible) this.view.visible = visible;
-    if (!sprite) return;
-    this.view.position.copyFrom(sprite.position);
-    const alpha = sprite.alpha * this.growth;
-    if (this.view.alpha !== alpha) this.view.alpha = alpha;
-  }
-
-  destroy(): void {
-    this.grow.cancel();
-    destroyTree(this.view);
-  }
+  /** Where the glows' textures come from; painted on 2D canvases by default. */
+  glows?: GlowTextureSource;
 }
 
 /**
  * The marker on each token that holds the turn of a running fight (`turnTokenIds`): drawn above
- * the lighting and below the tokens' bars, it grows in as the turn comes (not with reduced motion)
- * and then stands still; the ticker only moves it with its token. A combatant beside the map has
- * none. What the players see of it is `playerLayers`, and pictures of the scene show none.
+ * the lighting and below the tokens' bars and the selection, it lands as the turn comes (not with
+ * reduced motion) and then stands still; the ticker only moves it with its token and redraws its
+ * arcs when the zoom changes. A combatant beside the map has none. What the players see of it is
+ * `playerLayers`, and pictures of the scene show none.
  */
 export class TurnMarkers {
   /** The layer every marker stands in. */
   readonly layer = new Container({ label: 'turnMarkers', eventMode: 'none', zIndex: MAP_LAYER_Z.turn });
   private readonly markers = new Map<string, TurnMarker>();
   private readonly unsubscribe: () => void;
+  private readonly glows: GlowTextureSource;
   private following: Ticker | null = null;
   private shownKey: string | null = null;
   private last: TurnMarkerState | null = null;
@@ -123,6 +63,7 @@ export class TurnMarkers {
   private accent = 0;
 
   constructor(private readonly deps: TurnMarkerDeps) {
+    this.glows = deps.glows ?? new TurnGlowTextures();
     deps.parent.addChild(this.layer);
     this.unsubscribe = deps.subscribe((state) => this.sync(state));
     this.sync(deps.getState(), false);
@@ -131,12 +72,6 @@ export class TurnMarkers {
   /** The tokens that carry a marker now. */
   get tokenIds(): string[] {
     return [...this.markers.keys()];
-  }
-
-  /** How far the marker on `tokenId` reaches beyond the token's edge, in world units; 0 for a token without one. */
-  reach(tokenId: string): number {
-    if (!this.markers.has(tokenId)) return 0;
-    return MARKER_REACH_UNITS * restingTokenUIScale(this.deps.getState().grid?.size ?? 70);
   }
 
   /** Follows the tokens by the ticker there is now (the app's, once the renderer has one). */
@@ -172,7 +107,7 @@ export class TurnMarkers {
   playerLayers(seen: TokenSeen, shown: boolean): LayerVisibility[] {
     return [
       { layer: this.layer, visible: shown },
-      ...[...this.markers].map(([tokenId, marker]) => ({ layer: marker.view, visible: shown && seen(tokenId), alpha: marker.growth })),
+      ...[...this.markers].flatMap(([tokenId, marker]) => marker.playerLayers(shown && seen(tokenId))),
     ];
   }
 
@@ -186,13 +121,14 @@ export class TurnMarkers {
     this.stopFollowing();
     for (const marker of this.markers.values()) marker.destroy();
     this.markers.clear();
+    this.glows.destroy();
     destroyTree(this.layer);
   }
 
   private sync(state: TurnMarkerState, animate = true): void {
     const previous = this.last;
     this.last = state;
-    if (previous && previous.initiative === state.initiative && sceneTokens(previous.objects) === sceneTokens(state.objects) && previous.grid === state.grid) return;
+    if (previous && previous.initiative === state.initiative && sceneTokens(previous.objects) === sceneTokens(state.objects) && previous.grid === state.grid && previous.selectedIds === state.selectedIds) return;
     const turn = currentTurn(state.initiative);
     const key = turn ? turnKey(turn) : null;
     // Sides are read off every combatant's token; only those on the map carry a marker
@@ -202,40 +138,43 @@ export class TurnMarkers {
     const turnMoved = key !== this.shownKey;
     this.shownKey = key;
     if (turnMoved) this.accent = readAccent();
-    const grow = animate && !state.isMapLoading && !this.deps.reducedMotion();
-    let marked = false;
-    for (const [tokenId, marker] of this.markers) {
-      if (ids.has(tokenId)) continue;
-      marker.destroy();
-      this.markers.delete(tokenId);
-      marked = true;
-    }
+    const motion = animate && !state.isMapLoading && !this.deps.reducedMotion();
+    const selected = new Set(state.selectedIds ?? []);
+    // New markers first: one that takes the shape of a marker going takes its glow over, unpainted
     for (const tokenId of ids) {
       let marker = this.markers.get(tokenId);
       const isNew = marker === undefined;
       if (!marker) {
-        marked = true;
-        marker = new TurnMarker();
+        marker = new TurnMarker(this.glows);
         this.markers.set(tokenId, marker);
         this.layer.addChild(marker.view);
       }
       this.drawMarker(tokenId, marker);
-      if (isNew || turnMoved) marker.growIn(grow);
+      if (isNew || turnMoved) marker.growIn(motion);
+      marker.select(selected.has(tokenId), motion && !isNew);
       marker.follow(this.deps.spriteOf(tokenId));
+    }
+    for (const [tokenId, marker] of this.markers) {
+      if (ids.has(tokenId)) continue;
+      marker.destroy();
+      this.markers.delete(tokenId);
     }
     if (this.markers.size > 0) this.startFollowing();
     else this.stopFollowing();
-    if (marked) this.deps.onMarkedChange?.();
   }
 
   private drawMarker(tokenId: string, marker: TurnMarker, force = false): void {
     const state = this.deps.getState();
     const gridSize = state.grid?.size ?? 70;
     const token = mapTokens(state.objects)[tokenId];
-    const size = this.deps.spriteOf(tokenId)?.tokenSize ?? 0;
-    if (!token || !(size > 0)) return;
-    const outer = token.showRing === false ? size : getTokenRingOuterDiameter(size, computeTokenStrokeWidth(gridSize));
-    marker.draw(outer / 2, restingTokenUIScale(gridSize), this.accent, force);
+    const sprite = this.deps.spriteOf(tokenId);
+    const size = sprite?.tokenSize ?? 0;
+    if (!sprite || !token || !(size > 0)) return;
+    // The ring as drawn, which the scene's ring size may have scaled: the selection reads it so too
+    const outer = token.showRing === false
+      ? size
+      : (sprite.getChildByLabel('tokenRing')?.width || getTokenRingOuterDiameter(size, computeTokenStrokeWidth(gridSize)));
+    marker.draw(outer / 2, restingTokenUIScale(gridSize), this.deps.parent.scale.x || 1, this.accent, force);
   }
 
   /** Each frame the markers take their tokens' places, visibility and size; PIXI renders only what changed. */

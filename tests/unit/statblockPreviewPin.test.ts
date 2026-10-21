@@ -13,12 +13,16 @@ vi.mock('../../src/app/services/FantasyStatblocksService', () => ({
   getFantasyStatblocksApi: (): object => ({}),
 }));
 const statblockProps = vi.hoisted(() => [] as Array<Record<string, unknown>>);
-vi.mock('../../src/app/statblocks/render/LinkedStatblock', () => ({
-  LinkedStatblock: (props: Record<string, unknown>): null => {
-    statblockProps.push(props);
-    return null;
-  },
-}));
+vi.mock('../../src/app/statblocks/render/LinkedStatblock', async () => {
+  const { createElement } = await vi.importActual<typeof import('react')>('react');
+  return {
+    // The card's top: the name, with a roll in it.
+    LinkedStatblock: (props: Record<string, unknown>): React.JSX.Element => {
+      statblockProps.push(props);
+      return createElement('div', { className: 'atlas-sb-header' }, createElement('a', { className: 'atlas-dice-link' }, '1d6'));
+    },
+  };
+});
 
 const VIEW_ID = 'statblock-pin-test';
 const NOTE_PATH = 'Bestiary/Goblin.md';
@@ -127,6 +131,69 @@ describe('pinning a statblock preview of a token on the map', () => {
     expect(preview!.style.top).toBe('30px');
     releaseMod();
     expect(windows()).toEqual([preview]);
+  });
+
+  describe('staying within reach', () => {
+    const rect = (left: number, top: number, width: number, height: number): DOMRect =>
+      ({ left, top, right: left + width, bottom: top + height, width, height, x: left, y: top, toJSON: () => ({}) });
+    const capsuleOf = (preview: HTMLElement): HTMLElement => preview.querySelector<HTMLElement>('.atlas-statblock-preview-window__controls')!;
+
+    /** A preview whose capsule and card top are laid out at the window's top right, which jsdom does not do. */
+    function openLaidOut(): HTMLElement {
+      hoverToken(eventBus);
+      const [preview] = windows();
+      capsuleOf(preview!).getBoundingClientRect = (): DOMRect => rect(900, 100, 80, 36);
+      preview!.querySelector<HTMLElement>('.atlas-sb-header')!.getBoundingClientRect = (): DOMRect => rect(620, 140, 360, 60);
+      return preview!;
+    }
+
+    it('cannot be dragged so far that its capsule leaves the map view', () => {
+      const viewEl = document.body.createDiv({ cls: 'workspace-leaf' });
+      viewEl.getBoundingClientRect = (): DOMRect => rect(300, 40, 1000, 800);
+      manager.followView(viewEl);
+      const preview = openLaidOut();
+
+      capsuleOf(preview).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 920, clientY: 110 }));
+      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 920 + 2000, clientY: 110 - 500 }));
+      document.dispatchEvent(new MouseEvent('mouseup'));
+
+      // The capsule's right edge on the view's right edge, its top on the view's top.
+      expect([preview.style.left, preview.style.top]).toEqual(['320px', '-60px']);
+    });
+
+    it('moves by its card\'s top past a threshold, where a click on a roll still rolls', () => {
+      const preview = openLaidOut();
+      const roll = preview.querySelector<HTMLElement>('.atlas-dice-link')!;
+      const rolled = vi.fn();
+      preview.addEventListener('click', rolled);
+
+      roll.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 700, clientY: 160 }));
+      document.dispatchEvent(new MouseEvent('mouseup'));
+      roll.click();
+      expect(rolled).toHaveBeenCalledTimes(1);
+      expect(preview.classList.contains('is-pinned')).toBe(true);
+
+      const placed = preview.style.left;
+      roll.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 700, clientY: 160 }));
+      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 702, clientY: 161 }));
+      expect(preview.style.left).toBe(placed);
+      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 650, clientY: 200 }));
+      document.dispatchEvent(new MouseEvent('mouseup'));
+      roll.click();
+      expect([preview.style.left, preview.style.top]).toEqual(['-50px', '40px']);
+      expect(rolled).toHaveBeenCalledTimes(1);
+    });
+
+    it('comes back into view when the window shrinks under a pinned preview', () => {
+      const preview = openLaidOut();
+      buttonsOf(preview)[0]!.click();
+      Object.defineProperty(preview, 'offsetLeft', { configurable: true, value: 900 });
+      Object.defineProperty(preview, 'offsetTop', { configurable: true, value: 100 });
+      capsuleOf(preview).getBoundingClientRect = (): DOMRect => rect(1200, 100, 80, 36);
+
+      window.dispatchEvent(new Event('resize'));
+      expect(preview.style.left).toBe(`${900 - (1280 - window.innerWidth)}px`);
+    });
   });
 
   describe('following its token', () => {

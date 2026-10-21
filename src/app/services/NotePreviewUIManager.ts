@@ -488,6 +488,11 @@ export class NotePreviewUIManager {
     this.unlistenWindow = followWindow(containerEl, (win) => this.listenOn(win));
   }
 
+  /** The map view's element, once the view has given it (`followView`). */
+  public mapViewElement(): HTMLElement | null {
+    return this.viewEl;
+  }
+
   /** The document a preview opens in: that of the leaf it was hovered in, else the map view's, a popout's when it is in one. */
   private previewDocument(sourceLeaf: WorkspaceLeaf | null | undefined): Document {
     return (sourceLeaf?.view.containerEl ?? this.viewEl)?.doc ?? document;
