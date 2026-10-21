@@ -93,6 +93,7 @@ export class BookShare implements LootRecipientSource {
     this.questList = new AskedAnswer(() => ports.quests(), NO_QUESTS, () => this.update());
     this.statblocks = new StatblockShare({
       read: (path) => ports.readStatblock(path), write: (path, patches) => ports.writeStatblock(path, patches), now: () => ports.now(),
+      panelWidth: () => ports.statblockPanelWidth?.(),
       // What arrives once the table stopped is dropped: nothing more goes out.
       changed: () => this.whileRunning(() => this.update()),
       answered: (player) => this.whileRunning(() => this.resendStatblock(player)),

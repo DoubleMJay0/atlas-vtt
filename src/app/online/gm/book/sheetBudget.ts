@@ -7,6 +7,8 @@ import {
 const FRAME_MARGIN = 16 * 1024;
 /** The most bytes a drawn statblock's JSON takes, so its message always fits one GM frame. */
 export const MAX_STATBLOCK_BYTES = MAX_GM_FRAME - FRAME_MARGIN;
+/** Bytes the sheet's nodes leave for the abilities, so a sheet of huge values never crowds out the Abilities tab. */
+const ABILITY_BYTES = 32 * 1024;
 
 /** What one part of a drawn statblock costs, as the protocol's parser counts it, and its bytes. */
 interface Cost {
@@ -52,10 +54,10 @@ export class SheetBudget {
   private abilities = 0;
   private bytes = 0;
 
-  /** Takes a cost if it fits, and says whether it did. */
-  private take(cost: Cost): boolean {
+  /** Takes a cost if it fits within `bytes`, and says whether it did. */
+  private take(cost: Cost, bytes = MAX_STATBLOCK_BYTES): boolean {
     const fits = this.nodes + cost.nodes <= MAX_SHEET_NODES && this.chars + cost.chars <= MAX_SHEET_CHARS
-      && this.abilities + cost.abilities <= MAX_ABILITIES && this.bytes + cost.bytes <= MAX_STATBLOCK_BYTES;
+      && this.abilities + cost.abilities <= MAX_ABILITIES && this.bytes + cost.bytes <= bytes;
     if (!fits) return false;
     this.nodes += cost.nodes;
     this.chars += cost.chars;
@@ -72,12 +74,12 @@ export class SheetBudget {
   /** A node, counted alone: a container's children are taken on their own, so only its frame counts here. */
   takeNode(node: SheetNode): boolean {
     const own = node.k === 'section' || node.k === 'row' ? { ...node, nodes: [] } : node.k === 'tabs' ? { ...node, tabs: [] } : node;
-    return this.take({ nodes: 1, chars: ownChars(node), abilities: 0, bytes: jsonBytes(own) });
+    return this.take({ nodes: 1, chars: ownChars(node), abilities: 0, bytes: jsonBytes(own) }, MAX_STATBLOCK_BYTES - ABILITY_BYTES);
   }
 
   /** A component's frame (name, parts, the tabs' labels and intros), its entries aside. */
   takeFrame(frame: AbilityComponent): boolean {
-    const chars = frame.tabs.reduce((sum, tab) => sum + (tab.intro ? textChars(tab.intro) : 0), 0);
+    const chars = frame.tabs.reduce((sum, tab) => sum + (tab.intro ? textChars(tab.intro) : 0), 0) + (frame.heading ?? '').length + (frame.section ?? '').length;
     return this.take({ nodes: 0, chars, abilities: 0, bytes: jsonBytes(frame) });
   }
 

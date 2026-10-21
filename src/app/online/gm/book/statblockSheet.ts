@@ -1,5 +1,6 @@
-import type { AbilityComponent, BookStatblock, SheetSigils, SheetValue } from '../../protocol/index.ts';
+import { MAX_CARD_COLUMNS, MAX_CARD_WIDTH, MAX_COLUMN_WIDTH, MIN_CARD_WIDTH, MIN_COLUMN_WIDTH, type AbilityComponent, type BookStatblock, type SheetCard, type SheetSigils, type SheetValue } from '../../protocol/index.ts';
 import type { ResourceDefinition, ResourceValue } from '../../../resources/resourceTypes';
+import { FALLBACK_PANEL_WIDTH, paneCardWidth } from '../../../statblocks/editor/note-panel/paneCardWidth';
 import { evaluateCondition } from '../../../statblocks/expressions/conditions';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
@@ -21,6 +22,24 @@ export interface StatblockSheetInput {
   /** The resources of the scene's collection, and the values the character's token holds of them. */
   readonly definitions: readonly ResourceDefinition[];
   readonly resources: Readonly<Record<string, ResourceValue>> | undefined;
+  /** The width of the GM's statblock panel, which the card is laid out at (`paneCardWidth`); unset, a default. */
+  readonly panelWidth?: number;
+}
+
+/** The template's column width where it sets none (`StatblockSheet`). */
+const DEFAULT_COLUMN_WIDTH_EM = 22;
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+/** The GM's card as the note panel lays it out: its width, the template's columns, and whether the header's description leads the sheet. */
+function sheetCard(template: StatblockTemplate, panelWidth: number | undefined, description: boolean): SheetCard {
+  const maxColumns = clamp(template.layout.maxColumns, 1, MAX_CARD_COLUMNS);
+  return {
+    width: clamp(paneCardWidth(panelWidth ?? FALLBACK_PANEL_WIDTH, maxColumns), MIN_CARD_WIDTH, MAX_CARD_WIDTH),
+    columnWidth: clamp(template.layout.columnWidth ?? DEFAULT_COLUMN_WIDTH_EM, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH),
+    maxColumns,
+    description,
+  };
 }
 
 /** A drawn statblock, and the whole texts it names by hash, for the player it is drawn for to fetch. */
@@ -77,16 +96,18 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
     holds: (block) => block.showWhen === undefined || evaluateCondition(block.showWhen, reader),
   };
   const head = sheetHead(build);
-  const walk: SheetWalk = { abilities: [], drawnElsewhere: new Set(head.armorBlock === null ? [] : [head.armorBlock]) };
-  const nodes = sheetNodes(build, template.layout.blocks, 0, { section: null }, walk);
+  const walk: SheetWalk = { abilities: [] };
+  const nodes = sheetNodes(build, template.layout.blocks, 0, { section: null, row: false }, walk);
   const sigils: { -readonly [K in keyof SheetSigils]: SheetValue } = {};
   for (const [id, sigil] of head.sigils) if (build.budget.takeValue(sigil)) sigils[id] = sigil;
+  const blocks = fittedNodes(build.budget, head.description ? [head.description, ...nodes] : nodes);
   return {
     editable,
     displayName: head.displayName,
     sigils,
-    blocks: fittedNodes(build.budget, head.description ? [head.description, ...nodes] : nodes),
+    blocks,
     abilities: fittedAbilities(build.budget, walk.abilities),
+    card: sheetCard(template, input.panelWidth, head.description !== null && blocks[0] === head.description),
   };
 }
 

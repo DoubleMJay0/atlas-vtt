@@ -15,6 +15,8 @@ export interface WrittenValue {
 export interface StatblockSheetPorts {
   read(path: string): Promise<ResolvedStatblock | null>;
   now(): number;
+  /** The width of the GM's statblock panel, which the cards are laid out at; unset, a default. */
+  panelWidth?(): number | undefined;
   /** A note was read or a statblock drawn anew: the books are looked at again. */
   changed(): void;
 }
@@ -85,12 +87,13 @@ export class StatblockSheets {
     const source = this.source(entry);
     if (source === undefined) return undefined;
     if (source === null) return NO_STATBLOCK;
-    const inputs = JSON.stringify([definitions, resources ?? null]);
+    const panelWidth = this.ports.panelWidth?.();
+    const inputs = JSON.stringify([definitions, resources ?? null, panelWidth ?? null]);
     if (entry.asked?.source === source && entry.asked.inputs === inputs) return entry.drawn;
     const asked: Drawing = { source, inputs };
     entry.asked = asked;
     entry.drawn = undefined;
-    void drawnStatblock({ resolved: source, definitions, resources }).then((drawn) => {
+    void drawnStatblock({ resolved: source, definitions, resources, ...(panelWidth !== undefined && { panelWidth }) }).then((drawn) => {
       if (entry.asked !== asked || this.entries.get(path) !== entry) return;
       entry.drawn = drawn;
       this.ports.changed();
