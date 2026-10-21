@@ -15,6 +15,7 @@ import { isModHeld } from '../keyboard/modKey';
 import type { ViewAtlasStore } from '../storeFactory';
 import type { TokenRollContext } from '../types/diceRollOrigin';
 import { captureRollContext } from '../tools/diceRollOrigins';
+import { followWindow } from '../utils/followWindow';
 import { mapTokens } from '../tokens/offMap';
 import { shallow } from 'zustand/vanilla/shallow';
 
@@ -85,6 +86,10 @@ export class NotePreviewUIManager {
   private boundHandleKeyDown!: (e: KeyboardEvent) => void;
   private boundHandleKeyUp!: (e: KeyboardEvent) => void;
   private boundHandleFocus!: () => void;
+  /** Removes the key, focus and blur listeners from the window they are on. */
+  private unlistenWindow: () => void = (): void => undefined;
+  /** The map view's container, once `followView` was called. */
+  private viewEl: HTMLElement | null = null;
   private activeLeafChangeRef: EventRef | null = null;
   private layoutChangeRef: EventRef | null = null;
   private zIndexCounter = 5; // stay below asset manager (50) and Obsidian overlays (~1000)
@@ -151,12 +156,7 @@ export class NotePreviewUIManager {
       this.isModifierKeyDown = false;
     };
     
-    document.addEventListener('keydown', this.boundHandleKeyDown);
-    document.addEventListener('keyup', this.boundHandleKeyUp);
-    window.addEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
-    
-    // Reset modifier key state when window gains focus to avoid stuck state
-    window.addEventListener('focus', this.boundHandleFocus);
+    this.unlistenWindow = this.listenOn(window);
 
     // The pin's note opens in the workspace, which replaces its preview
     this.eventBus.on('close-active-preview', (notePath: string) => {
@@ -342,7 +342,7 @@ export class NotePreviewUIManager {
     // Scene links → lightweight tooltip with thumbnail + "Open Map" button; nothing for a scene not in this collection
     if (linkedMapPath(pin.notePath)) {
       const scene = linkedSceneFile(this.app, this.store.getState().mapPath, pin.notePath);
-      const mapPreview = scene ? new MapLinkPreview(this.app, scene, pin, this, { x: screenX, y: screenY }) : null;
+      const mapPreview = scene ? new MapLinkPreview(this.app, scene, pin, this, { x: screenX, y: screenY }, this.previewDocument(sourceLeaf)) : null;
       if (mapPreview?.element) {
         this.activePreviews.set(`${pin.notePath}::${pin.id}`, mapPreview);
         this.raiseZIndex(mapPreview);
@@ -370,6 +370,7 @@ export class NotePreviewUIManager {
           undefined,
           this.viewId,
           originContext,
+          this.previewDocument(sourceLeaf),
         );
         
         if (statblockPreview.element) {
@@ -477,11 +478,38 @@ export class NotePreviewUIManager {
     this.showStatblocksWithMap();
   }
 
+  /**
+   * Hears the modifier key, focus and blur in the window `containerEl` (the map view) is in,
+   * which follows the view into a popout and back. Until then, the main window's.
+   */
+  public followView(containerEl: HTMLElement): void {
+    this.viewEl = containerEl;
+    this.unlistenWindow();
+    this.unlistenWindow = followWindow(containerEl, (win) => this.listenOn(win));
+  }
+
+  /** The document a preview opens in: that of the leaf it was hovered in, else the map view's, a popout's when it is in one. */
+  private previewDocument(sourceLeaf: WorkspaceLeaf | null | undefined): Document {
+    return (sourceLeaf?.view.containerEl ?? this.viewEl)?.doc ?? document;
+  }
+
+  private listenOn(win: Window): () => void {
+    win.document.addEventListener('keydown', this.boundHandleKeyDown);
+    win.document.addEventListener('keyup', this.boundHandleKeyUp);
+    win.addEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
+    // Reset modifier key state when window gains focus to avoid stuck state
+    win.addEventListener('focus', this.boundHandleFocus);
+    return (): void => {
+      win.document.removeEventListener('keydown', this.boundHandleKeyDown);
+      win.document.removeEventListener('keyup', this.boundHandleKeyUp);
+      win.removeEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
+      win.removeEventListener('focus', this.boundHandleFocus);
+    };
+  }
+
   public destroy(): void {
-    document.removeEventListener('keydown', this.boundHandleKeyDown);
-    document.removeEventListener('keyup', this.boundHandleKeyUp);
-    window.removeEventListener('blur', this.boundHideAllUnpinnedPreviewsOnBlur);
-    window.removeEventListener('focus', this.boundHandleFocus);
+    this.unlistenWindow();
+    this.unlistenWindow = (): void => undefined;
     if (this.activeLeafChangeRef) {
       this.app.workspace.offref(this.activeLeafChangeRef);
       this.activeLeafChangeRef = null;

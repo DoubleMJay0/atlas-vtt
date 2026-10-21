@@ -34,6 +34,7 @@ import { AtlasUIContext, AtlasUIContextValue } from './root/AtlasUIContext';
 import { ContextMenuProvider } from './root/ContextMenuContext';
 import { PanelBoundary } from './root/PanelBoundary';
 import { useMapNavigationHotkeys } from './useMapNavigationHotkeys';
+import { useViewWindow } from './useViewWindow';
 import { useExperimentalFeature } from './hooks/useExperimentalFeature';
 import type { AtlasView } from '../atlas-view';
 import { runInBackground } from '../utils/backgroundTask';
@@ -68,6 +69,7 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
   const setDiceLogOpen = useAtlasStore(s => s.setDiceLogOpen);
 
   useMapNavigationHotkeys(view, store, settings);
+  const viewWindow = useViewWindow(view?.containerEl);
 
   const switchTab = (tabId: string): void => {
     if (view) runInBackground(view.switchToTab(tabId), 'Switching scene tab');
@@ -141,9 +143,9 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [app, isPlayerView, initiativeTrackerOpen, initiativeIsActive, nextTurn, previousTurn, store, view, settings]);
+    viewWindow.addEventListener('keydown', handleKeyDown);
+    return () => viewWindow.removeEventListener('keydown', handleKeyDown);
+  }, [app, isPlayerView, initiativeTrackerOpen, initiativeIsActive, nextTurn, previousTurn, store, view, settings, viewWindow]);
 
   return (
     <AtlasUIContext.Provider value={contextValue}>

@@ -58,13 +58,15 @@ export class StatblockPreviewWindow {
     viewId?: string,
     /** The view, scene and token a token on a map was hovered in; none for a token in a list. */
     originContext?: TokenRollContext,
+    /** The document of the window the token was hovered in, which may be a popout's. */
+    doc: Document = document,
   ) {
     this.notePath = notePath;
     this.originatingPin = 'type' in originatingToken ? originatingToken : null;
     this.manager = manager;
     this.initialPos = initialPos;
 
-    this.element = document.body.createDiv({ cls: 'atlas-statblock-preview-window' });
+    this.element = doc.body.createDiv({ cls: 'atlas-statblock-preview-window' });
     this.element.setAttribute('tabindex', '-1');
     // Only a map's preview, which its manager keeps, can stay open.
     if (manager) this.addControls(this.element);
@@ -151,8 +153,8 @@ export class StatblockPreviewWindow {
   setPosition(x: number, y: number) {
     if (!this.element) return;
 
-    const winWidth = window.innerWidth;
-    const winHeight = window.innerHeight;
+    const winWidth = this.element.win.innerWidth;
+    const winHeight = this.element.win.innerHeight;
     // A theme that draws around the preview asks for more room than this.
     const gaps = previewEdgeGaps(this.element.ownerDocument, 20);
     // The controls hang above the window, so they need room above it too.
@@ -160,7 +162,7 @@ export class StatblockPreviewWindow {
 
     this.element.classList.add('atlas-statblock-preview-window--measuring');
 
-    window.requestAnimationFrame(() => {
+    this.element.win.requestAnimationFrame(() => {
       if (!this.element) return;
 
       // Cap the window to the viewport first, so the measurement below is of

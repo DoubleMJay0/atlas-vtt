@@ -65,6 +65,7 @@ import { fitZoomRange } from './pixi/fitMapRect';
 import { viewCentreInClient, worldToClient, type ClientPoint } from './pixi/utils/worldToClient';
 import { mapTokens } from './tokens/offMap';
 import { TokenPlacer } from './pixi/tokenPlacement/TokenPlacer';
+import { followWindow } from './utils/followWindow';
 
 export class PixiRendererOrchestrator { // Renamed class
   private _isDestroyed: boolean = false;
@@ -120,7 +121,7 @@ export class PixiRendererOrchestrator { // Renamed class
   private _unsubscribeFromToolChanges?: () => void; // Add tool subscription cleanup
   private _unsubscribeFromGridVisibility?: () => void; // Add grid visibility subscription cleanup
   private viewId: string;
-  private keyboardHandler: ((e: KeyboardEvent) => void) | null = null;
+  private unbindKeyboard: (() => void) | null = null;
   private getViewportPositionHandler: ((e: WindowEventMap['get-viewport-position']) => void) | null = null;
   private eventBusUnsubscribers: Array<() => void> = [];
   /** Screen-space overlays that exist only for the DM, such as tool previews. */
@@ -867,10 +868,7 @@ export class PixiRendererOrchestrator { // Renamed class
   }
   
   private setupKeyboardHandlers(): void {
-    if (this.keyboardHandler) {
-      document.removeEventListener('keydown', this.keyboardHandler);
-      this.keyboardHandler = null;
-    }
+    this.unbindKeyboard?.();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!canRunMapHotkeys(e, this.viewId)) return;
@@ -912,8 +910,11 @@ export class PixiRendererOrchestrator { // Renamed class
       }
     };
     
-    this.keyboardHandler = handleKeyDown;
-    document.addEventListener('keydown', handleKeyDown);
+    // On the canvas' own window, which follows the view into a popout
+    this.unbindKeyboard = followWindow(this.pixiAppManager.getCanvasElement(), (win: Window): (() => void) => {
+      win.document.addEventListener('keydown', handleKeyDown);
+      return (): void => win.document.removeEventListener('keydown', handleKeyDown);
+    });
   }
   
 
@@ -1087,11 +1088,8 @@ export class PixiRendererOrchestrator { // Renamed class
     delete this._unsubscribeFromGridVisibility;
     
 
-    // Remove keyboard handler
-    if (this.keyboardHandler) {
-      document.removeEventListener('keydown', this.keyboardHandler);
-      this.keyboardHandler = null;
-    }
+    this.unbindKeyboard?.();
+    this.unbindKeyboard = null;
 
     
     // Remove drawing tool handlers

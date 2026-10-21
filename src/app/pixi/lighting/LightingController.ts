@@ -279,7 +279,7 @@ export class LightingController {
   private listen(): void {
     const { eventBus, store, obsApp, viewId } = this.deps;
     this.cleanups.push(() => this.rules.destroy(), ...listenToLightingSceneEvents({
-      eventBus, obsApp, viewId,
+      eventBus, obsApp, viewId, canvas: this.deps.app.canvas,
       resetExplored: () => this.renderer.resetExplored(),
       revealExplored: () => this.renderer.editExplored({ mode: 'reveal', area: 'everything' }),
       peek: (held) => {

@@ -101,6 +101,10 @@ const helpers: Record<string, (this: HTMLElement, ...args: never[]) => unknown> 
   show(this: HTMLElement) {
     this.style.removeProperty('display');
   },
+  // jsdom has one window, so nothing ever moves to another.
+  onWindowMigrated(this: HTMLElement): () => void {
+    return () => undefined;
+  },
 };
 
 function createDetached(tag: string, spec: ElementSpec): HTMLElement {
