@@ -3,7 +3,8 @@ import { Text } from 'pixi.js';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { TokenFootprint } from '../../src/app/vision/measureOrigin';
 import type { MeasurePlayersView } from '../../src/app/pixi/measurePartsVisibility';
-import { LABEL_LOOK } from '../../src/app/pixi/utils/measureLabel';
+import { labelScale } from '../../src/app/pixi/utils/measureLabelLayout';
+import { NAMEPLATE_TEXT } from '../../src/app/pixi/token-renderer/tokenSizing';
 import { measureFrom, measureScene, type MeasureScene } from '../helpers/measureScene';
 
 let current: MeasureScene | undefined;
@@ -176,9 +177,9 @@ describe('MeasureRenderer and the players\' picture', () => {
     expect(label.visible).toBe(false);
     s.viewport.scale.set(0.5);
     s.viewport.emit('zoomed', { viewport: s.viewport, type: 'wheel' });
-    // Drawn at its size on screen: scaled back from the world, its font as it always is.
-    expect(label.scale.x).toBe(2);
-    expect(text.style.fontSize).toBe(LABEL_LOOK.fontSize);
+    // Sized as token UI for the new zoom, its font as it always is.
+    expect(label.scale.x).toBe(labelScale(70, 0.5));
+    expect(text.style.fontSize).toBe(NAMEPLATE_TEXT.fontSize);
   });
 
   it('asks nothing of the players\' sight while there is no measurement', () => {

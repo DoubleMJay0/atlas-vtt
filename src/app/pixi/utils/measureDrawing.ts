@@ -5,7 +5,7 @@
  */
 
 import type { Point } from '../../grid/hexGeometry';
-import { LABEL_LOOK, type LabelTarget } from './measureLabel';
+import { MEASURE_DOT, type LabelTarget } from './measureLabelLayout';
 import type { InkTrace, MeasureInk } from './measureInk';
 
 /** The shapes the measure tool draws; a sphere is drawn as a circle. */
@@ -42,7 +42,7 @@ export function shortenPathEnd(points: readonly Point[], gap: number): Point[] {
 
 /** A dot where a measurement turns or ends: a node of its line; where it starts (`origin`), a ring. */
 export function drawMeasurePoint(ink: MeasureInk, color: number, point: Point, origin = false): void {
-  ink.dot(point, origin ? LABEL_LOOK.dot + 1 : LABEL_LOOK.dot, color, origin);
+  ink.dot(point, origin ? MEASURE_DOT + 1 : MEASURE_DOT, color, origin);
 }
 
 /** A circular area around `center` of `radius` world units: an even wash inside one outline. */

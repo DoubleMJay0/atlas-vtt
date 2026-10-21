@@ -200,6 +200,6 @@ export class RemoteMeasures {
   private label(label: MeasureLabel | undefined, record: MeasureRecord, { grid, measurement }: MeasureRules): void {
     if (label === undefined) return;
     const distance = formatDistance(pathLengthInCells(grid, [record.start, record.end], measurement.diagonalRule), measurement);
-    label.show(distance, measureLabelTarget(record), this.zoom());
+    label.show(distance, measureLabelTarget(record), this.zoom(), grid.size);
   }
 }

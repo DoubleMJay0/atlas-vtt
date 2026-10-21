@@ -20,6 +20,7 @@ interface Drawn {
   readonly points: readonly Point[];
   readonly distance: string;
   readonly tokenRadius: number;
+  readonly gridSize: number;
 }
 
 export class DragRulerView {
@@ -44,10 +45,13 @@ export class DragRulerView {
     this.clear();
   }
 
-  /** Draws the path through `points` with `distance` beside its middle, clear of a token of `tokenRadius` (world units) at its end. */
-  draw(points: readonly Point[], distance: string, tokenRadius = 0): void {
+  /**
+   * Draws the path through `points` with `distance` beside its middle, clear of a token of
+   * `tokenRadius` (world units) at its end, the label sized as token UI on a grid of `gridSize`.
+   */
+  draw(points: readonly Point[], distance: string, tokenRadius: number, gridSize: number): void {
     if (points.length === 0) return;
-    this.drawn = { points, distance, tokenRadius };
+    this.drawn = { points, distance, tokenRadius, gridSize };
     this.redraw();
     this.path.view.visible = true;
     this.label.view.visible = true;
@@ -75,7 +79,7 @@ export class DragRulerView {
   private redraw(): void {
     const drawn = this.drawn;
     if (!drawn) return;
-    const { points, distance, tokenRadius } = drawn;
+    const { points, distance, tokenRadius, gridSize } = drawn;
     const accent = cssColorToHexNumber(getObsidianAccentColor());
     const zoom = this.viewport.scale.x;
     this.drawnZoom = zoom;
@@ -84,6 +88,6 @@ export class DragRulerView {
     // The dragged token covers the end point; the origin and waypoints stay marked.
     points.slice(0, -1).forEach((point, index) => drawMeasurePoint(this.path, accent, point, index === 0));
     const end = points[points.length - 1]!;
-    this.label.show(distance, { beside: points, avoid: tokenRadius > 0 ? { x: end.x, y: end.y, radius: tokenRadius } : null }, zoom);
+    this.label.show(distance, { beside: points, avoid: tokenRadius > 0 ? { x: end.x, y: end.y, radius: tokenRadius } : null }, zoom, gridSize);
   }
 }

@@ -4,7 +4,8 @@ import { Bounds, Container, Graphics, Text } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';
 import { DragRulerView } from '../../src/app/pixi/token-renderer/DragRulerView';
 import { shortenPathEnd } from '../../src/app/pixi/utils/measureDrawing';
-import { pathMiddle } from '../../src/app/pixi/utils/measureLabel';
+import { labelScale, pathMiddle } from '../../src/app/pixi/utils/measureLabelLayout';
+import { NAMEPLATE_HEIGHT } from '../../src/app/pixi/token-renderer/tokenSizing';
 
 const pathMidpoint = (points: { x: number; y: number }[]): { x: number; y: number } | null => pathMiddle(points)?.point ?? null;
 
@@ -33,16 +34,17 @@ describe('DragRulerView', () => {
     vi.spyOn(Text.prototype, 'getLocalBounds').mockReturnValue(new Bounds(0, 0, 40, 16));
     const { viewport, view } = makeScene();
     const [, label] = view.layers as Container[];
-    view.draw([{ x: 0, y: 0 }, { x: 70, y: 0 }], '5 ft', 35);
+    view.draw([{ x: 0, y: 0 }, { x: 70, y: 0 }], '5 ft', 35, 70);
     const clearOfToken = (): number => {
       const { x, y } = label!.position;
-      const half = { w: label!.scale.x * 26, h: label!.scale.x * 14 };
+      // A pill of the nameplate's height, a mocked text 40 wide at the nameplate's text scale and its padding.
+      const half = { w: label!.scale.x * (40 * 0.333 + 12) / 2, h: label!.scale.x * NAMEPLATE_HEIGHT / 2 };
       return Math.hypot(Math.max(Math.abs(x - 70) - half.w, 0), Math.max(Math.abs(y) - half.h, 0));
     };
     expect(clearOfToken()).toBeGreaterThan(35);
     viewport.scale.set(4);
     viewport.emit('zoomed', {});
-    expect(label!.scale.x).toBe(0.25);
+    expect(label!.scale.x).toBe(labelScale(70, 4));
     expect(clearOfToken()).toBeGreaterThan(35);
     vi.restoreAllMocks();
   });

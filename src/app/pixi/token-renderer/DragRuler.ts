@@ -115,7 +115,7 @@ export class DragRuler {
     const settings = this.settingsProvider();
     const cells = pathLengthInCells(grid, this.cellPath(points, grid), settings.diagonalRule);
     const drawn = this.tip ? [...points.slice(0, -1), this.tip] : points;
-    this.view.draw(drawn, formatDistance(cells, settings), computeTokenPixelSize(grid.size, this.tokenSize()) / 2);
+    this.view.draw(drawn, formatDistance(cells, settings), computeTokenPixelSize(grid.size, this.tokenSize()) / 2, grid.size);
     this.refreshVisibility();
   }
 

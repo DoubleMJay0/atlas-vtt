@@ -130,7 +130,7 @@ export class RemoteDrags {
     // The start and the waypoints stay marked.
     path.slice(0, -1).forEach((point, index) => drawMeasurePoint(drawn.path, colour, point, index === 0));
     const landing = path[path.length - 1]!;
-    drawn.label.show(formatDistance(dragPathCells(rules, path, cells, snaps), rules.measurement), { beside: path, avoid: { ...landing, radius: tokenRadius } }, zoom);
+    drawn.label.show(formatDistance(dragPathCells(rules, path, cells, snaps), rules.measurement), { beside: path, avoid: { ...landing, radius: tokenRadius } }, zoom, rules.grid.size);
   }
 
   private remove(key: string, drawn: Drawn): void {

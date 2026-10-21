@@ -184,7 +184,7 @@ export class MeasureRenderer {
     const zoom = this.viewport.scale.x;
     shape.begin(zoom);
     drawMeasurement(shape, cssColorToHexNumber(getObsidianAccentColor()), record, this.measurementSettings().coneAngle);
-    label.show(this.measurementLabel(record.start, record.end), measureLabelTarget(record), zoom);
+    label.show(this.measurementLabel(record.start, record.end), measureLabelTarget(record), zoom, this.gridSystem.getOptions().size);
   }
 
   private drawLive(record: MeasureRecord): void {
