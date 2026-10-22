@@ -26,7 +26,7 @@ import { checkResourceEdit } from './resourceEdit.ts';
 import { OwedBooks } from './owedBooks.ts';
 import { bookUpdate, NO_QUESTS, RESEND, sentOf, type SentBook } from './sentBook.ts';
 import { StatblockShare } from './statblockShare.ts';
-import { WorldMaps, type WorldMapFile } from './worldMap.ts';
+import { WORLD_MAP_PROBLEM_TEXT, WorldMaps, type MapImageProblem, type WorldMapFile } from './worldMap.ts';
 
 export type { BookSharePorts } from './bookSharePorts.ts';
 export { REFUSAL_BOOK_MS } from './owedBooks.ts';
@@ -78,6 +78,8 @@ export class BookShare implements LootRecipientSource {
   /** The quests as they were last known. */
   private quests: readonly BookQuest[] = NO_QUESTS;
   private mapPath: string | null = null;
+  /** Why the world map's image could not be sent when the GM was last told, so they are told once. */
+  private mapProblem: MapImageProblem | null = null;
   /** What each connected player was last sent. */
   private readonly sent = new Map<string, SentBook>();
   /** The players whose page reads its book in parts (`book-parts`): they get a changed world map or quests alone. */
@@ -165,6 +167,7 @@ export class BookShare implements LootRecipientSource {
     const quests = this.questList.get();
     // Being looked up or read: the books go out once both are known, with them.
     if (map === undefined || quests === undefined) return;
+    this.tellMapProblem(map === null ? this.maps.problem() : null);
     this.worldMap = map;
     this.quests = this.questPlaces.of(quests, map?.questPlaces);
     const scene = this.ports.scene();
@@ -379,6 +382,12 @@ export class BookShare implements LootRecipientSource {
   /** Tells who listens when the people an item can be handed to changed. */
   private tell(): void {
     this.listeners.tell(this.recipients());
+  }
+
+  /** Tells the GM why the world map cannot be sent, once for each reason in a row. */
+  private tellMapProblem(problem: MapImageProblem | null): void {
+    if (problem !== null && problem !== this.mapProblem) this.ports.notice(WORLD_MAP_PROBLEM_TEXT[problem]);
+    this.mapProblem = problem;
   }
 }
 

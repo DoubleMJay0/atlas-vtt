@@ -30,5 +30,6 @@
 - A player's character sheet online is laid out as the GM's statblock card: the same rows, columns and boxes at the GM's card width, scaled to fit, with every ability list on its own heading or tab in the Abilities tab
 - Players can add words and labels with values (such as Experiences) to their character's lists online, and take them out again
 - Dice a player writes online with @ references, such as 2d8 + @str, roll at once with the numbers filled in
+- Players online see the campaign's world map wherever its image lies in the vault, and the GM is told when it cannot be sent
 - Typing @ in a value on a character sheet online suggests the values the player can reference, each with its current number
 - Players can write dice with @ references into their sheet's dice values, naming only values they can see

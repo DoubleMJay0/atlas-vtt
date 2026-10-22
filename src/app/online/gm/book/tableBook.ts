@@ -14,6 +14,7 @@ import { gatedQuestAsset, gatedQuests, onQuestsChange } from './questGate.ts';
 import { gatedRests } from './restGate.ts';
 import { gatedStatblocks } from './statblockGate.ts';
 import { gatedWorldMap, onWorldMapChange } from './worldMapGate.ts';
+import { showNotice } from '../../../ui/notice';
 import type { BookShelf } from './BookShelf.ts';
 
 export interface TableBookPorts {
@@ -68,6 +69,7 @@ export function tableBook(ports: TableBookPorts): TableBook {
       return file === null ? null : { mtime: file.stat.mtime, size: file.stat.size };
     },
     worldMap: () => gatedWorldMap(),
+    notice: (text) => showNotice(text),
     quests: () => gatedQuests(),
     questAsset: (hash) => gatedQuestAsset(hash),
     editResource: (edit, answer) => {
