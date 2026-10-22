@@ -83,8 +83,8 @@ function writeNote(grammar: Grammar, plan: RoomPlan): NoteText {
   };
 }
 
-export function writeNotes(seed: number, story: StoryContext, plans: readonly RoomPlan[]): NoteText[] {
-  const rng = stream(seed, 'text', 'notes');
+export function writeNotes(seed: number, story: StoryContext, plans: readonly RoomPlan[], variant = 0): NoteText[] {
+  const rng = stream(seed, 'text', variant ? `notes#${variant}` : 'notes');
   const facts = { ...story.facts, keyLook: story.keyLook, place: story.placeNoun, ...(story.boss ? { boss: story.boss } : {}) };
   const grammar = textGrammar(rng, flagsFor(story.tags, facts));
   pushFacts(grammar, facts);

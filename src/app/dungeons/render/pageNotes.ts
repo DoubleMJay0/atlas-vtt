@@ -26,6 +26,8 @@ export interface PageFrame {
   k: number;
   /** Title and story, which boxes keep clear of. */
   keepOut: Rect[];
+  /** Which automatic arrangement of the boxes; each draws its places from a stream of its own. */
+  arrangement: number;
 }
 
 /** Measures every visible note's box and places it around the map, the GM's places first. */
@@ -66,7 +68,7 @@ export function planBoxes(ctx: Canvas2D, dungeon: VisibleDungeon, style: Dungeon
     { x: inset, y: inset, w: frame.width - inset * 2, h: frame.height - inset * 2 },
     { polygons, rects: keepOut },
     6 * k,
-    stream(dungeon.model.seed, 'notes'),
+    stream(dungeon.model.seed, 'notes', frame.arrangement || ''),
   );
   const entries = notes.map((note, i) => ({ ref: note.ref, room: note.room, text: texts[i]!, anchor: anchors[i]!, box: boxes[i]! }));
   return { look, tailed, entries, clashes };

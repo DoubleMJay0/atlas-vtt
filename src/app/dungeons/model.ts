@@ -151,6 +151,11 @@ export interface DungeonModel {
   water: DungeonWater[];
   /** Floor cells under water, for exports. */
   waterCells: CellPoint[];
+  /**
+   * Secret wings the GM hid (Hide room), by the id of each wing's first room; never set by the
+   * generator. The view's secret rooms switch hides every secret wing whatever this says.
+   */
+  hiddenWings?: number[];
 }
 
 /** What a GM asks for: everything else follows from it. */
@@ -161,4 +166,6 @@ export interface DungeonRequest {
   name?: string;
   /** 0..1; unset follows the tags (dry 0, wet 0.3, flooded 0.6, else random). */
   waterLevel?: number;
+  /** Words the room notes over again (Reroll notes); unset or 0 is the first wording. Never moves a room. */
+  notesVariant?: number;
 }

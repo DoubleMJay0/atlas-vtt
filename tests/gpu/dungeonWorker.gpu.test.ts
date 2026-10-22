@@ -60,4 +60,41 @@ describe('the dungeon worker', () => {
     expect(result.page?.rooms.length).toBe(result.model.rooms.length);
     result.image.bitmap.close();
   });
+
+  it('leaves the paper out of a map asked for transparent', async () => {
+    const alphaAtCorner = async (transparent: boolean): Promise<number> => {
+      const result = await client.render(job({ kind: 'map', pxPerCell: 20, numbers: false, transparent }));
+      if (result.image.type !== 'png') throw new Error('No PNG');
+      const bitmap = await createImageBitmap(result.image.blob);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(bitmap, 0, 0);
+      return ctx.getImageData(0, 0, 1, 1).data[3]!;
+    };
+    expect(await alphaAtCorner(true)).toBe(0);
+    expect(await alphaAtCorner(false)).toBe(255);
+  });
+
+  it('arranges note boxes anew for another arrangement, and keeps a box the GM placed', async () => {
+    const first = await client.render(job({ kind: 'page', width: 1400, height: 1000 }, 3));
+    const model = first.model;
+    const placed = { ...model, notes: model.notes.map((note, i) => (i === 0 ? { ...note, manual: { x: model.rooms[0]!.x - 3, y: model.rooms[0]!.y - 3 } } : note)) };
+    const boxes = async (arrangement: number): Promise<{ room: number; x: number; y: number }[]> => {
+      const result = await client.render({ ...job({ kind: 'page', width: 1400, height: 1000, arrangement }, 3), model: placed });
+      if (result.image.type === 'bitmap') result.image.bitmap.close();
+      return result.page!.notes.map((note) => ({ room: note.room, x: Math.round(note.rect.x), y: Math.round(note.rect.y) }));
+    };
+    const [a, again, b] = [await boxes(0), await boxes(0), await boxes(1)];
+    expect(again).toEqual(a);
+    expect(b[0]).toEqual(a[0]);
+    expect(b.slice(1)).not.toEqual(a.slice(1));
+  });
+
+  it('draws a page as SVG', async () => {
+    const result = await client.render(job({ kind: 'page', width: 700, height: 500, svg: true }));
+    if (result.image.type !== 'svg') throw new Error('No SVG');
+    expect(result.image.svg.startsWith('<svg')).toBe(true);
+    expect(result.image.svg).toContain('<text');
+    expect(result.page?.rooms.length).toBe(result.model.rooms.length);
+  });
 });

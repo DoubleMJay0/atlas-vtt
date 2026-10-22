@@ -28,6 +28,7 @@ export function GeneratorFooter({ actions, ready, askingCell, onAskCell }: Gener
     const rect = button.getBoundingClientRect();
     const entries: ContextMenuEntry[] = [
       { type: 'item', label: t('dungeon.export.page'), icon: 'file-image', onClick: () => save('page') },
+      { type: 'item', label: t('dungeon.export.svg'), icon: 'file-code', onClick: () => save('svg') },
       { type: 'item', label: t('dungeon.export.map'), icon: 'map', onClick: () => onAskCell(true) },
       { type: 'item', label: t('dungeon.export.json'), icon: 'braces', onClick: () => save('json') },
       { type: 'item', label: t('dungeon.export.markdown'), icon: 'file-text', onClick: () => save('markdown') },
@@ -55,7 +56,7 @@ export function GeneratorFooter({ actions, ready, askingCell, onAskCell }: Gener
         <CellSizeDialog
           max={actions.maxCell}
           onCancel={() => onAskCell(false)}
-          onSave={(pxPerCell) => { onAskCell(false); void actions.exportAs('map', pxPerCell); }}
+          onSave={(options) => { onAskCell(false); void actions.exportAs('map', options); }}
         />
       )}
     </footer>

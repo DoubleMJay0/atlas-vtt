@@ -1,7 +1,8 @@
 /**
  * The generator's single keys, as the one-page generator GMs know has them: Enter a new dungeon,
- * T the tags, S the style, 1 to 5 the presets, Space puts the note boxes back, N steps through
- * the notes modes and L switches the legend, R rotate-to-fit, H secret rooms, M monochrome,
+ * T the tags, S the style, 1 to 5 the presets, Space arranges the note boxes anew and Shift+Space
+ * words the notes anew, N steps through the notes modes and L switches the legend, R
+ * rotate-to-fit, H secret rooms, M monochrome,
  * G the grid (Shift+G its style, Shift+1 and Shift+2 the tile size), W water (Shift+W raises
  * it), P props, E saves the page, Shift+E the map, J the JSON.
  */
@@ -11,6 +12,7 @@ export type DungeonShortcut =
   | { kind: 'style' }
   | { kind: 'preset'; index: number }
   | { kind: 'rearrange' }
+  | { kind: 'rerollNotes' }
   | { kind: 'cycleNotes' }
   | { kind: 'legend' }
   | { kind: 'rotate' }
@@ -46,6 +48,7 @@ const PLAIN: Readonly<Record<string, DungeonShortcut>> = {
 };
 
 const SHIFTED: Readonly<Record<string, DungeonShortcut>> = {
+  ' ': { kind: 'rerollNotes' },
   g: { kind: 'gridStyle' },
   w: { kind: 'raiseWater' },
   e: { kind: 'exportMap' },

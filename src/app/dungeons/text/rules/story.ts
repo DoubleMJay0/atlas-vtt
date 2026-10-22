@@ -8,7 +8,17 @@ import type { GrammarRules } from '../grammar';
 export const STORY_RULES: GrammarRules = {
   story: ['#intro# #inhabitants#', '#intro# #inhabitants# #reward#', '#intro# #inhabitants# #reward#'],
 
-  intro: ['BOSS?-#bossPast#', 'BOSS?-#bossPast#', '#abandonment#', '#abandonment#', '#location#', '#location#'],
+  /** With a boss, a story that opens without one names the boss before it ends. */
+  'BOSS?-story': [
+    '#bossPast# #inhabitants#',
+    '#bossPast# #inhabitants# #reward#',
+    '#abandonment# #inhabitants# #bossNow#',
+    '#abandonment# #bossNow# #reward#',
+    '#location# #inhabitants# #bossNow#',
+    '#location# #bossNow# #reward#',
+  ],
+
+  intro: ['#abandonment#', '#location#'],
 
   bossPast: [
     '#boss# built the #place# as a refuge from the world, and was never seen outside #it# again.',
@@ -56,6 +66,15 @@ export const STORY_RULES: GrammarRules = {
     'The #place.lies# under #landmark#; #its# entrance shows only when the bracken dies back in autumn.',
     'WET|FLOODED?-The entrance to the #place# lies in #wild#, half under black water.',
     'DRY?-#its.capitalize# entrance is a crack in the sun-baked rock of #wild#.',
+  ],
+
+  bossNow: [
+    'Deep inside, #boss# waits for whoever comes looking.',
+    'The few who came back speak of #boss#, waiting in the innermost hall.',
+    'Whatever else lives there answers to #boss#, who keeps the deepest room.',
+    'Those who still tell the old tales say #boss# has never left.',
+    'Something there has a name, and the name is #boss#.',
+    'At the far end of #it#, #boss# keeps watch over what is left.',
   ],
 
   inhabitants: ['RAIDERS?-#raiders#', 'VERMIN?-#vermins#', 'BEAST?-#beastNow#'],

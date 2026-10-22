@@ -2,11 +2,11 @@ import type { CellPoint, DungeonModel, DungeonNote } from './model';
 import { roomsByDistance } from './numbering';
 
 /**
- * What the GM changed by hand on a generated dungeon: the story typed on the page, and per room
- * its note's text, where its box was dragged, or that the note was deleted. Kept apart from the
- * model, so the same edits lie over the dungeon again when only its look changes, and dropped
- * when the dungeon itself is generated anew. A title typed on the page is the dungeon's name
- * (`DungeonRequest.name`), as in the Name field.
+ * What the GM changed by hand on a generated dungeon: the title and story typed on the page, the
+ * secret wings hidden, and per room its note's text, where its box was dragged, or that the note
+ * was deleted. Kept apart from the model, so the same edits lie over the dungeon again when only
+ * its look changes, and dropped when the dungeon itself is generated anew. A title typed on the
+ * page renames this dungeon only; the Name field asks for another dungeon (`DungeonRequest.name`).
  */
 export interface NoteEdit {
   /** The note's text; on a room without a note, a note added. */
@@ -17,7 +17,10 @@ export interface NoteEdit {
 }
 
 export interface DungeonEdits {
+  title?: string;
   story?: string;
+  /** Secret wings hidden by hand, by the id of each wing's first room (`secretWingOf`). */
+  hiddenWings?: readonly number[];
   /** By room id. */
   notes: Readonly<Record<number, NoteEdit>>;
 }
@@ -25,7 +28,7 @@ export interface DungeonEdits {
 export const NO_EDITS: DungeonEdits = { notes: {} };
 
 export function hasEdits(edits: DungeonEdits): boolean {
-  return edits.story !== undefined || Object.keys(edits.notes).length > 0;
+  return edits.title !== undefined || edits.story !== undefined || (edits.hiddenWings?.length ?? 0) > 0 || Object.keys(edits.notes).length > 0;
 }
 
 /** `edits` with the note of `room` changed by `change`; a field set to undefined is removed. */
@@ -36,18 +39,26 @@ export function withNoteEdit(edits: DungeonEdits, room: number, change: NoteEdit
   return { ...edits, notes };
 }
 
-/** `edits` without any box the GM dragged. */
-export function withoutManualPlaces(edits: DungeonEdits): DungeonEdits {
+/** `edits` with the secret wing `wing` hidden too. */
+export function withWingHidden(edits: DungeonEdits, wing: number): DungeonEdits {
+  const hidden = edits.hiddenWings ?? [];
+  return hidden.includes(wing) ? edits : { ...edits, hiddenWings: [...hidden, wing] };
+}
+
+/**
+ * `edits` for the notes worded anew: what the GM typed, added or deleted belonged to the old
+ * wording and goes; where a box was dragged stays, as do title, story and hidden wings.
+ */
+export function withoutNoteTexts(edits: DungeonEdits): DungeonEdits {
   const notes: Record<number, NoteEdit> = {};
   for (const [room, edit] of Object.entries(edits.notes)) {
-    const { manual: _manual, ...rest } = edit;
-    if (Object.keys(rest).length > 0) notes[Number(room)] = rest;
+    if (edit.manual && !edit.deleted) notes[Number(room)] = { manual: edit.manual };
   }
   return { ...edits, notes };
 }
 
 /**
- * The model as the GM left it: the story replaced, notes changed, added or deleted, and the
+ * The model as the GM left it: title and story replaced, wings hidden, notes changed, added or deleted, and the
  * notes numbered again by their rooms' distance from the entrance (`roomsByDistance`), as the
  * generator numbers them, so an added note takes its place in the order.
  */
@@ -72,9 +83,12 @@ export function applyDungeonEdits(model: DungeonModel, edits: DungeonEdits): Dun
     const note = byRoom.get(room);
     return note ? [note] : [];
   }).map((note, index) => ({ ...note, ref: String(index + 1) }));
+  const hiddenWings = (edits.hiddenWings ?? []).filter((wing) => rooms.has(wing));
   return {
     ...model,
+    title: edits.title ?? model.title,
     story: edits.story ?? model.story,
     notes,
+    ...(hiddenWings.length > 0 ? { hiddenWings } : {}),
   };
 }

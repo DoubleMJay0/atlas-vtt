@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { App, Scope } from 'obsidian';
 import type { CollectionMetadata } from '../../../services/AssetService';
 import { DungeonWorkerClient } from '../../../dungeons/worker/DungeonWorkerClient';
@@ -60,6 +60,7 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
     model: state.model,
     style: settings.style,
     view: settings.view,
+    arrangement: state.arrangement,
     size,
   }, state.setGenerated);
 
@@ -89,8 +90,6 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
     lastGrid,
   }));
 
-  const hideSecrets = useCallback(() => state.setView({ secrets: false }), [state]);
-
   return (
     <div ref={setRoot} className="atlas-dungeon-generator" tabIndex={-1} inert={actions.creating}>
       <div className="atlas-dungeon-generator__preview">
@@ -98,10 +97,11 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
           preview={preview}
           notesMode={settings.view.notes}
           onFrame={setFrame}
-          onRename={state.setName}
+          onTitle={state.editTitle}
           onStory={state.editStory}
           onNote={state.editNote}
-          onHideSecrets={hideSecrets}
+          onHideWing={state.hideWing}
+          onShowHiddenWings={state.edits.hiddenWings?.length ? state.showHiddenWings : undefined}
         />
       </div>
       <GeneratorSettings

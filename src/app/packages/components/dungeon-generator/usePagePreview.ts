@@ -27,6 +27,8 @@ export interface PagePreviewInput {
   model: DungeonModel | null;
   style: DungeonStyle;
   view: DungeonView;
+  /** Which automatic arrangement the note boxes take. */
+  arrangement: number;
   /** Device pixels; null until the preview's frame was measured. */
   size: { width: number; height: number } | null;
 }
@@ -43,12 +45,14 @@ interface Drawn {
   model: DungeonModel | null;
   style: DungeonStyle;
   view: DungeonView;
+  arrangement: number;
   width: number;
   height: number;
 }
 
 const sameDrawing = (a: Drawn | null, b: Drawn): boolean => a !== null
-  && a.request === b.request && a.model === b.model && a.style === b.style && a.view === b.view && a.width === b.width && a.height === b.height;
+  && a.request === b.request && a.model === b.model && a.style === b.style && a.view === b.view
+  && a.arrangement === b.arrangement && a.width === b.width && a.height === b.height;
 
 /**
  * The live page preview, drawn by the dungeon worker so the panel never loses a frame. The latest
@@ -64,17 +68,17 @@ export function usePagePreview(renderer: PreviewRenderer, input: PagePreviewInpu
   const drawn = useRef<Drawn | null>(null);
   const onGeneratedRef = useRef(onGenerated);
   onGeneratedRef.current = onGenerated;
-  const { request, generated, model, style, view, size } = input;
+  const { request, generated, model, style, view, arrangement, size } = input;
 
   useEffect(() => {
     if (!size) return;
     // The generated dungeon drawn as it came needs no second drawing once it is stored.
     const shown = model === generated ? null : model;
-    const next: Drawn = { request, model: generated ? shown : null, style, view, width: size.width, height: size.height };
+    const next: Drawn = { request, model: generated ? shown : null, style, view, arrangement, width: size.width, height: size.height };
     if (generated && model === generated && sameDrawing(drawn.current, { ...next, model: null })) return;
     const id = ++asked.current;
     setDrawing(true);
-    const job: DungeonJob = { request, ...(generated && model ? { model } : {}), style, view, output: { kind: 'page', width: size.width, height: size.height } };
+    const job: DungeonJob = { request, ...(generated && model ? { model } : {}), style, view, output: { kind: 'page', width: size.width, height: size.height, arrangement } };
     renderer.preview(job).then((result) => {
       if (!result) return;
       if (id !== asked.current || result.image.type !== 'bitmap' || !result.page) {
@@ -96,7 +100,7 @@ export function usePagePreview(renderer: PreviewRenderer, input: PagePreviewInpu
       setFailed(true);
       setDrawing(false);
     });
-  }, [renderer, request, generated, model, style, view, size]);
+  }, [renderer, request, generated, model, style, view, arrangement, size]);
 
   // The last picture's pixels go with the panel.
   const pictureRef = useRef(picture);

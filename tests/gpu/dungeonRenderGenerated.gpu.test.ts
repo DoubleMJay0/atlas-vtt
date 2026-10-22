@@ -3,6 +3,8 @@ import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { parseHex } from '../../src/app/dungeons/render/palette';
+import { narrowPockets, inPocket } from '../../src/app/dungeons/render/pockets';
+import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { renderPage } from '../../src/app/dungeons/render/renderPage';
 import { DEFAULT_VIEW, STYLE_PRESETS, type DungeonView, type StylePresetId } from '../../src/app/dungeons/style';
@@ -82,6 +84,27 @@ function map(model: DungeonModel, preset: StylePresetId, pxPerCell: number, view
   return { canvas, ms: performance.now() - started };
 }
 
+/** Points of rock the rooms close in on that the drawing left the colour of the paper. */
+function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, preset: StylePresetId, pxPerCell: number): string[] {
+  const style = STYLE_PRESETS[preset];
+  const dungeon = visibleDungeon(model, DEFAULT_VIEW);
+  const pockets = narrowPockets(dungeon, style.hatching.distance);
+  const { originCell } = mapLayout(model, pxPerCell, DEFAULT_VIEW);
+  const ctx = canvas.getContext('2d')!;
+  const [pr, pg, pb] = parseHex(style.colors.paper);
+  const out: string[] = [];
+  for (const { bounds } of pockets) {
+    for (let y = bounds.minY; y < bounds.maxY; y += 0.1) {
+      for (let x = bounds.minX; x < bounds.maxX; x += 0.1) {
+        if (!inPocket(pockets, x, y) || dungeon.field.distance(x, y) < 0.2) continue;
+        const [r, g, b] = ctx.getImageData(Math.floor((x - originCell.x) * pxPerCell), Math.floor((y - originCell.y) * pxPerCell), 1, 1).data;
+        if (Math.abs(r! - pr) + Math.abs(g! - pg) + Math.abs(b! - pb) < 6) out.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      }
+    }
+  }
+  return out;
+}
+
 describe('generated dungeons', () => {
   beforeAll(loadDungeonFonts);
 
@@ -108,6 +131,8 @@ describe('generated dungeons', () => {
       it(`draws the ${name} map in ${preset}`, async () => {
         const { canvas } = map(modelOf(name), preset, 100);
         expectSane(canvas, preset);
+        if (name === 'default') expect(narrowPockets(visibleDungeon(modelOf(name), DEFAULT_VIEW), 0.5).length).toBeGreaterThan(0);
+        if (STYLE_PRESETS[preset].hatching.mode !== 'dots') expect(paperInPockets(canvas, modelOf(name), preset, 100)).toEqual([]);
         await savePng(canvas, `gen-map-${name}-${preset}`);
       });
     }

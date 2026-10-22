@@ -140,6 +140,18 @@ describe('naming', () => {
     expect(bosses).toBeLessThan(470);
   });
 
+  it('names the boss in the story of every dungeon that has one', () => {
+    let opensWithoutBoss = 0;
+    for (let seed = 1; seed <= 600; seed++) {
+      const story = dungeonText.nameDungeon(seed, []);
+      if (!story.boss) continue;
+      const text = story.story.toLowerCase();
+      expect(text, story.story).toContain(story.boss.toLowerCase());
+      if (!text.split(/(?<=[.!?])\s+/)[0]!.includes(story.boss.toLowerCase())) opensWithoutBoss++;
+    }
+    expect(opensWithoutBoss).toBeGreaterThan(50);
+  });
+
   it('never adds a tag that pushes out a requested one', () => {
     for (let seed = 1; seed <= 300; seed++) {
       const story = dungeonText.nameDungeon(seed, ['single-level', 'winding', 'flat', 'secret']);

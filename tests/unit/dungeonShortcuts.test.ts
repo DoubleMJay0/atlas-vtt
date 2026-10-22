@@ -9,6 +9,7 @@ describe('the generator’s keys', () => {
   it.each([
     [press('Enter', 'Enter'), { kind: 'new' }],
     [press(' ', 'Space'), { kind: 'rearrange' }],
+    [press(' ', 'Space', { shiftKey: true }), { kind: 'rerollNotes' }],
     [press('n', 'KeyN'), { kind: 'cycleNotes' }],
     [press('G', 'KeyG', { shiftKey: true }), { kind: 'gridStyle' }],
     [press('3', 'Digit3'), { kind: 'preset', index: 2 }],

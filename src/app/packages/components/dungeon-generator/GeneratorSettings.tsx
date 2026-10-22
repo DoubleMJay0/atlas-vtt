@@ -47,7 +47,7 @@ export function GeneratorSettings({ state, refs, layer, collection, onSavePalett
         <ViewSettings view={settings.view} waterLevel={request.waterLevel} onView={state.setView} onWaterLevel={state.setWaterLevel} layer={layer} />
       </SettingsSection>
       <SettingsSection title={t('dungeon.notes')}>
-        <NotesSettings mode={settings.view.notes} onMode={(notes) => state.setView({ notes })} onRearrange={state.rearrangeNotes} layer={layer} />
+        <NotesSettings mode={settings.view.notes} onMode={(notes) => state.setView({ notes })} onRearrange={state.rearrangeNotes} onReroll={state.rerollNotes} layer={layer} />
       </SettingsSection>
       <SettingsSection title={t('dungeon.style')} sectionRef={refs.style}>
         <StyleSettings preset={settings.preset} style={settings.style} onStyle={state.setStyle} onPreset={state.applyPreset} onSavePalette={onSavePalette} layer={layer} />

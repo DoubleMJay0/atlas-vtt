@@ -61,6 +61,9 @@ export interface NoteText {
 
 export interface DungeonText {
   nameDungeon(seed: number, tags: readonly DungeonTag[], name?: string): StoryContext;
-  /** Notes in no particular order; numbering is the layout's (path distance). */
-  writeNotes(seed: number, story: StoryContext, plans: readonly RoomPlan[]): NoteText[];
+  /**
+   * Notes in no particular order; numbering is the layout's (path distance). Each `variant`
+   * words them anew (Reroll notes); 0 or unset is the first wording.
+   */
+  writeNotes(seed: number, story: StoryContext, plans: readonly RoomPlan[], variant?: number): NoteText[];
 }

@@ -10,6 +10,12 @@ import { t } from '../../../i18n';
 import { saveDungeonExport, type DungeonExportKind } from './dungeonExports';
 import type { DungeonState } from './useDungeonState';
 
+/** How a map PNG is saved. */
+export interface MapExportOptions {
+  pxPerCell: number;
+  transparent: boolean;
+}
+
 /** A scene the generator made. */
 export interface CreatedDungeonScene {
   name: string;
@@ -23,7 +29,7 @@ export interface GeneratorActions {
   create: () => Promise<void>;
   /** The largest cell a map PNG of the shown dungeon may have; null until it is generated. */
   maxCell: number | null;
-  exportAs: (kind: DungeonExportKind, pxPerCell?: number) => Promise<void>;
+  exportAs: (kind: DungeonExportKind, map?: MapExportOptions) => Promise<void>;
 }
 
 interface ActionOptions {
@@ -76,7 +82,7 @@ export function useGeneratorActions({ app, client, state, collectionId, pageAspe
     }
   }, [app]);
 
-  const exportAs = useCallback(async (kind: DungeonExportKind, pxPerCell?: number): Promise<void> => {
+  const exportAs = useCallback(async (kind: DungeonExportKind, map?: MapExportOptions): Promise<void> => {
     const { state: now, collectionId: collection, pageAspect: aspect } = latest.current;
     if (!now.model) return;
     try {
@@ -87,7 +93,8 @@ export function useGeneratorActions({ app, client, state, collectionId, pageAspe
         view: now.settings.view,
         collectionId: collection,
         pageAspect: aspect,
-        ...(pxPerCell === undefined ? {} : { pxPerCell }),
+        arrangement: now.arrangement,
+        ...map,
       });
       showNotice(t('dungeon.export.saved', { name: path.slice(path.lastIndexOf('/') + 1), folder: parentPath(path) }));
     } catch (error) {

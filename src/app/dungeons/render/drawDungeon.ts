@@ -6,13 +6,15 @@ import { drawDots } from './dots';
 import { drawInnerShadow, drawShadingBand, drawWallsAndFloor } from './floors';
 import { drawGrid } from './grid';
 import { drawHatching } from './hatching';
+import { fillPockets } from './pockets';
 import { drawProps } from './props';
 import type { RenderEnv } from './renderEnv';
 import { drawStonework } from './stonework';
 import { drawWater } from './water';
 
-/** What surrounds the walls, per hatching mode. */
+/** What surrounds the walls, per hatching mode; rock the rooms close in on is shaded whole but in stippling. */
 function drawSurroundings(env: RenderEnv): void {
+  if (env.style.hatching.mode !== 'dots') fillPockets(env);
   switch (env.style.hatching.mode) {
     case 'hatching':
       drawShadingBand(env);

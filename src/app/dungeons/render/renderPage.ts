@@ -39,8 +39,15 @@ export interface PageLayout {
   story: Rect | null;
 }
 
+export interface PageSize {
+  width: number;
+  height: number;
+  /** Which of the automatic arrangements of the note boxes (Rearrange notes); unset is the first. Boxes the GM placed stay. */
+  arrangement?: number;
+}
+
 /** The one-page layout: title and story, the map turned and scaled to fit, notes around it. */
-export function renderPage(ctx: Canvas2D, model: DungeonModel, style: DungeonStyle, view: DungeonView, size: { width: number; height: number }): PageLayout {
+export function renderPage(ctx: Canvas2D, model: DungeonModel, style: DungeonStyle, view: DungeonView, size: PageSize): PageLayout {
   const { width, height } = size;
   const k = Math.min(width / BASE_PAGE.w, height / BASE_PAGE.h);
   const margin = 50 * k;
@@ -71,7 +78,7 @@ export function renderPage(ctx: Canvas2D, model: DungeonModel, style: DungeonSty
   const left = legend ? margin + legendWidth + margin * 0.5 : margin;
   const area = { x: left, y: top, w: width - margin - left, h: height - margin - top };
   const boxed = view.notes === 'boxes' || view.notes === 'tailed';
-  const frame: PageFrame = { width, height, margin, k, keepOut: [heading.title, heading.story].filter((r): r is Rect => r !== null) };
+  const frame: PageFrame = { width, height, margin, k, arrangement: size.arrangement ?? 0, keepOut: [heading.title, heading.story].filter((r): r is Rect => r !== null) };
   // Boxes go in the room the map leaves; where they find none, the map gives up some of its area.
   let { map, drawn } = fitDrawn(dungeon, area, view, style, k);
   let plan: BoxPlan | null = boxed ? planBoxes(ctx, dungeon, drawn, view, map, frame) : null;

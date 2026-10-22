@@ -1,10 +1,12 @@
 import type { DungeonDoor, DungeonModel, DungeonRoom } from '../model';
+import { secretWingOf } from '../secretWings';
 import type { DungeonView } from '../style';
 import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
 
 /**
  * What a view shows of a dungeon: secret wings leave with their doors when secrets are hidden,
- * and a secret door is wall, so its cell is no floor.
+ * and so does every wing the GM hid (`DungeonModel.hiddenWings`); a secret door is wall, so its
+ * cell is no floor.
  */
 export interface VisibleDungeon {
   model: DungeonModel;
@@ -21,7 +23,8 @@ export interface VisibleDungeon {
 }
 
 export function visibleDungeon(model: DungeonModel, view: Pick<DungeonView, 'secrets'>): VisibleDungeon {
-  const rooms = model.rooms.filter(room => view.secrets || room.wing !== 'secret');
+  const hidden = new Set(model.hiddenWings ?? []);
+  const rooms = model.rooms.filter(room => room.wing !== 'secret' || (view.secrets && !hidden.has(secretWingOf(model.rooms, room.id) ?? room.id)));
   const shown = new Set(rooms.map(room => room.id));
   const doors = model.doors.filter(door => (door.from === null || shown.has(door.from)) && (door.to === null || shown.has(door.to)));
   const roomShapes = new Map(rooms.map(room => [room.id, roomShape(room)] as const));

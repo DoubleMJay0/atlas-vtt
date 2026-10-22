@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import type { RoomPlan } from '../../../src/app/dungeons/text/contract';
-import { bypasses, doorProblems, floorProblems, unreachableRooms } from './dungeonInvariants';
+import { bypasses, doorProblems, floorProblems, rotundaProblems, unreachableRooms } from './dungeonInvariants';
 import { fakeDungeonText } from './fakeDungeonText';
 
 const SEEDS = 500;
@@ -57,6 +57,16 @@ function has(run: Run, tag: string): boolean {
 describe('generated dungeons', () => {
   it('never overlap floors, and every floor stays clear of other rooms’ walls', () => {
     expect(failures((run) => floorProblems(run.model))).toEqual([]);
+  });
+
+  it('keep every rotunda and its wall clear of other rooms and their walls, but at a door', () => {
+    expect(ALL.some((run) => run.model.rooms.some((room) => room.rotunda))).toBe(true);
+    expect(failures((run) => rotundaProblems(run.model))).toEqual([]);
+    // The check itself sees a room laid against a rotunda's wall.
+    const run = ALL.find((r) => r.model.rooms.some((room) => room.rotunda))!;
+    const rotunda = run.model.rooms.find((room) => room.rotunda)!;
+    const against = { ...rotunda, id: run.model.rooms.length, rotunda: false, x: rotunda.x + rotunda.w + 0.2, y: rotunda.y + 1, w: 2, h: 1 };
+    expect(rotundaProblems({ ...run.model, rooms: [...run.model.rooms, against] })).not.toEqual([]);
   });
 
   it('put every door in the wall between its two rooms, or in an outer wall', () => {

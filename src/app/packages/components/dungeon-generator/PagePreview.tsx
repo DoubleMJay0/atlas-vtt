@@ -13,10 +13,14 @@ interface PagePreviewProps {
   preview: Preview;
   notesMode: NotesMode;
   onFrame: (frame: HTMLDivElement | null) => void;
-  onRename: (name: string) => void;
+  /** The title typed on the page: an edit of this dungeon, not another dungeon. */
+  onTitle: (title: string) => void;
   onStory: (story: string) => void;
   onNote: (room: number, change: NoteEdit | null) => void;
-  onHideSecrets: () => void;
+  /** Hides the secret wing a room lies in. */
+  onHideWing: (room: number) => void;
+  /** Shows the wings hidden by hand again; unset while none is. */
+  onShowHiddenWings?: (() => void) | undefined;
 }
 
 interface Drag {
@@ -38,7 +42,7 @@ const DRAG_THRESHOLD = 3;
  * The page preview and what can be done on it: drag a note's box (Boxes and Tailed), click the
  * title or the story to edit it, and right-click a room or a note for its note's menu.
  */
-export function PagePreview({ preview, notesMode, onFrame, onRename, onStory, onNote, onHideSecrets }: PagePreviewProps): React.JSX.Element {
+export function PagePreview({ preview, notesMode, onFrame, onTitle, onStory, onNote, onHideWing, onShowHiddenWings }: PagePreviewProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [edit, setEdit] = useState<PageTextEdit | null>(null);
@@ -112,22 +116,25 @@ export function PagePreview({ preview, notesMode, onFrame, onRename, onStory, on
     if (!located || !picture || !menu) return;
     const hit = hitPage(picture.layout, located.point);
     const room = hit.kind === 'note' ? hit.note.room : hit.kind === 'room' ? hit.room : null;
-    if (room === null) return;
-    event.preventDefault();
-    const at = { x: event.clientX - located.frame.left, y: event.clientY - located.frame.top, w: 0, h: 0 };
-    const hasNote = noteText(room) !== '';
     const entries: ContextMenuEntry[] = [];
-    if (picture.model.rooms.find((entry) => entry.id === room)?.wing === 'secret') {
-      entries.push({ type: 'item', label: t('dungeon.room.hide'), icon: 'eye-off', onClick: onHideSecrets });
+    if (room !== null) {
+      const at = { x: event.clientX - located.frame.left, y: event.clientY - located.frame.top, w: 0, h: 0 };
+      const hasNote = noteText(room) !== '';
+      if (picture.model.rooms.find((entry) => entry.id === room)?.wing === 'secret') {
+        entries.push({ type: 'item', label: t('dungeon.room.hide'), icon: 'eye-off', onClick: () => onHideWing(room) });
+      }
+      entries.push({ type: 'item', label: hasNote ? t('dungeon.note.edit') : t('dungeon.note.add'), icon: hasNote ? 'pencil' : 'plus', onClick: () => editNote(room, at) });
+      if (hasNote) entries.push({ type: 'item', label: t('dungeon.note.delete'), icon: 'trash-2', destructive: true, onClick: () => onNote(room, { deleted: true }) });
     }
-    entries.push({ type: 'item', label: hasNote ? t('dungeon.note.edit') : t('dungeon.note.add'), icon: hasNote ? 'pencil' : 'plus', onClick: () => editNote(room, at) });
-    if (hasNote) entries.push({ type: 'item', label: t('dungeon.note.delete'), icon: 'trash-2', destructive: true, onClick: () => onNote(room, { deleted: true }) });
+    if (onShowHiddenWings) entries.push({ type: 'item', label: t('dungeon.room.showHidden'), icon: 'eye', onClick: onShowHiddenWings });
+    if (entries.length === 0) return;
+    event.preventDefault();
     menu.open(entries, { x: event.clientX, y: event.clientY }, { returnFocus: frameRef.current });
   };
 
   const commit = (value: string): void => {
     if (!edit) return;
-    if (edit.kind === 'title') onRename(value);
+    if (edit.kind === 'title') onTitle(value);
     else if (edit.kind === 'story') onStory(value);
     else if (edit.room !== undefined) onNote(edit.room, value.trim() ? { text: value } : { deleted: true });
     setEdit(null);

@@ -2,6 +2,11 @@
 
 import { floorRect, inRect, rectsTouch, wallRect } from '../../../src/app/dungeons/geometry';
 import type { DungeonDoor, DungeonModel, DungeonRoom } from '../../../src/app/dungeons/model';
+import { roomShape, rotundaRadius, roomCentre, shapeDistance } from '../../../src/app/dungeons/render/geometry';
+import { REFERENCE_CELL_PX, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+
+/** The widest wall any preset draws outside a floor, in cells. */
+const WALL = Math.max(...Object.values(STYLE_PRESETS).map((style) => style.strokes.thick)) / REFERENCE_CELL_PX;
 
 const IMPASSABLE = new Set(['portcullis', 'barricade']);
 
@@ -16,6 +21,33 @@ export function floorProblems(model: DungeonModel): string[] {
       if (a.id !== b.id && rectsTouch(floorRect(a), wallRect(b))) out.push(`floor ${a.id} runs into the walls of ${b.id}`);
     });
   });
+  return out;
+}
+
+/**
+ * A rotunda's circle and its wall ring stay clear of every other room's floor and wall ring; only
+ * in a door cell may they meet, where the door joins them.
+ */
+export function rotundaProblems(model: DungeonModel): string[] {
+  const out: string[] = [];
+  const inDoorCell = (x: number, y: number): boolean => model.doors.some((door) => x >= door.x && x <= door.x + 1 && y >= door.y && y <= door.y + 1);
+  for (const rotunda of model.rooms.filter((room) => room.rotunda)) {
+    const c = roomCentre(rotunda);
+    const reach = rotundaRadius(rotunda) + WALL;
+    for (const other of model.rooms) {
+      if (other.id === rotunda.id) continue;
+      const shape = roomShape(other);
+      for (let i = 0; i < 360; i++) {
+        const a = (i / 360) * Math.PI * 2;
+        const x = c.x + Math.cos(a) * reach;
+        const y = c.y + Math.sin(a) * reach;
+        if (shapeDistance(shape, x, y) < WALL && !inDoorCell(x, y)) {
+          out.push(`rotunda ${rotunda.id} meets room ${other.id} at ${x.toFixed(2)},${y.toFixed(2)}`);
+          break;
+        }
+      }
+    }
+  }
   return out;
 }
 

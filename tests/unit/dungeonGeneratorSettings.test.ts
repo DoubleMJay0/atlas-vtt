@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { App } from 'obsidian';
-import { applyDungeonEdits, NO_EDITS, withNoteEdit, withoutManualPlaces } from '../../src/app/dungeons/edits';
+import { applyDungeonEdits, NO_EDITS, withNoteEdit, withoutNoteTexts, withWingHidden } from '../../src/app/dungeons/edits';
+import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
+import { dungeonNoteText, dungeonPins, shownNotes } from '../../src/app/dungeons/scene/dungeonNote';
+import { dungeonWalls } from '../../src/app/dungeons/scene/toWalls';
+import { secretWingOf } from '../../src/app/dungeons/secretWings';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import { DEFAULT_DUNGEON_GENERATOR_SETTINGS, readDungeonGeneratorSettings } from '../../src/app/dungeons/generatorSettings';
 import { roomsByDistance } from '../../src/app/dungeons/numbering';
@@ -89,10 +93,70 @@ describe('the GM’s edits on a dungeon', () => {
     expect(deleted.notes[0]!.ref).toBe('1');
   });
 
-  it('replace the story, and forget dragged boxes on Rearrange', () => {
-    const room = model.notes[0]!.room;
-    const edits = { ...withNoteEdit(NO_EDITS, room, { manual: { x: 1, y: 1 } }), story: 'Told otherwise.' };
-    expect(applyDungeonEdits(model, edits).story).toBe('Told otherwise.');
-    expect(withoutManualPlaces(edits).notes).toEqual({});
+  it('replace the title and the story', () => {
+    const edited = applyDungeonEdits(model, { ...NO_EDITS, title: 'The Pit', story: 'Told otherwise.' });
+    expect(edited.title).toBe('The Pit');
+    expect(edited.story).toBe('Told otherwise.');
+    expect(edited.rooms).toBe(model.rooms);
+  });
+
+  it('keep dragged boxes and drop typed words when the notes are worded anew', () => {
+    const [first, second] = model.notes;
+    let edits = withNoteEdit(NO_EDITS, first!.room, { text: 'Typed.', manual: { x: 1, y: 1 } });
+    edits = withNoteEdit(edits, second!.room, { text: 'Also typed.' });
+    edits = { ...edits, title: 'Kept' };
+    expect(withoutNoteTexts(edits)).toEqual({ title: 'Kept', notes: { [first!.room]: { manual: { x: 1, y: 1 } } } });
+  });
+});
+
+describe('words the notes anew', () => {
+  it('rewords the notes and leaves rooms and doors where they were', () => {
+    const request = { seed: 4242, tags: ['medium'] };
+    const first = generateDungeon(request, dungeonText);
+    const again = generateDungeon({ ...request, notesVariant: 1 }, dungeonText);
+    expect(again.rooms).toEqual(first.rooms);
+    expect(again.doors).toEqual(first.doors);
+    expect(again.title).toBe(first.title);
+    expect(again.story).toBe(first.story);
+    expect(again.notes.map((note) => note.room)).toEqual(first.notes.map((note) => note.room));
+    expect(again.notes.map((note) => note.text)).not.toEqual(first.notes.map((note) => note.text));
+    expect(generateDungeon({ ...request, notesVariant: 0 }, dungeonText)).toEqual(first);
+  });
+});
+
+describe('hiding one secret wing', () => {
+  const wingsOf = (m: ReturnType<typeof generateDungeon>): number[] => [...new Set(m.rooms.flatMap((room) => secretWingOf(m.rooms, room.id) ?? []))];
+  const seed = Array.from({ length: 400 }, (_, i) => i + 1).find((s) => wingsOf(generateDungeon({ seed: s, tags: ['secret'] }, dungeonText)).length >= 2)!;
+  const model = generateDungeon({ seed, tags: ['secret'] }, dungeonText);
+  const [hiddenWing, keptWing] = wingsOf(model);
+
+  it('names each wing by its first room, behind the secret door', () => {
+    for (const wing of wingsOf(model)) {
+      expect(model.doors.some((door) => door.to === wing && door.kind === 'secret')).toBe(true);
+    }
+    expect(secretWingOf(model.rooms, model.rooms[0]!.id)).toBeNull();
+  });
+
+  it('takes that wing out of the view, the note and the pins, and leaves the other', () => {
+    const edited = applyDungeonEdits(model, withWingHidden(NO_EDITS, hiddenWing!));
+    expect(edited.hiddenWings).toEqual([hiddenWing]);
+    const shown = visibleDungeon(edited, DEFAULT_VIEW).rooms;
+    const inWing = (room: { id: number }, wing: number): boolean => secretWingOf(model.rooms, room.id) === wing;
+    expect(shown.some((room) => inWing(room, hiddenWing!))).toBe(false);
+    expect(shown.some((room) => inWing(room, keptWing!))).toBe(true);
+    expect(visibleDungeon(edited, DEFAULT_VIEW).doors.some((door) => door.to === hiddenWing)).toBe(false);
+    const hiddenRooms = new Set(model.rooms.filter((room) => inWing(room, hiddenWing!)).map((room) => room.id));
+    expect(shownNotes(edited, DEFAULT_VIEW).some((note) => hiddenRooms.has(note.room))).toBe(false);
+    for (const note of model.notes.filter((n) => hiddenRooms.has(n.room))) expect(dungeonNoteText(edited, DEFAULT_VIEW)).not.toContain(note.text);
+    const placement = { originCell: { x: 0, y: 0 }, pxPerCell: 100 };
+    const pins = Object.values(dungeonPins(edited, DEFAULT_VIEW, placement, 'Dungeon.md'));
+    expect(pins).toHaveLength(shownNotes(edited, DEFAULT_VIEW).length);
+    const walls = (m: typeof model): number => Object.keys(dungeonWalls(m, STYLE_PRESETS.parchment, DEFAULT_VIEW, placement).walls).length;
+    expect(walls(edited)).toBeLessThan(walls(model));
+  });
+
+  it('hides every wing when the view hides secret rooms, whatever was hidden by hand', () => {
+    const edited = applyDungeonEdits(model, withWingHidden(NO_EDITS, hiddenWing!));
+    expect(visibleDungeon(edited, { secrets: false }).rooms.some((room) => room.wing === 'secret')).toBe(false);
   });
 });

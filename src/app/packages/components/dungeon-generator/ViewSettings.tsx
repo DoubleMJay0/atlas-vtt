@@ -65,12 +65,14 @@ interface NotesSettingsProps {
   mode: NotesMode;
   onMode: (notes: NotesMode) => void;
   onRearrange: () => void;
+  onReroll: () => void;
   layer: HTMLElement | null;
 }
 
-/** How the notes are shown, and putting dragged boxes back where the layout places them. */
-export function NotesSettings({ mode, onMode, onRearrange, layer }: NotesSettingsProps): React.JSX.Element {
+/** How the notes are shown, another arrangement of their boxes, and other words for them. */
+export function NotesSettings({ mode, onMode, onRearrange, onReroll, layer }: NotesSettingsProps): React.JSX.Element {
   const boxed = mode === 'boxes' || mode === 'tailed';
+  const written = boxed || mode === 'legend';
   return (
     <div className="atlas-dungeon-fields">
       <SelectRow<NotesMode>
@@ -80,7 +82,10 @@ export function NotesSettings({ mode, onMode, onRearrange, layer }: NotesSetting
         onChange={onMode}
         layer={layer}
       />
-      <Button variant="outline" size="sm" disabled={!boxed} onClick={onRearrange}>{t('dungeon.notes.rearrange')}</Button>
+      <div className="atlas-dungeon-fields__buttons">
+        <Button variant="outline" size="sm" disabled={!boxed} onClick={onRearrange}>{t('dungeon.notes.rearrange')}</Button>
+        <Button variant="outline" size="sm" disabled={!written} onClick={onReroll}>{t('dungeon.notes.reroll')}</Button>
+      </div>
     </div>
   );
 }

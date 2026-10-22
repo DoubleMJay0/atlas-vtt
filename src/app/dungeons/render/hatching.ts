@@ -1,4 +1,5 @@
 import { shapeBounds, unionBounds, type Vec } from './geometry';
+import { inPocket, narrowPockets } from './pockets';
 import { edgeSeeds, poissonDisc } from './poisson';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 import { SegmentHash } from './segmentHash';
@@ -32,6 +33,7 @@ export function hatchStrokes(env: RenderEnv): number[] {
   const count = Math.round(style.hatching.strokes);
   const rng = env.rng('hatching');
   const field = dungeon.field;
+  const pockets = narrowPockets(dungeon, distance);
   const inner = -(2 / 3) * size;
   const boxes = dungeon.floors.map(shape => shapeBounds(shape));
   const bounds = unionBounds(boxes.map(b => ({ minX: b.minX - distance - 1, minY: b.minY - distance - 1, maxX: b.maxX + distance + 1, maxY: b.maxY + distance + 1 })));
@@ -40,7 +42,7 @@ export function hatchStrokes(env: RenderEnv): number[] {
     size,
     (x, y) => {
       const d = field.distance(x, y);
-      return d < distance && d > inner;
+      return d > inner && (d < distance || inPocket(pockets, x, y));
     },
     edgeSeeds(boxes, distance / 2),
     rng,

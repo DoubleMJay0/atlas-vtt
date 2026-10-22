@@ -48,7 +48,7 @@ export class DungeonWorkerClient {
       client = new DungeonWorkerClient({
         createWorker: () => new DungeonWorker({ name: 'Atlas dungeons' }),
         fonts: () => readDungeonFonts(document),
-        inThread: (job) => runDungeonJob(job, document.fonts),
+        inThread: (job) => runDungeonJob(job, document.fonts, readDungeonFonts(document)),
       });
       DungeonWorkerClient.instances.set(app, client);
     }

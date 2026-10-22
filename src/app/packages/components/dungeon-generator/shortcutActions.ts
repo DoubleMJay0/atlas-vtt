@@ -43,6 +43,7 @@ export function runShortcut(shortcut: DungeonShortcut, state: DungeonState, hand
       return;
     }
     case 'rearrange': return state.rearrangeNotes();
+    case 'rerollNotes': return state.rerollNotes();
     case 'cycleNotes': return state.setView({ notes: nextNotesMode(view.notes) });
     case 'legend': return state.setView({ notes: view.notes === 'legend' ? 'boxes' : 'legend' });
     case 'rotate': return toggle('rotateToFit');

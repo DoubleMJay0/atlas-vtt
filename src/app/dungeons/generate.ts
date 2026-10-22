@@ -18,7 +18,7 @@ export function generateDungeon(request: DungeonRequest, text: DungeonText): Dun
   const story = text.nameDungeon(seed, readTags(request.tags), request.name);
   const params = dungeonParams(story.tags);
   const { rooms, doors, features } = buildDungeonLayout(seed, params);
-  const noteTexts = text.writeNotes(seed, story, roomPlans(rooms, features));
+  const noteTexts = text.writeNotes(seed, story, roomPlans(rooms, features), request.notesVariant);
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   const dry = level <= 0 && params.tags.has('dry');
   const pools = new Set(dry ? [] : noteTexts.filter((note) => note.water).map((note) => note.room));

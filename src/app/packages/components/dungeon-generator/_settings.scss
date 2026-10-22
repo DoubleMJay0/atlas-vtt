@@ -38,6 +38,14 @@
   @include atlas-flex-col($gap: $spacing-s);
 }
 
+.atlas-dungeon-fields__buttons {
+  @include atlas-flex-row($gap: $spacing-s);
+
+  > * {
+    flex: 1 1 0;
+  }
+}
+
 .atlas-dungeon-field {
   @include atlas-flex-row($gap: $spacing-s);
   justify-content: space-between;
