@@ -21,16 +21,21 @@ function hitPointsKey(keys: readonly string[], meanings: FieldMeanings): string 
 }
 
 /**
- * The value under `key`: the exact key, else one spelled differently
+ * The key of `record` that `key` reads: the exact key, else one spelled differently
  * (`Max Stress` for `max_stress`), else, for hit points, the field the
  * statblock's template means as its hit points or any of their usual names.
  */
-function lookup(record: Record<string, unknown>, key: string, meanings: FieldMeanings): unknown {
-  if (key in record) return record[key];
+export function matchingKey(record: Readonly<Record<string, unknown>>, key: string, meanings: FieldMeanings = NO_MEANINGS): string | undefined {
+  if (key in record) return key;
   const wanted = normalizedKey(key);
   const keys = Object.keys(record);
-  const match = keys.find((candidate) => normalizedKey(candidate) === wanted)
+  return keys.find((candidate) => normalizedKey(candidate) === wanted)
     ?? (isHitPointsKey(key) ? hitPointsKey(keys, meanings) : undefined);
+}
+
+/** The value under the key `key` reads (`matchingKey`). */
+function lookup(record: Record<string, unknown>, key: string, meanings: FieldMeanings): unknown {
+  const match = matchingKey(record, key, meanings);
   return match === undefined ? undefined : record[match];
 }
 
