@@ -1,101 +1,81 @@
 import { describe, expect, it } from 'vitest';
 import {
-  TURN_LOOK, arcLayout, arcPolygons, arcTaper, glowAlpha, glowAlphaAt, glowExtent, glowSpread, glowTextureSize, markerAppearance,
+  FLASH, TURN_LOOK, flashAppearance, poolAlphaAt, poolRadius, poolSpread, poolTexel, rimRadius,
 } from '../../src/app/pixi/token-renderer/turnMarker/turnMarkerShape';
+import { paintDisc, paintPool } from '../../src/app/pixi/token-renderer/turnMarker/turnTextures';
 
-describe('the turn glow', () => {
-  it('rises over the token\'s soft edge to its peak, then falls smoothly to nothing at its reach', () => {
-    expect(glowAlpha(-TURN_LOOK.glowInset)).toBe(0);
-    expect(glowAlpha(0)).toBeCloseTo(TURN_LOOK.rimAlpha + TURN_LOOK.poolAlpha);
-    let previous = glowAlpha(0);
-    for (let distance = 0.5; distance <= TURN_LOOK.glowReach; distance += 0.5) {
-      const alpha = glowAlpha(distance);
-      expect(alpha).toBeLessThan(previous);
-      previous = alpha;
+describe('the turn spotlight', () => {
+  it('is brightest in the middle and falls through its stops to nothing at its edge', () => {
+    expect(poolAlphaAt(0)).toBeCloseTo(0.42);
+    expect(poolAlphaAt(0.62)).toBeCloseTo(0.3);
+    expect(poolAlphaAt(0.8)).toBeCloseTo(0.14);
+    expect(poolAlphaAt(1)).toBe(0);
+    expect(poolAlphaAt(1.2)).toBe(0);
+    let previous = poolAlphaAt(0);
+    for (let share = 0.05; share <= 1; share += 0.05) {
+      expect(poolAlphaAt(share)).toBeLessThan(previous);
+      previous = poolAlphaAt(share);
     }
-    expect(glowAlpha(TURN_LOOK.glowReach)).toBe(0);
-    // No edge of its own: the last step before its reach is all but nothing
-    expect(glowAlpha(TURN_LOOK.glowReach - 0.5)).toBeLessThan(0.001);
   });
 
-  it('spreads further around a larger token, never less than around a medium one', () => {
-    expect(glowSpread(35)).toBe(1);
-    expect(glowSpread(10)).toBe(1);
-    expect(glowSpread(140)).toBe(2);
-    const huge = glowExtent(140, 1);
-    expect(huge.radius).toBe(140 + 2 * TURN_LOOK.glowReach);
-    expect(glowAlpha(TURN_LOOK.glowReach, 2)).toBeGreaterThan(0);
+  it('covers the floor with part of the pool and adds a little light on top, never past white', () => {
+    const middle = poolTexel(0);
+    expect(middle.alpha).toBeCloseTo(0.42 * TURN_LOOK.poolCover);
+    expect(middle.light).toBeCloseTo(0.42 * (TURN_LOOK.poolCover + TURN_LOOK.poolLight));
+    expect(middle.light).toBeGreaterThan(middle.alpha);
+    expect(middle.light).toBeLessThanOrEqual(1);
   });
 
-  it('reads the same glow from its texture\'s shares as from distances', () => {
-    const extent = glowExtent(35, 2);
-    // The token's edge, and halfway out to the glow's reach
-    expect(glowAlphaAt(extent.edgeShare, extent)).toBeCloseTo(glowAlpha(0));
-    const halfway = (35 + TURN_LOOK.glowReach) / extent.radius;
-    expect(glowAlphaAt(halfway, extent)).toBeCloseTo(glowAlpha(TURN_LOOK.glowReach / 2));
-    expect(glowAlphaAt(1, extent)).toBeCloseTo(0, 9);
+  it('reaches a little beyond the token, further around a larger one', () => {
+    expect(poolSpread(35)).toBe(1);
+    expect(poolSpread(140)).toBe(2);
+    expect(poolRadius(35, 1)).toBe(35 + TURN_LOOK.poolReach);
+    expect(poolRadius(70, 2)).toBe(70 + 2 * TURN_LOOK.poolReach);
+    expect(poolRadius(140, 1)).toBe(140 + 2 * TURN_LOOK.poolReach);
   });
 
-  it('takes about four texels per world unit, as a power of two between 256 and 1024', () => {
-    expect(glowTextureSize(10)).toBe(256);
-    expect(glowTextureSize(61)).toBe(512);
-    expect(glowTextureSize(100)).toBe(1024);
-    expect(glowTextureSize(500)).toBe(1024);
+  it('keeps its rim a few screen pixels outside the token at any zoom', () => {
+    expect(rimRadius(35, 1)).toBe(35 + TURN_LOOK.rimGap);
+    expect(rimRadius(35, 4)).toBe(140 + TURN_LOOK.rimGap);
+  });
+
+  it('paints the pool premultiplied, its light above its cover, and a white disc for framed tokens', () => {
+    const pool = paintPool(64);
+    const data = pool.source.resource as Uint8Array;
+    const middle = 4 * (32 * 64 + 32);
+    expect(data[middle + 3]).toBeGreaterThan(55);
+    expect(data[middle]).toBeGreaterThan(data[middle + 3]!);
+    // The corners lie outside the pool
+    expect(data[3]).toBe(0);
+    pool.destroy(true);
+    const disc = paintDisc(32);
+    const texels = disc.source.resource as Uint8Array;
+    expect(texels[4 * (16 * 32 + 16) + 3]).toBe(255);
+    expect(texels[3]).toBe(0);
+    disc.destroy(true);
   });
 });
 
-describe('the turn arcs', () => {
-  it('lie on the diagonals, leaving the top, bottom and sides open', () => {
-    const polygons = arcPolygons(60, 3);
-    expect(polygons).toHaveLength(TURN_LOOK.arcs);
-    for (const polygon of polygons) {
-      for (const { x, y } of polygon) {
-        const angle = Math.atan2(y, x);
-        // Every cardinal direction keeps a gap of 9 degrees either side
-        const fromCardinal = Math.min(...[0, Math.PI / 2, Math.PI, -Math.PI / 2, -Math.PI].map((cardinal) => Math.abs(angle - cardinal)));
-        expect(fromCardinal).toBeGreaterThan((8.9 * Math.PI) / 180);
-        expect(Math.hypot(x, y)).toBeGreaterThanOrEqual(60 - 1.5 - 1e-9);
-        expect(Math.hypot(x, y)).toBeLessThanOrEqual(60 + 1.5 + 1e-9);
-      }
-    }
+describe('the turn flash', () => {
+  const { enter, hold, exit, from } = FLASH.full;
+
+  it('swells in, holds, fades out and is done', () => {
+    expect(flashAppearance(0, FLASH.full)).toEqual({ alpha: 0, scale: from, done: false });
+    const swelling = flashAppearance(enter / 2, FLASH.full);
+    expect(swelling.alpha).toBeGreaterThan(0.5);
+    expect(swelling.scale).toBeGreaterThan(from);
+    expect(swelling.scale).toBeLessThan(1);
+    expect(flashAppearance(enter + hold / 2, FLASH.full)).toEqual({ alpha: 1, scale: 1, done: false });
+    const fading = flashAppearance(enter + hold + exit / 2, FLASH.full);
+    expect(fading.alpha).toBeCloseTo(0.5);
+    expect(fading.done).toBe(false);
+    expect(flashAppearance(enter + hold + exit, FLASH.full)).toEqual({ alpha: 0, scale: 1, done: true });
   });
 
-  it('taper from their full width in the middle to points', () => {
-    expect(arcTaper(0)).toBe(1);
-    expect(arcTaper(1)).toBe(0);
-    expect(arcTaper(-1)).toBe(0);
-    expect(arcTaper(0.5)).toBeGreaterThan(arcTaper(0.9));
-  });
-
-  it('keep the map\'s proportions, never thinner than a line nor with a heavy dark edge', () => {
-    expect(arcLayout(35, 1, 1)).toEqual({ radius: 35 + TURN_LOOK.arcGap, width: TURN_LOOK.arcWidth, keyline: 1 });
-    expect(arcLayout(35, 1, 3).radius).toBe(3 * (35 + TURN_LOOK.arcGap));
-    expect(arcLayout(35, 1, 3).width).toBe(3 * TURN_LOOK.arcWidth);
-    expect(arcLayout(35, 1, 3).keyline).toBe(TURN_LOOK.keylineMax);
-    expect(arcLayout(35, 1, 0.25).width).toBe(TURN_LOOK.arcMinWidth);
-    // Around a larger token they stand off and thicken with its glow
-    expect(arcLayout(140, 1, 1)).toMatchObject({ radius: 140 + 2 * TURN_LOOK.arcGap, width: 2 * TURN_LOOK.arcWidth });
-  });
-
-  it('follow their curve to a twentieth of a pixel however far the map is zoomed in', () => {
-    const [arc] = arcPolygons(2000, 0);
-    const outer = arc!.slice(0, arc!.length / 2);
-    for (let index = 1; index < outer.length; index += 1) {
-      const a = outer[index - 1]!;
-      const b = outer[index]!;
-      const middle = Math.hypot((a.x + b.x) / 2, (a.y + b.y) / 2);
-      expect(Math.hypot(a.x, a.y) - middle).toBeLessThan(0.05);
-    }
-  });
-});
-
-describe('the marker landing', () => {
-  it('lands from a little larger, fading in, its arcs turning into place', () => {
-    expect(markerAppearance(0)).toEqual({ alpha: 0, scale: TURN_LOOK.appearFrom, turn: TURN_LOOK.appearTurn });
-    const landed = markerAppearance(1);
-    expect([landed.alpha, landed.scale, Math.abs(landed.turn)]).toEqual([1, 1, 0]);
-    const halfway = markerAppearance(0.5);
-    expect(halfway.scale).toBeGreaterThan(1);
-    expect(halfway.scale).toBeLessThan(TURN_LOOK.appearFrom);
+  it('only fades in and out with reduced motion, quicker and without the swell', () => {
+    const { enter: plainIn, hold: plainHold, exit: plainOut } = FLASH.reduced;
+    expect(plainIn + plainHold + plainOut).toBeLessThan(enter + hold + exit);
+    expect(flashAppearance(plainIn / 2, FLASH.reduced)).toEqual({ alpha: 0.5, scale: 1, done: false });
+    expect(flashAppearance(plainIn + plainHold + plainOut, FLASH.reduced).done).toBe(true);
   });
 });

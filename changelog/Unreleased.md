@@ -7,7 +7,7 @@
 - Resource wheels stay beside their token when it is selected, instead of rising above it
 - Selected tokens are outlined by their own shape, crisp at any zoom, with a light frame around a group
 - Rulers, templates and drag rulers are drawn as one clean line in the selection's style, with a sharp distance label at every zoom
-- The token whose turn it is stands in a soft pool of light with four fine arcs, sharp at any zoom, and no longer shows two rings when selected
+- When a turn begins, a warm spotlight flashes beneath the token whose turn it is
 - Typing @ in a statblock value suggests the values you can reference, each with its current number
 - Dynamic lighting is no longer experimental: walls, lights and token vision are available to everyone
 

@@ -1,190 +1,110 @@
 /**
- * The marker of the token whose turn it is, as pure geometry, in token-UI units
- * (`restingTokenUIScale`: 1 is one pixel beside a medium token on a 70 px grid): a pool of the
- * accent's light on the ground around the token, and four tapered arcs on its diagonals, clear of
- * the handles, nameplate and bars. The values are the look the online player page ports
+ * The flash on the token whose turn begins, as pure numbers: a warm pool of light on the floor
+ * beneath the token, like a stage light, with a fine rim around it, that swells in, holds a moment
+ * and fades away. The figure stands in the pool: it shows only where the token's art is transparent
+ * (`TurnMarker` masks it with the art). A gold of its own, never the theme's accent, which the
+ * selection keeps. The values are the look the online player page ports
  * (docs/plans/2026-10-20-initiative-turn-look.md).
  */
-import { MOTION_SLOW_MS } from '../../../utils/motion';
+import { easeOut } from '../../../utils/motion';
 
-/** The marker's look. Distances of the glow are UI units, those of the arcs screen pixels. */
+/** The marker's look. The pool's distances are token-UI units (`restingTokenUIScale`), the rim's screen pixels. */
 export const TURN_LOOK = {
-  /** How far the glow reaches beyond a medium token's edge; a larger token's reaches further (`glowSpread`). */
-  glowReach: 26,
-  /** How far inside the token's edge the glow begins, rising to its peak at the edge: the ring's soft outer edge. */
-  glowInset: 0.75,
-  /** The bright rim right at the token's edge: its opacity, and the distance over which it falls to 1/e. */
-  rimAlpha: 0.3,
-  rimWidth: 3,
-  /** The wide pool beneath it. */
-  poolAlpha: 0.38,
-  poolWidth: 12,
+  /** The spotlight's gold, rgb(236, 184, 72). */
+  gold: 0xecb848,
+  /** How far the pool reaches beyond a medium token's edge; a larger token's reaches further (`poolSpread`). */
+  poolReach: 8.5,
+  /** The pool's opacity from its middle (share 0) to its edge (share 1), straight between the stops. */
+  poolStops: [[0, 0.42], [0.62, 0.3], [0.8, 0.14], [1, 0]] as const,
   /**
-   * How strongly the glow tints the map under it, which carries a light map, and how much light it
-   * adds, a little only: enough to lift a dark map, where more washed parchment out to a white bloom.
+   * How much of the pool lies over the floor (normal blending), and how much light it adds on top:
+   * together they read like the gold laid soft-light and then normal at 0.55 over the floor, which
+   * warms a wooden floor and lights a dark one without washing parchment out.
    */
-  glowTint: 1,
-  glowLight: 0.15,
-  /** The arcs: how many, how much of the circle each spans, their middle's distance from the token's edge and their width there. */
-  arcs: 4,
-  arcSpan: (72 * Math.PI) / 180,
-  arcGap: 5,
-  arcWidth: 2.25,
-  /** The fewest screen pixels an arc is wide, so a map zoomed far out keeps it a line. */
-  arcMinWidth: 1.5,
-  /** The dark line around each arc, which keeps it readable on the glow and on a light map: UI units, at most `keylineMax` screen pixels. */
-  keyline: 1,
-  keylineMax: 1.5,
-  keylineAlpha: 0.22,
-  /** As the turn comes the marker lands from this much larger, its arcs turning this far into place. */
-  appearFrom: 1.1,
-  appearTurn: -Math.PI / 9,
+  poolCover: 0.6,
+  poolLight: 0.1,
+  /** The rim: its distance outside the token's edge, its width and opacity, and the dark keyline beneath it. */
+  rimGap: 3,
+  rimWidth: 1.2,
+  rimAlpha: 0.95,
+  keylineWidth: 2,
+  keylineAlpha: 0.25,
 } as const;
 
-/** How long the marker takes to land (`$transition-slow`). */
-export const MARKER_GROW_MS = MOTION_SLOW_MS;
-
-/** A point in screen pixels about the token's middle. */
-export interface ArcPoint {
-  readonly x: number;
-  readonly y: number;
+/** How the flash runs: milliseconds to swell in, to hold and to fade out, the scale it swells from, and whether it fades plainly (linear, no easing). */
+export interface FlashTiming {
+  readonly enter: number;
+  readonly hold: number;
+  readonly exit: number;
+  readonly from: number;
+  readonly plain: boolean;
 }
 
-/** `edge0` to `edge1` eased with zero slope at both ends. */
-function smoothstep(edge0: number, edge1: number, value: number): number {
-  const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
+/** The flash, and with reduced motion a short plain fade in and out without the swell. */
+export const FLASH: { readonly full: FlashTiming; readonly reduced: FlashTiming } = {
+  full: { enter: 250, hold: 700, exit: 900, from: 0.8, plain: false },
+  reduced: { enter: 150, hold: 600, exit: 300, from: 1, plain: true },
+};
 
 /** A medium token's edge, in UI units from its middle. */
 const MEDIUM_EDGE = 35;
 
-/** How much wider a token's glow spreads than a medium token's, for a token whose edge lies `edge` UI units from its middle. */
-export function glowSpread(edge: number): number {
+/** How much further a token's pool reaches than a medium token's, for a token whose edge lies `edge` UI units from its middle. */
+export function poolSpread(edge: number): number {
   return Math.sqrt(Math.max(1, edge / MEDIUM_EDGE));
 }
 
-/**
- * The glow's opacity `distance` UI units outside the token's edge (negative inside it): it rises
- * over the inset to the rim's peak at the edge, falls off as a bright rim over a wide pool, and
- * reaches exactly 0 with zero slope at its reach, so the pool has no edge of its own. `spread`
- * widens the rim, the pool and the reach for a larger token.
- */
-export function glowAlpha(distance: number, spread = 1): number {
-  const { glowInset, rimAlpha, rimWidth, poolAlpha, poolWidth } = TURN_LOOK;
-  const reach = TURN_LOOK.glowReach * spread;
-  if (distance <= -glowInset || distance >= reach) return 0;
-  if (distance < 0) return (rimAlpha + poolAlpha) * smoothstep(-glowInset, 0, distance);
-  const fade = 1 - (distance / reach) ** 2;
-  const rim = rimAlpha * Math.exp(-((distance / (rimWidth * spread)) ** 2));
-  const pool = poolAlpha * Math.exp(-((distance / (poolWidth * spread)) ** 2));
-  return (rim + pool) * fade * fade;
+/** The pool's radius in world units, for a token whose edge is `outerRadius` world units from its middle, at `unit` world units per UI unit. */
+export function poolRadius(outerRadius: number, unit: number): number {
+  return outerRadius + TURN_LOOK.poolReach * poolSpread(outerRadius / unit) * unit;
 }
 
-/** Where the glow lies about a token whose edge is `outerRadius` world units from its middle, at `unit` world units per UI unit. */
-export interface GlowExtent {
-  /** The outer radius of the glow's sprite, in world units. */
-  readonly radius: number;
-  /** The token's edge as a share of `radius`. */
-  readonly edgeShare: number;
-  /** World units per UI unit, as a share of `radius`. */
-  readonly unitShare: number;
-  /** How much wider than a medium token's the glow spreads. */
-  readonly spread: number;
-}
-
-export function glowExtent(outerRadius: number, unit: number): GlowExtent {
-  const spread = glowSpread(outerRadius / unit);
-  const radius = outerRadius + TURN_LOOK.glowReach * spread * unit;
-  return { radius, edgeShare: outerRadius / radius, unitShare: unit / radius, spread };
-}
-
-/**
- * The glow's opacity at `share` of its sprite's radius (0 at the middle, 1 at its edge): what the
- * glow texture holds, sampled once per texel.
- */
-export function glowAlphaAt(share: number, extent: Pick<GlowExtent, 'edgeShare' | 'unitShare' | 'spread'>): number {
-  return glowAlpha((share - extent.edgeShare) / extent.unitShare, extent.spread);
-}
-
-/**
- * Texels across the glow's texture for a sprite `radius` world units wide: about four per world
- * unit, so it stays smooth up to a zoom of four, between 256 and 1024 (mipmaps take it down).
- */
-export function glowTextureSize(radius: number): number {
-  const wanted = 8 * radius;
-  return Math.min(1024, Math.max(256, 2 ** Math.ceil(Math.log2(Math.max(1, wanted)))));
-}
-
-/** Where the arcs lie on screen around a token whose edge is `outerRadius` world units from its middle, in screen pixels. */
-export interface ArcLayout {
-  /** The arcs' middle line from the token's middle. */
-  readonly radius: number;
-  readonly width: number;
-  readonly keyline: number;
-}
-
-/** The arcs stand off and thicken with the glow around a larger token (`glowSpread`). */
-export function arcLayout(outerRadius: number, unit: number, zoom: number): ArcLayout {
-  const { arcGap, arcWidth, arcMinWidth, keyline, keylineMax } = TURN_LOOK;
-  const spread = glowSpread(outerRadius / unit);
-  return {
-    radius: (outerRadius + arcGap * spread * unit) * zoom,
-    width: Math.max(arcMinWidth, arcWidth * spread * unit * zoom),
-    keyline: Math.min(keylineMax, Math.max(1, keyline * unit * zoom)),
-  };
-}
-
-/** Pieces enough that an arc of `radius` screen pixels strays no more than a twentieth of a pixel from its chords. */
-function arcSteps(radius: number, angle: number): number {
-  if (!(radius > 0.05)) return 2;
-  return Math.max(2, Math.ceil(angle / (2 * Math.acos(1 - 0.05 / radius))));
-}
-
-/**
- * How wide an arc is at `along` (-1 at one end, 1 at the other) as a share of its middle: a brush
- * stroke thinning all the way to fine points. A flatter profile kept its width almost to the end and
- * stopped in a blunt cut across the arc.
- */
-export function arcTaper(along: number): number {
-  return Math.max(0, 1 - along * along) ** 1.25;
-}
-
-/**
- * The arcs as closed polygons about the token's middle, in screen pixels: centred on the diagonals,
- * `radius` from the middle, `width` across at their middle and tapering to points.
- */
-export function arcPolygons(radius: number, width: number): ArcPoint[][] {
-  const { arcs, arcSpan } = TURN_LOOK;
-  const steps = arcSteps(radius + width / 2, arcSpan);
-  const polygons: ArcPoint[][] = [];
-  for (let arc = 0; arc < arcs; arc += 1) {
-    const middle = Math.PI / 4 + (arc * 2 * Math.PI) / arcs;
-    const outer: ArcPoint[] = [];
-    const inner: ArcPoint[] = [];
-    for (let step = 0; step <= steps; step += 1) {
-      const along = (2 * step) / steps - 1;
-      const angle = middle + (along * arcSpan) / 2;
-      const half = (width / 2) * arcTaper(along);
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      outer.push({ x: cos * (radius + half), y: sin * (radius + half) });
-      inner.push({ x: cos * (radius - half), y: sin * (radius - half) });
-    }
-    polygons.push([...outer, ...inner.reverse()]);
+/** The pool's opacity at `share` of its radius (0 in the middle, 1 at its edge). */
+export function poolAlphaAt(share: number): number {
+  const stops = TURN_LOOK.poolStops;
+  if (!(share >= 0)) return stops[0][1];
+  for (let index = 1; index < stops.length; index += 1) {
+    const [end, endAlpha] = stops[index]!;
+    if (share > end) continue;
+    const [start, startAlpha] = stops[index - 1]!;
+    return startAlpha + ((share - start) / (end - start)) * (endAlpha - startAlpha);
   }
-  return polygons;
+  return 0;
 }
 
-/** How the marker shows `growth` of the way through landing (0 as the turn comes, 1 once landed). */
-export interface MarkerAppearance {
+/**
+ * What the pool's texture holds at `share` of its radius, premultiplied: `alpha` covers the floor,
+ * `light` is its colour, which adds light beyond what covering alone would (`poolLight`).
+ */
+export function poolTexel(share: number): { readonly alpha: number; readonly light: number } {
+  const pool = poolAlphaAt(share);
+  return { alpha: pool * TURN_LOOK.poolCover, light: Math.min(1, pool * (TURN_LOOK.poolCover + TURN_LOOK.poolLight)) };
+}
+
+/** The rim's middle line in screen pixels from the token's middle, at `zoom` screen pixels per world unit. */
+export function rimRadius(outerRadius: number, zoom: number): number {
+  return outerRadius * zoom + TURN_LOOK.rimGap;
+}
+
+/** How the flash shows `elapsed` milliseconds after the turn began; `done` once it has faded away. */
+export interface FlashAppearance {
   readonly alpha: number;
   readonly scale: number;
-  /** How far the arcs are still turned from their place, in radians. */
-  readonly turn: number;
+  readonly done: boolean;
 }
 
-export function markerAppearance(growth: number): MarkerAppearance {
-  const g = Math.min(1, Math.max(0, growth));
-  return { alpha: g, scale: TURN_LOOK.appearFrom + (1 - TURN_LOOK.appearFrom) * g, turn: TURN_LOOK.appearTurn * (1 - g) };
+/** `value` eased with zero slope at both ends. */
+const smooth = (value: number): number => value * value * (3 - 2 * value);
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+export function flashAppearance(elapsed: number, timing: FlashTiming): FlashAppearance {
+  const { enter, hold, exit, from, plain } = timing;
+  if (!(elapsed > 0)) return { alpha: 0, scale: from, done: false };
+  if (elapsed < enter) {
+    const eased = plain ? elapsed / enter : easeOut(elapsed / enter);
+    return { alpha: eased, scale: from + (1 - from) * eased, done: false };
+  }
+  if (elapsed < enter + hold) return { alpha: 1, scale: 1, done: false };
+  const out = clamp01((elapsed - enter - hold) / exit);
+  return { alpha: 1 - (plain ? out : smooth(out)), scale: 1, done: out >= 1 };
 }

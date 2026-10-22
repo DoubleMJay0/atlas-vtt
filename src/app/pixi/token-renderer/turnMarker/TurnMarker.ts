@@ -1,144 +1,136 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
-import { MOTION_NORMAL_MS } from '../../../utils/motion';
 import type { LayerVisibility } from '../../playerSafeFrame';
 import { destroyTree } from '../../utils/destroyTree';
-import { ValueTransition } from '../../utils/ValueTransition';
 import type { TokenGroupContainer } from '../types';
-import { MARKER_GROW_MS, TURN_LOOK, arcLayout, arcPolygons, glowExtent, markerAppearance, type ArcPoint, type GlowExtent } from './turnMarkerShape';
+import { TURN_LOOK, flashAppearance, poolRadius, rimRadius, type FlashTiming } from './turnMarkerShape';
 
-/** Where the markers get their glow textures, shared between markers of one shape. */
-export interface GlowTextureSource {
-  take(extent: GlowExtent): { key: string; texture: Texture | null };
-  release(key: string): void;
-  destroy(): void;
+/** The textures the markers of a view share. */
+export interface TurnMarkerTextures {
+  readonly pool: Texture;
+  readonly disc: Texture;
 }
 
-/** Runs `transition` to `value`, or sets it at once. */
-function settle(transition: ValueTransition, value: number, animate: boolean): void {
-  if (animate) transition.animateTo(value);
-  else transition.jumpTo(value);
-}
-
-/** Adds `polygons` to `graphics` as closed shapes, for one fill. */
-function tracePolygons(graphics: Graphics, polygons: readonly ArcPoint[][]): void {
-  for (const polygon of polygons) graphics.poly(polygon.flatMap(({ x, y }) => [x, y]), true);
+/** Writes `value` into `target[key]` only when it differs, so a still marker gives PIXI nothing to render. */
+function assign<T extends object, K extends keyof T>(target: T, key: K, value: T[K]): void {
+  if (target[key] !== value) target[key] = value;
 }
 
 /**
- * The marker on one token: the glow, a texture scaled with the map like the ground it lies on, and
- * the arcs, laid out in the map's proportions but drawn in screen pixels inside a container scaled
- * back by the zoom, so PIXI builds their curves from as many pieces as they have on screen. It
- * lands as the turn comes and follows its token. While the GM has the token selected the
- * selection's line is its crisp edge, and the arcs step aside.
+ * The flash on one token as its turn begins: a pool of gold light on the floor beneath it, a
+ * texture scaled with the map like the floor it lies on, and a fine rim, laid out in the map's
+ * proportions but drawn in screen pixels inside a container scaled back by the zoom, so it stays
+ * crisp at any zoom. Both lie beneath the figure: an inverse alpha mask of the token's shape (its
+ * art for unframed art, else the disc its ring encloses) keeps them where the token is transparent,
+ * so the art is never tinted, while the layer stays above the lighting. It swells in, holds, fades
+ * out (`flashAppearance`) and follows its token meanwhile.
  */
 export class TurnMarker {
   readonly view = new Container({ label: 'turnMarker', eventMode: 'none' });
-  /** The glow twice over: laid over the map, which tints a light map, and added to it, which lights a dark one. */
-  private readonly glows = [
-    new Sprite({ anchor: 0.5, alpha: TURN_LOOK.glowTint, visible: false }),
-    new Sprite({ anchor: 0.5, alpha: TURN_LOOK.glowLight, blendMode: 'add', visible: false }),
-  ] as const;
-  private readonly arcs = new Container({ label: 'turnArcs' });
+  /** The token's shape, which PIXI never draws: what the spotlight is kept off. */
+  private readonly figure = new Sprite({ label: 'turnFigure', anchor: 0.5 });
+  /** The spotlight, masked by the figure and scaled as it swells in. */
+  private readonly spot = new Container({ label: 'turnSpot' });
+  private readonly pool: Sprite;
+  private readonly rim = new Container({ label: 'turnRim' });
   private readonly ink = new Graphics();
-  private glowKey: string | null = null;
-  private glowDrawn = '';
-  private arcsDrawn = '';
-  /** How far the marker has landed, 0 to 1: its scale, opacity and the arcs' turn follow it. */
-  growth = 1;
-  private readonly grow: ValueTransition;
-  private readonly arcsFade = new ValueTransition(1, MOTION_NORMAL_MS, (value) => { this.arcs.alpha = value; });
-  private selected = false;
+  private outerRadius = 0;
+  private poolDrawn = '';
+  private rimDrawn = '';
+  private masked = false;
+  private started = 0;
+  /** How strongly the flash shows now, 0 to 1. */
+  private shown = 0;
 
-  constructor(private readonly textures: GlowTextureSource) {
-    this.arcs.addChild(this.ink);
-    this.view.addChild(...this.glows, this.arcs);
-    this.grow = new ValueTransition(1, MARKER_GROW_MS, (value) => this.land(value));
+  constructor(private readonly textures: TurnMarkerTextures, private readonly timing: FlashTiming, now: number) {
+    this.pool = new Sprite({ texture: textures.pool, anchor: 0.5, tint: TURN_LOOK.gold });
+    this.rim.addChild(this.ink);
+    this.spot.addChild(this.pool, this.rim);
+    this.view.addChild(this.figure, this.spot);
+    this.keepOffArt(true);
+    this.restart(now);
   }
 
   /**
    * Draws the marker for a token whose edge lies `outerRadius` world units from its middle, at
    * `unit` world units per UI unit and `zoom` screen pixels per world unit; nothing when unchanged.
    */
-  draw(outerRadius: number, unit: number, zoom: number, accent: number, force = false): void {
-    const glowKey = `${outerRadius}|${unit}`;
-    if (force || glowKey !== this.glowDrawn) {
-      this.glowDrawn = glowKey;
-      this.paintGlow(glowExtent(outerRadius, unit));
+  draw(outerRadius: number, unit: number, zoom: number): void {
+    this.outerRadius = outerRadius;
+    const poolKey = `${outerRadius}|${unit}`;
+    if (poolKey !== this.poolDrawn) {
+      this.poolDrawn = poolKey;
+      const diameter = 2 * poolRadius(outerRadius, unit);
+      this.pool.width = diameter;
+      this.pool.height = diameter;
     }
-    for (const glow of this.glows) if (glow.tint !== accent) glow.tint = accent;
-    const arcsKey = `${outerRadius}|${unit}|${zoom}|${accent}`;
-    if (!force && arcsKey === this.arcsDrawn) return;
-    this.arcsDrawn = arcsKey;
-    this.arcs.scale.set(1 / zoom);
-    const { radius, width, keyline } = arcLayout(outerRadius, unit, zoom);
-    this.ink.clear();
-    tracePolygons(this.ink, arcPolygons(radius, width + 2 * keyline));
-    this.ink.fill({ color: 0x000000, alpha: TURN_LOOK.keylineAlpha });
-    tracePolygons(this.ink, arcPolygons(radius, width));
-    this.ink.fill({ color: accent });
+    const rimKey = `${outerRadius}|${zoom}`;
+    if (rimKey === this.rimDrawn) return;
+    this.rimDrawn = rimKey;
+    this.rim.scale.set(1 / zoom);
+    const radius = rimRadius(outerRadius, zoom);
+    this.ink.clear()
+      .circle(0, 0, radius).stroke({ width: TURN_LOOK.keylineWidth, color: 0x000000, alpha: TURN_LOOK.keylineAlpha })
+      .circle(0, 0, radius).stroke({ width: TURN_LOOK.rimWidth, color: TURN_LOOK.gold, alpha: TURN_LOOK.rimAlpha });
   }
 
-  /** Lands as the turn comes, or shows at once. */
-  growIn(animate: boolean): void {
-    if (!animate) {
-      this.grow.jumpTo(1);
-      return;
-    }
-    this.grow.jumpTo(0);
-    this.grow.animateTo(1);
+  /**
+   * Whether the renderer keeps the spotlight off the art. PIXI's Canvas renderer has no alpha
+   * masks and would draw the pool over the figure, so there the marker is its rim alone.
+   */
+  keepOffArt(canMask: boolean): void {
+    if (canMask === this.masked) return;
+    this.masked = canMask;
+    this.pool.visible = canMask;
+    if (canMask) this.spot.setMask({ mask: this.figure, inverse: true, channel: 'alpha' });
+    else this.spot.mask = null;
   }
 
-  /** Whether the GM has the token selected: the arcs fade out under the selection's line, and back. */
-  select(selected: boolean, animate: boolean): void {
-    if (selected === this.selected) return;
-    this.selected = selected;
-    settle(this.arcsFade, selected ? 0 : 1, animate);
+  /** Flashes again from the start: the turn began anew. */
+  restart(now: number): void {
+    this.started = now;
+    this.advance(now);
   }
 
-  /** Stands where `sprite` stands, shown with it, as translucent as it is and as far landed as it is. */
+  /** Shows the flash as it is at `now`; false once it has faded away. */
+  advance(now: number): boolean {
+    const look = flashAppearance(now - this.started, this.timing);
+    this.shown = look.alpha;
+    if (this.spot.scale.x !== look.scale) this.spot.scale.set(look.scale);
+    return !look.done;
+  }
+
+  /** Stands where `sprite` stands, shown with it, as translucent as it is and as strongly as the flash shows, beneath its shape. */
   follow(sprite: TokenGroupContainer | null): void {
     const visible = sprite !== null && sprite.visible;
-    if (this.view.visible !== visible) this.view.visible = visible;
+    assign(this.view, 'visible', visible);
     if (!sprite) return;
     if (this.view.x !== sprite.x || this.view.y !== sprite.y) this.view.position.copyFrom(sprite.position);
-    const alpha = sprite.alpha * markerAppearance(this.growth).alpha;
-    if (this.view.alpha !== alpha) this.view.alpha = alpha;
+    assign(this.view, 'alpha', sprite.alpha * this.shown);
+    if (visible) this.takeShape(sprite);
   }
 
-  /** The marker in the players' frame: as far landed as on the canvas, with its arcs, since players see no selection. */
+  /** The flash in the players' frame: as strong as on the canvas, without the GM's translucency of a hidden token. */
   playerLayers(visible: boolean): LayerVisibility[] {
-    return [
-      { layer: this.view, visible, alpha: markerAppearance(this.growth).alpha },
-      { layer: this.arcs, visible: true, alpha: 1 },
-    ];
+    return [{ layer: this.view, visible, alpha: this.shown }];
   }
 
   destroy(): void {
-    this.grow.cancel();
-    this.arcsFade.cancel();
-    if (this.glowKey !== null) this.textures.release(this.glowKey);
-    this.glowKey = null;
+    this.spot.mask = null;
     destroyTree(this.view);
   }
 
-  private paintGlow(extent: GlowExtent): void {
-    const previous = this.glowKey;
-    const { key, texture } = this.textures.take(extent);
-    this.glowKey = key;
-    if (previous !== null) this.textures.release(previous);
-    for (const glow of this.glows) {
-      glow.visible = texture !== null;
-      if (!texture) continue;
-      glow.texture = texture;
-      glow.width = 2 * extent.radius;
-      glow.height = 2 * extent.radius;
-    }
-  }
-
-  private land(growth: number): void {
-    this.growth = growth;
-    const look = markerAppearance(growth);
-    this.view.scale.set(look.scale);
-    this.arcs.rotation = look.turn;
+  /** The figure takes the token's shape: unframed art as drawn (turned and sized with it), else the disc out to the ring's edge. */
+  private takeShape(sprite: TokenGroupContainer): void {
+    const art = sprite.getChildByLabel('tokenSprite');
+    const unframed = sprite.tokenData?.showRing === false && art instanceof Sprite;
+    const texture = unframed ? art.texture : this.textures.disc;
+    const scale = unframed ? art.scale : { x: (2 * this.outerRadius) / (texture.width || 1), y: (2 * this.outerRadius) / (texture.height || 1) };
+    assign(this.figure, 'texture', texture);
+    if (unframed && (this.figure.anchor.x !== art.anchor.x || this.figure.anchor.y !== art.anchor.y)) this.figure.anchor.copyFrom(art.anchor);
+    if (!unframed && (this.figure.anchor.x !== 0.5 || this.figure.anchor.y !== 0.5)) this.figure.anchor.set(0.5);
+    const x = scale.x * sprite.scale.x;
+    const y = scale.y * sprite.scale.y;
+    if (this.figure.scale.x !== x || this.figure.scale.y !== y) this.figure.scale.set(x, y);
+    assign(this.figure, 'rotation', unframed ? art.rotation : 0);
   }
 }
