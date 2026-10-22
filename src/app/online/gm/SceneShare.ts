@@ -29,7 +29,7 @@ export { imageMimeType, isLit, LIGHTING_REFUSAL, REPEAT_REQUEST_MS };
 export interface SceneSharePorts extends TokenSharePorts, RulesSharePorts, Pick<MarkSharePorts, 'gmMarks' | 'showPlayerMarks' | 'showPlayerCursors' | 'nameOf'> {
   notice(text: string): void;
   /** Sends a live message (where dragged tokens are now) ahead of other frames, the latest of a key winning; without it drags reach players through the token list only. */
-  sendLive?(body: GmMessage, key: string): void;
+  sendLive?(body: GmMessage, key: string, to?: string): void;
   /** What the GM's own drag ruler measures now, or null while it shows none; without it players see none of the GM's. */
   gmDragRuler?(): GmRuler | null;
   /** Draws the rulers of the players' drags for the GM. */
@@ -96,7 +96,7 @@ export class SceneShare {
     const mine = seats === undefined ? null : new MineShare({ onlinePlayers: () => seats.onlinePlayers(), ownerOf }, (body, to) => ports.send(body, to));
     this.mine = mine;
     // The initiative list shows the players' look-alike numbers too: it follows them as they change
-    this.tokens = new TokenShare(store, { ...ports, numbersChanged: () => this.layers.update(), liveCarries: (alias) => this.live?.carries(alias) === true }, (listed) => mine?.setList(listed));
+    this.tokens = new TokenShare(store, { ...ports, numbersChanged: () => this.layers.update(), liveCarriedUntil: (alias) => this.live?.carriedUntil(alias) }, (listed) => mine?.setList(listed));
     const rulers = (): RulerPaths => dragRulerPaths(store.getState(), ports.gmDragRuler?.() ?? null, this.moves.dragStarts());
     this.live = ports.sendLive === undefined ? null : new LiveShare(store, { ...ports, sendLive: (body, key) => ports.sendLive?.(body, key), rulers }, () => ({
       scene: this.tokens.listedScene,
@@ -176,13 +176,11 @@ export class SceneShare {
     this.rules.resend(to);
     this.mine?.resend(to);
     this.marks.resend(to);
-    this.live?.resend();
   }
 
-  /** A player's map shows again: they are sent the marks and the drags under way as they are now. */
-  resendActivity(to: string): void {
-    this.marks.resend(to);
-    this.live?.resend();
+  /** A player's map shows again: they are sent the marks as they are now, also where there are none, so none they held stays. */
+  catchUpMarks(to: string): void {
+    this.marks.catchUp(to);
   }
 
   /** Who owns which token, which tokens are player tokens, or who is connected changed: players hear which tokens are player tokens and which are theirs now. */

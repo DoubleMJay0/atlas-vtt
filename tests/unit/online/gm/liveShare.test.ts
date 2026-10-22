@@ -2,6 +2,7 @@ import { LIVE_INTERVAL_MS, parseGmMessage, type LiveMessage, type SharedToken } 
 import { describe, expect, it } from 'vitest';
 import { LiveShare } from '../../../../src/app/online/gm/LiveShare.ts';
 import { TOKEN_INTERVAL_MS } from '../../../../src/app/online/gm/TokenShare.ts';
+import { CARRY_MS } from '../../../../src/app/online/gm/LiveShare.ts';
 import { fakeTokenSource } from './fakeTokenSource.ts';
 import { sceneState, shareHarness, token, tokenLists, type ShareHarness } from './shareHarness.ts';
 
@@ -43,8 +44,9 @@ describe('the live lane of a drag', () => {
     expect(sent.length).toBeGreaterThanOrEqual(Math.floor(300 / LIVE_INTERVAL_MS));
     expect(sent.length).toBeLessThanOrEqual(Math.ceil(300 / LIVE_INTERVAL_MS) + 2);
     expect(sent.every((message) => message.tokens.every((place) => place.id === alias))).toBe(true);
-    expect(sent.flatMap((message) => message.tokens).filter((place) => place.end === true)).toEqual([{ id: alias, x: 160.15, y: 100, end: true }]);
-    expect(sent.at(-1)?.tokens).toEqual([{ id: alias, x: 160.15, y: 100, end: true }]);
+    // Let go of where the players see it: the drag ends where it was dropped, as the list lands it.
+    expect(sent.flatMap((message) => message.tokens).filter((place) => place.end === true)).toEqual([{ id: alias, x: 170, y: 100, end: true }]);
+    expect(sent.at(-1)?.tokens).toEqual([{ id: alias, x: 170, y: 100, end: true }]);
     expect(sent.every((message) => parseGmMessage(JSON.parse(JSON.stringify(message))) !== null)).toBe(true);
     expect(sent.map((message) => message.at)).toEqual([...sent.map((message) => message.at)].sort((x, y) => x - y));
   });
@@ -66,8 +68,56 @@ describe('the live lane of a drag', () => {
     await table.set(scene([token('a', { x: 170 }), token('b', { x: 500 })]));
     await table.advance(TOKEN_INTERVAL_MS + LIVE_INTERVAL_MS);
     expect(tokenLists(table.sent).at(-1)?.tokens.find((entry) => entry.id === alias)?.x).toBe(170);
-    // The lane ends the drag where it last told it; the list lands the drop.
-    expect(lives(table).at(-1)?.tokens).toEqual([{ id: alias, x: 160, y: 100, end: true }]);
+    expect(lives(table).at(-1)?.tokens).toEqual([{ id: alias, x: 170, y: 100, end: true }]);
+  });
+
+  it('lands a drag that rests in the list before a page would give it up, for the players watching and for one who joins', async () => {
+    const table = await started([token('a', { x: 100 }), token('b', { x: 500 })]);
+    const alias = aliasAt(table, 100);
+    for (let step = 1; step <= 10; step += 1) {
+      await table.set(scene([token('a', { x: 100 + step * 5 }), token('b', { x: 500 })], ['a']));
+      await table.advance(LIVE_INTERVAL_MS);
+    }
+    const listedX = (): number | undefined => tokenLists(table.sent).at(-1)?.tokens.find((entry) => entry.id === alias)?.x;
+    expect(listedX()).toBeLessThan(150);
+    const lastLive = lives(table).length;
+    // Still held, resting: the lane says nothing more, and a page gives a drag it hears nothing of up after 1.5 s.
+    await table.advance(CARRY_MS + TOKEN_INTERVAL_MS + 10);
+    expect(lives(table)).toHaveLength(lastLive);
+    expect(listedX()).toBe(150);
+    const before = table.sent.length;
+    table.share.resend('joiner');
+    await table.advance(1);
+    const joined = tokenLists(table.sent.slice(before).filter(({ to }) => to === 'joiner')).at(-1);
+    expect(joined?.tokens.find((entry) => entry.id === alias)?.x).toBe(150);
+    // Moving again: once the lane tells the drag again, the list keeps the place it has.
+    await table.set(scene([token('a', { x: 180 }), token('b', { x: 500 })], ['a']));
+    await table.advance(LIVE_INTERVAL_MS);
+    const kept = listedX();
+    await table.set(scene([token('a', { x: 210 }), token('b', { x: 500 })], ['a']));
+    await table.advance(LIVE_INTERVAL_MS);
+    expect(listedX()).toBe(kept);
+    expect(lives(table).at(-1)?.tokens).toEqual([{ id: alias, x: 210, y: 100 }]);
+  });
+
+  it('ends a drag let go of where it was dropped at once in the list, however soon after another list', async () => {
+    const table = await started([token('a', { x: 100 }), token('b', { x: 500 })]);
+    const alias = aliasAt(table, 100);
+    for (let step = 1; step <= 5; step += 1) {
+      await table.set(scene([token('a', { x: 100 + step * 10 }), token('b', { x: 500 })], ['a']));
+      await table.advance(LIVE_INTERVAL_MS);
+    }
+    // Another token changes just before the drop, so a list went out a moment ago.
+    await table.set(scene([token('a', { x: 150 }), token('b', { x: 510 })], ['a']));
+    await table.advance(5);
+    const before = table.sent.length;
+    await table.set(scene([token('a', { x: 155 }), token('b', { x: 510 })]));
+    await table.advance(1);
+    expect(tokenLists(table.sent).at(-1)?.tokens.find((entry) => entry.id === alias)?.x).toBe(155);
+    await table.advance(LIVE_INTERVAL_MS);
+    const ended = lives(table).flatMap((message) => message.tokens).filter((place) => place.end === true);
+    expect(ended).toEqual([{ id: alias, x: 155, y: 100, end: true }]);
+    expect(table.sent.slice(before).some(({ body }) => body.t === 'delta' || body.t === 'tokens')).toBe(true);
   });
 
   it('never carries a hidden token, one the players do not see, or one not in their list yet', async () => {
@@ -96,7 +146,7 @@ describe('the live lane of a drag', () => {
     expect(Math.max(...places.map((place) => place.x))).toBe(190);
   });
 
-  it('shows a player who joins in the middle of a drag where it is: they get the lists, and the next live message holds the drag', async () => {
+  it('tells a player who joins in the middle of a drag nothing of it: they get the lists, and the next live message like everyone', async () => {
     const table = await started([token('a', { x: 100 })]);
     for (let step = 1; step <= 5; step += 1) {
       await table.set(scene([token('a', { x: 100 + step * 10 })], ['a']));
@@ -105,18 +155,13 @@ describe('the live lane of a drag', () => {
     const before = table.sent.length;
     table.share.resend('joiner');
     await table.advance(1);
-    const toJoiner = table.sent.slice(before).filter(({ to }) => to === 'joiner');
+    const toJoiner = table.sent.slice(before);
     expect(toJoiner.length).toBeGreaterThan(0);
-    // What a join brings the joiner alone is a list or a scene, never a live message: the lane goes to all.
-    expect(toJoiner.every(({ body }) => body.t !== 'live')).toBe(true);
-    await table.advance(LIVE_INTERVAL_MS);
-    // The token stands still, and the lane tells it again all the same: the list holds it where the drag began.
-    const alias = aliasAt(table, 100);
-    expect(lives(table).at(-1)?.tokens).toEqual([{ id: alias, x: 150, y: 100 }]);
-    expect(tokenLists(table.sent).at(-1)?.tokens.find((entry) => entry.id === alias)?.x).toBe(100);
+    // Everything a join brings goes to the joiner alone and is a list or a scene, never a live message: none is kept to send again.
+    expect(toJoiner.every(({ body, to }) => to === 'joiner' && body.t !== 'live')).toBe(true);
     await table.set(scene([token('a', { x: 160 })], ['a']));
     await table.advance(LIVE_INTERVAL_MS);
-    expect(lives(table).at(-1)?.tokens).toEqual([{ id: alias, x: 160, y: 100 }]);
+    expect(lives(table).at(-1)?.tokens).toEqual([{ id: aliasAt(table, 100), x: 160, y: 100 }]);
   });
 
   it('holds nothing back a list would not show, whatever the drags, hides and sight do (seeded)', async () => {
@@ -137,14 +182,16 @@ describe('the live lane of a drag', () => {
         await table.set(scene(tokens, held));
         await table.advance(5 + random() * 40);
         // Every place sent now is of a token in the players' last list that their picture shows, where the GM has it;
-        // an end repeats the last place sent of that token.
+        // an end is where a token let go of that they see stands, else the last place sent of that token.
         const listed = (table.share as unknown as { tokens: { listedToken(alias: string): string | undefined } }).tokens;
         const inList = new Set(tokenLists(table.sent).at(-1)?.tokens.map((entry: SharedToken) => entry.id));
         for (const message of table.sent.slice(before).flatMap(({ body }) => (body.t === 'live' ? [body] : []))) {
           for (const place of message.tokens) {
             const at = `trial ${trial} step ${step}`;
             if (place.end === true) {
-              expect(lastPlace.get(place.id), at).toEqual({ x: place.x, y: place.y });
+              const ended = tokens.find((entry) => entry.id === listed.listedToken(place.id));
+              const dropped = ended !== undefined && !held.includes(ended.id) && ended.isHidden !== true && !unseen.has(ended.id);
+              expect(dropped ? { x: Math.round(ended.x * 100) / 100, y: ended.y } : lastPlace.get(place.id), at).toEqual({ x: place.x, y: place.y });
               lastPlace.delete(place.id);
               continue;
             }

@@ -127,10 +127,11 @@ export class OnlineTable {
       cardsChanged: () => events.changed(),
     });
     this.covers = new CoveredPages({
+      ...timers,
       sendLive: (body, key, to) => this.connection.sendLive(body, key, to),
       batches: () => this.connection.batches,
       connected: () => this.connection.connected,
-      uncovered: (player) => this.bound()?.share.resendActivity(player),
+      uncovered: (player) => this.bound()?.share.catchUpMarks(player),
     });
     this.watch = new TabWatch<SceneBinding>({
       leaves: () => app.workspace.getLeavesOfType(ATLAS_VIEW_TYPE),
@@ -139,7 +140,7 @@ export class OnlineTable {
         app,
         seats: ownership,
         send: (body, to) => this.connection.send(body, to),
-        sendLive: (body, key) => this.covers.sendLive(body, key),
+        sendLive: (body, key, to) => this.covers.sendLive(body, key, to),
         readImage: (path) => readVaultImage(app, path),
         isLive: (binding) => this.watch.isLive(binding),
         randomId: () => randomHex(12),
@@ -163,6 +164,8 @@ export class OnlineTable {
         // Who joined while the GM was away is seated as one who joins now; who came or went is in the log before it goes out again.
         const players = connected.filter((player) => this.roster.joined(player));
         this.log.welcome(players);
+        // Pages say again with the books that follow whether theirs covers the map.
+        this.covers.reset();
         this.resend();
         ownership.welcome(players);
       },
