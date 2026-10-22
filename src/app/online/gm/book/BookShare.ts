@@ -5,6 +5,7 @@ import { ArtRefs } from '../artRefs.ts';
 import { every } from '../companionTimers.ts';
 import { MoveRate } from '../moveCheck.ts';
 import { AskedAnswer } from './askedAnswer.ts';
+import { BookPasses, type PassScope } from './bookPasses.ts';
 import { BookAssetDesk } from './bookAssetDesk.ts';
 import { BookRests } from './bookRests.ts';
 import type { NamedAssets } from './bookAssets.ts';
@@ -17,6 +18,7 @@ import { applyBookMessage, EMPTY_BOOK, withItem } from './bookStore.ts';
 import { Characters, type PlayedCharacter } from './characters.ts';
 import type { DrawnStatblock } from './statblockSheet.ts';
 import { QuestPlaces } from './questPlaces.ts';
+import { SettledPanelWidth } from './settledPanelWidth.ts';
 import { RecipientListeners } from './recipientListeners.ts';
 import type { BookScene } from './bookScene.ts';
 import type { BookSharePorts } from './bookSharePorts.ts';
@@ -83,6 +85,8 @@ export class BookShare implements LootRecipientSource {
   /** The whole books players are owed for writes of theirs that were refused. */
   private readonly owed: OwedBooks;
   private readonly listeners = new RecipientListeners();
+  /** The passes over the books asked for, made once per burst. */
+  private readonly passes = new BookPasses((scope) => this.pass(scope));
   private stopPoll: (() => void) | null = null;
 
   constructor(ports: BookSharePorts, shelf: BookShelf) {
@@ -92,12 +96,13 @@ export class BookShare implements LootRecipientSource {
     this.maps = new WorldMaps({ stat: (path) => ports.stat(path), readImage: (path) => ports.readImage(path), source: () => ports.worldMap(), read: () => this.update() });
     this.owed = new OwedBooks(ports, (player) => this.sendBook(player));
     this.questList = new AskedAnswer(() => ports.quests(), NO_QUESTS, () => this.update());
+    const panel = new SettledPanelWidth(() => ports.statblockPanelWidth?.(), () => ports.now());
     this.statblocks = new StatblockShare({
       read: (path) => ports.readStatblock(path), write: (path, patches) => ports.writeStatblock(path, patches), now: () => ports.now(),
-      panelWidth: () => ports.statblockPanelWidth?.(),
+      panelWidth: () => panel.get(),
       // What arrives once the table stopped is dropped: nothing more goes out.
-      changed: () => this.whileRunning(() => this.update()),
-      answered: (player) => this.whileRunning(() => this.resendStatblock(player)),
+      changed: (path) => this.whileRunning(() => this.passes.of(this.characters.playersOfNote(path))),
+      answered: (player, asSent) => this.whileRunning(() => this.resendStatblock(player, asSent)),
       owe: (player) => this.whileRunning(() => this.owed.owe(player)),
     });
     this.assets = new BookAssetDesk(ports, (player) => this.namedAssets(player));
@@ -140,11 +145,22 @@ export class BookShare implements LootRecipientSource {
   statblockChanged(path: string | null): void {
     this.statblocks.changed(path);
     this.rests.changed();
-    this.update();
+    if (path === null) this.update();
+    else this.passes.of(this.characters.playersOfNote(path));
   }
 
-  /** Reads the scene again and sends each connected player what changed for them: the whole book, or the sheet alone. */
+  /** Reads the scene again and sends each connected player what changed for them (the whole book, or a part alone), once the current task's work is done. */
   update(): void {
+    this.passes.all();
+  }
+
+  /**
+   * Reads the scene again for the players of `scope` and sends them what changed: everyone on the
+   * poll and whenever the world map, the quests or who plays what may have changed, only the players
+   * of a note or an edit when only that changed. A character's name is in every other player's
+   * statblock (the allies a rest may be taken for), so a pass that renames one looks at everyone.
+   */
+  private pass(scope: PassScope): void {
     const map = this.maps.get();
     const quests = this.questList.get();
     // Being looked up or read: the books go out once both are known, with them.
@@ -153,11 +169,13 @@ export class BookShare implements LootRecipientSource {
     this.quests = this.questPlaces.of(quests, map?.questPlaces);
     const scene = this.ports.scene();
     const players = this.ports.players();
-    if (scene !== null) this.read(scene, new Set(players.map((player) => player.id)));
+    const names = this.characters.names();
+    if (scene !== null) this.read(scene, new Set(players.map((player) => player.id)), scope === 'all' ? undefined : scope);
+    const renamed = scope !== 'all' && !sameNames(names, this.characters.names());
     this.statblocks.retain(this.characters.statblockPaths());
     const online = new Set(players.filter((player) => player.online).map((player) => player.id));
     for (const player of [...this.sent.keys()]) if (!online.has(player)) this.sent.delete(player);
-    for (const player of online) this.sync(player);
+    for (const player of online) if (scope === 'all' || renamed || scope.has(player)) this.sync(player);
     this.tell();
   }
 
@@ -166,8 +184,11 @@ export class BookShare implements LootRecipientSource {
     if (to === undefined) {
       this.sent.clear();
       this.assets.forget();
-    } else this.sent.delete(to);
-    this.update();
+      this.update();
+    } else {
+      this.sent.delete(to);
+      this.passes.of([to]);
+    }
   }
 
   /** A player left the table: chunks queued for them are dropped, and they get their book anew when they are back. */
@@ -227,8 +248,8 @@ export class BookShare implements LootRecipientSource {
     return this.listeners.subscribe(listener);
   }
 
-  /** Who plays which character in the scene, with the artwork of a new scene read afresh. */
-  private read(scene: BookScene, known: ReadonlySet<string>): void {
+  /** Who plays which character in the scene (only the players of `only` where it is given), with the artwork of a new scene read afresh. */
+  private read(scene: BookScene, known: ReadonlySet<string>, only?: ReadonlySet<string>): void {
     if (scene.mapPath !== this.mapPath) this.art.clear();
     this.mapPath = scene.mapPath;
     this.characters.update(scene, {
@@ -241,7 +262,7 @@ export class BookShare implements LootRecipientSource {
         return sheetOf(shown, token, scene.resources, (path) => this.art.get(path), extra);
       },
       libraryStatblock: (placed) => this.ports.libraryStatblock(placed),
-    });
+    }, only);
   }
 
   /** A player chose the token they act with: their book follows it (`Characters.choose`), read at once while their writes are within their rate, else at the next poll. */
@@ -281,11 +302,12 @@ export class BookShare implements LootRecipientSource {
     this.ports.send({ t: 'book-statblock', statblock: drawn.statblock }, player);
   }
 
-  /** A player's statblock edit was taken: they are sent their statblock again, also where it reads as before. */
-  private resendStatblock(player: string): void {
+  /** A player's statblock edit was taken: they are sent their statblock again, also where it reads as before unless their page shows what it was sent (`asSent`). */
+  private resendStatblock(player: string, asSent = false): void {
     const last = this.sent.get(player);
-    if (last !== undefined) this.sent.set(player, { ...last, statblock: RESEND });
-    this.update();
+    if (last !== undefined && !asSent) this.sent.set(player, { ...last, statblock: RESEND });
+    // At once: a rest's answer that follows must reach the player after it.
+    this.passes.now([player]);
   }
 
   private sendBook(player: string): void {
@@ -332,7 +354,7 @@ export class BookShare implements LootRecipientSource {
       if (this.characters.of(from)?.tokenId === character.tokenId) this.characters.setValue(from, edit.key, taken);
       const last = this.sent.get(from);
       if (last !== undefined) this.sent.set(from, { ...last, sheet: '' });
-      this.update();
+      this.passes.of([from]);
     });
     return true;
   }
@@ -358,4 +380,9 @@ export class BookShare implements LootRecipientSource {
   private tell(): void {
     this.listeners.tell(this.recipients());
   }
+}
+
+/** Whether two lists of the characters' names, in the players' order, read the same. */
+function sameNames(a: ReadonlyMap<string, string>, b: ReadonlyMap<string, string>): boolean {
+  return a.size === b.size && [...a].every(([player, name]) => b.get(player) === name);
 }

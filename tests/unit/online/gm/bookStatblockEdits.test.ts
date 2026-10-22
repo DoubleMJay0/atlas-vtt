@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseGmMessage, sheetBase, sheetItemKeys, type BookStatblock, type SheetRaw } from '../../../../src/app/online/protocol/index.ts';
-import { BOOK_POLL_MS, REFUSAL_BOOK_MS } from '../../../../src/app/online/gm/book/BookShare.ts';
+import { BOOK_POLL_MS, BookShare, REFUSAL_BOOK_MS } from '../../../../src/app/online/gm/book/BookShare.ts';
 import { BookShelf } from '../../../../src/app/online/gm/book/BookShelf.ts';
 import { setStatblockGate } from '../../../../src/app/online/gm/book/statblockGate.ts';
 import type { StatblockTemplate, TemplateBlock, TemplateField } from '../../../../src/app/statblocks/model/templateTypes';
@@ -98,6 +98,29 @@ describe('a player changing their own character\'s statblock at a running table'
     expect(speedOf(statblocks(after, ANA)[0])).toBe('40 ft.');
     expect(after.filter(({ to }) => to !== ANA)).toEqual([]);
     expect(tab.store.getState()).toBe(scene);
+    online.stop();
+  });
+
+  it('sends no statblock again for an edit that sets a value to what the player was sent', async () => {
+    const { online, socket, from } = await table();
+    const since = delivered(socket).length;
+    from(ANA, { t: 'book-field', key: 'speed', base: sheetBase('30 ft.'), value: '30 ft.' });
+    await advance(BOOK_POLL_MS);
+    expect(kinds(delivered(socket).slice(since), ANA)).toEqual([]);
+    online.stop();
+  });
+
+  it('looks again at the editing player\'s book alone, however many players sit at the table', async () => {
+    const sync = vi.spyOn(BookShare.prototype as unknown as { sync(player: string): void }, 'sync');
+    const { online, from } = await table();
+    sync.mockClear();
+    from(ANA, { t: 'book-field', key: 'speed', base: sheetBase('30 ft.'), value: '40 ft.' });
+    await advance(BOOK_POLL_MS);
+    const of = (player: string): number => sync.mock.calls.filter(([to]) => to === player).length;
+    // Ben's book is looked at by the poll alone; Ana's by the poll and the passes her edit asked for.
+    expect(of(BEN)).toBeGreaterThan(0);
+    expect(of(ANA)).toBeGreaterThan(of(BEN));
+    sync.mockRestore();
     online.stop();
   });
 

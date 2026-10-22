@@ -1,5 +1,5 @@
 import { ASSET_CHUNK_BYTES, isCount, isHash, isMaxSide, MAX_ASSET_BYTES, parseAsset, parseAssetVariant, type AssetRef, type AssetVariant } from './asset.ts';
-import { isBookType, isPlayerBookType, parseBookMessage, parseBookTokenMessage, parsePlayerBookMessage, type BookMessage, type BookTokenMessage, type PlayerBookMessage, type PlayerBookParts } from './book.ts';
+import { isBookType, isPlayerBookType, parseBookCover, parseBookMessage, parseBookTokenMessage, parsePlayerBookMessage, type BookMessage, type BookTokenMessage, type PlayerBookCover, type PlayerBookMessage, type PlayerBookParts } from './book.ts';
 import { parseBookRestMessage, type BookRestMessage } from './bookRest.ts';
 import { isDeltaOf, parseDelta, parseSeq, type DeltaMessage, type DeltaOf } from './delta.ts';
 import { parseFog, type SharedFog } from './fog.ts';
@@ -106,7 +106,7 @@ export interface PlayerAssetRequest {
   readonly maxSide?: number;
 }
 
-export type PlayerMessage = PlayerAssetRequest | PlayerResync | PlayerMove | PlayerDrag | PlayerDragCancel | PlayerRoll | PlayerLaser | PlayerMeasure | PlayerCursor | PlayerLogMessage | PlayerBookMessage | PlayerBookParts | BookTokenMessage | BookRestMessage | PlayerPinFound;
+export type PlayerMessage = PlayerAssetRequest | PlayerResync | PlayerMove | PlayerDrag | PlayerDragCancel | PlayerRoll | PlayerLaser | PlayerMeasure | PlayerCursor | PlayerLogMessage | PlayerBookMessage | PlayerBookParts | PlayerBookCover | BookTokenMessage | BookRestMessage | PlayerPinFound;
 
 const MAX_CHUNKS = Math.ceil(MAX_ASSET_BYTES / ASSET_CHUNK_BYTES);
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -250,6 +250,7 @@ export function parsePlayerMessage(value: unknown): PlayerMessage | null {
   if (value.t === 'book-token') return parseBookTokenMessage(value);
   if (value.t === 'book-rest') return parseBookRestMessage(value);
   if (value.t === 'book-parts') return { t: 'book-parts' };
+  if (value.t === 'book-cover') return parseBookCover(value);
   if (value.t === 'resync') return isSceneId(value.scene) && isDeltaOf(value.of) ? { t: 'resync', scene: value.scene, of: value.of } : null;
   return value.t === 'asset-request' ? parseAssetRequest(value) : null;
 }
