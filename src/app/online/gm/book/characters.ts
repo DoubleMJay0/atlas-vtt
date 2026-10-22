@@ -101,16 +101,17 @@ export class Characters {
     return new Set([...this.played.values()].flatMap((character) => (character.statblockPath === null ? [] : [character.statblockPath])));
   }
 
-  /** The sheet of a player's character with a resource's value as it was written, for a character whose token no shown scene holds to be read from. */
-  setValue(player: string, key: string, current: number): void {
+  /** The sheet of a player's character with a resource's value (and its maximum, where it was set) as it was written, for a character whose token no shown scene holds to be read from. */
+  setValue(player: string, key: string, current: number, max?: number): void {
     const character = this.played.get(player);
     if (character === undefined) return;
-    const resources = character.sheet.resources.map((resource) => (resource.key === key ? { ...resource, current } : resource));
+    const set = <T extends { readonly max: number }>(value: T): T & { current: number } => ({ ...value, current, ...(max !== undefined && { max }) });
+    const resources = character.sheet.resources.map((resource) => (resource.key === key ? set(resource) : resource));
     const held = character.drawnWith.resources;
     // A tracked number the token held none of yet takes the maximum the sheet offered it with
     const offered = character.sheet.resources.find((resource) => resource.key === key);
     const value = held?.[key] ?? (offered && { current: offered.current, max: offered.max });
-    const drawnWith = value === undefined ? character.drawnWith : { ...character.drawnWith, resources: { ...held, [key]: { ...value, current } } };
+    const drawnWith = value === undefined ? character.drawnWith : { ...character.drawnWith, resources: { ...held, [key]: set(value) } };
     this.played.set(player, { ...character, sheet: { ...character.sheet, resources }, drawnWith });
   }
 

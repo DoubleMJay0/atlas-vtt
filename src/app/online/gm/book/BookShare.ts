@@ -1,6 +1,7 @@
 import { isPlayerBookType, isRecord, parseBookTokenMessage, parsePlayerBookMessage, type BookQuest, type BookResourceMessage, type PlayerBook } from '../../protocol/index.ts';
 import type { LootRecipient, LootRecipientSource } from '../../../loot/lootRecipients';
 import type { LootDraw } from '../../../loot/lootRoller';
+import type { ResourceDefinition } from '../../../resources/resourceTypes';
 import { ArtRefs } from '../artRefs.ts';
 import { every } from '../companionTimers.ts';
 import { MoveRate } from '../moveCheck.ts';
@@ -22,7 +23,8 @@ import { SettledPanelWidth } from './settledPanelWidth.ts';
 import { RecipientListeners } from './recipientListeners.ts';
 import type { BookScene } from './bookScene.ts';
 import type { BookSharePorts } from './bookSharePorts.ts';
-import { checkResourceEdit } from './resourceEdit.ts';
+import { checkResourceEdit, type ResourceEdit } from './resourceEdit.ts';
+import { resourceMaxRoute } from './resourceMax.ts';
 import { OwedBooks } from './owedBooks.ts';
 import { bookUpdate, NO_QUESTS, RESEND, sentOf, type SentBook } from './sentBook.ts';
 import { StatblockShare } from './statblockShare.ts';
@@ -262,7 +264,8 @@ export class BookShare implements LootRecipientSource {
         const resolved = statblockPath === null ? null : this.statblocks.resolved(statblockPath);
         // Beside the token's own: the numbers its statblock tracks, and the gauges its template places for resources it holds none of
         const extra = [...trackedSheetValues(resolved, scene.resources, token.resources), ...placedSheetValues(resolved, scene.resources, token.resources)];
-        return sheetOf(shown, token, scene.resources, (path) => this.art.get(path), extra);
+        const maxEditable = (definition: ResourceDefinition): boolean => resourceMaxRoute(resolved, definition, token, statblockPath) !== null;
+        return sheetOf(shown, token, scene.resources, (path) => this.art.get(path), extra, maxEditable);
       },
       libraryStatblock: (placed) => this.ports.libraryStatblock(placed),
     }, only);
@@ -346,20 +349,31 @@ export class BookShare implements LootRecipientSource {
     return true;
   }
 
-  /** Hands a checked edit of the player's own resource to Atlas; they are sent their sheet with what it holds then, or their whole book when it was not taken. */
+  /**
+   * Hands a checked edit of the player's own resource to Atlas; they are sent their sheet with what it
+   * holds then, or their whole book when it was not taken. A maximum their note gives is written into
+   * the note first, and the rest of the edit follows once it is in.
+   */
   private editResource(from: string, character: PlayedCharacter, message: BookResourceMessage): boolean {
     const scene = this.ports.scene();
-    const edit = checkResourceEdit(from, character, scene, (tokenId) => this.ports.ownerOf(tokenId, scene?.tokens[tokenId]), message);
+    const resolved = character.statblockPath === null ? null : this.statblocks.resolved(character.statblockPath);
+    const edit = checkResourceEdit(from, character, scene, (tokenId) => this.ports.ownerOf(tokenId, scene?.tokens[tokenId]), message, resolved);
     if (edit === null) return false;
-    this.ports.editResource(edit, (taken) => {
+    const { max } = edit;
+    if (max?.route.kind === 'note') return this.statblocks.writeMax(from, character, max.route.field, max.value, () => this.takeResource(from, character, edit));
+    this.takeResource(from, character, edit);
+    return true;
+  }
+
+  private takeResource(from: string, character: PlayedCharacter, edit: ResourceEdit): void {
+    this.ports.editResource(edit, (taken, max) => {
       if (taken === null) return this.owed.owe(from);
       // The sheet goes out even when the value did not change: it answers what the page showed at once.
-      if (this.characters.of(from)?.tokenId === character.tokenId) this.characters.setValue(from, edit.key, taken);
+      if (this.characters.of(from)?.tokenId === character.tokenId) this.characters.setValue(from, edit.key, taken, max);
       const last = this.sent.get(from);
       if (last !== undefined) this.sent.set(from, { ...last, sheet: '' });
       this.passes.of([from]);
     });
-    return true;
   }
 
   /** What a connected player's book names that they may fetch by hash (`bookAssetOf`). */

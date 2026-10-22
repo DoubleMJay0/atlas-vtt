@@ -7,6 +7,7 @@ import { picksChoice } from '../../../statblocks/values/choicePicks';
 import { textProblem, valueMisfit } from '../../../statblocks/values/valueFit';
 import { countersAfterEdit } from './counterEdit.ts';
 import { playerAccess } from './playerAccess.ts';
+import { noteMaxRoute } from './resourceMax.ts';
 import {
   amongOptions, clears, editableTemplate, inOptionOrder, isDice, isLine, isPlainList, isScalar, playerReferences, referencesSafeIn, sentFields, writtenValue,
   type CheckedEdit, type EditInputs, type PlayerReferences,
@@ -97,4 +98,19 @@ export function checkFieldEdit(inputs: EditInputs, message: BookFieldMessage): C
     patches: fieldPatches(field.key, read, next.value),
     written: [writtenValue(field.key, read, next.value)],
   };
+}
+
+/**
+ * A maximum a player set of a resource of their character that their note's number field `key`
+ * gives (`noteMaxRoute`: a plain number of a field they may change, in a native note whose template
+ * reads as it was written and whose sheet was sent them editable), written as that field's new value
+ * against what the note holds now. Null where anything of it is refused.
+ */
+export function checkMaxFieldEdit(inputs: EditInputs, key: string, max: number): CheckedEdit | null {
+  const template = editableTemplate(inputs);
+  if (template === null || noteMaxRoute(inputs.resolved, key) === null) return null;
+  const field = fieldByKey(withHeaderFields(template).fields, key);
+  const read = field === undefined ? undefined : inputs.read(field);
+  if (field === undefined || read === undefined) return null;
+  return { patches: fieldPatches(field.key, read, max), written: [writtenValue(field.key, read, max)] };
 }
