@@ -23,6 +23,30 @@ const MAX_DIE_LABEL = 24;
 /** The most labelled constants a shared roll names: Atlas's formula holds no more terms. */
 export const MAX_NAMED_MODIFIERS = 20;
 
+/** Which way a roll is helped or hindered: rolled as the GM's dice set's rule for that side says. */
+export type AdvantageSide = 'advantage' | 'disadvantage';
+
+export const ADVANTAGE_SIDES: readonly AdvantageSide[] = ['advantage', 'disadvantage'];
+
+export const isAdvantageSide = (value: unknown): value is AdvantageSide => value === 'advantage' || value === 'disadvantage';
+
+/** The most groups of dice a dice set names. */
+export const MAX_ROLL_DICE_GROUPS = 20;
+/** The most dice of one group: Atlas's 100 dice of a formula. */
+const MAX_GROUP_DICE = 100;
+/** The most sides a roll's dice name, those of a later Atlas included. */
+const MAX_SIDES = 8;
+
+/**
+ * What a page needs of the dice a roll is made with to offer advantage: the set's own dice, in its
+ * order (a bare bonus is rolled with them, and advantage changes only a roll that holds them), and the
+ * sides its rules say anything for. A roll the set's dice are not in rolls as it is.
+ */
+export interface SharedRollDice {
+  readonly dice: readonly { readonly count: number; readonly sides: number }[];
+  readonly sides: readonly AdvantageSide[];
+}
+
 /** The roll button a roll answers: the log entry that offers it and which of its rolls. */
 export interface RollRequestAnswer {
   readonly id: string;
@@ -44,6 +68,11 @@ export interface PlayerRoll {
   readonly request?: RollRequestAnswer;
   /** Ask for the GM’s names and colours on an explicit matching pool. */
   readonly setAppearance?: true;
+  /**
+   * Roll with advantage or disadvantage, as the GM's dice set rules it; a roll that cannot take the
+   * side rolls plain. Added later: an older GM rolls plain, an older page never asks.
+   */
+  readonly advantage?: AdvantageSide;
 }
 
 /**
@@ -118,12 +147,26 @@ const REFUSALS: readonly string[] = ['formula', 'rate', 'scene', 'unavailable'];
 const isInteger = (value: unknown, min: number, max: number): value is number => Number.isInteger(value) && (value as number) >= min && (value as number) <= max;
 const isText = (value: unknown, max: number): value is string => typeof value === 'string' && value.length <= max;
 
+function parseDiceGroup(value: unknown): SharedRollDice['dice'][number] | null {
+  if (!isRecord(value) || !isInteger(value.count, 1, MAX_GROUP_DICE) || !isInteger(value.sides, 1, MAX_FACES)) return null;
+  return { count: value.count, sides: value.sides };
+}
+
+/** A roll's dice as a page reads them, or undefined for anything malformed; a side it does not know is left out. */
+export function parseRollDice(value: unknown): SharedRollDice | undefined {
+  if (!isRecord(value) || !Array.isArray(value.dice) || value.dice.length > MAX_ROLL_DICE_GROUPS || !Array.isArray(value.sides) || value.sides.length > MAX_SIDES) return undefined;
+  const dice = value.dice.map(parseDiceGroup);
+  if (dice.some((group) => group === null)) return undefined;
+  const sides = ADVANTAGE_SIDES.filter((side) => (value.sides as unknown[]).includes(side));
+  return { dice: dice as SharedRollDice['dice'][number][], sides };
+}
+
 function parseRequestAnswer(value: unknown): RollRequestAnswer | null {
   if (!isRecord(value) || typeof value.id !== 'string' || !LOG_ID_PATTERN.test(value.id) || !isInteger(value.index, 0, MAX_INLINE_ROLLS - 1)) return null;
   return { id: value.id, index: value.index };
 }
 
-/** A player's roll as the GM reads it, or null for anything malformed. */
+/** A player's roll as the GM reads it, or null for anything malformed; a side of advantage it does not know is left out, and the roll rolls plain. */
 export function parsePlayerRoll(value: Record<string, unknown>): PlayerRoll | null {
   const { scene, formula, token, mode, flavor } = value;
   if (!isText(scene, MAX_SCENE_ID) || scene === '' || !isText(formula, MAX_FORMULA)) return null;
@@ -139,6 +182,7 @@ export function parsePlayerRoll(value: Record<string, unknown>): PlayerRoll | nu
     ...(shownFlavor !== undefined && { flavor: shownFlavor }),
     ...(request !== undefined && { request }),
     ...(value.setAppearance === true && { setAppearance: true }),
+    ...(isAdvantageSide(value.advantage) && { advantage: value.advantage }),
   };
 }
 

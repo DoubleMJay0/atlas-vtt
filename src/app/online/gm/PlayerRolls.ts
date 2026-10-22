@@ -1,5 +1,5 @@
 import type { DiceRules } from '../../types/diceRulesTypes';
-import type { DiceSet, RollingDice } from '../../types/diceSetTypes';
+import type { AdvantageSide, DiceSet, RollingDice } from '../../types/diceSetTypes';
 import { completeFormula } from '../../tools/completeFormula';
 import { withoutConstantLabels } from '../../tools/namedModifiers';
 import type { RollOptions } from '../../tools/DiceTool';
@@ -13,6 +13,7 @@ import { tokenLabel } from './atlasView.ts';
 import type { LoggedRoll, RollRequest } from './log/TableLog.ts';
 import { rollFaceOf } from './log/logEntries.ts';
 import { MoveRate } from './moveCheck.ts';
+import { playerSide } from './rollAdvantage.ts';
 import type { RollNotes } from './RollShare.ts';
 
 /**
@@ -45,6 +46,14 @@ export interface RollContext {
   listedToken(alias: string): string | undefined;
   ownerOf(tokenId: string): string | undefined;
   readonly tokens: Readonly<Record<string, TokenEntity>>;
+}
+
+/** How a private roll is made besides its formula: the whisper a roll button stood in, the set, its dice's look and the side of advantage. */
+interface PrivateRoll {
+  readonly whisper: readonly string[] | undefined;
+  readonly set: DiceSet | undefined;
+  readonly setAppearance: true | undefined;
+  readonly advantage: AdvantageSide | undefined;
 }
 
 export type RollVerdict = { readonly ok: true; readonly tokenId: string | null } | { readonly ok: false; readonly reason: RollRefusal };
@@ -103,7 +112,7 @@ export interface PlayerRollsPorts {
   /** Runs a roll as `who`'s, so the roll's announcement goes to players as theirs (`RollShare.rollAs`). */
   rollAs(who: string, run: () => void, notes: RollNotes): void;
   /** A formula rolled by the shared map's rules without a throw, for a private roll; null where it does not roll. */
-  quietRoll(formula: string, set?: DiceSet, setAppearance?: true): SharedRoll | null;
+  quietRoll(formula: string, set?: DiceSet, setAppearance?: true, advantage?: AdvantageSide): SharedRoll | null;
   /** The roll button of the log a roll answers, as its presser may roll it; null where there is none. */
   request(from: string, answer: RollRequestAnswer): RollRequest | null;
   /** Takes a private roll into the table's log. */
@@ -117,7 +126,9 @@ export interface PlayerRollsPorts {
 /**
  * Players' rolls, made by the GM's own Atlas: the shared tab's dice tool rolls the formula by the map's
  * rules (criticals, exploding dice), throws it on the GM's screen and logs it, for the player's token
- * when the check lets it name one. A roll that is not made is refused to its sender alone.
+ * when the check lets it name one. A roll that asks for advantage or disadvantage takes it where the
+ * dice it is rolled with rule that side for it (`playerSide`), and is rolled plain elsewhere. A roll
+ * that is not made is refused to its sender alone.
  */
 export class PlayerRolls {
   private readonly rate = new MoveRate(ROLL_BURST, ROLLS_PER_SECOND);
@@ -151,10 +162,12 @@ export class PlayerRolls {
     const dice = this.ports.dice();
     const set = token === undefined ? undefined : dice?.setFor?.(token);
     const setAppearance = request === undefined ? message.setAppearance : undefined;
-    const options: RollOptions = { ...(set && { set }), ...(setAppearance && { setAppearance }) };
-    const formula = rolledFormula(message.formula, set ?? dice?.rules());
-    if (mode !== 'public') return this.rollPrivately(from, formula, mode, tokenId, source, context, notes, request?.to, set, setAppearance);
+    const rules = set ?? dice?.rules();
+    const formula = rolledFormula(message.formula, rules);
+    const advantage = rules === undefined ? undefined : playerSide(formula, rules, message.advantage);
+    if (mode !== 'public') return this.rollPrivately(from, formula, mode, tokenId, source, context, notes, { whisper: request?.to, set, setAppearance, advantage });
     if (dice === null || context.mapPath === null) return this.refuse('unavailable', from);
+    const options: RollOptions = { ...(set && { set }), ...(setAppearance && { setAppearance }), ...(advantage && { advantage }) };
     const origin = tokenId === null ? undefined : { viewId: dice.viewId, mapPath: context.mapPath, tokenId };
     let rolled = false;
     this.ports.rollAs(from, () => {
@@ -164,8 +177,9 @@ export class PlayerRolls {
   }
 
   /** A private roll: into the log for its audience, and thrown on the roller's page unless it is blind. */
-  private rollPrivately(from: string, formula: string, mode: Exclude<RollMode, 'public'>, tokenId: string | null, source: NonNullable<DiceRollResult['source']>, context: RollContext, notes: RollNotes, whisper?: readonly string[], set?: DiceSet, setAppearance?: true): void {
-    const roll = this.ports.quietRoll(formula, set, setAppearance);
+  private rollPrivately(from: string, formula: string, mode: Exclude<RollMode, 'public'>, tokenId: string | null, source: NonNullable<DiceRollResult['source']>, context: RollContext, notes: RollNotes, how: PrivateRoll): void {
+    const { whisper, set, setAppearance, advantage } = how;
+    const roll = this.ports.quietRoll(formula, set, setAppearance, advantage);
     if (roll === null) return this.refuse('formula', from);
     const token = tokenId === null ? null : this.ports.alias(tokenId);
     this.ports.logged({ who: from, roll, token, shared: true, mode, to: rollAudience(mode, from, whisper), ...notes, ...rollFaceOf(source, context.tokens) });
