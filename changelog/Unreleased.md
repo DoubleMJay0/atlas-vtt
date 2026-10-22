@@ -19,6 +19,7 @@
 - Statblock previews on the map can be moved and pinned again, and their images shown to players
 - Pinned previews can no longer be dragged out of reach, and statblock previews also move by their name
 - @ references in statblocks also find a value by its label, such as @str for Strength
+- Any dice formula or bonus in a statblock can be rolled, such as +4+1
 
 ## Atlas Online
 
