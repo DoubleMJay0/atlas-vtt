@@ -26,7 +26,7 @@ const RECORD = {
 describe('the names `@` offers', () => {
   const names = referenceNames(TEMPLATE, RECORD);
 
-  it('offers every field, entry, Table slot and row that names a number, with the number it reads', () => {
+  it('offers every field, entry, Table slot and row that names a number, with the number it reads, labels last', () => {
     expect(names).toEqual([
       { name: 'level', value: '5' },
       { name: 'prof', value: '+3' },
@@ -47,6 +47,8 @@ describe('the names `@` offers', () => {
       { name: 'ac', value: '12' },
       { name: 'secret', value: '4' },
       { name: 'hp', value: '27' },
+      { name: 'proficiency', value: '+3' },
+      { name: 'saving-throws.dex', value: '5' },
     ]);
   });
 
@@ -65,11 +67,21 @@ describe('the names `@` offers', () => {
     expect(referenceNames(plain, { health: 9 })).toEqual([{ name: 'health', value: '9' }, { name: 'hp', value: '9' }]);
   });
 
-  it('offers a label wherever the lookup reads it', () => {
-    const labelled = templateOf([{ key: 'speed_ft', label: 'Speed', type: 'number' }], []);
-    // The lookup reads `speed` only as a key spelt alike: a label of another spelling is offered once it reads it too.
-    expect(referenceNames(labelled, { speed_ft: 30, speed: 25 }).map((each) => each.name)).toEqual(['speed_ft', 'speed']);
-    expect(referenceNames(labelled, { speed_ft: 30 }).map((each) => each.name)).toEqual(['speed_ft']);
+  it('offers a field by its label where the lookup reads it so, after every other name', () => {
+    const labelled = templateOf([
+      { key: 'agility', label: 'Agi', type: 'number' },
+      { key: 'armor_class', label: 'Armor Class', type: 'number' },
+      { key: 'might', label: 'Shared', type: 'number' },
+      { key: 'grace', label: 'Shared', type: 'number' },
+    ], []);
+    const offered = referenceNames(labelled, { agility: 2, armor_class: 14, might: 1, grace: 3 });
+    // A label two fields share names neither
+    expect(offered).toEqual([
+      { name: 'agility', value: '2' }, { name: 'armor_class', value: '14' }, { name: 'might', value: '1' }, { name: 'grace', value: '3' },
+      { name: 'agi', value: '2' },
+    ]);
+    const lookup = statblockLookup(labelled, { agility: 2 });
+    expect(lookup('agi')).toBe(2);
   });
 });
 

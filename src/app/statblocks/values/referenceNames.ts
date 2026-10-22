@@ -1,19 +1,19 @@
 /**
  * The names a statblock's `@` references can be written with, each with the number it reads now:
- * what typing `@` in a value offers. The names tried are every field by its key and by its label,
- * what a field holds one step in (`saves.dex`), every Table slot with each worked-out row of its
- * Table (`str`, `str.mod`) and hit points (`hp`); the card's own lookup (`statblockLookup`) decides
- * which of them name a number. So every name offered reads what the card fills in, and a name the
- * lookup comes to accept (a label) is offered as soon as it does. Pure.
+ * what typing `@` in a value offers. The names tried are every field by its key, what a field holds
+ * one step in (`saves.dex`), every Table slot with each worked-out row of its Table (`str`,
+ * `str.mod`), hit points (`hp`), and the fields the lookup also names by their label
+ * (`fieldsByLabel`: `agi` for a field labelled Agi); the card's own lookup (`statblockLookup`)
+ * decides which of them name a number, so every name offered reads what the card fills in. Pure.
  */
 
 import { normalizedKey } from '../../resources/resourceFields';
 import { withHeaderFields } from '../model/templateHeader';
-import type { StatblockTemplate, TemplateField } from '../model/templateTypes';
+import type { FieldValue, StatblockTemplate, TemplateField } from '../model/templateTypes';
 import { isPairsList, readerFor, slotKeyOf, type FieldRecord } from './fieldValues';
 import { formatNumber, parseNumberText } from './numberText';
 import { referencePathAt } from './references';
-import { statblockLookup, tableColumns } from './statblockLookup';
+import { fieldsByLabel, statblockLookup, tableColumns } from './statblockLookup';
 
 /** A name a reference can be written with, and the number it reads, as the list shows it. */
 export interface ReferenceName {
@@ -44,11 +44,11 @@ function shownNumber(value: unknown): string | null {
   return value.trim();
 }
 
-/** The names a field is tried by: its key, what it holds one step in (a pair by its label), then its label. */
-function fieldNames(field: TemplateField, value: unknown): string[] {
-  const inside = Array.isArray(value) ? (isPairsList(value) ? value.flatMap((pair) => Object.keys(pair as object)) : value.map((_, index) => String(index))).slice(0, MAX_INSIDE)
+/** The names a field is tried by: its key and what it holds one step in (a pair by its label). */
+function fieldNames(name: string, value: FieldValue | undefined): string[] {
+  const inside = Array.isArray(value) ? (isPairsList(value) ? value.flatMap((pair) => Object.keys(pair ?? {})) : value.map((_, index) => String(index))).slice(0, MAX_INSIDE)
     : value !== null && typeof value === 'object' ? Object.keys(value).slice(0, MAX_INSIDE) : [];
-  return [field.key, ...inside.map((part) => `${field.key}.${part}`), referenceWord(field.label)];
+  return [name, ...inside.map((part) => `${name}.${part}`)];
 }
 
 /** The names of a Table field's slots (as the card shows them, then by key), each alone and with every worked-out row of its Table. */
@@ -57,6 +57,12 @@ function slotNames(field: TemplateField, rows: readonly string[]): string[] {
     if (slot === undefined || slot === '') return [];
     return [slot, ...rows.map((row) => `${slot}.${referenceWord(row)}`)];
   }));
+}
+
+/** A label as a reference writes it (`armor-class`), where that reads as the label the lookup names it by; else that name. */
+function labelName(label: string, field: TemplateField): string {
+  const word = referenceWord(field.label);
+  return word.replace(/[-_]/g, '') === label ? word : label;
 }
 
 /**
@@ -68,11 +74,13 @@ export function referenceNames(template: StatblockTemplate, record: FieldRecord)
   const lookup = statblockLookup(template, record, fields);
   const reader = readerFor(record, fields);
   const columns = tableColumns(template);
+  const rowsOf = (field: TemplateField): string[] => (columns.get(field.key) ?? []).flatMap((column) => column.label ?? []);
   const tried = [
-    ...fields.flatMap((field) => (field.type === 'scores'
-      ? slotNames(field, (columns.get(field.key) ?? []).flatMap((column) => column.label ?? []))
-      : fieldNames(field, reader(field.key)))),
+    ...fields.flatMap((field) => (field.type === 'scores' ? slotNames(field, rowsOf(field)) : fieldNames(field.key, reader(field.key)))),
     'hp',
+    // A field by its label, where the lookup reads one (`fieldsByLabel`), last as the card reads it last;
+    // a Table's slots are offered by their own names already
+    ...[...fieldsByLabel(fields)].flatMap(([label, field]) => (field.type === 'scores' ? [] : fieldNames(labelName(label, field), reader(field.key)))),
   ];
   const names: ReferenceName[] = [];
   const seen = new Set<string>();
