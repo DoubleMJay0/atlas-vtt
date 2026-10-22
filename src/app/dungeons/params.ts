@@ -1,0 +1,110 @@
+/**
+ * What the tags do to layout, plan, water and props. Every number a tag changes lives here, so the
+ * effect of a tag can be read in one place.
+ */
+
+import type { DungeonTag } from './tags';
+
+/**
+ * Room sizes, walls included: 0 small room, 1 large room, 2 corridor, 3 junction.
+ * Width runs across the axis a room grows along, depth along it.
+ */
+export type SizeStyle = 0 | 1 | 2 | 3;
+
+export interface DungeonParams {
+  tags: ReadonlySet<DungeonTag>;
+  /** Normal rooms (not corridors or junctions). */
+  minRooms: number;
+  maxRooms: number;
+  /** Drawn per room: true mirrors its side branches. */
+  symmetry: readonly boolean[];
+  sizeStyles: readonly SizeStyle[];
+  /** One exit per room. */
+  string: boolean;
+  /** Half of the room-sized rooms come out square, so they can be round. */
+  squareRooms: boolean;
+  stepsChance: number;
+  rotundaFactor: number;
+  colonnadeFactor: number;
+  /** Secret wings: how many to aim for. */
+  secretWings: { chance: number; extra: number };
+  /** Chance of a rear entrance. */
+  backdoorChance: number;
+  multiLevel: boolean;
+  /** 0..1, or null to roll one. */
+  waterLevel: number | null;
+  fountainChance: number;
+  wellChance: number;
+  tapestryChance: number;
+  crackChance: number;
+  shatteredChance: number;
+  /** Floor cells per expected stone. */
+  rubbleArea: number;
+}
+
+const DEFAULT_SIZES: readonly SizeStyle[] = [0, 0, 0, 1, 2, 3, 3];
+
+function sizeStyles(has: (tag: DungeonTag) => boolean): readonly SizeStyle[] {
+  if (has('compact')) return [0, 0, 0, 1];
+  if (has('winding')) return [0, 0, 1, 2, 2, 3, 3, 3, 3];
+  if (has('cramped')) return [0, 0, 0, 2, 3, 3];
+  if (has('spacious')) return [0, 0, 1, 1, 2, 3];
+  return DEFAULT_SIZES;
+}
+
+function roomRange(has: (tag: DungeonTag) => boolean): [number, number] {
+  if (has('small')) return [3, 6];
+  if (has('medium')) return [6, 12];
+  if (has('large')) return [12, 25];
+  return [6, 15];
+}
+
+function symmetry(has: (tag: DungeonTag) => boolean): readonly boolean[] {
+  if (has('chaotic')) return [false];
+  if (has('ordered')) return [true, true, true, true, true, true, false];
+  return [true, true, true, true, false];
+}
+
+function waterLevel(has: (tag: DungeonTag) => boolean): number | null {
+  if (has('dry')) return 0;
+  if (has('wet')) return 0.3;
+  if (has('flooded')) return 0.6;
+  return null;
+}
+
+function secretWings(has: (tag: DungeonTag) => boolean): DungeonParams['secretWings'] {
+  if (has('no-secrets') || has('string')) return { chance: 0, extra: 0 };
+  if (has('secret')) return { chance: 1, extra: 0.75 };
+  return { chance: 0.5, extra: 0.15 };
+}
+
+export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
+  const set = new Set(tags);
+  const has = (tag: DungeonTag): boolean => set.has(tag);
+  const [minRooms, maxRooms] = roomRange(has);
+  const crumbling = has('crumbling');
+  let tapestryChance = has('dwelling') ? 1 : 1 / 3;
+  if (crumbling || has('flooded')) tapestryChance /= 3;
+  return {
+    tags: set,
+    minRooms,
+    maxRooms,
+    symmetry: has('string') ? [false] : symmetry(has),
+    sizeStyles: sizeStyles(has),
+    string: has('string'),
+    squareRooms: has('round'),
+    stepsChance: has('flat') ? 0 : has('deep') ? 0.5 : 0.1,
+    rotundaFactor: has('square') ? 0 : has('round') ? 5 : 1,
+    colonnadeFactor: has('colonnades') ? 2 : 1,
+    secretWings: secretWings(has),
+    backdoorChance: has('backdoor') ? 1 : has('no-backdoor') ? 0 : 0.3,
+    multiLevel: has('multi-level') && !has('single-level'),
+    waterLevel: waterLevel(has),
+    fountainChance: has('tomb') ? 0.02 : 0.1,
+    wellChance: has('dwelling') ? 0.2 : 0.02,
+    tapestryChance,
+    crackChance: crumbling ? 1 / 3 : 0.125,
+    shatteredChance: crumbling ? 0.1 : 0.0125,
+    rubbleArea: crumbling ? 2 : 4,
+  };
+}

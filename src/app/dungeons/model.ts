@@ -1,6 +1,8 @@
 /**
  * A generated dungeon, in grid cells (x right, y down). The first entrance door sits at (0, 0).
  * Everything a renderer, the scene writer and the note writer need, and nothing they derive.
+ * Cell (x, y) covers [x, x + 1) × [y, y + 1); points (columns, props, water, rubble, cracks) are
+ * in that continuous space, so a cell's centre is (x + 0.5, y + 0.5) and columns stand on grid vertices.
  */
 
 /** Bump when the same seed and tags would give another dungeon. */
