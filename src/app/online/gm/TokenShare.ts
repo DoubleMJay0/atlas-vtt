@@ -33,6 +33,8 @@ export interface TokenSharePorts {
   atlasSettings?(): Pick<AtlasPlayerSettings, 'showInitiative' | 'movesOnTurn'>;
   /** The players' look-alike numbers changed (`badgeOf`): what shows them besides the token list is worked out again. */
   numbersChanged?(): void;
+  /** Whether the live lane carries a held token's place now, by the id players know it by (`LiveShare.carries`); without it every place goes in the list. */
+  liveCarries?(alias: string): boolean;
   randomId(): string;
   now(): number;
   setTimer(run: () => void, ms: number): number;
@@ -77,6 +79,8 @@ export class TokenShare {
   private numbers: InstanceNumbers = NO_INSTANCE_NUMBERS;
   /** Whether the scene shows look-alike badges, as the last list read it. */
   private badgesOn = true;
+  /** Where the last list put each token, by the id players know it by. */
+  private listedPlaces: ReadonlyMap<string, { readonly x: number; readonly y: number }> = new Map();
 
   /** `listed` hears of each list sent with the ids players know its tokens by, and of null when none is shared. */
   constructor(store: SceneStore, ports: TokenSharePorts, listed: (listed: ListedTokens | null) => void = () => undefined) {
@@ -96,6 +100,7 @@ export class TokenShare {
     this.shownArt = new Map();
     this.listedIds = new Map();
     this.listedAliases = new Map();
+    this.listedPlaces = new Map();
     this.numbers = NO_INSTANCE_NUMBERS;
     this.badgesOn = true;
     this.art.clear();
@@ -194,6 +199,7 @@ export class TokenShare {
     this.shownArt = art;
     this.listedIds = new Map([...aliases].map(([id, alias]) => [alias, id]));
     this.listedAliases = aliases;
+    this.listedPlaces = new Map(tokens.map((token) => [token.id, { x: token.x, y: token.y }]));
     this.list.publish(scene, { tokens, cell, snap });
     this.listed({ scene, aliases });
   }
@@ -255,7 +261,22 @@ export class TokenShare {
       const id = gmIds.get(token.id);
       return id === undefined ? [] : [[id, token.id]];
     }));
-    return { tokens, cell: gridSize, snap: snapGridOf(state.grid), art, aliases };
+    return { tokens: this.heldWhereListed(tokens, state.heldTokens), cell: gridSize, snap: snapGridOf(state.grid), art, aliases };
+  }
+
+  /**
+   * The tokens with each one being dragged at the place the last list gave it while the live lane
+   * carries it: players follow the drag there, and the list lands it with the drop, not as many
+   * times again as the drag moves.
+   */
+  private heldWhereListed(tokens: SharedToken[], held: Readonly<Record<string, unknown>>): SharedToken[] {
+    if (this.ports.liveCarries === undefined || Object.keys(held).length === 0) return tokens;
+    return tokens.map((token) => {
+      const listed = this.listedPlaces.get(token.id);
+      const id = this.listedIds.get(token.id);
+      if (listed === undefined || id === undefined || !Object.hasOwn(held, id) || this.ports.liveCarries?.(token.id) !== true) return token;
+      return listed.x === token.x && listed.y === token.y ? token : { ...token, x: listed.x, y: listed.y };
+    });
   }
 
   private schedulePoll(): void {

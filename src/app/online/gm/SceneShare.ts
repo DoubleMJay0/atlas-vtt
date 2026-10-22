@@ -96,7 +96,7 @@ export class SceneShare {
     const mine = seats === undefined ? null : new MineShare({ onlinePlayers: () => seats.onlinePlayers(), ownerOf }, (body, to) => ports.send(body, to));
     this.mine = mine;
     // The initiative list shows the players' look-alike numbers too: it follows them as they change
-    this.tokens = new TokenShare(store, { ...ports, numbersChanged: () => this.layers.update() }, (listed) => mine?.setList(listed));
+    this.tokens = new TokenShare(store, { ...ports, numbersChanged: () => this.layers.update(), liveCarries: (alias) => this.live?.carries(alias) === true }, (listed) => mine?.setList(listed));
     const rulers = (): RulerPaths => dragRulerPaths(store.getState(), ports.gmDragRuler?.() ?? null, this.moves.dragStarts());
     this.live = ports.sendLive === undefined ? null : new LiveShare(store, { ...ports, sendLive: (body, key) => ports.sendLive?.(body, key), rulers }, () => ({
       scene: this.tokens.listedScene,
@@ -176,6 +176,7 @@ export class SceneShare {
     this.rules.resend(to);
     this.mine?.resend(to);
     this.marks.resend(to);
+    this.live?.resend();
   }
 
   /** Who owns which token, which tokens are player tokens, or who is connected changed: players hear which tokens are player tokens and which are theirs now. */

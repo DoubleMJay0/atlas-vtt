@@ -59,6 +59,8 @@ export class LiveShare {
   private lit = false;
   /** Messages with an end sent so far: each waits under its own key. */
   private ended = 0;
+  /** The next message holds every drag under way, moved or not (`resend`). */
+  private again = false;
 
   constructor(store: SceneStore, ports: LiveSharePorts, listed: () => ListedTokens) {
     this.store = store;
@@ -73,6 +75,7 @@ export class LiveShare {
     if ((scene?.id ?? null) === this.scene) return;
     this.scene = scene?.id ?? null;
     this.sent = new Map();
+    this.again = false;
     this.pacer.cancel();
   }
 
@@ -84,6 +87,18 @@ export class LiveShare {
 
   stop(): void {
     this.setScene(null);
+  }
+
+  /** Whether players follow a token's drag through this lane now, by the id they know it by: the token list keeps it where it was until the drop. */
+  carries(alias: string): boolean {
+    return this.sent.has(alias);
+  }
+
+  /** The places of the drags under way again, whether or not they moved: a player who just joined has only the list's. */
+  resend(): void {
+    if (this.sent.size === 0) return;
+    this.again = true;
+    this.pacer.request();
   }
 
   private flush(): void {
@@ -115,7 +130,7 @@ export class LiveShare {
       const path = sharedPath(rulers.get(id));
       places.set(alias, { x: roundPlace(place.x), y: roundPlace(place.y), ...(path !== undefined && { path }), ruler: JSON.stringify(path ?? null) });
     }
-    const moved = [...places].some(([id, place]) => {
+    const moved = this.again || [...places].some(([id, place]) => {
       const last = this.sent.get(id);
       return last?.x !== place.x || last.y !== place.y || last.ruler !== place.ruler;
     });
@@ -127,6 +142,7 @@ export class LiveShare {
     const tokens: LivePlace[] = [...places].map(([id, { x, y, path }]) => ({ id, x, y, ...(path !== undefined && { path }) }));
     for (const [id, { x, y }] of ends) tokens.push({ id, x, y, end: true });
     this.sent = places;
+    this.again = false;
     // An end is said once: its message waits under a key of its own, which no later message replaces.
     if (ending) this.ended += 1;
     this.ports.sendLive({ t: 'live', scene, at: this.ports.now(), tokens }, ending ? `${scene}\n${this.ended}` : scene);
