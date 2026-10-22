@@ -1,7 +1,0 @@
-@use '../../../../../styles/tokens' as *;
-
-// Menus the generator opens are portaled to the body, outside the namespace: they must stand
-// above the map creator's overlay, which lies above Atlas' other menus.
-.atlas-ctx-menu[data-atlas-owner='atlas-dungeon-generator'] {
-  z-index: $z-atlas-modal + 1;
-}

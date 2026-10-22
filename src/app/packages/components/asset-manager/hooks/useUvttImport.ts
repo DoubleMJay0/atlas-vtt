@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { type App } from 'obsidian';
 import { runUvttImport } from '../../../../import/uvtt/runUvttImport';
 import { isUvttFileName } from '../../../../import/uvtt/uvttFileNames';
+import { openCreatedScene } from '../../../../import/openCreatedScene';
 import { useStableCallback } from '../../../../react/hooks/useStableCallback';
 import type { AssetService } from '../../../../services/AssetService';
 import { showNotice } from '../../../../ui/notice';
@@ -45,23 +46,6 @@ export function mayCarryMapFile(transfer: Pick<DataTransfer, 'items'>): boolean 
 function overManager(event: DragEvent): DataTransfer | null {
   const { target, dataTransfer } = event;
   return dataTransfer && target instanceof Element && target.closest(MANAGER_WINDOW) ? dataTransfer : null;
-}
-
-/**
- * Opens a scene Atlas just created, as a new scene is opened; false where it could not be opened,
- * which the GM is told (the scene stays in the Scenes tab).
- */
-export async function openCreatedScene(app: App, scenePath: string, name: string): Promise<boolean> {
-  const scene = app.vault.getFileByPath(scenePath);
-  if (!scene) return false;
-  try {
-    await app.workspace.getLeaf(false).openFile(scene);
-    return true;
-  } catch (error) {
-    console.error('[Atlas] A new scene could not be opened', error);
-    showNotice(`"${name}" could not be opened. It is in the Scenes tab.`);
-    return false;
-  }
 }
 
 function sayNotMaps(files: readonly File[]): void {

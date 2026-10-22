@@ -11,7 +11,6 @@ import { usePreviewSize } from './PreviewCanvas';
 import { useDungeonState } from './useDungeonState';
 import { useGeneratorActions, type CreatedDungeonScene } from './useGeneratorActions';
 import { useMapPreview } from './useMapPreview';
-import './dungeon-generator-menus.scss';
 
 export interface DungeonGeneratorPanelProps {
   app: App;
@@ -22,21 +21,18 @@ export interface DungeonGeneratorPanelProps {
   /** The name typed where the generator was opened from: the scene's name to begin with. */
   initialName?: string | undefined;
   onCreated: (scene: CreatedDungeonScene) => void;
-  /** A scene is being created: the dialog holding the panel stays open until it is done. */
+  /** A scene is being created: whoever holds the panel waits for it before letting go. */
   onBusyChange?: ((busy: boolean) => void) | undefined;
 }
 
-/** Marks the generator's menus (`dungeon-generator-menus.scss`). */
-const MENU_OWNER = 'atlas-dungeon-generator';
-
 /**
- * The dungeon generator: a live map preview on the left, drawn off the main thread, and the
- * settings beside it; below, Export and Create scene. The same panel serves the map creator's
- * Generate mode and the generator opened on its own (`openDungeonGenerator`).
+ * The dungeon generator, filling its tab (`DungeonGeneratorView`): a live map preview drawn off
+ * the main thread fills the main area, the settings stand in a sidebar on the right with Export
+ * and Create scene at its foot.
  */
 export function DungeonGeneratorPanel(props: DungeonGeneratorPanelProps): React.JSX.Element {
   return (
-    <ContextMenuProvider local ownerId={MENU_OWNER}>
+    <ContextMenuProvider local>
       <GeneratorPanel {...props} />
     </ContextMenuProvider>
   );
@@ -78,13 +74,15 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
           onShowHiddenWings={state.edits.hiddenWings?.length ? state.showHiddenWings : undefined}
         />
       </div>
-      <GeneratorSettings
-        state={state}
-        layer={root}
-        collection={collections && onCollectionChange ? { id: collectionId, options: collections, onChange: onCollectionChange } : undefined}
-        thumbnails={client}
-      />
-      <GeneratorFooter actions={actions} ready={state.model !== null} named={state.name.trim() !== ''} />
+      <div className="atlas-dungeon-generator__sidebar">
+        <GeneratorSettings
+          state={state}
+          layer={root}
+          collection={collections && onCollectionChange ? { id: collectionId, options: collections, onChange: onCollectionChange } : undefined}
+          thumbnails={client}
+        />
+        <GeneratorFooter actions={actions} ready={state.model !== null} named={state.name.trim() !== ''} />
+      </div>
     </div>
   );
 }

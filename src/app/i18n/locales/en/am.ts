@@ -94,6 +94,7 @@ export const am = {
   'am.header.create': 'Create',
   'am.header.createToken': 'Create Token',
   'am.header.addMap': 'Add Map',
+  'am.header.generateDungeon': 'Generate Dungeon',
   'am.header.createEncounter': 'Create Encounter',
   'am.header.createCollection': 'Create Collection',
   'am.link.missing': 'Install and enable the Fantasy Statblocks plugin to link statblocks.',

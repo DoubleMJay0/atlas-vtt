@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Dungeon generator – Barrel
 // ═══════════════════════════════════════════════════════════════════════════
-// The map preview on the left, the settings column on the right, Export and
-// Create scene below; inside the map creator or a dialog of its own.
+// A tab of its own: the map preview fills it, the settings stand in a sidebar
+// on the right with Export and Create scene at its foot.
 
 @use 'panel';
 @use 'settings';

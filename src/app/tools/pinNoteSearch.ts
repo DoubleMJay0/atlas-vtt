@@ -21,7 +21,7 @@ export interface PinNoteSearchOptions {
 
 export interface PinNoteSearch {
   focus: () => void;
-  /** A create entry is at work (a dialog of its own may be open): presses outside the dropdown belong to it. */
+  /** A create entry is at work (in a tab of its own, perhaps): presses outside the dropdown belong to it. */
   isCreating: () => boolean;
 }
 
@@ -127,11 +127,13 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
 
   const createAndPick = async (entry: PinCreateEntry, name: string): Promise<void> => {
     creating = true;
+    if (entry.away) container.addClass('atlas-away');
     let path: string | null;
     try {
       path = await entry.create(name);
     } finally {
       creating = false;
+      container.removeClass('atlas-away');
     }
     if (path !== null) options.onPick(path);
   };

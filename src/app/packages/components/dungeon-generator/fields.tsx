@@ -1,4 +1,5 @@
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { ToggleSwitch } from '../primitives/Toggle';
 import { Select, type SelectOption } from '../primitives/Select';
 
@@ -41,19 +42,35 @@ export function SelectRow<T extends string>({ label, value, options, onChange, l
 
 interface SettingsSectionProps {
   title: string;
-  actions?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function SettingsSection({ title, actions, children }: SettingsSectionProps): React.JSX.Element {
+/**
+ * A titled part of the sidebar that folds away by its title, so the parts below come up. Folded
+ * content stays mounted and hidden: the style gallery keeps its thumbnails for when it opens.
+ */
+export function SettingsSection({ title, children }: SettingsSectionProps): React.JSX.Element {
   const id = useId();
+  const bodyId = useId();
+  const [open, setOpen] = useState(true);
   return (
     <section className="atlas-dungeon-section" aria-labelledby={id}>
-      <header className="atlas-dungeon-section__header">
-        <h3 id={id} className="atlas-dungeon-section__title">{title}</h3>
-        {actions}
-      </header>
-      {children}
+      <h3 className="atlas-dungeon-section__title">
+        <button
+          type="button"
+          id={id}
+          className="atlas-dungeon-section__toggle"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => setOpen((shown) => !shown)}
+        >
+          <ChevronRight className="atlas-dungeon-section__chevron" aria-hidden="true" />
+          <span>{title}</span>
+        </button>
+      </h3>
+      <div id={bodyId} className="atlas-dungeon-section__body" hidden={!open}>
+        {children}
+      </div>
     </section>
   );
 }

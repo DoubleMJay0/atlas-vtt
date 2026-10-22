@@ -14,6 +14,8 @@ export interface PinCreateEntry {
   label: (name: string) => string;
   /** A Lucide icon id. */
   icon: string;
+  /** It works in a tab of its own: the dropdown is hidden until it is done. */
+  away?: boolean;
   /** Why `name` cannot be used, shown under a disabled entry; null where it can. */
   problem?: (name: string) => string | null;
   /** Makes it and returns the vault path the pin links, or null when the GM cancelled. */
@@ -47,7 +49,8 @@ export function noteCreateEntry(app: App, mapPath: string | null): PinCreateEntr
 
 /**
  * Generates a dungeon of the typed name as a scene of the map's own collection (a pin links only
- * scenes of its collection), and links the pin to it. Offered only on a map in a collection.
+ * scenes of its collection), in the generator's tab, and links the pin to it. Offered only on a
+ * map in a collection.
  */
 export function dungeonCreateEntry(app: App, mapPath: string | null): PinCreateEntry | null {
   const collectionId = collectionIdOfPath(mapPath);
@@ -56,6 +59,7 @@ export function dungeonCreateEntry(app: App, mapPath: string | null): PinCreateE
     id: 'dungeon',
     label: (name) => t('pin.search.generateDungeon', { name }),
     icon: 'castle',
+    away: true,
     create: async (name) => (await openDungeonGenerator(app, { name, collectionId }))?.scenePath ?? null,
   };
 }

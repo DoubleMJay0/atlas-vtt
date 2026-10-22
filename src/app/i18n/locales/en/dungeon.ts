@@ -1,10 +1,8 @@
 import type { Message } from '../../types';
 
 export const dungeon = {
-  'dungeon.title': 'Generate dungeon',
-  'dungeon.mode.label': 'How to add maps',
-  'dungeon.mode.import': 'Import',
-  'dungeon.mode.generate': 'Generate',
+  'dungeon.title': 'Dungeon generator',
+  'dungeon.collection': 'Collection',
 
   'dungeon.preview.label': 'Dungeon preview',
   'dungeon.preview.failed': 'The preview could not be drawn.',

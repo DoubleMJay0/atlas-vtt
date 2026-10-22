@@ -757,6 +757,14 @@
   overflow: auto;
 }
 
+// The dungeon generator's tab content (`DungeonGeneratorView`): the generator fills it edge to
+// edge, and its layout asks the tab's size.
+.atlas-vtt-plugin.atlas-dungeon-generator-view {
+  padding: 0;
+  overflow: hidden;
+  container: atlas-dungeon-generator / size;
+}
+
 // Atlas VTT view styles - scoped to our plugin views only
 .workspace-leaf-content[data-type="atlas-vtt"] .atlas-vtt-view,
 .workspace-leaf-content[data-type="atlas-vtt-dashboard"] .atlas-vtt-view {
@@ -828,6 +836,11 @@
   color: var(--text-normal);
   font-family: var(--font-interface);
   font-size: $font-ui-small;
+
+  // A create entry is at work in a tab of its own (Generate dungeon): the dropdown waits unseen.
+  &.atlas-away {
+    visibility: hidden;
+  }
 
   // ── Search ─────────────────────────────────────────────────────
   .pin-search-wrapper {

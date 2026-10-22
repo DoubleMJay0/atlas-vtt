@@ -2,16 +2,15 @@
 @use '../../../../../styles/mixins' as *;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Dungeon generator – settings column
+// Dungeon generator – the sidebar's settings
 // ═══════════════════════════════════════════════════════════════════════════
 
 .atlas-dungeon-generator__settings {
   @include atlas-flex-col($gap: $spacing-l);
+  flex: 1;
   min-height: 0;
   padding: $spacing-l;
   overflow-y: auto;
-  border-left: $border-width-s solid var(--divider-color);
-  background: var(--background-secondary);
   @include atlas-scrollbar;
 }
 
@@ -21,16 +20,47 @@
   outline: none;
 }
 
-.atlas-dungeon-section__header {
-  @include atlas-flex-row($gap: $spacing-s);
-  justify-content: space-between;
-}
-
 .atlas-dungeon-section__title {
   margin: 0;
   font-size: $font-ui-small;
   font-weight: $font-weight-medium;
+}
+
+// The title folds its section away: the whole row is the button.
+.atlas-dungeon-section__toggle {
+  @include atlas-flex-row($gap: $spacing-xs);
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
   color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: transparent;
+    color: var(--text-normal);
+  }
+
+  @include atlas-focus-ring;
+}
+
+.atlas-dungeon-section__chevron {
+  flex-shrink: 0;
+  width: $icon-s;
+  height: $icon-s;
+  transition: transform $transition-fast $transition-ease;
+}
+
+.atlas-dungeon-section__toggle[aria-expanded='true'] > .atlas-dungeon-section__chevron {
+  transform: rotate(90deg);
+}
+
+.atlas-dungeon-section__body[hidden] {
+  display: none;
 }
 
 .atlas-dungeon-fields,
@@ -145,12 +175,13 @@
 }
 
 // ── Style gallery ───────────────────────────────────────────────────────────
-// Two cards a row; the chosen one ringed in the accent. Each card's art is a window of the
-// dungeon drawn by the worker at the art's device pixels (`useThumbnailSize`).
+// As many cards a row as the sidebar's width holds; the chosen one ringed in the accent. Each
+// card's art is a window of the dungeon drawn by the worker at the art's device pixels
+// (`useThumbnailSize`).
 
 .atlas-dungeon-style-gallery {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: $spacing-s;
 }
 

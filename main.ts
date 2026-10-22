@@ -84,6 +84,7 @@ import { IssueReporter } from './src/app/support/IssueReporter';
 import { runInBackground } from './src/app/utils/backgroundTask';
 import { TileDecoderClient } from './src/app/pixi/mapImage/TileDecoderClient';
 import { DungeonWorkerClient } from './src/app/dungeons/worker/DungeonWorkerClient';
+import { DUNGEON_GENERATOR_VIEW_TYPE, DungeonGeneratorView } from './src/app/packages/components/dungeon-generator/DungeonGeneratorView';
 import { MapImageService } from './src/app/pixi/mapImage/MapImageService';
 
 declare const __ATLAS_RELEASE_BUILD__: boolean;
@@ -302,6 +303,7 @@ export default class AtlasVTTPlugin extends Plugin {
     this.registerView(ATLAS_VIEW_TYPE, (leaf) => new AtlasView(leaf, this));
     this.registerView(LOCAL_PLAYER_VIEW_TYPE, (leaf) => new LocalPlayerView(leaf));
     this.registerView(DASHBOARD_VIEW_TYPE, (leaf) => new DashboardView(leaf, this));
+    this.registerView(DUNGEON_GENERATOR_VIEW_TYPE, (leaf) => new DungeonGeneratorView(leaf));
     registerLootQueryView(this);
     registerBaseGiveButtons(this);
     this.registerView(TEMPLATE_EDITOR_VIEW_TYPE, (leaf) => new TemplateEditorView(leaf));

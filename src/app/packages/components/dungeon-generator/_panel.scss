@@ -2,18 +2,43 @@
 @use '../../../../../styles/mixins' as *;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Dungeon generator – panel shell, preview, footer and the two hosts
+// Dungeon generator – its tab, the preview and the sidebar's foot
 // ═══════════════════════════════════════════════════════════════════════════
 
+// The tab's own content element is styled in styles/main.scss (it carries `.atlas-vtt-plugin`
+// itself, outside this namespace) and is the container the narrow layout asks.
+
 .atlas-dungeon-generator {
-  // The layer its select lists open in: it clips nothing, the columns scroll.
+  // The layer its select lists open in: it clips nothing, the sidebar scrolls.
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  grid-template-rows: minmax(0, 1fr) auto;
-  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 30%, 440px);
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
+  min-height: 0;
   outline: none;
+}
+
+// A narrow tab (a split, a phone) stacks the sidebar under the map.
+@container atlas-dungeon-generator (max-width: 720px) {
+  .atlas-dungeon-generator {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(200px, 45%) minmax(0, 1fr);
+  }
+
+  .atlas-dungeon-generator__sidebar {
+    border-top: $border-width-s solid var(--divider-color);
+    border-left: none;
+  }
+}
+
+.atlas-dungeon-generator__sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: $border-width-s solid var(--divider-color);
+  background: var(--background-secondary);
 }
 
 // ── Preview ─────────────────────────────────────────────────────────────────
@@ -22,7 +47,8 @@
   display: flex;
   min-width: 0;
   min-height: 0;
-  padding: $spacing-l;
+  padding: $spacing-xl;
+  background: var(--background-primary);
 }
 
 .atlas-dungeon-preview {
@@ -95,16 +121,21 @@
 }
 
 // ── Footer ──────────────────────────────────────────────────────────────────
+// The sidebar's foot: status on its own line where it needs the room, the actions at the end.
 
 .atlas-dungeon-generator__footer {
   position: relative;
-  grid-column: 1 / -1;
-  @include atlas-modal-footer;
+  @include atlas-flex-row($gap: $spacing-l);
+  flex-wrap: wrap;
+  flex-shrink: 0;
   justify-content: space-between;
+  padding: $spacing-l;
+  border-top: $border-width-s solid var(--divider-color);
 }
 
 .atlas-dungeon-generator__status {
   @include atlas-flex-row($gap: $spacing-xs);
+  flex: 1 1 auto;
   min-width: 0;
   font-size: $font-ui-small;
   color: var(--text-muted);
@@ -121,10 +152,7 @@
 
 .atlas-dungeon-generator__actions {
   @include atlas-flex-row($gap: $spacing-s);
-
-  > .btn:last-child {
-    @include atlas-modal-corner-control(bottom-right);
-  }
+  margin-inline-start: auto;
 }
 
 .atlas-dungeon-cell-dialog {
@@ -144,45 +172,6 @@
 
 .atlas-dungeon-generator .atlas-spin {
   animation: atlas-spin 700ms linear infinite;
-}
-
-// ── Hosts ───────────────────────────────────────────────────────────────────
-
-// The map creator's Generate mode: header above, the panel below, no rail.
-.atlas-token-creator__window--generate {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
-
-  > .atlas-token-creator__header {
-    grid-column: 1;
-  }
-
-  > .atlas-dungeon-generator {
-    grid-column: 1;
-    grid-row: 2;
-  }
-}
-
-.atlas-token-creator__source-switch {
-  flex-shrink: 0;
-  margin-inline-start: auto;
-}
-
-// The generator in a dialog of its own (note pin search)
-.atlas-dungeon-generator-modal {
-  width: min(1280px, 94vw);
-  max-width: none;
-  height: min(860px, 90vh);
-  max-height: none;
-
-  > .modal-content {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    // The panel's footer meets the dialog's edges, as the creator's does.
-    margin: 0 calc(-1 * #{$spacing-l}) calc(-1 * #{$spacing-l});
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

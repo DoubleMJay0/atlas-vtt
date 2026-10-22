@@ -135,6 +135,37 @@ describe('the dungeon generator panel', () => {
     expect(onCreated).not.toHaveBeenCalled();
   });
 
+  it('folds a sidebar section away by its title, keeping what it holds', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
+    const style = screen.getByRole('button', { name: 'Style' });
+    expect(style.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(style);
+    expect(style.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('radiogroup', { name: 'Style' })).toBeNull();
+    fireEvent.click(style);
+    expect(screen.getByRole('radiogroup', { name: 'Style' })).toBeTruthy();
+    // The cards drawn before are kept for the unfolded gallery
+    expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length);
+  });
+
+  it('offers the collections where the GM may choose one', () => {
+    const onCollectionChange = vi.fn();
+    render(
+      <DungeonGeneratorPanel
+        app={app}
+        collectionId="Dungeons"
+        collections={[{ id: 'Dungeons', name: 'Dungeons' }, { id: 'Ruins', name: 'Ruins' }] as never}
+        onCollectionChange={onCollectionChange}
+        onCreated={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('group', { name: 'Collection' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Dungeons/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Ruins/ }));
+    expect(onCollectionChange).toHaveBeenCalledWith('Ruins');
+  });
+
   it('has no keyboard shortcuts: keys pressed in the panel change nothing', async () => {
     renderPanel();
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());

@@ -22,9 +22,6 @@ import type { SavedToken } from './token-creator/tokenStatblocks';
 import { useFrameProgress } from '../primitives/useFrameProgress';
 import { uvttFilesAmong, type ImportMaps } from './hooks/useUvttImport';
 import { useFileDrop } from './token-creator/useFileDrop';
-import { MapSourceSwitch, type MapSource } from './token-creator/MapSourceSwitch';
-import { DungeonGeneratorPanel } from '../dungeon-generator/DungeonGeneratorPanel';
-import type { CreatedDungeonScene } from '../dungeon-generator/useGeneratorActions';
 import type { CreatorMode, CreatorSource, EditTokenInput, PreviewImage } from './token-creator/types';
 import { t } from '../../../i18n';
 
@@ -39,11 +36,9 @@ interface TokenCreatorProps {
   playerCharacters?: boolean;
   /** Given to the map creator: takes the Universal VTT files among the added files, which become scenes at once. */
   onImportMaps?: ImportMaps;
-  /** Given to the map creator: offers Generate beside Import, and opens the scene a dungeon became. */
-  onDungeonCreated?: (scene: CreatedDungeonScene) => void;
 }
 
-export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollection = AssetService.defaultCollectionId(), editToken, initialSource = 'images', onImportMaps, onDungeonCreated, playerCharacters = false }: TokenCreatorProps): React.JSX.Element | null {
+export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollection = AssetService.defaultCollectionId(), editToken, initialSource = 'images', onImportMaps, playerCharacters = false }: TokenCreatorProps): React.JSX.Element | null {
   const { app } = useAtlasUI();
   const { assetService, collections } = useAssetCatalog(app, isOpen);
   const previews = useTokenPreviews(mode);
@@ -66,10 +61,6 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
   const [saveError, setSaveError] = useState('');
   const [saveBlocked, setSaveBlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mapSource, setMapSource] = useState<MapSource>('import');
-  const [creatingDungeon, setCreatingDungeon] = useState(false);
-  const generating = mode === 'map' && !editToken && onDungeonCreated !== undefined && mapSource === 'generate';
-  const busy = isSubmitting || creatingDungeon;
   // Saving reports every preview; the footer shows it at most once a frame
   const { progress: saveProgress, report: reportSaveProgress, clear: clearSaveProgress } = useFrameProgress();
   const [previewPane, setPreviewPane] = useState<HTMLDivElement | null>(null);
@@ -169,18 +160,18 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
       if (e.key === 'Escape' && windowRef.current?.querySelector('[aria-haspopup="menu"][aria-expanded="true"]')) return;
       // A dialog or list inside the window (a note being edited) takes its own Escape.
       if (e.key === 'Escape' && e.target instanceof Element && e.target.closest('[role="dialog"] [role="dialog"], [role="listbox"], .atlas-ctx-menu')) return;
-      if (e.key === 'Escape' && !busy) {
+      if (e.key === 'Escape' && !isSubmitting) {
         e.preventDefault();
         e.stopPropagation();
         onClose();
-      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !generating) {
+      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         void handleSubmit();
       }
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, onClose, handleSubmit, busy, generating]);
+  }, [isOpen, onClose, handleSubmit, isSubmitting]);
 
   const addChosen = (images: PreviewImage[]): void => { previews.addImages(images); setSource('images'); };
   const closeChooser = (): void => { importController.abort(); setImportController(new AbortController()); setSource('images'); };
@@ -191,19 +182,19 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
   const title = editToken ? t(`creator.${mode}.edit`) : t(`creator.${mode}.create`);
 
   return (
-    <motion.div {...dialogOverlayMotion} className="atlas-vtt-plugin atlas-vtt-root atlas-token-creator" data-token-creator="true" onClick={() => { if (!busy) onClose(); }}>
+    <motion.div {...dialogOverlayMotion} className="atlas-vtt-plugin atlas-vtt-root atlas-token-creator" data-token-creator="true" onClick={() => { if (!isSubmitting) onClose(); }}>
       <motion.div
         ref={windowRef}
-        className={cn('atlas-token-creator__window', isDragging && 'atlas-dragging', generating && 'atlas-token-creator__window--generate')}
+        className={cn('atlas-token-creator__window', isDragging && 'atlas-dragging')}
         variants={windowVariants}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
-        {...(generating ? {} : drop.handlers)}
+        {...drop.handlers}
       >
-        {!generating && <TokenCreatorRail
+        <TokenCreatorRail
           source={source}
           onSourceChange={next => { if (next !== 'images') setImportController(new AbortController()); setSource(next); }}
           sourceDisabled={importRunning || isSubmitting}
@@ -222,20 +213,17 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
           tagsDisabled={!assetService || isSubmitting || selectedPreviews.length === 0}
           onToggleTag={previews.toggleTag}
           statblocks={statblockRow}
-        />}
+        />
 
         <header className="atlas-token-creator__header">
           <h2>
             <span id={titleId}>{title}</span>
-            {!choosingImages && !generating && count > 0 && <span className="atlas-token-creator__subtitle">{t(`creator.${mode}.count`, { count })}</span>}
+            {!choosingImages && count > 0 && <span className="atlas-token-creator__subtitle">{t(`creator.${mode}.count`, { count })}</span>}
           </h2>
-          {mode === 'map' && !editToken && onDungeonCreated && <MapSourceSwitch value={mapSource} onChange={setMapSource} disabled={busy || importRunning} />}
-          <CloseButton onClick={() => { if (!busy) onClose(); }} />
+          <CloseButton onClick={() => { if (!isSubmitting) onClose(); }} />
         </header>
 
-        {generating && app ? (
-          <DungeonGeneratorPanel app={app} collectionId={collection} collections={collections} onCollectionChange={setCollection} onCreated={onDungeonCreated} onBusyChange={setCreatingDungeon} />
-        ) : usingStatblocks ? (
+        {usingStatblocks ? (
           <StatblockImportContent app={app} queuedPaths={queuedPaths} onAdd={addChosen} onClose={closeChooser} controller={importController} onRunningChange={setImportRunning} />
         ) : usingVault ? (
           <VaultImageContent app={app} mode={mode} queuedPaths={queuedVaultPaths} onAdd={addChosen} onClose={closeChooser} controller={importController} onRunningChange={setImportRunning} />
@@ -258,7 +246,7 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
           )}
         </div>}
 
-        {!choosingImages && !generating && (
+        {!choosingImages && (
           <TokenCreatorFooter
             mode={mode}
             isEditing={Boolean(editToken)}
