@@ -1,7 +1,8 @@
 /**
  * A roll on one of the collection's tables, as the history keeps it: Text tables give
  * results (their first column as text, the other columns as fields, the GM's hidden
- * columns marked), Items tables give item draws as a loot base does. Rows that roll other
+ * columns marked), Items tables give item draws as a loot base does, generators one result
+ * of all their parts each (`generatorResults.ts`). Rows that roll other
  * tables or Base views (master tables) give what those gave.
  */
 
@@ -13,6 +14,7 @@ import { tableSourceId } from './tableLookup';
 import type { RarityOption } from '../types/randomTableTypes';
 import { TABLE_LIMITS } from './tableModel';
 import { rollTable, type TableDraw } from './tableRoller';
+import { rollGeneratorResults } from './generatorResults';
 
 export interface TableRollRequest {
   /** How many to draw; at most `TABLE_LIMITS.results`. */
@@ -67,6 +69,7 @@ async function itemDraws(found: CollectionTable, draw: TableDraw, context: CellC
 /** Rolls `found` (a table that was found in its note); nothing for a table that is missing. */
 export async function rollCollectionTable(found: CollectionTable, request: TableRollRequest): Promise<TableRollOutcome> {
   if (!found.table) return { results: [], draws: [] };
+  if (found.source.kind === 'generator') return rollGeneratorResults(found, request, request.count);
   const random = request.random ?? Math.random;
   const draws = rollTable(found.table, { count: request.count, noRepeats: found.source.noRepeats === true, random });
   const context: CellContext = {

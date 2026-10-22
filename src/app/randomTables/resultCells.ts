@@ -7,7 +7,9 @@
  * it as the loot roller does. So a master table is a table whose rows link
  * smaller tables and views. Any other link, and plain dice text, stay as
  * written: a damage roll belongs to the moment it hits. A row that links its own
- * table ("Mithral + reroll") rolls that table again without itself. Nesting stops at
+ * table ("Mithral + reroll") rolls that table again without itself, and a link to a
+ * table the collection rolls as a generator rolls the whole generator, its name
+ * and parts as one line and its item with the cell's items. Nesting stops at
  * `TABLE_LIMITS.depth`, at the results budget and at a table that reaches itself
  * any other way.
  */
@@ -19,6 +21,7 @@ import { parseFormula, type ParsedFormula } from '../tools/parseFormula';
 import type { RarityOption } from '../types/randomTableTypes';
 import { TABLE_LIMITS, type RandomTable, type TableRow } from './tableModel';
 import { rollTable } from './tableRoller';
+import { generatorItem, generatorText, rollGenerator } from './generatorRoller';
 
 /** A number rolled inside the text: its formula, its total and where the total stands. */
 export interface RolledNumber {
@@ -51,6 +54,8 @@ export type LinkedTable =
     notePath: string;
     /** Where the collection rolls the table as Items: the item of each row, in row order. */
     items?: readonly LootItem[];
+    /** Where the collection rolls the table as a generator: the names its result and item go by. */
+    generator?: { name: string; noteName: string };
   }
   | {
     kind: 'view';
@@ -133,6 +138,7 @@ async function rollLinked(target: string, context: CellContext, stopped: Nesting
     });
     return item ? { ...nothing(), text: item.name, items: [item] } : nothing();
   }
+  if (linked.generator) return rollLinkedGenerator(linked, linked.generator, context);
   const [draw] = rollTable(linked.table, { count: 1, random: context.random, ...(without && { exclude: new Set([without]) }) });
   // A table whose every row rolls it again has nothing else to give.
   if (without && !draw) return stop('loop', stopped);
@@ -145,6 +151,24 @@ async function rollLinked(target: string, context: CellContext, stopped: Nesting
     row: draw.row,
   });
   return item ? { ...cell, items: [toDraw(item, context.currency, context.rarities), ...cell.items] } : cell;
+}
+
+/** A linked generator rolled whole: its name and parts as one line, its item and its parts' items. */
+async function rollLinkedGenerator(
+  linked: Extract<LinkedTable, { kind: 'table' }>, generator: { name: string; noteName: string }, context: CellContext,
+): Promise<ResolvedCell> {
+  const rolled = await rollGenerator(linked.table, generator.name, {
+    ...context, fromPath: linked.notePath, trail: [...context.trail, linked.key],
+  }, resolveCell);
+  const item = generatorItem(rolled, {
+    notePath: linked.notePath, source: [generator.noteName, generator.name], currency: context.currency, ...(context.rarities && { rarities: context.rarities }),
+  });
+  return {
+    text: generatorText(rolled),
+    rolls: [],
+    stopped: rolled.stopped,
+    items: [...(item ? [item] : []), ...rolled.parts.flatMap((part) => part.items)],
+  };
 }
 
 function stop(reason: NestingStop, stopped: NestingStop[]): null {
