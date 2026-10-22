@@ -1,14 +1,18 @@
 import { matchingKey } from '../../../resources/resourceFields';
 import type { ResourceDefinition, ResourceHolder } from '../../../resources/resourceTypes';
+import { holdsValue } from '../../../resources/resourceValues';
 import { statblockResourceValue } from '../../../resources/statblockResourceValues';
 import { shownFieldsOf, type ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import { fieldByKey } from '../../../statblocks/model/fieldKeys';
-import { withHeaderFields } from '../../../statblocks/model/templateHeader';
-import type { FieldKey, FieldValue } from '../../../statblocks/model/templateTypes';
+import { shownHeaderParts, withHeaderFields } from '../../../statblocks/model/templateHeader';
+import type { FieldKey, FieldValue, StatblockTemplate, TemplateBlock } from '../../../statblocks/model/templateTypes';
+import { flattenReadingOrder } from '../../../statblocks/model/treeQueries';
 import { readField } from '../../../statblocks/values/fieldValues';
 import { isWholeNumberText } from '../../../statblocks/values/numberText';
 import type { TrackedNumber } from '../../../statblocks/values/trackedNumbers';
-import { playerAccess } from './playerAccess.ts';
+import { blockAccess, playerAccess } from './playerAccess.ts';
+
+type TrackBlock = Extract<TemplateBlock, { type: 'track' }>;
 
 /**
  * Where the maximum a player sets of their character's resource is written: into a number field of
@@ -18,9 +22,6 @@ import { playerAccess } from './playerAccess.ts';
 export type MaxRoute = { readonly kind: 'note'; readonly field: FieldKey } | { readonly kind: 'hand' };
 
 const BY_HAND: MaxRoute = { kind: 'hand' };
-
-/** A token as far as its maximums follow its note: linked to it, and not set by hand. */
-export type MaxHolder = ResourceHolder & { readonly kind?: string; readonly statblockPath?: string | undefined };
 
 /** A number as the note stores it and a page may write back: a whole number from 0 up, or text that is one and nothing else. Anything worked out (`@level * 2`, `10+2`) is none. */
 function isPlainNumber(value: FieldValue | undefined): boolean {
@@ -46,19 +47,42 @@ export function trackedMaxRoute(resolved: ResolvedStatblock | null | undefined, 
   return noteMaxRoute(resolved, tracked.maxField);
 }
 
-/**
- * Where the maximum of a collection resource the character's token holds is written. While the token
- * follows its note (linked to `statblockPath`, the maximum not set by hand, the note giving the
- * resource a value) it is the note's field, where a player may write it (else nobody but the GM
- * changes it); otherwise the token's maximum is its own, set by hand. Null while the note is read.
- */
-export function heldMaxRoute(resolved: ResolvedStatblock | null | undefined, definition: ResourceDefinition, token: MaxHolder, statblockPath: string | null): MaxRoute | null {
-  const linked = statblockPath !== null && token.kind === 'character' && token.statblockPath === statblockPath;
-  if (!linked || token.overriddenMax?.includes(definition.key) === true) return BY_HAND;
-  if (resolved === undefined) return null;
-  if (resolved === null || statblockResourceValue(shownFieldsOf(resolved), definition, resolved.meanings) === null) return BY_HAND;
-  // Only a field of the note itself, never a path into a value (`stats.0`)
+/** The tracks of a template's card that show a collection resource: those of its layout, and the header's hit points drawn as one; none the player may not see. */
+export function resourceTracks(template: StatblockTemplate): TrackBlock[] {
+  const header = shownHeaderParts(template).flatMap((part) => (part.id === 'hp' ? [part.block] : []));
+  return [...header, ...flattenReadingOrder(template.layout.blocks)]
+    .filter((block): block is TrackBlock => block.type === 'track' && block.resource !== undefined && blockAccess(template, block) !== 'hidden');
+}
+
+/** Where a maximum read through a resource's field (a key of the note, never a path into a value: `stats.0`) is written: that note field, where a player may write it. */
+function definitionFieldRoute(resolved: ResolvedStatblock, definition: ResourceDefinition): MaxRoute | null {
   const path = definition.field.trim();
   const key = path.includes('.') ? undefined : matchingKey(resolved.fields, path, resolved.meanings);
   return key === undefined ? null : noteMaxRoute(resolved, key);
+}
+
+/**
+ * Where the maximum of a collection resource of the character is written, the one decision the
+ * sheet (`maxEditable`) and a player's edit (`checkResourceEdit`) both ask, for a token in a shown
+ * scene (`holder`) or a character no scene shows (none). Null where the player may not set it:
+ * - a Track the template places for the resource whose field the player may not change locks it;
+ * - a maximum the GM set by hand on the token stays by hand;
+ * - where the character's note gives the resource its value, the field behind it is the place
+ *   (`noteMaxRoute`: a plain number of a field the player may change), else nothing;
+ * - a gauge the template places for a resource the token holds none of starts at its track's own
+ *   number, whose field is then the place in the same way;
+ * - only where no note field controls the maximum is it set by hand.
+ * Undecided (null) while the note is read.
+ */
+export function resourceMaxRoute(resolved: ResolvedStatblock | null | undefined, definition: ResourceDefinition, holder: ResourceHolder | undefined, statblockPath: string | null): MaxRoute | null {
+  if (resolved === undefined && statblockPath !== null) return null;
+  const template = resolved?.source.kind === 'atlas' ? resolved.template : null;
+  const track = template ? resourceTracks(template).find((block) => block.resource === definition.key) : undefined;
+  if (template && track && playerAccess(template, track.field) !== 'edit') return null;
+  if (holder?.overriddenMax?.includes(definition.key) === true) return BY_HAND;
+  if (!resolved) return BY_HAND;
+  if (statblockResourceValue(shownFieldsOf(resolved), definition, resolved.meanings) !== null) return definitionFieldRoute(resolved, definition);
+  const held = holder?.resources?.[definition.key];
+  if (template && track && !(held && holdsValue(definition, held)) && readField(resolved.fields, { key: track.field }).value !== undefined) return noteMaxRoute(resolved, track.field);
+  return BY_HAND;
 }

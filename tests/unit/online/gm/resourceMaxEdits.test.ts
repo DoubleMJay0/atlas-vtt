@@ -3,8 +3,9 @@ import { sheetOf } from '../../../../src/app/online/gm/book/bookSheet.ts';
 import type { BookScene } from '../../../../src/app/online/gm/book/bookScene.ts';
 import type { PlayedCharacter } from '../../../../src/app/online/gm/book/characters.ts';
 import { checkMaxFieldEdit } from '../../../../src/app/online/gm/book/fieldEdit.ts';
+import { placedSheetValues } from '../../../../src/app/online/gm/book/placedResources.ts';
 import { checkResourceEdit } from '../../../../src/app/online/gm/book/resourceEdit.ts';
-import { heldMaxRoute } from '../../../../src/app/online/gm/book/resourceMax.ts';
+import { resourceMaxRoute } from '../../../../src/app/online/gm/book/resourceMax.ts';
 import { ResourceWrites, type TokenResourceEdit } from '../../../../src/app/online/gm/book/resourceWrites.ts';
 import { statblockSheet } from '../../../../src/app/online/gm/book/statblockSheet.ts';
 import { storedRead } from '../../../../src/app/online/gm/book/statblockSheets.ts';
@@ -39,7 +40,7 @@ const PATH = 'Characters/Ana.md';
 const LINKED = token('ana', { kind: 'character', statblockPath: PATH, resources: { hp: { current: 6, max: 10 }, armor: { current: 2, max: 3 } } } as never);
 
 const sheetFor = (resolved = RESOLVED, held = LINKED): PlayedCharacter['sheet'] =>
-  sheetOf({ name: 'Ana', imagePath: 'ana.png', showRing: false } as never, held, [HP], () => null, trackedSheetValues(resolved, [HP], held.resources), (definition) => heldMaxRoute(resolved, definition, held, PATH) !== null)!;
+  sheetOf({ name: 'Ana', imagePath: 'ana.png', showRing: false } as never, held, [HP], () => null, trackedSheetValues(resolved, [HP], held.resources), (definition) => resourceMaxRoute(resolved, definition, held, PATH) !== null)!;
 
 const ana = (sheet = sheetFor()): PlayedCharacter => ({
   collection: 'c', key: 'lib-ana', imagePath: 'ana.png', tokenId: 'ana', placed: { assetId: 'lib-ana', imagePath: 'ana.png' }, sheet, statblockPath: PATH, drawnWith: { definitions: [HP], resources: LINKED.resources },
@@ -60,11 +61,14 @@ describe('which maximums a player may set', () => {
     expect(sheetFor(readOnly).resources.map(({ key, maxEditable }) => [key, maxEditable])).toEqual([['hp', false], ['armor', false], ['ki', true]]);
   });
 
-  it('by hand where the token follows no note: not linked, or its maximum set by hand already', () => {
-    expect(heldMaxRoute(RESOLVED, HP, { ...LINKED, statblockPath: undefined }, PATH)).toEqual({ kind: 'hand' });
-    expect(heldMaxRoute(RESOLVED, HP, { ...LINKED, overriddenMax: ['hp'] }, PATH)).toEqual({ kind: 'hand' });
-    expect(heldMaxRoute(RESOLVED, HP, LINKED, PATH)).toEqual({ kind: 'note', field: 'hp' });
-    expect(heldMaxRoute(undefined, HP, LINKED, PATH)).toBeNull();
+  it('by hand only where no note field controls it: no note, or a maximum the GM set by hand already', () => {
+    expect(resourceMaxRoute(null, HP, LINKED, null)).toEqual({ kind: 'hand' });
+    expect(resourceMaxRoute(RESOLVED, HP, { ...LINKED, overriddenMax: ['hp'] }, PATH)).toEqual({ kind: 'hand' });
+    expect(resourceMaxRoute(RESOLVED, HP, LINKED, PATH)).toEqual({ kind: 'note', field: 'hp' });
+    // The note gives the value whether or not the token is linked to it, and for a character no scene shows
+    expect(resourceMaxRoute(RESOLVED, HP, { resources: LINKED.resources }, PATH)).toEqual({ kind: 'note', field: 'hp' });
+    expect(resourceMaxRoute(RESOLVED, HP, undefined, PATH)).toEqual({ kind: 'note', field: 'hp' });
+    expect(resourceMaxRoute(undefined, HP, LINKED, PATH)).toBeNull();
   });
 });
 
@@ -85,8 +89,9 @@ describe('a player\'s maximum, checked', () => {
     expect(checkResourceEdit(ANA, ana(), sceneOf(), () => ANA, message('hp', 0, 0), RESOLVED)).toBeNull();
   });
 
-  it('is the campaign\'s by hand for a resource of a character no scene shows, and still the note\'s for a tracked number', () => {
-    expect(checkResourceEdit(ANA, ana(), null, () => ANA, message('hp', 6, 12), RESOLVED)).toMatchObject({ kind: 'character', max: { value: 12, route: { kind: 'hand' } } });
+  it('goes for a character no scene shows where it goes for its token: the note\'s field, else the campaign\'s by hand', () => {
+    expect(checkResourceEdit(ANA, ana(), null, () => ANA, message('hp', 6, 12), RESOLVED)).toMatchObject({ kind: 'character', max: { value: 12, route: { kind: 'note', field: 'hp' } } });
+    expect(checkResourceEdit(ANA, { ...ana(), statblockPath: null }, null, () => ANA, message('hp', 6, 12), null)).toMatchObject({ kind: 'character', max: { value: 12, route: { kind: 'hand' } } });
     expect(checkResourceEdit(ANA, ana(), null, () => ANA, message('armor', 1, 4), RESOLVED)).toMatchObject({ kind: 'character', max: { route: { kind: 'note', field: 'armor' } } });
   });
 
@@ -105,6 +110,41 @@ describe('a player\'s maximum, checked', () => {
     expect(trackedSheetValues(resolvedOf(TEMPLATE, after), [HP], { armor: { current: 4, max: 3 } }).map(({ value }) => value)).toEqual([{ current: 4, max: 5 }, { current: 6, max: 6 }]);
     expect(checkMaxFieldEdit({ ...inputs, sent: null }, 'armor', 5)).toBeNull();
     expect(checkMaxFieldEdit(inputs, 'name', 5)).toBeNull();
+  });
+});
+
+describe('a maximum the GM locked', () => {
+  const WARD: ResourceDefinition = { key: 'ward', name: 'Ward', field: 'wardmax', direction: 'drains', color: '#4455aa', visibleToPlayers: true };
+  const wardFields: TemplateField[] = [...FIELDS, { key: 'ward', label: 'Ward', type: 'number' }, { key: 'wardmax', label: 'Ward max', type: 'number' }];
+  const gauge = { id: 'track001', type: 'track', field: 'ward', resource: 'ward', look: 'gauge', counts: 'down' } as const;
+  const lockedBy = (players: Record<string, 'read' | 'hidden'>): ReturnType<typeof resolvedOf> => resolvedOf({ ...templateOf(wardFields, [gauge]), players }, { ...NOTE, ward: 4, wardmax: 6 });
+  /** A sheet offering the Ward's maximum, as a stale one might: the edit is checked again all the same. */
+  const offering = (character: PlayedCharacter): PlayedCharacter => ({
+    ...character, drawnWith: { definitions: [HP, WARD], resources: LINKED.resources },
+    sheet: { ...character.sheet, resources: [...character.sheet.resources, { key: 'ward', name: 'Ward', colour: '#4455aa', direction: 'drains', current: 6, max: 6, editable: true, maxEditable: true }] },
+  });
+  const scene: BookScene = { ...sceneOf(), resources: [HP, WARD] };
+
+  it('is no maximum of a gauge the template places whose note field the player may only read, on the sheet or in an edit', () => {
+    const resolved = lockedBy({ wardmax: 'read' });
+    expect(placedSheetValues(resolved, [HP, WARD], LINKED.resources).map(({ definition, maxEditable }) => [definition.key, maxEditable])).toEqual([['ward', false]]);
+    expect(checkResourceEdit(ANA, offering(ana()), scene, () => ANA, message('ward', 6, 9), resolved)).toBeNull();
+    expect(placedSheetValues(lockedBy({}), [HP, WARD], LINKED.resources).map(({ maxEditable }) => maxEditable)).toEqual([true]);
+    expect(checkResourceEdit(ANA, offering(ana()), scene, () => ANA, message('ward', 6, 9), lockedBy({}))).toMatchObject({ max: { route: { kind: 'note', field: 'wardmax' } } });
+  });
+
+  it('is refused for a character no scene shows as for one the scene holds', () => {
+    const resolved = lockedBy({ wardmax: 'read', hp: 'hidden' });
+    expect(checkResourceEdit(ANA, offering(ana()), null, () => ANA, message('ward', 6, 9), resolved)).toBeNull();
+    expect(checkResourceEdit(ANA, offering(ana()), null, () => ANA, message('hp', 6, 12), resolved)).toBeNull();
+  });
+
+  it('is refused where the template places a Track for the resource whose field the player may not change', () => {
+    const resolved = lockedBy({ ward: 'read' });
+    const holding = { ...LINKED, resources: { ...LINKED.resources, ward: { current: 3, max: 6 } } };
+    expect(resourceMaxRoute(resolved, WARD, holding, PATH)).toBeNull();
+    expect(placedSheetValues(resolved, [HP, WARD], LINKED.resources).map(({ maxEditable }) => maxEditable)).toEqual([false]);
+    expect(checkResourceEdit(ANA, offering(ana()), { ...scene, tokens: { ana: holding } }, () => ANA, message('ward', 3, 9), resolved)).toBeNull();
   });
 });
 

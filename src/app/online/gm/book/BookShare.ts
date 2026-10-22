@@ -24,7 +24,7 @@ import { RecipientListeners } from './recipientListeners.ts';
 import type { BookScene } from './bookScene.ts';
 import type { BookSharePorts } from './bookSharePorts.ts';
 import { checkResourceEdit, type ResourceEdit } from './resourceEdit.ts';
-import { heldMaxRoute } from './resourceMax.ts';
+import { resourceMaxRoute } from './resourceMax.ts';
 import { OwedBooks } from './owedBooks.ts';
 import { bookUpdate, NO_QUESTS, RESEND, sentOf, type SentBook } from './sentBook.ts';
 import { StatblockShare } from './statblockShare.ts';
@@ -264,7 +264,7 @@ export class BookShare implements LootRecipientSource {
         const resolved = statblockPath === null ? null : this.statblocks.resolved(statblockPath);
         // Beside the token's own: the numbers its statblock tracks, and the gauges its template places for resources it holds none of
         const extra = [...trackedSheetValues(resolved, scene.resources, token.resources), ...placedSheetValues(resolved, scene.resources, token.resources)];
-        const maxEditable = (definition: ResourceDefinition): boolean => heldMaxRoute(resolved, definition, token, statblockPath) !== null;
+        const maxEditable = (definition: ResourceDefinition): boolean => resourceMaxRoute(resolved, definition, token, statblockPath) !== null;
         return sheetOf(shown, token, scene.resources, (path) => this.art.get(path), extra, maxEditable);
       },
       libraryStatblock: (placed) => this.ports.libraryStatblock(placed),

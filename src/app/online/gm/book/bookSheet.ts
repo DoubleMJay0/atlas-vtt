@@ -16,7 +16,7 @@ const isValue = (value: number): boolean => Number.isFinite(value) && Math.abs(v
  * resource from players hides it on other tokens, never from the player whose character it is.
  * Each names its key, and the player may change every one but a fixed value (`static`), which the
  * statblock gives, and a tracked number whose field the template lets them only read. Its maximum
- * they may set where `maxEditable` says so for the token's own (`heldMaxRoute`), and where the
+ * they may set where `maxEditable` says so for the token's own (`resourceMaxRoute`), and where the
  * tracked number says so.
  */
 function sheetResources(

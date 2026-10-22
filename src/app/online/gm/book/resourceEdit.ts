@@ -7,7 +7,7 @@ import { visibleResources } from '../../../resources/visibleResources';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import type { BookScene } from './bookScene.ts';
 import type { PlayedCharacter } from './characters.ts';
-import { heldMaxRoute, trackedMaxRoute, type MaxRoute } from './resourceMax.ts';
+import { resourceMaxRoute, trackedMaxRoute, type MaxRoute } from './resourceMax.ts';
 
 /** A maximum a player sets, where it is written (`MaxRoute`), and whether it is a fixed value's one number (`static`). */
 export interface MaxEdit {
@@ -62,10 +62,8 @@ function maxEditOf(
   const fixed = definition?.direction === 'static';
   // A counting value needs a maximum above 0, a fixed value (an armour class) may be 0
   if (message.max < (fixed ? 0 : 1)) return null;
-  let route: MaxRoute | null;
-  if (definition === undefined) route = trackedNumberRoute(resolved, definitions, message.key);
-  // A token the scene holds follows its note or holds its own; the campaign's value of a character no scene shows is by hand
-  else route = token?.resources?.[definition.key] ? heldMaxRoute(resolved, definition, token, character.statblockPath) : { kind: 'hand' };
+  // The same decision as the sheet's, for a token the scene holds (with or without a value of it) and a character no scene shows
+  const route = definition === undefined ? trackedNumberRoute(resolved, definitions, message.key) : resourceMaxRoute(resolved, definition, token, character.statblockPath);
   return route === null ? null : { value: message.max, route, fixed };
 }
 
