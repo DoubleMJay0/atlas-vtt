@@ -80,10 +80,10 @@ export function playerFormula(formula: string): boolean {
 }
 
 /**
- * A player's formula as it is rolled by `rules`: as sent, or without the labels of its constants
- * where only those keep the dice tool from rolling it (the length a label adds once a bonus is
- * completed with the map's dice), so a roll that names its numbers is never refused where the plain
- * one rolls.
+ * A player's formula as it is rolled by `rules`: as sent (a labelled bonus, `+4[Agility]`, completed
+ * with the map's dice as a plain one is: `completeFormula`), or without the labels of its constants
+ * where only those keep the dice tool from rolling it (a completed formula past its length), so a
+ * roll that names its numbers is never refused where the plain one rolls.
  */
 export function rolledFormula(formula: string, rules: DiceRules | RollingDice | undefined): string {
   if (rules === undefined || completeFormula(formula, rules).ok) return formula;
