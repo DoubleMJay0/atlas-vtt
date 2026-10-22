@@ -179,6 +179,12 @@ export class SceneShare {
     this.live?.resend();
   }
 
+  /** A player's map shows again: they are sent the marks and the drags under way as they are now. */
+  resendActivity(to: string): void {
+    this.marks.resend(to);
+    this.live?.resend();
+  }
+
   /** Who owns which token, which tokens are player tokens, or who is connected changed: players hear which tokens are player tokens and which are theirs now. */
   ownersChanged(): void {
     this.tokens.update();
