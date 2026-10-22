@@ -7,29 +7,30 @@ import type { NotePatch } from '../../../statblocks/notes/patchTypes';
 import { keyedEntryItems } from '../../../statblocks/values/entryKeys';
 import { entryNameKey, entryTextKey, entryTextKeyOf } from '../../../statblocks/values/entryValues';
 import type { FieldRead } from '../../../statblocks/values/fieldValues';
+import type { FieldLookup } from '../../../statblocks/values/references';
 import { playerAccess } from './playerAccess.ts';
-import { amongOptions, clears, editableTemplate, inOptionOrder, isDice, isLine, isPlainList, writtenValue, type CheckedEdit, type EditInputs } from './statblockChecks.ts';
+import { amongOptions, clears, editableTemplate, inOptionOrder, isDice, isLine, isPlainList, playerLookup, writtenValue, type CheckedEdit, type EditInputs } from './statblockChecks.ts';
 
 /** Whether a part's value fits the part as the template shapes it. */
-function fitsPart(shape: EntryExtraShape, value: SheetRaw): boolean {
+function fitsPart(shape: EntryExtraShape, value: SheetRaw, lookup: FieldLookup): boolean {
   switch (shape.type) {
     case 'text': return isLine(value);
     case 'number': return typeof value === 'number';
     case 'list': return isPlainList(value);
-    case 'dice': return isDice(value);
+    case 'dice': return isDice(value, lookup);
     case 'choice': return shape.several === true ? inOptionOrder(value, shape.options ?? [], false) : amongOptions(value, shape.options, false);
   }
 }
 
 /** The parts of an ability as the note keeps them, in the template's order, empty ones left out; null where one is no part of the list or does not fit it. */
-function abilityParts(shape: EntryShape | undefined, parts: AbilityInput['parts']): [string, FieldValue][] | null {
+function abilityParts(shape: EntryShape | undefined, parts: AbilityInput['parts'], lookup: FieldLookup): [string, FieldValue][] | null {
   const extras = shape?.extras ?? [];
   if (Object.keys(parts).some((key) => !extras.some((extra) => extra.key === key))) return null;
   const kept: [string, FieldValue][] = [];
   for (const extra of extras) {
     const value = Object.hasOwn(parts, extra.key) ? parts[extra.key] : undefined;
     if (value === undefined || clears(value)) continue;
-    if (!fitsPart(extra, value)) return null;
+    if (!fitsPart(extra, value, lookup)) return null;
     kept.push([extra.key, value as FieldValue]);
   }
   return kept;
@@ -115,7 +116,7 @@ export function checkAbilityEdit(inputs: EditInputs, message: BookAbilityMessage
   const field = fieldByKey(template.fields, message.list);
   const read = field === undefined ? undefined : inputs.read(field);
   if (field?.type !== 'entries' || read === undefined) return null;
-  const parts = message.op === 'remove' ? [] : abilityParts(field.entry, message.entry.parts);
+  const parts = message.op === 'remove' ? [] : abilityParts(field.entry, message.entry.parts, playerLookup(inputs, template));
   if (parts === null) return null;
   const items = Array.isArray(read.value) ? read.value : keyedEntryItems(read.value).map((entry) => entry.item);
   const next = editedList(items, read, field.entry, message, parts);

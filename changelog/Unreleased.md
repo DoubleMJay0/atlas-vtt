@@ -29,3 +29,4 @@
 - Players can add words and labels with values (such as Experiences) to their character's lists online, and take them out again
 - Dice a player writes online with @ references, such as 2d8 + @str, roll at once with the numbers filled in
 - Typing @ in a value on a character sheet online suggests the values the player can reference, each with its current number
+- Players can write dice with @ references into their sheet's dice values

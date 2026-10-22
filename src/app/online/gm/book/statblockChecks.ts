@@ -1,9 +1,13 @@
 import { bookLine, MAX_BOOK_TITLE, MAX_SHEET_LIST, type BookStatblock, type SheetField, type SheetNode, type SheetRaw, type SheetValue } from '../../protocol/index.ts';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
+import { withHeaderFields } from '../../../statblocks/model/templateHeader';
 import type { FieldValue, StatblockTemplate } from '../../../statblocks/model/templateTypes';
 import type { NotePatch } from '../../../statblocks/notes/patchTypes';
-import { isDiceNotation } from '../../../statblocks/values/diceNotation';
+import { rollsWithReferences } from '../../../statblocks/values/diceValues';
 import type { FieldRead, KeyedField } from '../../../statblocks/values/fieldValues';
+import type { FieldLookup } from '../../../statblocks/values/references';
+import { statblockLookup } from '../../../statblocks/values/statblockLookup';
+import { shownRecord } from './playerAccess.ts';
 import type { WrittenValue } from './statblockSheets.ts';
 
 /** What a player's statblock edit is checked against. */
@@ -42,8 +46,21 @@ export const isLine = (value: unknown): value is string => typeof value === 'str
 
 export const isScalar = (value: SheetRaw | undefined): value is string | number | boolean | null => value === null || typeof value !== 'object';
 
-/** Dice a line writes, which Atlas rolls. */
-export const isDice = (value: unknown): value is string => isLine(value) && isDiceNotation(value);
+/**
+ * The numbers a player's `@` references read: the card's lookup over the values they may see
+ * (`shownRecord`), as their sheet's references are worked out, so one naming a hidden field reads nothing.
+ */
+export function playerLookup(inputs: EditInputs, template: StatblockTemplate): FieldLookup {
+  const { fields } = withHeaderFields(template);
+  return statblockLookup(template, shownRecord(inputs.resolved?.fields ?? {}, template, fields), fields);
+}
+
+/**
+ * Dice a line writes, which Atlas rolls once its references are filled in from `lookup`
+ * (`playerLookup`). A reference that names no number the player may see refuses it; the text is
+ * stored as written.
+ */
+export const isDice = (value: unknown, lookup: FieldLookup): value is string => isLine(value) && rollsWithReferences(value, lookup);
 
 /** Several options in the options' order, each once; an open choice may name others after them. */
 export function inOptionOrder(value: SheetRaw, options: readonly string[], open: boolean): value is readonly string[] {
