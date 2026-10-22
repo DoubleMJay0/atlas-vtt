@@ -35,10 +35,11 @@ async function textResult(found: CollectionTable, draw: TableDraw, context: Cell
   const { source, table } = found;
   const hidden = new Set(source.hiddenColumns ?? []);
   const cells = draw.row?.cells ?? [];
-  const text = await resolveCell(cells[0] ?? '', context);
+  const rowContext: CellContext = { ...context, ...(draw.row && { row: draw.row }) };
+  const text = await resolveCell(cells[0] ?? '', rowContext);
   const fields: TableResultField[] = [];
   for (let column = 1; column < cells.length; column++) {
-    const value = (await resolveCell(cells[column]!, context)).text.trim();
+    const value = (await resolveCell(cells[column]!, rowContext)).text.trim();
     const label = table!.columns[column] ?? '';
     if (value) fields.push({ label, value, ...(hidden.has(label) && { hidden: true as const }) });
   }
@@ -57,7 +58,7 @@ async function textResult(found: CollectionTable, draw: TableDraw, context: Cell
 async function itemDraws(found: CollectionTable, draw: TableDraw, context: CellContext): Promise<LootDraw[]> {
   if (!draw.row) return [];
   // A row that rolls another table or a Base view gives what that gave; any other row is its own item.
-  const nested = await resolveCell(draw.row.cells[0] ?? '', context);
+  const nested = await resolveCell(draw.row.cells[0] ?? '', { ...context, row: draw.row });
   if (nested.items.length > 0) return nested.items;
   const item = found.items?.[draw.row.index];
   return item ? [toDraw(item, context.currency, context.rarities)] : [];

@@ -6,8 +6,10 @@
  * or embedded as Obsidian writes it, `![[Loot.base#Rare]]`) draws an item of
  * it as the loot roller does. So a master table is a table whose rows link
  * smaller tables and views. Any other link, and plain dice text, stay as
- * written: a damage roll belongs to the moment it hits. Nesting stops at
- * `TABLE_LIMITS.depth`, at the results budget and at a table that reaches itself.
+ * written: a damage roll belongs to the moment it hits. A row that links its own
+ * table ("Mithral + reroll") rolls that table again without itself. Nesting stops at
+ * `TABLE_LIMITS.depth`, at the results budget and at a table that reaches itself
+ * any other way.
  */
 
 import { rollLoot, toDraw, type LootDraw } from '../loot/lootRoller';
@@ -15,7 +17,7 @@ import type { LootItem } from '../loot/lootItem';
 import { rollFormula } from '../tools/diceFormula';
 import { parseFormula, type ParsedFormula } from '../tools/parseFormula';
 import type { RarityOption } from '../types/randomTableTypes';
-import { TABLE_LIMITS, type RandomTable } from './tableModel';
+import { TABLE_LIMITS, type RandomTable, type TableRow } from './tableModel';
 import { rollTable } from './tableRoller';
 
 /** A number rolled inside the text: its formula, its total and where the total stands. */
@@ -70,6 +72,8 @@ export interface CellContext {
   random: () => number;
   /** Keys of the tables rolled on the way to this cell, the outermost first. */
   trail: readonly string[];
+  /** The row whose cell this is, in the table the trail ends with; a link to that table rolls it again without this row. */
+  row?: TableRow;
   /** Nested results still allowed in this roll; shared by every cell of it. */
   budget: { results: number };
   /** Named after plain-number prices of drawn items, e.g. "gp". */
@@ -102,11 +106,24 @@ function linkTarget(inner: string): string {
   return inner.split('|')[0]!.trim();
 }
 
+/**
+ * The row a link to the table it stands in rolls it again without: the cell's own row, when that
+ * table is the one rolled last and was not rolled before it on the way here. Any other way back
+ * to a table is a loop, so a row reached by such a reroll never rerolls once more.
+ */
+function rerolledRow(linked: LinkedTable, context: CellContext): TableRow | null {
+  const { trail, row } = context;
+  if (linked.kind !== 'table' || !row || trail[trail.length - 1] !== linked.key || trail.indexOf(linked.key) !== trail.length - 1) return null;
+  // The link may have read the note again: the row is found by its place, not as the same object.
+  return linked.table.rows.find((candidate) => candidate.index === row.index) ?? null;
+}
+
 /** The text a linked table rolls into, or null to keep the link as written. */
 async function rollLinked(target: string, context: CellContext, stopped: NestingStop[]): Promise<ResolvedCell | null> {
   const linked = await context.resolver.resolve(target, context.fromPath);
   if (!linked) return null;
-  if (context.trail.includes(linked.key)) return stop('loop', stopped);
+  const without = rerolledRow(linked, context);
+  if (context.trail.includes(linked.key) && !without) return stop('loop', stopped);
   if (context.trail.length >= TABLE_LIMITS.depth) return stop('depth', stopped);
   if (context.budget.results <= 0) return stop('results', stopped);
   context.budget.results--;
@@ -116,13 +133,16 @@ async function rollLinked(target: string, context: CellContext, stopped: Nesting
     });
     return item ? { ...nothing(), text: item.name, items: [item] } : nothing();
   }
-  const [draw] = rollTable(linked.table, { count: 1, random: context.random });
+  const [draw] = rollTable(linked.table, { count: 1, random: context.random, ...(without && { exclude: new Set([without]) }) });
+  // A table whose every row rolls it again has nothing else to give.
+  if (without && !draw) return stop('loop', stopped);
   if (!draw?.row) return nothing();
   const item = linked.items?.[draw.row.index];
   const cell = await resolveCell(draw.row.cells[0] ?? '', {
     ...context,
     fromPath: linked.notePath,
     trail: [...context.trail, linked.key],
+    row: draw.row,
   });
   return item ? { ...cell, items: [toDraw(item, context.currency, context.rarities), ...cell.items] } : cell;
 }
