@@ -9,7 +9,7 @@ import type { FieldRead } from '../../../statblocks/values/fieldValues';
 import { formatSigned } from '../../../statblocks/values/numberText';
 import { normalisePairs } from '../../../statblocks/values/pairValues';
 import { playerAccess } from './playerAccess.ts';
-import { editableTemplate, sentFields, writtenValue, type CheckedEdit, type EditInputs } from './statblockChecks.ts';
+import { editableTemplate, playerReferences, referencesSafeIn, sentFields, writtenValue, type CheckedEdit, type EditInputs } from './statblockChecks.ts';
 
 /** A list edit worked out: the patches it is written with and what the field holds once they are in. */
 interface ListChange {
@@ -138,6 +138,8 @@ export function checkListEdit(inputs: EditInputs, message: BookListMessage): Che
   const read = field === undefined ? undefined : inputs.read(field);
   if (field === undefined || read === undefined || field.type !== sent.type) return null;
   const { item } = message;
+  // An entry added may name the note's values only as the player was shown them
+  if (message.op === 'add' && !referencesSafeIn(item, playerReferences(inputs, template))) return null;
   const change = field.type === 'list' ? wordChange(read, field.key, message) : pairChange(read, field.key, message);
   if (change === null) return null;
   // The note holds the write once it holds the entry as often as the write left it, whatever else the GM changed in the list.
