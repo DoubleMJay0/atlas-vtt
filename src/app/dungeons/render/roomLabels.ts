@@ -51,7 +51,7 @@ export function roomLabels(dungeon: VisibleDungeon, mode: NotesMode): RoomLabel[
  * Where a room's number goes: its centre, or where the centre holds a prop or a column, the
  * nearest place inside the room that keeps clear of them.
  */
-export function labelSpot(dungeon: VisibleDungeon, room: DungeonRoom): Vec {
+function labelSpot(dungeon: VisibleDungeon, room: DungeonRoom): Vec {
   const centre = roomCentre(room);
   const shape = dungeon.roomShapes.get(room.id);
   const { model } = dungeon;

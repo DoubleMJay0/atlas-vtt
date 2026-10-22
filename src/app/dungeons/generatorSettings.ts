@@ -22,7 +22,7 @@ export const DEFAULT_DUNGEON_GENERATOR_SETTINGS: DungeonGeneratorSettings = {
   tags: [],
 };
 
-export function isStylePresetId(value: unknown): value is StylePresetId {
+function isStylePresetId(value: unknown): value is StylePresetId {
   return typeof value === 'string' && Object.hasOwn(STYLE_PRESETS, value);
 }
 

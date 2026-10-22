@@ -37,7 +37,7 @@ export const TEXT_RULES: GrammarRules = {
 export type Inhabitants = 'raiders' | 'vermin' | 'beast';
 
 /** The facts a dungeon fixes and pushes as symbols of the same name. */
-export const FACT_SYMBOLS = ['place', 'boss', 'raider', 'vermin', 'beast', 'symbol', 'landmark', 'wild', 'artefact', 'keyLook'] as const;
+const FACT_SYMBOLS = ['place', 'boss', 'raider', 'vermin', 'beast', 'symbol', 'landmark', 'wild', 'artefact', 'keyLook'] as const;
 
 export type FactSymbol = (typeof FACT_SYMBOLS)[number];
 

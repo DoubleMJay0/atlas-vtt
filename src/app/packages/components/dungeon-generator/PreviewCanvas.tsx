@@ -14,7 +14,7 @@ export interface PreviewSize {
 }
 
 /** The device pixels a frame of this many CSS pixels holds, within `MAX_PREVIEW_SIDE`. */
-export function previewSizeOf(cssWidth: number, cssHeight: number, ratio: number): PreviewSize | null {
+function previewSizeOf(cssWidth: number, cssHeight: number, ratio: number): PreviewSize | null {
   if (cssWidth < 1 || cssHeight < 1) return null;
   const scale = Math.min(ratio, MAX_PREVIEW_SIDE / Math.max(cssWidth, cssHeight));
   return { width: Math.round(cssWidth * scale), height: Math.round(cssHeight * scale) };

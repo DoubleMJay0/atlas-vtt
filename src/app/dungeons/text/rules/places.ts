@@ -7,7 +7,7 @@ import type { DungeonTag } from '../../tags';
 
 export type PlaceKind = 'temple' | 'tomb' | 'fort' | 'house' | 'lair' | 'mine' | 'water' | 'lore' | 'prison' | 'cave' | 'works';
 
-export const PLACE_KINDS: readonly PlaceKind[] = ['temple', 'tomb', 'fort', 'house', 'lair', 'mine', 'water', 'lore', 'prison', 'cave', 'works'];
+const PLACE_KINDS: readonly PlaceKind[] = ['temple', 'tomb', 'fort', 'house', 'lair', 'mine', 'water', 'lore', 'prison', 'cave', 'works'];
 
 export const PLACES: Readonly<Record<PlaceKind, readonly string[]>> = {
   temple: ['temple', 'shrine', 'sanctum', 'chapel', 'cathedral', 'abbey', 'monastery', 'cloister', 'sanctuary', 'basilica', 'oratory', 'priory'],

@@ -16,7 +16,7 @@ interface DungeonIdentityProps {
 }
 
 /** A typed seed as the generator takes it: a whole number from 1 to `MAX_SEED`, or null. */
-export function readSeed(text: string): number | null {
+function readSeed(text: string): number | null {
   const value = Number(text.trim());
   if (!Number.isInteger(value)) return null;
   return Math.min(MAX_SEED, Math.max(1, value));

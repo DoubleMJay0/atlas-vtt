@@ -17,7 +17,7 @@ import { freePathIn } from '../../../services/collectionBundle/pathRemap';
 
 export type DungeonExportKind = 'page' | 'svg' | 'map' | 'json' | 'markdown' | 'palette';
 
-export const DUNGEON_EXPORTS_FOLDER = 'dungeon-exports';
+const DUNGEON_EXPORTS_FOLDER = 'dungeon-exports';
 
 /** The longest side of a page saved as PNG. */
 const PAGE_EXPORT_SIDE = 3200;
@@ -47,7 +47,7 @@ export interface DungeonExportDeps {
 }
 
 /** A page of the preview's shape whose longest side is `side`. */
-export function pageExportSize(aspect: number, side = PAGE_EXPORT_SIDE): { width: number; height: number } {
+function pageExportSize(aspect: number, side = PAGE_EXPORT_SIDE): { width: number; height: number } {
   const ratio = Number.isFinite(aspect) && aspect > 0 ? aspect : 1.4;
   return ratio >= 1 ? { width: side, height: Math.round(side / ratio) } : { width: Math.round(side * ratio), height: side };
 }

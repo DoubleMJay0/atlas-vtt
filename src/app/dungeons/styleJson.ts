@@ -27,7 +27,7 @@ export const GRID_STYLES: readonly GridStyle[] = ['off', 'dotted', 'dashed', 'so
 export const NOTES_MODES: readonly NotesMode[] = ['off', 'boxes', 'tailed', 'legend', 'symbols', 'numbers'];
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
-export function clampTo([min, max]: Limit, value: number): number {
+function clampTo([min, max]: Limit, value: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
@@ -125,7 +125,7 @@ export function readDungeonView(value: unknown, base: DungeonView = DEFAULT_VIEW
 }
 
 /** What a palette file holds: the style alone, marked so a file of something else is told apart. */
-export const PALETTE_FORMAT = 'atlas-dungeon-palette';
+const PALETTE_FORMAT = 'atlas-dungeon-palette';
 
 export function paletteFileText(style: DungeonStyle): string {
   return `${JSON.stringify({ format: PALETTE_FORMAT, version: 1, style }, null, 2)}\n`;

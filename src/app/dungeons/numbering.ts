@@ -8,7 +8,7 @@ import type { DungeonDoor, DungeonNote, DungeonRoom } from './model';
 import type { NoteText } from './text/contract';
 
 /** Walking cost from the first room to every room. */
-export function costsFromFirstRoom(rooms: readonly DungeonRoom[], doors: readonly DungeonDoor[]): number[] {
+function costsFromFirstRoom(rooms: readonly DungeonRoom[], doors: readonly DungeonDoor[]): number[] {
   if (rooms.length === 0) return [];
   return pathCosts(adjacency(rooms.length, doors, (id) => rooms[id]?.kind === 'room'), 0);
 }

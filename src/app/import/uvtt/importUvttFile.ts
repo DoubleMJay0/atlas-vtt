@@ -3,22 +3,16 @@ import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import type { Size } from '../../imageProcessing/imageLayout';
 import type { ProcessedImage } from '../../imageProcessing/imageProcessing';
 import type { ScaleDown } from '../../imageProcessing/imageJob';
-import type { App } from 'obsidian';
-import type { AssetService } from '../../services/AssetService';
-import type { AssetThumbnailService } from '../../services/AssetThumbnailService';
 import { UVTT_TOO_LARGE, parseUvtt } from './parseUvtt';
 import { wallsCrowd } from './uvttCrowding';
 import { uvttSceneName } from './uvttFileNames';
-import { writeMapScene } from '../writeMapScene';
+import { COLLECTION_GONE, writeMapScene, type MapSceneDeps } from '../writeMapScene';
 import { uvttCellSize, uvttToScene, type UvttCounts } from './uvttToScene';
 import { UVTT_LIMITS, type UvttMap, type UvttRefusal } from './uvttTypes';
 
-export interface UvttImportDeps {
-  app: App;
-  assetService: AssetService;
+export interface UvttImportDeps extends MapSceneDeps {
   /** The file's image as a map stores it, with its thumbnail: the image workers. */
   convertImage: (image: Blob) => Promise<ProcessedImage>;
-  thumbnails: Pick<AssetThumbnailService, 'tryThumbnailForImage'>;
 }
 
 export interface UvttImported {
@@ -38,7 +32,6 @@ export type UvttImportResult = UvttImported | UvttRefusal;
 const refused = (problem: string): UvttRefusal => ({ ok: false, problem });
 
 const UNREADABLE_IMAGE = 'The map image in the file could not be read.';
-const COLLECTION_GONE = 'The collection no longer exists. Choose another collection and try again.';
 const CROWDED_WALLS = 'The walls in the file end too close together in too many places for Atlas to join them.';
 
 /**

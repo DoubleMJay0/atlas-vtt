@@ -44,7 +44,7 @@ function spotsAlong(a: WorkRoom, b: WorkRoom, cells: CellPoint[], d: CellDir): L
 }
 
 /** Door cells in the straight wall two rooms share (never its corners); none for a wall under 3 cells. */
-export function sharedWallSpots(a: WorkRoom, b: WorkRoom): LoopSpot[] {
+function sharedWallSpots(a: WorkRoom, b: WorkRoom): LoopSpot[] {
   const wall = intersection(roomRect(a), roomRect(b));
   if (!wall) return [];
   const cells: CellPoint[] = [];

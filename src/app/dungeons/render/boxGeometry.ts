@@ -1,20 +1,11 @@
 /** Distances and overlaps between note boxes and room outlines, in page pixels. */
 
-import type { Vec } from './geometry';
+import { pointSegmentDistance, pointsBounds, type Vec } from './geometry';
 import type { Rect } from './pageText';
 
 /** The gap between a rectangle and a polygon's bounding box; 0 where they overlap. */
 export function rectBoundsGap(r: Rect, polygon: readonly Vec[]): number {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const p of polygon) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
+  const { minX, minY, maxX, maxY } = pointsBounds(polygon);
   const dx = Math.max(0, minX - (r.x + r.w), r.x - maxX);
   const dy = Math.max(0, minY - (r.y + r.h), r.y - maxY);
   return Math.hypot(dx, dy);
@@ -36,13 +27,6 @@ export function rectPolygonGap(r: Rect, polygon: readonly Vec[]): number {
     for (const c of corners) best = Math.min(best, pointSegmentDistance(c, a, b));
   }
   return best;
-}
-
-function pointSegmentDistance(p: Vec, a: Vec, b: Vec): number {
-  const abx = b.x - a.x;
-  const aby = b.y - a.y;
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / (abx * abx + aby * aby || 1)));
-  return Math.hypot(p.x - (a.x + abx * t), p.y - (a.y + aby * t));
 }
 
 /** Separating-axis test of a rectangle against a convex polygon. */

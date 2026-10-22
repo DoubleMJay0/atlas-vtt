@@ -46,7 +46,7 @@ export interface MapScenePlan {
 
 export type MapSceneWritten = { ok: true; name: string; scenePath: string } | { ok: false; problem: string };
 
-const COLLECTION_GONE = 'The collection no longer exists. Choose another collection and try again.';
+export const COLLECTION_GONE = 'The collection no longer exists. Choose another collection and try again.';
 
 /** The first of `base`, `base 2`, `base 3`… no scene file in `folder` carries, however its letters are cased. */
 async function freeSceneName(app: App, folder: string, base: string): Promise<string> {

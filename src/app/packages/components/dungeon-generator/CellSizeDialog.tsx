@@ -5,9 +5,9 @@ import { SwitchRow } from './fields';
 import type { MapExportOptions } from './useGeneratorActions';
 
 /** Smallest cell a map PNG is saved with. */
-export const MIN_EXPORT_CELL = 10;
+const MIN_EXPORT_CELL = 10;
 /** The cell a map PNG is offered at first, where the map's limits allow it. */
-export const DEFAULT_EXPORT_CELL = 70;
+const DEFAULT_EXPORT_CELL = 70;
 
 interface CellSizeDialogProps {
   /** The largest cell the map's limits allow. */

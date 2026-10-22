@@ -41,8 +41,8 @@ export function doorShape(door: Pick<DungeonDoor, 'x' | 'y'>): FloorShape {
 }
 
 /** A doorway's opening across the passage, and how deep its jambs reach along it, in cells. */
-export const DOORWAY_OPENING = 0.6;
-export const DOORWAY_DEPTH = 0.5;
+const DOORWAY_OPENING = 0.6;
+const DOORWAY_DEPTH = 0.5;
 
 /**
  * The floor of a door cell. A doorway's is narrowed by two wall jambs in its middle, so the walls
@@ -86,6 +86,25 @@ export function unionBounds(boxes: readonly Bounds[]): Bounds {
   return out;
 }
 
+/** The bounding box of a set of points. */
+export function pointsBounds(points: readonly Vec[]): Bounds {
+  const out: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  for (const p of points) {
+    out.minX = Math.min(out.minX, p.x);
+    out.minY = Math.min(out.minY, p.y);
+    out.maxX = Math.max(out.maxX, p.x);
+    out.maxY = Math.max(out.maxY, p.y);
+  }
+  return out;
+}
+
+export function pointSegmentDistance(p: Vec, a: Vec, b: Vec): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / (abx * abx + aby * aby || 1)));
+  return Math.hypot(p.x - (a.x + abx * t), p.y - (a.y + aby * t));
+}
+
 /** Signed distance from a point to a shape's edge: negative inside. */
 export function shapeDistance(shape: FloorShape, x: number, y: number): number {
   if (shape.kind === 'circle') return Math.hypot(x - shape.cx, y - shape.cy) - shape.r;
@@ -101,7 +120,7 @@ export function shapeDistance(shape: FloorShape, x: number, y: number): number {
  * Adds a shape as a closed subpath, grown by `grow` with round corners of that radius, all
  * clockwise on screen so a nonzero fill of many shapes is their union.
  */
-export function traceShape(path: CanvasPath, shape: FloorShape, grow = 0, cornerRadius = grow): void {
+function traceShape(path: CanvasPath, shape: FloorShape, grow = 0, cornerRadius = grow): void {
   if (shape.kind === 'circle') {
     path.moveTo(shape.cx + shape.r + grow, shape.cy);
     path.arc(shape.cx, shape.cy, shape.r + grow, 0, Math.PI * 2);

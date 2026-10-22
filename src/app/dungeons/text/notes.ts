@@ -26,7 +26,7 @@ const SYMBOL: Readonly<Record<RoomFeature['kind'], string>> = {
 };
 
 /** What a room is called, by its floor area: halls from 21 cells, rooms from 15. */
-export function roomWord(plan: RoomPlan): string {
+function roomWord(plan: RoomPlan): string {
   if (plan.corridor) return '{corridor|passage}';
   if (plan.rotunda) return plan.area >= 15 ? '{rotunda|round hall}' : 'round chamber';
   if (plan.area >= 21) return '{hall|large chamber|large room}';
@@ -35,7 +35,7 @@ export function roomWord(plan: RoomPlan): string {
 }
 
 /** The compass name of a wall seen from inside ("north", "south-west") and its adjective. */
-export function sideWords(side: CellDir): { side: string; adjective: string } {
+function sideWords(side: CellDir): { side: string; adjective: string } {
   const ns = side.y < 0 ? 'north' : side.y > 0 ? 'south' : '';
   const ew = side.x < 0 ? 'west' : side.x > 0 ? 'east' : '';
   if (ns && ew) return { side: `${ns}-${ew}`, adjective: `${ns}-${ew}ern` };

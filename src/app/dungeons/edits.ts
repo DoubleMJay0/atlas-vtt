@@ -27,7 +27,7 @@ export interface DungeonEdits {
 
 export const NO_EDITS: DungeonEdits = { notes: {} };
 
-export function hasEdits(edits: DungeonEdits): boolean {
+function hasEdits(edits: DungeonEdits): boolean {
   return edits.title !== undefined || edits.story !== undefined || (edits.hiddenWings?.length ?? 0) > 0 || Object.keys(edits.notes).length > 0;
 }
 

@@ -27,7 +27,7 @@ interface StyleSettingsProps {
 }
 
 /** Reads a palette file the GM picked; null with a notice when it is none. */
-export async function readPaletteUpload(file: File): Promise<DungeonStyle | null> {
+async function readPaletteUpload(file: File): Promise<DungeonStyle | null> {
   const style = file.size <= MAX_PALETTE_BYTES ? readPaletteFile(await file.text()) : null;
   if (!style) showNotice(t('dungeon.style.notPalette', { name: file.name }));
   return style;

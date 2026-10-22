@@ -1,4 +1,5 @@
 import type { CellPoint } from '../../../dungeons/model';
+import { pointInPolygon } from '../../../dungeons/render/geometry';
 import { pageToCell } from '../../../dungeons/render/pageMap';
 import type { PageLayout, PageNote } from '../../../dungeons/render/renderPage';
 import type { Rect } from '../../../dungeons/render/pageText';
@@ -33,24 +34,13 @@ export function inRect(rect: Rect | null, p: PagePoint): rect is Rect {
   return rect !== null && p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h;
 }
 
-/** Even-odd test: whether `p` lies inside the polygon. */
-export function inPolygon(polygon: readonly PagePoint[], p: PagePoint): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const a = polygon[i]!;
-    const b = polygon[j]!;
-    if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-}
-
 export function hitPage(layout: PageLayout, p: PagePoint): PageHit {
   // Later boxes are drawn over earlier ones.
   const note = [...layout.notes].reverse().find((entry) => inRect(entry.rect, p));
   if (note) return { kind: 'note', note };
   if (inRect(layout.title, p)) return { kind: 'title', rect: layout.title };
   if (inRect(layout.story, p)) return { kind: 'story', rect: layout.story };
-  const room = layout.rooms.find((entry) => inPolygon(entry.outline, p));
+  const room = layout.rooms.find((entry) => pointInPolygon(entry.outline, p.x, p.y));
   return room ? { kind: 'room', room: room.id } : { kind: 'none' };
 }
 

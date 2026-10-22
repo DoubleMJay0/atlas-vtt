@@ -24,7 +24,7 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /** One octave of gradient noise, about −0.7..0.7. */
-export function gradientNoise(rng: Rng): Noise2 {
+function gradientNoise(rng: Rng): Noise2 {
   const base = shuffled(
     rng,
     Array.from({ length: 256 }, (_, i) => i),

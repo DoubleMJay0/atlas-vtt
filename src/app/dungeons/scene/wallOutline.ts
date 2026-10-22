@@ -1,6 +1,6 @@
 import type { CellDir, DungeonDoor, DungeonRoom } from '../model';
 import { unionRings } from '../render/clipShapes';
-import { roomCentre, rotundaRadius, type Vec } from '../render/geometry';
+import { doorShape, roomCentre, roomShape, rotundaRadius, shapePolygon, type Vec } from '../render/geometry';
 
 /**
  * The centre line of a dungeon's drawn walls, in cells. The renderer strokes every floor shape at
@@ -16,18 +16,9 @@ import { roomCentre, rotundaRadius, type Vec } from '../render/geometry';
 /** Grid steps per cell, as `unionRings` rounds them. */
 export const STEPS = 1024;
 /** A rotunda's wall is a polygon of this many sides. */
-export const ROTUNDA_SIDES = 32;
+const ROTUNDA_SIDES = 32;
 
 const snap = (cells: number): number => Math.round(cells * STEPS) / STEPS;
-
-function grownRect(x: number, y: number, w: number, h: number, grow: number): Vec[] {
-  return [
-    { x: x - grow, y: y - grow },
-    { x: x + w + grow, y: y - grow },
-    { x: x + w + grow, y: y + h + grow },
-    { x: x - grow, y: y + h + grow },
-  ];
-}
 
 function rotundaRing(room: DungeonRoom, grow: number): Vec[] {
   const c = roomCentre(room);
@@ -48,8 +39,8 @@ function rotundaRing(room: DungeonRoom, grow: number): Vec[] {
 export function wallRings(rooms: readonly DungeonRoom[], doors: readonly DungeonDoor[], grow: number): Vec[][] {
   const g = snap(grow);
   const shapes = [
-    ...rooms.map(room => (room.rotunda ? rotundaRing(room, g) : grownRect(room.x, room.y, room.w, room.h, g))),
-    ...doors.map(door => grownRect(door.x, door.y, 1, 1, g)),
+    ...rooms.map(room => (room.rotunda ? rotundaRing(room, g) : shapePolygon(roomShape(room), g))),
+    ...doors.map(door => shapePolygon(doorShape(door), g)),
   ];
   return unionRings(shapes);
 }

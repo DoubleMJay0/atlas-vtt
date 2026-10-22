@@ -1,5 +1,5 @@
 import { unionRings } from './clipShapes';
-import { pointInPolygon, shapePolygon, signedArea2, tracePolygon, type Bounds, type Vec } from './geometry';
+import { pointInPolygon, pointsBounds, shapePolygon, signedArea2, tracePolygon, type Bounds, type Vec } from './geometry';
 import type { RenderEnv } from './renderEnv';
 import type { VisibleDungeon } from './visibleDungeon';
 
@@ -24,7 +24,7 @@ const PROBE = 0.1;
 const enclosed = new WeakMap<VisibleDungeon, Pocket[]>();
 
 /** Rock the floors close in on all sides: the holes in the union of the floors. */
-export function enclosedRock(dungeon: VisibleDungeon): Pocket[] {
+function enclosedRock(dungeon: VisibleDungeon): Pocket[] {
   const known = enclosed.get(dungeon);
   if (known) return known;
   const rings = unionRings(dungeon.floors.map(shape => shapePolygon(shape, 0, OUTLINE_PX_PER_CELL)));
@@ -35,7 +35,7 @@ export function enclosedRock(dungeon: VisibleDungeon): Pocket[] {
     if (Math.abs(area) > Math.abs(outward)) outward = area;
   }
   const holes = rings.filter(ring => ring.length >= 3 && Math.sign(signedArea2(ring)) === -Math.sign(outward));
-  const found = holes.map(ring => ({ ring, bounds: ringBounds(ring) }));
+  const found = holes.map(ring => ({ ring, bounds: pointsBounds(ring) }));
   enclosed.set(dungeon, found);
   return found;
 }
@@ -71,15 +71,4 @@ function isNarrow(dungeon: VisibleDungeon, { ring, bounds }: Pocket, reach: numb
     }
   }
   return true;
-}
-
-function ringBounds(ring: readonly Vec[]): Bounds {
-  const out: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-  for (const p of ring) {
-    out.minX = Math.min(out.minX, p.x);
-    out.minY = Math.min(out.minY, p.y);
-    out.maxX = Math.max(out.maxX, p.x);
-    out.maxY = Math.max(out.maxY, p.y);
-  }
-  return out;
 }

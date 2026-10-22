@@ -5,7 +5,7 @@
  * props, water, rubble, cracks) live in that continuous space, so a cell's centre is (x + .5, y + .5).
  */
 
-import type { CellDir, CellPoint, DungeonModel, DungeonRoom } from './model';
+import type { CellDir, CellPoint, DungeonRoom } from './model';
 
 /** An inclusive rectangle of cells. */
 export interface CellRect {
@@ -13,14 +13,6 @@ export interface CellRect {
   y0: number;
   x1: number;
   y1: number;
-}
-
-/** A rectangle in the continuous plane. */
-export interface DungeonBounds {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
 }
 
 export function unit(n: number): -1 | 0 | 1 {
@@ -79,22 +71,4 @@ export function cellsOf(rect: CellRect): CellPoint[] {
   const cells: CellPoint[] = [];
   for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) cells.push({ x, y });
   return cells;
-}
-
-/** Everything the dungeon covers, walls and outer door cells included. */
-export function dungeonBounds(model: Pick<DungeonModel, 'rooms' | 'doors'>): DungeonBounds {
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  const take = (r: CellRect): void => {
-    x0 = Math.min(x0, r.x0);
-    y0 = Math.min(y0, r.y0);
-    x1 = Math.max(x1, r.x1);
-    y1 = Math.max(y1, r.y1);
-  };
-  model.rooms.forEach((room) => take(wallRect(room)));
-  model.doors.forEach((door) => take({ x0: door.x, y0: door.y, x1: door.x, y1: door.y }));
-  if (x0 > x1) return { x: 0, y: 0, w: 0, h: 0 };
-  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }

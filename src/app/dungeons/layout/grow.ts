@@ -36,7 +36,7 @@ export function roomFits(layout: WorkLayout, rect: CellRect, ignore: ReadonlySet
   return layout.rooms.every((room) => room.removed || ignore.has(room.id) || !rectsClash(rect, roomRect(room)));
 }
 
-export function normalCount(layout: WorkLayout): number {
+function normalCount(layout: WorkLayout): number {
   return layout.rooms.filter((room) => !room.removed && isNormal(room)).length;
 }
 

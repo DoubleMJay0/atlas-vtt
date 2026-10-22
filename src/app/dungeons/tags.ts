@@ -53,7 +53,7 @@ const EXCLUSIVE: readonly (readonly DungeonTag[])[] = [
   ['round', 'square'],
 ];
 
-export function isDungeonTag(value: string): value is DungeonTag {
+function isDungeonTag(value: string): value is DungeonTag {
   return (DUNGEON_TAGS as readonly string[]).includes(value);
 }
 

@@ -41,9 +41,3 @@ export function edgePlaces(shape: FloorShape, offset: number, step: number, phas
   });
   return out;
 }
-
-/** The outline's length, grown by `offset` with round corners. */
-export function outlineLength(shape: FloorShape, offset: number): number {
-  if (shape.kind === 'circle') return Math.PI * 2 * (shape.r + offset);
-  return 2 * (shape.w + shape.h) + Math.PI * 2 * offset;
-}

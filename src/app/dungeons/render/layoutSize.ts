@@ -8,7 +8,7 @@ export const MAX_MAP_SIDE = 16_383;
 /** Largest number of pixels a map image may have. */
 export const MAX_MAP_PIXELS = 144_000_000;
 /** Whole cells of paper around the floors: room for the hatching, its strokes and the exits. */
-export const MAP_MARGIN_CELLS = 2;
+const MAP_MARGIN_CELLS = 2;
 export const DEFAULT_PX_PER_CELL = 100;
 
 /** Where a map image lies on the grid: its pixel (0, 0) is the corner of cell `originCell`. */

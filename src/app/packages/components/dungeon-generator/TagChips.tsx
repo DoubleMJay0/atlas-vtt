@@ -22,7 +22,7 @@ export function tagName(tag: DungeonTag): string {
 }
 
 /** What a tag does, in Atlas' words. */
-export function tagDescription(tag: DungeonTag): string {
+function tagDescription(tag: DungeonTag): string {
   return t(`dungeon.tag.${tagKey(tag)}` as MessageKey);
 }
 

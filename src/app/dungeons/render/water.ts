@@ -1,6 +1,6 @@
 import type { Rng } from '../rng';
 import { clipToFloors } from './floors';
-import { pointInPolygon, signedArea2, traceSmoothClosed, type Vec } from './geometry';
+import { pointInPolygon, pointSegmentDistance, signedArea2, traceSmoothClosed, type Vec } from './geometry';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 
 /** Ripples inside every pool, as far in from its shore, in cells. */
@@ -75,12 +75,7 @@ export function insetRuns(outline: readonly Vec[], inset: number): Vec[][] {
 function distanceToOutline(outline: readonly Vec[], p: Vec): number {
   let best = Infinity;
   for (let i = 0; i < outline.length; i++) {
-    const a = outline[i]!;
-    const b = outline[(i + 1) % outline.length]!;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
-    best = Math.min(best, Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t)));
+    best = Math.min(best, pointSegmentDistance(p, outline[i]!, outline[(i + 1) % outline.length]!));
   }
   return best;
 }
