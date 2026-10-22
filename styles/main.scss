@@ -29,7 +29,10 @@
  *  Fantaisie Artistique by George Williams, released under the SIL Open Font License by its author
  *  (https://fontforge.org/archive/sfds/toyfonts.html).
  *  Oxanium, Copyright 2019 The Oxanium Project Authors (https://github.com/sevmeyer/oxanium),
- *  licensed under the SIL Open Font License, Version 1.1.
+ *  Germania One, Copyright (c) 2011 by John Vargas Beltran (https://github.com/googlefonts/germaniaone),
+ *  with Reserved Font Name "Germania One", and
+ *  Pathway Gothic One, Copyright 2013 The Pathway Gothic Project Authors (https://github.com/etunni/pathway-gothic),
+ *  with Reserved Font Name "Pathway", each licensed under the SIL Open Font License, Version 1.1.
  *  Licence text: https://openfontlicense.org
  *  Credits: https://github.com/atlas-vtt/atlas-vtt/blob/main/THIRD_PARTY_NOTICES.md
  */
@@ -49,6 +52,24 @@
   font-family: 'Atlas Oxanium';
   src: url('../src/app/assets/fonts/oxanium.ttf') format('truetype');
   font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+// The dungeon generator's title face; its renderer reads this rule to load the face into its worker.
+@font-face {
+  font-family: 'Atlas Germania One';
+  src: url('../src/app/assets/fonts/germania-one.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+// The dungeon generator's text face, read the same way.
+@font-face {
+  font-family: 'Atlas Pathway Gothic One';
+  src: url('../src/app/assets/fonts/pathway-gothic-one.ttf') format('truetype');
+  font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
@@ -899,6 +920,27 @@
       flex: 1;
       min-width: 0;
       @include atlas-truncate;
+    }
+
+    // A create entry's label, with the reason under it when the name cannot be used
+    .pin-result-text {
+      @include atlas-flex-col($gap: 0);
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pin-result-reason {
+      font-size: $font-ui-smaller;
+      color: var(--text-faint);
+    }
+
+    &.is-disabled {
+      cursor: default;
+      color: var(--text-muted);
+
+      &:active {
+        background: none;
+      }
     }
   }
 

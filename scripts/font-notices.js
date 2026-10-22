@@ -20,6 +20,18 @@ const BUNDLED_FONTS = [
     credit: 'Copyright 2019 The Oxanium Project Authors',
     source: 'https://github.com/sevmeyer/oxanium',
   },
+  {
+    font: 'src/app/assets/fonts/germania-one.ttf',
+    licence: 'src/app/assets/fonts/germania-one-OFL.txt',
+    credit: 'Copyright (c) 2011 by John Vargas Beltran',
+    source: 'https://github.com/googlefonts/germaniaone',
+  },
+  {
+    font: 'src/app/assets/fonts/pathway-gothic-one.ttf',
+    licence: 'src/app/assets/fonts/pathway-gothic-one-OFL.txt',
+    credit: 'Copyright 2013 The Pathway Gothic Project Authors',
+    source: 'https://github.com/etunni/pathway-gothic',
+  },
 ];
 
 /** Where the notice links the licence text, once for every font. */

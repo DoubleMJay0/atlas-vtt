@@ -1,0 +1,107 @@
+import type { DungeonDoor, DungeonRoom } from '../model';
+import type { Rng } from '../rng';
+import { clipToFloors } from './floors';
+import type { Vec } from './geometry';
+import { strokeWidth, type RenderEnv } from './renderEnv';
+
+type Line = [Vec, Vec];
+
+/**
+ * The grid inside the floors: interior cell lines of every room (chords in a rotunda) and the
+ * lines where an open passage meets its rooms, in the view's style.
+ */
+export function drawGrid(env: RenderEnv): void {
+  const { view, ctx, palette, style } = env;
+  if (view.grid === 'off') return;
+  const step = view.smallTiles ? 0.5 : 1;
+  const lines: Line[] = [];
+  for (const room of env.dungeon.rooms) lines.push(...roomLines(room, step));
+  for (const door of env.dungeon.doors) lines.push(...doorLines(door));
+  const rng = env.rng('grid');
+  ctx.save();
+  clipToFloors(env);
+  ctx.strokeStyle = palette.ink;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = strokeWidth(env, view.grid === 'dotted' && !view.smallTiles ? style.strokes.normal : style.strokes.thin);
+  ctx.beginPath();
+  if (view.grid === 'dotted') {
+    // Round dots, one on every crossing and evenly between, drawn as near-zero dashes with round caps.
+    const dot = env.px * 0.75;
+    const period = step / (view.smallTiles ? 3 : 5);
+    ctx.setLineDash([dot, period - dot]);
+    ctx.lineDashOffset = dot / 2;
+    for (const [a, b] of lines) traceLine(ctx, a, b);
+  } else if (view.grid === 'solid') {
+    for (const [a, b] of lines) traceLine(ctx, a, b);
+  } else if (view.grid === 'dashed') {
+    for (const [a, b] of lines) traceDashedCells(ctx, a, b, step, rng);
+  } else {
+    for (const [a, b] of lines) traceBroken(ctx, a, b, env.px, rng);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function traceLine(ctx: CanvasPath, a: Vec, b: Vec): void {
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+}
+
+/** Interior lines of a room's rectangle; the floor clip turns them into chords in a rotunda. */
+function roomLines(room: DungeonRoom, step: number): Line[] {
+  const lines: Line[] = [];
+  for (let x = room.x + step; x < room.x + room.w - 1e-9; x += step) lines.push([{ x, y: room.y }, { x, y: room.y + room.h }]);
+  for (let y = room.y + step; y < room.y + room.h - 1e-9; y += step) lines.push([{ x: room.x, y }, { x: room.x + room.w, y }]);
+  return lines;
+}
+
+/** An open passage is floor: the lines where it meets its rooms are drawn as grid. */
+function doorLines(door: DungeonDoor): Line[] {
+  if (door.kind !== 'open') return [];
+  if (door.dir.x !== 0) {
+    return [door.x, door.x + 1].map(x => [{ x, y: door.y }, { x, y: door.y + 1 }] as Line);
+  }
+  return [door.y, door.y + 1].map(y => [{ x: door.x, y }, { x: door.x + 1, y }] as Line);
+}
+
+/** One dash in the middle of every cell edge, leaving 10 to 30 % at each corner. */
+function traceDashedCells(ctx: CanvasPath, a: Vec, b: Vec, step: number, rng: Rng): void {
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  const dx = (b.x - a.x) / length;
+  const dy = (b.y - a.y) / length;
+  for (let t = 0; t < length - 1e-9; t += step) {
+    const end = Math.min(length, t + step);
+    const span = end - t;
+    const g0 = (0.1 + rng() * 0.2) * step;
+    const g1 = (0.1 + rng() * 0.2) * step;
+    if (span <= g0 + g1) continue;
+    traceLine(ctx, { x: a.x + dx * (t + g0), y: a.y + dy * (t + g0) }, { x: a.x + dx * (end - g1), y: a.y + dy * (end - g1) });
+  }
+}
+
+/** Hand-drawn: resampled every 10 px, wobbled by up to 1.25 px, broken into dashes of random length. */
+function traceBroken(ctx: CanvasPath, a: Vec, b: Vec, px: number, rng: Rng): void {
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  const dx = (b.x - a.x) / length;
+  const dy = (b.y - a.y) / length;
+  const sample = 10 * px;
+  const wobble = 1.25 * px;
+  const at = (t: number): Vec => {
+    const w = (rng() * 2 - 1) * wobble;
+    return { x: a.x + dx * t - dy * w, y: a.y + dy * t + dx * w };
+  };
+  let t = rng() * 0.1;
+  while (t < length) {
+    const on = 0.25 + rng() * 0.9;
+    const end = Math.min(length, t + on);
+    const start = at(t);
+    ctx.moveTo(start.x, start.y);
+    for (let s = t + sample; s < end; s += sample) {
+      const p = at(s);
+      ctx.lineTo(p.x, p.y);
+    }
+    const last = at(end);
+    ctx.lineTo(last.x, last.y);
+    t = end + 0.04 + rng() * 0.14;
+  }
+}
