@@ -1,5 +1,5 @@
 import { shapePolygon, traceShapes, tracePolygon } from './geometry';
-import { shadowRegion } from './clipShapes';
+import { unionRings } from './clipShapes';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 import { withAlpha } from './palette';
 
@@ -55,24 +55,42 @@ export function clipToFloors(env: RenderEnv): void {
 }
 
 /**
- * The inner shadow: the strip of floor the floor shifted towards the light leaves uncovered,
- * and a disc beside every column, multiplied onto the floor.
+ * The inner shadow: the walls cast a soft shadow onto the floor, falling towards the bottom right
+ * of the screen whatever the map's turn, and every standing column casts one beside it. Drawn as
+ * the blurred shadow of everything that is not floor, multiplied onto the floor and clipped to it.
  */
 export function drawInnerShadow(env: RenderEnv): void {
-  const { ctx, palette, dungeon, shadowOffset } = env;
+  const { ctx, palette, dungeon } = env;
   if (!palette.shadow) return;
-  const floors = dungeon.floors.map(shape => shapePolygon(shape, 0, env.pxPerCell));
-  const rim = wallWidth(env);
-  const columns = dungeon.model.columns
-    .filter(c => dungeon.field.distance(c.x, c.y) < 0)
-    .map(c => shapePolygon({ kind: 'circle', cx: c.x + shadowOffset.x, cy: c.y + shadowOffset.y, r: c.radius + rim * 0.5 }, 0, env.pxPerCell));
-  const region = shadowRegion(floors, shadowOffset, columns);
+  const { a, b, c, d } = ctx.getTransform();
+  // Shadow offset and blur are in device pixels, outside the context's transform.
+  const devicePerCell = Math.sqrt(Math.abs(a * d - b * c));
+  const distance = env.style.shadow.distance * devicePerCell;
+  const bounds = dungeon.bounds;
+  const solid = unionRings(dungeon.floors.map(shape => shapePolygon(shape, 0, env.pxPerCell)));
   ctx.save();
   clipToFloors(env);
   ctx.globalCompositeOperation = 'multiply';
+  ctx.shadowColor = palette.shadow;
+  ctx.shadowBlur = distance * 1.2;
+  ctx.shadowOffsetX = distance * 0.75;
+  ctx.shadowOffsetY = distance * 0.75;
   ctx.fillStyle = palette.shadow;
   ctx.beginPath();
-  for (const ring of region) tracePolygon(ctx, ring);
+  ctx.rect(bounds.minX - 4, bounds.minY - 4, bounds.maxX - bounds.minX + 8, bounds.maxY - bounds.minY + 8);
+  for (const ring of solid) tracePolygon(ctx, ring);
+  ctx.fill('evenodd');
+  ctx.beginPath();
+  for (const column of dungeon.model.columns) {
+    if (column.shattered || dungeon.field.distance(column.x, column.y) >= 0) continue;
+    const r = column.radius;
+    if (column.square) {
+      ctx.rect(column.x - r, column.y - r, r * 2, r * 2);
+      continue;
+    }
+    ctx.moveTo(column.x + r, column.y);
+    ctx.arc(column.x, column.y, r, 0, Math.PI * 2);
+  }
   ctx.fill();
   ctx.restore();
 }

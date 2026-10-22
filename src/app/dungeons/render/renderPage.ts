@@ -8,8 +8,9 @@ import { drawPlannedBoxes, planBoxes, type BoxPlan, type PageFrame } from './pag
 import { applyPageMap, cellToPage, fitMap, type PageMapTransform } from './pageMap';
 import { balancedWrap, drawCentredLines, widestLine, type Rect } from './pageText';
 import { createRenderEnv } from './renderEnv';
-import { drawLabels, roomLabels } from './roomLabels';
-import { visibleDungeon } from './visibleDungeon';
+import { drawLabels, haloAt, roomLabels } from './roomLabels';
+import { visibleDungeon, type VisibleDungeon } from './visibleDungeon';
+import { legibleStyle } from './legibleStyle';
 
 /** The page Watabou's layout was made for; sizes scale with the page from it. */
 const BASE_PAGE = { w: 1400, h: 1000 };
@@ -52,41 +53,51 @@ export function renderPage(ctx: Canvas2D, model: DungeonModel, style: DungeonSty
 
   const heading = view.titleAndStory ? drawHeading(ctx, model, style, width, k, palette.ink) : { title: null, story: null, bottom: 0 };
   const noted = model.notes.filter(note => dungeon.roomShapes.has(note.room));
-  const legendFont = cssFont(style.fonts.legend, style.fonts.legend.size * k);
-  const legendLine = style.fonts.legend.size * k * 1.2;
-  const legendWidth = 280 * k;
-  const legend = view.notes === 'legend' && noted.length ? measureLegend(ctx, noted, legendFont, legendWidth, legendLine) : null;
   const top = Math.max(margin, heading.bottom + margin * 0.5);
+  const legendWidth = 280 * k;
+  let legendFont = '';
+  let legendLine = 0;
+  let legend: ReturnType<typeof measureLegend> | null = null;
+  if (view.notes === 'legend' && noted.length) {
+    // A long legend sets its text smaller until it fits beside the map.
+    for (let shrink = 1; ; shrink *= 0.92) {
+      const px = style.fonts.legend.size * k * shrink;
+      legendFont = cssFont(style.fonts.legend, px);
+      legendLine = px * 1.2;
+      legend = measureLegend(ctx, noted, legendFont, legendWidth, legendLine);
+      if (legend.height <= height - margin - top || shrink < 0.4) break;
+    }
+  }
   const left = legend ? margin + legendWidth + margin * 0.5 : margin;
   const area = { x: left, y: top, w: width - margin - left, h: height - margin - top };
   const boxed = view.notes === 'boxes' || view.notes === 'tailed';
   const frame: PageFrame = { width, height, margin, k, keepOut: [heading.title, heading.story].filter((r): r is Rect => r !== null) };
   // Boxes go in the room the map leaves; where they find none, the map gives up some of its area.
-  let map = fitMap(dungeon, area, view, k, style.hatching.distance + 0.3);
-  let plan: BoxPlan | null = boxed ? planBoxes(ctx, dungeon, style, view, map, frame) : null;
+  let { map, drawn } = fitDrawn(dungeon, area, view, style, k);
+  let plan: BoxPlan | null = boxed ? planBoxes(ctx, dungeon, drawn, view, map, frame) : null;
   for (const share of SHRINK) {
     if (!plan || plan.clashes === 0) break;
     const smaller = { x: area.x + (area.w * (1 - share)) / 2, y: area.y + (area.h * (1 - share)) / 2, w: area.w * share, h: area.h * share };
-    const candidate = fitMap(dungeon, smaller, view, k, style.hatching.distance + 0.3);
-    const next = planBoxes(ctx, dungeon, style, view, candidate, frame);
+    const candidate = fitDrawn(dungeon, smaller, view, style, k);
+    const next = planBoxes(ctx, dungeon, candidate.drawn, view, candidate.map, frame);
     if (next.clashes < plan.clashes) {
-      map = candidate;
+      ({ map, drawn } = candidate);
       plan = next;
     }
   }
 
   ctx.save();
   applyPageMap(ctx, map);
-  drawDungeon(createRenderEnv(ctx, dungeon, style, view, map.scale, map.angle));
+  drawDungeon(createRenderEnv(ctx, dungeon, drawn, view, map.scale));
   ctx.restore();
 
   const rooms = dungeon.rooms.map(room => ({ id: room.id, outline: shapePolygon(dungeon.roomShapes.get(room.id)!, 0, 1).map(p => cellToPage(map, p)) }));
-  const labels = roomLabels(dungeon, view.notes).map(label => ({ text: label.text, ...cellToPage(map, label.at) }));
-  drawLabels(ctx, labels, cssFont(style.fonts.symbols, style.fonts.symbols.size * k), palette.ink, palette.floor, style.strokes.normal * 4 * k);
+  const labels = roomLabels(dungeon, view.notes).map(label => ({ text: label.text, ...cellToPage(map, label.at), halo: haloAt(dungeon, palette, view.water, label.at) }));
+  drawLabels(ctx, labels, cssFont(style.fonts.symbols, style.fonts.symbols.size * k), palette.ink, style.strokes.normal * 4 * k);
 
   let notes: PageNote[] = [];
   if (legend) {
-    const at = { x: margin, y: height - margin - legend.height };
+    const at = { x: margin, y: Math.max(top, height - margin - legend.height) };
     const rects = drawLegend(ctx, legend, at, legendWidth, legendFont, legendLine, palette.ink);
     notes = noted.map((note, i) => ({ ref: note.ref, room: note.room, rect: rects[i]! }));
   } else if (plan) {
@@ -94,6 +105,14 @@ export function renderPage(ctx: Canvas2D, model: DungeonModel, style: DungeonSty
     notes = plan.entries.map(entry => ({ ref: entry.ref, room: entry.room, rect: entry.box }));
   }
   return { map, notes, rooms, title: heading.title, story: heading.story };
+}
+
+/** Fits the map into an area, with the style it is drawn in at the scale it gets there. */
+function fitDrawn(dungeon: VisibleDungeon, area: Rect, view: DungeonView, style: DungeonStyle, k: number): { map: PageMapTransform; drawn: DungeonStyle } {
+  const first = fitMap(dungeon, area, view, k, style.hatching.distance + 0.3);
+  const drawn = legibleStyle(style, first.scale / k);
+  if (drawn === style) return { map: first, drawn };
+  return { map: fitMap(dungeon, area, view, k, drawn.hatching.distance + 0.3), drawn };
 }
 
 function drawHeading(ctx: Canvas2D, model: DungeonModel, style: DungeonStyle, width: number, k: number, ink: string): { title: Rect | null; story: Rect | null; bottom: number } {

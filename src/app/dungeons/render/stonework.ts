@@ -13,7 +13,7 @@ export function drawStonework(env: RenderEnv): void {
   const size = Math.max(style.hatching.size, 0.1);
   const depth = style.hatching.distance;
   const blocks: Vec[][] = [];
-  for (const shape of dungeon.floors) {
+  for (const shape of dungeon.outlines) {
     for (const place of edgePlaces(shape, 0, size * 0.9, rng() * size)) {
       const length = size * (0.8 + rng() * 0.5);
       const thick = depth * (0.2 + rng() * 0.4);

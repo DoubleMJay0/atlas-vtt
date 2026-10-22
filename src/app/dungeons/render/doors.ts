@@ -17,6 +17,7 @@ export function drawDoors(env: RenderEnv): void {
   }
 }
 
+/** A doorway needs nothing here: its jambs are wall, cut out of the door cell's floor. */
 function drawDoor(env: RenderEnv, door: DungeonDoor): void {
   const { ctx } = env;
   switch (door.kind) {
@@ -31,13 +32,6 @@ function drawDoor(env: RenderEnv, door: DungeonDoor): void {
       leaf(env, 0.2);
       line(env, -0.42, -0.22, 0.42, -0.22);
       return;
-    case 'doorway': {
-      const w = wallWidth(env);
-      ctx.fillStyle = env.palette.ink;
-      ctx.fillRect(-0.5 - w, -0.25, 0.2 + w, 0.5);
-      ctx.fillRect(0.3, -0.25, 0.2 + w, 0.5);
-      return;
-    }
     case 'portcullis': {
       ctx.fillStyle = env.palette.ink;
       ctx.beginPath();

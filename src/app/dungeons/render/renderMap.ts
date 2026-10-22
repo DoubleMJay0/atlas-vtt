@@ -6,7 +6,7 @@ import { cssFont } from './fonts';
 import type { Canvas2D } from './geometry';
 import { mapLayout, type MapLayout } from './layoutSize';
 import { createRenderEnv } from './renderEnv';
-import { drawLabels, roomLabels } from './roomLabels';
+import { drawLabels, haloAt, roomLabels } from './roomLabels';
 import { visibleDungeon } from './visibleDungeon';
 
 export interface RenderMapOptions {
@@ -41,8 +41,9 @@ export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyl
       text: label.text,
       x: (label.at.x - layout.originCell.x) * pxPerCell,
       y: (label.at.y - layout.originCell.y) * pxPerCell,
+      halo: haloAt(dungeon, env.palette, view.water, label.at),
     }));
-    drawLabels(ctx, labels, cssFont(style.fonts.symbols, style.fonts.symbols.size * k), env.palette.ink, env.palette.floor, style.strokes.normal * 2 * k * 2);
+    drawLabels(ctx, labels, cssFont(style.fonts.symbols, style.fonts.symbols.size * k), env.palette.ink, style.strokes.normal * 4 * k);
   }
   return layout;
 }

@@ -1,6 +1,6 @@
 import type { DungeonDoor, DungeonModel, DungeonRoom } from '../model';
 import type { DungeonView } from '../style';
-import { doorShape, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
+import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
 
 /**
  * What a view shows of a dungeon: secret wings leave with their doors when secrets are hidden,
@@ -10,8 +10,10 @@ export interface VisibleDungeon {
   model: DungeonModel;
   rooms: DungeonRoom[];
   doors: DungeonDoor[];
-  /** Room floors, then door cells. */
+  /** Room floors, then door cells (a doorway's narrowed by its jambs). */
   floors: FloorShape[];
+  /** The floors with every door cell whole: what courses of brick and stone are laid around. */
+  outlines: FloorShape[];
   roomShapes: Map<number, FloorShape>;
   field: FloorField;
   /** Of the floors. */
@@ -23,9 +25,11 @@ export function visibleDungeon(model: DungeonModel, view: Pick<DungeonView, 'sec
   const shown = new Set(rooms.map(room => room.id));
   const doors = model.doors.filter(door => (door.from === null || shown.has(door.from)) && (door.to === null || shown.has(door.to)));
   const roomShapes = new Map(rooms.map(room => [room.id, roomShape(room)] as const));
-  const floors = [...roomShapes.values(), ...doors.filter(door => door.kind !== 'secret').map(doorShape)];
+  const open = doors.filter(door => door.kind !== 'secret');
+  const floors = [...roomShapes.values(), ...open.flatMap(doorShapes)];
+  const outlines = [...roomShapes.values(), ...open.map(doorShape)];
   const bounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
-  return { model, rooms, doors, floors, roomShapes, field: new FloorField(floors), bounds };
+  return { model, rooms, doors, floors, outlines, roomShapes, field: new FloorField(floors), bounds };
 }
 
 /** How far from the floors the field answers exactly; farther points read as this far. */

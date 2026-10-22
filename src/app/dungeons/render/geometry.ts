@@ -40,6 +40,33 @@ export function doorShape(door: Pick<DungeonDoor, 'x' | 'y'>): FloorShape {
   return { kind: 'rect', x: door.x, y: door.y, w: 1, h: 1 };
 }
 
+/** A doorway's opening across the passage, and how deep its jambs reach along it, in cells. */
+export const DOORWAY_OPENING = 0.6;
+export const DOORWAY_DEPTH = 0.5;
+
+/**
+ * The floor of a door cell. A doorway's is narrowed by two wall jambs in its middle, so the walls
+ * drawn around the floor step in and out of the opening; any other door cell is floor whole.
+ */
+export function doorShapes(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'kind'>): FloorShape[] {
+  if (door.kind !== 'doorway') return [doorShape(door)];
+  const end = (1 - DOORWAY_DEPTH) / 2;
+  const side = (1 - DOORWAY_OPENING) / 2;
+  const { x, y } = door;
+  if (door.dir.x !== 0) {
+    return [
+      { kind: 'rect', x, y, w: end, h: 1 },
+      { kind: 'rect', x: x + end, y: y + side, w: DOORWAY_DEPTH, h: DOORWAY_OPENING },
+      { kind: 'rect', x: x + 1 - end, y, w: end, h: 1 },
+    ];
+  }
+  return [
+    { kind: 'rect', x, y, w: 1, h: end },
+    { kind: 'rect', x: x + side, y: y + end, w: DOORWAY_OPENING, h: DOORWAY_DEPTH },
+    { kind: 'rect', x, y: y + 1 - end, w: 1, h: end },
+  ];
+}
+
 export function shapeBounds(shape: FloorShape, grow = 0): Bounds {
   if (shape.kind === 'rect') {
     return { minX: shape.x - grow, minY: shape.y - grow, maxX: shape.x + shape.w + grow, maxY: shape.y + shape.h + grow };

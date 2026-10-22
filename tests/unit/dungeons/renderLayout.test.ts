@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { hatchStrokes } from '../../../src/app/dungeons/render/hatching';
 import { MAX_MAP_PIXELS, MAX_MAP_SIDE, mapLayout, maxPxPerCell, suggestedPxPerCell } from '../../../src/app/dungeons/render/layoutSize';
-import { placeBoxes, rectMeetsPolygon } from '../../../src/app/dungeons/render/notePlacement';
+import { placeBoxes } from '../../../src/app/dungeons/render/notePlacement';
+import { legibleStyle } from '../../../src/app/dungeons/render/legibleStyle';
+import { rectMeetsPolygon } from '../../../src/app/dungeons/render/boxGeometry';
 import { cellToPage, fitMap, pageToCell } from '../../../src/app/dungeons/render/pageMap';
 import { createRenderEnv } from '../../../src/app/dungeons/render/renderEnv';
 import { roomsByDistance } from '../../../src/app/dungeons/render/roomLabels';
@@ -104,6 +106,31 @@ describe('dungeon page layout', () => {
     expect(clashes).toBe(0);
     for (const box of boxes.slice(0, 2)) expect(rectMeetsPolygon(box, room)).toBe(false);
     expect(boxes[2]).toEqual({ x: 50, y: 80, w: 100, h: 40 });
+  });
+
+  it('places a note box beside its own room rather than a neighbour', () => {
+    const west = [{ x: 200, y: 300 }, { x: 400, y: 300 }, { x: 400, y: 500 }, { x: 200, y: 500 }];
+    const east = [{ x: 600, y: 300 }, { x: 800, y: 300 }, { x: 800, y: 500 }, { x: 600, y: 500 }];
+    const { boxes } = placeBoxes(
+      [{ w: 120, h: 60, anchor: { x: 700, y: 400 }, room: 1 }],
+      { x: 0, y: 0, w: 1000, h: 800 },
+      { polygons: [west, east], rects: [] },
+      5,
+      rngFrom(4),
+    );
+    const box = boxes[0]!;
+    const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    expect(Math.hypot(centre.x - 700, centre.y - 400)).toBeLessThan(Math.hypot(centre.x - 300, centre.y - 400));
+    expect(Math.hypot(centre.x - 700, centre.y - 400)).toBeLessThan(220);
+  });
+
+  it('keeps hatching and strokes from shrinking to hairlines on a small map', () => {
+    const style = STYLE_PRESETS.parchment;
+    expect(legibleStyle(style, 30)).toBe(style);
+    const small = legibleStyle(style, 12);
+    expect(small.hatching.distance * 12).toBeGreaterThan(style.hatching.distance * 12 * 1.5);
+    expect(small.hatching.distance * 12).toBeLessThan(style.hatching.distance * 30);
+    expect(small.strokes.thick).toBeGreaterThan(style.strokes.thick);
   });
 
   it('numbers rooms nearest the entrance first', () => {

@@ -22,13 +22,13 @@ export function drawBricks(env: RenderEnv): void {
     const outer = (distance * k) / courses;
     const inner = (distance * (k - 1)) / courses;
     ctx.beginPath();
-    traceShapes(ctx, dungeon.floors, outer, outer);
+    traceShapes(ctx, dungeon.outlines, outer, outer);
     ctx.lineWidth = ink * 2;
     ctx.stroke();
     ctx.fillStyle = palette.shading;
     ctx.fill();
     ctx.beginPath();
-    for (const shape of dungeon.floors) {
+    for (const shape of dungeon.outlines) {
       // Bricks of one course stagger against the next by a random phase.
       const phase = rng() * brick;
       for (const place of edgePlaces(shape, inner, brick, phase)) {

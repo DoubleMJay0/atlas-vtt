@@ -56,16 +56,19 @@ export function hatchStrokes(env: RenderEnv): number[] {
     const angle = angles[i]!;
     const tx = Math.cos(angle);
     const ty = Math.sin(angle);
-    const cap = (0.6 + rng() * 0.5) * size;
-    const free = cap;
+    // A stroke runs on until it meets a neighbour's, up to 1.5 to 3.5 half-sizes; one that meets
+    // none stays at the square root of that, so strokes grow into the gaps between clusters.
+    const half = size / 2;
+    const cap = (1.5 + rng() * 2) * half;
+    const free = Math.sqrt(cap / half) * half;
     const cluster: number[] = [];
     for (let k = 0; k < count; k++) {
       const offset = (count === 1 ? 0 : k / (count - 1) - 0.5) * width;
       const cx = p.x - ty * offset;
       const cy = p.y + tx * offset;
       const jitter = 0.85 + rng() * 0.3;
-      const ahead = reachOf(hash.firstHit(cx, cy, tx, ty, cap * jitter), cap * jitter, free, gap);
-      const behind = reachOf(hash.firstHit(cx, cy, -tx, -ty, cap * jitter), cap * jitter, free, gap);
+      const ahead = reachOf(hash.firstHit(cx, cy, tx, ty, cap * jitter), cap * jitter, free * jitter, gap);
+      const behind = reachOf(hash.firstHit(cx, cy, -tx, -ty, cap * jitter), cap * jitter, free * jitter, gap);
       if (ahead + behind < size * 0.25) continue;
       cluster.push(cx - tx * behind, cy - ty * behind, cx + tx * ahead, cy + ty * ahead);
     }

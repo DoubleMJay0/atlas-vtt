@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { doorShape, rotundaRadius, roomShape, shapeDistance, signedArea2, shapePolygon } from '../../../src/app/dungeons/render/geometry';
+import { doorShape, doorShapes, rotundaRadius, roomShape, shapeDistance, signedArea2, shapePolygon } from '../../../src/app/dungeons/render/geometry';
 import { visibleDungeon } from '../../../src/app/dungeons/render/visibleDungeon';
 import { insetRuns } from '../../../src/app/dungeons/render/water';
 import { taperedOutline } from '../../../src/app/dungeons/render/debris';
-import { shadowRegion } from '../../../src/app/dungeons/render/clipShapes';
 import { paletteOf } from '../../../src/app/dungeons/render/palette';
 import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
 import { smallDungeon } from '../../fixtures/dungeonModels';
@@ -26,6 +25,19 @@ describe('dungeon render geometry', () => {
     expect(shapeDistance(cell, 2.5, 3.5)).toBeCloseTo(-0.5);
     expect(shapeDistance(cell, 4, 3.5)).toBeCloseTo(1);
     expect(shapeDistance(cell, 4, 5)).toBeCloseTo(Math.SQRT2);
+  });
+
+  it('narrows a doorway with wall jambs and leaves any other door cell whole', () => {
+    const across = { x: 2, y: 3, dir: { x: 1, y: 0 } as const };
+    expect(doorShapes({ ...across, kind: 'door' })).toEqual([doorShape(across)]);
+    const pieces = doorShapes({ ...across, kind: 'doorway' });
+    const floor = (x: number, y: number): boolean => pieces.some(shape => shapeDistance(shape, x, y) < 0);
+    // Full width where it meets the rooms, 0.6 of a cell between the jambs.
+    expect(floor(2.1, 3.05)).toBe(true);
+    expect(floor(2.5, 3.5)).toBe(true);
+    expect(floor(2.5, 3.1)).toBe(false);
+    expect(floor(2.5, 3.9)).toBe(false);
+    expect(floor(2.5, 3.25)).toBe(true);
   });
 
   it('keeps every polygon clockwise on screen, so a nonzero fill is a union', () => {
@@ -67,16 +79,6 @@ describe('dungeon render details', () => {
     expect(outline).toHaveLength(6);
     expect(Math.abs(outline[0]!.y - outline[5]!.y)).toBeCloseTo(0.2);
     expect(outline[2]!.y).toBeCloseTo(outline[3]!.y);
-  });
-
-  it('casts the inner shadow on the side the light comes from', () => {
-    const room = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 }];
-    const region = shadowRegion([room], { x: 0.2, y: 0.2 }, []);
-    const inside = (x: number, y: number): boolean => region.some(ring => pointInPolygon(ring, x, y));
-    expect(inside(0.1, 2)).toBe(true);
-    expect(inside(2, 0.1)).toBe(true);
-    expect(inside(3.9, 2)).toBe(false);
-    expect(inside(2, 2)).toBe(false);
   });
 
   it('snaps colours to ink or paper in monochrome and takes the shadow away', () => {

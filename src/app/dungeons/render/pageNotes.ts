@@ -59,6 +59,8 @@ export function planBoxes(ctx: Canvas2D, dungeon: VisibleDungeon, style: Dungeon
       w: texts[i]!.w,
       h: texts[i]!.h,
       anchor: anchors[i]!,
+      room: dungeon.rooms.findIndex(room => room.id === note.room),
+      tail: tailed,
       ...(note.manual ? { manual: cellToPage(map, note.manual) } : {}),
     })),
     { x: inset, y: inset, w: frame.width - inset * 2, h: frame.height - inset * 2 },

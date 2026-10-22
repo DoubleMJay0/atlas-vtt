@@ -1,6 +1,6 @@
 import type { Rng } from '../rng';
 import { clipToFloors } from './floors';
-import { pointInPolygon, signedArea2, tracePolygon, type Vec } from './geometry';
+import { pointInPolygon, signedArea2, traceSmoothClosed, type Vec } from './geometry';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 
 /** Ripples inside every pool, as far in from its shore, in cells. */
@@ -17,7 +17,7 @@ export function drawWater(env: RenderEnv): void {
   ctx.save();
   clipToFloors(env);
   ctx.beginPath();
-  for (const pool of dungeon.model.water) tracePolygon(ctx, pool.outline);
+  for (const pool of dungeon.model.water) traceSmoothClosed(ctx, pool.outline);
   ctx.fillStyle = palette.water;
   ctx.fill();
   ctx.strokeStyle = palette.ink;
