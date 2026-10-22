@@ -4,6 +4,7 @@
  * names the result and may name other parts with `{Part}`, filled with what they rolled. Pure.
  */
 
+import { statblockLinksAsText } from '../services/statblockLinks';
 import type { RandomTable } from './tableModel';
 
 /** One part of a generator: its row, its name and the cell it rolls. */
@@ -55,9 +56,17 @@ export function fillName(template: string, values: ReadonlyMap<string, string>):
   return filled.replace(/[ \t]{2,}/g, ' ').trim();
 }
 
-/** What each part rolled, by `partKey`, for `fillName`; the first of two parts of one name counts. */
+/**
+ * A part as the name shows it: plain text, links as the words they show and no emphasis, since a
+ * name is a file name and an item's name too ("Scroll of *[[Spells/Illusion|Illusion]]*" → "Scroll of Illusion").
+ */
+export function plainPart(value: string): string {
+  return statblockLinksAsText(value).replace(/\*+/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** What each part rolled as plain text, by `partKey`, for `fillName`; the first of two parts of one name counts. */
 export function partValues(parts: readonly { label: string; value: string }[]): Map<string, string> {
   const values = new Map<string, string>();
-  for (const part of parts) if (!values.has(partKey(part.label))) values.set(partKey(part.label), part.value);
+  for (const part of parts) if (!values.has(partKey(part.label))) values.set(partKey(part.label), plainPart(part.value));
   return values;
 }

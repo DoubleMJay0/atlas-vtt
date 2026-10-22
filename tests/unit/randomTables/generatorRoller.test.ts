@@ -24,6 +24,12 @@ describe('a generator table', () => {
     expect(fillName('{bonus} {TYPE}', values)).toBe('+1 Longsword');
     expect(fillName('{Curse} {Type} of {Owner}', values)).toBe('Longsword of {Owner}');
   });
+
+  it('names with plain text: a part\'s links count as the words they show, its emphasis is dropped', () => {
+    const values = partValues([{ label: 'Spell', value: '*[[Magic/Spells/Illusion|Illusion]]*' }, { label: 'Ink', value: '**[[Gold Ink]]**' }]);
+    expect(fillName('Scroll of {Spell}', values)).toBe('Scroll of Illusion');
+    expect(fillName('{Ink} wand', values)).toBe('Gold Ink wand');
+  });
 });
 
 describe('rolling a generator', () => {
