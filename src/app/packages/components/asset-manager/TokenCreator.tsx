@@ -173,14 +173,14 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
         e.preventDefault();
         e.stopPropagation();
         onClose();
-      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !generating) {
         e.preventDefault();
         void handleSubmit();
       }
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, onClose, handleSubmit, busy]);
+  }, [isOpen, onClose, handleSubmit, busy, generating]);
 
   const addChosen = (images: PreviewImage[]): void => { previews.addImages(images); setSource('images'); };
   const closeChooser = (): void => { importController.abort(); setImportController(new AbortController()); setSource('images'); };

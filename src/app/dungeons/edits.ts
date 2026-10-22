@@ -31,11 +31,18 @@ export function hasEdits(edits: DungeonEdits): boolean {
   return edits.title !== undefined || edits.story !== undefined || (edits.hiddenWings?.length ?? 0) > 0 || Object.keys(edits.notes).length > 0;
 }
 
-/** `edits` with the note of `room` changed by `change`; a field set to undefined is removed. */
+/**
+ * `edits` with the note of `room` changed by `change`, merged over what was edited before (a
+ * retyped note keeps where its box was dragged); a deletion replaces it, null forgets it.
+ */
 export function withNoteEdit(edits: DungeonEdits, room: number, change: NoteEdit | null): DungeonEdits {
   const notes: Record<number, NoteEdit> = { ...edits.notes };
   if (change === null) delete notes[room];
-  else notes[room] = change;
+  else if (change.deleted) notes[room] = change;
+  else {
+    const { deleted: _deleted, ...kept } = notes[room] ?? {};
+    notes[room] = { ...kept, ...change };
+  }
   return { ...edits, notes };
 }
 

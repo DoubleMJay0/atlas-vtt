@@ -169,7 +169,7 @@ describe('creating a dungeon scene', () => {
     const result = await createDungeonSceneWith(b.deps, options());
     restore();
 
-    expect(result).toEqual({ ok: false, problem: 'The map could not be saved. Nothing was added.' });
+    expect(result).toEqual({ ok: false, problem: 'The scene could not be created.' });
     expect(filesOf(b)).toEqual(before);
     expect(await recordsOf(b)).toEqual([]);
   });
@@ -179,7 +179,7 @@ describe('creating a dungeon scene', () => {
     b.deps.render = () => Promise.reject(new Error('Worker crashed'));
     const before = filesOf(b);
 
-    expect(await createDungeonSceneWith(b.deps, options())).toEqual({ ok: false, problem: 'The dungeon could not be saved.' });
+    expect(await createDungeonSceneWith(b.deps, options())).toEqual({ ok: false, problem: 'The scene could not be created.' });
     expect(filesOf(b)).toEqual(before);
   });
 

@@ -69,6 +69,8 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     tags: settings.tags,
     ...(initialName.trim() ? { name: initialName.trim() } : {}),
   }));
+  const requestRef = useRef(request);
+  requestRef.current = request;
   const [draftTags, setDraftTags] = useState<DungeonTag[]>(settings.tags);
   const [edits, setEdits] = useState<DungeonEdits>(NO_EDITS);
   const [arrangement, setArrangement] = useState(0);
@@ -85,7 +87,11 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
 
   // A request is another dungeon: what was edited on the last one does not fit it.
   const changeRequest = useCallback((change: (current: DungeonRequest) => DungeonRequest): void => {
-    setRequest((current) => change(current));
+    const next = change(requestRef.current);
+    // Leaving a field unchanged asks for the same dungeon, whose edits still fit
+    if (next === requestRef.current) return;
+    requestRef.current = next;
+    setRequest(next);
     setEdits(NO_EDITS);
     setArrangement(0);
   }, []);

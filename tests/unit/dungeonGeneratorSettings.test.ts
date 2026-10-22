@@ -160,3 +160,13 @@ describe('hiding one secret wing', () => {
     expect(visibleDungeon(edited, { secrets: false }).rooms.some((room) => room.wing === 'secret')).toBe(false);
   });
 });
+
+describe('note edits', () => {
+  it('keeps a dragged box where it was when its text is retyped, and forgets it on delete', () => {
+    const dragged = withNoteEdit(NO_EDITS, 3, { text: 'A', manual: { x: 2, y: 5 } });
+    const retyped = withNoteEdit(dragged, 3, { text: 'B' });
+    expect(retyped.notes[3]).toEqual({ text: 'B', manual: { x: 2, y: 5 } });
+    expect(withNoteEdit(retyped, 3, { deleted: true }).notes[3]).toEqual({ deleted: true });
+    expect(withNoteEdit(withNoteEdit(retyped, 3, { deleted: true }), 3, { text: 'C' }).notes[3]).toEqual({ text: 'C' });
+  });
+});

@@ -45,6 +45,8 @@ class DungeonGeneratorModal extends Modal {
         parentScope={this.scope}
         onBusyChange={(busy) => { this.busy = busy; }}
         onCreated={(scene) => {
+          // The scene is written: closing must not wait for the busy flag the creation clears later
+          this.busy = false;
           this.created = scene;
           this.close();
         }}

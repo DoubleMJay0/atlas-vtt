@@ -4,6 +4,7 @@ import { IMAGE_PRESETS, optimizeImage, type ProcessedImage } from '../../imagePr
 import { writeMapScene, type MapSceneDeps } from '../../import/writeMapScene';
 import type { AssetService } from '../../services/AssetService';
 import { AssetThumbnailService, THUMBNAIL_SPEC } from '../../services/AssetThumbnailService';
+import { t } from '../../i18n';
 import { INVALID_NAME_CHARACTERS } from '../../services/assetPaths';
 import type { DungeonModel, DungeonRequest } from '../model';
 import { DEFAULT_PX_PER_CELL, type MapLayout } from '../render/layoutSize';
@@ -38,9 +39,6 @@ export type DungeonSceneResult = { ok: true; name: string; scenePath: string; no
 
 const refused = (problem: string): DungeonSceneResult => ({ ok: false, problem });
 
-const COLLECTION_GONE = 'The collection no longer exists. Choose another collection and try again.';
-const NOT_DRAWN = 'The dungeon could not be drawn.';
-const CROWDED_WALLS = 'The dungeon\'s walls end too close together for Atlas to join them.';
 const INVALID_CHARACTERS = new RegExp(INVALID_NAME_CHARACTERS.source, 'g');
 
 /** A dungeon's title as a vault file may be called. */
@@ -66,7 +64,7 @@ function placementOn(layout: MapLayout, saved: { width: number }): DungeonPlacem
 async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Promise<DungeonSceneResult> {
   const { style, view } = options;
   const collection = await deps.assetService.getCollection(options.collectionId);
-  if (!collection) return refused(COLLECTION_GONE);
+  if (!collection) return refused(t('dungeon.problem.collectionGone'));
 
   const rendered = await deps.render({
     request: options.request,
@@ -76,14 +74,14 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
     output: { kind: 'map', pxPerCell: options.pxPerCell ?? DEFAULT_PX_PER_CELL, numbers: options.numbers ?? true },
   });
   const { model, map: layout, image: drawn } = rendered;
-  if (!layout || drawn.type !== 'png') return refused(NOT_DRAWN);
+  if (!layout || drawn.type !== 'png') return refused(t('dungeon.problem.notDrawn'));
 
   const image = await deps.convertImage(drawn.blob);
   // A map within the limits is kept as drawn; one the workers scaled down has smaller cells
   const saved = (await imageDimensions(image.image)) ?? image.scaledDown?.to ?? { width: layout.widthPx, height: layout.heightPx };
   const placement = placementOn(layout, saved);
   const parts = dungeonScene(model, style, view, placement, saved);
-  if (!parts) return refused(CROWDED_WALLS);
+  if (!parts) return refused(t('dungeon.problem.crowdedWalls'));
   if (parts.unplaced > 0) console.debug(`[Atlas] ${model.title}: ${parts.unplaced} doors had no walls beside them and were left open`);
 
   let notePath = '';
@@ -98,7 +96,10 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
       return [{ path: notePath, content: dungeonNoteText(model, view) }];
     },
   });
-  if (!written.ok) return written;
+  if (!written.ok) {
+    console.error('[Atlas] Saving a dungeon scene failed:', written.problem);
+    return refused(t('dungeon.createFailed'));
+  }
   return { ok: true, name: written.name, scenePath: written.scenePath, notePath };
 }
 
@@ -113,7 +114,7 @@ export async function createDungeonSceneWith(deps: DungeonSceneDeps, options: Du
     return await create(deps, options);
   } catch (error) {
     console.error('[Atlas] Creating a dungeon scene failed', error);
-    return refused('The dungeon could not be saved.');
+    return refused(t('dungeon.createFailed'));
   }
 }
 

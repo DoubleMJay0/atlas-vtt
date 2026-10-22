@@ -105,7 +105,11 @@ export function usePagePreview(renderer: PreviewRenderer, input: PagePreviewInpu
   // The last picture's pixels go with the panel.
   const pictureRef = useRef(picture);
   pictureRef.current = picture;
-  useEffect(() => () => pictureRef.current?.bitmap.close(), []);
+  useEffect(() => () => {
+    // A preview answering after the panel closed is stale too, so its bitmap is closed on arrival
+    asked.current++;
+    pictureRef.current?.bitmap.close();
+  }, []);
 
   return { picture, drawing, failed };
 }
