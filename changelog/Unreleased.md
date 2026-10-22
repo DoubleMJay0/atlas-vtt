@@ -35,4 +35,5 @@
 - Typing @ in a value on a character sheet online suggests the values the player can reference, each with its current number
 - Players can write dice with @ references into their sheet's dice values, naming only values they can see
 - Editing an ability online keeps the @ references it was written with
+- Players can roll with advantage or disadvantage online: right-click or long-press a die
 - Players can change the maximum of their character's resources and tracked numbers online, such as armour slots

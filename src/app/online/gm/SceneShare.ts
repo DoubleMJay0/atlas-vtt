@@ -1,4 +1,4 @@
-import { MAX_ASSET_BYTES, parsePlayerMessage, type AssetRef, type GmMessage, type RollRequestAnswer, type SharedScene } from '../protocol/index.ts';
+import { MAX_ASSET_BYTES, parsePlayerMessage, type AssetRef, type GmMessage, type RollRequestAnswer, type SharedRollDice, type SharedScene } from '../protocol/index.ts';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import type { RollSceneLookup } from '../../services/playerRollSource';
 import type { DiceSource } from './atlasDice.ts';
@@ -10,6 +10,7 @@ import { AssetAnswers } from './assetAnswers.ts';
 import { imageMimeType, REPEAT_REQUEST_MS, sha256Hex } from './assetServe.ts';
 import type { ScaleImage } from './assetVariants.ts';
 import { MineShare } from './mineShare.ts';
+import { mapRollDice, tokenRollDice } from './rollAdvantage.ts';
 import { InputShare } from './InputShare.ts';
 import { LiveShare } from './LiveShare.ts';
 import type { LoggedRoll, RollRequest } from './log/TableLog.ts';
@@ -93,7 +94,8 @@ export class SceneShare {
     this.ports = ports;
     const seats = ports.seats;
     const ownerOf = ownerIn(seats, store);
-    const mine = seats === undefined ? null : new MineShare({ onlinePlayers: () => seats.onlinePlayers(), ownerOf }, (body, to) => ports.send(body, to));
+    const diceOf = (tokenId: string): SharedRollDice | undefined => tokenRollDice(ports.dice?.() ?? null, store.getState().objects.tokens[tokenId]);
+    const mine = seats === undefined ? null : new MineShare({ onlinePlayers: () => seats.onlinePlayers(), ownerOf, diceOf }, (body, to) => ports.send(body, to));
     this.mine = mine;
     // The initiative list shows the players' look-alike numbers too: it follows them as they change
     this.tokens = new TokenShare(store, { ...ports, numbersChanged: () => this.layers.update(), liveCarriedUntil: (alias) => this.live?.carriedUntil(alias) }, (listed) => mine?.setList(listed));
@@ -109,7 +111,7 @@ export class SceneShare {
     });
     this.layers = new MapLayerShare(store, { ...ports, mapLayers: () => ports.mapLayers?.() ?? null, badgeOf: (tokenId) => this.tokens.badgeOf(tokenId) });
     const cursorsShown = (): boolean => ports.atlasSettings().showCursors;
-    this.rules = new RulesShare(store, { ...ports, cursorsShown });
+    this.rules = new RulesShare(store, { ...ports, cursorsShown, rollDice: () => mapRollDice(ports.dice?.() ?? null) });
     this.moves = new PlayerMoves(store, {
       ...ports,
       context: () => ({
@@ -244,6 +246,8 @@ export class SceneShare {
       this.poll = undefined;
       void this.update(this.store.getState());
       this.rules.update();
+      // A character's template may name another dice set at any time
+      this.mine?.update();
       this.marks.update();
       this.schedulePoll();
     }, TOKEN_POLL_MS);
