@@ -1,5 +1,5 @@
 import {
-  MAX_ABILITIES, MAX_GM_FRAME, MAX_SHEET_CHARS, MAX_SHEET_NODES, type AbilityComponent, type AbilityEntry, type SheetNode, type SheetText,
+  MAX_ABILITIES, MAX_GM_FRAME, MAX_SHEET_CHARS, MAX_SHEET_NODES, writtenChars, type AbilityComponent, type AbilityEntry, type SheetNode, type SheetText,
   type SheetValue,
 } from '../../protocol/index.ts';
 
@@ -105,8 +105,9 @@ export class SheetBudget {
     return this.take({ nodes: 0, chars, abilities: 0, bytes: jsonBytes(frame) });
   }
 
-  /** One ability: its name, text and parts, as the parser counts them. */
+  /** One ability: its name, text and parts, and what differs as written, as the parser counts them. */
   takeAbility(entry: AbilityEntry): boolean {
-    return this.take({ nodes: 0, chars: textChars(entry.text) + entry.name.length + JSON.stringify(entry.parts).length, abilities: 1, bytes: jsonBytes(entry) });
+    const written = entry.written === undefined ? 0 : (entry.written.text ? textChars(entry.written.text) : 0) + writtenChars(entry.written).length;
+    return this.take({ nodes: 0, chars: textChars(entry.text) + entry.name.length + JSON.stringify(entry.parts).length + written, abilities: 1, bytes: jsonBytes(entry) });
   }
 }

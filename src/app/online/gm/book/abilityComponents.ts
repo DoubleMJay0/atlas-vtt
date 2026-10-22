@@ -1,9 +1,9 @@
 import {
   bookLine, isFieldKey, MAX_ABILITY_PARTS, MAX_ABILITY_TABS, MAX_BOOK_TITLE, MAX_SHEET_OPTIONS, parseSheetRaw, sheetItemKeys,
-  type AbilityComponent, type AbilityEntry, type AbilityPart, type AbilityTab, type SheetRaw,
+  type AbilityComponent, type AbilityEntry, type AbilityPart, type AbilityWritten, type AbilityTab, type SheetRaw,
 } from '../../protocol/index.ts';
 import { tabLabel } from '../../../statblocks/model/blockCatalogue';
-import type { EntriesBlock, EntryShape, SectionBlock, SpellsBlock, TabsBlock } from '../../../statblocks/model/templateTypes';
+import type { EntriesBlock, EntryShape, FieldValue, SectionBlock, SpellsBlock, TabsBlock } from '../../../statblocks/model/templateTypes';
 import { sectionHeading } from '../../../statblocks/render/values/sectionHeading';
 import { spellEntries, spellGroups, type SpellLine } from '../../../statblocks/render/shared/spellGroups';
 import { keyedEntryItems } from '../../../statblocks/values/entryKeys';
@@ -54,27 +54,51 @@ function abilityParts(shape: EntryShape | undefined): AbilityPart[] {
   }).slice(0, MAX_ABILITY_PARTS);
 }
 
-/** The abilities of one list as the note holds them, references filled in, each named by its key among the list's items as written (`entryItemKeys`). */
-function abilityEntries(build: SheetBuild, block: EntriesBlock, parts: readonly AbilityPart[]): AbilityEntry[] {
+/** An ability's name, text and the values of its parts as one item of its list holds them. */
+interface EntryContent {
+  readonly name: string;
+  readonly text: string;
+  readonly parts: Readonly<Record<string, SheetRaw>>;
+}
+
+function entryContent(item: FieldValue | undefined, shape: EntryShape | undefined, parts: readonly AbilityPart[]): EntryContent {
+  const record = item !== undefined && item !== null && typeof item === 'object' && !Array.isArray(item) ? item : {};
+  const values = parts.flatMap((part): [string, SheetRaw][] => {
+    const value = record[part.key] === undefined ? undefined : parseSheetRaw(record[part.key]);
+    return value === undefined ? [] : [[part.key, value]];
+  });
+  return { name: clippedLine(entryName(item, shape), MAX_BOOK_TITLE) ?? '', text: entryText(item, shape) ?? '', parts: Object.fromEntries(values) };
+}
+
+/** What of an ability as written differs from what shows (its `@` references); undefined where nothing does. */
+function writtenEntry(build: SheetBuild, written: EntryContent, shown: EntryContent): AbilityWritten | undefined {
+  const parts = Object.entries(written.parts).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(shown.parts[key]));
+  const entry: AbilityWritten = {
+    ...(written.name !== shown.name && { name: written.name }),
+    ...(written.text !== shown.text && { text: build.texts.of(written.text) }),
+    ...(parts.length > 0 && { parts: Object.fromEntries(parts) }),
+  };
+  return Object.keys(entry).length > 0 ? entry : undefined;
+}
+
+/**
+ * The abilities of one list as the note holds them, references filled in, each named by its key
+ * among the list's items as written (`entryItemKeys`). A list the player edits also carries what
+ * differs as written, from the values the player may see, so their edit keeps its references.
+ */
+function abilityEntries(build: SheetBuild, block: EntriesBlock, parts: readonly AbilityPart[], edit: boolean): AbilityEntry[] {
   const field = build.shown.fields.get(block.field);
   if (!field) return [];
   const shape = field.entry;
   // Keys name the note's items as written; what shows is the item with its references filled in
   const shown = build.shown.reader(field.key);
   const shownList = Array.isArray(shown) ? shown : [shown];
+  const asWritten = readField(build.shown.record, field).value;
+  const writtenList = Array.isArray(asWritten) ? asWritten : [asWritten];
   return keyedEntryItems(readField(build.record, field).value).map(({ key, index }): AbilityEntry => {
-    const item = shownList[index] ?? null;
-    const record = item !== null && typeof item === 'object' && !Array.isArray(item) ? item : {};
-    const values = parts.flatMap((part): [string, SheetRaw][] => {
-      const value = record[part.key] === undefined ? undefined : parseSheetRaw(record[part.key]);
-      return value === undefined ? [] : [[part.key, value]];
-    });
-    return {
-      key,
-      name: clippedLine(entryName(item, shape), MAX_BOOK_TITLE) ?? '',
-      text: build.texts.of(entryText(item, shape) ?? ''),
-      parts: Object.fromEntries(values),
-    };
+    const content = entryContent(shownList[index], shape, parts);
+    const written = edit ? writtenEntry(build, entryContent(writtenList[index], shape, parts), content) : undefined;
+    return { key, name: content.name, text: build.texts.of(content.text), parts: content.parts, ...(written !== undefined && { written }) };
   });
 }
 
@@ -111,7 +135,7 @@ export function abilityComponent(build: SheetBuild, block: TabsBlock | EntriesBl
   const parts = abilityParts(first?.entry);
   const tabs = lists.map(({ label, block: list }): AbilityTab => {
     const intro = list.introField ? valueText(build.shown.reader(list.introField)).trim() : '';
-    return { label, list: list.field, ...(intro !== '' && { intro: build.texts.of(intro) }), entries: abilityEntries(build, list, parts) };
+    return { label, list: list.field, ...(intro !== '' && { intro: build.texts.of(intro) }), entries: abilityEntries(build, list, parts, access === 'edit' && build.editable) };
   }).filter((tab) => isFieldKey(tab.list) && (access === 'edit' || tab.entries.length > 0));
   if (tabs.length === 0) return null;
   const keys = { nameKey: first?.entry?.nameKey ?? 'name', textKey: first?.entry?.textKey ?? 'desc' };
