@@ -20,6 +20,8 @@ const MAX_ROLL_ID = 64;
 const MAX_TOTAL = 1_000_000_000;
 /** The longest label a die's term carries. */
 const MAX_DIE_LABEL = 24;
+/** The most labelled constants a shared roll names: Atlas's formula holds no more terms. */
+export const MAX_NAMED_MODIFIERS = 20;
 
 /** The roll button a roll answers: the log entry that offers it and which of its rolls. */
 export interface RollRequestAnswer {
@@ -78,6 +80,18 @@ export interface SharedRoll {
   readonly source?: { readonly type: 'toolbar' | 'statblock'; readonly abilityName?: string };
   /** The formula is no plain sum (it multiplies, divides or counts): `modifiers` is 0 then. */
   readonly linear?: false;
+  /**
+   * The constants of `modifiers` written with a label (`+3[Str mod]`), in written order, each kept
+   * apart so the roll names it: "+ 4 − 1 Str mod". Absent where it names none. Added later: an older
+   * GM sends none, and an older page reads `modifiers` alone.
+   */
+  readonly namedModifiers?: readonly SharedNamedModifier[];
+}
+
+/** A constant of a roll written with a label: `+2[Proficiency]` is Proficiency, 2; a subtracted one is negative. */
+export interface SharedNamedModifier {
+  readonly label: string;
+  readonly value: number;
 }
 
 /**
@@ -153,6 +167,27 @@ function parseSource(value: unknown): SharedRoll['source'] | null {
   return isText(abilityName, MAX_ABILITY_NAME) ? { type: value.type, abilityName } : null;
 }
 
+/** A labelled constant as a shared roll names it, or null for anything else: a label the dice notation writes, a whole signed number. */
+function parseNamedModifier(value: unknown): SharedNamedModifier | null {
+  if (!isRecord(value)) return null;
+  const { label, value: amount } = value;
+  if (typeof label !== 'string' || label.trim() === '' || !DIE_LABEL.test(label) || !isInteger(amount, -MAX_TOTAL, MAX_TOTAL)) return null;
+  return { label, value: amount };
+}
+
+/**
+ * A roll's labelled constants, or undefined where it names none or the list cannot be part of its
+ * constants (`modifiers`): a roll that is no plain sum has none, and what the named ones leave for
+ * the unnamed constants is a number a formula can make. A malformed list is dropped, the roll kept.
+ */
+function parseNamedModifiers(value: unknown, modifiers: number, linear: boolean): readonly SharedNamedModifier[] | undefined {
+  if (!linear || !Array.isArray(value) || value.length === 0 || value.length > MAX_NAMED_MODIFIERS) return undefined;
+  const entries = value.flatMap((entry: unknown) => parseNamedModifier(entry) ?? []);
+  if (entries.length !== value.length) return undefined;
+  const plain = entries.reduce((rest, entry) => rest - entry.value, modifiers);
+  return Math.abs(plain) <= MAX_TOTAL ? entries : undefined;
+}
+
 /** A shared roll as the client reads it, or null for anything malformed: nothing else reaches the dice. */
 export function parseSharedRoll(value: unknown): SharedRoll | null {
   if (!isRecord(value)) return null;
@@ -164,9 +199,11 @@ export function parseSharedRoll(value: unknown): SharedRoll | null {
   const rolls = value.rolls.map(parseDie);
   const source = parseSource(value.source);
   if (rolls.some((die) => die === null) || source === null || (value.linear !== undefined && value.linear !== false)) return null;
+  const namedModifiers = parseNamedModifiers(value.namedModifiers, modifiers, value.linear !== false);
   return {
     id, timestamp, formula, rolls: rolls as SharedDie[], modifiers, total,
     ...(value.linear === false && { linear: false as const }),
+    ...(namedModifiers !== undefined && { namedModifiers }),
     ...(crit !== undefined && { crit }),
     ...(source !== undefined && { source }),
   };

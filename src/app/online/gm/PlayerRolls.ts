@@ -1,4 +1,7 @@
-import type { DiceSet } from '../../types/diceSetTypes';
+import type { DiceRules } from '../../types/diceRulesTypes';
+import type { DiceSet, RollingDice } from '../../types/diceSetTypes';
+import { completeFormula } from '../../tools/completeFormula';
+import { withoutConstantLabels } from '../../tools/namedModifiers';
 import type { RollOptions } from '../../tools/DiceTool';
 import type { GmMessage, PlayerRoll, RollMode, RollRefusal, RollRequestAnswer, SharedRoll } from '../protocol/index.ts';
 import { parseFormula } from '../../tools/parseFormula';
@@ -59,11 +62,24 @@ export function rollableFormula(formula: string): boolean {
 
 /**
  * Whether a player's formula is rolled: one with dice (`rollableFormula`), or a bonus from their sheet
- * as a page sends it, signed and without spaces (`+2`, `+4+1`, a roll by `isRollFormula`), which the
- * map's dice complete as they complete a bonus clicked on a statblock (`1d20+2`, `2d12+5`).
+ * as a page sends it, signed and without spaces but in a label (`+2`, `+4+1`, `+4+3[Str mod]`, a roll
+ * by `isRollFormula`), which the map's dice complete as they complete a bonus clicked on a statblock
+ * (`1d20+2`, `2d12+5`).
  */
 export function playerFormula(formula: string): boolean {
-  return rollableFormula(formula) || (!/\s/.test(formula) && isRollFormula(formula));
+  return rollableFormula(formula) || (!/\s(?![^[]*\])/.test(formula) && isRollFormula(formula));
+}
+
+/**
+ * A player's formula as it is rolled by `rules`: as sent, or without the labels of its constants
+ * where only those keep the dice tool from rolling it (the length a label adds once a bonus is
+ * completed with the map's dice), so a roll that names its numbers is never refused where the plain
+ * one rolls.
+ */
+export function rolledFormula(formula: string, rules: DiceRules | RollingDice | undefined): string {
+  if (rules === undefined || completeFormula(formula, rules).ok) return formula;
+  const plain = withoutConstantLabels(formula);
+  return plain !== formula && completeFormula(plain, rules).ok ? plain : formula;
 }
 
 /**
@@ -136,12 +152,13 @@ export class PlayerRolls {
     const set = token === undefined ? undefined : dice?.setFor?.(token);
     const setAppearance = request === undefined ? message.setAppearance : undefined;
     const options: RollOptions = { ...(set && { set }), ...(setAppearance && { setAppearance }) };
-    if (mode !== 'public') return this.rollPrivately(from, message.formula, mode, tokenId, source, context, notes, request?.to, set, setAppearance);
+    const formula = rolledFormula(message.formula, set ?? dice?.rules());
+    if (mode !== 'public') return this.rollPrivately(from, formula, mode, tokenId, source, context, notes, request?.to, set, setAppearance);
     if (dice === null || context.mapPath === null) return this.refuse('unavailable', from);
     const origin = tokenId === null ? undefined : { viewId: dice.viewId, mapPath: context.mapPath, tokenId };
     let rolled = false;
     this.ports.rollAs(from, () => {
-      rolled = dice.rollDice(message.formula, source, origin, options) !== null;
+      rolled = dice.rollDice(formula, source, origin, options) !== null;
     }, notes);
     if (!rolled) this.refuse('unavailable', from);
   }

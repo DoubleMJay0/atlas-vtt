@@ -23,6 +23,9 @@ export function quietRoll(formula: string, rules: DiceRules | RollingDice, id: s
   const complete = formula.trim() === '' ? null : completeFormula(formula, rules);
   if (complete === null || !complete.ok) return null;
   const looks = complete.written ? [] : rollingRules(rules).dice;
-  const { rolls, modifiers, total, linear } = rollFormula(complete.parsed, random, rules, looks);
-  return sharedRoll({ id, timestamp: now, formula: complete.formula, rolls: complete.written && setAppearance ? dressSetDice(rolls, rollingRules(rules)) : rolls, modifiers, total, crit: getDiceCrit(rolls, rules), ...(!linear && { linear: false as const }) });
+  const { rolls, modifiers, named, total, linear } = rollFormula(complete.parsed, random, rules, looks);
+  return sharedRoll({
+    id, timestamp: now, formula: complete.formula, rolls: complete.written && setAppearance ? dressSetDice(rolls, rollingRules(rules)) : rolls, modifiers,
+    ...(named.length > 0 && { namedModifiers: named }), total, crit: getDiceCrit(rolls, rules), ...(!linear && { linear: false as const }),
+  });
 }

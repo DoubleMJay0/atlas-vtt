@@ -70,14 +70,14 @@ function sheetPairs(value: unknown): unknown[] {
 }
 
 describe('a player\'s sheet: what each value rolls', () => {
-  it('gives every Experience its roll, the sums through references included', () => {
+  it('gives every Experience its roll, the sums through references included and their references named', () => {
     const sheet = statblockSheet({ resolved: resolvedOf(TEMPLATE, NOTE), definitions: [], resources: undefined }) as BookStatblock;
     expect(sheetPairs(sheet.blocks)).toEqual([
       { label: 'Never backs down', value: '+2', roll: '+2' },
       { label: 'Test Experience 2', value: '+3', roll: '+3' },
-      { label: 'Test Experience 3', value: '+4+1', roll: '+4+1' },
-      { label: 'Test Experience 4', value: '+4+2', roll: '+4+2' },
-      { label: 'Feint', value: '2d8 + 1', roll: '2d8+1' },
+      { label: 'Test Experience 3', value: '+4+1', roll: '+4+1[Agi]' },
+      { label: 'Test Experience 4', value: '+4+2', roll: '+4+2[Str]' },
+      { label: 'Feint', value: '2d8 + 1', roll: '2d8+1[Agility]' },
     ]);
   });
 });

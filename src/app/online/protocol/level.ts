@@ -7,8 +7,9 @@
  * 2: rest requests from a player character's recovery buttons (`book-rest`, `book-rest-answer`) and the `rest` log entry (2026-10-20).
  * 3: rest steps: actions picked in a rest, for oneself or another character (2026-10-20).
  * 4: entries added to or taken out of a character's list values (`book-list`: words, labels with values) (2026-10-21).
+ * 5: a player's formula may name its numbers (`+4+3[Str mod]`, a bonus too), as a value's `@` references fill it in (2026-10-22).
  */
-export const GM_LEVEL = 4;
+export const GM_LEVEL = 5;
 
 /** The level of a GM that names none: one from before levels, which serves level 1. */
 export const UNNAMED_GM_LEVEL = 1;
