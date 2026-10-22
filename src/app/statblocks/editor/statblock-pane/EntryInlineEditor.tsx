@@ -38,6 +38,9 @@ export interface EntryInlineEditorProps {
  * ability is empty, and never reaches the one before); Alt+↑/↓ move it and Mod+D
  * duplicates it, each one write to the note that takes what is typed along.
  */
+/** What takes focus on a press inside an ability being edited: its inputs, its text and the controls of its parts. */
+const FOCUSABLE = 'input, textarea, button, select, [contenteditable], [tabindex], [role="option"]';
+
 export function EntryInlineEditor({ block, field, editing }: EntryInlineEditorProps): React.JSX.Element {
   const pane = usePaneEdit();
   const target = pane.editing;
@@ -242,6 +245,12 @@ export function EntryInlineEditor({ block, field, editing }: EntryInlineEditorPr
     }
   };
 
+  /** A press on a part of the ability that is no control (a part's label, a gap) keeps focus where it is: it would leave the ability and close it. */
+  const keepFocusOnBareParts = (event: React.MouseEvent): void => {
+    if (event.button !== 0) return;
+    if ((event.target as Partial<Element>).closest?.(FOCUSABLE) == null) event.preventDefault();
+  };
+
   const onBlur = (event: React.FocusEvent): void => {
     if (focusStaysIn(rootRef.current, event.relatedTarget)) return;
     commit();
@@ -263,6 +272,7 @@ export function EntryInlineEditor({ block, field, editing }: EntryInlineEditorPr
       aria-label={editing.kind === 'edit' ? `Edit ${startName || noun.toLowerCase()}` : `New ${noun.toLowerCase()}`}
       onKeyDown={onKeyDown}
       onBlur={onBlur}
+      onMouseDown={keepFocusOnBareParts}
     >
       <span className="atlas-sb-trait-name">
         <input
