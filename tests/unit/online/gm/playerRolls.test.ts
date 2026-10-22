@@ -242,6 +242,9 @@ describe('a bonus from a player\'s sheet', () => {
     const gm = await table({ defaultRoll: '2d12', crit: 'natural' }, () => 0.5);
     gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: '+4+3[Str mod]', token: gm.alias(1) });
     expect(gm.rolled[0]).toMatchObject({ formula: '2d12+4+3[Str mod]', modifiers: 7, namedModifiers: [{ label: 'Str mod', value: 3 }] });
+    expect(parseSharedRoll(rollsSent(gm.sent)[0]?.result)?.namedModifiers).toEqual([{ label: 'Str mod', value: 3 }]);
+    gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: '1d6-1[Bane]', token: gm.alias(1), mode: 'gm' });
+    expect(parseSharedRoll(gm.logged.at(-1)?.roll)?.namedModifiers).toEqual([{ label: 'Bane', value: -1 }]);
     const long = `+1[${'A'.repeat(24)}]`.repeat(3) + '+1'.repeat(7);
     gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: long, token: gm.alias(1), mode: 'gm' });
     expect(gm.logged.at(-1)?.roll.formula).toBe(`2d12${'+1'.repeat(10)}`);

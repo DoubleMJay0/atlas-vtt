@@ -95,3 +95,28 @@ describe('shared dice of the full notation', () => {
     expect(parseSharedRoll(roll([], { linear: true }))).toBeNull();
   });
 });
+
+describe('the named constants of a shared roll', () => {
+  const named = { ...ROLL, formula: '1d20+4-1[Str mod]', modifiers: 3, total: 15, rolls: [{ die: 'd20', value: 12, max: 20 }] };
+
+  it('are read in written order, a name the dice notation writes with a whole number each', () => {
+    const terms = [{ label: 'Str mod', value: -1 }, { label: 'Proficiency', value: 2 }, { label: 'Proficiency', value: 2 }];
+    expect(parseSharedRoll({ ...named, modifiers: 7, namedModifiers: terms })?.namedModifiers).toEqual(terms);
+    expect(parseSharedRoll({ ...named, namedModifiers: [{ label: 'Str mod', value: -1, extra: true }] })?.namedModifiers).toEqual([{ label: 'Str mod', value: -1 }]);
+    expect(parseSharedRoll(named)).not.toHaveProperty('namedModifiers');
+  });
+
+  it('are dropped, the roll kept, where they are malformed or cannot be part of its constants', () => {
+    for (const namedModifiers of [
+      'Str mod', [], [{ label: '', value: 1 }], [{ label: ' ', value: 1 }], [{ label: 'Str[mod]', value: 1 }], [{ label: 'A'.repeat(25), value: 1 }],
+      [{ label: 'Str', value: 1.5 }], [{ label: 'Str', value: 2_000_000_000 }], [{ label: 'Str' }], [null],
+      Array.from({ length: 21 }, () => ({ label: 'Str', value: 0 })),
+      [{ label: 'A', value: -1_000_000_000 }, { label: 'B', value: -1_000_000_000 }],
+    ]) {
+      const read = parseSharedRoll({ ...named, namedModifiers });
+      expect(read, JSON.stringify(namedModifiers)).toMatchObject({ formula: named.formula, total: 15 });
+      expect(read, JSON.stringify(namedModifiers)).not.toHaveProperty('namedModifiers');
+    }
+    expect(parseSharedRoll({ ...named, linear: false, modifiers: 0, namedModifiers: [{ label: 'Str', value: 3 }] })).not.toHaveProperty('namedModifiers');
+  });
+});
