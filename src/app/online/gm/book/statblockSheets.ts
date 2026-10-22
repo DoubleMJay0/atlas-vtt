@@ -23,8 +23,8 @@ export interface StatblockSheetPorts {
   now(): number;
   /** The width of the GM's statblock panel, which the cards are laid out at; unset, a default. */
   panelWidth?(): number | undefined;
-  /** A note was read or a statblock drawn anew: the books are looked at again. */
-  changed(): void;
+  /** The note at `path` was read or its statblock drawn anew: the books of its characters are looked at again. */
+  changed(path: string): void;
 }
 
 /** How long a written value counts after its write was taken, should the note never read it back (someone else changed it since). */
@@ -102,7 +102,7 @@ export class StatblockSheets {
     void drawnStatblock({ resolved: source, definitions, resources, ...(panelWidth !== undefined && { panelWidth }) }).then((drawn) => {
       if (entry.asked !== asked || this.entries.get(path) !== entry) return;
       entry.drawn = drawn;
-      this.ports.changed();
+      this.ports.changed(path);
     }, (error: unknown) => console.error('[Atlas] Drawing a player\'s statblock failed:', error));
     return entry.drawn;
   }
@@ -198,7 +198,7 @@ export class StatblockSheets {
       entry.trusted = doubted;
       entry.source = undefined;
       this.readBack(entry);
-      this.ports.changed();
+      this.ports.changed(path);
     });
   }
 

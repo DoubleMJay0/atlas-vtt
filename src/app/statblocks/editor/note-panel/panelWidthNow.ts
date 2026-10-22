@@ -17,15 +17,21 @@ function mainNoteView(app: App): MarkdownView | null {
   return views.reduce<MarkdownView | null>((widest, view) => (widest === null || view.contentEl.clientWidth > widest.contentEl.clientWidth ? view : widest), null);
 }
 
+/** The panel's stored choices: the open panel's, else this device's. */
+const panelPrefsOf = (app: App): ReturnType<typeof loadPanelPrefs> => panelPrefsSource(app)?.panelPrefs() ?? loadPanelPrefs(app);
+
 /**
  * The width a statblock panel beside a note has on this device: the width the user chose by
- * dragging its edge, else the default, each as the widest note view of the main area gives it room
- * (without one, the chosen width, else a width that holds a one-column card whole). What the card
- * is laid out at elsewhere, so it reads as the GM sees it beside their notes.
+ * dragging its edge, else the default, each as the widest note view of the main area gives it room;
+ * null while no note shows there (then `chosenPanelWidth`). What the card is laid out at elsewhere,
+ * so it reads as the GM sees it beside their notes.
  */
-export function panelWidthNow(app: App): number {
-  const prefs = panelPrefsSource(app)?.panelPrefs() ?? loadPanelPrefs(app);
+export function shownPanelWidth(app: App): number | null {
   const view = mainNoteView(app);
-  if (view) return panelWidth(prefs, measureNoteRoom(view));
-  return prefs.width ?? FALLBACK_PANEL_WIDTH;
+  return view ? panelWidth(panelPrefsOf(app), measureNoteRoom(view)) : null;
+}
+
+/** The width a statblock panel takes without a note to measure: the one the user chose, else the default. */
+export function chosenPanelWidth(app: App): number {
+  return panelPrefsOf(app).width ?? FALLBACK_PANEL_WIDTH;
 }

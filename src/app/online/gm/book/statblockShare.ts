@@ -1,4 +1,4 @@
-import type { BookAbilityMessage, BookFieldMessage, BookListMessage } from '../../protocol/index.ts';
+import type { BookAbilityMessage, BookFieldMessage, BookListMessage, BookStatblock } from '../../protocol/index.ts';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import type { NotePatch } from '../../../statblocks/notes/patchTypes';
 import { checkAbilityEdit } from './abilityEdit.ts';
@@ -16,10 +16,14 @@ export interface StatblockSharePorts {
   now(): number;
   /** The width of the GM's statblock panel, which the players' cards are laid out at; unset, a default. */
   panelWidth?(): number | undefined;
-  /** A statblock was read or drawn anew, or an edit is under way: the books are looked at again. */
-  changed(): void;
-  /** A player's edit was taken: they are sent their statblock again, whether or not it reads otherwise. */
-  answered(player: string): void;
+  /** The note at `path` was read or its statblock drawn anew, or an edit of it is under way: the books of its characters are looked at again. */
+  changed(path: string): void;
+  /**
+   * A player's edit was taken: they are sent their statblock again, whether or not it reads
+   * otherwise, unless `asSent` (their page shows what they were sent: the edit set a value to what
+   * it was), when only a statblock that reads otherwise goes.
+   */
+  answered(player: string, asSent: boolean): void;
   /** A player's edit was refused once it was written: they are owed their whole book. */
   owe(player: string): void;
 }
@@ -99,8 +103,9 @@ export class StatblockShare {
     const inputs: EditInputs = { resolved: this.sheets.resolved(path), sent: sent?.path === path ? sent.drawn.statblock : null, read: (field) => this.sheets.read(path, field) };
     const checked = checkedEdit(inputs, message);
     if (checked === null) return false;
+    const asSent = inputs.sent !== null && inputs.sent !== undefined && showsAsSent(inputs.sent, message);
     if (checked.patches.length === 0) {
-      this.ports.answered(from);
+      this.ports.answered(from, asSent);
       return true;
     }
     this.sheets.hold(path, checked.written);
@@ -111,9 +116,30 @@ export class StatblockShare {
     void this.ports.write(path, checked.patches).then((outcome) => {
       if (outcome.conflicts.length > 0 || outcome.problem !== null) return refused();
       this.sheets.settle(path, checked.written);
-      this.ports.answered(from);
+      this.ports.answered(from, asSent);
     }, refused);
-    this.ports.changed();
+    this.ports.changed(path);
     return true;
   }
+}
+
+/**
+ * Whether a page that made this edit shows what it was sent: a value set, not a cell of a table, to
+ * what every place of it in the statblock holds already. The page shows each edit at once, so for
+ * any other edit what it shows is the GM's to confirm or correct.
+ */
+function showsAsSent(sent: BookStatblock, message: StatblockEditMessage): boolean {
+  if (message.t !== 'book-field' || message.cell !== undefined) return false;
+  const values = fieldValues(sent, message.key);
+  const asked = JSON.stringify(message.value);
+  return values.length > 0 && values.every((value) => JSON.stringify(value) === asked);
+}
+
+/** The values a statblock offers its player to change under `key`, wherever it shows them. */
+function fieldValues(node: unknown, key: string): unknown[] {
+  if (Array.isArray(node)) return node.flatMap((child) => fieldValues(child, key));
+  if (node === null || typeof node !== 'object') return [];
+  const record = node as Record<string, unknown>;
+  const own = record.key === key && typeof record.base === 'string' && typeof record.type === 'string' ? [record.value] : [];
+  return [...own, ...Object.values(record).flatMap((child) => fieldValues(child, key))];
 }

@@ -86,6 +86,16 @@ export class Characters {
     return [...this.played].flatMap(([player, character]) => (character.key === key ? [player] : []));
   }
 
+  /** The players whose character's statblock is the note at `path`. */
+  playersOfNote(path: string): string[] {
+    return [...this.played].flatMap(([player, character]) => (character.statblockPath === path ? [player] : []));
+  }
+
+  /** The name each player's character goes by now, by player. */
+  names(): Map<string, string> {
+    return new Map([...this.played].map(([player, character]) => [player, character.sheet.name]));
+  }
+
   /** The statblock notes of every character played. */
   statblockPaths(): Set<string> {
     return new Set([...this.played.values()].flatMap((character) => (character.statblockPath === null ? [] : [character.statblockPath])));
@@ -104,15 +114,21 @@ export class Characters {
     this.played.set(player, { ...character, sheet: { ...character.sheet, resources }, drawnWith });
   }
 
-  /** Reads the shared scene: who plays which character now. */
-  update(scene: BookScene, inputs: CharacterInputs): void {
+  /**
+   * Reads the shared scene: who plays which character now. With `only`, the characters of those
+   * players alone are read again (nothing else in the scene changed for the others).
+   */
+  update(scene: BookScene, inputs: CharacterInputs, only?: ReadonlySet<string>): void {
     for (const [player, character] of [...this.played]) {
       const givenAway = Object.hasOwn(scene.tokens, character.tokenId) && inputs.ownerOf(character.tokenId) !== player;
       if (givenAway || !inputs.isKnown(player)) this.played.delete(player);
     }
     for (const player of [...this.chosen.keys()]) if (!inputs.isKnown(player)) this.chosen.delete(player);
     const holders = new Map([...this.played].map(([player, character]) => [character.key, player]));
-    const owned = Object.keys(scene.tokens).filter((tokenId) => inputs.ownerOf(tokenId) !== undefined);
+    const owned = Object.keys(scene.tokens).filter((tokenId) => {
+      const owner = inputs.ownerOf(tokenId);
+      return owner !== undefined && (only === undefined || only.has(owner));
+    });
     const shown = scene.shown(owned);
     const settled = new Set<string>();
     const isChosen = (tokenId: string): boolean => {

@@ -20,7 +20,7 @@ export interface StatblockGate {
   read(path: string): Promise<ResolvedStatblock | null>;
   /** Writes checked patches into a note, as every statblock edit in Atlas is written. */
   write(path: string, patches: readonly NotePatch[]): Promise<StatblockWriteOutcome>;
-  /** The width of the statblock panel beside a note on this device now, which the players' cards are laid out at (`panelWidthNow`). */
+  /** The width of the statblock panel beside a note on this device now, which the players' cards are laid out at (`shownPanelWidth`; while no note shows, the width last measured beside one). */
   panelWidth?(): number | undefined;
   /** Calls `listener` with a note's path when its properties may read otherwise, and with null when every note may (a template changed); returns what stops it. */
   onChange(listener: (path: string | null) => void): () => void;
