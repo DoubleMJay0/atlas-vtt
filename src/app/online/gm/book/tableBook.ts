@@ -73,7 +73,10 @@ export function tableBook(ports: TableBookPorts): TableBook {
     quests: () => gatedQuests(),
     questAsset: (hash) => gatedQuestAsset(hash),
     editResource: (edit, answer) => {
-      if (edit.kind === 'character') return answer(writeCharacterValue(app, edit));
+      if (edit.kind === 'character') {
+        const taken = writeCharacterValue(app, edit);
+        return taken === null ? answer(null) : answer(taken.current, edit.max === undefined ? undefined : taken.max);
+      }
       const writes = ports.tokenWrites();
       if (writes === null) answer(null);
       else writes.write(edit, answer);

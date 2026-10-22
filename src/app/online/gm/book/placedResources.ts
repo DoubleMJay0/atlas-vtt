@@ -45,7 +45,8 @@ export function placedSheetValues(
     if (!definition || placed.has(definition.key) || (holding && holdsValue(definition, holding))) continue;
     const max = numericValue(reader(track.field));
     const value = statblockResourceValue(visible, definition, resolved.meanings) ?? startingValue(definition, max !== null && max > 0 ? Math.floor(max) : 0);
-    placed.set(definition.key, { definition, value, editable: definition.direction !== 'static' });
+    // The token holds no value of it: a maximum the player sets is its own, set by hand
+    placed.set(definition.key, { definition, value, editable: definition.direction !== 'static', maxEditable: true });
   }
   return [...placed.values()];
 }
