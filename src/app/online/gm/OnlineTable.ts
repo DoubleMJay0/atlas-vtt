@@ -310,6 +310,7 @@ export class OnlineTable {
     this.log.dispose();
     this.books.stop();
     this.cards.dispose();
+    this.covers.reset();
     this.closing = null;
     this.events.ended(end);
   }

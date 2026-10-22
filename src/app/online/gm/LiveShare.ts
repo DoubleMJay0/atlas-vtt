@@ -52,7 +52,9 @@ function sharedPath(points: readonly Place[] | undefined): MarkPoint[] | undefin
  * more with `end` at the last place they were sent, and never again; a token let go of ends where
  * it was dropped. A message holds every token it may, moved or not, so the newest stands for all
  * before it. While the lane carries a token the token list keeps it where it was listed
- * (`carriedUntil`), and the drop, or a drag resting longer than `CARRY_MS`, lands it there. Each token carries its drag's ruler while it measures
+ * (`carriedUntil`), and the drop, or a drag resting longer than `CARRY_MS`, lands it there; a
+ * drag that rests is told again every `CARRY_MS` all the same, so a page whose list is held up behind
+ * other messages (artwork, a join) never gives it up. Each token carries its drag's ruler while it measures
  * something, as Atlas's player window shows it: whenever the token is in the message, so only while
  * the players see it, and never a ruler of a token they do not see.
  */
@@ -67,8 +69,12 @@ export class LiveShare {
   private lit = false;
   /** Messages with an end sent so far: each waits under its own key. */
   private ended = 0;
-  /** When the lane last told of each token it carries, by the id players know it by. */
+  /** When the lane last told of each token it carries moving, by the id players know it by. */
   private sentAt = new Map<string, number>();
+  /** Tells the drags under way again once the lane has said nothing for `CARRY_MS`. */
+  private keepAlive: number | undefined;
+  /** The next message holds the drags under way though none moved. */
+  private keepAliveDue = false;
 
   constructor(store: SceneStore, ports: LiveSharePorts, listed: () => ListedTokens) {
     this.store = store;
@@ -84,6 +90,7 @@ export class LiveShare {
     this.scene = scene?.id ?? null;
     this.sent = new Map();
     this.sentAt = new Map();
+    this.cancelKeepAlive();
     this.pacer.cancel();
   }
 
@@ -142,17 +149,34 @@ export class LiveShare {
     });
     const ends = [...this.sent].filter(([id]) => !places.has(id));
     const ending = ends.length > 0;
-    if (!moved && !ending) return;
+    const resting = !moved && !ending && this.keepAliveDue && places.size > 0;
+    this.keepAliveDue = false;
+    if (!moved && !ending && !resting) return;
     // Every held token is in every message, so a newer one may replace a waiting one and lose nothing.
     const tokens: LivePlace[] = [...places].map(([id, { x, y, path }]) => ({ id, x, y, ...(path !== undefined && { path }) }));
     const dropped = this.droppedPlaces(ends.map(([, place]) => place.tokenId));
     for (const [id, place] of ends) tokens.push({ id, ...(dropped.get(place.tokenId) ?? { x: place.x, y: place.y }), end: true });
     const now = this.ports.now();
     this.sent = places;
-    this.sentAt = new Map([...places.keys()].map((id) => [id, now]));
+    // Telling a drag that rests again keeps it on the pages, not in the list's way: the list lands it.
+    if (!resting) this.sentAt = new Map([...places.keys()].map((id) => [id, now]));
+    this.cancelKeepAlive();
+    if (places.size > 0) {
+      this.keepAlive = this.ports.setTimer(() => {
+        this.keepAlive = undefined;
+        this.keepAliveDue = true;
+        this.pacer.request();
+      }, CARRY_MS);
+    }
     // An end is said once: its message waits under a key of its own, which no later message replaces.
     if (ending) this.ended += 1;
     this.ports.sendLive({ t: 'live', scene, at: now, tokens }, ending ? `${scene}\n${this.ended}` : scene);
+  }
+
+  private cancelKeepAlive(): void {
+    if (this.keepAlive !== undefined) this.ports.clearTimer(this.keepAlive);
+    this.keepAlive = undefined;
+    this.keepAliveDue = false;
   }
 
   /**

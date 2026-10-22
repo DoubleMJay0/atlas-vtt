@@ -87,6 +87,27 @@ describe('pages whose book covers their map', () => {
     expect(caughtUp).toEqual([ANA, ANA]);
   });
 
+  it('lets no catch-up outlive a reset, as when the table ends', () => {
+    const { covers, caughtUp, advance } = pages();
+    covers.receive(ANA, COVER);
+    covers.receive(ANA, UNCOVER);
+    covers.receive(ANA, COVER);
+    covers.receive(ANA, UNCOVER);
+    expect(caughtUp).toEqual([ANA]);
+    covers.reset();
+    advance(5 * CATCH_UP_MS);
+    expect(caughtUp).toEqual([ANA]);
+  });
+
+  it('keeps no covers where the relay takes no batches: every page gets every marks message, and none needs catching up', () => {
+    const { covers, sent, caughtUp } = pages(false);
+    expect(covers.receive(ANA, COVER)).toBe(true);
+    covers.sendLive(MARKS, 'marks');
+    expect(covers.receive(ANA, UNCOVER)).toBe(true);
+    expect(sent).toEqual([{ body: MARKS, to: '*' }]);
+    expect(caughtUp).toEqual([]);
+  });
+
   it('takes no page as covered after the GM reached the relay anew, or after the page left, or where the relay takes no batches', () => {
     const reset = pages();
     reset.covers.receive(ANA, COVER);

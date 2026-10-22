@@ -81,9 +81,9 @@ describe('the live lane of a drag', () => {
     const listedX = (): number | undefined => tokenLists(table.sent).at(-1)?.tokens.find((entry) => entry.id === alias)?.x;
     expect(listedX()).toBeLessThan(150);
     const lastLive = lives(table).length;
-    // Still held, resting: the lane says nothing more, and a page gives a drag it hears nothing of up after 1.5 s.
+    // Still held, resting: the lane tells the same place now and then, and the list lands it before a page would give it up (1.5 s).
     await table.advance(CARRY_MS + TOKEN_INTERVAL_MS + 10);
-    expect(lives(table)).toHaveLength(lastLive);
+    expect(lives(table).slice(lastLive).flatMap((message) => message.tokens)).toEqual(Array.from({ length: lives(table).length - lastLive }, () => ({ id: alias, x: 150, y: 100 })));
     expect(listedX()).toBe(150);
     const before = table.sent.length;
     table.share.resend('joiner');

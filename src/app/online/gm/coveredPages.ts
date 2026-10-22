@@ -35,6 +35,8 @@ export class CoveredPages {
   /** A player's message: true when it was a cover message, so nobody else reads it. */
   receive(from: string, body: unknown): boolean {
     if (!isRecord(body) || body.t !== 'book-cover') return false;
+    // Without batches every page gets every marks message: there is nothing to leave out or catch up.
+    if (!this.ports.batches()) return true;
     const message = parseBookCover(body);
     if (message?.covered === true) this.covered.add(from);
     else if (message !== null && this.covered.delete(from)) this.catchUp(from);
