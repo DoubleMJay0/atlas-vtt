@@ -71,4 +71,19 @@ describe('pages whose book covers their map, at a running table', () => {
     expect(after.every(({ to }) => to === '*')).toBe(true);
     online.stop();
   });
+
+  it('sends a page the marks as they are once its book no longer covers the map', async () => {
+    const { online, socket, from } = await openTable(new BookShelf(), PLAYERS);
+    socket.relay({ t: 'welcome', role: 'gm', players: PLAYERS, batch: true });
+    await advance(1_000);
+    const scene = String((bodies(socket).filter(({ t }) => t === 'scene').at(-1)?.body.scene as { id?: string } | undefined)?.id);
+    from(ANA, { t: 'book-cover', covered: true });
+    from(BEN, { t: 'laser', scene, color: '#66ffa9', size: 16, at: [100, 100], pts: [100, 100, 110, 100], on: true });
+    await advance(MARKS_INTERVAL_MS * 2);
+    const since = bodies(socket).length;
+    from(ANA, { t: 'book-cover', covered: false });
+    await advance(MARKS_INTERVAL_MS * 2);
+    expect(bodies(socket).slice(since).some(({ t, to }) => t === 'marks' && to === ANA)).toBe(true);
+    online.stop();
+  });
 });

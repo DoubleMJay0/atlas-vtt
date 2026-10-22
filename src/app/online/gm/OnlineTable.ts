@@ -127,7 +127,10 @@ export class OnlineTable {
       cardsChanged: () => events.changed(),
     });
     this.covers = new CoveredPages({
-      ...timers,
+      // Each method by itself: the timers are a class, whose methods a spread leaves behind
+      now: () => timers.now(),
+      setTimer: (run, ms) => timers.setTimer(run, ms),
+      clearTimer: (timer) => timers.clearTimer(timer),
       sendLive: (body, key, to) => this.connection.sendLive(body, key, to),
       batches: () => this.connection.batches,
       connected: () => this.connection.connected,
