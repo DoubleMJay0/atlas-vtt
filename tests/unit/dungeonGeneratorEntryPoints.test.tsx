@@ -8,7 +8,7 @@ import { TokenCreator } from '../../src/app/packages/components/asset-manager/To
 import { Header } from '../../src/app/packages/components/asset-manager/components/Header';
 import type { FilterSearch } from '../../src/app/packages/components/asset-manager/hooks/useFilterSearch';
 import { openCreatedScene } from '../../src/app/import/openCreatedScene';
-import { openDungeonGenerator } from '../../src/app/packages/components/dungeon-generator/openDungeonGenerator';
+import { generateDungeonFor } from '../../src/app/packages/components/dungeon-generator/openDungeonGenerator';
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { NotePinTool } from '../../src/app/tools/NotePinTool';
@@ -16,7 +16,7 @@ import { dungeonCreateEntry } from '../../src/app/tools/pinCreateEntries';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { stubLayout } from '../mocks/jsdomLayout';
 
-vi.mock('../../src/app/packages/components/dungeon-generator/openDungeonGenerator', () => ({ openDungeonGenerator: vi.fn() }));
+vi.mock('../../src/app/packages/components/dungeon-generator/openDungeonGenerator', () => ({ generateDungeonFor: vi.fn() }));
 vi.mock('../../src/app/packages/components/asset-manager/token-creator/useAssetCatalog', () => ({
   useAssetCatalog: () => ({ assetService: {}, collections: [{ id: 'Dungeons', name: 'Dungeons' }] }),
 }));
@@ -88,9 +88,10 @@ describe('the asset manager', () => {
 describe('generating a dungeon from the note pin search', () => {
   it('is offered only on a map of a collection, whose scenes a pin may link', () => {
     const { app } = createInMemoryApp({ files: {} });
-    expect(dungeonCreateEntry(app, 'maps/town.atlasmap')).toBeNull();
-    expect(dungeonCreateEntry(app, null)).toBeNull();
-    expect(dungeonCreateEntry(app, SCENE_MAP)?.label('Crypt')).toBe('Generate dungeon “Crypt”');
+    const store = createViewAtlasStore(app, 'pin-dungeon-entry');
+    expect(dungeonCreateEntry(store, 'maps/town.atlasmap')).toBeNull();
+    expect(dungeonCreateEntry(store, null)).toBeNull();
+    expect(dungeonCreateEntry(store, SCENE_MAP)?.label('Crypt')).toBe('Generate dungeon “Crypt”');
   });
 
   it('pins the scene the generator created, in the map’s collection', async () => {
@@ -111,14 +112,14 @@ describe('generating a dungeon from the note pin search', () => {
       const entry = [...document.querySelectorAll<HTMLElement>('.pin-create-item')].find((item) => item.textContent?.includes('Generate dungeon'));
       expect(entry).toBeDefined();
       let finish!: (scene: { scenePath: string }) => void;
-      vi.mocked(openDungeonGenerator).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      vi.mocked(generateDungeonFor).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
       entry!.click();
-      // The generator works in a tab of its own: the dropdown waits unseen meanwhile
+      // The generator works over the map: the dropdown waits unseen meanwhile
       const dropdown = document.querySelector<HTMLElement>('#atlas-note-pin-dropdown')!;
       await waitFor(() => expect(dropdown.classList.contains('atlas-away')).toBe(true));
       finish({ scenePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap' });
       await waitFor(() => expect(Object.values(store.getState().objects.pins)).toHaveLength(1));
-      expect(openDungeonGenerator).toHaveBeenCalledWith(app, { name: 'Crypt', collectionId: 'Dungeons' });
+      expect(generateDungeonFor).toHaveBeenCalledWith(store, { name: 'Crypt', collectionId: 'Dungeons' });
       expect(Object.values(store.getState().objects.pins)[0]).toMatchObject({ notePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap' });
     } finally {
       tool.destroy();

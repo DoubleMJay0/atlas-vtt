@@ -11,7 +11,7 @@ import { DungeonWorkerClient } from '../../src/app/dungeons/worker/DungeonWorker
 import { DungeonGeneratorPanel } from '../../src/app/packages/components/dungeon-generator/DungeonGeneratorPanel';
 
 /**
- * The dungeon generator filling its tab, laid out by the plugin's real stylesheet and drawn by the
+ * The dungeon generator over the Atlas view, laid out by the plugin's real stylesheet and drawn by the
  * real worker. The variables stand in for Obsidian's theme.
  */
 const THEME = `
@@ -25,23 +25,24 @@ const THEME = `
 
 const app = {} as App;
 let root: Root | null = null;
+let view: HTMLElement;
 let tab: HTMLElement;
 const style = document.createElement('style');
 style.textContent = THEME + css;
 
-/** The tab's content element as Obsidian gives it to the view, `width` × `height` px. */
+/** The overlay over an Atlas view of `width` × `height` px (here the page, as a leaf contains it). */
 async function openTab(width: number, height: number): Promise<void> {
   await page.viewport(width, height);
-  tab = document.body.createDiv({ cls: 'view-content atlas-vtt-plugin atlas-dungeon-generator-view' });
-  tab.style.width = `${width}px`;
-  tab.style.height = `${height}px`;
+  view = document.body.createDiv({ cls: 'atlas-vtt-plugin' });
+  tab = view.createDiv({ cls: 'atlas-dungeon-generator-overlay' });
   root = createRoot(tab);
-  act(() => root!.render(createElement(DungeonGeneratorPanel, { app, collectionId: 'Dungeons', initialName: 'Crypt', onCreated: () => {} })));
+  const header = createElement('button', { className: 'atlas-close-btn' }, '×');
+  act(() => root!.render(createElement(DungeonGeneratorPanel, { app, collectionId: 'Dungeons', initialName: 'Crypt', onCreated: () => {}, header })));
 }
 
 const box = (selector: string): DOMRect => tab.querySelector(selector)!.getBoundingClientRect();
 
-describe('the dungeon generator tab', () => {
+describe('the dungeon generator over the Atlas view', () => {
   beforeEach(() => {
     document.head.append(style);
   });
@@ -49,19 +50,24 @@ describe('the dungeon generator tab', () => {
   afterEach(() => {
     act(() => root?.unmount());
     root = null;
-    tab.remove();
+    view.remove();
     style.remove();
     DungeonWorkerClient.release(app);
   });
 
-  it('fills the tab: the map in the main area, the settings in a sidebar on the right with its actions at the foot', async () => {
+  it('fills the view: the map in the main area, the settings in a sidebar on the right under the close button, its actions at the foot', async () => {
     await openTab(1440, 860);
     const frame = tab.getBoundingClientRect();
-    // Obsidian's padding of a view's content is not the generator's
+    expect([frame.width, frame.height]).toEqual([1440, 860]);
     expect(box('.atlas-dungeon-generator').width).toBe(frame.width);
+    const header = box('.atlas-dungeon-generator__header');
+    const close = box('.atlas-close-btn');
+    expect(header.top).toBe(frame.top);
+    expect(close.right).toBe(frame.right - 8);
+    expect(close.top).toBe(frame.top + 8);
     const sidebar = box('.atlas-dungeon-generator__sidebar');
     expect(sidebar.right).toBe(frame.right);
-    expect(sidebar.height).toBe(frame.height);
+    expect([sidebar.left, sidebar.top, sidebar.bottom]).toEqual([header.left, header.bottom, frame.bottom]);
     expect(sidebar.width).toBeGreaterThanOrEqual(320);
     expect(sidebar.width).toBeLessThanOrEqual(440);
     const preview = box('.atlas-dungeon-generator__preview');
@@ -88,11 +94,15 @@ describe('the dungeon generator tab', () => {
     expect(cards.filter((card) => card.top === cards[0]!.top).length).toBeGreaterThanOrEqual(3);
   });
 
-  it('stacks the sidebar under the map in a narrow tab', async () => {
+  it('stacks the sidebar under the map in a narrow view, the close button still in the top right corner', async () => {
     await openTab(600, 900);
     const frame = tab.getBoundingClientRect();
+    const header = box('.atlas-dungeon-generator__header');
     const preview = box('.atlas-dungeon-generator__preview');
     const sidebar = box('.atlas-dungeon-generator__sidebar');
+    expect([header.top, header.width]).toEqual([frame.top, frame.width]);
+    expect(box('.atlas-close-btn').right).toBe(frame.right - 8);
+    expect(preview.top).toBe(header.bottom);
     expect(preview.width).toBe(frame.width);
     expect(sidebar.width).toBe(frame.width);
     expect(sidebar.top).toBe(preview.bottom);

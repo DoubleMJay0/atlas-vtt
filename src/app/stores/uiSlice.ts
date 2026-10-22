@@ -7,7 +7,7 @@
  */
 
 import { DEFAULT_EXPLORED_BRUSH, type ExploredBrushOptions } from '../lighting/exploredEdits';
-import type { HeldTokens, ViewUIState } from '../types/viewUIState';
+import type { DungeonGeneratorRequest, HeldTokens, ViewUIState } from '../types/viewUIState';
 
 /** State fields added to ViewAtlasState */
 export interface UISlice extends ViewUIState {
@@ -30,6 +30,9 @@ export interface UISlice extends ViewUIState {
   setExploredBrush: (changes: Partial<ExploredBrushOptions>) => void;
   /** Starting the toolbar editor closes the dice tray, which hangs where the tray goes. */
   setToolbarEditing: (on: boolean) => void;
+  /** Opens the dungeon generator over the map, in place of one open already. */
+  openDungeonGenerator: (request: DungeonGeneratorRequest) => void;
+  closeDungeonGenerator: () => void;
 }
 
 /** Default state — all panels closed */
@@ -49,6 +52,7 @@ export function createInitialUIState(): Pick<
   | 'heldTokens'
   | 'exploredBrush'
   | 'isToolbarEditing'
+  | 'dungeonGenerator'
 > {
   return {
     isGridSettingsOpen: false,
@@ -65,6 +69,7 @@ export function createInitialUIState(): Pick<
     heldTokens: {},
     exploredBrush: DEFAULT_EXPLORED_BRUSH,
     isToolbarEditing: false,
+    dungeonGenerator: null,
   };
 }
 
@@ -89,6 +94,8 @@ export function createUIActions(
   | 'setHeldTokens'
   | 'setExploredBrush'
   | 'setToolbarEditing'
+  | 'openDungeonGenerator'
+  | 'closeDungeonGenerator'
 > {
   return {
     setGridSettingsOpen: (open) => set((draft) => { draft.isGridSettingsOpen = open; }),
@@ -130,5 +137,10 @@ export function createUIActions(
       draft.isToolbarEditing = on;
       if (on) draft.isDiceTrayOpen = false;
     }),
+    openDungeonGenerator: (request) => set((draft) => {
+      draft.dungeonGenerator = request;
+      draft.isToolbarEditing = false;
+    }),
+    closeDungeonGenerator: () => set((draft) => { draft.dungeonGenerator = null; }),
   };
 }

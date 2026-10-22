@@ -13,6 +13,7 @@ import { ViewActionsMenu } from './components/ViewActionsMenu';
 import { UndoRedoControls } from './components/UndoRedoControls';
 import { BottomToolbarRow } from './components/BottomToolbarRow';
 import DMScreen from './components/DMScreen';
+import { DungeonGeneratorOverlay } from '../packages/components/dungeon-generator/DungeonGeneratorOverlay';
 import { InitiativeTracker } from './components/InitiativeTracker';
 import { DiceRollLog } from './components/dice-log/DiceRollLog';
 import { DiceRollDisplay } from './components/dice/DiceRollDisplay';
@@ -218,6 +219,8 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
               />
             </PanelBoundary>
           )}
+
+          {!isPlayerView && <PanelBoundary name="the dungeon generator"><DungeonGeneratorOverlay /></PanelBoundary>}
 
           {/* Dice Roll Log - left side panel */}
           <PanelBoundary name="the dice log"><DiceRollLog isOpen={isDiceLogOpen} onClose={() => setDiceLogOpen(false)} /></PanelBoundary>

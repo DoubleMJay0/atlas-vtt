@@ -4,6 +4,18 @@ import type { Point } from './visionTypes';
 /** The tokens held at their starting positions. */
 export type HeldTokens = Readonly<Record<string, Point>>;
 
+/** The dungeon generator as it was opened over the map. */
+export interface DungeonGeneratorRequest {
+  /** One per opening: each is a dungeon of its own. */
+  id: number;
+  /** The collection the scene goes to, to begin with. */
+  collectionId: string;
+  /** The scene's name to begin with. */
+  name: string;
+  /** A note pin waits for the scene: name and collection are fixed, and the map stays shown. */
+  waiting: boolean;
+}
+
 export interface ViewUIState {
 
   // Panel visibility
@@ -27,4 +39,6 @@ export interface ViewUIState {
   exploredBrush: ExploredBrushOptions;
   /** The toolbar editor is open in this view: tray, hide and show, inert tools. Never saved. */
   isToolbarEditing: boolean;
+  /** The dungeon generator, filling the view while it is open. */
+  dungeonGenerator: DungeonGeneratorRequest | null;
 }

@@ -1,7 +1,9 @@
 import type { App } from 'obsidian';
 import { t } from '../i18n';
 import { INVALID_NAME_CHARACTERS, collectionIdOfPath } from '../services/assetPaths';
-import { openDungeonGenerator } from '../packages/components/dungeon-generator/openDungeonGenerator';
+import type { StoreApi } from 'zustand';
+import { generateDungeonFor } from '../packages/components/dungeon-generator/openDungeonGenerator';
+import type { ViewAtlasState } from '../storeFactory';
 import { freeNotePath } from '../utils/notePaths';
 
 /**
@@ -14,7 +16,7 @@ export interface PinCreateEntry {
   label: (name: string) => string;
   /** A Lucide icon id. */
   icon: string;
-  /** It works in a tab of its own: the dropdown is hidden until it is done. */
+  /** It works over the map: the dropdown is hidden until it is done. */
   away?: boolean;
   /** Why `name` cannot be used, shown under a disabled entry; null where it can. */
   problem?: (name: string) => string | null;
@@ -49,10 +51,10 @@ export function noteCreateEntry(app: App, mapPath: string | null): PinCreateEntr
 
 /**
  * Generates a dungeon of the typed name as a scene of the map's own collection (a pin links only
- * scenes of its collection), in the generator's tab, and links the pin to it. Offered only on a
- * map in a collection.
+ * scenes of its collection), in the generator over the map, and links the pin to it. Offered only
+ * on a map in a collection.
  */
-export function dungeonCreateEntry(app: App, mapPath: string | null): PinCreateEntry | null {
+export function dungeonCreateEntry(store: StoreApi<ViewAtlasState>, mapPath: string | null): PinCreateEntry | null {
   const collectionId = collectionIdOfPath(mapPath);
   if (!collectionId) return null;
   return {
@@ -60,6 +62,6 @@ export function dungeonCreateEntry(app: App, mapPath: string | null): PinCreateE
     label: (name) => t('pin.search.generateDungeon', { name }),
     icon: 'castle',
     away: true,
-    create: async (name) => (await openDungeonGenerator(app, { name, collectionId }))?.scenePath ?? null,
+    create: async (name) => (await generateDungeonFor(store, { name, collectionId }))?.scenePath ?? null,
   };
 }

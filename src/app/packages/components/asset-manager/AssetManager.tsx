@@ -241,7 +241,7 @@ export default function AssetManager({ isOpen, onClose, initialTab, onExitComple
                   onCreateTokens={() => crud.setIsTokenCreatorOpen(true)}
                   onCreateMap={crud.handleCreateMap}
                   onGenerateDungeon={() => {
-                    runInBackground(showDungeonGenerator(data.app, { collectionId: selectedCollection }), 'Opening the dungeon generator');
+                    runInBackground(showDungeonGenerator(data.app, selectedCollection), 'Opening the dungeon generator');
                     onClose();
                   }}
                   onCreateEncounter={() => crud.setIsEncounterBuilderOpen(true)}

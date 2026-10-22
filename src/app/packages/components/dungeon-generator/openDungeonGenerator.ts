@@ -1,51 +1,52 @@
-import type { App, WorkspaceLeaf } from 'obsidian';
-import { getActiveWorkspaceLeaf } from '../../../utils/embeddedLeafFocus';
-import { DUNGEON_GENERATOR_VIEW_TYPE, DungeonGeneratorView } from './DungeonGeneratorView';
+import type { App } from 'obsidian';
+import type { StoreApi } from 'zustand';
+import { loadAtlasView } from '../../../plugin/atlasLeaves';
+import type { ViewAtlasState } from '../../../storeFactory';
+import { showNotice } from '../../../ui/notice';
+import { t } from '../../../i18n';
+import type { CreatedDungeonScene } from './useGeneratorActions';
 
-export interface OpenDungeonGeneratorOptions {
-  /** The name typed where the generator was opened from: the scene's name to begin with. */
-  name?: string;
-  /** The collection the scene goes to. */
-  collectionId: string;
+/** The pins waiting for a scene, by the opening that will make it. */
+const waiting = new Map<number, (scene: CreatedDungeonScene | null) => void>();
+let openings = 0;
+
+/** Hands a waiting pin its scene, or null when the generator closed without one; once. */
+export function settleDungeonRequest(id: number, scene: CreatedDungeonScene | null): void {
+  const settle = waiting.get(id);
+  waiting.delete(id);
+  settle?.(scene);
 }
 
-/** Opens the generator's view in `leaf`, made active; null where the leaf holds none afterwards. */
-async function openIn(leaf: WorkspaceLeaf, collectionId: string): Promise<DungeonGeneratorView | null> {
-  await leaf.setViewState({ type: DUNGEON_GENERATOR_VIEW_TYPE, state: { collectionId }, active: true });
-  return leaf.view instanceof DungeonGeneratorView ? leaf.view : null;
-}
-
-/**
- * Opens the dungeon generator in a new tab for a scene asked for elsewhere (the note pin search),
- * with its name and collection fixed. Resolves with the scene once it was created (the tab closes
- * and the asking tab is active again), or null when the tab was closed without one.
- */
-export async function openDungeonGenerator(app: App, options: OpenDungeonGeneratorOptions): Promise<{ scenePath: string } | null> {
-  const returnTo = getActiveWorkspaceLeaf(app.workspace);
-  const view = await openIn(app.workspace.getLeaf('tab'), options.collectionId);
-  if (!view) return null;
-  return new Promise((resolve) => {
-    view.take({
-      name: options.name ?? '',
-      collectionId: options.collectionId,
-      returnTo,
-      done: (scene) => resolve(scene ? { scenePath: scene.scenePath } : null),
-    });
-  });
+function open(store: StoreApi<ViewAtlasState>, collectionId: string, name: string, waits: boolean): number {
+  const previous = store.getState().dungeonGenerator;
+  if (previous) settleDungeonRequest(previous.id, null);
+  openings += 1;
+  store.getState().openDungeonGenerator({ id: openings, collectionId, name, waiting: waits });
+  return openings;
 }
 
 /**
- * Shows the dungeon generator for `collectionId` (the asset manager's Generate dungeon): in the
- * generator tab already open for no task, which keeps its dungeon, else in a new tab.
+ * Opens the dungeon generator over the Atlas view's map for `collectionId` (the asset manager's
+ * Generate Dungeon), bringing the view to the front. Without an Atlas view the GM is told to open one.
  */
-export async function showDungeonGenerator(app: App, options: { collectionId: string }): Promise<void> {
-  for (const leaf of app.workspace.getLeavesOfType(DUNGEON_GENERATOR_VIEW_TYPE)) {
-    await leaf.loadIfDeferred();
-    if (leaf.view instanceof DungeonGeneratorView && !leaf.view.hasTask()) {
-      await openIn(leaf, options.collectionId);
-      await app.workspace.revealLeaf(leaf);
-      return;
-    }
+export async function showDungeonGenerator(app: App, collectionId: string): Promise<void> {
+  const view = await loadAtlasView(app);
+  if (!view) {
+    showNotice(t('dungeon.needsAtlasView'));
+    return;
   }
-  await openIn(app.workspace.getLeaf('tab'), options.collectionId);
+  await app.workspace.revealLeaf(view.leaf);
+  open(view.getStore(), collectionId, '', false);
+}
+
+/**
+ * Opens the dungeon generator over the map for a scene a note pin asks for, with its name and
+ * collection fixed. Resolves with the scene once it was created (the generator closes and the
+ * map shows again), or null when the generator closed without one.
+ */
+export function generateDungeonFor(store: StoreApi<ViewAtlasState>, options: { name: string; collectionId: string }): Promise<{ scenePath: string } | null> {
+  return new Promise((resolve) => {
+    const id = open(store, options.collectionId, options.name, true);
+    waiting.set(id, (scene) => resolve(scene ? { scenePath: scene.scenePath } : null));
+  });
 }

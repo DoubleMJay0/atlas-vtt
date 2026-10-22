@@ -2,37 +2,84 @@
 @use '../../../../../styles/mixins' as *;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Dungeon generator – its tab, the preview and the sidebar's foot
+// Dungeon generator – the overlay, the preview and the sidebar's foot
 // ═══════════════════════════════════════════════════════════════════════════
 
-// The tab's own content element is styled in styles/main.scss (it carries `.atlas-vtt-plugin`
-// itself, outside this namespace) and is the container the narrow layout asks.
+// Fills the Atlas view: Obsidian gives every `.workspace-leaf` `contain: strict`, which makes the
+// leaf the box of `position: fixed`, so sidebars and splits shrink it with the map. Above the
+// map's bars and beside its other overlays (the DM screen); its layout asks its own size.
+.atlas-dungeon-generator-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--background-primary);
+  container: atlas-dungeon-generator / size;
+  outline: none;
+  animation: atlas-dungeon-generator-enter $transition-normal $transition-ease-out both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes atlas-dungeon-generator-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 .atlas-dungeon-generator {
   // The layer its select lists open in: it clips nothing, the sidebar scrolls.
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(320px, 30%, 440px);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "preview header"
+    "preview sidebar";
   height: 100%;
   min-height: 0;
   outline: none;
 }
 
-// A narrow tab (a split, a phone) stacks the sidebar under the map.
+// A narrow view (a split, a phone) stacks the sidebar under the map, the header above both.
 @container atlas-dungeon-generator (max-width: 720px) {
   .atlas-dungeon-generator {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(200px, 45%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(200px, 45%) minmax(0, 1fr);
+    grid-template-areas:
+      "header"
+      "preview"
+      "sidebar";
+  }
+
+  .atlas-dungeon-generator__header,
+  .atlas-dungeon-generator__sidebar {
+    border-left: none;
   }
 
   .atlas-dungeon-generator__sidebar {
     border-top: $border-width-s solid var(--divider-color);
-    border-left: none;
   }
 }
 
+// The title and the close button, which sits $close-button-gap from the view's top right corner.
+.atlas-dungeon-generator__header {
+  grid-area: header;
+  @include atlas-flex-row($gap: $spacing-s);
+  @include atlas-close-header;
+  justify-content: space-between;
+  border-left: $border-width-s solid var(--divider-color);
+  background: var(--background-secondary);
+}
+
+.atlas-dungeon-generator__title {
+  margin: 0;
+  font-size: $font-ui-medium;
+  font-weight: $font-weight-semibold;
+}
+
 .atlas-dungeon-generator__sidebar {
+  grid-area: sidebar;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -44,6 +91,7 @@
 // ── Preview ─────────────────────────────────────────────────────────────────
 
 .atlas-dungeon-generator__preview {
+  grid-area: preview;
   display: flex;
   min-width: 0;
   min-height: 0;

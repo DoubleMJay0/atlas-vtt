@@ -253,6 +253,8 @@ export interface ViewAtlasState extends ViewState {
   setHeldTokens: UISlice['setHeldTokens'];
   setExploredBrush: UISlice['setExploredBrush'];
   setToolbarEditing: UISlice['setToolbarEditing'];
+  openDungeonGenerator: UISlice['openDungeonGenerator'];
+  closeDungeonGenerator: UISlice['closeDungeonGenerator'];
   setGridSettingsOpen: UISlice['setGridSettingsOpen'];
   setDMScreenOpen: UISlice['setDMScreenOpen'];
   setGridAlignmentOpen: UISlice['setGridAlignmentOpen'];

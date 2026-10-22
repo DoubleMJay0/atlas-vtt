@@ -36,6 +36,6 @@ it('opens the dungeon generator for the collection shown and gets out of its way
   const onClose = vi.fn();
   render(<AssetManager isOpen onClose={onClose} />);
   fireEvent.click(screen.getByRole('button', { name: 'Generate Dungeon' }));
-  expect(showDungeonGenerator).toHaveBeenCalledWith(app, { collectionId: AssetService.defaultCollectionId() });
+  expect(showDungeonGenerator).toHaveBeenCalledWith(app, AssetService.defaultCollectionId());
   expect(onClose).toHaveBeenCalled();
 });

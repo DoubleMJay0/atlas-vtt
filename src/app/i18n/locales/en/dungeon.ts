@@ -3,6 +3,7 @@ import type { Message } from '../../types';
 export const dungeon = {
   'dungeon.title': 'Dungeon generator',
   'dungeon.collection': 'Collection',
+  'dungeon.needsAtlasView': 'Open a scene first: the dungeon generator opens over its map.',
 
   'dungeon.preview.label': 'Dungeon preview',
   'dungeon.preview.failed': 'The preview could not be drawn.',

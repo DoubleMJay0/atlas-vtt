@@ -11,6 +11,7 @@ import { usePreviewSize } from './PreviewCanvas';
 import { useDungeonState } from './useDungeonState';
 import { useGeneratorActions, type CreatedDungeonScene } from './useGeneratorActions';
 import { useMapPreview } from './useMapPreview';
+import { t } from '../../../i18n';
 
 export interface DungeonGeneratorPanelProps {
   app: App;
@@ -23,12 +24,14 @@ export interface DungeonGeneratorPanelProps {
   onCreated: (scene: CreatedDungeonScene) => void;
   /** A scene is being created: whoever holds the panel waits for it before letting go. */
   onBusyChange?: ((busy: boolean) => void) | undefined;
+  /** What ends the header row, the overlay's close button. */
+  header?: React.ReactNode;
 }
 
 /**
- * The dungeon generator, filling its tab (`DungeonGeneratorView`): a live map preview drawn off
- * the main thread fills the main area, the settings stand in a sidebar on the right with Export
- * and Create scene at its foot.
+ * The dungeon generator, filling the Atlas view (`DungeonGeneratorOverlay`): a live map preview
+ * drawn off the main thread fills the main area, the settings stand in a sidebar on the right
+ * under the header row, with Export and Create scene at its foot.
  */
 export function DungeonGeneratorPanel(props: DungeonGeneratorPanelProps): React.JSX.Element {
   return (
@@ -38,7 +41,7 @@ export function DungeonGeneratorPanel(props: DungeonGeneratorPanelProps): React.
   );
 }
 
-function GeneratorPanel({ app, collectionId, collections, onCollectionChange, initialName, onCreated, onBusyChange }: DungeonGeneratorPanelProps): React.JSX.Element {
+function GeneratorPanel({ app, collectionId, collections, onCollectionChange, initialName, onCreated, onBusyChange, header }: DungeonGeneratorPanelProps): React.JSX.Element {
   const client = useMemo(() => DungeonWorkerClient.forApp(app), [app]);
   const state = useDungeonState(app, initialName);
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
@@ -65,6 +68,10 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
 
   return (
     <div ref={setRoot} className="atlas-dungeon-generator" tabIndex={-1} inert={actions.creating}>
+      <div className="atlas-dungeon-generator__header">
+        <h2 className="atlas-dungeon-generator__title">{t('dungeon.title')}</h2>
+        {header}
+      </div>
       <div className="atlas-dungeon-generator__preview">
         <MapPreview
           preview={preview}

@@ -255,7 +255,7 @@ export class NotePinTool {
   
   /** What the search offers to create for a name no file carries, in the order listed. */
   private createEntries(mapPath: string | null): PinCreateEntry[] {
-    const dungeon = dungeonCreateEntry(this.obsidianApp, mapPath);
+    const dungeon = dungeonCreateEntry(this.store, mapPath);
     return [noteCreateEntry(this.obsidianApp, mapPath), ...(dungeon ? [dungeon] : [])];
   }
 
