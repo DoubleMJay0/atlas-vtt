@@ -36,8 +36,8 @@ import { DrawingRenderer } from "./pixi/DrawingRenderer"; // Import DrawingRende
 import { DrawingInteraction } from "./pixi/DrawingInteraction";
 import { TextRenderer } from "./pixi/TextRenderer"; // Import TextRenderer
 import { TextTool } from "./tools/TextTool"; // Import TextTool
-import type { LightingController } from './pixi/lighting/LightingController';
-import { LightingFeature } from './pixi/lighting/LightingFeature';
+import { LightingController } from './pixi/lighting/LightingController';
+import { settingsLightingQuality } from './pixi/lighting/settingsLightingQuality';
 import { ShownPlaces } from './lighting/shownPlaces';
 import type { SceneFrame } from './pixi/lighting/engine/types';
 import { captureSceneFrame } from './pixi/sceneFrameCapture';
@@ -86,15 +86,12 @@ export class PixiRendererOrchestrator { // Renamed class
   private drawingInteraction?: DrawingInteraction;
   private textRenderer?: TextRenderer; // Add TextRenderer instance
   private textTool?: TextTool; // Add TextTool instance
-  /** The view's lighting, built and removed as the GM switches dynamic lighting on and off. */
-  private lightingFeature?: LightingFeature;
+  /** The GM view's walls, lights and sight; the player view has none. */
+  private lighting?: LightingController;
   /** Where gliding tokens are drawn: the token renderer notes them, the lighting reads its tokens there. */
   private readonly shownPlaces = new ShownPlaces();
   /** The players' frame, rendered at the player window's size; made when this view is first presented. */
   private playerFrames?: Pick<PlayerFrameTexture, 'canRender' | 'render' | 'copy' | 'release' | 'destroy'>;
-  private get lighting(): LightingController | undefined {
-    return this.lightingFeature?.controller;
-  }
   private audioRenderer?: AudioRenderer;
   private audioTool?: AudioTool;
   private soundRegistry?: SoundRegistry;
@@ -406,7 +403,8 @@ export class PixiRendererOrchestrator { // Renamed class
     fogContainer.zIndex = 1000;
 
     if (!isPlayerView) {
-      this.lightingFeature = new LightingFeature({
+      const quality = settingsLightingQuality(SettingsService.forApp(this.obsApp));
+      this.lighting = new LightingController({
         viewport,
         app: this.pixiAppManager.app,
         store: this.store,
@@ -418,6 +416,7 @@ export class PixiRendererOrchestrator { // Renamed class
         grid: () => this.gridSystem ?? null,
         fogCoverage: () => this.fogRenderer!.getCommittedCoverage(),
         shown: this.shownPlaces,
+        ...(quality && { quality }),
       });
     }
 
@@ -990,7 +989,7 @@ export class PixiRendererOrchestrator { // Renamed class
       this.selectionManager.setGroupTurnHost(this.tokenRenderer.groupTurnHost());
     }
 
-    this.lightingFeature?.wire(this.tokenRenderer);
+    this.lighting?.wire(this.tokenRenderer);
 
     // Wire audio tool viewport handlers
     if (this.audioRenderer && this.audioTool) {
@@ -1115,7 +1114,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.drawingInteraction?.destroy();
     this.textRenderer?.destroy(); // Destroy TextRenderer
     this.textTool?.destroy(); // Destroy TextTool
-    this.lightingFeature?.destroy();
+    this.lighting?.destroy();
     this.playerFrames?.destroy();
     delete this.playerFrames;
     this.audioRenderer?.destroy();

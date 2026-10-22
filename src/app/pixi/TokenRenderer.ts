@@ -1629,22 +1629,6 @@ export class TokenRenderer {
     this.glideWay = clearWay;
   }
 
-  /** The view's lighting is gone: nothing takes the pointer for lights, walls and doors any more, no sight hides tokens, and tokens glide on any way. */
-  public clearLighting(): void {
-    delete this.glideWay;
-    delete this.lightHandlers;
-    delete this.doorClickHandler;
-    delete this.doorMenuHandlers;
-    delete this.wallPointerDownHandler;
-    delete this.wallPointerMoveHandler;
-    delete this.wallPointerUpHandler;
-    delete this.wallDoubleClickHandler;
-    delete this.wallContextMenuHandler;
-    delete this.wallCursorProvider;
-    this.playerSight.setProvider(() => undefined);
-    this.refreshPlayerSight();
-  }
-
   public setAudioPointerDownHandler(fn: (worldX: number, worldY: number, e: FederatedPointerEvent) => boolean): void {
     this.audioPointerDownHandler = fn;
   }

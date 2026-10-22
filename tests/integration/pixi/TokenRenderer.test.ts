@@ -445,7 +445,7 @@ describe('TokenRenderer Integration Tests', () => {
       expect(tokenGroup('covered').visible).toBe(true);
     });
 
-    it('retains fog when lighting is removed and applies it during an existing unlit peek', async () => {
+    it('retains fog where no lighting is wired and applies it during an existing unlit peek', async () => {
       wireFog();
       setFog();
       store.getState().addToken(token({ id: 'covered', x: 200 }));
@@ -458,7 +458,8 @@ describe('TokenRenderer Integration Tests', () => {
       tokenRenderer.refreshPlayerSight();
       expect(tokenGroup('covered').visible).toBe(true);
       store.getState().setGMView(false);
-      tokenRenderer.clearLighting();
+      tokenRenderer.setPlayerSightProvider(() => undefined);
+      tokenRenderer.refreshPlayerSight();
       expect(tokenGroup('covered').visible).toBe(false);
     });
 
@@ -1589,7 +1590,8 @@ describe('TokenRenderer Integration Tests', () => {
     });
 
     it('holds the window\'s numbers on the canvas in the command palette\'s player mode where no lighting is wired', async () => {
-      tokenRenderer.clearLighting();
+      tokenRenderer.setPlayerSightProvider(() => undefined);
+      tokenRenderer.refreshPlayerSight();
       await goblins({ id: 'A' }, { id: 'B', isHidden: true }, { id: 'C' });
       eventBus.emit('player-mode-changed', true);
       await expectLooks(['A', 'B', 'C'], ['gm 1', 'none', 'players 2']);
@@ -1633,7 +1635,7 @@ describe('TokenRenderer Integration Tests', () => {
 
     /**
      * A lighting that keeps sight of its own, as the view's lighting does: worked out by a store listener that
-     * comes after the token renderer's (dynamic lighting switched on in an open view), from the party's token P,
+     * comes after the token renderer's (an order the canvas must survive as well as the other), from the party's token P,
      * which sees every token within 150 px. A load keeps the sight of the scene before until it ends; while
      * `blocked` (a lost graphics context) nothing is built, and the sight it keeps is no longer the scene's from
      * the first change it cannot take in. New sight is reported as `onSightChange` reports it.

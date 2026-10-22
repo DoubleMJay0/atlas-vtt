@@ -23,14 +23,7 @@ export class PixiAppManager {
   private unbindPopout: (() => void) | null = null;
   public onRecoverCallback?: () => void;
 
-  /**
-   * `throughBackBuffer`: WebGL draws through a multisampled back buffer and the canvas gets no
-   * samples. For a view that will light its scenes: dynamic lighting needs the back buffer anyway
-   * and from resolution 2 draws it plain (`BackBufferHold`), so samples on the canvas were 190 to
-   * 250 MB of graphics memory nothing drew into. Unlit, the back buffer costs about 80 MB more
-   * than samples on the canvas, so a view without dynamic lighting keeps those.
-   */
-  constructor(initialWidth: number, initialHeight: number, private readonly throughBackBuffer = false) {
+  constructor(initialWidth: number, initialHeight: number) {
     this.width = initialWidth;
     this.height = initialHeight;
     this.canvasEl = createEl('canvas');
@@ -138,7 +131,11 @@ export class PixiAppManager {
       backgroundColor: 0xf4e8d0, // Default parchment color
       backgroundAlpha: 1,
       antialias: true,
-      useBackBuffer: this.throughBackBuffer,
+      // WebGL draws through a multisampled back buffer and the canvas gets no samples: dynamic
+      // lighting needs the back buffer anyway and from resolution 2 draws it plain
+      // (`BackBufferHold`), so samples on the canvas were 190 to 250 MB of graphics memory nothing
+      // drew into. A scene that is not lit pays about 80 MB more than samples on the canvas would.
+      useBackBuffer: true,
       autoDensity: true,
       resolution,
       // The map has no accessible display objects; since PIXI 8.22 Tab would otherwise

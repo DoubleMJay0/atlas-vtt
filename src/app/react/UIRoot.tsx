@@ -35,7 +35,6 @@ import { ContextMenuProvider } from './root/ContextMenuContext';
 import { PanelBoundary } from './root/PanelBoundary';
 import { useMapNavigationHotkeys } from './useMapNavigationHotkeys';
 import { useViewWindow } from './useViewWindow';
-import { useExperimentalFeature } from './hooks/useExperimentalFeature';
 import type { AtlasView } from '../atlas-view';
 import { runInBackground } from '../utils/backgroundTask';
 
@@ -51,7 +50,6 @@ interface UIRootProps {
  */
 export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
   const settings = SettingsService.forApp(app);
-  const lightingOn = useExperimentalFeature('dynamicLighting', settings);
   const [hotkeyHelpOpen, setHotkeyHelpOpen] = useState(false);
   const [isSceneSwitcherOpen, setSceneSwitcherOpen] = useState(false);
 
@@ -229,8 +227,8 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
 
           {/* Loot Roller - floating window, DM only */}
           {!isPlayerView && <PanelBoundary name="the random tables"><RandomTables /></PanelBoundary>}
-          {!isPlayerView && lightingOn && <PanelBoundary name="the light settings"><LightPopoverHost /><LightZonePopoverHost /></PanelBoundary>}
-          {!isPlayerView && lightingOn && <PanelBoundary name="the scene lighting"><SceneLightingPanelHost /></PanelBoundary>}
+          {!isPlayerView && <PanelBoundary name="the light settings"><LightPopoverHost /><LightZonePopoverHost /></PanelBoundary>}
+          {!isPlayerView && <PanelBoundary name="the scene lighting"><SceneLightingPanelHost /></PanelBoundary>}
 
           {/* Player Character Sheet - REMOVED: Players should only edit via their character sheet file */}
           

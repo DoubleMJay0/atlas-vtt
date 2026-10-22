@@ -238,7 +238,7 @@ export class SceneShare {
     return this.tokens.artPath(hash) ?? this.layers.artPath(hash) ?? this.ports.logArt?.(hash);
   }
 
-  /** Looks again every `TOKEN_POLL_MS`: Atlas's dynamic lighting and the map's measurement may change without a store change. */
+  /** Looks again every `TOKEN_POLL_MS`: the map's measurement may change without a store change. */
   private schedulePoll(): void {
     this.poll = this.ports.setTimer(() => {
       this.poll = undefined;
@@ -251,7 +251,7 @@ export class SceneShare {
 
   private async update(state: SceneState): Promise<void> {
     if (!state.mapLoaded || state.isMapLoading) return;
-    const lit = isLit(state, this.ports.atlasSettings());
+    const lit = isLit(state);
     const refusal = lit && this.ports.lightingSource() === null ? LIGHTING_REFUSAL : null;
     if (refusal !== null) {
       if (refusal !== this.refusal) this.ports.notice(refusal);

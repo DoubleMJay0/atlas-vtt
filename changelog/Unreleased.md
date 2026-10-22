@@ -9,6 +9,7 @@
 - Rulers, templates and drag rulers are drawn as one clean line in the selection's style, with a sharp distance label at every zoom
 - The token whose turn it is stands in a soft pool of light with four fine arcs, sharp at any zoom, and no longer shows two rings when selected
 - Typing @ in a statblock value suggests the values you can reference, each with its current number
+- Dynamic lighting is no longer experimental: walls, lights and token vision are available to everyone
 
 ## Fixed
 
