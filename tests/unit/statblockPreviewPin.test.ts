@@ -106,15 +106,11 @@ describe('pinning a statblock preview of a token on the map', () => {
     expect(windows()).toHaveLength(0);
   });
 
-  it('pins a preview the GM presses into, and lets it be unpinned again', () => {
+  it('pins only with its pin button: a press into the window leaves it unpinned', () => {
     hoverToken(eventBus);
     const [preview] = windows();
     preview!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    releaseMod();
-    expect(windows()).toEqual([preview]);
-
-    hoverToken(eventBus, 'token-1');
-    buttonsOf(preview!)[0]!.click();
+    expect(preview!.classList.contains('is-pinned')).toBe(false);
     releaseMod();
     expect(windows()).toHaveLength(0);
   });
@@ -129,8 +125,8 @@ describe('pinning a statblock preview of a token on the map', () => {
 
     expect(preview!.style.left).toBe('50px');
     expect(preview!.style.top).toBe('30px');
-    releaseMod();
-    expect(windows()).toEqual([preview]);
+    // Moving it pins nothing
+    expect(preview!.classList.contains('is-pinned')).toBe(false);
   });
 
   describe('staying within reach', () => {
@@ -171,7 +167,8 @@ describe('pinning a statblock preview of a token on the map', () => {
       document.dispatchEvent(new MouseEvent('mouseup'));
       roll.click();
       expect(rolled).toHaveBeenCalledTimes(1);
-      expect(preview.classList.contains('is-pinned')).toBe(true);
+      // Rolling a die never pins the window
+      expect(preview.classList.contains('is-pinned')).toBe(false);
 
       const placed = preview.style.left;
       roll.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 700, clientY: 160 }));

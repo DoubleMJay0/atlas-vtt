@@ -159,14 +159,16 @@ export class StatblockPreviewWindow {
     close.setAttribute('aria-label', t('preview.close'));
     close.onclick = (): void => this.hide(true);
 
+    // Pinning is the pin button's alone: rolling a die or dragging the window never pins it. A window
+    // the user moves stays where they put it rather than following the pointer it opened at.
     controls.addEventListener('mousedown', (e) => {
+      this.initialPos = undefined;
       this.stopDrag = startPreviewWindowDrag(element, e, reach, dragEnded);
     });
     element.addEventListener('mousedown', (e) => {
       const target = e.target as HTMLElement | null;
-      // As in a note preview, using the window keeps it open: a press anywhere in it but on a button pins it.
-      if (!this.pinned && !target?.closest('button')) this.setPinned(true);
       if (e.button === 0 && target?.closest(CARD_HEADER)) {
+        this.initialPos = undefined;
         this.stopDrag = startPreviewWindowDrag(element, e, reach, dragEnded, HEADER_DRAG_THRESHOLD);
       }
     });
