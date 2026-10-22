@@ -33,6 +33,8 @@ const MAX_CHAIN = 4;
 /** How many values that name references one lookup works out at most. */
 const MAX_EXPANSIONS = 256;
 const NOTHING_READ: ReadonlySet<string> = new Set();
+/** A trace's mark where a value naming references was left unread: too deep, in a circle, or over the lookup's budget. */
+const CUT = '!';
 
 const isSingle = (value: unknown): value is string | number | boolean => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
@@ -104,13 +106,30 @@ function columnValue(column: ScoreColumn, slot: Slot, score: FieldValue | undefi
 
 /**
  * What a lookup read to answer a path, in order: every path it asked the note for, with whether the
- * note held it (`str=`, `hidden?`), and the key loose matching took (`~Max Stress`), the reads of the
- * values the answer names included. Two lookups that read the same answer the same field.
+ * note held it (`str=`, `hidden?`), the key loose matching took (`~Max Stress`) and a mark where a
+ * value naming references was left unread, the reads of the values the answer names included. Two
+ * lookups that read the same answer the same field.
  */
 export type LookupTrace = readonly string[];
 
+/** What a traced lookup answers a path with: the value, what it read, and whether it left a value naming references unread. */
+export interface TracedAnswer {
+  readonly value: unknown;
+  readonly trace: LookupTrace;
+  /** A value the answer names was left unread (too deep, in a circle, over the budget): the answer may be cut short. */
+  readonly exhausted: boolean;
+}
+
 /** A lookup that also says what it read (`LookupTrace`). */
-export type TracedLookup = (path: string) => { readonly value: unknown; readonly trace: LookupTrace };
+export type TracedLookup = (path: string) => TracedAnswer;
+
+/** The keys a trace read a value under, in order: each path the note held (`str=`) and each key loose matching took. */
+export function keysRead(trace: LookupTrace): string[] {
+  return trace.flatMap((read) => {
+    if (read.startsWith('~')) return read.length > 1 ? [read.slice(1)] : [];
+    return read.endsWith('=') ? [read.slice(0, -1)] : [];
+  });
+}
 
 interface LookupOptions {
   /** Reads the references a value names, in place of the lookup itself. */
@@ -139,12 +158,16 @@ export function statblockLookupWith(template: StatblockTemplate, record: FieldRe
   return buildLookup(template, record, fields, { inner }).lookup;
 }
 
-/** `statblockLookup` with what each answer read (`LookupTrace`), to tell whether two lookups answer a path from the same field. */
+/**
+ * `statblockLookup` with what each answer read (`LookupTrace`), to tell whether two lookups answer a
+ * path from the same field. Its budget is shared by every path it is asked: build one per text checked.
+ */
 export function tracedStatblockLookup(template: StatblockTemplate, record: FieldRecord, fields: readonly TemplateField[] = template.fields): TracedLookup {
   const built = buildLookup(template, record, fields, { traced: true });
   return (path) => {
     const value = built.lookup(path);
-    return { value, trace: built.lastTrace() };
+    const trace = built.lastTrace();
+    return { value, trace, exhausted: trace.includes(CUT) };
   };
 }
 
@@ -216,7 +239,10 @@ function buildLookup(template: StatblockTemplate, record: FieldRecord, fields: r
   const expanded = (path: string, reading: ReadonlySet<string>): unknown => {
     const value = read(path);
     if (typeof value !== 'string' || !namesReference(value)) return value;
-    if (reading.size >= MAX_CHAIN || reading.has(path) || budget <= 0) return value;
+    if (reading.size >= MAX_CHAIN || reading.has(path) || budget <= 0) {
+      trail?.push(CUT);
+      return value;
+    }
     budget -= 1;
     const inner = new Set(reading).add(path);
     const result = numberValue(fillReferences(value, options.inner ?? ((next) => chained(next, inner))).text);
