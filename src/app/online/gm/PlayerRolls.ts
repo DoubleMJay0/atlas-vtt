@@ -2,6 +2,7 @@ import type { DiceSet } from '../../types/diceSetTypes';
 import type { RollOptions } from '../../tools/DiceTool';
 import type { GmMessage, PlayerRoll, RollMode, RollRefusal, RollRequestAnswer, SharedRoll } from '../protocol/index.ts';
 import { parseFormula } from '../../tools/parseFormula';
+import { isRollFormula } from '../../tools/textRolls';
 import type { TokenEntity } from '../../types';
 import type { DiceRollResult } from '../../types/diceTypes';
 import type { DiceSource } from './atlasDice.ts';
@@ -56,15 +57,13 @@ export function rollableFormula(formula: string): boolean {
   return parsed.ok && parsed.terms.some((term) => term.kind === 'dice' && term.count > 0);
 }
 
-/** A bonus as a player's sheet rolls it (`+2`, `-1`): signed, at most four digits, as a formula's constants are. */
-const SHEET_BONUS = /^[+-]\d{1,4}$/;
-
 /**
- * Whether a player's formula is rolled: one with dice (`rollableFormula`), or a bonus from their sheet,
- * which the map's dice complete as they complete a bonus clicked on a statblock (`1d20+2`, `2d12+2`).
+ * Whether a player's formula is rolled: one with dice (`rollableFormula`), or a bonus from their sheet
+ * as a page sends it, signed and without spaces (`+2`, `+4+1`, a roll by `isRollFormula`), which the
+ * map's dice complete as they complete a bonus clicked on a statblock (`1d20+2`, `2d12+5`).
  */
 export function playerFormula(formula: string): boolean {
-  return SHEET_BONUS.test(formula) || rollableFormula(formula);
+  return rollableFormula(formula) || (!/\s/.test(formula) && isRollFormula(formula));
 }
 
 /**
