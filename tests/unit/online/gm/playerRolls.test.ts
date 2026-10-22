@@ -237,6 +237,17 @@ describe('a bonus from a player\'s sheet', () => {
     expect(refusals(gm.sent)).toEqual([]);
     expect(gm.errors).toEqual([]);
   });
+
+  it('keeps the names of its numbers, and drops them where only they keep the completed bonus from rolling', async () => {
+    const gm = await table({ defaultRoll: '2d12', crit: 'natural' }, () => 0.5);
+    gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: '+4+3[Str mod]', token: gm.alias(1) });
+    expect(gm.rolled[0]).toMatchObject({ formula: '2d12+4+3[Str mod]', modifiers: 7, namedModifiers: [{ label: 'Str mod', value: 3 }] });
+    const long = `+1[${'A'.repeat(24)}]`.repeat(3) + '+1'.repeat(7);
+    gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: long, token: gm.alias(1), mode: 'gm' });
+    expect(gm.logged.at(-1)?.roll.formula).toBe(`2d12${'+1'.repeat(10)}`);
+    expect(refusals(gm.sent)).toEqual([]);
+    expect(gm.errors).toEqual([]);
+  });
 });
 
 describe('rollable formulas', () => {
@@ -248,5 +259,7 @@ describe('rollable formulas', () => {
   it('take a signed bonus from a player, a sum of numbers too, and no bare number or unsigned sum', () => {
     expect(['+3', '-1', '+0', '1d20', '+3+1', '+4+1', '-1+2', '+2*3'].every(playerFormula)).toBe(true);
     expect(['3', '4+1', '+ 3', '+12345', '*2', '+3+', '', '1d0'].some(playerFormula)).toBe(false);
+    expect(['+4+3[Str mod]', '-1[Bane]'].every(playerFormula)).toBe(true);
+    expect(['+4 +3[Str mod]', '+3[Str mod] '].some(playerFormula)).toBe(false);
   });
 });

@@ -10,6 +10,7 @@
 - When a turn begins, a warm spotlight flashes beneath the token whose turn it is
 - Typing @ in a statblock value suggests the values you can reference, each with its current number
 - Dynamic lighting is no longer experimental: walls, lights and token vision are available to everyone
+- A roll that uses a statblock value through @, such as 2d8 + @agility, names it in the roll, as Agility
 
 ## Fixed
 
