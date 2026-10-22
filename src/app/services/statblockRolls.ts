@@ -16,7 +16,7 @@ import { templateDiceSet } from '../statblocks/resolve/templateDiceSet';
 import type { RollOptions } from '../tools/DiceTool';
 import { ArmedBonuses, type ArmedBonus } from '../statblocks/rollBonuses/armedBonuses';
 import type { ArmableValues } from '../statblocks/rollBonuses/armableValues';
-import { armedValues, withArmedBonuses } from '../statblocks/rollBonuses/bonusFormula';
+import { armedValues, namedBareBonus, withArmedBonuses } from '../statblocks/rollBonuses/bonusFormula';
 import { completeFormula } from '../tools/completeFormula';
 import { parseFormula } from '../tools/parseFormula';
 
@@ -129,14 +129,15 @@ export function statblockRollingDice(app: App, source: DiceRollSource, offMap?: 
 
 /**
  * The formula a statblock's roll throws: `formula` with the values armed for it after it, naming the
- * `@` references it was filled in from where its card knows them (`namedRolls`). Where the names would
- * take it past what the dice roll (a limit, once a bonus is completed with the game's dice), it is
- * thrown plain, as it would be without them.
+ * `@` references it was filled in from where its card knows them (`namedRolls`), else a bare bonus by
+ * what the roll is for (`abilityName`: `+4` rolled for Agility throws `+4[Agility]`). Where the names
+ * would take it past what the dice roll (a limit, once a bonus is completed with the game's dice), it
+ * is thrown plain, as it would be without them.
  */
 function thrownFormula(app: App, formula: string, armed: readonly ArmedBonus[], source: DiceRollSource, offMap: OffMapRolls | null | undefined): string {
   const plain = withArmedBonuses(formula, armed);
-  const named = source.namedRolls?.get(formula);
-  if (named === undefined) return plain;
+  const named = source.namedRolls?.get(formula) ?? namedBareBonus(formula, source.abilityName);
+  if (named === null) return plain;
   const withNames = withArmedBonuses(named, armed);
   const rules = statblockRollingDice(app, source, offMap);
   return (rules ? completeFormula(withNames, rules) : parseFormula(withNames)).ok ? withNames : plain;

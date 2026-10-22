@@ -94,11 +94,10 @@ describe('a card\'s roll of a value with references', () => {
     expect(result).toMatchObject({ formula: '2d8-1[Agility]', modifiers: -1, namedModifiers: [{ label: 'Agility', value: -1 }] });
   });
 
-  it('rolls plain where the names would not roll once a bonus is completed', () => {
-    const long = `+1[${'A'.repeat(24)}]`.repeat(3) + '+1'.repeat(7);
-    expect(long.length).toBeLessThanOrEqual(FORMULA_LIMITS.characters);
-    const named = new Map([['+1', long]]);
-    const result = rollStatblockDice(app, '+1', { namedRolls: named }, offMap);
-    expect(result?.formula).toBe('1d20+1');
+  it('keeps the names of a bonus that fills a formula\'s length once it is completed, and rolls plain where they would not roll', () => {
+    const long = `+1[${'A'.repeat(24)}]`.repeat(3) + '+1'.repeat(8);
+    expect(long.length).toBe(FORMULA_LIMITS.characters);
+    expect(rollStatblockDice(app, '+1', { namedRolls: new Map([['+1', long]]) }, offMap)?.formula).toBe(`1d20${long}`);
+    expect(rollStatblockDice(app, '+1', { namedRolls: new Map([['+1', `${long}+1`]]) }, offMap)?.formula).toBe('1d20+1');
   });
 });
