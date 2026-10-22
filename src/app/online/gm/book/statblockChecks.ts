@@ -1,14 +1,14 @@
 import { bookLine, MAX_BOOK_TITLE, MAX_SHEET_LIST, type BookStatblock, type SheetField, type SheetNode, type SheetRaw, type SheetValue } from '../../protocol/index.ts';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
-import type { FieldValue, StatblockTemplate } from '../../../statblocks/model/templateTypes';
+import type { FieldValue, StatblockTemplate, TemplateField } from '../../../statblocks/model/templateTypes';
 import type { NotePatch } from '../../../statblocks/notes/patchTypes';
 import { referencesAgree, rollsWithReferences } from '../../../statblocks/values/diceValues';
-import type { FieldRead, KeyedField } from '../../../statblocks/values/fieldValues';
-import type { FieldLookup } from '../../../statblocks/values/references';
-import { fillReferences } from '../../../statblocks/values/fillReferences';
+import { splitRef, type FieldRead, type KeyedField } from '../../../statblocks/values/fieldValues';
+import { namesReference, type FieldLookup } from '../../../statblocks/values/references';
+import { fillReferences, namedReferences } from '../../../statblocks/values/fillReferences';
 import { fieldsNamedBy } from '../../../statblocks/values/referenceNames';
-import { statblockLookup, tracedStatblockLookup } from '../../../statblocks/values/statblockLookup';
+import { keysRead, statblockLookup, tracedStatblockLookup } from '../../../statblocks/values/statblockLookup';
 import { playerAccess, shownRecord } from './playerAccess.ts';
 import type { WrittenValue } from './statblockSheets.ts';
 
@@ -48,15 +48,20 @@ export const isLine = (value: unknown): value is string => typeof value === 'str
 
 export const isScalar = (value: SheetRaw | undefined): value is string | number | boolean | null => value === null || typeof value !== 'object';
 
+/** The most `@` references one text a player writes may name; a text naming more is refused. */
+export const MAX_PLAYER_REFERENCES = 16;
+
 /** What a player's `@` references are checked against (`playerReferences`). */
 export interface PlayerReferences {
   /** The numbers they read: the card's lookup over the values the player may see (`shownRecord`), as their sheet's references are worked out. */
   readonly lookup: FieldLookup;
   /**
-   * Whether a text the player wrote names nothing hidden from them: no reference may name a hidden
-   * field by any name the lookup reads (`fieldsNamedBy`), even one the note holds nothing of now,
-   * and each must read the same field over the values they may see as over the whole note
-   * (`referencesAgree`), so whatever fills it in for the GM reads what the player was shown.
+   * Whether a text the player wrote names nothing hidden from them. It names at most
+   * `MAX_PLAYER_REFERENCES`; no reference names a hidden field by any name the lookup reads
+   * (`fieldsNamedBy`), even one the note holds nothing of now; each reads the same field over the
+   * values they may see as over the whole note, and is not cut short in either (`referencesAgree`);
+   * and every key a reference reads, those the values it names read included, is a field of the
+   * template the player may see. A reference that reads nothing (`Ask @DM`) is prose.
    */
   safe(text: string): boolean;
 }
@@ -76,13 +81,26 @@ export function playerReferences(inputs: EditInputs, template: StatblockTemplate
   const { fields } = withHeaderFields(template);
   const record = inputs.resolved?.fields ?? {};
   const shown = shownRecord(record, template, fields);
-  const seen = tracedStatblockLookup(template, shown, fields);
-  const all = tracedStatblockLookup(template, record, fields);
-  const hidden = (path: string): boolean => fieldsNamedBy(fields, path.split('.')[0] ?? '').some((field) => playerAccess(template, field.key) === 'hidden');
-  return {
-    lookup: statblockLookup(template, shown, fields),
-    safe: (text) => !referencePaths(text).some(hidden) && referencesAgree(text, seen, all),
+  const visible = (field: TemplateField): boolean => playerAccess(template, field.key) !== 'hidden';
+  const hidden = (path: string): boolean => fieldsNamedBy(fields, path.split('.')[0] ?? '').some((field) => !visible(field));
+  // A key read is the player's only where it is a shown field's key or one it had, whole or before a dotted index
+  const fieldOf = (key: string): TemplateField | undefined => fields.find((field) => field.key === key || (field.formerKeys ?? []).includes(key));
+  const shownKey = (key: string): boolean => {
+    const field = fieldOf(key) ?? fieldOf(splitRef(key).key);
+    return field !== undefined && visible(field);
   };
+  const safe = (text: string): boolean => {
+    if (!namesReference(text)) return true;
+    if (namedReferences(text).length > MAX_PLAYER_REFERENCES) return false;
+    const paths = referencePaths(text);
+    if (paths.some(hidden)) return false;
+    // Fresh lookups for each text, so one text's budget is never spent by another's
+    const seen = tracedStatblockLookup(template, shown, fields);
+    const all = tracedStatblockLookup(template, record, fields);
+    const readsShown = paths.every((path) => [seen(path), all(path)].every((answer) => keysRead(answer.trace).every(shownKey)));
+    return readsShown && referencesAgree(text, seen, all);
+  };
+  return { lookup: statblockLookup(template, shown, fields), safe };
 }
 
 /** Whether every text a player wrote into a value, at any depth, names nothing hidden from them (`PlayerReferences.safe`). */

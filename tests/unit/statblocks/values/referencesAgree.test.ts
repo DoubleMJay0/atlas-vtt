@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { referencesAgree } from '../../../../src/app/statblocks/values/diceValues';
-import { statblockLookup, tracedStatblockLookup } from '../../../../src/app/statblocks/values/statblockLookup';
+import { keysRead, statblockLookup, tracedStatblockLookup } from '../../../../src/app/statblocks/values/statblockLookup';
 import { TEMPLATE_FORMAT, type StatblockTemplate, type TemplateField } from '../../../../src/app/statblocks/model/templateTypes';
 
 const FIELDS: TemplateField[] = [
@@ -31,5 +31,14 @@ describe('referencesAgree', () => {
 
   it('answers as the plain lookup does', () => {
     for (const path of ['x', 'level', 'hd', 'shown', 'nope']) expect(all(path).value).toEqual(statblockLookup(TEMPLATE, WHOLE)(path));
+  });
+
+  it('says which keys an answer read, and where it was cut short', () => {
+    expect(keysRead(seen('shown').trace)).toEqual(['X_']);
+    expect(seen('hd').exhausted).toBe(false);
+    const chain = { level: '@hd', hd: '@level' };
+    const circle = tracedStatblockLookup(TEMPLATE, chain);
+    expect(circle('level').exhausted).toBe(true);
+    expect(referencesAgree('@level', circle, circle)).toBe(false);
   });
 });

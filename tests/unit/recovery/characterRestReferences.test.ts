@@ -36,4 +36,11 @@ describe('a rest reading a value the player wrote', () => {
   it('still reads a field the GM\'s own formula names, hidden or not', () => {
     expect(rest.character.lookup('x')).toBe(9);
   });
+
+  it('leaves a value unfilled once the GM hides the field it names, after the player wrote it', () => {
+    const later = { ...TEMPLATE, players: { x: 'hidden', X_: 'hidden' } } satisfies StatblockTemplate;
+    const hidden = characterRestOf({} as App, ASSET, { notePath: 'Mira.md', templateId: TEMPLATE.id, template: later, record: { ...RECORD, bonus: '@X_' } });
+    expect(hidden.character.lookup('bonus')).toBe('@X_');
+    expect(fillFormula('1d8+@bonus', (path) => hidden.character.lookup(path)).ok).toBe(false);
+  });
 });
