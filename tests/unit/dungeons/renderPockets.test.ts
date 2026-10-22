@@ -3,20 +3,17 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { inPocket, narrowPockets } from '../../../src/app/dungeons/render/pockets';
 import { visibleDungeon } from '../../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
-import { dungeonText } from '../../../src/app/dungeons/text/dungeonText';
 import { addDoor, addRoom, emptyModel } from '../../fixtures/dungeonModelBuilder';
 
 describe('rock the rooms close in on', () => {
-  // The dungeon whose page showed a ragged island of paper between rotunda 3 and the rooms around it.
-  const dungeon = visibleDungeon(generateDungeon({ seed: 458782179, tags: [] }, dungeonText), DEFAULT_VIEW);
+  // A dungeon with rock walled in between a rotunda and the rooms around it.
+  const dungeon = visibleDungeon(generateDungeon({ seed: 16, tags: [] }), DEFAULT_VIEW);
   const pockets = narrowPockets(dungeon, 0.5);
 
   it('finds the pocket beside the rotunda, where the band did not reach', () => {
     // Farther than the hatching distance from every floor, yet walled in on all sides.
-    expect(dungeon.field.distance(13.6, -1.4)).toBeGreaterThan(0.5);
-    expect(inPocket(pockets, 13.6, -1.4)).toBe(true);
-    // The strip between the two rooms above, which the same rock runs into.
-    expect(inPocket(pockets, 12.5, -3.5)).toBe(true);
+    expect(dungeon.field.distance(-2.2, 15.8)).toBeGreaterThan(0.5);
+    expect(inPocket(pockets, -2.2, 15.8)).toBe(true);
   });
 
   it('never counts a floor or the open ground outside as a pocket', () => {
@@ -30,7 +27,7 @@ describe('rock the rooms close in on', () => {
   });
 
   it('leaves a courtyard wider than the band open ground', () => {
-    const model = emptyModel(1, 'Ring', '');
+    const model = emptyModel(1);
     // Four halls around a 4 × 4 yard, joined at the corners by single cells.
     addRoom(model, { x: 0, y: 0, w: 6, h: 1 });
     addRoom(model, { x: 0, y: 5, w: 6, h: 1 });

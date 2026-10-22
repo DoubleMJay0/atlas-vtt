@@ -7,7 +7,7 @@ import { SettingsSection } from './fields';
 import { StyleSettings } from './StyleSettings';
 import { TagChips } from './TagChips';
 import type { DungeonState } from './useDungeonState';
-import { NotesSettings, ViewSettings } from './ViewSettings';
+import { ViewSettings } from './ViewSettings';
 
 interface GeneratorSettingsProps {
   state: DungeonState;
@@ -18,7 +18,7 @@ interface GeneratorSettingsProps {
   onSavePalette: () => void;
 }
 
-/** The settings column: what dungeon, which tags, what the page shows, and how it is drawn. */
+/** The settings column: what dungeon, which tags, what the map shows, and how it is drawn. */
 export function GeneratorSettings({ state, layer, collection, onSavePalette }: GeneratorSettingsProps): React.JSX.Element {
   const { request, settings } = state;
   return (
@@ -27,8 +27,7 @@ export function GeneratorSettings({ state, layer, collection, onSavePalette }: G
         <CollectionSelect value={collection.id} options={collection.options} onChange={collection.onChange} />
       )}
       <DungeonIdentity
-        name={request.name ?? ''}
-        generatedTitle={request.name ? null : state.generated?.title ?? null}
+        name={state.name}
         seed={request.seed}
         onName={state.setName}
         onSeed={state.setSeed}
@@ -39,9 +38,6 @@ export function GeneratorSettings({ state, layer, collection, onSavePalette }: G
       </SettingsSection>
       <SettingsSection title={t('dungeon.view')}>
         <ViewSettings view={settings.view} waterLevel={request.waterLevel} onView={state.setView} onWaterLevel={state.setWaterLevel} layer={layer} />
-      </SettingsSection>
-      <SettingsSection title={t('dungeon.notes')}>
-        <NotesSettings mode={settings.view.notes} onMode={(notes) => state.setView({ notes })} onRearrange={state.rearrangeNotes} onReroll={state.rerollNotes} layer={layer} />
       </SettingsSection>
       <SettingsSection title={t('dungeon.style')}>
         <StyleSettings preset={settings.preset} style={settings.style} onStyle={state.setStyle} onPreset={state.applyPreset} onSavePalette={onSavePalette} layer={layer} />

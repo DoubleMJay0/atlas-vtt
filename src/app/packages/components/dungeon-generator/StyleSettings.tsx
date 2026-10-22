@@ -33,7 +33,7 @@ async function readPaletteUpload(file: File): Promise<DungeonStyle | null> {
   return style;
 }
 
-/** How the dungeon is drawn: a preset, then colours, strokes, shadow, hatching and fonts. */
+/** How the dungeon is drawn: a preset, then colours, strokes, shadow and hatching. */
 export function StyleSettings({ preset, style, onStyle, onPreset, onSavePalette, layer }: StyleSettingsProps): React.JSX.Element {
   const [group, setGroup] = useState<StyleGroup>('colors');
   const fileInput = useRef<HTMLInputElement>(null);

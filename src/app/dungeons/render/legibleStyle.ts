@@ -1,14 +1,14 @@
 import type { DungeonStyle } from '../style';
 
 /**
- * Page pixels per cell (on the 1400 × 1000 page sizes are given for) below which a drawn map
- * keeps its hatching and strokes from shrinking with it: a large dungeon fitted to a page would
- * otherwise wear its hatching as a fringe of hairlines.
+ * Pixels per cell (on a 1400 × 1000 picture) below which a drawn map keeps its hatching and
+ * strokes from shrinking with it: a large dungeon fitted into the preview would otherwise wear
+ * its hatching as a fringe of hairlines.
  */
 const LEGIBLE_CELL_PX = 24;
 
 /**
- * The style a map is drawn in at `cellPx` page pixels per cell: below the legible size the
+ * The style a map is drawn in at `cellPx` pixels per cell: below the legible size the
  * surroundings grow by (legible / cellPx)^0.75 and the strokes by its square root, so both shrink
  * more slowly than the map but still with it.
  */

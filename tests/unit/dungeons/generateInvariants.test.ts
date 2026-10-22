@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
-import type { RoomPlan } from '../../../src/app/dungeons/text/contract';
 import { bypasses, doorProblems, floorProblems, rotundaProblems, unreachableRooms } from './dungeonInvariants';
-import { fakeDungeonText } from './fakeDungeonText';
 
 const SEEDS = 500;
 
@@ -25,7 +23,6 @@ interface Run {
   seed: number;
   tags: string[];
   model: DungeonModel;
-  plans: readonly RoomPlan[];
   ms: number;
 }
 
@@ -35,10 +32,9 @@ function runs(): Run[] {
     const combo = COMBOS[seed % COMBOS.length] ?? [];
     for (const size of SIZES) {
       const tags = size ? [...combo, size] : [...combo];
-      const text = fakeDungeonText();
       const start = performance.now();
-      const model = generateDungeon({ seed: seed * 7919, tags }, text);
-      out.push({ seed: seed * 7919, tags, model, plans: text.plans, ms: performance.now() - start });
+      const model = generateDungeon({ seed: seed * 7919, tags });
+      out.push({ seed: seed * 7919, tags, model, ms: performance.now() - start });
     }
   }
   return out;
@@ -97,18 +93,13 @@ describe('generated dungeons', () => {
     ).toEqual([]);
   });
 
-  it('lock a separate culmination wing behind one gate with a keyhole per key', () => {
+  it('lock a separate culmination wing behind one gate', () => {
     expect(
       failures((run) => {
         const gates = run.model.doors.filter((door) => door.kind === 'gate').length;
         const separate = run.model.rooms.some((room) => room.wing === 'culmination' || room.wing === 'approach');
-        const keys = run.plans.flatMap((plan) => plan.features).filter((f) => f.kind === 'key').length;
-        const gateFeatures = run.plans.flatMap((plan) => plan.features).filter((f) => f.kind === 'gate');
-        const keyholes = gateFeatures.reduce((sum, f) => sum + (f.kind === 'gate' ? f.keyholes : 0), 0);
         const problems: string[] = [];
         if (gates !== (separate ? 1 : 0)) problems.push(`${gates} gates, separate wing ${separate}`);
-        if (gateFeatures.length !== gates) problems.push(`${gateFeatures.length} gate notes for ${gates} gates`);
-        if (keyholes !== keys) problems.push(`${keyholes} keyholes for ${keys} keys`);
         if (run.model.rooms.filter((room) => room.ending).length !== 1) problems.push('not one culmination');
         return problems;
       }),
@@ -133,13 +124,34 @@ describe('generated dungeons', () => {
     ).toEqual([]);
   });
 
-  it('number notes 1..n nearest first', () => {
+  it('add tags by chance only where no tag rules them out', () => {
     expect(
       failures((run) => {
-        const refs = run.model.notes.map((note) => note.ref);
-        return refs.every((ref, i) => ref === String(i + 1)) ? [] : [`refs ${refs.join(',')}`];
+        const problems: string[] = [];
+        if (has(run, 'multi-level') && has(run, 'single-level')) problems.push('multi-level and single-level');
+        if (has(run, 'string') && (has(run, 'winding') || has(run, 'secret'))) problems.push('string with winding or secret');
+        if (has(run, 'deep') && has(run, 'flat')) problems.push('deep and flat');
+        if (!run.tags.every((tag) => has(run, tag))) problems.push('a tag the GM asked for is gone');
+        return problems;
       }),
     ).toEqual([]);
+    const untagged = ALL.filter((run) => !run.tags.includes('single-level'));
+    const multi = untagged.filter((run) => has(run, 'multi-level')).length / untagged.length;
+    expect(multi).toBeGreaterThan(0.4);
+    expect(multi).toBeLessThan(0.75);
+  });
+
+  it('furnish rooms after what the plan put in them and the tags', () => {
+    const share = (tag: string, kinds: readonly string[]): number => {
+      const tagged = ALL.filter((run) => has(run, tag));
+      return tagged.filter((run) => run.model.props.some((p) => kinds.includes(p.kind) && !run.model.rooms[p.room]?.ending)).length / tagged.length;
+    };
+    expect(share('temple', ['altar'])).toBeGreaterThan(0.4);
+    expect(share('tomb', ['sarcophagus'])).toBeGreaterThan(0.4);
+    expect(share('dwelling', ['throne', 'tapestry'])).toBeGreaterThan(0.6);
+    expect(share('treasure', ['chest'])).toBeGreaterThan(0.6);
+    const props = ALL.reduce((sum, run) => sum + run.model.props.length, 0) / ALL.length;
+    expect(props).toBeGreaterThan(5);
   });
 
   it('make round rooms only of square floors', () => {

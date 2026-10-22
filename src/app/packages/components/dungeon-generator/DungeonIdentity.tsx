@@ -6,9 +6,8 @@ import { MAX_SEED } from '../../../dungeons/rng';
 import { t } from '../../../i18n';
 
 interface DungeonIdentityProps {
+  /** What the scene is called; the dungeon does not change with it. */
   name: string;
-  /** The title the generator gave the dungeon, shown while no name is typed. */
-  generatedTitle: string | null;
   seed: number;
   onName: (name: string) => void;
   onSeed: (seed: number) => void;
@@ -22,13 +21,14 @@ function readSeed(text: string): number | null {
   return Math.min(MAX_SEED, Math.max(1, value));
 }
 
-/** Name and seed: what makes this dungeon this one. Both are taken when the field is left or Enter is pressed. */
-export function DungeonIdentity({ name, generatedTitle, seed, onName, onSeed, onNew }: DungeonIdentityProps): React.JSX.Element {
+/**
+ * Name and seed. The seed makes this dungeon this one; the name only names its scene and is taken
+ * as it is typed, the seed when the field is left or Enter is pressed.
+ */
+export function DungeonIdentity({ name, seed, onName, onSeed, onNew }: DungeonIdentityProps): React.JSX.Element {
   const nameId = useId();
   const seedId = useId();
-  const [nameText, setNameText] = useState(name);
   const [seedText, setSeedText] = useState(String(seed));
-  useEffect(() => setNameText(name), [name]);
   useEffect(() => setSeedText(String(seed)), [seed]);
 
   const takeSeed = (): void => {
@@ -53,11 +53,9 @@ export function DungeonIdentity({ name, generatedTitle, seed, onName, onSeed, on
           type="text"
           className="atlas-dungeon-field__text"
           aria-labelledby={nameId}
-          value={nameText}
-          placeholder={generatedTitle ?? t('dungeon.namePlaceholder')}
-          onChange={(event) => setNameText(event.target.value)}
-          onBlur={() => onName(nameText)}
-          onKeyDown={onEnter(() => onName(nameText))}
+          value={name}
+          placeholder={t('dungeon.namePlaceholder')}
+          onChange={(event) => onName(event.target.value)}
         />
       </div>
       <div className="atlas-dungeon-field atlas-dungeon-field--stacked">

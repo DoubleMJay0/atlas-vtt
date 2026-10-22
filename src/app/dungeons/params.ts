@@ -3,7 +3,8 @@
  * effect of a tag can be read in one place.
  */
 
-import type { DungeonTag } from './tags';
+import { chance, stream } from './rng';
+import { readTags, rivalsOf, withTag, type DungeonTag } from './tags';
 
 /**
  * Room sizes, walls included: 0 small room, 1 large room, 2 corridor, 3 junction.
@@ -40,6 +41,26 @@ export interface DungeonParams {
   shatteredChance: number;
   /** Floor cells per expected stone. */
   rubbleArea: number;
+}
+
+/** Tags a dungeon gets by chance, each unless a tag it holds rules it out. */
+const CHANCE_TAGS: readonly { tag: DungeonTag; chance: number; unless: readonly DungeonTag[] }[] = [
+  { tag: 'multi-level', chance: 0.5, unless: [] },
+  { tag: 'string', chance: 0.05, unless: ['winding'] },
+  { tag: 'deep', chance: 0.05, unless: [] },
+];
+
+/**
+ * The tags a dungeon is built with: the GM's, and those a roll of the layout stream adds. Every
+ * roll is made whatever the tags, so asking for one tag never shifts the rolls of the others.
+ */
+export function dungeonTags(seed: number, requested: readonly string[]): DungeonTag[] {
+  const rng = stream(seed, 'layout', 'tags');
+  return CHANCE_TAGS.reduce<DungeonTag[]>((tags, { tag, chance: p, unless }) => {
+    const hit = chance(rng, p);
+    const blocked = [...rivalsOf(tag), ...unless].some((t) => tags.includes(t));
+    return hit && !blocked && !tags.includes(tag) ? withTag(tags, tag) : tags;
+  }, readTags(requested));
 }
 
 const DEFAULT_SIZES: readonly SizeStyle[] = [0, 0, 0, 1, 2, 3, 3];

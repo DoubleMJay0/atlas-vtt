@@ -4,9 +4,8 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
 import { generateDungeon } from '../../src/app/dungeons/generate';
-import type { DungeonRequest } from '../../src/app/dungeons/model';
+import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { createDungeonScene } from '../../src/app/dungeons/scene/createDungeonScene';
-import { dungeonText } from '../../src/app/dungeons/text/dungeonText';
 import type { DungeonJob, DungeonRendered } from '../../src/app/dungeons/worker/dungeonJob';
 import { DungeonGeneratorPanel } from '../../src/app/packages/components/dungeon-generator/DungeonGeneratorPanel';
 import { useDungeonState } from '../../src/app/packages/components/dungeon-generator/useDungeonState';
@@ -25,9 +24,9 @@ stubLayout({ width: 800, height: 560 });
 
 /** The worker as the panel sees it: the dungeon of the job's request, drawn as nothing. */
 function answer(job: DungeonJob): Promise<DungeonRendered> {
-  const model = job.model ?? generateDungeon(job.request, dungeonText);
+  const model = job.model ?? generateDungeon(job.request);
   const bitmap = { width: 10, height: 10, close: vi.fn() } as unknown as ImageBitmap;
-  return Promise.resolve({ model, image: { type: 'bitmap', bitmap }, page: { map: { angle: 0, scale: 1, pivot: { x: 0, y: 0 }, at: { x: 0, y: 0 } }, notes: [], rooms: [], title: null, story: null } });
+  return Promise.resolve({ model, map: mapLayout(model, 1), image: { type: 'bitmap', bitmap } });
 }
 
 const assets = { initialize: vi.fn().mockResolvedValue(undefined) } as unknown as AssetService;
@@ -45,8 +44,8 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-function renderPanel(onCreated = vi.fn()): ReturnType<typeof vi.fn> {
-  render(<DungeonGeneratorPanel app={app} collectionId="Dungeons" initialName="Sunken Vault" onCreated={onCreated} />);
+function renderPanel(onCreated = vi.fn(), initialName = 'Sunken Vault'): ReturnType<typeof vi.fn> {
+  render(<DungeonGeneratorPanel app={app} collectionId="Dungeons" initialName={initialName} onCreated={onCreated} />);
   return onCreated;
 }
 
@@ -54,14 +53,36 @@ const lastJob = (): DungeonJob => worker.preview.mock.calls.at(-1)![0] as Dungeo
 const tag = (name: string): HTMLElement => screen.getByRole('button', { name, pressed: undefined });
 
 describe('the dungeon generator panel', () => {
-  it('draws the page of the typed name off the main thread', async () => {
+  it('draws the map fitted into the preview off the main thread', async () => {
     renderPanel();
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const job = lastJob();
-    expect(job.request.name).toBe('Sunken Vault');
-    expect(job.output).toMatchObject({ kind: 'page' });
+    expect(job.output).toMatchObject({ kind: 'preview' });
     expect(job.model).toBeUndefined();
     expect(await screen.findByRole('img', { name: 'Dungeon preview' })).toBeTruthy();
+  });
+
+  it('never draws another dungeon for another name', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    const calls = worker.preview.mock.calls.length;
+    const { request } = lastJob();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Moon Temple' } });
+    await act(async () => { await Promise.resolve(); });
+    expect(worker.preview.mock.calls.length).toBe(calls);
+    expect(lastJob().request).toBe(request);
+  });
+
+  it('creates a scene only once it has a name', async () => {
+    renderPanel(vi.fn(), '');
+    const create = screen.getByRole('button', { name: 'Create scene' });
+    expect(create.hasAttribute('disabled')).toBe(true);
+    const name = screen.getByRole('textbox', { name: 'Name' });
+    expect(name.getAttribute('placeholder')).toBe('Name it to create the scene');
+    fireEvent.change(name, { target: { value: '   ' } });
+    expect(create.hasAttribute('disabled')).toBe(true);
+    fireEvent.change(name, { target: { value: 'Grey Vault' } });
+    expect(create.hasAttribute('disabled')).toBe(false);
   });
 
   it('lets one tag of a group stand, and generates with the same seed', async () => {
@@ -90,7 +111,7 @@ describe('the dungeon generator panel', () => {
   });
 
   it('creates the scene of the dungeon as shown and hands it on', async () => {
-    vi.mocked(createDungeonScene).mockResolvedValue({ ok: true, name: 'Sunken Vault', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Sunken Vault.atlasmap', notePath: 'n.md' });
+    vi.mocked(createDungeonScene).mockResolvedValue({ ok: true, name: 'Sunken Vault', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Sunken Vault.atlasmap' });
     const onCreated = renderPanel();
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByRole('button', { name: /Export/ }).hasAttribute('disabled')).toBe(false));
@@ -99,8 +120,8 @@ describe('the dungeon generator panel', () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith({ name: 'Sunken Vault', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Sunken Vault.atlasmap' }));
     const [, service, options] = vi.mocked(createDungeonScene).mock.calls[0]!;
     expect(service).toBe(assets);
-    expect(options).toMatchObject({ collectionId: 'Dungeons', request: { name: 'Sunken Vault' } as Partial<DungeonRequest> });
-    expect(options.model?.title).toBeTruthy();
+    expect(options).toMatchObject({ collectionId: 'Dungeons', name: 'Sunken Vault' });
+    expect(options.model?.rooms.length).toBeGreaterThan(0);
     expect(options.style).toEqual(settings.getDungeonGenerator().style);
   });
 
@@ -110,17 +131,6 @@ describe('the dungeon generator panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create scene' }));
     expect(await screen.findByText('The collection no longer exists.')).toBeTruthy();
     expect(onCreated).not.toHaveBeenCalled();
-  });
-
-  it('words the notes anew with the same rooms, and arranges the boxes anew', async () => {
-    renderPanel();
-    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
-    const { seed } = lastJob().request;
-    fireEvent.click(screen.getByRole('button', { name: 'Reroll notes' }));
-    await waitFor(() => expect(lastJob().request.notesVariant).toBe(1));
-    expect(lastJob().request.seed).toBe(seed);
-    fireEvent.click(screen.getByRole('button', { name: 'Rearrange notes' }));
-    await waitFor(() => expect(lastJob().output).toMatchObject({ kind: 'page', arrangement: 1 }));
   });
 
   it('has no keyboard shortcuts: keys pressed in the panel change nothing', async () => {
@@ -142,34 +152,28 @@ describe('the dungeon generator panel', () => {
 });
 
 describe('the generator state', () => {
-  it('takes a title typed on the page as an edit of this dungeon, and the Name field as another dungeon', () => {
-    const { result } = renderHook(() => useDungeonState(app, 'Sunken Vault'));
+  it('names the scene with the Name field and keeps the dungeon as it is', () => {
+    const { result } = renderHook(() => useDungeonState(app, ' Sunken Vault '));
+    expect(result.current.name).toBe('Sunken Vault');
     const request = result.current.request;
-    act(() => result.current.setGenerated(request, generateDungeon(request, dungeonText)));
-    const rooms = result.current.model!.rooms;
-
-    act(() => result.current.editTitle('  The Drowned Pit '));
-    expect(result.current.request).toBe(request);
-    expect(result.current.model!.title).toBe('The Drowned Pit');
-    expect(result.current.model!.rooms).toBe(rooms);
-    expect(result.current.edits.title).toBe('The Drowned Pit');
-
-    act(() => result.current.editTitle(''));
-    expect(result.current.model!.title).toBe(result.current.generated!.title);
+    act(() => result.current.setGenerated(request, generateDungeon(request)));
+    const model = result.current.model;
 
     act(() => result.current.setName('Moon Temple'));
-    expect(result.current.request.name).toBe('Moon Temple');
-    expect(result.current.model).toBeNull();
+    expect(result.current.name).toBe('Moon Temple');
+    expect(result.current.request).toBe(request);
+    expect(result.current.model).toBe(model);
   });
 
-  it('keeps the boxes the GM placed when the notes are worded anew', () => {
+  it('keeps the hidden wings while only the water changes, and drops them for another seed', () => {
     const { result } = renderHook(() => useDungeonState(app));
     const request = result.current.request;
-    act(() => result.current.setGenerated(request, generateDungeon(request, dungeonText)));
-    const room = result.current.model!.notes[0]!.room;
-    act(() => result.current.editNote(room, { text: 'Typed.', manual: { x: 3, y: 4 } }));
-    act(() => result.current.rerollNotes());
-    expect(result.current.request).toMatchObject({ seed: request.seed, notesVariant: 1 });
-    expect(result.current.edits.notes).toEqual({ [room]: { manual: { x: 3, y: 4 } } });
+    act(() => result.current.setGenerated(request, generateDungeon(request)));
+    const secret = result.current.model!.rooms.find((room) => room.wing === 'secret');
+    if (!secret) return;
+    act(() => result.current.hideWing(secret.id));
+    expect(result.current.edits.hiddenWings?.length).toBe(1);
+    act(() => result.current.newSeed());
+    expect(result.current.edits).toEqual({});
   });
 });

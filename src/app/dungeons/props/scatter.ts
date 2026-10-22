@@ -3,7 +3,7 @@
 import type { CellPoint, DungeonCrack, DungeonDoor, DungeonRubble } from '../model';
 import { type Rng, chance, int } from '../rng';
 import { chaikin } from '../water/smooth';
-import type { ClearZone } from './notedProps';
+import type { ClearZone } from './markedProps';
 import { type RoomFrame, onFloor, pointIn, rotundaRadius } from './roomFrame';
 
 function stone(rng: Rng, at: CellPoint): DungeonRubble {
@@ -17,7 +17,7 @@ function stone(rng: Rng, at: CellPoint): DungeonRubble {
   return { points: chaikin(quad, 1) };
 }
 
-/** About one stone per `areaPerStone` floor cells, at random; `extra` more for a note about rubble. */
+/** About one stone per `areaPerStone` floor cells, at random; `extra` more where the plan marks rubble. */
 export function rubbleIn(rng: Rng, frame: RoomFrame, areaPerStone: number, extra: number, obstacles: readonly ClearZone[]): DungeonRubble[] {
   const area = frame.room.w * frame.room.h;
   const count = Math.floor(rng() * (1 + area / areaPerStone)) + extra;

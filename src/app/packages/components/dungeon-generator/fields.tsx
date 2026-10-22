@@ -48,7 +48,7 @@ interface NumberInputProps {
 }
 
 /** A number typed freely and taken once it is one within its limits; leaving the field holds it within them. */
-export function NumberInput({ value, limits, step, onChange, labelledBy }: NumberInputProps): React.JSX.Element {
+function NumberInput({ value, limits, step, onChange, labelledBy }: NumberInputProps): React.JSX.Element {
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
   const [min, max] = limits;

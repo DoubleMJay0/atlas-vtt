@@ -1,6 +1,7 @@
 /**
  * A generated dungeon, in grid cells (x right, y down). The first entrance door sits at (0, 0).
- * Everything a renderer, the scene writer and the note writer need, and nothing they derive.
+ * Everything a renderer and the scene writer need, and nothing they derive. It holds no text:
+ * a dungeon is named only by the GM, and only its scene carries that name.
  * Cell (x, y) covers [x, x + 1) × [y, y + 1); points (columns, props, water, rubble, cracks) are
  * in that continuous space, so a cell's centre is (x + 0.5, y + 0.5) and columns stand on grid vertices.
  */
@@ -75,15 +76,6 @@ export interface DungeonDoor {
   to: number | null;
 }
 
-export interface DungeonNote {
-  /** The printed number, "1".."n", in order of path distance from the entrance. */
-  ref: string;
-  text: string;
-  room: number;
-  /** Where the GM dragged the note's box on the page, in cells; unset is placed automatically. */
-  manual?: CellPoint;
-}
-
 export type PropKind =
   | 'barrel'
   | 'crate'
@@ -137,13 +129,10 @@ export interface DungeonWater {
 export interface DungeonModel {
   version: number;
   seed: number;
-  /** The tags the dungeon was built with: the GM's merged with those its name implies. */
+  /** The tags the dungeon was built with: the GM's and those added by chance (`dungeonTags`). */
   tags: string[];
-  title: string;
-  story: string;
   rooms: DungeonRoom[];
   doors: DungeonDoor[];
-  notes: DungeonNote[];
   columns: DungeonColumn[];
   props: DungeonProp[];
   rubble: DungeonRubble[];
@@ -162,10 +151,6 @@ export interface DungeonModel {
 export interface DungeonRequest {
   seed: number;
   tags: string[];
-  /** A name the GM typed; unset lets the generator name the dungeon. */
-  name?: string;
   /** 0..1; unset follows the tags (dry 0, wet 0.3, flooded 0.6, else random). */
   waterLevel?: number;
-  /** Words the room notes over again (Reroll notes); unset or 0 is the first wording. Never moves a room. */
-  notesVariant?: number;
 }

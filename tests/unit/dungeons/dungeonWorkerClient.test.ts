@@ -4,6 +4,7 @@ import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
 import { DungeonWorkerClient } from '../../../src/app/dungeons/worker/DungeonWorkerClient';
 import type { DungeonJob, DungeonRendered, DungeonWorkerMessage, DungeonWorkerReply } from '../../../src/app/dungeons/worker/dungeonJob';
 import { smallDungeon } from '../../fixtures/dungeonModels';
+import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 
 /** A worker that keeps what it is sent and answers when the test says so. */
 class FakeWorker {
@@ -25,8 +26,7 @@ class FakeWorker {
 
   /** The id of the last render job sent. */
   lastJob(): number {
-    const jobs = this.sent.filter((m): m is Extract<DungeonWorkerMessage, { type: 'render' }> => m.type === 'render');
-    return jobs[jobs.length - 1]!.id;
+    return this.sent[this.sent.length - 1]!.id;
   }
 
   answer(reply: DungeonWorkerReply): void {
@@ -42,11 +42,12 @@ const job = (seed: number): DungeonJob => ({
   request: { seed, tags: [] },
   style: STYLE_PRESETS.parchment,
   view: DEFAULT_VIEW,
-  output: { kind: 'page', width: 1400, height: 1000 },
+  output: { kind: 'preview', width: 1400, height: 1000 },
 });
 
 function rendered(close = vi.fn()): DungeonRendered {
-  return { model: smallDungeon(), image: { type: 'bitmap', bitmap: { close } as unknown as ImageBitmap } };
+  const model = smallDungeon();
+  return { model, map: mapLayout(model, 30), image: { type: 'bitmap', bitmap: { close } as unknown as ImageBitmap } };
 }
 
 const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
@@ -58,7 +59,6 @@ function clientWith(workers: FakeWorker[], inThread?: (job: DungeonJob) => Promi
       workers.push(worker);
       return worker as unknown as Worker;
     },
-    fonts: () => [{ family: 'Atlas Germania One', source: 'url("data:font/ttf;base64,AA==")' }],
     ...(inThread && { inThread }),
   });
 }
@@ -66,13 +66,12 @@ function clientWith(workers: FakeWorker[], inThread?: (job: DungeonJob) => Promi
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('the dungeon worker client', () => {
-  it('starts one worker, hands it the fonts first and answers each job', async () => {
+  it('starts one worker and answers each job', async () => {
     const workers: FakeWorker[] = [];
     const client = clientWith(workers);
 
     const first = client.render(job(1));
     expect(workers).toHaveLength(1);
-    expect(workers[0]!.sent[0]).toMatchObject({ type: 'fonts' });
     const result = rendered();
     workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result });
     await expect(first).resolves.toBe(result);
@@ -99,7 +98,7 @@ describe('the dungeon worker client', () => {
     expect(close).toHaveBeenCalled();
 
     await flush();
-    const sentSeeds = workers[0]!.sent.flatMap(m => (m.type === 'render' ? [m.job.request.seed] : []));
+    const sentSeeds = workers[0]!.sent.map(m => m.job.request.seed);
     expect(sentSeeds).toEqual([1, 3]);
     const result = rendered();
     workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result });
@@ -128,7 +127,6 @@ describe('the dungeon worker client', () => {
 
     const next = client.render(job(2));
     expect(workers).toHaveLength(2);
-    expect(workers[1]!.sent[0]).toMatchObject({ type: 'fonts' });
     const result = rendered();
     workers[1]!.answer({ id: workers[1]!.lastJob(), ok: true, result });
     await expect(next).resolves.toBe(result);
@@ -139,7 +137,6 @@ describe('the dungeon worker client', () => {
     const inThread = vi.fn(async () => result);
     const client = new DungeonWorkerClient({
       createWorker: () => { throw new Error('No workers here'); },
-      fonts: () => [],
       inThread,
     });
     vi.spyOn(console, 'warn').mockImplementation(() => {});

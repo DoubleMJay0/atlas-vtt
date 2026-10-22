@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DungeonModel, DungeonRequest } from '../../../dungeons/model';
-import type { PageLayout } from '../../../dungeons/render/renderPage';
+import type { MapLayout } from '../../../dungeons/render/layoutSize';
 import type { DungeonStyle, DungeonView } from '../../../dungeons/style';
 import type { DungeonJob, DungeonRendered } from '../../../dungeons/worker/dungeonJob';
 
@@ -9,17 +9,15 @@ export interface PreviewRenderer {
   preview: (job: DungeonJob) => Promise<DungeonRendered | null>;
 }
 
-/** A drawn page and where everything on it landed. */
-export interface PagePicture {
+/** A drawn map and where it lies on the grid. */
+export interface MapPicture {
   bitmap: ImageBitmap;
-  layout: PageLayout;
-  width: number;
-  height: number;
+  map: MapLayout;
   /** The dungeon it shows, for hit-testing. */
   model: DungeonModel;
 }
 
-export interface PagePreviewInput {
+export interface MapPreviewInput {
   request: DungeonRequest;
   /** The dungeon before the GM's edits, once generated; null asks the worker to generate it. */
   generated: DungeonModel | null;
@@ -27,14 +25,12 @@ export interface PagePreviewInput {
   model: DungeonModel | null;
   style: DungeonStyle;
   view: DungeonView;
-  /** Which automatic arrangement the note boxes take. */
-  arrangement: number;
-  /** Device pixels; null until the preview's frame was measured. */
+  /** Device pixels the map is fitted into; null until the preview's frame was measured. */
   size: { width: number; height: number } | null;
 }
 
-export interface PagePreview {
-  picture: PagePicture | null;
+export interface MapPreview {
+  picture: MapPicture | null;
   /** A newer picture is being drawn; the one shown is held until it arrives. */
   drawing: boolean;
   failed: boolean;
@@ -45,43 +41,42 @@ interface Drawn {
   model: DungeonModel | null;
   style: DungeonStyle;
   view: DungeonView;
-  arrangement: number;
   width: number;
   height: number;
 }
 
 const sameDrawing = (a: Drawn | null, b: Drawn): boolean => a !== null
   && a.request === b.request && a.model === b.model && a.style === b.style && a.view === b.view
-  && a.arrangement === b.arrangement && a.width === b.width && a.height === b.height;
+  && a.width === b.width && a.height === b.height;
 
 /**
- * The live page preview, drawn by the dungeon worker so the panel never loses a frame. The latest
- * change wins: a preview a newer one replaced is never shown, and the last picture stays until
- * the next arrives, so the pane is never empty once it had a picture. The first answer for a
- * request also brings its generated dungeon (`onGenerated`).
+ * The live map preview, fitted into the preview's frame and drawn by the dungeon worker so the
+ * panel never loses a frame. The latest change wins: a preview a newer one replaced is never
+ * shown, and the last picture stays until the next arrives, so the pane is never empty once it
+ * had a picture. The first answer for a request also brings its generated dungeon (`onGenerated`).
  */
-export function usePagePreview(renderer: PreviewRenderer, input: PagePreviewInput, onGenerated: (request: DungeonRequest, model: DungeonModel) => void): PagePreview {
-  const [picture, setPicture] = useState<PagePicture | null>(null);
+export function useMapPreview(renderer: PreviewRenderer, input: MapPreviewInput, onGenerated: (request: DungeonRequest, model: DungeonModel) => void): MapPreview {
+  const [picture, setPicture] = useState<MapPicture | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [failed, setFailed] = useState(false);
   const asked = useRef(0);
   const drawn = useRef<Drawn | null>(null);
   const onGeneratedRef = useRef(onGenerated);
   onGeneratedRef.current = onGenerated;
-  const { request, generated, model, style, view, arrangement, size } = input;
+  const { request, generated, model, style, view, size } = input;
 
   useEffect(() => {
     if (!size) return;
     // The generated dungeon drawn as it came needs no second drawing once it is stored.
     const shown = model === generated ? null : model;
-    const next: Drawn = { request, model: generated ? shown : null, style, view, arrangement, width: size.width, height: size.height };
+    const next: Drawn = { request, model: generated ? shown : null, style, view, width: size.width, height: size.height };
     if (generated && model === generated && sameDrawing(drawn.current, { ...next, model: null })) return;
     const id = ++asked.current;
     setDrawing(true);
-    const job: DungeonJob = { request, ...(generated && model ? { model } : {}), style, view, output: { kind: 'page', width: size.width, height: size.height, arrangement } };
+    const job: DungeonJob = { request, ...(generated && model ? { model } : {}), style, view, output: { kind: 'preview', width: size.width, height: size.height } };
     renderer.preview(job).then((result) => {
       if (!result) return;
-      if (id !== asked.current || result.image.type !== 'bitmap' || !result.page) {
+      if (id !== asked.current || result.image.type !== 'bitmap') {
         if (result.image.type === 'bitmap') result.image.bitmap.close();
         return;
       }
@@ -89,7 +84,7 @@ export function usePagePreview(renderer: PreviewRenderer, input: PagePreviewInpu
       const bitmap = result.image.bitmap;
       setPicture((old) => {
         old?.bitmap.close();
-        return { bitmap, layout: result.page!, width: size.width, height: size.height, model: result.model };
+        return { bitmap, map: result.map, model: result.model };
       });
       setFailed(false);
       setDrawing(false);
@@ -100,7 +95,7 @@ export function usePagePreview(renderer: PreviewRenderer, input: PagePreviewInpu
       setFailed(true);
       setDrawing(false);
     });
-  }, [renderer, request, generated, model, style, view, arrangement, size]);
+  }, [renderer, request, generated, model, style, view, size]);
 
   // The last picture's pixels go with the panel.
   const pictureRef = useRef(picture);

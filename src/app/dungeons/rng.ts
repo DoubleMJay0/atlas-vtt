@@ -4,10 +4,10 @@ import { fnv1a32 } from '../utils/hashing';
 export type Rng = () => number;
 
 /**
- * The concerns that draw numbers. Each has a stream of its own, so rewording, restyling or moving
- * notes never changes the layout, and a change in one never shifts the others.
+ * The concerns that draw numbers. Each has a stream of its own, so restyling never changes the
+ * layout, and a change in one never shifts the others.
  */
-export type RngStream = 'layout' | 'plan' | 'text' | 'props' | 'water' | 'render' | 'notes';
+export type RngStream = 'layout' | 'plan' | 'props' | 'water' | 'render';
 
 /** Largest seed a GM can type (as Watabou's: 1 to 2³¹ − 2). */
 export const MAX_SEED = 2_147_483_646;

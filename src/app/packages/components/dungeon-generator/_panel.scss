@@ -30,11 +30,6 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  touch-action: none;
-
-  &[data-dragging='true'] {
-    cursor: grabbing;
-  }
 }
 
 .atlas-dungeon-preview__stage {
@@ -45,7 +40,7 @@
   justify-content: center;
 }
 
-// Drawn at the frame's device pixels: the largest size that fits keeps its shape while a newer one is drawn.
+// Fitted to the frame's device pixels: the largest size that fits keeps its shape while a newer one is drawn.
 .atlas-dungeon-preview__canvas {
   display: block;
   max-width: 100%;
@@ -63,10 +58,6 @@
   border-radius: $radius-l;
   background: var(--background-secondary);
   --atlas-skeleton-surface: var(--background-secondary);
-}
-
-.atlas-dungeon-preview__skeleton-title {
-  font-size: $font-ui-large;
 }
 
 .atlas-dungeon-preview__skeleton-map {
@@ -94,42 +85,6 @@
   font-size: $font-ui-small;
 }
 
-.atlas-dungeon-preview__ghost {
-  position: absolute;
-  border: $border-width-m solid var(--interactive-accent);
-  border-radius: $radius-s;
-  background: color-mix(in oklch, var(--interactive-accent) 10%, transparent);
-  pointer-events: none;
-}
-
-// A text of the page edited where it stands
-.atlas-dungeon-text-editor {
-  @include atlas-elevated-surface;
-  @include atlas-panel-radius($radius-xl);
-  @include atlas-flex-col($gap: $spacing-s);
-  position: absolute;
-  z-index: 2;
-  max-width: 360px;
-  padding: $spacing-s;
-}
-
-.atlas-dungeon-text-editor__heading {
-  @include atlas-field-label;
-}
-
-.atlas-dungeon-text-editor__field {
-  @include atlas-text-input;
-  @include atlas-panel-inset-radius($spacing-s);
-
-  &:is(textarea) {
-    height: auto;
-    padding: $spacing-s;
-    resize: vertical;
-    line-height: var(--line-height-normal);
-  }
-}
-
-.atlas-dungeon-text-editor__actions,
 .atlas-dungeon-cell-dialog__actions {
   @include atlas-flex-row($gap: $spacing-s);
   justify-content: flex-end;

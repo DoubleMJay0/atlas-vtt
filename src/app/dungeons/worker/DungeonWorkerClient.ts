@@ -1,5 +1,4 @@
 import type { App } from 'obsidian';
-import { readDungeonFonts, type DungeonFontSource } from '../render/fonts';
 import { runDungeonJob, type DungeonJob, type DungeonRendered, type DungeonWorkerMessage, type DungeonWorkerReply } from './dungeonJob';
 import DungeonWorker from './dungeonWorker?worker&inline';
 
@@ -8,8 +7,6 @@ export type InThreadRunner = (job: DungeonJob) => Promise<DungeonRendered>;
 
 export interface DungeonWorkerClientOptions {
   createWorker: () => Worker;
-  /** The bundled faces, read once a worker starts. */
-  fonts: () => DungeonFontSource[];
   /** Used when the worker cannot start. */
   inThread?: InThreadRunner;
   jobTimeoutMs?: number;
@@ -47,8 +44,7 @@ export class DungeonWorkerClient {
     if (!client) {
       client = new DungeonWorkerClient({
         createWorker: () => new DungeonWorker({ name: 'Atlas dungeons' }),
-        fonts: () => readDungeonFonts(document),
-        inThread: (job) => runDungeonJob(job, document.fonts, readDungeonFonts(document)),
+        inThread: (job) => runDungeonJob(job),
       });
       DungeonWorkerClient.instances.set(app, client);
     }
@@ -115,7 +111,7 @@ export class DungeonWorkerClient {
         this.runInThread(next);
         return;
       }
-      const message: DungeonWorkerMessage = { type: 'render', id: next.id, job: next.job };
+      const message: DungeonWorkerMessage = { id: next.id, job: next.job };
       worker.postMessage(message);
     } catch (error) {
       this.settle(next, null, error instanceof Error ? error : new Error(String(error)));
@@ -124,7 +120,7 @@ export class DungeonWorkerClient {
     this.timeout = window.setTimeout(() => this.crash('Drawing the dungeon took too long.'), this.options.jobTimeoutMs ?? JOB_TIMEOUT_MS);
   }
 
-  /** The running worker, started with the fonts where there is none; null when none can start. */
+  /** The running worker, started where there is none; null when none can start. */
   private startedWorker(): Worker | null {
     if (this.worker) return this.worker;
     let worker: Worker;
@@ -141,8 +137,6 @@ export class DungeonWorkerClient {
       this.crash(event.message || 'The dungeon worker stopped unexpectedly.');
     });
     worker.addEventListener('messageerror', () => this.crash('Could not read the dungeon worker’s reply.'));
-    const fonts: DungeonWorkerMessage = { type: 'fonts', fonts: this.options.fonts() };
-    worker.postMessage(fonts);
     this.worker = worker;
     return worker;
   }

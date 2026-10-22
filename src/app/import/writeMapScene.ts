@@ -6,7 +6,7 @@ import type { AssetThumbnailService } from '../services/AssetThumbnailService';
 import { discardAssetFiles, writeAssetImage } from '../services/assetImageFiles';
 import { collectionFolderPath } from '../services/assetPaths';
 import { TransferFiles } from '../services/assetTransfer/transferFiles';
-import { newSceneFile, type NewSceneFile } from '../services/newSceneFile';
+import { newSceneFile } from '../services/newSceneFile';
 import { JSON_FOLDERS, defaultJsonPath } from '../services/vault-sync/assetFiles';
 import type { GridState } from '../types/gridTypes';
 import type { LightSource, SceneLighting } from '../types/lightingTypes';
@@ -26,22 +26,11 @@ export interface MapSceneParts {
   lighting: SceneLighting;
 }
 
-/** A file written along with the scene, and taken back with it. */
-export interface CompanionFile {
-  path: string;
-  content: string;
-}
-
 export interface MapScenePlan {
   baseName: string;
   collection: CollectionMetadata;
   image: ProcessedImage;
   scene: MapSceneParts;
-  /**
-   * Last changes to the scene file once its name is known, and files that belong with it (a
-   * dungeon's note). Runs under the lock, before anything is committed.
-   */
-  finish?: (written: { name: string; scenePath: string; content: NewSceneFile }) => Promise<CompanionFile[]> | CompanionFile[];
 }
 
 export type MapSceneWritten = { ok: true; name: string; scenePath: string } | { ok: false; problem: string };
@@ -58,7 +47,7 @@ async function freeSceneName(app: App, folder: string, base: string): Promise<st
 
 /**
  * Writes a map and its scene: the image and its thumbnail, the scene file with the grid and what
- * stands on the map, the plan's companion files, and both records in one save of the index. All
+ * stands on the map, and both records in one save of the index. All
  * of it happens under the index lock, so the vault check never sees the new scene without its
  * record and adds a second one. A failure takes back every file written so far, still under the
  * lock, and leaves the index as it was.
@@ -86,9 +75,7 @@ export function writeMapScene({ app, assetService, thumbnails }: MapSceneDeps, p
       content.state.grid = { ...grid, ...scene.grid };
       content.state.objects = { ...content.state.objects, walls: scene.walls, lights: scene.lights };
       content.state.lighting = scene.lighting;
-      const companions = plan.finish ? await plan.finish({ name, scenePath, content }) : [];
       await files.write(scenePath, JSON.stringify(content, null, 2));
-      for (const companion of companions) await files.write(companion.path, companion.content);
 
       const now = Date.now();
       const identity = <T extends 'map' | 'scene'>(type: T): { id: string; type: T; filePath: string } => {

@@ -3,7 +3,7 @@ import { LoadingSpinner } from '../primitives/LoadingSpinner';
 import { Skeleton, SkeletonGroup } from '../primitives/Skeleton';
 import { observeResize } from '../../../utils/observeResize';
 import { t } from '../../../i18n';
-import type { PagePicture } from './usePagePreview';
+import type { MapPicture } from './useMapPreview';
 
 /** The longest side a preview is drawn at, in device pixels. */
 const MAX_PREVIEW_SIDE = 2400;
@@ -20,7 +20,7 @@ function previewSizeOf(cssWidth: number, cssHeight: number, ratio: number): Prev
   return { width: Math.round(cssWidth * scale), height: Math.round(cssHeight * scale) };
 }
 
-/** Measures the frame the page is drawn for; null until it has a size. */
+/** Measures the frame the map is fitted into; null until it has a size. */
 export function usePreviewSize(frame: HTMLElement | null): PreviewSize | null {
   const [size, setSize] = useState<PreviewSize | null>(null);
   useLayoutEffect(() => {
@@ -37,7 +37,7 @@ export function usePreviewSize(frame: HTMLElement | null): PreviewSize | null {
 }
 
 interface PreviewCanvasProps {
-  picture: PagePicture | null;
+  picture: MapPicture | null;
   drawing: boolean;
   failed: boolean;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -45,7 +45,7 @@ interface PreviewCanvasProps {
 }
 
 /**
- * The drawn page, or its skeleton until the first picture arrived. A picture is held while the
+ * The drawn map, or its skeleton until the first picture arrived. A picture is held while the
  * next is drawn, so changing a setting never empties the pane; a small spinner says a newer one
  * is on its way.
  */
@@ -57,8 +57,8 @@ export function PreviewCanvas({ picture, drawing, failed, canvasRef, className }
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !picture || shown.current === picture.bitmap) return;
-    canvas.width = picture.width;
-    canvas.height = picture.height;
+    canvas.width = picture.bitmap.width;
+    canvas.height = picture.bitmap.height;
     canvas.getContext('2d')?.drawImage(picture.bitmap, 0, 0);
     shown.current = picture.bitmap;
   }, [picture, canvasRef]);
@@ -82,8 +82,6 @@ export function PreviewCanvas({ picture, drawing, failed, canvasRef, className }
         </>
       ) : (
         <SkeletonGroup label={t('dungeon.preview.label')} className="atlas-dungeon-preview__skeleton">
-          <Skeleton shape="text" width="46%" className="atlas-dungeon-preview__skeleton-title" />
-          <Skeleton shape="text" width="64%" />
           <Skeleton className="atlas-dungeon-preview__skeleton-map" />
         </SkeletonGroup>
       )}

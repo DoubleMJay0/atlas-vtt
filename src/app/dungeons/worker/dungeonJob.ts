@@ -1,34 +1,29 @@
 import { generateDungeon } from '../generate';
 import type { DungeonModel, DungeonRequest } from '../model';
-import { dungeonFontsReady, type DungeonFontSource } from '../render/fonts';
-import { renderPageSvg } from '../render/svgPage';
 import { mapPixelSize, suggestedPxPerCell, type MapLayout } from '../render/layoutSize';
-import { renderMap } from '../render/renderMap';
-import { renderPage, type PageLayout } from '../render/renderPage';
+import { fittedPxPerCell, renderMap, renderMapSvg } from '../render/renderMap';
 import type { DungeonStyle, DungeonView } from '../style';
-import { dungeonText } from '../text/dungeonText';
 
 /**
- * What the dungeon worker does: generate a dungeon (or take one as it is) and draw it on an
- * `OffscreenCanvas`, as the floor plan of a scene or as the one-page layout. Runs in the worker,
- * or in the window where no worker can start.
+ * What the dungeon worker does: generate a dungeon (or take one as it is) and draw its floor plan
+ * on an `OffscreenCanvas`. Runs in the worker, or in the window where no worker can start.
  */
+
+/** The picture size sizes of a map's strokes are judged against (`legibleStyle`). */
+const LEGIBLE_PICTURE = { width: 1400, height: 1000 };
 
 export type DungeonOutput =
   /**
-   * The floor plan, at `pxPerCell` or less where the image would pass a map's limits; a PNG, or a
-   * bitmap for a preview. `transparent` leaves the paper out.
+   * The floor plan at `pxPerCell`, or less where the image would pass a map's limits; a PNG, a
+   * bitmap, or with `svg` an SVG document. `transparent` leaves the paper out.
    */
-  | { kind: 'map'; pxPerCell: number; numbers: boolean; bitmap?: boolean; transparent?: boolean }
-  /**
-   * The page: title, story, the map and its notes, the boxes in their `arrangement` (`PageSize`);
-   * a bitmap, or with `svg` an SVG document.
-   */
-  | { kind: 'page'; width: number; height: number; arrangement?: number; svg?: boolean };
+  | { kind: 'map'; pxPerCell: number; bitmap?: boolean; svg?: boolean; transparent?: boolean }
+  /** The floor plan fitted into `width` × `height` pixels, as a bitmap: the preview. */
+  | { kind: 'preview'; width: number; height: number };
 
 export interface DungeonJob {
   request: DungeonRequest;
-  /** A dungeon to draw as it is (notes the GM edited or moved); unset generates it from `request`. */
+  /** A dungeon to draw as it is (wings the GM hid); unset generates it from `request`. */
   model?: DungeonModel;
   style: DungeonStyle;
   view: DungeonView;
@@ -40,20 +35,14 @@ export type RenderedImage = { type: 'png'; blob: Blob } | { type: 'bitmap'; bitm
 export interface DungeonRendered {
   model: DungeonModel;
   image: RenderedImage;
-  /** Where a map image lies on the grid (map output). */
-  map?: MapLayout;
-  /** Where everything landed on a page (page output), for hit-testing. */
-  page?: PageLayout;
+  /** Where the image lies on the grid: its pixel (0, 0) is the corner of `originCell`. */
+  map: MapLayout;
 }
 
-/** What waits until a font can draw: a worker's or a document's font set. */
-export interface FontLoader {
-  load(font: string): Promise<unknown>;
+export interface DungeonWorkerMessage {
+  id: number;
+  job: DungeonJob;
 }
-
-export type DungeonWorkerMessage =
-  | { type: 'fonts'; fonts: DungeonFontSource[] }
-  | { type: 'render'; id: number; job: DungeonJob };
 
 export type DungeonWorkerReply = { id: number; ok: true; result: DungeonRendered } | { id: number; ok: false; message: string };
 
@@ -64,26 +53,29 @@ function canvasOf(width: number, height: number): { canvas: OffscreenCanvas; ctx
   return { canvas, ctx };
 }
 
-/** `sources` are the bundled faces, which an SVG page embeds. */
-export async function runDungeonJob(job: DungeonJob, fonts: FontLoader, sources: readonly DungeonFontSource[] = []): Promise<DungeonRendered> {
+function previewOf(model: DungeonModel, job: DungeonJob, width: number, height: number): DungeonRendered {
+  const pxPerCell = fittedPxPerCell(model, job.view, Math.max(1, width), Math.max(1, height));
+  const size = mapPixelSize(model, pxPerCell, job.view);
+  const { canvas, ctx } = canvasOf(size.width, size.height);
+  const legibleAt = Math.min(width / LEGIBLE_PICTURE.width, height / LEGIBLE_PICTURE.height);
+  const map = renderMap(ctx, model, job.style, job.view, { pxPerCell, legibleAt });
+  return { model, map, image: { type: 'bitmap', bitmap: canvas.transferToImageBitmap() } };
+}
+
+export async function runDungeonJob(job: DungeonJob): Promise<DungeonRendered> {
   const { style, view, output } = job;
-  const model = job.model ?? generateDungeon(job.request, dungeonText);
-  await dungeonFontsReady(fonts, style);
-  if (output.kind === 'page') {
-    const size = { width: Math.max(1, Math.round(output.width)), height: Math.max(1, Math.round(output.height)), ...(output.arrangement ? { arrangement: output.arrangement } : {}) };
-    if (output.svg) {
-      const { svg, page } = renderPageSvg(model, style, view, size, sources);
-      return { model, page, image: { type: 'svg', svg } };
-    }
-    const { canvas, ctx } = canvasOf(size.width, size.height);
-    const page = renderPage(ctx, model, style, view, size);
-    return { model, page, image: { type: 'bitmap', bitmap: canvas.transferToImageBitmap() } };
-  }
+  const model = job.model ?? generateDungeon(job.request);
+  if (output.kind === 'preview') return previewOf(model, job, output.width, output.height);
   const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, view);
+  const options = { pxPerCell, ...(output.transparent ? { transparent: true } : {}) };
+  if (output.svg) {
+    const { svg, layout } = renderMapSvg(model, style, view, options);
+    return { model, map: layout, image: { type: 'svg', svg } };
+  }
   // The canvas must have the size of the layout renderMap draws
   const size = mapPixelSize(model, pxPerCell, view);
   const { canvas, ctx } = canvasOf(size.width, size.height);
-  const map = renderMap(ctx, model, style, view, { pxPerCell, numbers: output.numbers, ...(output.transparent ? { transparent: true } : {}) });
+  const map = renderMap(ctx, model, style, view, options);
   const image: RenderedImage = output.bitmap
     ? { type: 'bitmap', bitmap: canvas.transferToImageBitmap() }
     : { type: 'png', blob: await canvas.convertToBlob({ type: 'image/png' }) };

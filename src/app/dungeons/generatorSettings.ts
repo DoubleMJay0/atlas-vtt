@@ -5,7 +5,7 @@ import { readTags, type DungeonTag } from './tags';
 
 /**
  * The GM's preferences for the dungeon generator, kept in Atlas' settings: how dungeons are drawn
- * and shown, and the tags asked for last. Never a dungeon itself: that lives in its scene's note.
+ * and shown, and the tags asked for last. Never a dungeon itself: that becomes a scene.
  */
 export interface DungeonGeneratorSettings {
   /** The preset the style started from; `custom` once a field was changed or a palette loaded. */

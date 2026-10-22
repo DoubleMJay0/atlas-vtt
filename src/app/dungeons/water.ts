@@ -1,6 +1,6 @@
 /**
- * Water: a noise field over the dungeon, cut at the water level, plus a pool in every room whose
- * note asks for one. The wet cells are traced into closed outlines, then roughened and smoothed
+ * Water: a noise field over the dungeon, cut at the water level, plus a pool in every room the
+ * plan marks for one. The wet cells are traced into closed outlines, then roughened and smoothed
  * into shorelines. The renderer clips them to the floors.
  */
 
@@ -19,7 +19,7 @@ export interface WaterResult {
 export interface WaterRequest {
   /** 0..1: the share of the noise range under water. */
   level: number;
-  /** Rooms whose note mentions a pool. */
+  /** Rooms the plan puts a pool in (`RoomMarks.water`). */
   pools: ReadonlySet<number>;
 }
 

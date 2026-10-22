@@ -8,7 +8,7 @@ import { addDoor, addRoom, colonnade, emptyModel, pool, scatter } from './dungeo
  */
 
 export function smallDungeon(): DungeonModel {
-  const m = emptyModel(4242, 'Sunken Vault of the Grey Abbot', 'Long after the abbot drowned, the vault was sealed and forgotten. Now a band of goblins has dug its way in, and they say his silver reliquary still lies somewhere below the water.');
+  const m = emptyModel(4242);
   const hall = addRoom(m, { x: -2, y: -5, w: 5, h: 5 });
   const rotunda = addRoom(m, { x: -2, y: -11, w: 5, h: 5, rotunda: true, colonnade: true, parent: 0 });
   const corridor = addRoom(m, { x: 4, y: -3, w: 4, h: 1, parent: 0, axis: { x: 1, y: 0 } });
@@ -54,13 +54,6 @@ export function smallDungeon(): DungeonModel {
   scatter(m, hall, 11, 4, 2);
   scatter(m, store, 12, 3, 1);
   scatter(m, throne, 13, 5, 2);
-  m.notes.push(
-    { ref: '1', room: hall.id, text: 'A dry fountain, its basin full of copper coins.' },
-    { ref: '2', room: store.id, text: 'Barrels of spoiled wine and two crates of lamp oil.' },
-    { ref: '3', room: pond.id, text: 'A flooded cistern. A rusty key lies at the bottom of the pool.' },
-    { ref: '4', room: secret.id, text: 'A hidden crypt: a locked chest beside the abbot\'s coffin.' },
-    { ref: '5', room: throne.id, text: 'The grey abbot sits on a throne of drowned stone, waiting.' },
-  );
   return m;
 }
 
@@ -68,9 +61,9 @@ const CONNECTORS: readonly DoorKind[] = ['door', 'door', 'door', 'doorway', 'ope
 const ROOM_PROPS: readonly PropKind[] = ['barrel', 'crate', 'chest', 'fountain', 'well', 'statue', 'sarcophagus', 'altar'];
 
 /** Rooms on a grid, joined by corridors along a random spanning tree and a few loops. */
-function gridDungeon(seed: number, cols: number, rows: number, title: string, story: string): DungeonModel {
+function gridDungeon(seed: number, cols: number, rows: number): DungeonModel {
   const rng = rngFrom(seed);
-  const m = emptyModel(seed, title, story);
+  const m = emptyModel(seed);
   const slot = 11;
   const grid: DungeonRoom[][] = [];
   for (let j = 0; j < rows; j++) {
@@ -150,7 +143,6 @@ function connect(m: DungeonModel, rng: Rng, linked: Set<string>, a: DungeonRoom,
 
 function furnish(m: DungeonModel, rng: Rng): void {
   const rooms = m.rooms.filter(r => r.kind === 'room');
-  let ref = 1;
   for (const room of rooms) {
     if (room.colonnade) m.columns.push(...colonnade(room, 1 / 8 + rng() / 8, rng() < 0.25));
     if (!room.colonnade && rng() < 0.45) {
@@ -159,30 +151,15 @@ function furnish(m: DungeonModel, rng: Rng): void {
     }
     if (rng() < 0.2) m.water.push(pool(rng, room.x + rng() * room.w, room.y + rng() * room.h, 1 + rng() * 2, 1 + rng() * 2));
     scatter(m, room, Math.floor(rng() * 1e6), Math.floor(rng() * 4), rng() < 0.4 ? 1 : 0);
-    if (rng() < 0.25) {
-      m.notes.push({ ref: String(ref), room: room.id, text: NOTE_TEXTS[(ref - 1) % NOTE_TEXTS.length]! });
-      ref++;
-    }
   }
 }
 
-const NOTE_TEXTS = [
-  'A rusted halberd and a handful of silver among the bones.',
-  'A goblin sentry, asleep against the wall.',
-  'Faded murals of a drowned city cover every wall.',
-  'A brass key hangs from a hook above the door.',
-  'Collapsed shelves; scrolls rot in the damp.',
-  'An altar stained dark, with a dagger of black glass on it.',
-  'Six empty cells. One still holds a skeleton in chains.',
-  'A pool of still water reflects a sky that is not there.',
-];
-
 export function mediumDungeon(): DungeonModel {
-  return gridDungeon(9001, 4, 3, 'Lower Halls of Varrow', 'The halls were cut by dwarves who never returned. Kobolds keep them now, and trade with whoever pays in iron.');
+  return gridDungeon(9001, 4, 3);
 }
 
 export function largeDungeon(): DungeonModel {
-  return gridDungeon(31337, 8, 5, 'The Endless Undercroft of Saint Merrow', 'Beneath the ruined abbey the crypts run on for miles. Pilgrims went down to pray and did not come back up; the bells still ring at night.');
+  return gridDungeon(31337, 8, 5);
 }
 
 export const DUNGEON_FIXTURES = { small: smallDungeon, medium: mediumDungeon, large: largeDungeon } as const;

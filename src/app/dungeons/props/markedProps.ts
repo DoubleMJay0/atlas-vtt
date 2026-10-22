@@ -1,6 +1,6 @@
 /**
- * Props a room is known for: those its note mentions, set in the aisle before the back wall, and
- * the culmination's dais with what stands on it.
+ * Props a room is known for: those its plan calls for (`roomMarks`), set in the aisle before the
+ * back wall, and the culmination's dais with what stands on it.
  */
 
 import type { DungeonDoor, DungeonProp, PropKind } from '../model';
@@ -24,8 +24,8 @@ function prop(frame: RoomFrame, kind: PropKind, u: number, v: number, scale = 1)
   return { kind, x: at.x, y: at.y, rotation: facingIn(frame), scale, room: frame.room.id };
 }
 
-/** The note's props: wells and fountains in the middle, a tapestry on the back wall, the rest in the aisle before it. */
-export function notedProps(frame: RoomFrame, doors: readonly DungeonDoor[], kinds: readonly PropKind[]): DungeonProp[] {
+/** A room's marked props: wells and fountains in the middle, a tapestry on the back wall, the rest in the aisle before it. */
+export function markedProps(frame: RoomFrame, doors: readonly DungeonDoor[], kinds: readonly PropKind[]): DungeonProp[] {
   const open = backWallOpen(frame, doors);
   const unique = [...new Set(kinds)];
   const out: DungeonProp[] = [];

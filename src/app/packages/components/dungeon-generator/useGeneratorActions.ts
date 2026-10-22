@@ -37,25 +37,24 @@ interface ActionOptions {
   client: DungeonWorkerClient;
   state: DungeonState;
   collectionId: string;
-  /** Width over height of the preview, which a saved page keeps. */
-  pageAspect: number;
   onCreated: (scene: CreatedDungeonScene) => void;
   onBusyChange?: ((busy: boolean) => void) | undefined;
 }
 
 /** Creating the scene and saving exports from what the panel shows. */
-export function useGeneratorActions({ app, client, state, collectionId, pageAspect, onCreated, onBusyChange }: ActionOptions): GeneratorActions {
+export function useGeneratorActions({ app, client, state, collectionId, onCreated, onBusyChange }: ActionOptions): GeneratorActions {
   const [creating, setCreating] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const latest = useRef({ state, collectionId, pageAspect, onCreated, onBusyChange });
-  latest.current = { state, collectionId, pageAspect, onCreated, onBusyChange };
+  const latest = useRef({ state, collectionId, onCreated, onBusyChange });
+  latest.current = { state, collectionId, onCreated, onBusyChange };
   const busy = useRef(false);
 
   const create = useCallback(async (): Promise<void> => {
-    if (busy.current) return;
-    busy.current = true;
     const now = latest.current;
     const { request, model, settings } = now.state;
+    const name = now.state.name.trim();
+    if (busy.current || !name) return;
+    busy.current = true;
     setCreating(true);
     setProblem(null);
     now.onBusyChange?.(true);
@@ -63,8 +62,9 @@ export function useGeneratorActions({ app, client, state, collectionId, pageAspe
       const assetService = AssetService.getInstance(app);
       await assetService.initialize();
       const result = await createDungeonScene(app, assetService, {
+        name,
         request,
-        // The dungeon as shown, edits and moved notes included; generated anew where none arrived yet.
+        // The dungeon as shown, hidden wings included; generated anew where none arrived yet.
         ...(model ? { model } : {}),
         style: settings.style,
         view: settings.view,
@@ -83,17 +83,16 @@ export function useGeneratorActions({ app, client, state, collectionId, pageAspe
   }, [app]);
 
   const exportAs = useCallback(async (kind: DungeonExportKind, map?: MapExportOptions): Promise<void> => {
-    const { state: now, collectionId: collection, pageAspect: aspect } = latest.current;
+    const { state: now, collectionId: collection } = latest.current;
     if (!now.model) return;
     try {
       const path = await saveDungeonExport({ app, render: (job) => client.render(job) }, kind, {
         request: now.request,
         model: now.model,
+        name: now.name,
         style: now.settings.style,
         view: now.settings.view,
         collectionId: collection,
-        pageAspect: aspect,
-        arrangement: now.arrangement,
         ...map,
       });
       showNotice(t('dungeon.export.saved', { name: path.slice(path.lastIndexOf('/') + 1), folder: parentPath(path) }));

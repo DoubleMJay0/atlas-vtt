@@ -1,6 +1,6 @@
 /**
  * The path part of the SVG drawing context (`SvgCanvas`): subpaths, lines, curves and arcs as
- * Canvas 2D builds them, written as SVG path data in page pixels through the current transform.
+ * Canvas 2D builds them, written as SVG path data in device pixels through the current transform.
  */
 
 export type Matrix = readonly [number, number, number, number, number, number];
@@ -121,7 +121,7 @@ export abstract class SvgPathBuilder {
     this.arc(cx, cy, r, from, to, (((to - from) % TAU) + TAU) % TAU > Math.PI);
   }
 
-  /** Uniform scale of the transform: what a line width becomes on the page. */
+  /** Uniform scale of the transform: what a line width becomes in the drawing. */
   protected get unit(): number {
     const [a, b, c, d] = this.matrix;
     return Math.sqrt(Math.abs(a * d - b * c));

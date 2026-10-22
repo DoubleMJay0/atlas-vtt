@@ -1,8 +1,8 @@
 /**
  * A drawing context that writes SVG: the part of Canvas 2D the dungeon renderer uses (paths,
- * arcs, fills and strokes, clipping, text, the inner shadow's blurred and multiplied fill),
- * recorded in device pixels and written out as SVG elements, so the page saved as SVG is the
- * page drawn on a canvas, line for line. Text is measured on a real canvas of the same fonts.
+ * arcs, fills and strokes, clipping, the inner shadow's blurred and multiplied fill), recorded in
+ * device pixels and written out as SVG elements, so the map saved as SVG is the map drawn on a
+ * canvas, line for line.
  */
 
 import { escapeXml, IDENTITY, multiply, num, SvgPathBuilder, type Matrix } from './svgPath';
@@ -15,9 +15,6 @@ interface State {
   lineCap: CanvasLineCap;
   lineDash: number[];
   lineDashOffset: number;
-  font: string;
-  textAlign: CanvasTextAlign;
-  textBaseline: CanvasTextBaseline;
   shadowColor: string;
   shadowBlur: number;
   shadowOffsetX: number;
@@ -37,9 +34,6 @@ export class SvgCanvas extends SvgPathBuilder {
     lineCap: 'butt',
     lineDash: [],
     lineDashOffset: 0,
-    font: '10px sans-serif',
-    textAlign: 'start',
-    textBaseline: 'alphabetic',
     shadowColor: 'rgba(0, 0, 0, 0)',
     shadowBlur: 0,
     shadowOffsetX: 0,
@@ -53,8 +47,7 @@ export class SvgCanvas extends SvgPathBuilder {
   private readonly body: string[] = [];
   private ids = 0;
 
-  /** `measure` sets the font of a real 2D context, which measures every text drawn. */
-  constructor(readonly width: number, readonly height: number, private readonly measure: CanvasText & CanvasTextDrawingStyles) {
+  constructor(readonly width: number, readonly height: number) {
     super();
   }
 
@@ -76,12 +69,6 @@ export class SvgCanvas extends SvgPathBuilder {
   set lineCap(value: CanvasLineCap) { this.state.lineCap = value; }
   get lineDashOffset(): number { return this.state.lineDashOffset; }
   set lineDashOffset(value: number) { this.state.lineDashOffset = value; }
-  get font(): string { return this.state.font; }
-  set font(value: string) { this.state.font = value; }
-  get textAlign(): CanvasTextAlign { return this.state.textAlign; }
-  set textAlign(value: CanvasTextAlign) { this.state.textAlign = value; }
-  get textBaseline(): CanvasTextBaseline { return this.state.textBaseline; }
-  set textBaseline(value: CanvasTextBaseline) { this.state.textBaseline = value; }
   get shadowColor(): string { return this.state.shadowColor; }
   set shadowColor(value: string) { this.state.shadowColor = value; }
   get shadowBlur(): number { return this.state.shadowBlur; }
@@ -156,26 +143,11 @@ export class SvgCanvas extends SvgPathBuilder {
     this.state.clip = id;
   }
 
-  measureText(text: string): TextMetrics {
-    this.measure.font = this.state.font;
-    this.measure.textAlign = this.state.textAlign;
-    this.measure.textBaseline = this.state.textBaseline;
-    return this.measure.measureText(text);
-  }
-
-  fillText(text: string, x: number, y: number): void {
-    this.text(text, x, y, `fill="${escapeXml(this.state.fillStyle)}"`);
-  }
-
-  strokeText(text: string, x: number, y: number): void {
-    this.text(text, x, y, `fill="none"${this.strokeAttributes()}`);
-  }
-
   // Output ---------------------------------------------------------------------------------------
 
-  /** The drawing as an SVG document; `styles` goes into its stylesheet (the fonts' faces). */
-  toSvg(styles = ''): string {
-    const defs = [styles ? `<style>${styles}</style>` : '', ...this.defs].join('');
+  /** The drawing as an SVG document. */
+  toSvg(): string {
+    const defs = this.defs.join('');
     return [
       `<svg xmlns="http://www.w3.org/2000/svg" width="${this.width}" height="${this.height}" viewBox="0 0 ${this.width} ${this.height}">`,
       defs ? `<defs>${defs}</defs>` : '',
@@ -199,23 +171,7 @@ export class SvgCanvas extends SvgPathBuilder {
     return out;
   }
 
-  /** Text at its alphabetic baseline and left edge, as the canvas would have placed it. */
-  private text(text: string, x: number, y: number, paint: string): void {
-    const metrics = this.measureText(text);
-    // How far below the asked baseline the alphabetic one lies, as the canvas measures it.
-    this.measure.textBaseline = 'alphabetic';
-    const baseline = this.measure.measureText(text).actualBoundingBoxAscent - metrics.actualBoundingBoxAscent;
-    const align = this.state.textAlign;
-    const shift = align === 'center' ? -metrics.width / 2 : align === 'right' || align === 'end' ? -metrics.width : 0;
-    const [a, b, c, d, e, f] = this.state.matrix;
-    const transform = `matrix(${[a, b, c, d, e, f].map(num).join(' ')})`;
-    const element = `<text transform="${transform}" x="${num(x + shift)}" y="${num(y + baseline)}" style="font: ${escapeXml(this.state.font)}; white-space: pre" ${paint}>${escapeXml(text)}</text>`;
-    // Clip and shadow are in page pixels: they go on a group around the turned text.
-    const extra = this.effects();
-    this.body.push(extra ? `<g${extra}>${element}</g>` : element);
-  }
-
-  /** One path in page pixels, with the clip, shadow and blending in force. */
+  /** One path in device pixels, with the clip, shadow and blending in force. */
   private emit(attributes: string): void {
     this.body.push(`<path ${attributes}${this.effects()}/>`);
   }
@@ -230,7 +186,7 @@ export class SvgCanvas extends SvgPathBuilder {
     return extra;
   }
 
-  /** The canvas shadow as a filter, in page pixels as the canvas takes them; null when there is none. */
+  /** The canvas shadow as a filter, in device pixels as the canvas takes them; null when there is none. */
   private shadowFilter(): string | null {
     const { shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY } = this.state;
     if (!shadowBlur && !shadowOffsetX && !shadowOffsetY) return null;

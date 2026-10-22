@@ -20,7 +20,7 @@ export function placeBackdoor(rng: Rng, layout: WorkLayout, params: DungeonParam
     }
     const { cell, out } = pick(rng, cells);
     layout.doors.push({ x: cell.x, y: cell.y, dir: dir(-out.x, -out.y), kind: 'entrance', from: null, to: room.id, loop: false });
-    addFeature(features, room.id, { kind: 'backdoor', side: out });
+    addFeature(features, room.id, { kind: 'backdoor' });
     return;
   }
 }

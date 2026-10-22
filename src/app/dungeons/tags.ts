@@ -1,5 +1,5 @@
 /**
- * The tags a GM can ask a dungeon for. Ids are stored (note frontmatter, exports) and never
+ * The tags a GM can ask a dungeon for. Ids are stored (settings, exports) and never
  * translated or renamed; what each does is shown through `t('dungeon.tag.<i18nKey>')`.
  */
 

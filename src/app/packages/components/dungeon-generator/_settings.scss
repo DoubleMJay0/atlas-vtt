@@ -182,26 +182,3 @@
     flex: 1;
   }
 }
-
-.atlas-dungeon-font {
-  @include atlas-flex-row($gap: $spacing-xs);
-
-  > .atlas-select {
-    flex: 1;
-    min-width: 0;
-  }
-
-  > .atlas-dungeon-field__number {
-    width: 56px;
-  }
-}
-
-.atlas-dungeon-font__flag {
-  @include atlas-icon-button('s');
-  flex-shrink: 0;
-
-  &.atlas-active {
-    background: var(--background-modifier-active-hover);
-    color: var(--text-normal);
-  }
-}

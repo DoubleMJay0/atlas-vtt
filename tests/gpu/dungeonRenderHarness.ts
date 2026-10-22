@@ -1,17 +1,25 @@
 import { commands } from 'vitest/browser';
-import germaniaUrl from '../../src/app/assets/fonts/germania-one.ttf?url';
-import pathwayUrl from '../../src/app/assets/fonts/pathway-gothic-one.ttf?url';
-import { DUNGEON_FONT_FAMILIES, installDungeonFonts } from '../../src/app/dungeons/render/fonts';
 
 /** Where rendered pictures go, under the project root (the browser may write nowhere else). */
 export const RENDER_OUT = 'out/dungeon-render';
 
-/** Loads the bundled faces as a worker would: from their sources into a font set. */
-export async function loadDungeonFonts(): Promise<void> {
-  await installDungeonFonts(document.fonts, [
-    { family: DUNGEON_FONT_FAMILIES.title, source: `url("${germaniaUrl}")` },
-    { family: DUNGEON_FONT_FAMILIES.text, source: `url("${pathwayUrl}")` },
-  ]);
+/**
+ * `ctx` with every text call recorded instead of drawn, so a test can hold that a map carries no
+ * text at all.
+ */
+export function withoutText<T extends object>(ctx: T): { ctx: T; texts: string[] } {
+  const texts: string[] = [];
+  const proxy = new Proxy(ctx, {
+    get(target, key) {
+      if (key === 'fillText' || key === 'strokeText') return (text: unknown) => { texts.push(String(text)); };
+      const value: unknown = Reflect.get(target, key, target);
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+    },
+    set(target, key, value) {
+      return Reflect.set(target, key, value, target);
+    },
+  });
+  return { ctx: proxy, texts };
 }
 
 export async function savePng(canvas: OffscreenCanvas, name: string): Promise<void> {

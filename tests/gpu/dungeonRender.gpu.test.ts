@@ -1,27 +1,18 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
-import { renderPage } from '../../src/app/dungeons/render/renderPage';
 import { parseHex } from '../../src/app/dungeons/render/palette';
-import {
-  DEFAULT_VIEW,
-  STYLE_PRESETS,
-  type DungeonView,
-  type GridStyle,
-  type NotesMode,
-  type StylePresetId,
-} from '../../src/app/dungeons/style';
+import { DEFAULT_VIEW, STYLE_PRESETS, type DungeonView, type GridStyle, type StylePresetId } from '../../src/app/dungeons/style';
 import { DUNGEON_FIXTURES } from '../fixtures/dungeonModels';
-import { loadDungeonFonts, pixelStats, savePng } from './dungeonRenderHarness';
+import { pixelStats, savePng, withoutText } from './dungeonRenderHarness';
 
 /**
- * Renders the fixtures in every preset, notes mode and grid style, checks the pictures are
- * sane and in time, and writes them as PNGs to `out/dungeon-render/` for a person to look at.
+ * Renders the fixtures in every preset, grid style and view, checks the pictures are sane, in
+ * time and free of text, and writes them as PNGs to `out/dungeon-render/` for a person to look at.
  */
 
 const PRESETS = Object.keys(STYLE_PRESETS) as StylePresetId[];
-const NOTES: NotesMode[] = ['off', 'boxes', 'tailed', 'legend', 'symbols', 'numbers'];
 const GRIDS: GridStyle[] = ['off', 'dotted', 'dashed', 'solid', 'broken'];
 const FIXTURES = Object.keys(DUNGEON_FIXTURES) as (keyof typeof DUNGEON_FIXTURES)[];
 
@@ -32,24 +23,13 @@ function drawMap(model: DungeonModel, preset: StylePresetId, view: DungeonView, 
   const layout = mapLayout(model, pxPerCell, view);
   const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
   const started = performance.now();
-  const ctx = canvas.getContext('2d')!;
-  renderMap(ctx, model, STYLE_PRESETS[preset], view, { pxPerCell, numbers: true });
+  const real = canvas.getContext('2d')!;
+  const { ctx, texts } = withoutText(real);
+  renderMap(ctx, model, STYLE_PRESETS[preset], view, { pxPerCell });
+  expect(texts).toEqual([]);
   // Reading a pixel waits for the drawing to reach the canvas, so the time is the whole render.
-  ctx.getImageData(0, 0, 1, 1);
+  real.getImageData(0, 0, 1, 1);
   return { canvas, ms: performance.now() - started };
-}
-
-function drawPage(model: DungeonModel, preset: StylePresetId, view: DungeonView): OffscreenCanvas {
-  const canvas = new OffscreenCanvas(1400, 1000);
-  const layout = renderPage(canvas.getContext('2d')!, model, STYLE_PRESETS[preset], view, { width: 1400, height: 1000 });
-  for (const note of layout.notes) {
-    expect(note.rect.x).toBeGreaterThanOrEqual(-1);
-    expect(note.rect.y).toBeGreaterThanOrEqual(-1);
-    expect(note.rect.x + note.rect.w).toBeLessThanOrEqual(1401);
-    expect(note.rect.y + note.rect.h).toBeLessThanOrEqual(1001);
-  }
-  expect(layout.rooms.length).toBeGreaterThan(0);
-  return canvas;
 }
 
 function expectSane(canvas: OffscreenCanvas, preset: StylePresetId): void {
@@ -61,8 +41,6 @@ function expectSane(canvas: OffscreenCanvas, preset: StylePresetId): void {
 }
 
 describe('dungeon renderer', () => {
-  beforeAll(loadDungeonFonts);
-
   for (const fixture of FIXTURES) {
     for (const preset of PRESETS) {
       it(`draws the ${fixture} map in ${preset}`, async () => {
@@ -71,22 +49,6 @@ describe('dungeon renderer', () => {
         expectSane(canvas, preset);
         if (fixture === 'large') expect(ms).toBeLessThan(MAP_BUDGET_MS);
         await savePng(canvas, `map-${fixture}-${preset}`);
-      });
-
-      it(`lays out the ${fixture} page in ${preset}`, async () => {
-        const canvas = drawPage(DUNGEON_FIXTURES[fixture](), preset, DEFAULT_VIEW);
-        expectSane(canvas, preset);
-        await savePng(canvas, `page-${fixture}-${preset}`);
-      });
-    }
-  }
-
-  for (const notes of NOTES) {
-    for (const fixture of ['small', 'medium'] as const) {
-      it(`shows notes as ${notes} on the ${fixture} page`, async () => {
-        const canvas = drawPage(DUNGEON_FIXTURES[fixture](), 'parchment', { ...DEFAULT_VIEW, notes });
-        expectSane(canvas, 'parchment');
-        await savePng(canvas, `notes-${fixture}-${notes}`);
       });
     }
   }
@@ -104,12 +66,11 @@ describe('dungeon renderer', () => {
   const variants: [string, Partial<DungeonView>][] = [
     ['monochrome', { monochrome: true }],
     ['no-secrets', { secrets: false }],
-    ['no-rotation', { rotateToFit: false }],
-    ['bare', { water: false, props: false, shadow: false, exits: false, titleAndStory: false }],
+    ['bare', { water: false, props: false, shadow: false, exits: false }],
   ];
   for (const [name, change] of variants) {
-    it(`draws the ${name} page`, async () => {
-      const canvas = drawPage(DUNGEON_FIXTURES.small(), 'parchment', { ...DEFAULT_VIEW, ...change });
+    it(`draws the ${name} map`, async () => {
+      const { canvas } = drawMap(DUNGEON_FIXTURES.small(), 'parchment', { ...DEFAULT_VIEW, ...change }, 60);
       expectSane(canvas, 'parchment');
       await savePng(canvas, `view-${name}`);
     });
@@ -119,7 +80,7 @@ describe('dungeon renderer', () => {
     const model = DUNGEON_FIXTURES.small();
     const layout = mapLayout(model, 40);
     const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
-    renderMap(canvas.getContext('2d')!, model, STYLE_PRESETS.parchment, DEFAULT_VIEW, { pxPerCell: 40, numbers: false, transparent: true });
+    renderMap(canvas.getContext('2d')!, model, STYLE_PRESETS.parchment, DEFAULT_VIEW, { pxPerCell: 40, transparent: true });
     const corner = canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data;
     expect(corner[3]).toBe(0);
   });

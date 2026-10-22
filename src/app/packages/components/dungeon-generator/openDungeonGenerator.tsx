@@ -8,7 +8,7 @@ import { DungeonGeneratorPanel } from './DungeonGeneratorPanel';
 import type { CreatedDungeonScene } from './useGeneratorActions';
 
 export interface OpenDungeonGeneratorOptions {
-  /** The name typed where the generator was opened from; the generator names the dungeon without one. */
+  /** The name typed where the generator was opened from: the scene's name to begin with. */
   name?: string;
   /** The collection the scene goes to. */
   collectionId: string;

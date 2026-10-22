@@ -8,7 +8,6 @@ import type { ProcessedImage } from '../../../src/app/imageProcessing/imageProce
 import { prebuildMapImageAt } from '../../../src/app/pixi/mapImage/prebuildMapImage';
 import { AssetService, type Asset } from '../../../src/app/services/AssetService';
 import { AssetThumbnailService } from '../../../src/app/services/AssetThumbnailService';
-import type { NotePin } from '../../../src/app/types';
 import type { WallSegment } from '../../../src/app/types/wallTypes';
 import { smallDungeon } from '../../fixtures/dungeonModels';
 import { pngHeader } from '../../fixtures/uvttFiles';
@@ -59,6 +58,7 @@ async function bench(): Promise<Bench> {
 }
 
 const options = (model: DungeonModel = smallDungeon()): Parameters<typeof createDungeonSceneWith>[1] => ({
+  name: TITLE,
   request: { seed: model.seed, tags: model.tags },
   model,
   style: STYLE,
@@ -74,7 +74,7 @@ function created(result: DungeonSceneResult): Extract<DungeonSceneResult, { ok: 
 interface SceneState {
   background: string;
   grid: { size: number; offsetX: number; offsetY: number; autoDetect?: unknown };
-  objects: { walls: Record<string, WallSegment>; lights: Record<string, unknown>; pins: Record<string, NotePin> };
+  objects: { walls: Record<string, WallSegment>; lights: Record<string, unknown>; pins?: Record<string, unknown> };
   lighting: unknown;
 }
 
@@ -89,13 +89,13 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); AssetService.resetInstance(); });
 
 describe('creating a dungeon scene', () => {
-  it('adds a map, a scene with grid, walls, doors, lighting and room pins, and the room key beside it', async () => {
+  it('adds a map and a scene of the GM\'s name with grid, walls, doors and lighting, and nothing else', async () => {
     const b = await bench();
 
     const result = created(await createDungeonSceneWith(b.deps, options()));
 
-    expect(result).toEqual({ ok: true, name: TITLE, scenePath: `${SCENES}/${TITLE}.atlasmap`, notePath: `${SCENES}/${TITLE}.md` });
-    expect(b.jobs[0]!.output).toEqual({ kind: 'map', pxPerCell: 100, numbers: true });
+    expect(result).toEqual({ ok: true, name: TITLE, scenePath: `${SCENES}/${TITLE}.atlasmap` });
+    expect(b.jobs[0]!.output).toEqual({ kind: 'map', pxPerCell: 100 });
     const records = await recordsOf(b);
     expect(records.map(r => r.type).sort()).toEqual(['map', 'scene']);
     const map = records.find(r => r.type === 'map');
@@ -111,33 +111,17 @@ describe('creating a dungeon scene', () => {
     const walls = Object.values(state.objects.walls);
     expect(walls.filter(w => w.type === 'door')).toHaveLength(4);
     expect(walls.filter(w => w.type === 'secret-door')).toHaveLength(1);
-
-    const pins = Object.values(state.objects.pins);
-    expect(pins.map(p => p.notePath).sort()).toEqual(['1', '2', '3', '4', '5'].map(ref => `${result.notePath}#${ref}`));
-    expect(pins.every(p => p.icon === 'number' && p.gmOnly === true && p.notePath.endsWith(`#${p.label}`))).toBe(true);
-
-    const note = b.vault.files.get(result.notePath)!;
-    expect(note).toContain(`# ${TITLE}`);
-    for (const ref of ['1', '2', '3', '4', '5']) expect(note).toContain(`\n## ${ref}\n`);
+    expect(Object.keys(state.objects.pins ?? {})).toEqual([]);
+    expect(filesOf(b).filter(path => path.endsWith('.md'))).toEqual([]);
   });
 
-  it('numbers a second dungeon of the same title, scene and note alike', async () => {
+  it('numbers a second dungeon of the same name', async () => {
     const b = await bench();
     await createDungeonSceneWith(b.deps, options());
 
     const second = created(await createDungeonSceneWith(b.deps, options()));
 
-    expect(second).toMatchObject({ name: `${TITLE} 2`, notePath: `${SCENES}/${TITLE} 2.md` });
-  });
-
-  it('never writes over a note that is already there', async () => {
-    const b = await bench();
-    await b.vault.app.vault.create(`${SCENES}/${TITLE}.md`, 'Mine');
-
-    const result = created(await createDungeonSceneWith(b.deps, options()));
-
-    expect(b.vault.files.get(`${SCENES}/${TITLE}.md`)).toBe('Mine');
-    expect(result.notePath).toBe(`${SCENES}/${TITLE} 2.md`);
+    expect(second).toMatchObject({ name: `${TITLE} 2`, scenePath: `${SCENES}/${TITLE} 2.atlasmap` });
   });
 
   it('fits grid and walls to an image the workers scaled down', async () => {
@@ -153,17 +137,13 @@ describe('creating a dungeon scene', () => {
 
     const state = sceneState(b, result.scenePath);
     expect(state.grid.size).toBe(50);
-    const pin = Object.values(state.objects.pins).find(p => p.label === '1')!;
-    const hall = smallDungeon().rooms[0]!;
-    const { originCell } = mapLayout(smallDungeon(), 100, DEFAULT_VIEW);
-    expect(pin.x).toBe((hall.x + hall.w / 2 - originCell.x) * 50);
   });
 
-  it('leaves no file and no record when the note cannot be written', async () => {
+  it('leaves no file and no record when the scene cannot be written', async () => {
     const b = await bench();
     const before = filesOf(b);
     const restore = interceptWrites(b.vault.app.vault, 'create', (path) => {
-      if (path.endsWith('.md')) throw new Error('EIO: i/o error');
+      if (path.endsWith('.atlasmap')) throw new Error('EIO: i/o error');
     });
 
     const result = await createDungeonSceneWith(b.deps, options());

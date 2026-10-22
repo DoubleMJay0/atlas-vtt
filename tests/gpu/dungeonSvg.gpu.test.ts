@@ -1,38 +1,24 @@
-import { beforeAll, describe, expect, it } from 'vitest';
-import germaniaUrl from '../../src/app/assets/fonts/germania-one.ttf?url';
-import pathwayUrl from '../../src/app/assets/fonts/pathway-gothic-one.ttf?url';
+import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../src/app/dungeons/generate';
-import { DUNGEON_FONT_FAMILIES, type DungeonFontSource } from '../../src/app/dungeons/render/fonts';
-import { renderPage } from '../../src/app/dungeons/render/renderPage';
-import { renderPageSvg } from '../../src/app/dungeons/render/svgPage';
+import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
+import { renderMap, renderMapSvg } from '../../src/app/dungeons/render/renderMap';
 import { DEFAULT_VIEW, STYLE_PRESETS, type StylePresetId } from '../../src/app/dungeons/style';
-import { dungeonText } from '../../src/app/dungeons/text/dungeonText';
-import { loadDungeonFonts, savePng } from './dungeonRenderHarness';
+import { savePng } from './dungeonRenderHarness';
 
 /**
- * The page saved as SVG against the page drawn on a canvas: the SVG, shown by the browser with
- * the faces it embeds, must be the same picture but for the edges antialiasing draws apart.
+ * The map saved as SVG against the map drawn on a canvas: the SVG, shown by the browser, must be
+ * the same picture but for the edges antialiasing draws apart, and hold no text.
  */
 
-const SIZE = { width: 1400, height: 1000 };
+const PX_PER_CELL = 30;
 
-/** A face as the plugin's stylesheet holds it: its file inlined as a data URL. */
-async function inlined(family: string, url: string): Promise<DungeonFontSource> {
-  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { family, source: `url("data:font/ttf;base64,${btoa(binary)}")` };
-}
-
-let SOURCES: DungeonFontSource[] = [];
-
-async function rasterise(svg: string): Promise<OffscreenCanvas> {
+async function rasterise(svg: string, size: { width: number; height: number }): Promise<OffscreenCanvas> {
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   try {
     const image = new Image();
     image.src = url;
     await image.decode();
-    const canvas = new OffscreenCanvas(SIZE.width, SIZE.height);
+    const canvas = new OffscreenCanvas(size.width, size.height);
     canvas.getContext('2d')!.drawImage(image, 0, 0);
     return canvas;
   } finally {
@@ -42,10 +28,11 @@ async function rasterise(svg: string): Promise<OffscreenCanvas> {
 
 /** The share of pixels whose colours differ by more than a faint edge would, and a picture of where. */
 function difference(a: OffscreenCanvas, b: OffscreenCanvas): { share: number; picture: OffscreenCanvas } {
-  const da = a.getContext('2d')!.getImageData(0, 0, SIZE.width, SIZE.height).data;
-  const db = b.getContext('2d')!.getImageData(0, 0, SIZE.width, SIZE.height).data;
-  const picture = new OffscreenCanvas(SIZE.width, SIZE.height);
-  const out = picture.getContext('2d')!.createImageData(SIZE.width, SIZE.height);
+  const size = { width: a.width, height: a.height };
+  const da = a.getContext('2d')!.getImageData(0, 0, size.width, size.height).data;
+  const db = b.getContext('2d')!.getImageData(0, 0, size.width, size.height).data;
+  const picture = new OffscreenCanvas(size.width, size.height);
+  const out = picture.getContext('2d')!.createImageData(size.width, size.height);
   let differ = 0;
   for (let i = 0; i < da.length; i += 4) {
     const d = Math.abs(da[i]! - db[i]!) + Math.abs(da[i + 1]! - db[i + 1]!) + Math.abs(da[i + 2]! - db[i + 2]!);
@@ -68,25 +55,19 @@ const CASES: readonly { name: string; seed: number; tags: string[]; preset: Styl
   { name: 'crumbling', seed: 202, tags: ['crumbling', 'dangerous'], preset: 'stipple' },
 ];
 
-describe('the page as SVG', () => {
-  beforeAll(async () => {
-    await loadDungeonFonts();
-    SOURCES = await Promise.all([inlined(DUNGEON_FONT_FAMILIES.title, germaniaUrl), inlined(DUNGEON_FONT_FAMILIES.text, pathwayUrl)]);
-  });
-
+describe('the map as SVG', () => {
   for (const { name, seed, tags, preset } of CASES) {
-    it(`draws the ${name} page in ${preset} as the canvas does`, async () => {
-      const model = generateDungeon({ seed, tags }, dungeonText);
+    it(`draws the ${name} map in ${preset} as the canvas does`, async () => {
+      const model = generateDungeon({ seed, tags });
       const style = STYLE_PRESETS[preset];
-      const canvas = new OffscreenCanvas(SIZE.width, SIZE.height);
-      const drawn = renderPage(canvas.getContext('2d')!, model, style, DEFAULT_VIEW, SIZE);
-      const { svg, page } = renderPageSvg(model, style, DEFAULT_VIEW, SIZE, SOURCES);
+      const size = mapLayout(model, PX_PER_CELL, DEFAULT_VIEW);
+      const canvas = new OffscreenCanvas(size.widthPx, size.heightPx);
+      const drawn = renderMap(canvas.getContext('2d')!, model, style, DEFAULT_VIEW, { pxPerCell: PX_PER_CELL });
+      const { svg, layout } = renderMapSvg(model, style, DEFAULT_VIEW, { pxPerCell: PX_PER_CELL });
 
-      expect(page).toEqual(drawn);
-      const bundled = Object.values(style.fonts).some((font) => font.face === 'title' || font.face === 'text');
-      expect(svg.includes('@font-face')).toBe(bundled);
-      expect(svg).not.toMatch(/NaN|undefined|Infinity/);
-      const { share, picture } = difference(canvas, await rasterise(svg));
+      expect(layout).toEqual(drawn);
+      expect(svg).not.toMatch(/NaN|undefined|Infinity|<text|@font-face/);
+      const { share, picture } = difference(canvas, await rasterise(svg, { width: size.widthPx, height: size.heightPx }));
       await savePng(picture, `svg-diff-${name}-${preset}`);
       expect(share).toBeLessThan(0.01);
     });

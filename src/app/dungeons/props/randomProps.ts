@@ -1,5 +1,5 @@
 /**
- * Life for rooms nobody wrote about: now and then a fountain or a well, crates or barrels in a
+ * Life for rooms the plan leaves empty: now and then a fountain or a well, crates or barrels in a
  * corner, a tapestry on the back wall.
  */
 

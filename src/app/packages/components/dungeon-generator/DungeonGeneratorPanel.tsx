@@ -5,11 +5,11 @@ import { DungeonWorkerClient } from '../../../dungeons/worker/DungeonWorkerClien
 import { ContextMenuProvider } from '../../../react/root/ContextMenuContext';
 import { GeneratorFooter } from './GeneratorFooter';
 import { GeneratorSettings } from './GeneratorSettings';
-import { PagePreview } from './PagePreview';
+import { MapPreview } from './MapPreview';
 import { usePreviewSize } from './PreviewCanvas';
 import { useDungeonState } from './useDungeonState';
 import { useGeneratorActions, type CreatedDungeonScene } from './useGeneratorActions';
-import { usePagePreview } from './usePagePreview';
+import { useMapPreview } from './useMapPreview';
 import './dungeon-generator-menus.scss';
 
 export interface DungeonGeneratorPanelProps {
@@ -18,7 +18,7 @@ export interface DungeonGeneratorPanelProps {
   /** Offered where the GM may choose the collection the scene goes to. */
   collections?: CollectionMetadata[] | undefined;
   onCollectionChange?: ((id: string) => void) | undefined;
-  /** The name typed where the generator was opened from. */
+  /** The name typed where the generator was opened from: the scene's name to begin with. */
   initialName?: string | undefined;
   onCreated: (scene: CreatedDungeonScene) => void;
   /** A scene is being created: the dialog holding the panel stays open until it is done. */
@@ -29,7 +29,7 @@ export interface DungeonGeneratorPanelProps {
 const MENU_OWNER = 'atlas-dungeon-generator';
 
 /**
- * The dungeon generator: a live page preview on the left, drawn off the main thread, and the
+ * The dungeon generator: a live map preview on the left, drawn off the main thread, and the
  * settings beside it; below, Export and Create scene. The same panel serves the map creator's
  * Generate mode and the generator opened on its own (`openDungeonGenerator`).
  */
@@ -48,13 +48,12 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const size = usePreviewSize(frame);
   const { settings } = state;
-  const preview = usePagePreview(client, {
+  const preview = useMapPreview(client, {
     request: state.request,
     generated: state.generated,
     model: state.model,
     style: settings.style,
     view: settings.view,
-    arrangement: state.arrangement,
     size,
   }, state.setGenerated);
 
@@ -63,7 +62,6 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
     client,
     state,
     collectionId,
-    pageAspect: size ? size.width / size.height : 1.4,
     onCreated,
     onBusyChange,
   });
@@ -71,13 +69,10 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
   return (
     <div ref={setRoot} className="atlas-dungeon-generator" tabIndex={-1} inert={actions.creating}>
       <div className="atlas-dungeon-generator__preview">
-        <PagePreview
+        <MapPreview
           preview={preview}
-          notesMode={settings.view.notes}
+          view={settings.view}
           onFrame={setFrame}
-          onTitle={state.editTitle}
-          onStory={state.editStory}
-          onNote={state.editNote}
           onHideWing={state.hideWing}
           onShowHiddenWings={state.edits.hiddenWings?.length ? state.showHiddenWings : undefined}
         />
@@ -88,7 +83,7 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
         collection={collections && onCollectionChange ? { id: collectionId, options: collections, onChange: onCollectionChange } : undefined}
         onSavePalette={() => { void actions.exportAs('palette'); }}
       />
-      <GeneratorFooter actions={actions} ready={state.model !== null} />
+      <GeneratorFooter actions={actions} ready={state.model !== null} named={state.name.trim() !== ''} />
     </div>
   );
 }

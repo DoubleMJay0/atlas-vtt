@@ -4,7 +4,6 @@ import type { DoorKind, DungeonDoor, DungeonModel } from '../../../src/app/dunge
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { dungeonWalls, wallInkWidth, type DungeonPlacement } from '../../../src/app/dungeons/scene/toWalls';
 import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
-import { dungeonText } from '../../../src/app/dungeons/text/dungeonText';
 import type { WallSegment } from '../../../src/app/types/wallTypes';
 import { smallDungeon } from '../../fixtures/dungeonModels';
 import { duplicateWalls, escapingRays, farReach, looseEnds, overlappingWalls, toWorld, wallsCrossed } from './wallChecks';
@@ -98,7 +97,7 @@ describe('dungeon walls', () => {
   it('seals generated dungeons of every shape', () => {
     const combos: string[][] = [[], ['round', 'secret', 'multi-level'], ['chaotic', 'winding', 'large'], ['ordered', 'temple', 'colonnades', 'backdoor']];
     for (let seed = 1; seed <= 24; seed++) {
-      const model = generateDungeon({ seed, tags: combos[seed % combos.length]! }, dungeonText);
+      const model = generateDungeon({ seed, tags: combos[seed % combos.length]! });
       checkSealed(model);
       const { doors, unplaced } = dungeonWalls(model, STYLE, DEFAULT_VIEW, placementOf(model));
       const closing = model.doors.filter(d => !OPENINGS.includes(d.kind)).length;

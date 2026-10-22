@@ -1,4 +1,4 @@
-import { normalizePath, type App } from 'obsidian';
+import type { App } from 'obsidian';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import { IMAGE_PRESETS, optimizeImage, type ProcessedImage } from '../../imageProcessing/imageProcessing';
 import { writeMapScene, type MapSceneDeps } from '../../import/writeMapScene';
@@ -11,7 +11,6 @@ import { DEFAULT_PX_PER_CELL, type MapLayout } from '../render/layoutSize';
 import type { DungeonStyle, DungeonView } from '../style';
 import { DungeonWorkerClient } from '../worker/DungeonWorkerClient';
 import type { DungeonJob, DungeonRendered } from '../worker/dungeonJob';
-import { dungeonNoteText, dungeonPins } from './dungeonNote';
 import { dungeonScene } from './toScene';
 import type { DungeonPlacement } from './toWalls';
 
@@ -23,36 +22,28 @@ export interface DungeonSceneDeps extends MapSceneDeps {
 }
 
 export interface DungeonSceneOptions {
+  /** What the scene and its map are called: the name the GM gave the dungeon. */
+  name: string;
   request: DungeonRequest;
-  /** The dungeon as the GM last saw it (edited or moved notes); unset generates it from `request`. */
+  /** The dungeon as the GM last saw it (wings hidden); unset generates it from `request`. */
   model?: DungeonModel;
   style: DungeonStyle;
   view: DungeonView;
   collectionId: string;
   /** Pixels per cell of the map image; less where the image would pass a map's limits. */
   pxPerCell?: number;
-  /** Room numbers on the map image; on unless set false. */
-  numbers?: boolean;
 }
 
-export type DungeonSceneResult = { ok: true; name: string; scenePath: string; notePath: string } | { ok: false; problem: string };
+export type DungeonSceneResult = { ok: true; name: string; scenePath: string } | { ok: false; problem: string };
 
 const refused = (problem: string): DungeonSceneResult => ({ ok: false, problem });
 
 const INVALID_CHARACTERS = new RegExp(INVALID_NAME_CHARACTERS.source, 'g');
 
-/** A dungeon's title as a vault file may be called. */
-export function dungeonSceneName(title: string): string {
-  const name = title.replace(INVALID_CHARACTERS, ' ').replace(/\s+/g, ' ').replace(/^[.\s]+/, '').trim();
+/** A dungeon's name as a vault file may be called. */
+export function dungeonSceneName(given: string): string {
+  const name = given.replace(INVALID_CHARACTERS, ' ').replace(/\s+/g, ' ').replace(/^[.\s]+/, '').trim();
   return name || 'Dungeon';
-}
-
-/** The first of `name.md`, `name 2.md`… that is no file in `folder` yet. */
-async function freeNotePath(app: App, folder: string, name: string): Promise<string> {
-  for (let number = 1; ; number++) {
-    const path = normalizePath(`${folder}/${number === 1 ? name : `${name} ${number}`}.md`);
-    if (!(await app.vault.adapter.exists(path))) return path;
-  }
 }
 
 /** Where the saved image lies on the grid: the layout's cells, at the pixels per cell of the image as it was saved. */
@@ -71,10 +62,10 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
     ...(options.model && { model: options.model }),
     style,
     view,
-    output: { kind: 'map', pxPerCell: options.pxPerCell ?? DEFAULT_PX_PER_CELL, numbers: options.numbers ?? true },
+    output: { kind: 'map', pxPerCell: options.pxPerCell ?? DEFAULT_PX_PER_CELL },
   });
   const { model, map: layout, image: drawn } = rendered;
-  if (!layout || drawn.type !== 'png') return refused(t('dungeon.problem.notDrawn'));
+  if (drawn.type !== 'png') return refused(t('dungeon.problem.notDrawn'));
 
   const image = await deps.convertImage(drawn.blob);
   // A map within the limits is kept as drawn; one the workers scaled down has smaller cells
@@ -82,32 +73,26 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
   const placement = placementOn(layout, saved);
   const parts = dungeonScene(model, style, view, placement, saved);
   if (!parts) return refused(t('dungeon.problem.crowdedWalls'));
-  if (parts.unplaced > 0) console.debug(`[Atlas] ${model.title}: ${parts.unplaced} doors had no walls beside them and were left open`);
+  if (parts.unplaced > 0) console.debug(`[Atlas] ${options.name}: ${parts.unplaced} doors had no walls beside them and were left open`);
 
-  let notePath = '';
   const written = await writeMapScene(deps, {
-    baseName: dungeonSceneName(model.title),
+    baseName: dungeonSceneName(options.name),
     collection,
     image,
     scene: parts.scene,
-    finish: async ({ name, scenePath, content }) => {
-      notePath = await freeNotePath(deps.app, scenePath.slice(0, scenePath.lastIndexOf('/')), name);
-      content.state.objects = { ...content.state.objects, pins: dungeonPins(model, view, placement, notePath) };
-      return [{ path: notePath, content: dungeonNoteText(model, view) }];
-    },
   });
   if (!written.ok) {
     console.error('[Atlas] Saving a dungeon scene failed:', written.problem);
     return refused(t('dungeon.createFailed'));
   }
-  return { ok: true, name: written.name, scenePath: written.scenePath, notePath };
+  return { ok: true, name: written.name, scenePath: written.scenePath };
 }
 
 /**
- * Turns a dungeon into a scene of a collection: the floor plan as the map image, a grid that fits
- * it by construction, its walls and doors, dynamic lighting in daylight, a pin on every numbered
- * room, and a note beside the scene with the title, the story and the room key. All of it is
- * written together or not at all. Never throws: what went wrong comes back as a problem.
+ * Turns a dungeon into a scene of a collection, named as the GM named it: the floor plan as the
+ * map image, a grid that fits it by construction, its walls and doors and dynamic lighting in
+ * daylight. All of it is written together or not at all. Never throws: what went wrong comes back
+ * as a problem.
  */
 export async function createDungeonSceneWith(deps: DungeonSceneDeps, options: DungeonSceneOptions): Promise<DungeonSceneResult> {
   try {

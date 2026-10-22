@@ -6,10 +6,8 @@ import {
   STYLE_PRESETS,
   type DungeonStyle,
   type DungeonView,
-  type FontStyle,
   type GridStyle,
   type HatchingMode,
-  type NotesMode,
 } from './style';
 
 /**
@@ -22,9 +20,7 @@ import {
 type Limit = readonly [number, number];
 
 const HATCHING_MODES: readonly HatchingMode[] = ['hatching', 'stonework', 'bricks', 'dots', 'none'];
-const FONT_FACES: readonly FontStyle['face'][] = ['title', 'text', 'sans', 'serif'];
 export const GRID_STYLES: readonly GridStyle[] = ['off', 'dotted', 'dashed', 'solid', 'broken'];
-export const NOTES_MODES: readonly NotesMode[] = ['off', 'boxes', 'tailed', 'legend', 'symbols', 'numbers'];
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
 function clampTo([min, max]: Limit, value: number): number {
@@ -53,16 +49,6 @@ function field(record: Record<string, unknown>, key: string): Record<string, unk
   return isRecord(value) ? value : {};
 }
 
-function font(value: unknown, base: FontStyle): FontStyle {
-  const record = isRecord(value) ? value : {};
-  return {
-    face: oneOf(record.face, FONT_FACES, base.face),
-    size: number(record.size, base.size, STYLE_LIMITS.fontSize),
-    bold: flag(record.bold, base.bold),
-    italic: flag(record.italic, base.italic),
-  };
-}
-
 /** A style from stored or loaded data, over `base` field by field. */
 export function readDungeonStyle(value: unknown, base: DungeonStyle = STYLE_PRESETS[DEFAULT_STYLE_PRESET]): DungeonStyle {
   const record = isRecord(value) ? value : {};
@@ -70,7 +56,6 @@ export function readDungeonStyle(value: unknown, base: DungeonStyle = STYLE_PRES
   const strokes = field(record, 'strokes');
   const shadow = field(record, 'shadow');
   const hatching = field(record, 'hatching');
-  const fonts = field(record, 'fonts');
   return {
     colors: {
       ink: colour(colors.ink, base.colors.ink),
@@ -95,13 +80,6 @@ export function readDungeonStyle(value: unknown, base: DungeonStyle = STYLE_PRES
       size: number(hatching.size, base.hatching.size, STYLE_LIMITS.hatchingSize),
       distance: number(hatching.distance, base.hatching.distance, STYLE_LIMITS.hatchingDistance),
     },
-    fonts: {
-      title: font(fonts.title, base.fonts.title),
-      story: font(fonts.story, base.fonts.story),
-      notes: font(fonts.notes, base.fonts.notes),
-      legend: font(fonts.legend, base.fonts.legend),
-      symbols: font(fonts.symbols, base.fonts.symbols),
-    },
   };
 }
 
@@ -111,16 +89,12 @@ export function readDungeonView(value: unknown, base: DungeonView = DEFAULT_VIEW
   return {
     grid: oneOf(record.grid, GRID_STYLES, base.grid),
     smallTiles: flag(record.smallTiles, base.smallTiles),
-    notes: oneOf(record.notes, NOTES_MODES, base.notes),
-    titleAndStory: flag(record.titleAndStory, base.titleAndStory),
     water: flag(record.water, base.water),
     props: flag(record.props, base.props),
     shadow: flag(record.shadow, base.shadow),
     exits: flag(record.exits, base.exits),
     secrets: flag(record.secrets, base.secrets),
     monochrome: flag(record.monochrome, base.monochrome),
-    rotateToFit: flag(record.rotateToFit, base.rotateToFit),
-    zoomToFit: flag(record.zoomToFit, base.zoomToFit),
   };
 }
 

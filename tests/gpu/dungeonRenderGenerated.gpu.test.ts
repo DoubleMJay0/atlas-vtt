@@ -1,19 +1,18 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { parseHex } from '../../src/app/dungeons/render/palette';
 import { narrowPockets, inPocket } from '../../src/app/dungeons/render/pockets';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
-import { renderMap } from '../../src/app/dungeons/render/renderMap';
-import { renderPage } from '../../src/app/dungeons/render/renderPage';
+import { fittedPxPerCell, renderMap } from '../../src/app/dungeons/render/renderMap';
 import { DEFAULT_VIEW, STYLE_PRESETS, type DungeonView, type StylePresetId } from '../../src/app/dungeons/style';
-import { dungeonText } from '../../src/app/dungeons/text/dungeonText';
-import { loadDungeonFonts, pixelStats, savePng } from './dungeonRenderHarness';
+import { pixelStats, savePng, withoutText } from './dungeonRenderHarness';
 
 /**
- * Real dungeons from the generator, over seeds and tags, drawn as pages and maps in every
- * preset and written to `out/dungeon-render/` as `gen-*.png` for a person to look at.
+ * Real dungeons from the generator, over seeds and tags, drawn as the preview shows them and as
+ * scene maps in every preset, without any text, and written to `out/dungeon-render/` as
+ * `gen-*.png` for a person to look at.
  */
 
 const PRESETS = Object.keys(STYLE_PRESETS) as StylePresetId[];
@@ -22,7 +21,7 @@ const PRESETS = Object.keys(STYLE_PRESETS) as StylePresetId[];
 const MAP_BUDGET_MS = 1500;
 
 const CASES: readonly { name: string; seed: number; tags: string[] }[] = [
-  { name: 'default', seed: 458782179, tags: [] },
+  { name: 'default', seed: 16, tags: [] },
   { name: 'small', seed: 31337, tags: ['small'] },
   { name: 'large', seed: 777, tags: ['large'] },
   { name: 'ordered', seed: 101, tags: ['ordered'] },
@@ -49,7 +48,7 @@ function modelOf(name: string): DungeonModel {
   let model = models.get(name);
   if (!model) {
     const spec = CASES.find(c => c.name === name)!;
-    model = generateDungeon({ seed: spec.seed, tags: spec.tags }, dungeonText);
+    model = generateDungeon({ seed: spec.seed, tags: spec.tags });
     models.set(name, model);
   }
   return model;
@@ -62,15 +61,15 @@ function expectSane(canvas: OffscreenCanvas, preset: StylePresetId): void {
   expect(stats.transparent).toBe(0);
 }
 
-function page(model: DungeonModel, preset: StylePresetId, view: DungeonView): OffscreenCanvas {
-  const canvas = new OffscreenCanvas(1400, 1000);
-  const layout = renderPage(canvas.getContext('2d')!, model, STYLE_PRESETS[preset], view, { width: 1400, height: 1000 });
-  for (const note of layout.notes) {
-    expect(note.rect.x).toBeGreaterThanOrEqual(-1);
-    expect(note.rect.y).toBeGreaterThanOrEqual(-1);
-    expect(note.rect.x + note.rect.w).toBeLessThanOrEqual(1401);
-    expect(note.rect.y + note.rect.h).toBeLessThanOrEqual(1001);
-  }
+/** The map fitted into a 1400 × 1000 preview, as the generator's panel draws it. */
+function preview(model: DungeonModel, preset: StylePresetId, view: DungeonView): OffscreenCanvas {
+  const pxPerCell = fittedPxPerCell(model, view, 1400, 1000);
+  const layout = mapLayout(model, pxPerCell, view);
+  const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
+  const { ctx, texts } = withoutText(canvas.getContext('2d')!);
+  renderMap(ctx, model, STYLE_PRESETS[preset], view, { pxPerCell, legibleAt: 1 });
+  expect(texts).toEqual([]);
+  expect(Math.max(layout.widthPx / 1400, layout.heightPx / 1000)).toBeGreaterThan(0.99);
   return canvas;
 }
 
@@ -78,9 +77,11 @@ function map(model: DungeonModel, preset: StylePresetId, pxPerCell: number, view
   const layout = mapLayout(model, pxPerCell, view);
   const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
   const started = performance.now();
-  const ctx = canvas.getContext('2d')!;
-  renderMap(ctx, model, STYLE_PRESETS[preset], view, { pxPerCell, numbers: true });
-  ctx.getImageData(0, 0, 1, 1);
+  const real = canvas.getContext('2d')!;
+  const { ctx, texts } = withoutText(real);
+  renderMap(ctx, model, STYLE_PRESETS[preset], view, { pxPerCell });
+  expect(texts).toEqual([]);
+  real.getImageData(0, 0, 1, 1);
   return { canvas, ms: performance.now() - started };
 }
 
@@ -106,22 +107,20 @@ function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, preset: St
 }
 
 describe('generated dungeons', () => {
-  beforeAll(loadDungeonFonts);
-
   for (const { name } of CASES) {
-    it(`draws the ${name} page in parchment`, async () => {
-      const canvas = page(modelOf(name), 'parchment', DEFAULT_VIEW);
+    it(`draws the ${name} preview in parchment`, async () => {
+      const canvas = preview(modelOf(name), 'parchment', DEFAULT_VIEW);
       expectSane(canvas, 'parchment');
-      await savePng(canvas, `gen-page-${name}-parchment`);
+      await savePng(canvas, `gen-preview-${name}-parchment`);
     });
   }
 
   for (const name of ['default', 'large', 'round', 'flooded', 'crumbling'] as const) {
     for (const preset of PRESETS.filter(p => p !== 'parchment')) {
-      it(`draws the ${name} page in ${preset}`, async () => {
-        const canvas = page(modelOf(name), preset, DEFAULT_VIEW);
+      it(`draws the ${name} preview in ${preset}`, async () => {
+        const canvas = preview(modelOf(name), preset, DEFAULT_VIEW);
         expectSane(canvas, preset);
-        await savePng(canvas, `gen-page-${name}-${preset}`);
+        await savePng(canvas, `gen-preview-${name}-${preset}`);
       });
     }
   }
@@ -149,14 +148,12 @@ describe('generated dungeons', () => {
   });
 
   const views: [string, Partial<DungeonView>][] = [
-    ['tailed', { notes: 'tailed' }],
-    ['legend', { notes: 'legend' }],
     ['monochrome', { monochrome: true }],
     ['no-secrets', { secrets: false }],
   ];
   for (const [label, change] of views) {
-    it(`draws the secret page as ${label}`, async () => {
-      const canvas = page(modelOf('secret'), 'parchment', { ...DEFAULT_VIEW, ...change });
+    it(`draws the secret preview as ${label}`, async () => {
+      const canvas = preview(modelOf('secret'), 'parchment', { ...DEFAULT_VIEW, ...change });
       expectSane(canvas, 'parchment');
       await savePng(canvas, `gen-view-${label}`);
     });

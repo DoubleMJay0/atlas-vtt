@@ -1,16 +1,16 @@
 import React, { useId } from 'react';
 import { Button } from '../primitives/button';
 import { Slider } from '../primitives/slider';
-import { GRID_STYLES, NOTES_MODES } from '../../../dungeons/styleJson';
-import type { DungeonView, GridStyle, NotesMode } from '../../../dungeons/style';
+import { GRID_STYLES } from '../../../dungeons/styleJson';
+import type { DungeonView, GridStyle } from '../../../dungeons/style';
 import type { MessageKey } from '../../../i18n/types';
 import { t } from '../../../i18n';
 import { SelectRow, SwitchRow } from './fields';
 
-type ViewSwitch = Exclude<keyof DungeonView, 'grid' | 'notes' | 'smallTiles' | 'water'>;
+type ViewSwitch = Exclude<keyof DungeonView, 'grid' | 'smallTiles' | 'water'>;
 
-/** The layers and fits a switch turns on and off, in the order shown. */
-const SWITCHES: readonly ViewSwitch[] = ['props', 'shadow', 'exits', 'titleAndStory', 'secrets', 'monochrome', 'rotateToFit', 'zoomToFit'];
+/** The layers a switch turns on and off, in the order shown. */
+const SWITCHES: readonly ViewSwitch[] = ['props', 'shadow', 'exits', 'secrets', 'monochrome'];
 
 interface ViewSettingsProps {
   view: DungeonView;
@@ -21,7 +21,7 @@ interface ViewSettingsProps {
   layer: HTMLElement | null;
 }
 
-/** What the page shows: grid, water, props and the other layers. */
+/** What the map shows: grid, water, props and the other layers. */
 export function ViewSettings({ view, waterLevel, onView, onWaterLevel, layer }: ViewSettingsProps): React.JSX.Element {
   const levelId = useId();
   const level = waterLevel ?? null;
@@ -57,35 +57,6 @@ export function ViewSettings({ view, waterLevel, onView, onWaterLevel, layer }: 
       {SWITCHES.map((key) => (
         <SwitchRow key={key} label={t(`dungeon.view.${key}` as MessageKey)} value={view[key]} onChange={(on) => onView({ [key]: on })} />
       ))}
-    </div>
-  );
-}
-
-interface NotesSettingsProps {
-  mode: NotesMode;
-  onMode: (notes: NotesMode) => void;
-  onRearrange: () => void;
-  onReroll: () => void;
-  layer: HTMLElement | null;
-}
-
-/** How the notes are shown, another arrangement of their boxes, and other words for them. */
-export function NotesSettings({ mode, onMode, onRearrange, onReroll, layer }: NotesSettingsProps): React.JSX.Element {
-  const boxed = mode === 'boxes' || mode === 'tailed';
-  const written = boxed || mode === 'legend';
-  return (
-    <div className="atlas-dungeon-fields">
-      <SelectRow<NotesMode>
-        label={t('dungeon.notes')}
-        value={mode}
-        options={NOTES_MODES.map((notes) => ({ value: notes, label: t(`dungeon.notes.${notes}` as MessageKey) }))}
-        onChange={onMode}
-        layer={layer}
-      />
-      <div className="atlas-dungeon-fields__buttons">
-        <Button variant="outline" size="sm" disabled={!boxed} onClick={onRearrange}>{t('dungeon.notes.rearrange')}</Button>
-        <Button variant="outline" size="sm" disabled={!written} onClick={onReroll}>{t('dungeon.notes.reroll')}</Button>
-      </div>
     </div>
   );
 }

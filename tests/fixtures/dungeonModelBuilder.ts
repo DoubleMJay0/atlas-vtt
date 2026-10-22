@@ -19,16 +19,13 @@ import { rngFrom, type Rng } from '../../src/app/dungeons/rng';
  * [i, i + 1] × [j, j + 1], so the middle of cell (3, 4) is (3.5, 4.5).
  */
 
-export function emptyModel(seed: number, title: string, story: string): DungeonModel {
+export function emptyModel(seed: number): DungeonModel {
   return {
     version: DUNGEON_GENERATOR_VERSION,
     seed,
     tags: [],
-    title,
-    story,
     rooms: [],
     doors: [],
-    notes: [],
     columns: [],
     props: [],
     rubble: [],
