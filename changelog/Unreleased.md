@@ -38,3 +38,5 @@
 - Editing an ability online keeps the @ references it was written with
 - Players can roll with advantage or disadvantage online: right-click or long-press a die
 - Players can change the maximum of their character's resources and tracked numbers online, such as armour slots
+- Players online can click a combatant in the initiative list to bring its token into view
+
