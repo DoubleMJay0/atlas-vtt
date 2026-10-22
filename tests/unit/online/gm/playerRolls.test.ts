@@ -167,6 +167,16 @@ describe('a bonus from a player\'s sheet', () => {
     expect(parseSharedRoll(gm.logged.at(-1)?.roll)?.rolls).toMatchObject(want);
   });
 
+  it('rolls a sum of numbers as one bonus with the set\'s dice, in public and private', async () => {
+    const gm = await table(campaign, () => 0.5);
+    Object.assign(gm.dice, { setFor: () => character });
+    gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: '+4+1', token: gm.alias(1) });
+    expect(gm.rolled[0]).toMatchObject({ formula: '1d12+1d12+4+1', modifiers: 5 });
+    gm.share.receive(ANA, { t: 'roll', scene: gm.scene, formula: '-1+2', token: gm.alias(1), mode: 'gm' });
+    expect(gm.logged.at(-1)?.roll.formula).toBe('1d12+1d12-1+2');
+    expect(refusals(gm.sent)).toEqual([]);
+  });
+
   it('gives explicit sheet pools the owned character appearance in public and private', async () => {
     const gm = await table(campaign, () => 0.5);
     Object.assign(gm.dice, { setFor: () => character });
@@ -235,8 +245,8 @@ describe('rollable formulas', () => {
     expect(['+3', '0d6', '1d6+', 'x', '1d6'.repeat(30)].some(rollableFormula)).toBe(false);
   });
 
-  it('take a signed bonus from a player, and no bare number', () => {
-    expect(['+3', '-1', '+0', '1d20'].every(playerFormula)).toBe(true);
-    expect(['3', '+12345', '+ 3', '+3+1', ''].some(playerFormula)).toBe(false);
+  it('take a signed bonus from a player, a sum of numbers too, and no bare number or unsigned sum', () => {
+    expect(['+3', '-1', '+0', '1d20', '+3+1', '+4+1', '-1+2', '+2*3'].every(playerFormula)).toBe(true);
+    expect(['3', '4+1', '+ 3', '+12345', '*2', '+3+', '', '1d0'].some(playerFormula)).toBe(false);
   });
 });
