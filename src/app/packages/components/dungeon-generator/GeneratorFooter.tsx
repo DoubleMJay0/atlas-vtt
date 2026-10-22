@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { ChevronDown, Loader2, Map as MapIcon } from 'lucide-react';
 import { Button } from '../primitives/button';
 import { useOptionalContextMenu, type ContextMenuEntry } from '../../../react/root/ContextMenuContext';
@@ -11,15 +11,14 @@ interface GeneratorFooterProps {
   actions: GeneratorActions;
   /** Whether a dungeon is there to export. */
   ready: boolean;
-  /** The map PNG's cell size is being asked. */
-  askingCell: boolean;
-  onAskCell: (asking: boolean) => void;
 }
 
 /** Status, the Export menu and Create scene. */
-export function GeneratorFooter({ actions, ready, askingCell, onAskCell }: GeneratorFooterProps): React.JSX.Element {
+export function GeneratorFooter({ actions, ready }: GeneratorFooterProps): React.JSX.Element {
   const menu = useOptionalContextMenu();
   const exportButton = useRef<HTMLButtonElement>(null);
+  // The map PNG's cell size is being asked.
+  const [askingCell, setAskingCell] = useState(false);
   const save = (kind: DungeonExportKind): void => { void actions.exportAs(kind); };
 
   const openExports = (): void => {
@@ -29,7 +28,7 @@ export function GeneratorFooter({ actions, ready, askingCell, onAskCell }: Gener
     const entries: ContextMenuEntry[] = [
       { type: 'item', label: t('dungeon.export.page'), icon: 'file-image', onClick: () => save('page') },
       { type: 'item', label: t('dungeon.export.svg'), icon: 'file-code', onClick: () => save('svg') },
-      { type: 'item', label: t('dungeon.export.map'), icon: 'map', onClick: () => onAskCell(true) },
+      { type: 'item', label: t('dungeon.export.map'), icon: 'map', onClick: () => setAskingCell(true) },
       { type: 'item', label: t('dungeon.export.json'), icon: 'braces', onClick: () => save('json') },
       { type: 'item', label: t('dungeon.export.markdown'), icon: 'file-text', onClick: () => save('markdown') },
     ];
@@ -55,8 +54,8 @@ export function GeneratorFooter({ actions, ready, askingCell, onAskCell }: Gener
       {askingCell && actions.maxCell !== null && (
         <CellSizeDialog
           max={actions.maxCell}
-          onCancel={() => onAskCell(false)}
-          onSave={(options) => { onAskCell(false); void actions.exportAs('map', options); }}
+          onCancel={() => setAskingCell(false)}
+          onSave={(options) => { setAskingCell(false); void actions.exportAs('map', options); }}
         />
       )}
     </footer>

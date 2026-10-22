@@ -38,7 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('ResizeObserver', class { observe(): void {} unobserve(): void {} disconnect(): void {} });
   HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
-  app = { scope: {}, keymap: { pushScope: vi.fn(), popScope: vi.fn() } } as unknown as App;
+  app = { scope: {} } as unknown as App;
   settings = new SettingsService(app);
   worker.preview.mockImplementation(answer);
   vi.spyOn(AssetService, 'getInstance').mockReturnValue(assets);
@@ -121,6 +121,23 @@ describe('the dungeon generator panel', () => {
     expect(lastJob().request.seed).toBe(seed);
     fireEvent.click(screen.getByRole('button', { name: 'Rearrange notes' }));
     await waitFor(() => expect(lastJob().output).toMatchObject({ kind: 'page', arrangement: 1 }));
+  });
+
+  it('has no keyboard shortcuts: keys pressed in the panel change nothing', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    const calls = worker.preview.mock.calls.length;
+    const { request } = lastJob();
+    const before = settings.getDungeonGenerator();
+    const panel = document.querySelector<HTMLElement>('.atlas-dungeon-generator')!;
+    panel.focus();
+    for (const key of ['Enter', ' ', 'n', 'g', 'G', 'h', 'm', 'w', 'p', 'e', 'j', '1']) {
+      fireEvent.keyDown(panel, { key, shiftKey: key === 'G' });
+    }
+    await act(async () => { await Promise.resolve(); });
+    expect(worker.preview.mock.calls.length).toBe(calls);
+    expect(lastJob().request).toEqual(request);
+    expect(settings.getDungeonGenerator()).toEqual(before);
   });
 });
 

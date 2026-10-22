@@ -111,16 +111,14 @@ export function ColourRow({ label, value, onChange }: ColourRowProps): React.JSX
 
 interface SettingsSectionProps {
   title: string;
-  /** Focused by the section's shortcut. */
-  sectionRef?: React.Ref<HTMLElement>;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function SettingsSection({ title, sectionRef, actions, children }: SettingsSectionProps): React.JSX.Element {
+export function SettingsSection({ title, actions, children }: SettingsSectionProps): React.JSX.Element {
   const id = useId();
   return (
-    <section ref={sectionRef} className="atlas-dungeon-section" aria-labelledby={id} tabIndex={-1}>
+    <section className="atlas-dungeon-section" aria-labelledby={id}>
       <header className="atlas-dungeon-section__header">
         <h3 id={id} className="atlas-dungeon-section__title">{title}</h3>
         {actions}
