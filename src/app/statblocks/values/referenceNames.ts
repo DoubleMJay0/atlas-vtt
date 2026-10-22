@@ -7,7 +7,8 @@
  * decides which of them name a number, so every name offered reads what the card fills in. Pure.
  */
 
-import { normalizedKey } from '../../resources/resourceFields';
+import { isHitPointsKey, normalizedKey } from '../../resources/resourceFields';
+import { meaningsOf } from '../resolve/fieldMeanings';
 import { withHeaderFields } from '../model/templateHeader';
 import type { FieldValue, StatblockTemplate, TemplateField } from '../model/templateTypes';
 import { isPairsList, readerFor, slotKeyOf, type FieldRecord } from './fieldValues';
@@ -104,4 +105,22 @@ export function namesFitting<T extends { readonly name: string }>(names: readonl
   if (wanted === '') return [...names];
   const starting = names.filter((each) => sameAs(each.name).startsWith(wanted));
   return [...starting, ...names.filter((each) => !starting.includes(each) && sameAs(each.name).includes(wanted))];
+}
+
+/**
+ * The template's fields a reference whose path starts with `name` may read, without case or
+ * separators, whatever the note holds now: a field by its key or a key it had before a rename, a
+ * Table field by one of its slots (name or key), a field by its label where the lookup reads it so
+ * (`fieldsByLabel`), and for hit points' usual names the field the template means as hit points and
+ * any keyed so.
+ */
+export function fieldsNamedBy(fields: readonly TemplateField[], name: string): TemplateField[] {
+  const wanted = normalizedKey(name);
+  const named = (each: string | undefined): boolean => each !== undefined && normalizedKey(each) === wanted;
+  const byLabel = fieldsByLabel(fields).get(wanted);
+  const hitPoints = isHitPointsKey(name) ? meaningsOf(fields)['hit-points'] : undefined;
+  return fields.filter((field) => [field.key, ...(field.formerKeys ?? [])].some(named)
+    || (field.type === 'scores' && (field.slots ?? []).some((slot, index) => named(slot) || named(slotKeyOf(field, index))))
+    || field === byLabel
+    || (isHitPointsKey(name) && (field.key === hitPoints || isHitPointsKey(field.key))));
 }

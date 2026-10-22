@@ -8,6 +8,7 @@
 import { writtenRoll } from '../../tools/textRolls';
 import { fillReferences } from './fillReferences';
 import type { FieldLookup } from './references';
+import type { LookupTrace, TracedLookup } from './statblockLookup';
 
 /** Whether a Dice value written without references rolls as a whole. */
 export function isDiceValue(text: string): boolean {
@@ -21,4 +22,25 @@ export function isDiceValue(text: string): boolean {
 export function rollsWithReferences(text: string, lookup: FieldLookup): boolean {
   const filled = fillReferences(text, lookup);
   return filled.unresolved.length === 0 && isDiceValue(filled.text);
+}
+
+const sameTrace = (a: LookupTrace, b: LookupTrace): boolean => a.length === b.length && a.every((read, at) => read === b[at]);
+
+/**
+ * Whether every `@` reference of `text` reads the same field through both lookups: `seen`, over the
+ * values a reader may see, and `all`, over the whole note. Each reference must name the same path in
+ * both (or nothing in both) and read it from the same keys (`LookupTrace`), not merely come to the
+ * same number, so a name that one lookup reads from a hidden field and the other from a field shown
+ * under that name never agrees. Text without references agrees.
+ */
+export function referencesAgree(text: string, seen: TracedLookup, all: TracedLookup): boolean {
+  let agree = true;
+  fillReferences(text, (path) => {
+    const shown = seen(path);
+    const whole = all(path);
+    if (shown.value === undefined && whole.value === undefined) return undefined;
+    if (!Object.is(shown.value, whole.value) || !sameTrace(shown.trace, whole.trace)) agree = false;
+    return shown.value;
+  });
+  return agree;
 }

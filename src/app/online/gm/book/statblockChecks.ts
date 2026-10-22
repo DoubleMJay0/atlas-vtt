@@ -3,11 +3,13 @@ import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes'
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
 import type { FieldValue, StatblockTemplate } from '../../../statblocks/model/templateTypes';
 import type { NotePatch } from '../../../statblocks/notes/patchTypes';
-import { rollsWithReferences } from '../../../statblocks/values/diceValues';
+import { referencesAgree, rollsWithReferences } from '../../../statblocks/values/diceValues';
 import type { FieldRead, KeyedField } from '../../../statblocks/values/fieldValues';
 import type { FieldLookup } from '../../../statblocks/values/references';
-import { statblockLookup } from '../../../statblocks/values/statblockLookup';
-import { shownRecord } from './playerAccess.ts';
+import { fillReferences } from '../../../statblocks/values/fillReferences';
+import { fieldsNamedBy } from '../../../statblocks/values/referenceNames';
+import { statblockLookup, tracedStatblockLookup } from '../../../statblocks/values/statblockLookup';
+import { playerAccess, shownRecord } from './playerAccess.ts';
 import type { WrittenValue } from './statblockSheets.ts';
 
 /** What a player's statblock edit is checked against. */
@@ -46,21 +48,58 @@ export const isLine = (value: unknown): value is string => typeof value === 'str
 
 export const isScalar = (value: SheetRaw | undefined): value is string | number | boolean | null => value === null || typeof value !== 'object';
 
-/**
- * The numbers a player's `@` references read: the card's lookup over the values they may see
- * (`shownRecord`), as their sheet's references are worked out, so one naming a hidden field reads nothing.
- */
-export function playerLookup(inputs: EditInputs, template: StatblockTemplate): FieldLookup {
+/** What a player's `@` references are checked against (`playerReferences`). */
+export interface PlayerReferences {
+  /** The numbers they read: the card's lookup over the values the player may see (`shownRecord`), as their sheet's references are worked out. */
+  readonly lookup: FieldLookup;
+  /**
+   * Whether a text the player wrote names nothing hidden from them: no reference may name a hidden
+   * field by any name the lookup reads (`fieldsNamedBy`), even one the note holds nothing of now,
+   * and each must read the same field over the values they may see as over the whole note
+   * (`referencesAgree`), so whatever fills it in for the GM reads what the player was shown.
+   */
+  safe(text: string): boolean;
+}
+
+/** The paths a text's references may read, each `@` with every shorter path the lookup tries after its whole one. */
+function referencePaths(text: string): string[] {
+  const paths: string[] = [];
+  fillReferences(text, (path) => {
+    paths.push(path);
+    return undefined;
+  });
+  return paths;
+}
+
+/** What a player's `@` references read, and whether one they wrote names only what they may see. */
+export function playerReferences(inputs: EditInputs, template: StatblockTemplate): PlayerReferences {
   const { fields } = withHeaderFields(template);
-  return statblockLookup(template, shownRecord(inputs.resolved?.fields ?? {}, template, fields), fields);
+  const record = inputs.resolved?.fields ?? {};
+  const shown = shownRecord(record, template, fields);
+  const seen = tracedStatblockLookup(template, shown, fields);
+  const all = tracedStatblockLookup(template, record, fields);
+  const hidden = (path: string): boolean => fieldsNamedBy(fields, path.split('.')[0] ?? '').some((field) => playerAccess(template, field.key) === 'hidden');
+  return {
+    lookup: statblockLookup(template, shown, fields),
+    safe: (text) => !referencePaths(text).some(hidden) && referencesAgree(text, seen, all),
+  };
+}
+
+/** Whether every text a player wrote into a value, at any depth, names nothing hidden from them (`PlayerReferences.safe`). */
+export function referencesSafeIn(value: unknown, references: PlayerReferences): boolean {
+  if (typeof value === 'string') return references.safe(value);
+  if (Array.isArray(value)) return value.every((item: unknown) => referencesSafeIn(item, references));
+  if (value === null || typeof value !== 'object') return true;
+  return Object.values(value).every((item: unknown) => referencesSafeIn(item, references));
 }
 
 /**
- * Dice a line writes, which Atlas rolls once its references are filled in from `lookup`
- * (`playerLookup`). A reference that names no number the player may see refuses it; the text is
- * stored as written.
+ * Dice a line writes, which Atlas rolls once its references are filled in from what the player may
+ * see (`playerReferences`). A reference that names no number there, or anything hidden from them,
+ * refuses it; the text is stored as written.
  */
-export const isDice = (value: unknown, lookup: FieldLookup): value is string => isLine(value) && rollsWithReferences(value, lookup);
+export const isDice = (value: unknown, references: PlayerReferences): value is string =>
+  isLine(value) && rollsWithReferences(value, references.lookup) && references.safe(value);
 
 /** Several options in the options' order, each once; an open choice may name others after them. */
 export function inOptionOrder(value: SheetRaw, options: readonly string[], open: boolean): value is readonly string[] {
