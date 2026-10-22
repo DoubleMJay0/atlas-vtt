@@ -10,12 +10,12 @@ export type SelectedSource =
 /** The groups of the library the window lists. */
 export type ListedLibrary = Pick<RandomTablesLibrary, 'items' | 'text' | 'generators'>;
 
-/** Every source of the library in the sidebar's order: bases, Items tables, Text tables, generators. */
+/** Every source of the library in the sidebar's order: generators, bases, Items tables, Text tables. */
 export function librarySources(library: ListedLibrary): SelectedSource[] {
   return [
+    ...library.generators.map((table): SelectedSource => ({ kind: 'table', id: table.id, table })),
     ...library.items.bases.map((base): SelectedSource => ({ kind: 'base', id: base.path, base })),
-    ...library.items.tables.map((table): SelectedSource => ({ kind: 'table', id: table.id, table })),
-    ...[...library.text, ...library.generators].map((table): SelectedSource => ({ kind: 'table', id: table.id, table })),
+    ...[...library.items.tables, ...library.text].map((table): SelectedSource => ({ kind: 'table', id: table.id, table })),
   ];
 }
 

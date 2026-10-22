@@ -44,8 +44,9 @@ interface TablesSidebarProps {
 }
 
 /**
- * The collection's tables to pick one to roll on, grouped by what they give: Items (the loot
- * bases, the selected one with its views to tick, then the Items tables of notes), Text and Generators.
+ * The collection's tables to pick one to roll on, grouped by what they give: Generators first (a
+ * collection has few, and they roll whole results), then Items (the loot bases, the selected one
+ * with its views to tick, then the Items tables of notes) and Text.
  */
 export function TablesSidebar(props: TablesSidebarProps): React.ReactElement {
   const { library, selectedId, onSelect, disabledViews, onDisabledViewsChange, onNewTable, onUseNote, onRename, onRemove, onOpen } = props;
@@ -136,6 +137,13 @@ export function TablesSidebar(props: TablesSidebarProps): React.ReactElement {
         </LabelTooltip>
       </div>
 
+      {generators.length > 0 && (
+        <section className="atlas-tables-group" aria-label={t('tables.group.generators')}>
+          <h3 className="atlas-loot-section-label">{t('tables.group.generators')}</h3>
+          <ul>{generators.map(tableRow)}</ul>
+        </section>
+      )}
+
       {(bases.length > 0 || itemTables.length > 0) && (
         <section className="atlas-tables-group" aria-label={t('tables.group.items')}>
           <h3 className="atlas-loot-section-label">{t('tables.group.items')}</h3>
@@ -164,13 +172,6 @@ export function TablesSidebar(props: TablesSidebarProps): React.ReactElement {
         <section className="atlas-tables-group" aria-label={t('tables.group.text')}>
           <h3 className="atlas-loot-section-label">{t('tables.group.text')}</h3>
           <ul>{textTables.map(tableRow)}</ul>
-        </section>
-      )}
-
-      {generators.length > 0 && (
-        <section className="atlas-tables-group" aria-label={t('tables.group.generators')}>
-          <h3 className="atlas-loot-section-label">{t('tables.group.generators')}</h3>
-          <ul>{generators.map(tableRow)}</ul>
         </section>
       )}
 
