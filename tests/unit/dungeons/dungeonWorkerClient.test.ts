@@ -1,0 +1,164 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { DungeonWorkerClient } from '../../../src/app/dungeons/worker/DungeonWorkerClient';
+import type { DungeonJob, DungeonRendered, DungeonWorkerMessage, DungeonWorkerReply } from '../../../src/app/dungeons/worker/dungeonJob';
+import { smallDungeon } from '../../fixtures/dungeonModels';
+
+/** A worker that keeps what it is sent and answers when the test says so. */
+class FakeWorker {
+  readonly sent: DungeonWorkerMessage[] = [];
+  terminated = false;
+  private readonly listeners = new Map<string, ((event: unknown) => void)[]>();
+
+  postMessage(message: DungeonWorkerMessage): void {
+    this.sent.push(message);
+  }
+
+  addEventListener(type: string, listener: (event: unknown) => void): void {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  }
+
+  terminate(): void {
+    this.terminated = true;
+  }
+
+  /** The id of the last render job sent. */
+  lastJob(): number {
+    const jobs = this.sent.filter((m): m is Extract<DungeonWorkerMessage, { type: 'render' }> => m.type === 'render');
+    return jobs[jobs.length - 1]!.id;
+  }
+
+  answer(reply: DungeonWorkerReply): void {
+    for (const listener of this.listeners.get('message') ?? []) listener({ data: reply });
+  }
+
+  crash(): void {
+    for (const listener of this.listeners.get('error') ?? []) listener({ message: 'boom', preventDefault: () => {} });
+  }
+}
+
+const job = (seed: number): DungeonJob => ({
+  request: { seed, tags: [] },
+  style: STYLE_PRESETS.parchment,
+  view: DEFAULT_VIEW,
+  output: { kind: 'page', width: 1400, height: 1000 },
+});
+
+function rendered(close = vi.fn()): DungeonRendered {
+  return { model: smallDungeon(), image: { type: 'bitmap', bitmap: { close } as unknown as ImageBitmap } };
+}
+
+const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+
+function clientWith(workers: FakeWorker[], inThread?: (job: DungeonJob) => Promise<DungeonRendered>): DungeonWorkerClient {
+  return new DungeonWorkerClient({
+    createWorker: () => {
+      const worker = new FakeWorker();
+      workers.push(worker);
+      return worker as unknown as Worker;
+    },
+    fonts: () => [{ family: 'Atlas Germania One', source: 'url("data:font/ttf;base64,AA==")' }],
+    ...(inThread && { inThread }),
+  });
+}
+
+afterEach(() => { vi.restoreAllMocks(); });
+
+describe('the dungeon worker client', () => {
+  it('starts one worker, hands it the fonts first and answers each job', async () => {
+    const workers: FakeWorker[] = [];
+    const client = clientWith(workers);
+
+    const first = client.render(job(1));
+    expect(workers).toHaveLength(1);
+    expect(workers[0]!.sent[0]).toMatchObject({ type: 'fonts' });
+    const result = rendered();
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result });
+    await expect(first).resolves.toBe(result);
+
+    const second = client.render(job(2));
+    await flush();
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: false, message: 'No canvas' });
+    await expect(second).rejects.toThrow('No canvas');
+    expect(workers).toHaveLength(1);
+  });
+
+  it('lets the latest preview win: queued ones give way, a running one is dropped', async () => {
+    const workers: FakeWorker[] = [];
+    const client = clientWith(workers);
+
+    const running = client.preview(job(1));
+    const queued = client.preview(job(2));
+    const latest = client.preview(job(3));
+    await expect(queued).resolves.toBeNull();
+
+    const close = vi.fn();
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result: rendered(close) });
+    await expect(running).resolves.toBeNull();
+    expect(close).toHaveBeenCalled();
+
+    await flush();
+    const sentSeeds = workers[0]!.sent.flatMap(m => (m.type === 'render' ? [m.job.request.seed] : []));
+    expect(sentSeeds).toEqual([1, 3]);
+    const result = rendered();
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result });
+    await expect(latest).resolves.toBe(result);
+  });
+
+  it('never drops a render for a preview', async () => {
+    const workers: FakeWorker[] = [];
+    const client = clientWith(workers);
+
+    const render = client.render(job(1));
+    void client.preview(job(2));
+    const result = rendered();
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result });
+    await expect(render).resolves.toBe(result);
+  });
+
+  it('fails the job of a worker that crashed and starts a new one for the next', async () => {
+    const workers: FakeWorker[] = [];
+    const client = clientWith(workers);
+
+    const lost = client.render(job(1));
+    workers[0]!.crash();
+    await expect(lost).rejects.toThrow('boom');
+    expect(workers[0]!.terminated).toBe(true);
+
+    const next = client.render(job(2));
+    expect(workers).toHaveLength(2);
+    expect(workers[1]!.sent[0]).toMatchObject({ type: 'fonts' });
+    const result = rendered();
+    workers[1]!.answer({ id: workers[1]!.lastJob(), ok: true, result });
+    await expect(next).resolves.toBe(result);
+  });
+
+  it('draws in the window when no worker can start', async () => {
+    const result = rendered();
+    const inThread = vi.fn(async () => result);
+    const client = new DungeonWorkerClient({
+      createWorker: () => { throw new Error('No workers here'); },
+      fonts: () => [],
+      inThread,
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(client.render(job(1))).resolves.toBe(result);
+    expect(inThread).toHaveBeenCalledOnce();
+  });
+
+  it('fails every job once disposed', async () => {
+    const workers: FakeWorker[] = [];
+    const client = clientWith(workers);
+    const running = client.render(job(1));
+    const queued = client.render(job(2));
+
+    client.dispose();
+
+    await expect(running).rejects.toThrow('stopped');
+    await expect(queued).rejects.toThrow('stopped');
+    expect(workers[0]!.terminated).toBe(true);
+    await expect(client.render(job(3))).rejects.toThrow('stopped');
+  });
+});
