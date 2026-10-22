@@ -7,6 +7,7 @@ import { runInBackground } from '../utils/backgroundTask';
 import { resolvePinIcon } from '../types/pinIcons';
 import { createPinIconPalette, type PinIconPalette } from './pinIconPalette';
 import { createPinNoteSearch } from './pinNoteSearch';
+import { noteCreateEntry, type PinCreateEntry } from './pinCreateEntries';
 import type { PinActionEventDetail } from '../types/atlasWindowEvents';
 import { animatePanelIn, animatePanelOutAndRemove } from '../ui/panelMotion';
 import { NotePinPreview } from './notePinPreview';
@@ -170,9 +171,11 @@ export class NotePinTool {
       });
 
       // ── Search, results and key hints ──
+      const mapPath = this.store.getState().mapPath;
       const noteSearch = createPinNoteSearch(dropdown, {
         app: this.obsidianApp,
-        mapPath: this.store.getState().mapPath,
+        mapPath,
+        createEntries: this.createEntries(mapPath),
         onPick: (notePath) => {
           this.closeDropdown();
           resolve({ accepted: true, notePath, icon: selectedIcon });
@@ -250,6 +253,11 @@ export class NotePinTool {
     });
   }
   
+  /** What the search offers to create for a name no file carries, in the order listed. */
+  private createEntries(mapPath: string | null): PinCreateEntry[] {
+    return [noteCreateEntry(this.obsidianApp, mapPath)];
+  }
+
   /**
    * Closes the note pin dropdown if it's open
    */

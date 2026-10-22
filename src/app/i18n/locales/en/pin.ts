@@ -98,5 +98,9 @@ export const pin = {
   'pin.search.whole': 'Entire note',
   'pin.search.noHeaders': 'No matching headers found',
   'pin.search.noNotes': 'No notes found',
+  'pin.search.createNote': 'Create note “{name}”',
+  'pin.search.invalidName': 'Note names cannot contain \\ / : * ? " < > | # ^ [ or ]',
+  'pin.search.dotName': 'Note names cannot start with a dot',
+  'pin.search.createFailed': 'Could not create “{name}”',
   'pin.places': 'Places',
 } as const satisfies Record<string, Message>;
