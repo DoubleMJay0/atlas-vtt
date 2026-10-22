@@ -51,6 +51,7 @@ import type { BarsSpan, TokenGroupContainer } from './token-renderer/types';
 import type { TokenPreview } from './tokenPlacement/PlacementGhost';
 import type { TokenInput } from '../types/viewState';
 import { setCanvasCursor } from './utils/canvasCursor';
+import { usesCanvasRenderer } from './utils/rendererType';
 import { markHandled, resetHandled } from './utils/handledEvents';
 import { watchClick } from './utils/clickRelease';
 import type { HexLinkPointerHandlers } from './hexLinks/HexLinkInteraction';
@@ -262,7 +263,7 @@ export class TokenRenderer {
       }
     });
     
-    // Before the collection's rules arrive: their refresh works the markers out again
+    // Before the collection's rules arrive: their refresh works the turn out again
     this.turnMarkers = new TurnMarkers({
       parent: this.viewport,
       getState: () => this.store.getState(),
@@ -271,6 +272,7 @@ export class TokenRenderer {
       ticker: () => this.pixiApp?.ticker ?? null,
       reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
       defeated: (state) => defeatedCombatants(state.initiative.entries, sceneTokens(state.objects), this.resourceDefsProvider()),
+      canMask: () => !this.pixiApp?.renderer || !usesCanvasRenderer(this.pixiApp.renderer),
     });
     this.collectionSync = new TokenCollectionSync(obsApp, store.getState, {
       refreshRules: () => this.refreshCollectionRules(),
@@ -816,7 +818,7 @@ export class TokenRenderer {
   }
 
   /**
-   * The turn markers on the canvas: while it shows the players' view (session view, the peek, the
+   * The turn flashes on the canvas: while it shows the players' view (session view, the peek, the
    * palette's player mode) only where the players are shown their initiative list, as their frame.
    */
   private syncCanvasTurn(): void {
@@ -825,7 +827,7 @@ export class TokenRenderer {
     this.turnMarkers.showOnCanvas(!showsPlayers || ((view?.showInitiative ?? false) && this.store.getState().initiativeTrackerOpen));
   }
 
-  /** Keeps the canvas's turn markers in step with the players' view, the player view's settings and the tracker. */
+  /** Keeps the canvas's turn flashes in step with the players' view, the player view's settings and the tracker. */
   private watchCanvasTurn(): void {
     const stopView = this.playersView.listen(() => this.syncCanvasTurn());
     const stopSettings = SettingsService.forApp(this.obsApp)?.onChange(() => this.syncCanvasTurn());
@@ -1378,7 +1380,6 @@ export class TokenRenderer {
           // Theme changed, update rotation and resize handles
           this.uiManager.getRotationUI()?.updateTheme();
           this.uiManager.getResizeUI()?.updateTheme();
-          this.turnMarkers.refreshTheme();
         }
       }
     });
