@@ -2,19 +2,18 @@ import type { App } from 'obsidian';
 import type { DungeonModel, DungeonRequest } from '../../../dungeons/model';
 import { dungeonSceneName } from '../../../dungeons/scene/createDungeonScene';
 import type { DungeonStyle, DungeonView } from '../../../dungeons/style';
-import { paletteFileText } from '../../../dungeons/styleJson';
 import type { DungeonJob, DungeonRendered } from '../../../dungeons/worker/dungeonJob';
 import { ensureFolder, isPathTaken } from '../../../plugin/vaultFolders';
 import { collectionFolderPath } from '../../../services/assetPaths';
 import { freePathIn } from '../../../services/collectionBundle/pathRemap';
 
 /**
- * Saving a dungeon as files: the map as PNG or SVG, the model as JSON, the style as a palette.
+ * Saving a dungeon as files: the map as PNG or SVG, and the model as JSON.
  * Every file goes into the collection's `dungeon-exports` folder, which no tab of the asset
  * manager reads, so nothing saved there becomes an asset.
  */
 
-export type DungeonExportKind = 'map' | 'svg' | 'json' | 'palette';
+export type DungeonExportKind = 'map' | 'svg' | 'json';
 
 const DUNGEON_EXPORTS_FOLDER = 'dungeon-exports';
 
@@ -69,8 +68,6 @@ async function contentOf(deps: DungeonExportDeps, kind: DungeonExportKind, input
     }
     case 'json':
       return `${JSON.stringify(model, null, 2)}\n`;
-    case 'palette':
-      return paletteFileText(style);
   }
 }
 
@@ -80,7 +77,6 @@ function fileNameOf(kind: DungeonExportKind, input: DungeonExportInput): string 
     case 'map': return `${base}.png`;
     case 'svg': return `${base}.svg`;
     case 'json': return `${base}.json`;
-    case 'palette': return `Palette ${input.style.colors.ink.slice(1)}-${input.style.colors.paper.slice(1)}.json`;
   }
 }
 

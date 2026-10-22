@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { renderMap, renderMapSvg } from '../../src/app/dungeons/render/renderMap';
-import { DEFAULT_VIEW, STYLE_PRESETS, type StylePresetId } from '../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
+import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
 import { savePng } from './dungeonRenderHarness';
 
 /**
@@ -47,19 +48,19 @@ function difference(a: OffscreenCanvas, b: OffscreenCanvas): { share: number; pi
   return { share: differ / (da.length / 4), picture };
 }
 
-const CASES: readonly { name: string; seed: number; tags: string[]; preset: StylePresetId }[] = [
-  { name: 'default', seed: 458782179, tags: [], preset: 'parchment' },
-  { name: 'round', seed: 404, tags: ['round', 'colonnades', 'temple'], preset: 'masonry' },
-  { name: 'flooded', seed: 2024, tags: ['flooded', 'tomb', 'winding'], preset: 'slate' },
-  { name: 'secret', seed: 515, tags: ['secret'], preset: 'drafting' },
-  { name: 'crumbling', seed: 202, tags: ['crumbling', 'dangerous'], preset: 'stipple' },
+const CASES: readonly { name: string; seed: number; tags: string[]; styleId: DungeonStyleId }[] = [
+  { name: 'default', seed: 458782179, tags: [], styleId: 'parchment' },
+  { name: 'round', seed: 404, tags: ['round', 'colonnades', 'temple'], styleId: 'masonry' },
+  { name: 'flooded', seed: 2024, tags: ['flooded', 'tomb', 'winding'], styleId: 'slate' },
+  { name: 'secret', seed: 515, tags: ['secret'], styleId: 'drafting' },
+  { name: 'crumbling', seed: 202, tags: ['crumbling', 'dangerous'], styleId: 'stipple' },
 ];
 
 describe('the map as SVG', () => {
-  for (const { name, seed, tags, preset } of CASES) {
-    it(`draws the ${name} map in ${preset} as the canvas does`, async () => {
+  for (const { name, seed, tags, styleId } of CASES) {
+    it(`draws the ${name} map in ${styleId} as the canvas does`, async () => {
       const model = generateDungeon({ seed, tags });
-      const style = STYLE_PRESETS[preset];
+      const style = dungeonStyle(styleId);
       const size = mapLayout(model, PX_PER_CELL, DEFAULT_VIEW);
       const canvas = new OffscreenCanvas(size.widthPx, size.heightPx);
       const drawn = renderMap(canvas.getContext('2d')!, model, style, DEFAULT_VIEW, { pxPerCell: PX_PER_CELL });
@@ -68,7 +69,7 @@ describe('the map as SVG', () => {
       expect(layout).toEqual(drawn);
       expect(svg).not.toMatch(/NaN|undefined|Infinity|<text|@font-face/);
       const { share, picture } = difference(canvas, await rasterise(svg, { width: size.widthPx, height: size.heightPx }));
-      await savePng(picture, `svg-diff-${name}-${preset}`);
+      await savePng(picture, `svg-diff-${name}-${styleId}`);
       expect(share).toBeLessThan(0.01);
     });
   }

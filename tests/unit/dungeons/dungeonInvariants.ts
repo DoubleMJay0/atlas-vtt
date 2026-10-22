@@ -3,10 +3,11 @@
 import { floorRect, inRect, rectsTouch, wallRect } from '../../../src/app/dungeons/geometry';
 import type { DungeonDoor, DungeonModel, DungeonRoom } from '../../../src/app/dungeons/model';
 import { roomShape, rotundaRadius, roomCentre, shapeDistance } from '../../../src/app/dungeons/render/geometry';
-import { REFERENCE_CELL_PX, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { REFERENCE_CELL_PX } from '../../../src/app/dungeons/style';
+import { DUNGEON_STYLES } from '../../../src/app/dungeons/styleCatalog';
 
 /** The widest wall any preset draws outside a floor, in cells. */
-const WALL = Math.max(...Object.values(STYLE_PRESETS).map((style) => style.strokes.thick)) / REFERENCE_CELL_PX;
+const WALL = Math.max(...DUNGEON_STYLES.map(({ style }) => style.strokes.thick)) / REFERENCE_CELL_PX;
 
 const IMPASSABLE = new Set(['portcullis', 'barricade']);
 

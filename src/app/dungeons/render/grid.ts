@@ -20,13 +20,13 @@ export function drawGrid(env: RenderEnv): void {
   const rng = env.rng('grid');
   ctx.save();
   clipToFloors(env);
-  ctx.strokeStyle = palette.ink;
+  ctx.strokeStyle = palette.grid;
   ctx.lineCap = 'round';
-  ctx.lineWidth = strokeWidth(env, view.grid === 'dotted' && !view.smallTiles ? style.strokes.normal : style.strokes.thin);
+  ctx.lineWidth = strokeWidth(env, view.grid === 'dotted' && !view.smallTiles ? style.strokes.normal : style.strokes.thin) * style.grid.weight;
   ctx.beginPath();
   if (view.grid === 'dotted') {
     // Round dots, one on every crossing and evenly between, drawn as near-zero dashes with round caps.
-    const dot = env.px * 0.75;
+    const dot = env.px * 0.75 * style.grid.weight;
     const period = step / (view.smallTiles ? 3 : 5);
     ctx.setLineDash([dot, period - dot]);
     ctx.lineDashOffset = dot / 2;

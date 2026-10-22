@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { mapLayout, suggestedPxPerCell } from '../../../src/app/dungeons/render/layoutSize';
 import { createDungeonSceneWith, dungeonSceneName, type DungeonSceneDeps, type DungeonSceneResult } from '../../../src/app/dungeons/scene/createDungeonScene';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import type { DungeonJob, DungeonRendered } from '../../../src/app/dungeons/worker/dungeonJob';
 import type { ProcessedImage } from '../../../src/app/imageProcessing/imageProcessing';
 import { prebuildMapImageAt } from '../../../src/app/pixi/mapImage/prebuildMapImage';
@@ -17,7 +18,7 @@ vi.mock('../../../src/app/pixi/mapImage/prebuildMapImage', () => ({ prebuildMapI
 
 const COLLECTION = 'Dungeons';
 const SCENES = `atlas-vtt/collections/${COLLECTION}/scenes`;
-const STYLE = STYLE_PRESETS.parchment;
+const STYLE = dungeonStyle('parchment');
 const TITLE = 'Sunken Vault of the Grey Abbot';
 
 interface Bench {

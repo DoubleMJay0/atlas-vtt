@@ -1,7 +1,8 @@
 import { generateDungeon } from '../generate';
 import type { DungeonModel, DungeonRequest } from '../model';
-import { mapPixelSize, suggestedPxPerCell, type MapLayout } from '../render/layoutSize';
+import { mapLayout, mapPixelSize, suggestedPxPerCell, type MapLayout } from '../render/layoutSize';
 import { fittedPxPerCell, renderMap, renderMapSvg } from '../render/renderMap';
+import { renderThumbnail, THUMBNAIL_CELLS_ACROSS } from '../render/thumbnail';
 import type { DungeonStyle, DungeonView } from '../style';
 
 /**
@@ -19,7 +20,9 @@ export type DungeonOutput =
    */
   | { kind: 'map'; pxPerCell: number; bitmap?: boolean; svg?: boolean; transparent?: boolean }
   /** The floor plan fitted into `width` × `height` pixels, as a bitmap: the preview. */
-  | { kind: 'preview'; width: number; height: number };
+  | { kind: 'preview'; width: number; height: number }
+  /** A window of the dungeon, as a bitmap: a style's card in the gallery (`renderThumbnail`). */
+  | { kind: 'thumbnail'; width: number; height: number; legibleAt: number };
 
 export interface DungeonJob {
   request: DungeonRequest;
@@ -62,10 +65,18 @@ function previewOf(model: DungeonModel, job: DungeonJob, width: number, height: 
   return { model, map, image: { type: 'bitmap', bitmap: canvas.transferToImageBitmap() } };
 }
 
+function thumbnailOf(model: DungeonModel, job: DungeonJob, output: Extract<DungeonOutput, { kind: 'thumbnail' }>): DungeonRendered {
+  const { canvas, ctx } = canvasOf(output.width, output.height);
+  renderThumbnail(ctx, model, job.style, job.view, output);
+  // The bitmap is a window of the map; `map` is the whole map's layout at the thumbnail's cell size.
+  return { model, map: mapLayout(model, output.width / THUMBNAIL_CELLS_ACROSS, job.view), image: { type: 'bitmap', bitmap: canvas.transferToImageBitmap() } };
+}
+
 export async function runDungeonJob(job: DungeonJob): Promise<DungeonRendered> {
   const { style, view, output } = job;
   const model = job.model ?? generateDungeon(job.request);
   if (output.kind === 'preview') return previewOf(model, job, output.width, output.height);
+  if (output.kind === 'thumbnail') return thumbnailOf(model, job, output);
   const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, view);
   const options = { pxPerCell, ...(output.transparent ? { transparent: true } : {}) };
   if (output.svg) {

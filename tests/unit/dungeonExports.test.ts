@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TFolder, type App } from 'obsidian';
 import { generateDungeon } from '../../src/app/dungeons/generate';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
+import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import type { DungeonJob, DungeonRendered } from '../../src/app/dungeons/worker/dungeonJob';
 import { saveDungeonExport, type DungeonExportKind } from '../../src/app/packages/components/dungeon-generator/dungeonExports';
@@ -33,7 +34,7 @@ async function save(kind: DungeonExportKind, extra: { pxPerCell?: number; transp
     const image = asked.output.kind === 'map' && asked.output.svg ? { type: 'svg' as const, svg: '<svg/>' } : { type: 'png' as const, blob: new Blob(['png']) };
     return Promise.resolve({ model, map: mapLayout(model, 30), image });
   };
-  const path = await saveDungeonExport({ app, render }, kind, { request, model, style: STYLE_PRESETS.parchment, view: DEFAULT_VIEW, collectionId: 'Dungeons', ...extra });
+  const path = await saveDungeonExport({ app, render }, kind, { request, model, style: dungeonStyle('parchment'), view: DEFAULT_VIEW, collectionId: 'Dungeons', ...extra });
   return { job, path, written };
 }
 

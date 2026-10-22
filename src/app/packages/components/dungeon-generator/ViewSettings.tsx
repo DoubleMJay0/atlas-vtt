@@ -1,8 +1,7 @@
 import React, { useId } from 'react';
 import { Button } from '../primitives/button';
 import { Slider } from '../primitives/slider';
-import { GRID_STYLES } from '../../../dungeons/styleJson';
-import type { DungeonView, GridStyle } from '../../../dungeons/style';
+import { GRID_STYLES, type DungeonView, type GridStyle } from '../../../dungeons/style';
 import type { MessageKey } from '../../../i18n/types';
 import { t } from '../../../i18n';
 import { SelectRow, SwitchRow } from './fields';

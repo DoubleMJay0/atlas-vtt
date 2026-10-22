@@ -7,6 +7,10 @@ export interface Palette {
   water: string;
   floor: string;
   paper: string;
+  /** What props and rubble are filled with: the paper, or the floor where the paper is ink. */
+  fill: string;
+  /** The grid's lines: ink let into the floor by the style's grid strength, opaque so an SVG needs no alpha. */
+  grid: string;
   /** Null when no inner shadow is drawn. */
   shadow: string | null;
 }
@@ -30,23 +34,54 @@ export function withAlpha(colour: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+function hex([r, g, b]: Rgb): string {
+  return `#${[r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** `a` moved towards `b` by `t` (0..1). */
+export function mixColours(a: string, b: string, t: number): string {
+  const from = parseHex(a);
+  const to = parseHex(b);
+  return hex([0, 1, 2].map(i => from[i]! + (to[i]! - from[i]!) * t) as Rgb);
+}
+
 /** Pure white switches the shadow off, as it would multiply to nothing. */
 function isWhite(colour: string): boolean {
   const [r, g, b] = parseHex(colour);
   return r === 255 && g === 255 && b === 255;
 }
 
-export function paletteOf(style: DungeonStyle, view: Pick<DungeonView, 'monochrome' | 'shadow'>): Palette {
+/** Luminance apart below which paper reads as ink, as in a style whose rock is solid ink. */
+const PAPER_AS_INK = 60;
+
+/** Whether the paper is as dark or light as the ink: a style whose rock is solid ink. */
+function paperIsInk(style: DungeonStyle): boolean {
   const { ink, paper } = style.colors;
-  if (view.monochrome) {
-    const inkL = luminance(parseHex(ink));
-    const paperL = luminance(parseHex(paper));
-    const snap = (colour: string): string => {
-      const l = luminance(parseHex(colour));
-      return Math.abs(l - inkL) <= Math.abs(l - paperL) ? ink : paper;
-    };
-    return { ink, paper, shading: snap(style.colors.shading), water: snap(style.colors.water), floor: snap(style.colors.floor), shadow: null };
-  }
+  return Math.abs(luminance(parseHex(paper)) - luminance(parseHex(ink))) < PAPER_AS_INK;
+}
+
+/**
+ * Monochrome is the style's ink and one other colour: its paper, or its floor where the paper is
+ * ink itself. Every colour takes whichever of the two it is nearer to; water takes the floor's
+ * and shows by its inked shore and ripples.
+ */
+function monochromeOf(style: DungeonStyle): Palette {
+  const { ink } = style.colors;
+  const inkL = luminance(parseHex(ink));
+  const apart = (colour: string): number => Math.abs(luminance(parseHex(colour)) - inkL);
+  const other = paperIsInk(style) ? style.colors.floor : style.colors.paper;
+  const otherL = luminance(parseHex(other));
+  const snap = (colour: string): string => (apart(colour) <= Math.abs(luminance(parseHex(colour)) - otherL) ? ink : other);
+  const floor = snap(style.colors.floor);
+  const paper = snap(style.colors.paper);
+  return { ink, paper, fill: paper === ink ? floor : paper, shading: snap(style.colors.shading), water: floor, floor, grid: ink, shadow: null };
+}
+
+export function paletteOf(style: DungeonStyle, view: Pick<DungeonView, 'monochrome' | 'shadow'>): Palette {
+  if (view.monochrome) return monochromeOf(style);
+  const { ink } = style.colors;
   const shadow = view.shadow && !isWhite(style.shadow.color) ? style.shadow.color : null;
-  return { ...style.colors, shadow };
+  const grid = mixColours(style.colors.floor, ink, style.grid.strength);
+  const fill = paperIsInk(style) ? style.colors.floor : style.colors.paper;
+  return { ...style.colors, fill, grid, shadow };
 }

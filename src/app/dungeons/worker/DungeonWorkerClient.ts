@@ -12,11 +12,14 @@ export interface DungeonWorkerClientOptions {
   jobTimeoutMs?: number;
 }
 
+/** Renders go first and are never dropped; a preview follows the latest; thumbnails wait for both. */
+type Lane = 'render' | 'preview' | 'thumbnail';
+
 interface Pending {
   id: number;
   job: DungeonJob;
-  preview: boolean;
-  /** A later preview replaced it: its result is dropped. */
+  lane: Lane;
+  /** A later preview replaced it, or its thumbnails were dropped: its result is dropped. */
   stale: boolean;
   resolve: (result: DungeonRendered | null) => void;
   reject: (reason: Error) => void;
@@ -33,7 +36,9 @@ function closeImage(result: DungeonRendered): void {
 /**
  * The window's side of the dungeon worker: one worker per app, which generates and draws
  * dungeons off the main thread one job at a time. Previews follow the latest request: a preview
- * still queued gives way to a newer one, and one already running is answered with null. A worker
+ * still queued gives way to a newer one, and one already running is answered with null.
+ * Thumbnails (the style gallery's cards) run only while nothing else waits, and are answered with
+ * null once dropped. A worker
  * that crashes or stops answering fails its job and is started anew for the next.
  */
 export class DungeonWorkerClient {
@@ -68,19 +73,33 @@ export class DungeonWorkerClient {
 
   /** Draws a dungeon; queued behind earlier jobs and never dropped. */
   async render(job: DungeonJob): Promise<DungeonRendered> {
-    const result = await this.enqueue(job, false);
+    const result = await this.enqueue(job, 'render');
     if (!result) throw new Error(STOPPED);
     return result;
   }
 
   /** Draws a preview, or answers null once a newer preview has replaced it. */
   preview(job: DungeonJob): Promise<DungeonRendered | null> {
-    if (this.running?.preview) this.running.stale = true;
+    this.drop('preview');
+    return this.enqueue(job, 'preview');
+  }
+
+  /** Draws a thumbnail once no render or preview waits, or answers null once dropped. */
+  thumbnail(job: DungeonJob): Promise<DungeonRendered | null> {
+    return this.enqueue(job, 'thumbnail');
+  }
+
+  /** Drops every thumbnail asked for and not yet answered: they answer null. */
+  dropThumbnails(): void {
+    this.drop('thumbnail');
+  }
+
+  private drop(lane: Lane): void {
+    if (this.running?.lane === lane) this.running.stale = true;
     for (let i = this.queue.length - 1; i >= 0; i--) {
-      if (!this.queue[i]!.preview) continue;
+      if (this.queue[i]!.lane !== lane) continue;
       this.queue.splice(i, 1)[0]!.resolve(null);
     }
-    return this.enqueue(job, true);
   }
 
   /** Stops the worker and fails every job. */
@@ -92,17 +111,18 @@ export class DungeonWorkerClient {
     for (const pending of failed) pending.reject(new Error(STOPPED));
   }
 
-  private enqueue(job: DungeonJob, preview: boolean): Promise<DungeonRendered | null> {
+  private enqueue(job: DungeonJob, lane: Lane): Promise<DungeonRendered | null> {
     if (this.disposed) return Promise.reject(new Error(STOPPED));
     return new Promise((resolve, reject) => {
-      this.queue.push({ id: this.nextId++, job, preview, stale: false, resolve, reject });
+      this.queue.push({ id: this.nextId++, job, lane, stale: false, resolve, reject });
       this.pump();
     });
   }
 
   private pump(): void {
     if (this.running || this.disposed) return;
-    const next = this.queue.shift();
+    const first = this.queue.findIndex(pending => pending.lane !== 'thumbnail');
+    const next = this.queue.splice(first < 0 ? 0 : first, 1)[0];
     if (!next) return;
     this.running = next;
     try {
@@ -162,7 +182,7 @@ export class DungeonWorkerClient {
   private settle(pending: Pending, result: DungeonRendered | null, error: Error | null): void {
     if (this.running === pending) this.running = null;
     if (pending.stale) {
-      // Nobody waits for a replaced preview, whatever became of it
+      // Nobody waits for a replaced preview or a dropped thumbnail, whatever became of it
       if (result) closeImage(result);
       pending.resolve(null);
     } else if (error) pending.reject(error);

@@ -57,7 +57,7 @@ function miterNormal(pts: readonly CellPoint[], i: number): Vec {
   return { x: m.x * scale, y: m.y * scale };
 }
 
-/** Rubble: small rounded stones in paper colour, outlined in ink. */
+/** Rubble: small rounded stones in the palette's fill, outlined in ink. */
 export function drawRubble(env: RenderEnv): void {
   const { ctx, palette, dungeon, style } = env;
   if (!env.view.props || dungeon.model.rubble.length === 0) return;
@@ -65,7 +65,7 @@ export function drawRubble(env: RenderEnv): void {
   clipToFloors(env);
   ctx.beginPath();
   for (const stone of dungeon.model.rubble) traceSmoothClosed(ctx, stone.points);
-  ctx.fillStyle = palette.paper;
+  ctx.fillStyle = palette.fill;
   ctx.fill();
   ctx.strokeStyle = palette.ink;
   ctx.lineJoin = 'round';

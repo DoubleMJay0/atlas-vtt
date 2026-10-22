@@ -6,16 +6,18 @@ import { parseHex } from '../../src/app/dungeons/render/palette';
 import { narrowPockets, inPocket } from '../../src/app/dungeons/render/pockets';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { fittedPxPerCell, renderMap } from '../../src/app/dungeons/render/renderMap';
-import { DEFAULT_VIEW, STYLE_PRESETS, type DungeonView, type StylePresetId } from '../../src/app/dungeons/style';
+import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
+import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
 import { pixelStats, savePng, withoutText } from './dungeonRenderHarness';
 
 /**
  * Real dungeons from the generator, over seeds and tags, drawn as the preview shows them and as
- * scene maps in every preset, without any text, and written to `out/dungeon-render/` as
+ * scene maps in a style of each kind, without any text, and written to `out/dungeon-render/` as
  * `gen-*.png` for a person to look at.
  */
 
-const PRESETS = Object.keys(STYLE_PRESETS) as StylePresetId[];
+/** One style of each kind of surroundings, and a dark one; every style is drawn in `dungeonStyles.gpu.test.ts`. */
+const STYLES = ['parchment', 'masonry', 'stipple', 'drafting', 'slate', 'night'] as const satisfies readonly DungeonStyleId[];
 
 /** A large dungeon at 100 px per cell must render in this long. */
 const MAP_BUDGET_MS = 1500;
@@ -54,40 +56,40 @@ function modelOf(name: string): DungeonModel {
   return model;
 }
 
-function expectSane(canvas: OffscreenCanvas, preset: StylePresetId): void {
-  const stats = pixelStats(canvas, parseHex(STYLE_PRESETS[preset].colors.ink));
+function expectSane(canvas: OffscreenCanvas, styleId: DungeonStyleId): void {
+  const stats = pixelStats(canvas, parseHex(dungeonStyle(styleId).colors.ink));
   expect(stats.ink).toBeGreaterThan(0.005);
   expect(stats.ink).toBeLessThan(0.6);
   expect(stats.transparent).toBe(0);
 }
 
 /** The map fitted into a 1400 × 1000 preview, as the generator's panel draws it. */
-function preview(model: DungeonModel, preset: StylePresetId, view: DungeonView): OffscreenCanvas {
+function preview(model: DungeonModel, styleId: DungeonStyleId, view: DungeonView): OffscreenCanvas {
   const pxPerCell = fittedPxPerCell(model, view, 1400, 1000);
   const layout = mapLayout(model, pxPerCell, view);
   const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
   const { ctx, texts } = withoutText(canvas.getContext('2d')!);
-  renderMap(ctx, model, STYLE_PRESETS[preset], view, { pxPerCell, legibleAt: 1 });
+  renderMap(ctx, model, dungeonStyle(styleId), view, { pxPerCell, legibleAt: 1 });
   expect(texts).toEqual([]);
   expect(Math.max(layout.widthPx / 1400, layout.heightPx / 1000)).toBeGreaterThan(0.99);
   return canvas;
 }
 
-function map(model: DungeonModel, preset: StylePresetId, pxPerCell: number, view: DungeonView = DEFAULT_VIEW): { canvas: OffscreenCanvas; ms: number } {
+function map(model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number, view: DungeonView = DEFAULT_VIEW): { canvas: OffscreenCanvas; ms: number } {
   const layout = mapLayout(model, pxPerCell, view);
   const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
   const started = performance.now();
   const real = canvas.getContext('2d')!;
   const { ctx, texts } = withoutText(real);
-  renderMap(ctx, model, STYLE_PRESETS[preset], view, { pxPerCell });
+  renderMap(ctx, model, dungeonStyle(styleId), view, { pxPerCell });
   expect(texts).toEqual([]);
   real.getImageData(0, 0, 1, 1);
   return { canvas, ms: performance.now() - started };
 }
 
 /** Points of rock the rooms close in on that the drawing left the colour of the paper. */
-function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, preset: StylePresetId, pxPerCell: number): string[] {
-  const style = STYLE_PRESETS[preset];
+function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number): string[] {
+  const style = dungeonStyle(styleId);
   const dungeon = visibleDungeon(model, DEFAULT_VIEW);
   const pockets = narrowPockets(dungeon, style.hatching.distance);
   const { originCell } = mapLayout(model, pxPerCell, DEFAULT_VIEW);
@@ -116,23 +118,23 @@ describe('generated dungeons', () => {
   }
 
   for (const name of ['default', 'large', 'round', 'flooded', 'crumbling'] as const) {
-    for (const preset of PRESETS.filter(p => p !== 'parchment')) {
-      it(`draws the ${name} preview in ${preset}`, async () => {
-        const canvas = preview(modelOf(name), preset, DEFAULT_VIEW);
-        expectSane(canvas, preset);
-        await savePng(canvas, `gen-preview-${name}-${preset}`);
+    for (const styleId of STYLES.filter(p => p !== 'parchment')) {
+      it(`draws the ${name} preview in ${styleId}`, async () => {
+        const canvas = preview(modelOf(name), styleId, DEFAULT_VIEW);
+        expectSane(canvas, styleId);
+        await savePng(canvas, `gen-preview-${name}-${styleId}`);
       });
     }
   }
 
   for (const name of ['default', 'round', 'flooded'] as const) {
-    for (const preset of PRESETS) {
-      it(`draws the ${name} map in ${preset}`, async () => {
-        const { canvas } = map(modelOf(name), preset, 100);
-        expectSane(canvas, preset);
+    for (const styleId of STYLES) {
+      it(`draws the ${name} map in ${styleId}`, async () => {
+        const { canvas } = map(modelOf(name), styleId, 100);
+        expectSane(canvas, styleId);
         if (name === 'default') expect(narrowPockets(visibleDungeon(modelOf(name), DEFAULT_VIEW), 0.5).length).toBeGreaterThan(0);
-        if (STYLE_PRESETS[preset].hatching.mode !== 'dots') expect(paperInPockets(canvas, modelOf(name), preset, 100)).toEqual([]);
-        await savePng(canvas, `gen-map-${name}-${preset}`);
+        if (dungeonStyle(styleId).hatching.mode !== 'dots') expect(paperInPockets(canvas, modelOf(name), styleId, 100)).toEqual([]);
+        await savePng(canvas, `gen-map-${name}-${styleId}`);
       });
     }
   }

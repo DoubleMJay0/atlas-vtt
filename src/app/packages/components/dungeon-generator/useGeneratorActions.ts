@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { App } from 'obsidian';
 import { createDungeonScene } from '../../../dungeons/scene/createDungeonScene';
 import { maxPxPerCell } from '../../../dungeons/render/layoutSize';
+import { dungeonStyle } from '../../../dungeons/styleCatalog';
 import type { DungeonWorkerClient } from '../../../dungeons/worker/DungeonWorkerClient';
 import { AssetService } from '../../../services/AssetService';
 import { showNotice } from '../../../ui/notice';
@@ -66,7 +67,7 @@ export function useGeneratorActions({ app, client, state, collectionId, onCreate
         request,
         // The dungeon as shown, hidden wings included; generated anew where none arrived yet.
         ...(model ? { model } : {}),
-        style: settings.style,
+        style: dungeonStyle(settings.style),
         view: settings.view,
         collectionId: now.collectionId,
       });
@@ -90,7 +91,7 @@ export function useGeneratorActions({ app, client, state, collectionId, onCreate
         request: now.request,
         model: now.model,
         name: now.name,
-        style: now.settings.style,
+        style: dungeonStyle(now.settings.style),
         view: now.settings.view,
         collectionId: collection,
         ...map,

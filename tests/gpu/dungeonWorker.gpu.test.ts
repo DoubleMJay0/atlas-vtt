@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { dungeonWalls } from '../../src/app/dungeons/scene/toWalls';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
+import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { DungeonWorkerClient } from '../../src/app/dungeons/worker/DungeonWorkerClient';
 import DungeonWorker from '../../src/app/dungeons/worker/dungeonWorker?worker&inline';
 import type { DungeonJob } from '../../src/app/dungeons/worker/dungeonJob';
@@ -8,7 +9,7 @@ import { imageDimensions } from '../../src/app/imageProcessing/imageDimensions';
 
 /** The real worker, end to end: generation, drawing and the image it hands back. */
 
-const STYLE = STYLE_PRESETS.parchment;
+const STYLE = dungeonStyle('parchment');
 
 const client = new DungeonWorkerClient({
   createWorker: () => new DungeonWorker({ name: 'Atlas dungeons (test)' }),

@@ -6,7 +6,8 @@ import { legibleStyle } from '../../../src/app/dungeons/render/legibleStyle';
 import { createRenderEnv } from '../../../src/app/dungeons/render/renderEnv';
 import { visibleDungeon } from '../../../src/app/dungeons/render/visibleDungeon';
 import type { Canvas2D } from '../../../src/app/dungeons/render/geometry';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import { largeDungeon, smallDungeon } from '../../fixtures/dungeonModels';
 import { addRoom, emptyModel } from '../../fixtures/dungeonModelBuilder';
 
@@ -26,7 +27,7 @@ function crosses(s: readonly number[], i: number, j: number): boolean {
 describe('dungeon hatching', () => {
   it('weaves clusters whose strokes never cross one another, the same for the same seed', () => {
     const dungeon = visibleDungeon(smallDungeon(), DEFAULT_VIEW);
-    const env = createRenderEnv(NO_CANVAS, dungeon, STYLE_PRESETS.parchment, DEFAULT_VIEW, 100);
+    const env = createRenderEnv(NO_CANVAS, dungeon, dungeonStyle('parchment'), DEFAULT_VIEW, 100);
     const strokes = hatchStrokes(env);
     expect(strokes.length / 4).toBeGreaterThan(500);
     let crossings = 0;
@@ -42,7 +43,7 @@ describe('dungeon hatching', () => {
 
   it('hatches a large dungeon quickly', () => {
     const dungeon = visibleDungeon(largeDungeon(), DEFAULT_VIEW);
-    const env = createRenderEnv(NO_CANVAS, dungeon, STYLE_PRESETS.parchment, DEFAULT_VIEW, 100);
+    const env = createRenderEnv(NO_CANVAS, dungeon, dungeonStyle('parchment'), DEFAULT_VIEW, 100);
     const started = performance.now();
     hatchStrokes(env);
     expect(performance.now() - started).toBeLessThan(1500);
@@ -81,7 +82,7 @@ describe('dungeon preview', () => {
   });
 
   it('keeps hatching and strokes from shrinking to hairlines on a small map', () => {
-    const style = STYLE_PRESETS.parchment;
+    const style = dungeonStyle('parchment');
     expect(legibleStyle(style, 30)).toBe(style);
     const small = legibleStyle(style, 12);
     expect(small.hatching.distance * 12).toBeGreaterThan(style.hatching.distance * 12 * 1.5);

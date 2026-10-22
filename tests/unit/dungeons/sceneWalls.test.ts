@@ -3,12 +3,13 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DoorKind, DungeonDoor, DungeonModel } from '../../../src/app/dungeons/model';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { dungeonWalls, wallInkWidth, type DungeonPlacement } from '../../../src/app/dungeons/scene/toWalls';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import type { WallSegment } from '../../../src/app/types/wallTypes';
 import { smallDungeon } from '../../fixtures/dungeonModels';
 import { duplicateWalls, escapingRays, farReach, looseEnds, overlappingWalls, toWorld, wallsCrossed } from './wallChecks';
 
-const STYLE = STYLE_PRESETS.parchment;
+const STYLE = dungeonStyle('parchment');
 const OPENINGS: readonly DoorKind[] = ['open', 'doorway', 'entrance', 'stairs-down', 'steps', 'portcullis'];
 
 const placementOf = (model: DungeonModel, pxPerCell = 100): DungeonPlacement => {

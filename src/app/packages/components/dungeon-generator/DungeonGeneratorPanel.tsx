@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { App } from 'obsidian';
 import type { CollectionMetadata } from '../../../services/AssetService';
+import { dungeonStyle } from '../../../dungeons/styleCatalog';
 import { DungeonWorkerClient } from '../../../dungeons/worker/DungeonWorkerClient';
 import { ContextMenuProvider } from '../../../react/root/ContextMenuContext';
 import { GeneratorFooter } from './GeneratorFooter';
@@ -52,7 +53,7 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
     request: state.request,
     generated: state.generated,
     model: state.model,
-    style: settings.style,
+    style: dungeonStyle(settings.style),
     view: settings.view,
     size,
   }, state.setGenerated);
@@ -81,7 +82,7 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
         state={state}
         layer={root}
         collection={collections && onCollectionChange ? { id: collectionId, options: collections, onChange: onCollectionChange } : undefined}
-        onSavePalette={() => { void actions.exportAs('palette'); }}
+        thumbnails={client}
       />
       <GeneratorFooter actions={actions} ready={state.model !== null} named={state.name.trim() !== ''} />
     </div>

@@ -7,6 +7,7 @@ import { SettingsSection } from './fields';
 import { StyleSettings } from './StyleSettings';
 import { TagChips } from './TagChips';
 import type { DungeonState } from './useDungeonState';
+import type { ThumbnailRenderer } from './useStyleThumbnails';
 import { ViewSettings } from './ViewSettings';
 
 interface GeneratorSettingsProps {
@@ -15,11 +16,12 @@ interface GeneratorSettingsProps {
   layer: HTMLElement | null;
   /** Offered where the GM may pick the collection the scene goes to. */
   collection?: { id: string; options: CollectionMetadata[]; onChange: (id: string) => void } | undefined;
-  onSavePalette: () => void;
+  /** Draws the style gallery's thumbnails. */
+  thumbnails: ThumbnailRenderer;
 }
 
 /** The settings column: what dungeon, which tags, what the map shows, and how it is drawn. */
-export function GeneratorSettings({ state, layer, collection, onSavePalette }: GeneratorSettingsProps): React.JSX.Element {
+export function GeneratorSettings({ state, layer, collection, thumbnails }: GeneratorSettingsProps): React.JSX.Element {
   const { request, settings } = state;
   return (
     <div className="atlas-dungeon-generator__settings">
@@ -40,7 +42,7 @@ export function GeneratorSettings({ state, layer, collection, onSavePalette }: G
         <ViewSettings view={settings.view} waterLevel={request.waterLevel} onView={state.setView} onWaterLevel={state.setWaterLevel} layer={layer} />
       </SettingsSection>
       <SettingsSection title={t('dungeon.style')}>
-        <StyleSettings preset={settings.preset} style={settings.style} onStyle={state.setStyle} onPreset={state.applyPreset} onSavePalette={onSavePalette} layer={layer} />
+        <StyleSettings state={state} renderer={thumbnails} />
       </SettingsSection>
     </div>
   );

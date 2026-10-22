@@ -4,7 +4,8 @@ import { visibleDungeon } from '../../../src/app/dungeons/render/visibleDungeon'
 import { insetRuns } from '../../../src/app/dungeons/render/water';
 import { taperedOutline } from '../../../src/app/dungeons/render/debris';
 import { paletteOf } from '../../../src/app/dungeons/render/palette';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import { smallDungeon } from '../../fixtures/dungeonModels';
 import { pool } from '../../fixtures/dungeonModelBuilder';
 import { rngFrom } from '../../../src/app/dungeons/rng';
@@ -82,12 +83,12 @@ describe('dungeon render details', () => {
   });
 
   it('snaps colours to ink or paper in monochrome and takes the shadow away', () => {
-    const style = STYLE_PRESETS.parchment;
+    const style = dungeonStyle('parchment');
     const mono = paletteOf(style, { monochrome: true, shadow: true });
     expect([style.colors.ink, style.colors.paper]).toContain(mono.floor);
     expect([style.colors.ink, style.colors.paper]).toContain(mono.water);
     expect(mono.shadow).toBeNull();
-    expect(paletteOf(STYLE_PRESETS.stipple, { monochrome: false, shadow: true }).shadow).toBeNull();
+    expect(paletteOf(dungeonStyle('stipple'), { monochrome: false, shadow: true }).shadow).toBeNull();
     expect(paletteOf(style, { monochrome: false, shadow: true }).shadow).toBe(style.shadow.color);
   });
 });

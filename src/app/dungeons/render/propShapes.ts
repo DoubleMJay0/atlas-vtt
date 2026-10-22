@@ -4,7 +4,7 @@ import type { Palette } from './palette';
 
 /**
  * Atlas' own drawings of the props, in cells around the prop's centre, its front towards −y.
- * Each fills in paper or water and inks its outline with the context's current line width; `fine`
+ * Each fills in the palette's fill or water and inks its outline with the context's current line width; `fine`
  * is the width of inner detail.
  */
 export interface PropPen {
@@ -74,30 +74,30 @@ const COFFIN = [-0.16, -0.45, 0.16, -0.45, 0.25, -0.18, 0.18, 0.45, -0.18, 0.45,
 
 const SHAPES: Record<PropKind, Draw> = {
   barrel: pen => {
-    disc(pen, 0, 0, 0.25, pen.palette.paper);
+    disc(pen, 0, 0, 0.25, pen.palette.fill);
     ring(pen, 0.19);
     ring(pen, 0.11);
   },
   crate: pen => {
-    box(pen, 0, 0, 0.6, 0.6, pen.palette.paper);
+    box(pen, 0, 0, 0.6, 0.6, pen.palette.fill);
     details(pen, [-0.3, -0.1, 0.3, -0.1, -0.3, 0.1, 0.3, 0.1]);
   },
   chest: pen => {
-    box(pen, 0, 0, 0.8, 0.6, pen.palette.paper);
+    box(pen, 0, 0, 0.8, 0.6, pen.palette.fill);
     details(pen, [-0.4, -0.08, 0.4, -0.08, -0.22, -0.3, -0.22, 0.3, 0.22, -0.3, 0.22, 0.3]);
   },
   fountain: pen => {
-    disc(pen, 0, 0, 0.5, pen.palette.paper);
+    disc(pen, 0, 0, 0.5, pen.palette.fill);
     disc(pen, 0, 0, 0.4, pen.palette.water);
     ring(pen, 0.25);
-    disc(pen, 0, 0, 0.1, pen.palette.paper);
+    disc(pen, 0, 0, 0.1, pen.palette.fill);
   },
   well: pen => {
-    disc(pen, 0, 0, 0.4, pen.palette.paper);
+    disc(pen, 0, 0, 0.4, pen.palette.fill);
     disc(pen, 0, 0, 0.24, pen.palette.water);
   },
   statue: pen => {
-    disc(pen, 0, 0, 0.33, pen.palette.paper);
+    disc(pen, 0, 0, 0.33, pen.palette.fill);
     const star: number[] = [];
     for (let i = 0; i < 10; i++) {
       const a = -Math.PI / 2 + (i * Math.PI) / 5;
@@ -111,7 +111,7 @@ const SHAPES: Record<PropKind, Draw> = {
     ctx.restore();
   },
   sarcophagus: pen => {
-    polygon(pen, COFFIN, pen.palette.paper);
+    polygon(pen, COFFIN, pen.palette.fill);
     const { ctx } = pen;
     ctx.save();
     ctx.lineWidth = pen.fine;
@@ -119,12 +119,12 @@ const SHAPES: Record<PropKind, Draw> = {
     ctx.restore();
   },
   altar: pen => {
-    box(pen, 0, 0, 0.8, 0.4, pen.palette.paper);
+    box(pen, 0, 0, 0.8, 0.4, pen.palette.fill);
     details(pen, [-0.3, -0.2, -0.3, 0.2, 0.3, -0.2, 0.3, 0.2]);
   },
   throne: pen => {
-    box(pen, 0, 0.05, 0.5, 0.4, pen.palette.paper);
-    box(pen, 0, 0.3, 0.6, 0.12, pen.palette.paper);
+    box(pen, 0, 0.05, 0.5, 0.4, pen.palette.fill);
+    box(pen, 0, 0.3, 0.6, 0.12, pen.palette.fill);
     details(pen, [-0.25, -0.05, -0.12, -0.05, 0.12, -0.05, 0.25, -0.05]);
   },
   dais: pen => {
@@ -132,7 +132,7 @@ const SHAPES: Record<PropKind, Draw> = {
     ctx.beginPath();
     ctx.arc(0, 0, 1.5, Math.PI, Math.PI * 2);
     ctx.closePath();
-    ctx.fillStyle = pen.palette.paper;
+    ctx.fillStyle = pen.palette.fill;
     ctx.fill();
     ctx.stroke();
     ctx.save();

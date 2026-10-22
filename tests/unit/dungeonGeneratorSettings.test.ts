@@ -7,8 +7,9 @@ import { dungeonWalls } from '../../src/app/dungeons/scene/toWalls';
 import { secretWingOf } from '../../src/app/dungeons/secretWings';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import { DEFAULT_DUNGEON_GENERATOR_SETTINGS, readDungeonGeneratorSettings } from '../../src/app/dungeons/generatorSettings';
-import { DEFAULT_VIEW, STYLE_LIMITS, STYLE_PRESETS } from '../../src/app/dungeons/style';
-import { paletteFileText, readDungeonStyle, readPaletteFile } from '../../src/app/dungeons/styleJson';
+import { parseHex } from '../../src/app/dungeons/render/palette';
+import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
+import { DEFAULT_STYLE_ID, DUNGEON_STYLES, dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { readStoredSettings } from '../../src/app/services/atlasSettings';
 import { SettingsService } from '../../src/app/services/SettingsService';
 
@@ -18,52 +19,51 @@ describe('reading the generator settings', () => {
     expect(readStoredSettings({}, 'mouse').settings.dungeonGenerator).toEqual(DEFAULT_DUNGEON_GENERATOR_SETTINGS);
   });
 
-  it('holds every number within the style limits and drops what it cannot read', () => {
+  it('keeps a style it knows and drops what it cannot read', () => {
     const read = readDungeonGeneratorSettings({
-      preset: 'custom',
-      style: { colors: { ink: 'red', paper: '#ABCDEF' }, strokes: { thick: 99 }, hatching: { mode: 'wavy', strokes: 3.6 } },
+      style: 'night',
       view: { grid: 'hexes', water: false, notes: 'boxes', titleAndStory: true, rotateToFit: false },
       tags: ['small', 'large', 'unknown', 7],
     });
-    expect(read.preset).toBe('custom');
-    expect(read.style.colors.ink).toBe(STYLE_PRESETS.parchment.colors.ink);
-    expect(read.style.colors.paper).toBe('#abcdef');
-    expect(read.style.strokes.thick).toBe(STYLE_LIMITS.strokeThick[1]);
-    expect(read.style.hatching).toMatchObject({ mode: 'hatching', strokes: 4 });
+    expect(read.style).toBe('night');
     // Fields of the page the generator once drew are left behind
     expect(read.view).toEqual({ ...DEFAULT_VIEW, water: false });
     // Rivals resolve in order: the later size wins
     expect(read.tags).toEqual(['large']);
   });
 
-  it('reads a preset name it does not know as the default preset', () => {
-    expect(readDungeonGeneratorSettings({ preset: 'neon' }).preset).toBe(DEFAULT_DUNGEON_GENERATOR_SETTINGS.preset);
+  it('reads a style it does not know, or the colours an earlier build stored, as the default style', () => {
+    expect(readDungeonGeneratorSettings({ style: 'neon' }).style).toBe(DEFAULT_STYLE_ID);
+    const earlier = readDungeonGeneratorSettings({ preset: 'custom', style: { colors: { ink: '#123456' }, strokes: { thick: 9 } } });
+    expect(earlier.style).toBe(DEFAULT_STYLE_ID);
+    expect(earlier).not.toHaveProperty('preset');
   });
 
   it('keeps what the GM chose in Atlas settings', () => {
     const settings = new SettingsService({} as App);
-    settings.setDungeonGenerator({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'] });
-    expect(settings.getDungeonGenerator()).toMatchObject({ view: { monochrome: true }, tags: ['tomb'], preset: 'parchment' });
+    settings.setDungeonGenerator({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint' });
+    expect(settings.getDungeonGenerator()).toEqual({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint' });
   });
 });
 
-describe('palette files', () => {
-  it('reads back what it saved', () => {
-    expect(readPaletteFile(paletteFileText(STYLE_PRESETS.slate))).toEqual(STYLE_PRESETS.slate);
+describe('the style catalog', () => {
+  it('has distinct ids and a style for every id, the default first', () => {
+    const ids = DUNGEON_STYLES.map(({ id }) => id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids[0]).toBe(DEFAULT_STYLE_ID);
+    expect(ids.length).toBeGreaterThanOrEqual(12);
+    expect(dungeonStyle('nothing')).toBe(dungeonStyle(DEFAULT_STYLE_ID));
   });
 
-  it('reads a palette saved with fonts, leaving them out', () => {
-    const old = JSON.stringify({ format: 'atlas-dungeon-palette', version: 1, style: { ...STYLE_PRESETS.slate, fonts: { title: { face: 'title', size: 48 } } } });
-    expect(readPaletteFile(old)).toEqual(STYLE_PRESETS.slate);
-  });
-
-  it('refuses text that is no palette', () => {
-    expect(readPaletteFile('not json')).toBeNull();
-    expect(readPaletteFile(JSON.stringify({ style: STYLE_PRESETS.slate }))).toBeNull();
-  });
-
-  it('fills fields a palette lacks from the base', () => {
-    expect(readDungeonStyle({ colors: { ink: '#123456' } }).strokes).toEqual(STYLE_PRESETS.parchment.strokes);
+  it('keeps the ink far from the floor in every style, so walls read under tokens', () => {
+    const luminance = (hex: string): number => {
+      const [r, g, b] = parseHex(hex);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    for (const { id, style } of DUNGEON_STYLES) {
+      const { ink, floor } = style.colors;
+      expect(Math.abs(luminance(ink) - luminance(floor)), id).toBeGreaterThan(90);
+    }
   });
 });
 
@@ -96,7 +96,7 @@ describe('hiding one secret wing', () => {
     expect(shown.some((room) => inWing(room, keptWing!))).toBe(true);
     expect(visibleDungeon(edited, DEFAULT_VIEW).doors.some((door) => door.to === hiddenWing)).toBe(false);
     const placement = { originCell: { x: 0, y: 0 }, pxPerCell: 100 };
-    const walls = (m: typeof model): number => Object.keys(dungeonWalls(m, STYLE_PRESETS.parchment, DEFAULT_VIEW, placement).walls).length;
+    const walls = (m: typeof model): number => Object.keys(dungeonWalls(m, dungeonStyle('parchment'), DEFAULT_VIEW, placement).walls).length;
     expect(walls(edited)).toBeLessThan(walls(model));
   });
 

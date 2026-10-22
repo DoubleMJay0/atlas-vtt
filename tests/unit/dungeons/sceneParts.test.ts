@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { dungeonScene } from '../../../src/app/dungeons/scene/toScene';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import { smallDungeon } from '../../fixtures/dungeonModels';
 
-const STYLE = STYLE_PRESETS.parchment;
+const STYLE = dungeonStyle('parchment');
 
 function placement(pxPerCell = 100): { originCell: { x: number; y: number }; pxPerCell: number } {
   const { originCell } = mapLayout(smallDungeon(), pxPerCell, DEFAULT_VIEW);

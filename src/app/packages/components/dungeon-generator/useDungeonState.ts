@@ -5,7 +5,8 @@ import { DEFAULT_DUNGEON_GENERATOR_SETTINGS, type DungeonGeneratorSettings } fro
 import type { DungeonModel, DungeonRequest } from '../../../dungeons/model';
 import { randomSeed } from '../../../dungeons/rng';
 import { secretWingOf } from '../../../dungeons/secretWings';
-import { STYLE_PRESETS, type DungeonStyle, type DungeonView, type StylePresetId } from '../../../dungeons/style';
+import type { DungeonView } from '../../../dungeons/style';
+import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
 import { withTag, type DungeonTag } from '../../../dungeons/tags';
 import { SettingsService } from '../../../services/SettingsService';
 
@@ -35,8 +36,8 @@ export interface DungeonState {
   random: () => void;
   setWaterLevel: (level: number | undefined) => void;
   setView: (changes: Partial<DungeonView>) => void;
-  setStyle: (style: DungeonStyle) => void;
-  applyPreset: (preset: StylePresetId) => void;
+  /** The look picked in the style gallery. */
+  setStyle: (style: DungeonStyleId) => void;
   /** Hides the secret wing `room` lies in (Hide room). */
   hideWing: (room: number) => void;
   /** Shows every secret wing hidden by hand again. */
@@ -124,8 +125,7 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
       return level === undefined ? rest : { ...rest, waterLevel: level };
     }), []),
     setView: useCallback((changes) => persist({ view: { ...settingsRef.current.view, ...changes } }), [persist]),
-    setStyle: useCallback((style) => persist({ style, preset: 'custom' }), [persist]),
-    applyPreset: useCallback((preset) => persist({ style: STYLE_PRESETS[preset], preset }), [persist]),
+    setStyle: useCallback((style) => persist({ style }), [persist]),
     hideWing: useCallback((room) => {
       const wing = generated ? secretWingOf(generated.model.rooms, room) : null;
       if (wing !== null) setEdits((current) => withWingHidden(current, wing));

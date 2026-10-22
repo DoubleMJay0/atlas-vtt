@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_VIEW, STYLE_PRESETS } from '../../../src/app/dungeons/style';
+import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import { DungeonWorkerClient } from '../../../src/app/dungeons/worker/DungeonWorkerClient';
 import type { DungeonJob, DungeonRendered, DungeonWorkerMessage, DungeonWorkerReply } from '../../../src/app/dungeons/worker/dungeonJob';
 import { smallDungeon } from '../../fixtures/dungeonModels';
@@ -40,7 +41,7 @@ class FakeWorker {
 
 const job = (seed: number): DungeonJob => ({
   request: { seed, tags: [] },
-  style: STYLE_PRESETS.parchment,
+  style: dungeonStyle('parchment'),
   view: DEFAULT_VIEW,
   output: { kind: 'preview', width: 1400, height: 1000 },
 });
@@ -114,6 +115,34 @@ describe('the dungeon worker client', () => {
     const result = rendered();
     workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result });
     await expect(render).resolves.toBe(result);
+  });
+
+  it('draws thumbnails only while no preview waits, and drops them on request', async () => {
+    const workers: FakeWorker[] = [];
+    const client = clientWith(workers);
+    const thumbnail = (seed: number): DungeonJob => ({ ...job(seed), output: { kind: 'thumbnail', width: 272, height: 204, legibleAt: 2 } });
+
+    const running = client.thumbnail(thumbnail(1));
+    const waiting = client.thumbnail(thumbnail(2));
+    const preview = client.preview(job(3));
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result: rendered() });
+    await expect(running).resolves.not.toBeNull();
+
+    // The preview asked for later goes before the thumbnail still waiting
+    await flush();
+    expect(workers[0]!.sent.map(m => m.job.request.seed)).toEqual([1, 3]);
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result: rendered() });
+    await expect(preview).resolves.not.toBeNull();
+
+    await flush();
+    expect(workers[0]!.sent.map(m => m.job.request.seed)).toEqual([1, 3, 2]);
+    const late = client.thumbnail(thumbnail(4));
+    client.dropThumbnails();
+    await expect(late).resolves.toBeNull();
+    const close = vi.fn();
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result: rendered(close) });
+    await expect(waiting).resolves.toBeNull();
+    expect(close).toHaveBeenCalled();
   });
 
   it('fails the job of a worker that crashed and starts a new one for the next', async () => {

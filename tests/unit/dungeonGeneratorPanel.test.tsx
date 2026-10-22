@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
 import { generateDungeon } from '../../src/app/dungeons/generate';
+import { DEFAULT_STYLE_ID, DUNGEON_STYLES, dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { createDungeonScene } from '../../src/app/dungeons/scene/createDungeonScene';
 import type { DungeonJob, DungeonRendered } from '../../src/app/dungeons/worker/dungeonJob';
@@ -13,7 +14,7 @@ import { AssetService } from '../../src/app/services/AssetService';
 import { SettingsService } from '../../src/app/services/SettingsService';
 import { stubLayout } from '../mocks/jsdomLayout';
 
-const worker = vi.hoisted(() => ({ preview: vi.fn(), render: vi.fn() }));
+const worker = vi.hoisted(() => ({ preview: vi.fn(), render: vi.fn(), thumbnail: vi.fn(), dropThumbnails: vi.fn() }));
 vi.mock('../../src/app/dungeons/worker/DungeonWorkerClient', () => ({ DungeonWorkerClient: { forApp: () => worker } }));
 vi.mock('../../src/app/dungeons/scene/createDungeonScene', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../src/app/dungeons/scene/createDungeonScene')>(),
@@ -40,6 +41,7 @@ beforeEach(() => {
   app = { scope: {} } as unknown as App;
   settings = new SettingsService(app);
   worker.preview.mockImplementation(answer);
+  worker.thumbnail.mockImplementation(answer);
   vi.spyOn(AssetService, 'getInstance').mockReturnValue(assets);
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -122,7 +124,7 @@ describe('the dungeon generator panel', () => {
     expect(service).toBe(assets);
     expect(options).toMatchObject({ collectionId: 'Dungeons', name: 'Sunken Vault' });
     expect(options.model?.rooms.length).toBeGreaterThan(0);
-    expect(options.style).toEqual(settings.getDungeonGenerator().style);
+    expect(options.style).toBe(dungeonStyle(settings.getDungeonGenerator().style));
   });
 
   it('says why a scene could not be created', async () => {
@@ -148,6 +150,61 @@ describe('the dungeon generator panel', () => {
     expect(worker.preview.mock.calls.length).toBe(calls);
     expect(lastJob().request).toEqual(request);
     expect(settings.getDungeonGenerator()).toEqual(before);
+  });
+});
+
+describe('the style gallery', () => {
+  it('offers every style as one radio group, the chosen one checked', () => {
+    renderPanel();
+    const group = screen.getByRole('radiogroup', { name: 'Style' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios).toHaveLength(DUNGEON_STYLES.length);
+    const chosen = within(group).getByRole('radio', { checked: true });
+    expect(chosen.textContent).toBe('Parchment');
+    // Tab reaches only the chosen card
+    expect(radios.filter((radio) => radio.tabIndex === 0)).toEqual([chosen]);
+  });
+
+  it('keeps the style picked by its id and draws the map in it', async () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('radio', { name: 'Night' }));
+    expect(settings.getDungeonGenerator().style).toBe('night');
+    expect(screen.getByRole('radio', { name: 'Night' }).getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => expect(lastJob().style).toBe(dungeonStyle('night')));
+  });
+
+  it('moves the choice with the arrow keys, Home and End', () => {
+    renderPanel();
+    const first = screen.getByRole('radio', { name: 'Parchment' });
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    const second = DUNGEON_STYLES[1]!.id;
+    expect(settings.getDungeonGenerator().style).toBe(second);
+    expect(document.activeElement?.getAttribute('aria-checked')).toBe('true');
+    fireEvent.keyDown(document.activeElement!, { key: 'End' });
+    expect(settings.getDungeonGenerator().style).toBe(DUNGEON_STYLES.at(-1)!.id);
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(settings.getDungeonGenerator().style).toBe(DEFAULT_STYLE_ID);
+  });
+
+  it('draws a thumbnail of the dungeon as shown in every style, the chosen one first', async () => {
+    settings.setDungeonGenerator({ style: 'volcanic' });
+    renderPanel();
+    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
+    const jobs = worker.thumbnail.mock.calls.map(([job]) => job as DungeonJob);
+    expect(jobs[0]!.style).toBe(dungeonStyle('volcanic'));
+    expect(new Set(jobs.map((job) => job.style)).size).toBe(DUNGEON_STYLES.length);
+    expect(jobs.every((job) => job.output.kind === 'thumbnail' && job.model !== undefined)).toBe(true);
+  });
+
+  it('asks for no thumbnail again for a dungeon and view it has drawn, and drops those of the last view', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
+    fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
+    expect(worker.dropThumbnails).toHaveBeenCalled();
+    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length * 2));
+    fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
+    await act(async () => { await Promise.resolve(); });
+    expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length * 2);
   });
 });
 
