@@ -1,0 +1,237 @@
+@use '../../../../../styles/tokens' as *;
+@use '../../../../../styles/mixins' as *;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Dungeon generator – panel shell, preview, footer and the two hosts
+// ═══════════════════════════════════════════════════════════════════════════
+
+.atlas-dungeon-generator {
+  // The layer its select lists open in: it clips nothing, the columns scroll.
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  height: 100%;
+  outline: none;
+}
+
+// ── Preview ─────────────────────────────────────────────────────────────────
+
+.atlas-dungeon-generator__preview {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding: $spacing-l;
+}
+
+.atlas-dungeon-preview {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  touch-action: none;
+
+  &[data-dragging='true'] {
+    cursor: grabbing;
+  }
+}
+
+.atlas-dungeon-preview__stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Drawn at the frame's device pixels: the largest size that fits keeps its shape while a newer one is drawn.
+.atlas-dungeon-preview__canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: $radius-l;
+  box-shadow: $shadow-md;
+}
+
+.atlas-dungeon-preview__skeleton {
+  @include atlas-flex-col($gap: $spacing-s);
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: $spacing-l;
+  border-radius: $radius-l;
+  background: var(--background-secondary);
+  --atlas-skeleton-surface: var(--background-secondary);
+}
+
+.atlas-dungeon-preview__skeleton-title {
+  font-size: $font-ui-large;
+}
+
+.atlas-dungeon-preview__skeleton-map {
+  flex: 1;
+  width: 70%;
+  border-radius: $radius-l;
+}
+
+.atlas-dungeon-preview__spinner {
+  position: absolute;
+  top: $spacing-s;
+  right: $spacing-s;
+}
+
+.atlas-dungeon-preview__failed {
+  position: absolute;
+  bottom: $spacing-s;
+  left: 50%;
+  margin: 0;
+  padding: $spacing-xs $spacing-s;
+  transform: translateX(-50%);
+  border-radius: $radius-m;
+  background: var(--background-primary);
+  color: var(--text-error);
+  font-size: $font-ui-small;
+}
+
+.atlas-dungeon-preview__ghost {
+  position: absolute;
+  border: $border-width-m solid var(--interactive-accent);
+  border-radius: $radius-s;
+  background: color-mix(in oklch, var(--interactive-accent) 10%, transparent);
+  pointer-events: none;
+}
+
+// A text of the page edited where it stands
+.atlas-dungeon-text-editor {
+  @include atlas-elevated-surface;
+  @include atlas-panel-radius($radius-xl);
+  @include atlas-flex-col($gap: $spacing-s);
+  position: absolute;
+  z-index: 2;
+  max-width: 360px;
+  padding: $spacing-s;
+}
+
+.atlas-dungeon-text-editor__heading {
+  @include atlas-field-label;
+}
+
+.atlas-dungeon-text-editor__field {
+  @include atlas-text-input;
+  @include atlas-panel-inset-radius($spacing-s);
+
+  &:is(textarea) {
+    height: auto;
+    padding: $spacing-s;
+    resize: vertical;
+    line-height: var(--line-height-normal);
+  }
+}
+
+.atlas-dungeon-text-editor__actions,
+.atlas-dungeon-cell-dialog__actions {
+  @include atlas-flex-row($gap: $spacing-s);
+  justify-content: flex-end;
+
+  > .btn {
+    @include atlas-panel-inset-radius($spacing-s, bottom-right);
+  }
+}
+
+// ── Footer ──────────────────────────────────────────────────────────────────
+
+.atlas-dungeon-generator__footer {
+  position: relative;
+  grid-column: 1 / -1;
+  @include atlas-modal-footer;
+  justify-content: space-between;
+}
+
+.atlas-dungeon-generator__status {
+  @include atlas-flex-row($gap: $spacing-xs);
+  min-width: 0;
+  font-size: $font-ui-small;
+  color: var(--text-muted);
+
+  svg {
+    width: $icon-s;
+    height: $icon-s;
+  }
+}
+
+.atlas-dungeon-generator__problem {
+  color: var(--text-error);
+}
+
+.atlas-dungeon-generator__actions {
+  @include atlas-flex-row($gap: $spacing-s);
+
+  > .btn:last-child {
+    @include atlas-modal-corner-control(bottom-right);
+  }
+}
+
+.atlas-dungeon-cell-dialog {
+  @include atlas-elevated-surface;
+  @include atlas-panel-radius($radius-xl);
+  @include atlas-flex-col($gap: $spacing-s);
+  position: absolute;
+  right: $spacing-l;
+  bottom: calc(100% + #{$spacing-s});
+  z-index: 2;
+  padding: $spacing-s;
+}
+
+.atlas-dungeon-cell-dialog__row {
+  @include atlas-flex-row($gap: $spacing-s);
+}
+
+.atlas-dungeon-generator .atlas-spin {
+  animation: atlas-spin 700ms linear infinite;
+}
+
+// ── Hosts ───────────────────────────────────────────────────────────────────
+
+// The map creator's Generate mode: header above, the panel below, no rail.
+.atlas-token-creator__window--generate {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+
+  > .atlas-token-creator__header {
+    grid-column: 1;
+  }
+
+  > .atlas-dungeon-generator {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+
+.atlas-token-creator__source-switch {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+// The generator in a dialog of its own (note pin search)
+.atlas-dungeon-generator-modal {
+  width: min(1280px, 94vw);
+  max-width: none;
+  height: min(860px, 90vh);
+  max-height: none;
+
+  > .modal-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    // The panel's footer meets the dialog's edges, as the creator's does.
+    margin: 0 calc(-1 * #{$spacing-l}) calc(-1 * #{$spacing-l});
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-dungeon-generator .atlas-spin {
+    animation-duration: 1.4s;
+  }
+}

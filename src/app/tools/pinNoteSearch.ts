@@ -21,6 +21,8 @@ export interface PinNoteSearchOptions {
 
 export interface PinNoteSearch {
   focus: () => void;
+  /** A create entry is at work (a dialog of its own may be open): presses outside the dropdown belong to it. */
+  isCreating: () => boolean;
 }
 
 interface ResultEntry {
@@ -277,5 +279,5 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
 
   render();
 
-  return { focus: () => search.focus() };
+  return { focus: () => search.focus(), isCreating: () => creating };
 }

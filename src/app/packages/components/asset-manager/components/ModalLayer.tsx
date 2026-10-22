@@ -17,7 +17,7 @@ import type { SelectionState } from '../hooks/useSelectionHandlers';
 import type { AssetCrudActions } from '../hooks/useAssetCrud';
 import type { TagsAndCollectionsState } from '../hooks/useTagsAndCollections';
 import type { StatblockLinkState } from '../hooks/useStatblockLink';
-import { useUvttImport } from '../hooks/useUvttImport';
+import { openCreatedScene, useUvttImport } from '../hooks/useUvttImport';
 import { tagGroupOfTab } from '../utils/assetTags';
 import { newStatblockOption } from '../../../../statblocks/editor/create/entryPoints';
 import { openTemplateEditor } from '../../../../statblocks/editor/openTemplateEditor';
@@ -113,6 +113,13 @@ export function ModalLayer({
             isOpen={crud.isMapCreatorOpen}
             mode="map"
             onImportMaps={importMaps}
+            onDungeonCreated={(scene) => {
+              void openCreatedScene(data.app, scene.scenePath, scene.name).then((opened) => {
+                // A scene that did not open is in the Scenes tab: the manager stays to show it.
+                crud.setIsMapCreatorOpen(false);
+                if (opened) onClose();
+              });
+            }}
             selectedCollection={selectedCollection}
             onClose={() => {
               crud.setIsMapCreatorOpen(false);

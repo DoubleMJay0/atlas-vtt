@@ -7,7 +7,7 @@ import { runInBackground } from '../utils/backgroundTask';
 import { resolvePinIcon } from '../types/pinIcons';
 import { createPinIconPalette, type PinIconPalette } from './pinIconPalette';
 import { createPinNoteSearch } from './pinNoteSearch';
-import { noteCreateEntry, type PinCreateEntry } from './pinCreateEntries';
+import { dungeonCreateEntry, noteCreateEntry, type PinCreateEntry } from './pinCreateEntries';
 import type { PinActionEventDetail } from '../types/atlasWindowEvents';
 import { animatePanelIn, animatePanelOutAndRemove } from '../ui/panelMotion';
 import { NotePinPreview } from './notePinPreview';
@@ -232,7 +232,7 @@ export class NotePinTool {
 
       // Outside click handler
       const handleOutsideClick = (e: MouseEvent): void => {
-        if (dropdown && !dropdown.contains(e.target as Node)) {
+        if (dropdown && !dropdown.contains(e.target as Node) && !noteSearch.isCreating()) {
           this.closeDropdown();
           resolve({ accepted: false });
         }
@@ -255,7 +255,8 @@ export class NotePinTool {
   
   /** What the search offers to create for a name no file carries, in the order listed. */
   private createEntries(mapPath: string | null): PinCreateEntry[] {
-    return [noteCreateEntry(this.obsidianApp, mapPath)];
+    const dungeon = dungeonCreateEntry(this.obsidianApp, mapPath);
+    return [noteCreateEntry(this.obsidianApp, mapPath), ...(dungeon ? [dungeon] : [])];
   }
 
   /**

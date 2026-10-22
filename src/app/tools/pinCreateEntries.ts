@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import { t } from '../i18n';
-import { INVALID_NAME_CHARACTERS } from '../services/assetPaths';
+import { INVALID_NAME_CHARACTERS, collectionIdOfPath } from '../services/assetPaths';
+import { openDungeonGenerator } from '../packages/components/dungeon-generator/openDungeonGenerator';
 import { freeNotePath } from '../utils/notePaths';
 
 /**
@@ -41,5 +42,20 @@ export function noteCreateEntry(app: App, mapPath: string | null): PinCreateEntr
       const file = await app.vault.create(freeNotePath(app, folder, name), '');
       return file.path;
     },
+  };
+}
+
+/**
+ * Generates a dungeon of the typed name as a scene of the map's own collection (a pin links only
+ * scenes of its collection), and links the pin to it. Offered only on a map in a collection.
+ */
+export function dungeonCreateEntry(app: App, mapPath: string | null): PinCreateEntry | null {
+  const collectionId = collectionIdOfPath(mapPath);
+  if (!collectionId) return null;
+  return {
+    id: 'dungeon',
+    label: (name) => t('pin.search.generateDungeon', { name }),
+    icon: 'castle',
+    create: async (name) => (await openDungeonGenerator(app, { name, collectionId }))?.scenePath ?? null,
   };
 }

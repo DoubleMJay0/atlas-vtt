@@ -1,0 +1,107 @@
+import { useEffect, useRef, useState } from 'react';
+import type { DungeonModel, DungeonRequest } from '../../../dungeons/model';
+import type { PageLayout } from '../../../dungeons/render/renderPage';
+import type { DungeonStyle, DungeonView } from '../../../dungeons/style';
+import type { DungeonJob, DungeonRendered } from '../../../dungeons/worker/dungeonJob';
+
+/** Draws previews: the dungeon worker, which answers null for a preview a newer one replaced. */
+export interface PreviewRenderer {
+  preview: (job: DungeonJob) => Promise<DungeonRendered | null>;
+}
+
+/** A drawn page and where everything on it landed. */
+export interface PagePicture {
+  bitmap: ImageBitmap;
+  layout: PageLayout;
+  width: number;
+  height: number;
+  /** The dungeon it shows, for hit-testing. */
+  model: DungeonModel;
+}
+
+export interface PagePreviewInput {
+  request: DungeonRequest;
+  /** The dungeon before the GM's edits, once generated; null asks the worker to generate it. */
+  generated: DungeonModel | null;
+  /** The dungeon as shown, with the GM's edits. */
+  model: DungeonModel | null;
+  style: DungeonStyle;
+  view: DungeonView;
+  /** Device pixels; null until the preview's frame was measured. */
+  size: { width: number; height: number } | null;
+}
+
+export interface PagePreview {
+  picture: PagePicture | null;
+  /** A newer picture is being drawn; the one shown is held until it arrives. */
+  drawing: boolean;
+  failed: boolean;
+}
+
+interface Drawn {
+  request: DungeonRequest;
+  model: DungeonModel | null;
+  style: DungeonStyle;
+  view: DungeonView;
+  width: number;
+  height: number;
+}
+
+const sameDrawing = (a: Drawn | null, b: Drawn): boolean => a !== null
+  && a.request === b.request && a.model === b.model && a.style === b.style && a.view === b.view && a.width === b.width && a.height === b.height;
+
+/**
+ * The live page preview, drawn by the dungeon worker so the panel never loses a frame. The latest
+ * change wins: a preview a newer one replaced is never shown, and the last picture stays until
+ * the next arrives, so the pane is never empty once it had a picture. The first answer for a
+ * request also brings its generated dungeon (`onGenerated`).
+ */
+export function usePagePreview(renderer: PreviewRenderer, input: PagePreviewInput, onGenerated: (request: DungeonRequest, model: DungeonModel) => void): PagePreview {
+  const [picture, setPicture] = useState<PagePicture | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const asked = useRef(0);
+  const drawn = useRef<Drawn | null>(null);
+  const onGeneratedRef = useRef(onGenerated);
+  onGeneratedRef.current = onGenerated;
+  const { request, generated, model, style, view, size } = input;
+
+  useEffect(() => {
+    if (!size) return;
+    // The generated dungeon drawn as it came needs no second drawing once it is stored.
+    const shown = model === generated ? null : model;
+    const next: Drawn = { request, model: generated ? shown : null, style, view, width: size.width, height: size.height };
+    if (generated && model === generated && sameDrawing(drawn.current, { ...next, model: null })) return;
+    const id = ++asked.current;
+    setDrawing(true);
+    const job: DungeonJob = { request, ...(generated && model ? { model } : {}), style, view, output: { kind: 'page', width: size.width, height: size.height } };
+    renderer.preview(job).then((result) => {
+      if (!result) return;
+      if (id !== asked.current || result.image.type !== 'bitmap' || !result.page) {
+        if (result.image.type === 'bitmap') result.image.bitmap.close();
+        return;
+      }
+      drawn.current = next;
+      const bitmap = result.image.bitmap;
+      setPicture((old) => {
+        old?.bitmap.close();
+        return { bitmap, layout: result.page!, width: size.width, height: size.height, model: result.model };
+      });
+      setFailed(false);
+      setDrawing(false);
+      if (!generated) onGeneratedRef.current(request, result.model);
+    }, (error: unknown) => {
+      if (id !== asked.current) return;
+      console.error('[Atlas] The dungeon preview could not be drawn', error);
+      setFailed(true);
+      setDrawing(false);
+    });
+  }, [renderer, request, generated, model, style, view, size]);
+
+  // The last picture's pixels go with the panel.
+  const pictureRef = useRef(picture);
+  pictureRef.current = picture;
+  useEffect(() => () => pictureRef.current?.bitmap.close(), []);
+
+  return { picture, drawing, failed };
+}

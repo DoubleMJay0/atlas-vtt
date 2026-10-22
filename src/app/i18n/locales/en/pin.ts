@@ -99,6 +99,7 @@ export const pin = {
   'pin.search.noHeaders': 'No matching headers found',
   'pin.search.noNotes': 'No notes found',
   'pin.search.createNote': 'Create note “{name}”',
+  'pin.search.generateDungeon': 'Generate dungeon “{name}”',
   'pin.search.invalidName': 'Note names cannot contain \\ / : * ? " < > | # ^ [ or ]',
   'pin.search.dotName': 'Note names cannot start with a dot',
   'pin.search.createFailed': 'Could not create “{name}”',

@@ -23,6 +23,7 @@ import { loadInitiativeCollapsed, loadInputMode, loadLightingQuality, saveInitia
 import { readDock, type InitiativeLayout } from '../initiative/initiativeLayout';
 import type { InitiativeTurnOptions } from '../initiative/turnOptions';
 import type { LightingQualityLevel } from '../lighting/lightingQuality';
+import { readDungeonGeneratorSettings, type DungeonGeneratorSettings } from '../dungeons/generatorSettings';
 
 export { TUTORIAL_IDS } from './atlasSettings';
 export type { AtlasSettings, NavigationInputMode, NavigationSettings, TutorialId } from './atlasSettings';
@@ -232,6 +233,17 @@ export class SettingsService {
   setLaserPointerSettings(settings: Partial<LaserPointerSettings>): void {
     // Spread over the stored record, so fields a newer Atlas added survive.
     this.settings.laserPointer = { ...this.settings.laserPointer, ...resolveLaserPointerSettings({ ...this.settings.laserPointer, ...settings }) };
+    this.commit();
+  }
+
+  /** The dungeon generator's preferences, each field checked. */
+  getDungeonGenerator(): DungeonGeneratorSettings {
+    return readDungeonGeneratorSettings(this.settings.dungeonGenerator);
+  }
+
+  setDungeonGenerator(changes: Partial<DungeonGeneratorSettings>): void {
+    // Spread over the stored record, so fields a newer Atlas added survive.
+    this.settings.dungeonGenerator = { ...this.settings.dungeonGenerator, ...changes };
     this.commit();
   }
 

@@ -47,6 +47,23 @@ function overManager(event: DragEvent): DataTransfer | null {
   return dataTransfer && target instanceof Element && target.closest(MANAGER_WINDOW) ? dataTransfer : null;
 }
 
+/**
+ * Opens a scene Atlas just created, as a new scene is opened; false where it could not be opened,
+ * which the GM is told (the scene stays in the Scenes tab).
+ */
+export async function openCreatedScene(app: App, scenePath: string, name: string): Promise<boolean> {
+  const scene = app.vault.getFileByPath(scenePath);
+  if (!scene) return false;
+  try {
+    await app.workspace.getLeaf(false).openFile(scene);
+    return true;
+  } catch (error) {
+    console.error('[Atlas] A new scene could not be opened', error);
+    showNotice(`"${name}" could not be opened. It is in the Scenes tab.`);
+    return false;
+  }
+}
+
 function sayNotMaps(files: readonly File[]): void {
   const names = files.map((file) => file.name);
   const last = names.pop();
@@ -82,16 +99,7 @@ export function useUvttImport(options: UvttImportOptions): ImportMaps {
     // A map creator that was not the one asking may hold images waiting to be created
     if (now.isMapCreatorOpen && creatorOpenings.current !== creator) return;
     if (stay?.()) return;
-    const scene = app.vault.getFileByPath(last.scenePath);
-    if (!scene) return;
-    try {
-      await app.workspace.getLeaf(false).openFile(scene);
-    } catch (error) {
-      console.error('[Atlas] An imported scene could not be opened', error);
-      showNotice(`"${last.name}" could not be opened. It is in the Scenes tab.`);
-      return;
-    }
-    now.onSceneOpened();
+    if (await openCreatedScene(app, last.scenePath, last.name)) now.onSceneOpened();
   });
 
   // Listened for on the document, ahead of the manager's own handlers: a folder tile takes

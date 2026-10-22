@@ -1,0 +1,199 @@
+@use '../../../../../styles/tokens' as *;
+@use '../../../../../styles/mixins' as *;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Dungeon generator – settings column
+// ═══════════════════════════════════════════════════════════════════════════
+
+.atlas-dungeon-generator__settings {
+  @include atlas-flex-col($gap: $spacing-l);
+  min-height: 0;
+  padding: $spacing-l;
+  overflow-y: auto;
+  border-left: $border-width-s solid var(--divider-color);
+  background: var(--background-secondary);
+  @include atlas-scrollbar;
+}
+
+.atlas-dungeon-section {
+  @include atlas-flex-col($gap: $spacing-s);
+  flex-shrink: 0;
+  outline: none;
+}
+
+.atlas-dungeon-section__header {
+  @include atlas-flex-row($gap: $spacing-s);
+  justify-content: space-between;
+}
+
+.atlas-dungeon-section__title {
+  margin: 0;
+  font-size: $font-ui-small;
+  font-weight: $font-weight-medium;
+  color: var(--text-muted);
+}
+
+.atlas-dungeon-fields,
+.atlas-dungeon-identity {
+  @include atlas-flex-col($gap: $spacing-s);
+}
+
+.atlas-dungeon-field {
+  @include atlas-flex-row($gap: $spacing-s);
+  justify-content: space-between;
+  min-height: $input-height-s;
+
+  > .atlas-select {
+    flex: 0 1 160px;
+    min-width: 0;
+  }
+}
+
+.atlas-dungeon-field--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: $spacing-xs;
+}
+
+.atlas-dungeon-field__line {
+  @include atlas-flex-row($gap: $spacing-s);
+  justify-content: space-between;
+}
+
+.atlas-dungeon-field__label {
+  @include atlas-truncate;
+  font-size: $font-ui-small;
+  color: var(--text-normal);
+}
+
+.atlas-dungeon-field__value {
+  font-size: $font-ui-smaller;
+  color: var(--text-muted);
+}
+
+.atlas-dungeon-field__reset.btn {
+  height: auto;
+  padding: 0 $spacing-xs;
+  font-size: $font-ui-smaller;
+}
+
+.atlas-dungeon-field__text {
+  @include atlas-text-input;
+}
+
+.atlas-dungeon-field__number {
+  @include atlas-text-input;
+  width: 72px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-dungeon-field--colour {
+  cursor: pointer;
+}
+
+.atlas-dungeon-field__hex {
+  margin-inline-start: auto;
+  font-size: $font-ui-smaller;
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+}
+
+.atlas-dungeon-field__colour {
+  @include atlas-colour-input(24px);
+  flex-shrink: 0;
+}
+
+.atlas-dungeon-identity__seed {
+  @include atlas-flex-row($gap: $spacing-s);
+
+  > .atlas-dungeon-field__seed {
+    flex: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  > .btn {
+    flex-shrink: 0;
+  }
+}
+
+// ── Tags ────────────────────────────────────────────────────────────────────
+
+.atlas-dungeon-tags {
+  @include atlas-flex-col($gap: $spacing-s);
+}
+
+.atlas-dungeon-tags__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-xs;
+}
+
+.atlas-dungeon-tag {
+  height: auto;
+  padding: 2px $spacing-s;
+  border: $border-width-s solid var(--background-modifier-border);
+  border-radius: $radius-full;
+  background: var(--background-primary);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+  cursor: pointer;
+  transition: background-color $transition-fast $transition-ease, color $transition-fast $transition-ease;
+
+  &:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+  }
+
+  &.atlas-active {
+    border-color: var(--interactive-accent);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+
+  @include atlas-focus-ring;
+}
+
+.atlas-dungeon-tags__actions {
+  @include atlas-flex-row($gap: $spacing-s);
+  justify-content: flex-end;
+}
+
+// ── Style ───────────────────────────────────────────────────────────────────
+
+.atlas-dungeon-style__groups .atlas-segmented__option {
+  padding: $spacing-xs 2px;
+  font-size: $font-ui-smaller;
+}
+
+.atlas-dungeon-style__files {
+  @include atlas-flex-row($gap: $spacing-s);
+
+  > .btn {
+    flex: 1;
+  }
+}
+
+.atlas-dungeon-font {
+  @include atlas-flex-row($gap: $spacing-xs);
+
+  > .atlas-select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  > .atlas-dungeon-field__number {
+    width: 56px;
+  }
+}
+
+.atlas-dungeon-font__flag {
+  @include atlas-icon-button('s');
+  flex-shrink: 0;
+
+  &.atlas-active {
+    background: var(--background-modifier-active-hover);
+    color: var(--text-normal);
+  }
+}

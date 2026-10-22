@@ -60,6 +60,7 @@ import { laser } from './laser';
 import { text } from './text';
 import { audio } from './audio';
 import { drawing } from './drawing';
+import { dungeon } from './dungeon';
 import { editToken } from './editToken';
 import { hex } from './hex';
 import { light } from './light';
@@ -156,6 +157,7 @@ export const en = {
   ...text,
   ...audio,
   ...drawing,
+  ...dungeon,
   ...editToken,
   ...hex,
   ...light,
