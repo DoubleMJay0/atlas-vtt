@@ -33,3 +33,4 @@
 - Players online see the campaign's world map wherever its image lies in the vault, and the GM is told when it cannot be sent
 - Typing @ in a value on a character sheet online suggests the values the player can reference, each with its current number
 - Players can write dice with @ references into their sheet's dice values, naming only values they can see
+- Editing an ability online keeps the @ references it was written with
