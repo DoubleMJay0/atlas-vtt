@@ -6,6 +6,7 @@ import { Q_SCALE } from '../types/shapeTypes';
 import type { Point } from '../types/visionTypes';
 import type { WallSegment } from '../types/wallTypes';
 import { nearbySegments, twoWayWalls, type LightReachPart } from './areaReach';
+import { inBox, polygonBox } from './polygonBounds';
 import { computeVisibility, pointInPolygon, type Polygon } from './visibility';
 
 /**
@@ -171,7 +172,7 @@ function evenlyChosen<T>(items: readonly T[], count: number): readonly T[] {
 
 /** Whether reflected light the rule counts reaches `point`. */
 export function reflectedAt(point: Point, parts: readonly ReflectionPart[]): boolean {
-  return parts.some((part) => Math.hypot(point.x - part.origin.x, point.y - part.origin.y) <= part.reach && pointInPolygon(point, part.polygon));
+  return parts.some((part) => Math.hypot(point.x - part.origin.x, point.y - part.origin.y) <= part.reach && inBox(point, polygonBox(part.polygon)) && pointInPolygon(point, part.polygon));
 }
 
 const areas = new WeakMap<readonly ReflectionPart[], Polygon[]>();

@@ -17,6 +17,12 @@ type AnyRecord = Record<string, unknown>;
 const results = new WeakMap<ObjectsByKind, WeakMap<readonly SceneLevel[], Map<string, ObjectsByKind>>>();
 /** The last result for each level shown, so a write on another level leaves a level's records as they were. */
 const previous = new Map<string, ObjectsByKind>();
+/**
+ * What each record of the last result for a level was filtered from, and among which levels: a
+ * write changes one kind (a dragged token, its tokens), and the other kinds are taken over without
+ * looking at their entries again.
+ */
+const previousInputs = new Map<string, { levels: readonly SceneLevel[]; records: AnyRecord }>();
 const PREVIOUS_LEVELS = 32;
 
 function isOnLevel(entry: unknown, levelId: string, levels: readonly SceneLevel[]): boolean {
@@ -50,12 +56,19 @@ const isRecordOfEntries = (value: unknown): value is AnyRecord => typeof value =
 /** `objects` with each kind filtered to the level; the earlier result, or `objects` itself, where every kind is the same. */
 function filterObjects(objects: ObjectsByKind, levelId: string, levels: readonly SceneLevel[]): ObjectsByKind {
   const earlier: AnyRecord | undefined = previous.get(levelId) as AnyRecord | undefined;
+  const inputs = previousInputs.get(levelId);
+  const sameInputs = earlier && inputs?.levels === levels ? inputs.records : undefined;
   const result: AnyRecord = {};
   for (const [key, record] of Object.entries(objects)) {
     if (record === undefined) continue;
     const before = earlier?.[key];
+    if (sameInputs && sameInputs[key] === record && key in earlier!) {
+      result[key] = before;
+      continue;
+    }
     result[key] = isRecordOfEntries(record) ? filterRecord(record, levelId, levels, isRecordOfEntries(before) ? before : undefined) : record;
   }
+  previousInputs.set(levelId, { levels, records: { ...objects } });
   const keys = Object.keys(result);
   const unchanged = (other: AnyRecord | undefined): boolean => !!other
     && Object.keys(other).filter((key) => other[key] !== undefined).length === keys.length && keys.every((key) => other[key] === result[key]);
@@ -85,7 +98,11 @@ export function levelObjects<O extends ObjectsByKind>(state: LevelObjectsState<O
     byLevel.set(levelId, result);
     previous.delete(levelId);
     previous.set(levelId, result);
-    if (previous.size > PREVIOUS_LEVELS) previous.delete(previous.keys().next().value!);
+    if (previous.size > PREVIOUS_LEVELS) {
+      const oldest = previous.keys().next().value!;
+      previous.delete(oldest);
+      previousInputs.delete(oldest);
+    }
   }
   // The same kinds as `objects`, each filtered: the shape the caller handed in
   return result as O;

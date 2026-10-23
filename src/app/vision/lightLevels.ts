@@ -4,6 +4,7 @@ import type { Point } from '../types/visionTypes';
 import type { AmbientLight, LightReach } from './sight';
 import { pointInPolygon } from './visibility';
 import { areaDistance } from './areaReach';
+import { inBox, reachBox } from './polygonBounds';
 import { reflectedAt } from './reflectedLight';
 
 /**
@@ -40,7 +41,7 @@ function ambientLevelAt(point: Point, light: AmbientLight): LightLevel {
 function levelFromLights(point: Point, lights: readonly LightReach[], above = -Infinity): LightLevel {
   let level: LightLevel = 'dark';
   for (const light of lights) {
-    if (light.darkness || (light.priority ?? 0) <= above) continue;
+    if (light.darkness || (light.priority ?? 0) <= above || !inBox(point, reachBox(light))) continue;
     const direct = directLevel(point, light);
     if (direct === 'bright') return 'bright';
     if (direct === 'dim' || (level === 'dark' && light.reflection?.length && reflectedAt(point, light.reflection))) level = 'dim';
@@ -50,7 +51,7 @@ function levelFromLights(point: Point, lights: readonly LightReach[], above = -I
 
 /** The light level `light` gives `point` straight from itself, without its reflection. */
 function directLevel(point: Point, light: LightReach): LightLevel {
-  const distance = light.parts ? areaDistance(point, light) : Math.hypot(point.x - light.origin.x, point.y - light.origin.y);
+  const distance = light.parts ? areaDistance(point, light, light.dim) : Math.hypot(point.x - light.origin.x, point.y - light.origin.y);
   if (distance > light.dim || (!light.parts && !pointInPolygon(point, light.polygon))) return 'dark';
   return distance <= light.bright ? 'bright' : 'dim';
 }

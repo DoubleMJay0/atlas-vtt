@@ -1,6 +1,7 @@
 import { distToSeg, segOf, splitBlocking, solidSegments, type Seg } from '../lighting/segments';
 import type { Point } from '../types/visionTypes';
 import type { WallSegment } from '../types/wallTypes';
+import { inBox, polygonBox } from './polygonBounds';
 import { computeVisibility, pointInPolygon, type Polygon } from './visibility';
 
 /**
@@ -119,14 +120,15 @@ interface AreaReach {
 /**
  * How far `point` lies from the nearest point of the area it has a clear line to, as the rule
  * counts it: 0 inside the area, the distance to the nearest traced point of the outline that
- * reaches it, or Infinity where none does.
+ * reaches it, or Infinity where none does. Points of the outline farther than `limit` are not asked:
+ * a caller that counts nothing beyond it gets Infinity instead of their distance.
  */
-export function areaDistance(point: Point, { polygon, parts = [] }: AreaReach): number {
+export function areaDistance(point: Point, { polygon, parts = [] }: AreaReach, limit = Infinity): number {
   if (pointInPolygon(point, polygon)) return 0;
   let best = Infinity;
   for (const part of parts) {
     const distance = Math.hypot(point.x - part.origin.x, point.y - part.origin.y);
-    if (distance < best && pointInPolygon(point, part.polygon)) best = distance;
+    if (distance < best && distance <= limit && inBox(point, polygonBox(part.polygon)) && pointInPolygon(point, part.polygon)) best = distance;
   }
   return best;
 }
