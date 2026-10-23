@@ -36,7 +36,8 @@ export interface UISlice extends ViewUIState {
   setToolbarEditing: (on: boolean) => void;
   /** Opens the dungeon generator over the map, in place of one open already. */
   openDungeonGenerator: (request: DungeonGeneratorRequest) => void;
-  closeDungeonGenerator: () => void;
+  /** Closes the generator opening `id`; one opened since stays. */
+  closeDungeonGenerator: (id: number) => void;
   setRoofsHidden: (hidden: boolean) => void;
 }
 
@@ -161,7 +162,9 @@ export function createUIActions(
       draft.dungeonGenerator = request;
       draft.isToolbarEditing = false;
     }),
-    closeDungeonGenerator: () => set((draft) => { draft.dungeonGenerator = null; }),
+    closeDungeonGenerator: (id) => set((draft) => {
+      if (draft.dungeonGenerator?.id === id) draft.dungeonGenerator = null;
+    }),
     setRoofsHidden: (hidden) => set((draft) => { draft.roofsHidden = hidden; }),
   };
 }

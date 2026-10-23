@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { openCreatedScene } from '../../../import/openCreatedScene';
 import { handledByAnotherControl } from '../../../keyboard/tooltipEscape';
 import { useAtlasUI } from '../../../react/root/AtlasUIContext';
-import { useAtlasStore } from '../../../react/ViewStoreContext';
+import { useAtlasStore, useViewStoreHook } from '../../../react/ViewStoreContext';
 import type { DungeonGeneratorRequest } from '../../../types/viewUIState';
 import { t } from '../../../i18n';
 import { CloseButton } from '../primitives/CloseButton';
@@ -21,7 +21,7 @@ export function DungeonGeneratorOverlay(): React.JSX.Element | null {
 
 interface OverlayProps {
   request: DungeonGeneratorRequest;
-  onClose: () => void;
+  onClose: (id: number) => void;
 }
 
 /**
@@ -31,6 +31,7 @@ interface OverlayProps {
  */
 function GeneratorOverlay({ request, onClose }: OverlayProps): React.JSX.Element {
   const { app } = useAtlasUI();
+  const store = useViewStoreHook();
   const [collectionId, setCollectionId] = useState(request.collectionId);
   const { collections } = useAssetCatalog(app, !request.waiting);
   const busy = useRef(false);
@@ -38,19 +39,23 @@ function GeneratorOverlay({ request, onClose }: OverlayProps): React.JSX.Element
 
   useEffect(() => {
     root.current?.focus();
-    // A view closed under it: a pin still waiting hears no scene came, unless one is being written.
+    // Closed under it (the view went, or the generator was opened anew): a pin still waiting hears
+    // no scene came, unless one is being written, which still answers it once written.
     return () => { if (!busy.current) settleDungeonRequest(request.id, null); };
   }, [request.id]);
 
   const close = (): void => {
     if (busy.current) return;
     settleDungeonRequest(request.id, null);
-    onClose();
+    onClose(request.id);
   };
 
+  // A scene finished after the GM opened the generator anew closes nothing and opens nothing:
+  // only a pin that waits for it still gets it.
   const created = (scene: CreatedDungeonScene): void => {
     settleDungeonRequest(request.id, scene);
-    onClose();
+    if (store.getState().dungeonGenerator?.id !== request.id) return;
+    onClose(request.id);
     if (!request.waiting) void openCreatedScene(app, scene.scenePath, scene.name, { level: scene.entryLevel });
   };
 

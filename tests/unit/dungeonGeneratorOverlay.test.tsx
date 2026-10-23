@@ -100,4 +100,19 @@ describe('the dungeon generator over the map', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('lets a scene still being written answer its pin after the generator was opened anew, closing nothing', async () => {
+    const { store } = mount();
+    let first: Promise<{ scenePath: string } | null> = Promise.resolve(null);
+    act(() => { first = generateDungeonFor(store, { name: 'Crypt', collectionId: 'Dungeons' }); });
+    const writing = panel.props!;
+    act(() => writing.onBusyChange!(true));
+    act(() => { void generateDungeonFor(store, { name: 'Vault', collectionId: 'Dungeons' }); });
+    expect(panel.props!.initialName).toBe('Vault');
+    act(() => writing.onCreated(SCENE));
+    await expect(first).resolves.toEqual({ scenePath: SCENE.scenePath });
+    // The newer generator stays open, and the older scene opens nowhere
+    expect(store.getState().dungeonGenerator?.name).toBe('Vault');
+    expect(openCreatedScene).not.toHaveBeenCalled();
+  });
 });

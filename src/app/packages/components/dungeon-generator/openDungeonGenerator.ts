@@ -17,9 +17,8 @@ export function settleDungeonRequest(id: number, scene: CreatedDungeonScene | nu
   settle?.(scene);
 }
 
+/** A newer opening replaces the one shown; the replaced one's overlay settles its pin as it leaves (`DungeonGeneratorOverlay`). */
 function open(store: StoreApi<ViewAtlasState>, collectionId: string, name: string, waits: boolean): number {
-  const previous = store.getState().dungeonGenerator;
-  if (previous) settleDungeonRequest(previous.id, null);
   openings += 1;
   store.getState().openDungeonGenerator({ id: openings, collectionId, name, waiting: waits });
   return openings;
