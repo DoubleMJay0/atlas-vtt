@@ -13,6 +13,7 @@ import { LightingEngine } from '../LightingEngine';
 import { LightingWorld } from '../LightingWorld';
 import type { EngineLight } from '../types';
 import { createTestRenderer, readFloats } from './gpuTestUtils';
+import { REFLECTION_BLUR_TEXELS } from '../reflectionShader';
 import { distToOutline, fuzzRooms, insidePolygon, rng, roomOutline, type P } from './fuzzRooms';
 import { renderView } from './leakFuzzScene';
 
@@ -33,7 +34,7 @@ interface Report {
   /** Light-map texels lit by reflected light alone as the rule counts it, well inside its reach, and those of them the picture leaves dark. */
   counted: number;
   missing: number;
-  /** Light-map texels the rule counts unlit, past every light's tail and every reflection's glow, and those of them the picture lights. */
+  /** Light-map texels the rule counts unlit, past every light's reach and every reflection's (and its blur), and those of them the picture lights. */
   beyond: number;
   stray: number;
 }
@@ -51,8 +52,8 @@ interface FuzzOptions {
  * sampling), drawn by the real engine. Nothing past a room's walls is lit (the reflection's fans
  * end on the walls' centre lines and are taken out of the capsules, and its blur stays within the
  * free floor); the light map lights what the rule counts lit by the reflection alone, well inside
- * its reach and off the walls; and it lights nothing the rule counts unlit beyond the tails and
- * glows, but what the blur carries across a shadow's edge.
+ * its reach and off the walls; and it lights nothing the rule counts unlit beyond the lights' and
+ * reaches, but what the blur carries across a shadow's edge.
  */
 async function fuzz({ seed, trials, bounds = { width: 2048, height: 2048 }, quality = DEFAULT_LIGHTING_QUALITY }: FuzzOptions): Promise<Report> {
   const renderer = await createTestRenderer(SIZE);
@@ -109,12 +110,12 @@ async function fuzz({ seed, trials, bounds = { width: 2048, height: 2048 }, qual
       world.flush();
       const map = readFloats(renderer, world.lightMap.texture);
       const width = world.lightMap.texture.source.pixelWidth;
-      // Each light traced as far as its tail ends (and a texel of filtering): beyond it no light of its own.
+      // Each light traced as far as it ends (and a texel of filtering): beyond it no light of its own.
       const far = new LightReaches().sync(shining.map((light) => ({ ...light, dim: light.dim * LIGHT_REACH + 2 * texel })), walls, sampling);
       const direct = reaches.map(({ reflection: _reflection, ...reach }): LightReach => reach);
       const nearWall = (p: P): boolean => walls.some((wall) => distToSeg(p[0], p[1], segOf(wall)) < 2 * wallRadius(texel) + wallCore(texel));
       // How far the blur carries light past a shadow's edge, at most.
-      const blur = REFLECTION.blur * reflection.reach + 2 * texel;
+      const blur = (REFLECTION_BLUR_TEXELS + 2) * texel;
       for (let t = 0; t < map.length; t += 4 * 3) {
         const p: P = [(((t / 4) % width) + 0.5) * texel, (Math.floor(t / 4 / width) + 0.5) * texel];
         if (!insidePolygon(p, outline) || distToOutline(p, outline) < 2 * wallRadius(texel) || nearWall(p)) continue;
@@ -123,7 +124,7 @@ async function fuzz({ seed, trials, bounds = { width: 2048, height: 2048 }, qual
           report.counted++;
           if (map[t]! <= 0) report.missing++;
         } else if (far.every((reach) => !pointInPolygon(point, reach.polygon))
-          && reaches.every((reach) => !reach.reflection?.some((part) => Math.hypot(point.x - part.origin.x, point.y - part.origin.y) <= part.reach * REFLECTION.fade + blur))) {
+          && reaches.every((reach) => !reach.reflection?.some((part) => Math.hypot(point.x - part.origin.x, point.y - part.origin.y) <= part.reach + blur))) {
           report.beyond++;
           if (map[t]! > 1e-3) report.stray++;
         }
@@ -139,7 +140,7 @@ async function fuzz({ seed, trials, bounds = { width: 2048, height: 2048 }, qual
 }
 
 /**
- * `stray` is the share of texels past every tail and glow the picture may light: a flame's own
+ * `stray` is the share of texels past every reach the picture may light: a flame's own
  * penumbra reaches round a wall's end past what the rule traces from its middle, and the saver
  * quality's coarse texels smooth it farther (3.3 % at 60 trials there, 0.3 % at the default).
  */

@@ -1,5 +1,5 @@
 import { Container, Mesh, UniformGroup, type Geometry, type Renderer, type RenderTexture, type Shader } from 'pixi.js';
-import { HALO, LIGHT_LEVELS, LIGHT_REACH, REFLECTION } from '../../../lighting/lightingConstants';
+import { HALO, LIGHT_LEVELS, REFLECTION, softEdge } from '../../../lighting/lightingConstants';
 import type { Rect } from '../../../lighting/segments';
 import type { VisionCone } from '../../../vision/visionCone';
 import type { MapBounds } from '../../../vision/visibility';
@@ -15,12 +15,11 @@ export interface DrawnLight {
   tile: Tile;
   bright: number;
   dim: number;
-  reach: number;
   color: readonly [number, number, number];
   intensity: number;
   /** A light that shines one way; unset shines all around. */
   cone?: VisionCone | undefined;
-  /** Width of the soft edge past a beam's sides, in world pixels; unset, the fade past the dim radius. */
+  /** Width of the soft edge inside a beam's sides, in world pixels; unset, `softEdge` of its dim radius. */
   edge?: number | undefined;
   /** The light its lit floor gives back (`ReflectionTiles`). */
   reflection?: ReflectionTile | undefined;
@@ -89,12 +88,11 @@ export class LightMap {
       slot.light[1] = light.tile.y;
       u.uBright = light.bright;
       u.uDim = light.dim;
-      u.uReach = light.reach;
       u.uIntensity = light.intensity;
       slot.color.set(light.color);
       const { cone } = light;
       slot.cone.set(cone ? [Math.cos(cone.facing), Math.sin(cone.facing), cone.angle / 2, cone.apex ?? 0] : ALL_AROUND);
-      u.uEdge = light.edge ?? (LIGHT_REACH - 1) * light.dim;
+      u.uEdge = light.edge ?? softEdge(light.dim);
       slot.mesh.shader!.resources.uTile = light.tile.texture.source;
       // An area light counts its distances from its outline (`Tile.distance`).
       u.uIsArea = light.tile.distance ? 1 : 0;
@@ -144,7 +142,6 @@ export class LightMap {
       uLight: { value: light, type: 'vec2<f32>' },
       uBright: { value: 0, type: 'f32' },
       uDim: { value: 0, type: 'f32' },
-      uReach: { value: 1, type: 'f32' },
       uIntensity: { value: 1, type: 'f32' },
       uLightColor: { value: color, type: 'vec3<f32>' },
       uBrightLevel: { value: LIGHT_LEVELS.bright, type: 'f32' },

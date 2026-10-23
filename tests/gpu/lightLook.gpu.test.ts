@@ -8,7 +8,8 @@ import { createViewAtlasStore } from '../../src/app/storeFactory';
 import type { LightEmission, LightSource } from '../../src/app/types/lightingTypes';
 import type { WallSegment } from '../../src/app/types/wallTypes';
 import type { MeasurementSettings } from '../../src/app/grid/measurementFormat';
-import { LIGHT_REACH } from '../../src/app/lighting/lightingConstants';
+import { LIGHT_FADE_MIN } from '../../src/app/lighting/lightingConstants';
+import type { TokenEntity } from '../../src/app/types';
 import { LightingRenderer } from '../../src/app/pixi/lighting/LightingRenderer';
 import { readRgba } from '../../src/app/pixi/lighting/engine/__tests__/gpuTestUtils';
 
@@ -35,7 +36,7 @@ function hall(): WallSegment[] {
   ];
 }
 
-const LOOKS: Record<string, { emission: LightEmission; area?: LightSource['area']; rotation?: number }> = {
+const LOOKS: Record<string, { emission?: LightEmission; area?: LightSource['area']; rotation?: number }> = {
   torch: { emission: { bright: 20, dim: 40, color: '#ff9a3c', intensity: 1, animation: 'none', kind: 'torch', sourceRadius: 2 } },
   candle: { emission: { bright: 5, dim: 10, color: '#ffb347', intensity: 0.9, animation: 'none', kind: 'candle', sourceRadius: 1 } },
   lantern: { emission: { bright: 30, dim: 60, color: '#ffd28a', intensity: 1, animation: 'none', kind: 'lantern', sourceRadius: 1.5 } },
@@ -44,7 +45,12 @@ const LOOKS: Record<string, { emission: LightEmission; area?: LightSource['area'
     emission: { bright: 5, dim: 20, color: '#ff8a3d', intensity: 1, animation: 'none', kind: 'custom' },
     area: [{ x: 420, y: 440 }, { x: 560, y: 430 }, { x: 590, y: 520 }, { x: 500, y: 590 }, { x: 410, y: 550 }],
   },
+  /** No light: a token with 60 ft of darkvision in the dark, the hall seen in the grey of darkvision. */
+  darkvision: {},
 };
+
+/** The token of the darkvision scene, where the lights stand. */
+const SEER: TokenEntity = { id: 'seer', kind: 'token', imagePath: '', x: 300, y: 500, size: 1, layer: 0, rotation: 0, isHidden: false, vision: { enabled: true, range: 200, darkvision: 60 } };
 
 async function savePng(pixels: Uint8ClampedArray, width: number, height: number, name: string): Promise<void> {
   const canvas = new OffscreenCanvas(width, height);
@@ -56,10 +62,11 @@ async function savePng(pixels: Uint8ClampedArray, width: number, height: number,
 }
 
 /**
- * How lights look in a dark hall, in the players' picture with token vision off: every light's
- * dim range keeps its level up to its dim radius and then eases out over its tail
- * (`LIGHT_TAIL`), with no ring where the rules stop counting it and no visible end. Pictures in
- * `out/light-look/`, whole at zoom 1 and the dim radius close up at zoom 3.
+ * How lights look in a dark hall, in the players' picture with token vision off: from its bright
+ * radius every light fades into the dark (`FADE_GLSL`), with no ring where the fade begins, nearly
+ * black at its dim radius, where the rules stop counting it, and nothing of it past that; and how
+ * a token's darkvision fades towards the edge of its range (`SENSE_FADE`). Pictures in
+ * `out/light-look/`, whole at zoom 0.6 and the fade close up at zoom 3.
  */
 describe('the look of a light in the dark', () => {
   const cleanup: (() => void)[] = [];
@@ -89,9 +96,12 @@ describe('the look of a light in the dark', () => {
     const store = createViewAtlasStore(createInMemoryApp().app, `light-look-${Math.random()}`);
     store.getState().setPersistenceEnabled(false);
     store.getState().setMapPath('maps/light-look.atlasmap');
-    const light: LightSource = { id: 'light', kind: 'light', x: 300, y: 500, emission: look.emission, ...(look.area && { x: 495, y: 505, area: look.area }), ...(look.rotation !== undefined && { rotation: look.rotation }) };
-    store.setState((state) => ({ grid: { ...state.grid, size: CELL }, objects: { ...state.objects, walls: Object.fromEntries(hall().map((w) => [w.id, w])), lights: { light } } }));
-    store.getState().setSceneLighting({ enabled: true, ambient: 0, tokenVision: false });
+    const lights: Record<string, LightSource> = look.emission
+      ? { light: { id: 'light', kind: 'light', x: 300, y: 500, emission: look.emission, ...(look.area && { x: 495, y: 505, area: look.area }), ...(look.rotation !== undefined && { rotation: look.rotation }) } }
+      : {};
+    const tokens = look.emission ? {} : { seer: SEER };
+    store.setState((state) => ({ grid: { ...state.grid, size: CELL }, objects: { ...state.objects, walls: Object.fromEntries(hall().map((w) => [w.id, w])), lights, tokens } }));
+    store.getState().setSceneLighting({ enabled: true, ambient: 0, tokenVision: !look.emission, exploredMemory: false });
     const view = new LightingRenderer({ viewport, app, store, measurement: () => MEASUREMENT, bounds: () => ({ width: WIDTH, height: HEIGHT }), albedo: () => null });
     cleanup.push(() => {
       view.destroy();
@@ -114,27 +124,30 @@ describe('the look of a light in the dark', () => {
     return (sx, sy) => pixels[(sy * width + sx) * 4]! + pixels[(sy * width + sx) * 4 + 1]! + pixels[(sy * width + sx) * 4 + 2]!;
   }
 
-  it.each(Object.keys(LOOKS))('draws a %s that eases out past its dim radius', async (name) => {
+  it.each(Object.keys(LOOKS))('draws a %s that fades into the dark within what the rules count', async (name) => {
     await picture(name, 0.6, 0, 0, 840, 1020);
-    const { emission } = LOOKS[name]!;
-    const dim = emission.dim * FOOT;
-    if (LOOKS[name]!.area || emission.angle) {
-      // The pool's and the beam's tails are looked at in the pictures; the profile below is a round light's.
+    const { emission, area } = LOOKS[name]!;
+    if (area || emission?.angle) {
+      // The pool's and the beam's fades are looked at in the pictures; the profile below is a round one's.
       await picture(name, 2, 150, 700, 1024, 280);
       return;
     }
-    // Close up, south of the light, where the floor is open: from inside the dim radius to past the reach.
+    // A light fades from its bright radius (or `LIGHT_FADE_MIN` before its dim radius) to its dim
+    // radius; darkvision of 60 ft over the last `SENSE_FADE` of it, with sight ending at 200 px.
+    const [from, end] = emission ? [Math.min(emission.bright, emission.dim * (1 - LIGHT_FADE_MIN)) * FOOT, emission.dim * FOOT] : [0.6 * 60 * FOOT, 60 * FOOT];
+    // Close up, south of the light, where the floor is open: from the fade's start to past its end.
     const zoom = 3;
-    const top = 500 + dim * 0.85;
-    const length = Math.ceil(dim * (LIGHT_REACH - 0.85) + 20);
-    const at = await picture(name, zoom, 300 - 50, top, 300, Math.min(1024, Math.ceil(length * zoom)));
-    const profile = Array.from({ length: Math.min(1024, Math.ceil(length * zoom)) }, (_, sy) => at(150, sy));
-    const atDim = profile[Math.round((500 + dim - top) * zoom)]!;
-    const atTail = (share: number): number => profile[Math.min(profile.length - 1, Math.round((500 + dim * (1 + share) - top) * zoom))]!;
-    // Lit at its dim level up to the edge, faintly lit well into the tail, and at its end only by the floor's bounce.
-    expect(atDim).toBeGreaterThan(60);
-    expect(atTail(0.15)).toBeGreaterThan(atDim * 0.25);
-    expect(atTail(LIGHT_REACH - 1 + 0.02)).toBeLessThan(atDim * 0.06);
+    const top = 500 + from - 10;
+    const rows = Math.min(1024, Math.ceil((end - from + 40) * zoom));
+    const at = await picture(name, zoom, 300 - 50, top, 300, rows);
+    const profile = Array.from({ length: rows }, (_, sy) => at(150, sy));
+    const sample = (d: number): number => profile[Math.min(profile.length - 1, Math.round((500 + d - top) * zoom))]!;
+    const start = sample(from);
+    // Lit where the fade begins, still clearly halfway, nearly black at its end, and past it only the floor's bounce.
+    expect(start).toBeGreaterThan(60);
+    expect(sample((from + end) / 2)).toBeGreaterThan(start * 0.3);
+    expect(sample(end - 2)).toBeLessThan(start * 0.2);
+    expect(sample(end + 4)).toBeLessThan(start * 0.06);
     // No ring and no step: never brighter outwards, and no screen pixel more than a few levels below the last.
     for (let i = 1; i < profile.length; i++) {
       expect([i, profile[i]! <= profile[i - 1]! + 3]).toEqual([i, true]);

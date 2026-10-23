@@ -1,4 +1,4 @@
-import { TAIL_POWER } from '../../../lighting/lightingConstants';
+import { FADE_POWER } from '../../../lighting/lightingConstants';
 /**
  * PIXI compiles a shader as GLSL ES 1.00 unless its source starts with this line; `textureLod()`,
  * `flat` and the other WebGL2 features the engine uses need ES 3.00, so every engine shader starts with it.
@@ -92,15 +92,17 @@ vec3 nightShift(vec3 lit, float night) {
 }`;
 
 /**
- * A light's tail (`LIGHT_TAIL`): the share of its light left at u, 1 where the tail starts and 0
- * where the light ends. What the eye sees falls as u³(4 − 3u), level at both ends and falling
- * early, so it eases out without a ring and leaves a long, faint end, as light spilling into the
- * dark does; the light falls as that to the power `TAIL_POWER`, about the display's own.
+ * The fade of a light within its dim range, a beam towards its sides and a sense towards its
+ * range's edge (`LIGHT_FADE_MIN`): the share left at u, 1 where the fade begins and 0 where it
+ * ends. What the eye sees falls as (u(2 − u))^1.5: level where it begins, so no ring marks it,
+ * still clearly lit halfway (0.65), dark near its end (0.08 at nine tenths), and level again at
+ * nothing, so no step marks the end. The light falls as that to the power `FADE_POWER`, about the
+ * display's own.
  */
-export const TAIL_GLSL = `
-float tail(float u) {
+export const FADE_GLSL = `
+float fadeOf(float u) {
   u = clamp(u, 0.0, 1.0);
-  return pow(u * u * u * (4.0 - 3.0 * u), ${TAIL_POWER.toFixed(2)});
+  return pow(u * (2.0 - u), ${(1.5 * FADE_POWER).toFixed(2)});
 }`;
 
 /** Share of a unit disc left of x (-1..1). */
