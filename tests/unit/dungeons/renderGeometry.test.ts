@@ -88,7 +88,7 @@ describe('dungeon render details', () => {
     expect([style.colors.ink, style.colors.paper]).toContain(mono.floor);
     expect([style.colors.ink, style.colors.paper]).toContain(mono.water);
     expect(mono.shadow).toBeNull();
-    expect(paletteOf(dungeonStyle('stipple'), { monochrome: false, shadow: true }).shadow).toBeNull();
+    expect(paletteOf(dungeonStyle('drafting'), { monochrome: false, shadow: true }).shadow).toBeNull();
     expect(paletteOf(style, { monochrome: false, shadow: true }).shadow).toBe(style.shadow.color);
   });
 });

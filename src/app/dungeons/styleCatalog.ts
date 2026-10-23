@@ -35,21 +35,21 @@ export const DUNGEON_STYLES: readonly DungeonStyleEntry[] = [
   {
     id: 'parchment',
     style: {
-      colors: { ink: '#1a1612', shading: '#c8bfae', water: '#a9aea6', floor: '#f6eddc', paper: '#ebdfcb' },
-      strokes: { thin: 0.5, hatching: 1.2, normal: 1.5, thick: 3.5 },
-      shadow: { color: '#9a958e', distance: 0.15 },
-      hatching: { mode: 'hatching', strokes: 3, size: 0.3, distance: 0.5 },
-      grid: { weight: 1, strength: 0.6 },
+      colors: { ink: '#2a1c14', shading: '#c6b291', water: '#9db0a6', floor: '#f1e5c9', paper: '#d4c3a3' },
+      strokes: { thin: 0.55, hatching: 0.95, normal: 1.35, thick: 3 },
+      shadow: { color: '#a8957a', distance: 0.2 },
+      hatching: { mode: 'hatching', strokes: 4, size: 0.42, distance: 0.62 },
+      grid: { weight: 0.9, strength: 0.5 },
     },
   },
   {
     id: 'masonry',
     style: {
-      colors: { ink: '#2b231c', shading: '#bdbab0', water: '#869a9c', floor: '#e4e0cc', paper: '#d8d3c0' },
-      strokes: { thin: 0.5, hatching: 0.5, normal: 1.5, thick: 3 },
-      shadow: { color: '#b19f95', distance: 0.3 },
-      hatching: { mode: 'stonework', strokes: 3, size: 0.4, distance: 0.6 },
-      grid: { weight: 1, strength: 0.5 },
+      colors: { ink: '#22262b', shading: '#c8c2b2', water: '#7f979c', floor: '#e6e3da', paper: '#b9b4a6' },
+      strokes: { thin: 0.5, hatching: 0.5, normal: 1.3, thick: 2.8 },
+      shadow: { color: '#a39a8e', distance: 0.25 },
+      hatching: { mode: 'stonework', strokes: 3, size: 0.52, distance: 0.7 },
+      grid: { weight: 1, strength: 0.45 },
     },
   },
   {
@@ -65,11 +65,11 @@ export const DUNGEON_STYLES: readonly DungeonStyleEntry[] = [
   {
     id: 'stipple',
     style: {
-      colors: { ink: '#000000', shading: '#000000', water: '#d9e4e2', floor: '#ffffff', paper: '#f3f3f1' },
-      strokes: { thin: 0.3, hatching: 0.3, normal: 1, thick: 2 },
-      shadow: { color: '#ffffff', distance: 0.2 },
-      hatching: { mode: 'dots', strokes: 4, size: 0.6, distance: 0.9 },
-      grid: { weight: 1, strength: 0.5 },
+      colors: { ink: '#2a2c30', shading: '#2a2c30', water: '#cfdad8', floor: '#f8f6f0', paper: '#e4e1d8' },
+      strokes: { thin: 0.35, hatching: 0.35, normal: 1.1, thick: 2.4 },
+      shadow: { color: '#dcd9d1', distance: 0.18 },
+      hatching: { mode: 'dots', strokes: 4, size: 0.5, distance: 0.75 },
+      grid: { weight: 0.9, strength: 0.4 },
     },
   },
   {
@@ -165,11 +165,11 @@ export const DUNGEON_STYLES: readonly DungeonStyleEntry[] = [
   {
     id: 'slate',
     style: {
-      colors: { ink: '#0b0c0d', shading: '#7d7665', water: '#6f9a98', floor: '#8b939b', paper: '#b6bdab' },
-      strokes: { thin: 0.5, hatching: 1, normal: 1.5, thick: 2 },
-      shadow: { color: '#cbcbcb', distance: 0.2 },
-      hatching: { mode: 'bricks', strokes: 4, size: 0.4, distance: 0.67 },
-      grid: { weight: 1, strength: 0.5 },
+      colors: { ink: '#14181c', shading: '#6f7378', water: '#5f8a8c', floor: '#a4a9ab', paper: '#cfccc0' },
+      strokes: { thin: 0.5, hatching: 0.9, normal: 1.4, thick: 2.4 },
+      shadow: { color: '#8f9396', distance: 0.22 },
+      hatching: { mode: 'bricks', strokes: 3, size: 0.34, distance: 0.5 },
+      grid: { weight: 1, strength: 0.45 },
     },
   },
   {
@@ -185,11 +185,11 @@ export const DUNGEON_STYLES: readonly DungeonStyleEntry[] = [
   {
     id: 'drafting',
     style: {
-      colors: { ink: '#0d1015', shading: '#ececec', water: '#e6eef3', floor: '#ffffff', paper: '#fcfcfc' },
-      strokes: { thin: 0.5, hatching: 0.5, normal: 1, thick: 2 },
+      colors: { ink: '#1b2733', shading: '#e1e6e4', water: '#d3e3e8', floor: '#fbfaf6', paper: '#eceee8' },
+      strokes: { thin: 0.45, hatching: 0.55, normal: 1.1, thick: 2.2 },
       shadow: { color: '#ffffff', distance: 0.1 },
-      hatching: { mode: 'bricks', strokes: 2, size: 0.5, distance: 0.333 },
-      grid: { weight: 1, strength: 0.5 },
+      hatching: { mode: 'bricks', strokes: 2, size: 0.36, distance: 0.42 },
+      grid: { weight: 0.8, strength: 0.4 },
     },
   },
 ];
