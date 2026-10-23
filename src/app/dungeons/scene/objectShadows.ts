@@ -10,7 +10,8 @@ import type { DungeonPlacement } from './toWalls';
 /**
  * Tall objects as small closed walls in their scene that block sight (cover) without walls drawn by
  * the GM: standing columns, statues, wells, and the terrain that is total cover (pillars, statues,
- * wall fragments, obelisks). Low ones (altars, chests, sarcophagi, crates, barrels, a dais, low
+ * wall fragments, obelisks). Each face blocks only from inside (`insideOf`): the object's top is
+ * seen with its faces, never a black hole in the players' picture, and what stands behind it is hidden. Low ones (altars, chests, sarcophagi, crates, barrels, a dais, low
  * walls) get none. Light passes them (`blocks: 'sight'`): the floor's relief casts every object's
  * shadow from each light, its top lit, so a wall around it would only black its top out. Each
  * outline lies inside what the map draws, and keeps farther than the engine's seal tolerance from
@@ -119,6 +120,17 @@ function segmentDistance(a: Point, b: Point, c: Point, d: Point): number {
   return Math.min(pointToSegment(a, c, d), pointToSegment(b, c, d), pointToSegment(c, a, b), pointToSegment(d, a, b));
 }
 
+/**
+ * The side of the edge `a`→`b` the outline's middle lies on, which the edge blocks sight from
+ * (`WallSegment.direction`): a token outside sees through the near faces onto the object's top and
+ * is stopped at the far faces, so the top shows as seen wherever its faces are while what lies
+ * behind stays hidden. (The outline is convex, so every face's inside is the middle's side.)
+ */
+function insideOf(a: Point, b: Point, centre: Point): 'left' | 'right' {
+  // The left normal of a→b is (-dy, dx), as `wallNormal` has it.
+  return -(b.y - a.y) * (centre.x - a.x) + (b.x - a.x) * (centre.y - a.y) > 0 ? 'left' : 'right';
+}
+
 /** The least distance between a closed ring and segments. */
 function ringDistance(ring: readonly Point[], segments: readonly (readonly [Point, Point])[]): number {
   let least = Infinity;
@@ -165,8 +177,9 @@ export function objectShadows(
     placed++;
     ring.forEach((p1, k) => {
       const wallId = `${id}_${placed}_${k + 1}`;
-      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', blocks: 'sight', p1, p2: ring[(k + 1) % ring.length]!, chainId: `${id}_${placed}`, ...(levels && { levels }) };
-      segments.push([p1, ring[(k + 1) % ring.length]!]);
+      const p2 = ring[(k + 1) % ring.length]!;
+      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', blocks: 'sight', direction: insideOf(p1, p2, centre), p1, p2, chainId: `${id}_${placed}`, ...(levels && { levels }) };
+      segments.push([p1, p2]);
     });
   }
   return out;
