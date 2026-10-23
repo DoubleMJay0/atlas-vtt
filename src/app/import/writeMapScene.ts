@@ -14,6 +14,7 @@ import type { LightSource, SceneLighting } from '../types/lightingTypes';
 import type { WallSegment } from '../types/wallTypes';
 import type { NotePin } from '../types';
 import type { MapFeature } from '../types/mapFeatureTypes';
+import type { LiquidSurface } from '../types/liquidTypes';
 import type { LevelLink, LevelSurface, SceneLevel } from '../types/sceneLevelTypes';
 import { sceneFileVersion } from '../levels/levelFile';
 
@@ -34,6 +35,8 @@ export interface MapSceneParts {
   levelSurfaces?: Record<string, LevelSurface>;
   pins?: Record<string, NotePin>;
   mapFeatures?: Record<string, MapFeature>;
+  /** Water, lava and acid that move while maps are animated. */
+  liquids?: Record<string, LiquidSurface>;
 }
 
 /**
@@ -53,6 +56,7 @@ export function mapSceneFile(settings: CollectionSettings, background: string, p
     ...(parts.levelLinks && { levelLinks: parts.levelLinks }),
     ...(parts.levelSurfaces && { levelSurfaces: parts.levelSurfaces }),
     ...(parts.mapFeatures && { mapFeatures: parts.mapFeatures }),
+    ...(parts.liquids && { liquids: parts.liquids }),
   };
   content.state.lighting = parts.lighting;
   if (parts.levels) {

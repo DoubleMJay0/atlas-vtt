@@ -51,6 +51,7 @@ import { elsewhereThanViewedLevel, placedOnViewedLevel, placedOnViewedLevels } f
 import { createSceneLevelsActions, writeExploredMask, type SceneLevelsSlice } from './stores/sceneLevelsSlice';
 import { createLevelSurfacesActions, type LevelSurfacesSlice } from './stores/levelSurfacesSlice';
 import { createMapFeaturesActions, type MapFeaturesSlice } from './stores/mapFeaturesSlice';
+import { createLiquidsActions, type LiquidsSlice } from './stores/liquidsSlice';
 import { levelsForFile, readExploredMasks, readSceneLevels } from './levels/levelFile';
 import { levelAlignmentsOf, movesWithFrame, withoutAlignments } from './levels/levelAlignment';
 import { levelsCarriedWithGrid, type CarriedLevels, type GridCarryScene } from './levels/levelGridCarry';
@@ -233,6 +234,9 @@ export interface ViewAtlasState extends ViewState {
   addMapFeatures: MapFeaturesSlice['addMapFeatures'];
   updateMapFeature: MapFeaturesSlice['updateMapFeature'];
   deleteMapFeature: MapFeaturesSlice['deleteMapFeature'];
+  // Water, lava and acid that move on animated maps (from liquidsSlice.ts)
+  addLiquids: LiquidsSlice['addLiquids'];
+  deleteLiquid: LiquidsSlice['deleteLiquid'];
 
   // Copy, paste and duplicate (from mapObjectsSlice.ts)
   insertMapObjects: MapObjectsSlice['insertMapObjects'];
@@ -1501,6 +1505,7 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
           ...createSceneLevelsActions(set, get),
           ...createLevelSurfacesActions(set),
           ...createMapFeaturesActions(set),
+          ...createLiquidsActions(set),
 
           // --- Per-view UI visibility (from uiSlice.ts) ---
           ...createInitialUIState(),
