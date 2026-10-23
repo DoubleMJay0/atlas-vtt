@@ -15,6 +15,7 @@ import type { LightSource, LightZone } from '../../src/app/types/lightingTypes';
 import type { LevelSurface, SceneLevel } from '../../src/app/types/sceneLevelTypes';
 import { SceneModelBuilder } from '../../src/app/vision/sceneModel';
 import { belowTokenPerception, sightBelow, type BelowSight } from '../../src/app/vision/throughSight';
+import { snapshotGrid } from '../../src/app/pixi/lighting/levels/belowSnapshot';
 import { fuzzRooms, rng, type P } from '../../src/app/pixi/lighting/engine/__tests__/fuzzRooms';
 import { fakeLevelArt, LEVELS, openLevelsView, paintedTexture, worldOf, type LevelsView } from '../helpers/levelsView';
 import { belowArt, cyan, inside, light, surface, token, wallsOn } from '../helpers/levelsFuzz';
@@ -173,6 +174,8 @@ async function fuzz({ seed, trials, map = 2048, below = false, ignoreFading = fa
         lowerRule = roofRule(groundRoof, NO_STRETCH, bounds, partyPlaces(levelObjectsOn(state, 'ground').tokens), sight, everyToken, { ...state.lighting, ...model.ambient }, bounds);
       }
       const upperDrawn = (p: { x: number; y: number }): boolean => upper?.drawnAt(p) ?? false;
+      // The level below is read from its snapshot texel by texel: a pixel may show the texel whose middle lies half a texel's diagonal away.
+      const belowEdge = EDGE / scale + (stack ? stack.grid.texel * 0.02 + (snapshotGrid(stack)?.texel ?? 0) * Math.SQRT1_2 : 0);
 
       // Tokens on the viewed level: the view's rule is the rule here.
       for (const entry of Object.values(levelObjects(state).tokens)) {
@@ -208,7 +211,7 @@ async function fuzz({ seed, trials, map = 2048, below = false, ignoreFading = fa
           if (cyan(frame, o) && unseenBelow.some(near) && !seenBelow.some(near)) report.tokenLeaks++;
           if (lowerRule && stack) {
             const shown = (q: { x: number; y: number }): boolean => shownAt(stack!, q) === 1 && lowerRule!.drawnAt(q) && !upperDrawn(q);
-            if (decided(shown, p, EDGE / scale + stack.grid.texel * 0.02)) {
+            if (decided(shown, p, belowEdge)) {
               if (shown(p)) {
                 report.belowRoof++;
                 if (orange(frame, o)) report.belowRoofShown++;
@@ -220,7 +223,7 @@ async function fuzz({ seed, trials, map = 2048, below = false, ignoreFading = fa
             if (!upper.solidAt(p)) continue;
             report.drawn++;
             if (differs && green(frame, o)) report.drawnShown++;
-          } else if (!lowerRule || (decided((q) => lowerRule!.drawnAt(q) && shownAt(stack!, q) === 1, p, EDGE / scale + stack!.grid.texel * 0.02)
+          } else if (!lowerRule || (decided((q) => lowerRule!.drawnAt(q) && shownAt(stack!, q) === 1, p, belowEdge)
             && !(lowerRule.drawnAt(p) && shownAt(stack!, p) === 1) && !Object.values(levelObjectsOn(state, 'ground').tokens).some(near))) {
             // Where the roof below is drawn the frame differs from the reference by that roof, not this one; and the
             // tokens below a roof hides (art and all) are missing from the frame beside the roof too.
