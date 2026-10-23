@@ -64,6 +64,7 @@ uniform sampler2D uTexture;
 uniform sampler2D uBackTexture;
 uniform vec4 uInputSize;
 uniform vec4 uInputClamp;
+uniform vec4 uInputPixel;
 uniform sampler2D uLightMap;
 uniform sampler2D uExplored;
 uniform vec2 uAreaOrigin;
