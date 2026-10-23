@@ -62,7 +62,7 @@ export function GeneratorSettings({ state, layer, collection, thumbnails }: Gene
         />
       </div>
       <SettingsSection title={t('dungeon.tags')}>
-        <TagChips picked={state.draftTags} applied={request.tags} onToggle={state.toggleDraftTag} onGenerate={state.generate} onRandom={state.random} />
+        <TagChips picked={request.tags} onToggle={state.toggleTag} onRandom={state.random} />
       </SettingsSection>
       <SettingsSection title={t('dungeon.style')}>
         <StyleSettings state={state} renderer={thumbnails} />

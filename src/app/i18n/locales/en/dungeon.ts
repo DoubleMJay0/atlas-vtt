@@ -21,8 +21,6 @@ export const dungeon = {
   'dungeon.fiveRoom': 'Five-room dungeon',
   'dungeon.fiveRoom.hint': 'Five main rooms on one floor: entrance, puzzle, setback, climax and reward',
   'dungeon.tags': 'Tags',
-  'dungeon.tags.generate': 'Generate',
-  'dungeon.tags.generateHint': 'This seed with these tags',
   'dungeon.tags.random': 'Random',
   'dungeon.tags.randomHint': 'A new seed with these tags',
 

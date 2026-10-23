@@ -7,12 +7,9 @@ import { t } from '../../../i18n';
 import { cn } from '../../../../utils/cn';
 
 interface TagChipsProps {
-  /** The tags picked; Generate or Random makes them the dungeon's. */
-  picked: readonly DungeonTag[];
-  /** The tags the shown dungeon was generated with. */
-  applied: readonly string[];
+  /** The tags the shown dungeon is generated with. */
+  picked: readonly string[];
   onToggle: (tag: DungeonTag) => void;
-  onGenerate: () => void;
   onRandom: () => void;
 }
 
@@ -26,14 +23,11 @@ function tagDescription(tag: DungeonTag): string {
   return t(`dungeon.tag.${tagKey(tag)}` as MessageKey);
 }
 
-const sameTags = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((tag) => b.includes(tag));
-
 /**
- * Every tag as a chip that switches it on and off; switching one on switches off the tags it
- * rules out. Picking only stages the tags: Generate keeps the seed, Random takes a new one.
+ * Every tag as a chip that switches it on and off at once, on the same seed, so the map shows
+ * what the tag does; switching one on switches off the tags it rules out. Random takes a new seed.
  */
-export function TagChips({ picked, applied, onToggle, onGenerate, onRandom }: TagChipsProps): React.JSX.Element {
-  const unchanged = sameTags(picked, applied);
+export function TagChips({ picked, onToggle, onRandom }: TagChipsProps): React.JSX.Element {
   return (
     <div className="atlas-dungeon-tags">
       <div className="atlas-dungeon-tags__chips">
@@ -55,9 +49,6 @@ export function TagChips({ picked, applied, onToggle, onGenerate, onRandom }: Ta
         })}
       </div>
       <div className="atlas-dungeon-tags__actions">
-        <LabelTooltip label={t('dungeon.tags.generateHint')} describe>
-          <Button variant="secondary" size="sm" onClick={onGenerate} disabled={unchanged}>{t('dungeon.tags.generate')}</Button>
-        </LabelTooltip>
         <LabelTooltip label={t('dungeon.tags.randomHint')} describe>
           <Button variant="secondary" size="sm" onClick={onRandom}>{t('dungeon.tags.random')}</Button>
         </LabelTooltip>

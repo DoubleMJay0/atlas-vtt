@@ -88,22 +88,22 @@ describe('the dungeon generator panel', () => {
     expect(create.hasAttribute('disabled')).toBe(false);
   });
 
-  it('lets one tag of a group stand, and generates with the same seed', async () => {
+  it('generates at once with a tag picked, on the same seed, and lets one tag of a group stand', async () => {
     renderPanel();
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const seed = lastJob().request.seed;
     fireEvent.click(tag('small'));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['small']));
     fireEvent.click(tag('large'));
     expect(tag('small').getAttribute('aria-pressed')).toBe('false');
     expect(tag('large').getAttribute('aria-pressed')).toBe('true');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
     await waitFor(() => expect(lastJob().request.tags).toEqual(['large']));
     expect(lastJob().request.seed).toBe(seed);
     expect(settings.getDungeonGenerator().tags).toEqual(['large']);
 
     fireEvent.click(screen.getByRole('button', { name: 'Random' }));
     await waitFor(() => expect(lastJob().request.seed).not.toBe(seed));
+    expect(lastJob().request.tags).toEqual(['large']);
   });
 
   it('keeps what is shown in Atlas settings', async () => {

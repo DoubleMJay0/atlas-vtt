@@ -15,8 +15,6 @@ export interface DungeonState {
   request: DungeonRequest;
   /** What the scene will be called; the dungeon itself never depends on it. */
   name: string;
-  /** Tags picked but not yet generated with (Generate and Random apply them). */
-  draftTags: DungeonTag[];
   settings: DungeonGeneratorSettings;
   edits: DungeonEdits;
   /** The generated dungeon of the current request, before the GM's edits; null until it arrived. */
@@ -39,10 +37,9 @@ export interface DungeonState {
   setSeed: (seed: number) => void;
   /** New dungeon: a new seed, the tags as they are. */
   newSeed: () => void;
-  toggleDraftTag: (tag: DungeonTag) => void;
-  /** The picked tags, this seed. */
-  generate: () => void;
-  /** The picked tags, a new seed. */
+  /** Switches a tag on or off (and the tags it rules out off): this seed with the tags as they are then. */
+  toggleTag: (tag: DungeonTag) => void;
+  /** The tags as they are, a new seed. */
   random: () => void;
   setWaterLevel: (level: number | undefined) => void;
   setView: (changes: Partial<DungeonView>) => void;
@@ -64,7 +61,6 @@ function shownFloor(picked: number, request: DungeonRequest, model: DungeonModel
   return Math.max(0, Math.min(picked, count - 1));
 }
 
-const sameTags = (a: readonly DungeonTag[], b: readonly DungeonTag[]): boolean => a.length === b.length && a.every((tag) => b.includes(tag));
 
 /**
  * The generator's state. Style, view, the tags generated with, the floors and the boss room and
@@ -82,7 +78,6 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
   const [name, setNameState] = useState(initialName.trim());
   const requestRef = useRef(request);
   requestRef.current = request;
-  const [draftTags, setDraftTags] = useState<DungeonTag[]>(settings.tags);
   const [edits, setEdits] = useState<DungeonEdits>(NO_EDITS);
   const [generated, setGeneratedState] = useState<{ request: DungeonRequest; model: DungeonModel } | null>(null);
   // Ahead of the render, so changes made one after the other build on each other.
@@ -128,7 +123,6 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
   return {
     request,
     name,
-    draftTags,
     settings,
     edits,
     generated: generated?.request === request ? generated.model : null,
@@ -152,11 +146,11 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     setName: setNameState,
     setSeed: useCallback((seed) => changeRequest((current) => (current.seed === seed ? current : { ...current, seed })), [changeRequest]),
     newSeed: useCallback(() => changeRequest((current) => ({ ...current, seed: randomSeed() })), [changeRequest]),
-    toggleDraftTag: useCallback((tag) => setDraftTags((tags) => (tags.includes(tag) ? tags.filter((t) => t !== tag) : withTag(tags, tag))), []),
-    generate: useCallback(() => {
-      if (!sameTags(draftTags, request.tags as DungeonTag[])) applyTags(draftTags);
-    }, [applyTags, draftTags, request.tags]),
-    random: useCallback(() => applyTags(draftTags, randomSeed()), [applyTags, draftTags]),
+    toggleTag: useCallback((tag) => {
+      const tags = requestRef.current.tags as DungeonTag[];
+      applyTags(tags.includes(tag) ? tags.filter((t) => t !== tag) : withTag(tags, tag));
+    }, [applyTags]),
+    random: useCallback(() => applyTags(requestRef.current.tags as DungeonTag[], randomSeed()), [applyTags]),
     setWaterLevel: useCallback((level) => setRequest((current) => {
       const { waterLevel: _old, ...rest } = current;
       return level === undefined ? rest : { ...rest, waterLevel: level };
