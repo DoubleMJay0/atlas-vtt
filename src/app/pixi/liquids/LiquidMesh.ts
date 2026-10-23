@@ -1,6 +1,7 @@
 import { Buffer, BufferImageSource, BufferUsage, Color, Geometry, Mesh, Texture, triangulateWithHoles, type Shader } from 'pixi.js';
 import type { LiquidKind, LiquidSurface } from '../../types/liquidTypes';
 import { fnv1a32 } from '../../utils/hashing';
+import { smoulder } from '../lighting/lightFlicker';
 import { liquidField } from './liquidField';
 import { liquidDrifts, loopTime } from './liquidMotion';
 import { createLiquidShader, type LiquidUniforms } from './liquidShader';
@@ -40,6 +41,7 @@ export class LiquidMesh {
   private readonly geometry: Geometry;
   private readonly field: Texture;
   private readonly uniforms: LiquidUniforms;
+  private readonly lavaPhase: number;
   private readonly drifts = new Float32Array(8);
 
   constructor(readonly surface: LiquidSurface, readonly cell: number) {
@@ -61,11 +63,14 @@ export class LiquidMesh {
     uniforms.uFieldCode.set([field.outside, field.near, field.far, 0]);
     uniforms.uCell = cell;
     uniforms.uKind = KIND_CODE[surface.liquid];
+    uniforms.uLavaStyle = surface.lavaStyle === 'engraved' ? 1 : 0;
     const { flow } = surface;
     uniforms.uFlowing = flow ? 1 : 0;
     // Its frame: across the flow, then along it; a still surface keeps the map's axes.
     uniforms.uFrame.set(flow ? [-flow.y, flow.x, flow.x, flow.y] : [1, 0, 0, 1]);
     const hash = fnv1a32(surface.id);
+    // Placed lights reach LightFlicker with activeLights' namespaced key.
+    this.lavaPhase = (fnv1a32(surface.lavaLight ? `light:${surface.lavaLight}` : surface.id) % 7000) / 1000;
     uniforms.uSeed.set([hash % 997, (hash >>> 10) % 991]);
     setColor(uniforms.uSurface, surface.colors.surface);
     setColor(uniforms.uDeep, surface.colors.deep);
@@ -78,11 +83,19 @@ export class LiquidMesh {
   }
 
   /** Shows the surface as it moves `seconds` into its motion. */
-  setTime(seconds: number): void {
+  setTime(seconds: number, lightTimeMs = seconds * 1000): void {
     liquidDrifts(this.surface.liquid, !!this.surface.flow, seconds, this.drifts);
     this.uniforms.uDriftA.set(this.drifts.subarray(0, 4));
     this.uniforms.uDriftB.set(this.drifts.subarray(4, 8));
     this.uniforms.uTime = loopTime(seconds);
+    if (this.surface.liquid === 'lava') {
+      this.uniforms.uLavaGlow = this.uniforms.uLavaQuality > 0 ? smoulder(lightTimeMs, this.lavaPhase).intensity : 1;
+    }
+  }
+
+  /** 2: full crust detail, 1: fewer octaves, 0: one warp and no fine grain. */
+  setLavaQuality(detail: number): void {
+    this.uniforms.uLavaQuality = detail;
   }
 
   /** Frees the mesh, its geometry, field and shader; the GL program stays shared in PIXI's cache. */

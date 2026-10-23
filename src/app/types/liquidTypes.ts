@@ -29,6 +29,10 @@ export interface LiquidSurface extends OnOneLevel {
   holes?: { x: number; y: number }[][] | undefined;
   /** Where it flows, a unit vector in world space; absent, it stands still. */
   flow?: { x: number; y: number } | undefined;
+  /** Lava printed in burin lines; absent keeps the painted material used by older scenes. */
+  lavaStyle?: 'engraved' | undefined;
+  /** The area light this lava belongs to, shared by pieces cut apart by bridges. */
+  lavaLight?: string | undefined;
   colors: LiquidColors;
 }
 

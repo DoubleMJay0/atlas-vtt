@@ -31,6 +31,8 @@ export interface LiquidLayerDeps {
    * their detail is too fine to see move. Unset, `LIQUID_FPS`.
    */
   fps?: () => number;
+  /** Lava fragment detail, independent of zoom throttling: 2 high, 1 balanced, 0 saver. */
+  lavaQuality?: () => number;
   /** The time of the display frame (ms); unset, the ticker's, which every animation of the map shares (`frameTime`). */
   now?: () => number;
 }
@@ -59,6 +61,7 @@ export class LiquidLayer {
   private seconds = 0;
   /** The moment on screen: a pause holds it, and the clock resumes from it. */
   private shownSeconds = 0;
+  private shownLightTime = 0;
   private lastTick: number | null = null;
   private lastFrame: number | null = null;
   private readonly unsubscribe: () => void;
@@ -86,7 +89,7 @@ export class LiquidLayer {
   stillFor(): () => void {
     for (const { mesh } of this.built.values()) mesh.setTime(0);
     return (): void => {
-      for (const { mesh } of this.built.values()) mesh.setTime(this.shownSeconds);
+      for (const { mesh } of this.built.values()) mesh.setTime(this.shownSeconds, this.shownLightTime);
     };
   }
 
@@ -140,7 +143,8 @@ export class LiquidLayer {
     while (this.pending.length > 0) {
       const surface = this.pending.shift()!;
       const mesh = new LiquidMesh(surface, this.cell);
-      mesh.setTime(this.shownSeconds);
+      mesh.setLavaQuality(this.deps.lavaQuality?.() ?? 2);
+      mesh.setTime(this.shownSeconds, this.shownLightTime);
       this.built.set(surface.id, { entry: record?.[surface.id], mesh });
       if (this.now() - start >= budget) break;
     }
@@ -157,7 +161,11 @@ export class LiquidLayer {
   /** Shows `seconds` of motion on every surface and asks for the frame. */
   private show(seconds: number): void {
     this.shownSeconds = seconds;
-    for (const { mesh } of this.built.values()) mesh.setTime(seconds);
+    this.shownLightTime = this.mode === 'play' ? this.now() : this.mode === 'poster' ? 0 : this.shownLightTime;
+    for (const { mesh } of this.built.values()) {
+      mesh.setLavaQuality(this.deps.lavaQuality?.() ?? 2);
+      mesh.setTime(seconds, this.shownLightTime);
+    }
     if (this.built.size > 0) this.deps.requestRender();
   }
 

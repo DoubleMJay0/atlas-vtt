@@ -23,6 +23,7 @@
 
 ## Improved
 
+- Lava moves as slowly drifting crust and molten channels, with hatching on engraved maps and matching tones on Monochrome maps
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 
 ## Important changes

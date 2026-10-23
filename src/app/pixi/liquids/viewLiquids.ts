@@ -40,6 +40,10 @@ export function createViewLiquids(app: Application, viewport: Viewport, store: L
     requestRender: () => requestRender(app),
     inView: (box) => boxInView(viewport.getVisibleBounds(), box),
     fps: () => liquidFps((quality?.current() ?? DEFAULT_LIGHTING_QUALITY).liquidFps, (store.getState().grid?.size ?? 0) * viewport.scale.x),
+    lavaQuality: () => {
+      const fps = (quality?.current() ?? DEFAULT_LIGHTING_QUALITY).liquidFps;
+      return fps > 15 ? 2 : fps > 10 ? 1 : 0;
+    },
     drawable: app.renderer.name === 'webgl',
   });
 }
