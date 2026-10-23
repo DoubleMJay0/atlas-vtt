@@ -22,10 +22,10 @@ export function drawRock(scene: ArtScene, pens: Pens): void {
   const mass = fieldOf(scene.grid, (x, y) => 0.85 + 0.3 * fbm(x * 0.9, y * 0.9, seed + 2, 3));
   // Worked out once on the scene's grid; the lines begin crisply where the clip below lets them.
   // Full against the wall, lighter out towards the rock's broken edge, where the lines end.
-  const tone = fieldOf(scene.grid, (x, y) => {
+  const tone = fieldOf(scene.grid, (x, y, k) => {
     const d = scene.sdfAt(x, y);
     if (d < start - 0.1) return 0;
-    const c = cover(x, y);
+    const c = cover[k]!;
     if (c <= 0) return 0;
     const near = Math.exp(-Math.max(0, d - start) / 0.35);
     return Math.min(1, c * (0.5 + 0.42 * near) * sampleField(scene.grid, mass, x, y));

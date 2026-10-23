@@ -7,6 +7,10 @@ import { specimen } from './dungeonArtSpecimen';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
+import { renderThumbnail } from '../../src/app/dungeons/render/thumbnail';
+
+/** The dungeon the gallery's cards are judged on. */
+const CARD_DUNGEON = 'crumbling';
 
 /**
  * Every look on dungeons of every kind, whole and close up at 200 px per cell with tokens, written
@@ -38,6 +42,14 @@ describe('dungeon looks, for judging by eye', () => {
             if (shots.includes('close')) await savePng(drawClose(model, id as DungeonStyleId, view, floor), `v2-art/${id}-${name}${f}${suffix}-close`);
           }
         }
+      });
+    }
+    if (shots.includes('card')) {
+      it(`${id} card`, async () => {
+        // A style card as the gallery draws it: 104 × 78 points at a device pixel ratio of 2.
+        const canvas = new OffscreenCanvas(208, 156);
+        renderThumbnail(canvas.getContext('2d')!, artModel(CARD_DUNGEON), dungeonStyle(id), DEFAULT_VIEW, { width: 208, height: 156, legibleAt: 2 });
+        await savePng(canvas, `v2-art/card-${id}`);
       });
     }
     if (shots.includes('specimen')) {

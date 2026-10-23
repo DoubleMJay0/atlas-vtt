@@ -96,6 +96,7 @@ export function drawClose(model: DungeonModel, look: DungeonStyleId, view: Dunge
 
 /** Close-ups of terrain worth judging: holes and their bridges, galleries, shafts, platforms, stairwells on both floors. */
 export const ART_SPOTS: readonly { name: string; dungeon: string; floor: number; centre: { x: number; y: number }; cells?: number; rows?: number }[] = [
+  { name: 'entrance', dungeon: 'halls', floor: 0, centre: { x: 0.5, y: 0.5 } },
   { name: 'chasm-bridge', dungeon: 'two-floors', floor: 0, centre: { x: -3.5, y: 2 } },
   { name: 'gallery-above', dungeon: 'two-floors', floor: 0, centre: { x: -2, y: 8.5 } },
   { name: 'arena-below', dungeon: 'two-floors', floor: 1, centre: { x: -6, y: 8 } },

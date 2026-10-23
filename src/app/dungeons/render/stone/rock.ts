@@ -25,7 +25,7 @@ function tileOffset(seed: number): { x: number; y: number } {
 export function drawRock(scene: ArtScene, c: StoneColours): void {
   if (!scene.raster) return drawRockPlain(scene, c);
   const { env, grid } = scene;
-  const cover = fieldOf(grid, rockCoverage(scene));
+  const cover = rockCoverage(scene);
   // The rock is a mass standing over the vellum: it shades it a little, down and right.
   const lift = 0.07;
   const offset = Math.round(lift * grid.res);

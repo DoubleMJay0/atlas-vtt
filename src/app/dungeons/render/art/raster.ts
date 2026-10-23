@@ -197,3 +197,36 @@ export function activeCells(grid: Grid, field: Float32Array): (x: number, y: num
     return X >= 0 && Y >= 0 && X < w && Y < h && on[Y * w + X] === 1;
   };
 }
+
+/** The largest (or smallest) value within `radius` samples along rows, then along columns: a square window, in linear time. */
+function slide(grid: Grid, values: Float32Array, radius: number, pick: (a: number, b: number) => number): Float32Array {
+  const { w, h } = grid;
+  const queue = new Int32Array(Math.max(w, h));
+  const run = (read: (i: number) => number, n: number, write: (i: number, v: number) => void): void => {
+    // A monotonic queue of indices: its head is always the pick of the window.
+    let head = 0;
+    let tail = 0;
+    for (let i = 0; i < n + radius; i++) {
+      if (i < n) {
+        const v = read(i);
+        while (tail > head && pick(read(queue[tail - 1]!), v) === v) tail--;
+        queue[tail++] = i;
+      }
+      const at = i - radius;
+      if (at < 0) continue;
+      while (queue[head]! < at - radius) head++;
+      write(at, read(queue[head]!));
+    }
+  };
+  const rows = new Float32Array(values.length);
+  for (let j = 0; j < h; j++) run(i => values[j * w + i]!, w, (i, v) => (rows[j * w + i] = v));
+  const out = new Float32Array(values.length);
+  for (let i = 0; i < w; i++) run(j => rows[j * w + i]!, h, (j, v) => (out[j * w + i] = v));
+  return out;
+}
+
+/** Fills gaps and holes narrower than twice `radius` samples between what a field covers: a closing. */
+export function closeField(grid: Grid, values: Float32Array, radius: number): Float32Array {
+  const r = Math.max(1, Math.round(radius));
+  return slide(grid, slide(grid, values, r, Math.max), r, Math.min);
+}
