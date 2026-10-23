@@ -45,6 +45,8 @@ uniform vec2 uSeed;
 uniform vec3 uSurface;
 uniform vec3 uDeep;
 uniform vec3 uGlint;
+uniform float uAcidArt;
+uniform float uAcidDetail;
 ${NOISE_GLSL}
 ${WATER_GLSL}
 ${LAVA_GLSL}
@@ -86,6 +88,8 @@ export interface LiquidUniforms {
   uSurface: Float32Array;
   uDeep: Float32Array;
   uGlint: Float32Array;
+  uAcidArt: number;
+  uAcidDetail: number;
 }
 
 export interface LiquidShader {
@@ -112,6 +116,8 @@ export function createLiquidShader(field: Texture): LiquidShader {
     uSurface: { value: new Float32Array(3), type: 'vec3<f32>' },
     uDeep: { value: new Float32Array(3), type: 'vec3<f32>' },
     uGlint: { value: new Float32Array(3), type: 'vec3<f32>' },
+    uAcidArt: { value: 0, type: 'f32' },
+    uAcidDetail: { value: 3, type: 'f32' },
   });
   const glProgram = GlProgram.from({ vertex, fragment, name: 'atlas-liquid-surface', preferredFragmentPrecision: HIGHP });
   const shader = new Shader({ glProgram, resources: { liquid: group, uField: field.source } });

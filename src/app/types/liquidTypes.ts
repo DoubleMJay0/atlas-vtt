@@ -29,6 +29,8 @@ export interface LiquidSurface extends OnOneLevel {
   holes?: { x: number; y: number }[][] | undefined;
   /** Where it flows, a unit vector in world space; absent, it stands still. */
   flow?: { x: number; y: number } | undefined;
+  /** Acid drawn in burin lines; absent, the painted treatment used by existing scenes. */
+  acidArt?: 'engraved' | undefined;
   colors: LiquidColors;
 }
 
