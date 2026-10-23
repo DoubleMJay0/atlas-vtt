@@ -6,9 +6,10 @@
  */
 
 /**
- * The two ways a look is drawn. Stone & shadow paints the plan as built: natural rock fading into
- * the vellum, a course of dressed wall blocks, flagstones and one light casting every shadow.
- * Engraved cuts it as a copperplate: burin lines whose width carries the tone, in two colours.
+ * The two ways a look draws its floors, walls, props and terrain. Stone & shadow paints the plan as
+ * built: a course of dressed wall blocks, flagstones and one light casting every shadow. Engraved
+ * cuts it as a copperplate: burin lines whose width carries the tone, in two colours. The rock round
+ * the walls is the look's own (`DungeonSurround`) in either.
  */
 export type ArtDirection = 'stone' | 'engraved';
 
@@ -18,16 +19,34 @@ export type ArtDirection = 'stone' | 'engraved';
  */
 export type FloorPattern = 'flagstone' | 'ashlar' | 'cobble' | 'slab';
 
+/**
+ * How the rock round the walls is drawn: clusters of short hatched strokes, one course of blocks,
+ * rings of brick courses, stippling that thins out, or only the band's colour.
+ */
+export type RockMode = 'hatching' | 'stonework' | 'bricks' | 'dots' | 'none';
+
+/** The rock round the walls. */
+export interface DungeonSurround {
+  mode: RockMode;
+  /** How far the rock reaches past the walls, in cells. */
+  reach: number;
+  /** Strokes per hatching cluster, or courses of bricks plus one. */
+  strokes: number;
+  /** A hatching cluster's, block's or brick's size, in cells; for dots, how dense they lie. */
+  size: number;
+  /** The rock's stroke width, in reference pixels. */
+  stroke: number;
+}
+
 export interface DungeonStyle {
   direction: ArtDirection;
-  /** `rock` is the natural rock round the walls (Stone & shadow; Engraved cuts it in ink). */
+  /** `rock` fills the band of rock round the walls. */
   colors: { ink: string; rock: string; water: string; floor: string; paper: string };
   /** `thick` is the wall's ink outside the floor: the scene's walls lie on its middle. */
   strokes: { thin: number; normal: number; thick: number };
   /** Multiplied onto the floor, so it darkens whatever the floor's colour; white is no shadow. */
   shadow: { color: string; strength: number };
-  /** How far the rock (or its engraving) reaches past the walls, in cells. */
-  surround: { reach: number };
+  surround: DungeonSurround;
   floor: FloorPattern;
   /** What pools hold where it is not water. */
   liquid?: 'lava';

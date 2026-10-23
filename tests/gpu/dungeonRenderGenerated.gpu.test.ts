@@ -93,7 +93,7 @@ function map(model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number, vi
 function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number): string[] {
   const style = dungeonStyle(styleId);
   const dungeon = visibleDungeon(model, DEFAULT_VIEW);
-  const pockets = narrowPockets(dungeon, style.surround.reach / 2);
+  const pockets = narrowPockets(dungeon, style.surround.reach);
   const { originCell } = mapLayout(model, pxPerCell, DEFAULT_VIEW);
   const ctx = canvas.getContext('2d')!;
   const [pr, pg, pb] = parseHex(style.colors.paper);
@@ -138,7 +138,8 @@ describe('generated dungeons', () => {
         const { canvas } = map(modelOf(name), styleId, 100);
         expectSane(canvas, styleId);
         if (name === 'default') expect(narrowPockets(visibleDungeon(modelOf(name), DEFAULT_VIEW), 0.5).length).toBeGreaterThan(0);
-        expect(paperInPockets(canvas, modelOf(name), styleId, 100)).toEqual([]);
+        // Stippling thins out on its own and fills no rock whole.
+        if (dungeonStyle(styleId).surround.mode !== 'dots') expect(paperInPockets(canvas, modelOf(name), styleId, 100)).toEqual([]);
         await savePng(canvas, `gen-map-${name}-${styleId}`);
       });
     }

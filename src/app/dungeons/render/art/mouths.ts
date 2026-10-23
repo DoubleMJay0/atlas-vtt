@@ -1,8 +1,7 @@
 import type { DungeonDoor } from '../../model';
-import { pointSegmentDistance, type Vec } from '../geometry';
+import type { Vec } from '../geometry';
 import type { VisibleDungeon } from '../visibleDungeon';
-import { valueNoise } from './noise';
-import { rectPoly, smoothstep } from './paths';
+import { rectPoly } from './paths';
 
 /**
  * The ways out of a dungeon. An entrance is a clean opening at the dungeon's edge: its passage's
@@ -19,8 +18,6 @@ export interface Mouth {
 
 /** How far the wall's course, its ink and the rock are cleared beyond a mouth, in cells. */
 export const MOUTH_CLEAR = 0.7;
-/** How far out the rock stays parted in front of a mouth. */
-const PARTED = 3.2;
 
 export function mouthsOf(dungeon: VisibleDungeon): Mouth[] {
   return dungeon.doors
@@ -38,19 +35,4 @@ export function mouthClearing(mouth: Mouth): Vec[] {
   const x0 = Math.min(...xs);
   const y0 = Math.min(...ys);
   return rectPoly({ x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 });
-}
-
-/** 1 where the rock stands, 0 where it parts before a mouth: a way out a little wider than the passage, its sides broken. */
-export function partedRock(mouths: readonly Mouth[], seed = 0): (x: number, y: number) => number {
-  const ends = mouths.map(m => ({ a: m.at, b: { x: m.at.x + m.out.x * PARTED, y: m.at.y + m.out.y * PARTED } }));
-  return (x, y) => {
-    let keep = 1;
-    for (const { a, b } of ends) {
-      const d = pointSegmentDistance({ x, y }, a, b);
-      const along = Math.max(0, Math.min(1, ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / (PARTED * PARTED)));
-      const half = 0.56 + along * 0.35 + (valueNoise(x * 2.2, y * 2.2, seed) - 0.5) * 0.24;
-      keep = Math.min(keep, smoothstep(half, half + 0.06, d));
-    }
-    return keep;
-  };
 }

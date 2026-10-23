@@ -8,13 +8,13 @@ import { drawTerrainGround, drawTerrainOpenings, drawTerrainStanding } from '../
 import { drawFloor } from './floor';
 import { engravedHand } from './hand';
 import { pensOf } from './pens';
-import { drawRock } from './rock';
+import { drawRock } from '../rock';
 import { drawShade } from './shade';
 import { drawWalls } from './walls';
 import { drawPools } from './water';
 
 /**
- * Engraved, the copperplate, bottom to top: the rock's lines, the floor and its faint joints,
+ * Engraved, the copperplate, bottom to top: the rock, the floor and its faint joints,
  * water, terrain on the ground and raised floors, hatched shadows, the grid, the wall's cut, then
  * rubble, whatever stands, passages and stairs, and holes with their bridges. Ink and its paper.
  */
@@ -22,7 +22,7 @@ export function paintEngraved(scene: ArtScene): void {
   const pens = pensOf(scene);
   const hand = engravedHand(scene, pens);
   const colours = { water: pens.water, cloth: pens.floor };
-  drawRock(scene, pens);
+  drawRock(scene.env);
   drawFloor(scene, pens);
   drawPools(scene, pens);
   drawTerrainGround(hand, colours);

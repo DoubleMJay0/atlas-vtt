@@ -21,10 +21,10 @@ export function legibleStyle(style: DungeonStyle, cellPx: number): DungeonStyle 
   const ratio = LEGIBLE_CELL_PX / cellPx;
   const grow = Math.min(1.6, Math.sqrt(ratio));
   const thicken = ratio ** 0.75;
-  const { strokes } = style;
+  const { strokes, surround } = style;
   return {
     ...style,
     strokes: { thin: strokes.thin * thicken, normal: strokes.normal * thicken, thick: Math.max(strokes.thick * thicken, leastWall) },
-    surround: { reach: style.surround.reach * grow },
+    surround: { ...surround, reach: surround.reach * grow, size: surround.size * grow, stroke: surround.stroke * thicken },
   };
 }

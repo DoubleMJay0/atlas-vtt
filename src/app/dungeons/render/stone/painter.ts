@@ -8,7 +8,7 @@ import { drawTerrainGround, drawTerrainOpenings, drawTerrainStanding } from '../
 import { stoneColours } from './colours';
 import { drawFloor } from './floor';
 import { stoneHand } from './hand';
-import { drawRock } from './rock';
+import { drawRock } from '../rock';
 import { drawShade } from './shade';
 import { drawWallBand, drawWallEdge } from './walls';
 import { drawPools } from './water';
@@ -24,7 +24,7 @@ export function paintStone(scene: ArtScene): void {
   const c = stoneColours(env.palette, env.view.monochrome);
   const hand = stoneHand(scene, c);
   const colours = { water: c.water, cloth: c.cloth };
-  drawRock(scene, c);
+  drawRock(env);
   drawWallBand(scene, c);
   drawFloor(scene, c);
   drawPools(scene, c);

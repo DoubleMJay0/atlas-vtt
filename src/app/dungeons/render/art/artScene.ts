@@ -70,7 +70,7 @@ export function buildArtScene(env: RenderEnv, frame: ArtFrame, stands: readonly 
   // Distance is piecewise smooth: half the samples, read bilinearly, are as good and twice as quick.
   const sdfGrid = gridOver(b.minX, b.minY, b.maxX, b.maxY, res / 2);
   const sdf = fieldOf(sdfGrid, (x, y) => dungeon.field.distance(x, y));
-  const pockets = narrowPockets(dungeon, env.style.surround.reach / 2).map(p => p.ring);
+  const pockets = narrowPockets(dungeon, env.style.surround.reach).map(p => p.ring);
   const relief = rasterRelief(grid, floors, pockets, stands, (x, y) => dungeon.field.distance(x, y) > 0);
   const shadow = env.view.shadow ? castShadow(grid, relief.heights) : new Float32Array(relief.heights.length);
   const occlusion = occlusionOf(grid, relief.heights);

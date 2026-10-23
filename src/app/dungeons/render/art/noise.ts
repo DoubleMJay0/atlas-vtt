@@ -110,45 +110,6 @@ export function standardised(values: Float32Array): Float32Array {
   return values.map(v => (v - mean) / sd);
 }
 
-/**
- * Worley distance to the nearest of `count` jittered points on a wrapping `cells` × `cells`
- * lattice, and to the second nearest: their difference is small along the cells' borders.
- */
-export function periodicWorley(size: number, cells: number, seed: number): { f1: Float32Array; f2: Float32Array } {
-  const points: number[] = [];
-  for (let j = 0; j < cells; j++) for (let i = 0; i < cells; i++) points.push(i + hash2(i, j, seed), j + hash2(i, j, seed + 1));
-  const f1 = new Float32Array(size * size);
-  const f2 = new Float32Array(size * size);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const px = (x / size) * cells;
-      const py = (y / size) * cells;
-      const ci = Math.floor(px);
-      const cj = Math.floor(py);
-      let a = Infinity;
-      let b = Infinity;
-      for (let dj = -1; dj <= 1; dj++) {
-        for (let di = -1; di <= 1; di++) {
-          const i = ci + di;
-          const j = cj + dj;
-          const wi = ((i % cells) + cells) % cells;
-          const wj = ((j % cells) + cells) % cells;
-          const qx = points[(wj * cells + wi) * 2]! + (i - wi);
-          const qy = points[(wj * cells + wi) * 2 + 1]! + (j - wj);
-          const d = Math.hypot(qx - px, qy - py);
-          if (d < a) {
-            b = a;
-            a = d;
-          } else if (d < b) b = d;
-        }
-      }
-      f1[y * size + x] = a;
-      f2[y * size + x] = b;
-    }
-  }
-  return { f1, f2 };
-}
-
 const samplers = new Map<string, Tile>();
 /** Tiles kept: several per dungeon (rock edge, shade, weathering, water), for the last few dungeons. */
 const SAMPLER_LIMIT = 16;
