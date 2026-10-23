@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { hatchStrokes } from '../../../src/app/dungeons/render/hatching';
 import { MAX_MAP_PIXELS, MAX_MAP_SIDE, mapLayout, maxPxPerCell, suggestedPxPerCell } from '../../../src/app/dungeons/render/layoutSize';
 import { fittedPxPerCell } from '../../../src/app/dungeons/render/renderMap';
 import { legibleStyle } from '../../../src/app/dungeons/render/legibleStyle';
@@ -37,32 +36,6 @@ describe('the map layout of a dungeon of several floors', () => {
   });
 });
 
-describe('dungeon hatching', () => {
-  it('weaves clusters whose strokes never cross one another, the same for the same seed', () => {
-    const dungeon = visibleDungeon(smallDungeon(), DEFAULT_VIEW);
-    const env = createRenderEnv(NO_CANVAS, dungeon, dungeonStyle('parchment'), DEFAULT_VIEW, 100);
-    const strokes = hatchStrokes(env);
-    expect(strokes.length / 4).toBeGreaterThan(500);
-    let crossings = 0;
-    for (let i = 0; i < strokes.length; i += 4) {
-      for (let j = i + 4; j < strokes.length; j += 4) {
-        if (Math.abs(strokes[i]! - strokes[j]!) > 1.5 || Math.abs(strokes[i + 1]! - strokes[j + 1]!) > 1.5) continue;
-        if (crosses(strokes, i, j)) crossings++;
-      }
-    }
-    expect(crossings).toBe(0);
-    expect(hatchStrokes(env)).toEqual(strokes);
-  });
-
-  it('hatches a large dungeon quickly', () => {
-    const dungeon = visibleDungeon(largeDungeon(), DEFAULT_VIEW);
-    const env = createRenderEnv(NO_CANVAS, dungeon, dungeonStyle('parchment'), DEFAULT_VIEW, 100);
-    const started = performance.now();
-    hatchStrokes(env);
-    expect(performance.now() - started).toBeLessThan(1500);
-  });
-});
-
 describe('dungeon map size', () => {
   it('starts the image on a cell corner with whole cells of margin', () => {
     const layout = mapLayout(smallDungeon(), 100);
@@ -94,12 +67,14 @@ describe('dungeon preview', () => {
     expect(layout.heightPx).toBeGreaterThan(398);
   });
 
-  it('keeps hatching and strokes from shrinking to hairlines on a small map', () => {
+  it('keeps the surroundings and strokes from shrinking to hairlines on a small map', () => {
     const style = dungeonStyle('parchment');
-    expect(legibleStyle(style, 30)).toBe(style);
+    expect(legibleStyle(style, 60)).toBe(style);
     const small = legibleStyle(style, 12);
-    expect(small.hatching.distance * 12).toBeGreaterThan(style.hatching.distance * 12 * 1.5);
-    expect(small.hatching.distance * 12).toBeLessThan(style.hatching.distance * 30);
-    expect(small.strokes.thick).toBeGreaterThan(style.strokes.thick);
+    expect(small.surround.reach * 12).toBeGreaterThan(style.surround.reach * 12 * 1.3);
+    expect(small.surround.reach * 12).toBeLessThan(style.surround.reach * 30);
+    expect(small.strokes.normal).toBeGreaterThan(style.strokes.normal);
+    // The wall's ink stays at least a pixel and more wide
+    expect((small.strokes.thick / 30) * 12).toBeGreaterThanOrEqual(1.4);
   });
 });

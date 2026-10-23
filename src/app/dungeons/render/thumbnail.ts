@@ -1,7 +1,6 @@
 import type { DungeonModel } from '../model';
 import type { DungeonStyle, DungeonView } from '../style';
 import { pointsBounds, roomCentre, type Bounds, type Canvas2D, type Vec } from './geometry';
-import { mapLayout } from './layoutSize';
 import { paletteOf } from './palette';
 import { renderMap } from './renderMap';
 import { visibleDungeon } from './visibleDungeon';
@@ -72,12 +71,10 @@ export interface ThumbnailOptions {
 export function renderThumbnail(ctx: Canvas2D, model: DungeonModel, style: DungeonStyle, view: DungeonView, options: ThumbnailOptions): void {
   const pxPerCell = options.width / THUMBNAIL_CELLS_ACROSS;
   const corner = thumbnailWindow(model, view, THUMBNAIL_CELLS_ACROSS, options.height / pxPerCell);
-  const { originCell } = mapLayout(model, pxPerCell, view);
   ctx.save();
-  // Paper past the map's edge too; the whole map is drawn and the canvas keeps the window.
+  // Paper past the map's edge too; only the window is drawn.
   ctx.fillStyle = paletteOf(style, view).paper;
   ctx.fillRect(0, 0, options.width, options.height);
-  ctx.translate((originCell.x - corner.x) * pxPerCell, (originCell.y - corner.y) * pxPerCell);
-  renderMap(ctx, model, style, view, { pxPerCell, legibleAt: options.legibleAt });
+  renderMap(ctx, model, style, view, { pxPerCell, legibleAt: options.legibleAt, window: { originCell: corner, widthPx: options.width, heightPx: options.height } });
   ctx.restore();
 }

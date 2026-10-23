@@ -1,6 +1,5 @@
 import { unionRings } from './clipShapes';
-import { pointInPolygon, pointsBounds, shapePolygon, signedArea2, tracePolygon, type Bounds, type Vec } from './geometry';
-import type { RenderEnv } from './renderEnv';
+import { pointInPolygon, pointsBounds, shapePolygon, signedArea2, type Bounds, type Vec } from './geometry';
 import type { VisibleDungeon } from './visibleDungeon';
 
 /**
@@ -48,19 +47,6 @@ export function narrowPockets(dungeon: VisibleDungeon, distance: number): Pocket
 /** Whether a point lies in one of `pockets`. */
 export function inPocket(pockets: readonly Pocket[], x: number, y: number): boolean {
   return pockets.some(({ ring, bounds }) => x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY && pointInPolygon(ring, x, y));
-}
-
-/** Fills the narrow pockets with the shading colour, under whatever surrounds the walls. */
-export function fillPockets(env: RenderEnv): void {
-  const pockets = narrowPockets(env.dungeon, env.style.hatching.distance);
-  if (pockets.length === 0) return;
-  const { ctx, palette } = env;
-  ctx.save();
-  ctx.fillStyle = palette.shading;
-  ctx.beginPath();
-  for (const { ring } of pockets) tracePolygon(ctx, ring);
-  ctx.fill();
-  ctx.restore();
 }
 
 /** Whether no point of a pocket lies farther than `reach` from a floor. */

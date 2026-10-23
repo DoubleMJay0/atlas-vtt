@@ -7,9 +7,9 @@ import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleC
 import { savePng } from './dungeonRenderHarness';
 
 /**
- * The map saved as SVG against the map drawn on a canvas: the SVG, shown by the browser, must be
- * the same picture but for the edges antialiasing draws apart and the vellum (the SVG lies on plain
- * paper), and hold no text.
+ * The map saved as SVG against the map drawn on a canvas as the export draws it (`vector`: plain
+ * paper, no textures, soft shadows or other pictures, holes painted as depth): the SVG, shown by
+ * the browser, must be the same picture but for the edges antialiasing draws apart, and hold no text.
  */
 
 const PX_PER_CELL = 30;
@@ -64,7 +64,7 @@ describe('the map as SVG', () => {
       const style = dungeonStyle(styleId);
       const size = mapLayout(model, PX_PER_CELL, DEFAULT_VIEW);
       const canvas = new OffscreenCanvas(size.widthPx, size.heightPx);
-      const drawn = renderMap(canvas.getContext('2d')!, model, style, DEFAULT_VIEW, { pxPerCell: PX_PER_CELL, plainPaper: true });
+      const drawn = renderMap(canvas.getContext('2d')!, model, style, DEFAULT_VIEW, { pxPerCell: PX_PER_CELL, vector: true, openings: 'drawn' });
       const { svg, layout } = renderMapSvg(model, style, DEFAULT_VIEW, { pxPerCell: PX_PER_CELL });
 
       expect(layout).toEqual(drawn);

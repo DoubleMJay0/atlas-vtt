@@ -1,26 +1,5 @@
 import type { CellPoint, DungeonCrack } from '../model';
-import { clipToFloors } from './floors';
-import { traceSmoothClosed, type Vec } from './geometry';
-import { strokeWidth, type RenderEnv } from './renderEnv';
-
-/** Cracks: tapered ink wedges from the walls into the rooms, cut to the floors. */
-export function drawCracks(env: RenderEnv): void {
-  const { ctx, palette, dungeon } = env;
-  if (!env.view.props || dungeon.floor.cracks.length === 0) return;
-  ctx.save();
-  clipToFloors(env);
-  ctx.fillStyle = palette.ink;
-  ctx.beginPath();
-  for (const crack of dungeon.floor.cracks) {
-    const outline = taperedOutline(crack);
-    if (outline.length < 3) continue;
-    ctx.moveTo(outline[0]!.x, outline[0]!.y);
-    for (const p of outline.slice(1)) ctx.lineTo(p.x, p.y);
-    ctx.closePath();
-  }
-  ctx.fill();
-  ctx.restore();
-}
+import type { Vec } from './geometry';
 
 /** A polyline turned into a polygon whose width runs from the crack's width down to nothing. */
 export function taperedOutline(crack: DungeonCrack): Vec[] {
@@ -55,21 +34,4 @@ function miterNormal(pts: readonly CellPoint[], i: number): Vec {
   const m = { x: sx / len, y: sy / len };
   const scale = Math.min(2, 1 / Math.max(0.5, m.x * after.x + m.y * after.y));
   return { x: m.x * scale, y: m.y * scale };
-}
-
-/** Rubble: small rounded stones in the palette's fill, outlined in ink. */
-export function drawRubble(env: RenderEnv): void {
-  const { ctx, palette, dungeon, style } = env;
-  if (!env.view.props || dungeon.floor.rubble.length === 0) return;
-  ctx.save();
-  clipToFloors(env);
-  ctx.beginPath();
-  for (const stone of dungeon.floor.rubble) traceSmoothClosed(ctx, stone.points);
-  ctx.fillStyle = palette.fill;
-  ctx.fill();
-  ctx.strokeStyle = palette.ink;
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = strokeWidth(env, style.strokes.normal);
-  ctx.stroke();
-  ctx.restore();
 }

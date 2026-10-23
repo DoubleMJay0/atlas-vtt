@@ -1,65 +1,20 @@
-import { drawBricks } from './bricks';
-import { drawColumns } from './columns';
-import { drawCracks, drawRubble } from './debris';
-import { drawDoors } from './doors';
-import { drawDots } from './dots';
-import { drawInnerShadow, drawShadingBand, drawWallsAndFloor } from './floors';
-import { drawGrid } from './grid';
-import { drawHatching } from './hatching';
-import { fillPockets } from './pockets';
-import { drawProps } from './props';
+import { buildArtScene, type ArtFrame, type ArtScene } from './art/artScene';
+import { standsOf } from './art/stands';
+import { paintEngraved } from './engraved/painter';
 import type { RenderEnv } from './renderEnv';
-import { drawStairwells } from './stairwells';
-import { drawStonework } from './stonework';
-import { drawTerrainGround } from './terrain/terrainGround';
-import { drawTerrainOpenings } from './terrain/terrainOpenings';
-import { drawTerrainRaised } from './terrain/terrainRaised';
-import { drawTerrainStanding } from './terrain/terrainStanding';
-import { drawWater } from './water';
+import { isDarkColour } from './stone/colours';
+import { paintStone } from './stone/painter';
+import type { ArtDirection } from '../style';
 
-/** What surrounds the walls, per hatching mode; rock the rooms close in on is shaded whole but in stippling. */
-function drawSurroundings(env: RenderEnv): void {
-  if (env.style.hatching.mode !== 'dots') fillPockets(env);
-  switch (env.style.hatching.mode) {
-    case 'hatching':
-      drawShadingBand(env);
-      drawHatching(env);
-      return;
-    case 'none':
-      drawShadingBand(env);
-      return;
-    case 'stonework':
-      drawStonework(env);
-      return;
-    case 'bricks':
-      drawBricks(env);
-      return;
-    case 'dots':
-      drawDots(env);
-      return;
-  }
-}
+const PAINTERS: Record<ArtDirection, (scene: ArtScene) => void> = { stone: paintStone, engraved: paintEngraved };
 
 /**
- * The floor plan, bottom to top: what surrounds the walls, walls and floor, water, grid and
- * cracks, rubble, terrain on the ground and raised terrain, props, the inner shadow, terrain that
- * stands, holes in the floor and their bridges, then doors, stairwells and columns. The context is
- * in cells; paper and labels are the caller's.
+ * The floor plan of one floor in the look's direction (`DungeonStyle.direction`): the scene's
+ * fields are worked out once for the frame, then the direction paints. The context is in cells;
+ * the paper is the caller's. Without `pictures` (or on a context that cannot draw them) only what
+ * an SVG can hold is drawn.
  */
-export function drawDungeon(env: RenderEnv): void {
-  drawSurroundings(env);
-  drawWallsAndFloor(env);
-  drawWater(env);
-  drawGrid(env);
-  drawCracks(env);
-  drawRubble(env);
-  drawTerrainGround(env);
-  drawTerrainRaised(env);
-  drawProps(env);
-  drawInnerShadow(env);
-  drawTerrainStanding(env);
-  drawTerrainOpenings(env);
-  drawDoors(env);
-  drawStairwells(env);
-  drawColumns(env);
+export function drawDungeon(env: RenderEnv, frame: ArtFrame, pictures = true): void {
+  const scene = buildArtScene(env, frame, standsOf(env), isDarkColour(env.palette.floor), pictures);
+  PAINTERS[env.style.direction](scene);
 }

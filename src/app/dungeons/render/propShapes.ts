@@ -38,3 +38,8 @@ export function tracePropSilhouette(kind: PropKind, ctx: PropPen['ctx']): boolea
 export function propLift(kind: PropKind): number {
   return GLYPHS[kind].lift;
 }
+
+/** The outline that casts a prop's shadow, as a tracer; none for a prop that lies flat. */
+export function propSilhouette(kind: PropKind): ((ctx: PropPen['ctx']) => void) | undefined {
+  return GLYPHS[kind].silhouette;
+}

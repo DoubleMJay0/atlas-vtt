@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { doorShape, doorShapes, rotundaRadius, roomShape, shapeDistance, signedArea2, shapePolygon } from '../../../src/app/dungeons/render/geometry';
 import { visibleDungeon } from '../../../src/app/dungeons/render/visibleDungeon';
-import { insetRuns } from '../../../src/app/dungeons/render/water';
+import { insetRuns } from '../../../src/app/dungeons/render/shore';
 import { taperedOutline } from '../../../src/app/dungeons/render/debris';
 import { paletteOf } from '../../../src/app/dungeons/render/palette';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
@@ -88,13 +88,13 @@ describe('dungeon render details', () => {
     expect(outline[2]!.y).toBeCloseTo(outline[3]!.y);
   });
 
-  it('snaps colours to ink or paper in monochrome and takes the shadow away', () => {
+  it('snaps colours to ink or paper in monochrome and casts shadows in the ink', () => {
     const style = dungeonStyle('parchment');
     const mono = paletteOf(style, { monochrome: true, shadow: true });
     expect([style.colors.ink, style.colors.paper]).toContain(mono.floor);
     expect([style.colors.ink, style.colors.paper]).toContain(mono.water);
-    expect(mono.shadow).toBeNull();
-    expect(paletteOf(dungeonStyle('drafting'), { monochrome: false, shadow: true }).shadow).toBeNull();
+    expect(mono.shadow).toBe(style.colors.ink);
+    expect(paletteOf(style, { monochrome: true, shadow: false }).shadow).toBeNull();
     expect(paletteOf(style, { monochrome: false, shadow: true }).shadow).toBe(style.shadow.color);
   });
 });

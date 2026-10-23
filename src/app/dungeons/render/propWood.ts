@@ -69,7 +69,7 @@ export const WOOD_AND_CLOTH = {
       strokeFine(pen);
       block(pen, -0.26, -0.06, 0.1, 0.42, pen.palette.fill, 0.05);
       block(pen, 0.26, -0.06, 0.1, 0.42, pen.palette.fill, 0.05);
-      block(pen, 0, -0.08, 0.42, 0.42, pen.palette.fill, 0.04);
+      block(pen, 0, -0.08, 0.42, 0.42, pen.cloth ?? pen.palette.fill, 0.04);
       // A tufted cushion.
       const c = 0.13;
       fineLines(pen, [-c, -0.08 - c, c, -0.08 + c, c, -0.08 - c, -c, -0.08 + c]);

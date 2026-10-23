@@ -3,7 +3,8 @@ import type { DungeonStyle, DungeonView } from '../style';
 /** The colours a drawing uses, after Monochrome and the Shadow layer have had their say. */
 export interface Palette {
   ink: string;
-  shading: string;
+  /** The natural rock round the walls. */
+  rock: string;
   water: string;
   floor: string;
   paper: string;
@@ -11,7 +12,7 @@ export interface Palette {
   fill: string;
   /** The grid's lines: ink let into the floor by the style's grid strength, opaque so an SVG needs no alpha. */
   grid: string;
-  /** Null when no inner shadow is drawn. */
+  /** The colour shadows darken towards; null when the view shows none. */
   shadow: string | null;
 }
 
@@ -45,12 +46,6 @@ export function mixColours(a: string, b: string, t: number): string {
   return hex([0, 1, 2].map(i => from[i]! + (to[i]! - from[i]!) * t) as Rgb);
 }
 
-/** Pure white switches the shadow off, as it would multiply to nothing. */
-function isWhite(colour: string): boolean {
-  const [r, g, b] = parseHex(colour);
-  return r === 255 && g === 255 && b === 255;
-}
-
 /** Luminance apart below which paper reads as ink, as in a style whose rock is solid ink. */
 const PAPER_AS_INK = 60;
 
@@ -74,13 +69,13 @@ function monochromeOf(style: DungeonStyle): Palette {
   const snap = (colour: string): string => (apart(colour) <= Math.abs(luminance(parseHex(colour)) - otherL) ? ink : other);
   const floor = snap(style.colors.floor);
   const paper = snap(style.colors.paper);
-  return { ink, paper, fill: paper === ink ? floor : paper, shading: snap(style.colors.shading), water: floor, floor, grid: ink, shadow: null };
+  return { ink, paper, fill: paper === ink ? floor : paper, rock: snap(style.colors.rock), water: floor, floor, grid: ink, shadow: null };
 }
 
 export function paletteOf(style: DungeonStyle, view: Pick<DungeonView, 'monochrome' | 'shadow'>): Palette {
-  if (view.monochrome) return monochromeOf(style);
+  if (view.monochrome) return { ...monochromeOf(style), shadow: view.shadow ? style.colors.ink : null };
   const { ink } = style.colors;
-  const shadow = view.shadow && !isWhite(style.shadow.color) ? style.shadow.color : null;
+  const shadow = view.shadow ? style.shadow.color : null;
   const grid = mixColours(style.colors.floor, ink, style.grid.strength);
   const fill = paperIsInk(style) ? style.colors.floor : style.colors.paper;
   return { ...style.colors, fill, grid, shadow };

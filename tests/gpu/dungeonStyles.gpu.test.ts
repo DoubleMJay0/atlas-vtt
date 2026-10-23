@@ -57,7 +57,8 @@ function preview(model: DungeonModel, style: DungeonStyle): OffscreenCanvas {
 
 function expectInked(canvas: OffscreenCanvas, style: DungeonStyle): void {
   const stats = pixelStats(canvas, parseHex(style.colors.ink));
-  expect(stats.ink).toBeGreaterThan(0.005);
+  // Stone & shadow inks only the line where wall meets floor; Engraved cuts its rock in ink too
+  expect(stats.ink).toBeGreaterThan(0.001);
   // Where the rock is solid ink, ink covers much of the picture by design
   if (style.colors.paper !== style.colors.ink) expect(stats.ink).toBeLessThan(0.6);
   expect(stats.transparent).toBe(0);

@@ -1,6 +1,8 @@
 import type { WallSegment } from '../../types/wallTypes';
 import type { DungeonProp, DungeonTerrain, PropKind, TerrainKind } from '../model';
+import { STATUE_PLINTH, WELL_RADIUS } from '../render/propStone';
 import { cellBox } from '../render/terrain/cellRings';
+import { FRAGMENT, INSET as DRAWN_INSET } from '../render/terrain/footprints';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
 import type { DungeonPlacement } from './toWalls';
@@ -27,20 +29,18 @@ export interface Footprint {
 
 /**
  * The tall props, by the size of what the map draws of them at scale 1 (`render/propStone.ts`: a
- * statue's plinth, a well's ring). A restyle of the props must keep these, or the fidelity test
- * finds the outline off the drawn object.
+ * statue's plinth, a well's ring), so an outline always lies on its drawn object.
  */
 const TALL_PROPS: Partial<Record<PropKind, { half: number; round: boolean }>> = {
-  statue: { half: 0.3, round: false },
-  well: { half: 0.4, round: true },
+  statue: { half: STATUE_PLINTH / 2, round: false },
+  well: { half: WELL_RADIUS, round: true },
 };
 
 /**
- * The tall terrain, by how far its drawing (`render/terrain/terrainStanding.ts`) keeps inside the
- * cells it fills; a wall fragment is a slab of `FRAGMENT` along its longer side, its broken ends short of the cells.
+ * The tall terrain, by how far its drawing keeps inside the cells it fills (`render/terrain/footprints.ts`);
+ * a wall fragment is a slab of `FRAGMENT` along its longer side, its broken ends short of the cells.
  */
-const TALL_TERRAIN: Partial<Record<TerrainKind, number>> = { pillar: 0.1, obelisk: 0.14, statue: 0.18 };
-const FRAGMENT = { half: 0.17, ends: 0.12 };
+const TALL_TERRAIN: Partial<Record<TerrainKind, number>> = { pillar: DRAWN_INSET.pillar, obelisk: DRAWN_INSET.obelisk, statue: DRAWN_INSET.statue };
 
 /** The outline's share of the footprint: inside the drawn object's ink. */
 const INSET = 0.85;

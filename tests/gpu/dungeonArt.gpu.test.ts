@@ -1,0 +1,48 @@
+import { describe, it } from 'vitest';
+import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
+import { DUNGEON_STYLES, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
+import { ART_DUNGEONS, ART_SPOTS, artModel, drawClose, drawWhole } from './dungeonArtSheets';
+import { savePng } from './dungeonRenderHarness';
+
+/**
+ * Every look on dungeons of every kind, whole and close up at 200 px per cell with tokens, written
+ * to `out/dungeon-render/v2-art/` for judging by eye. `VITE_ART_LOOK`, `VITE_ART_DUNGEON` and
+ * `VITE_ART_SHOT` (whole, close, mono) narrow a run while iterating.
+ */
+
+const only = (key: string): string[] | null => {
+  const value = (import.meta.env as Record<string, string | undefined>)[key];
+  return value ? value.split(',') : null;
+};
+const looks = only('VITE_ART_LOOK');
+const dungeons = only('VITE_ART_DUNGEON');
+const shots = only('VITE_ART_SHOT') ?? ['whole', 'close'];
+
+describe('dungeon looks, for judging by eye', () => {
+  for (const { id } of DUNGEON_STYLES) {
+    if (looks && !looks.includes(id)) continue;
+    for (const { name } of ART_DUNGEONS) {
+      if (dungeons && !dungeons.includes(name)) continue;
+      it(`${id} ${name}`, async () => {
+        const model = artModel(name);
+        const views: [string, DungeonView][] = [['', DEFAULT_VIEW]];
+        if (shots.includes('mono')) views.push(['-mono', { ...DEFAULT_VIEW, monochrome: true }]);
+        for (const [suffix, view] of views) {
+          for (let floor = 0; floor < model.floors.length; floor++) {
+            const f = model.floors.length > 1 ? `-f${floor}` : '';
+            if (shots.includes('whole')) await savePng(drawWhole(model, id as DungeonStyleId, view, floor), `v2-art/${id}-${name}${f}${suffix}`);
+            if (shots.includes('close')) await savePng(drawClose(model, id as DungeonStyleId, view, floor), `v2-art/${id}-${name}${f}${suffix}-close`);
+          }
+        }
+      });
+    }
+    if (shots.includes('spots')) {
+      it(`${id} terrain spots`, async () => {
+        for (const spot of ART_SPOTS) {
+          const canvas = drawClose(artModel(spot.dungeon), id as DungeonStyleId, DEFAULT_VIEW, spot.floor, spot.cells ?? 10, spot.rows ?? 7, false, spot.centre);
+          await savePng(canvas, `v2-art/spot-${id}-${spot.name}`);
+        }
+      });
+    }
+  }
+});

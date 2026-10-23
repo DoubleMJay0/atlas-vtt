@@ -45,7 +45,6 @@ export function readDungeonView(value: unknown, base: DungeonView = DEFAULT_VIEW
     water: flag(record.water, base.water),
     props: flag(record.props, base.props),
     shadow: flag(record.shadow, base.shadow),
-    exits: flag(record.exits, base.exits),
     secrets: flag(record.secrets, base.secrets),
     monochrome: flag(record.monochrome, base.monochrome),
   };

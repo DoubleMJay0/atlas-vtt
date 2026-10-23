@@ -1,7 +1,8 @@
 import type { WallSegment } from '../../types/wallTypes';
 import type { DoorKind, DungeonDoor, DungeonModel } from '../model';
 import { visibleFloor } from '../render/visibleDungeon';
-import { REFERENCE_CELL_PX, type DungeonStyle, type DungeonView } from '../style';
+import type { DungeonStyle, DungeonView } from '../style';
+import { wallInkWidth } from '../render/wallInk';
 import type { Vec } from '../render/geometry';
 import { STEPS, doorEnds, doorLine, splitRings, wallRings, type RingHit } from './wallOutline';
 
@@ -41,12 +42,6 @@ function entranceMouth(door: DungeonDoor, half: number): (p: Vec) => boolean {
     const dy = p.y - mouth.y;
     return Math.abs(dx * door.dir.x + dy * door.dir.y) < 1 / STEPS && Math.abs(dx * door.dir.y - dy * door.dir.x) <= reach;
   };
-}
-
-/** The drawn wall's width outside the floor, in cells: Stonework walls use the normal stroke. */
-export function wallInkWidth(style: DungeonStyle): number {
-  const px = style.hatching.mode === 'stonework' ? style.strokes.normal : style.strokes.thick;
-  return px / REFERENCE_CELL_PX;
 }
 
 export interface DungeonWalls {

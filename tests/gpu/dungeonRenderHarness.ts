@@ -22,8 +22,19 @@ export function withoutText<T extends object>(ctx: T): { ctx: T; texts: string[]
   return { ctx: proxy, texts };
 }
 
+/** The most pixels a picture is written with; larger ones are written reduced, as the browser can hand over only so much. */
+const SAVED_PIXELS = 16_000_000;
+
 export async function savePng(canvas: OffscreenCanvas, name: string): Promise<void> {
-  const blob = await canvas.convertToBlob({ type: 'image/png' });
+  const k = Math.min(1, Math.sqrt(SAVED_PIXELS / (canvas.width * canvas.height)));
+  let saved = canvas;
+  if (k < 1) {
+    saved = new OffscreenCanvas(Math.round(canvas.width * k), Math.round(canvas.height * k));
+    const ctx = saved.getContext('2d')!;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas, 0, 0, saved.width, saved.height);
+  }
+  const blob = await saved.convertToBlob({ type: 'image/png' });
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));

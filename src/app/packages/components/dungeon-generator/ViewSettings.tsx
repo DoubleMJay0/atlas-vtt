@@ -9,7 +9,7 @@ import { SelectRow, SwitchRow } from './fields';
 type ViewSwitch = Exclude<keyof DungeonView, 'grid' | 'smallTiles' | 'water'>;
 
 /** The layers a switch turns on and off, in the order shown. */
-const SWITCHES: readonly ViewSwitch[] = ['props', 'shadow', 'exits', 'secrets', 'monochrome'];
+const SWITCHES: readonly ViewSwitch[] = ['props', 'shadow', 'secrets', 'monochrome'];
 
 interface ViewSettingsProps {
   view: DungeonView;

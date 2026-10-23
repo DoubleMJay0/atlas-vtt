@@ -5,14 +5,32 @@
  * `DUNGEON_STYLES` (`styleCatalog.ts`), and only its id is stored.
  */
 
-export type HatchingMode = 'hatching' | 'stonework' | 'bricks' | 'dots' | 'none';
+/**
+ * The two ways a look is drawn. Stone & shadow paints the plan as built: natural rock fading into
+ * the vellum, a course of dressed wall blocks, flagstones and one light casting every shadow.
+ * Engraved cuts it as a copperplate: burin lines whose width carries the tone, in two colours.
+ */
+export type ArtDirection = 'stone' | 'engraved';
+
+/**
+ * How the floor is laid: irregular flagstones on the cell lines, long ashlar courses, rounded
+ * cobbles, or one square slab a cell.
+ */
+export type FloorPattern = 'flagstone' | 'ashlar' | 'cobble' | 'slab';
 
 export interface DungeonStyle {
-  colors: { ink: string; shading: string; water: string; floor: string; paper: string };
-  strokes: { thin: number; hatching: number; normal: number; thick: number };
+  direction: ArtDirection;
+  /** `rock` is the natural rock round the walls (Stone & shadow; Engraved cuts it in ink). */
+  colors: { ink: string; rock: string; water: string; floor: string; paper: string };
+  /** `thick` is the wall's ink outside the floor: the scene's walls lie on its middle. */
+  strokes: { thin: number; normal: number; thick: number };
   /** Multiplied onto the floor, so it darkens whatever the floor's colour; white is no shadow. */
-  shadow: { color: string; distance: number };
-  hatching: { mode: HatchingMode; strokes: number; size: number; distance: number };
+  shadow: { color: string; strength: number };
+  /** How far the rock (or its engraving) reaches past the walls, in cells. */
+  surround: { reach: number };
+  floor: FloorPattern;
+  /** What pools hold where it is not water. */
+  liquid?: 'lava';
   /** The grid's line width as a share of the usual, and how strongly its ink shows over the floor (0..1). */
   grid: { weight: number; strength: number };
 }
@@ -28,10 +46,8 @@ export interface DungeonView {
   water: boolean;
   props: boolean;
   shadow: boolean;
-  /** The paper squares outside entrance and exit stairs. */
-  exits: boolean;
   secrets: boolean;
-  /** Only the style's ink and paper. */
+  /** Only the style's ink and paper (Stone & shadow: tones between the two). */
   monochrome: boolean;
 }
 
@@ -44,7 +60,6 @@ export const DEFAULT_VIEW: DungeonView = {
   water: true,
   props: true,
   shadow: true,
-  exits: true,
   secrets: true,
   monochrome: false,
 };

@@ -13,8 +13,11 @@ export interface RenderMapOptions {
   pxPerCell: number;
   /** Leave the paper out, for an image laid over something else. */
   transparent?: boolean;
-  /** Plain paper instead of the vellum, as the SVG export draws it (it holds no gradients or grain). */
-  plainPaper?: boolean;
+  /**
+   * Only what an SVG can hold, as the SVG export draws it: plain paper instead of the vellum, and
+   * no textures, soft shadows or other pictures (a canvas that cannot draw pictures gets the same).
+   */
+  vector?: boolean;
   /** The floor to draw, by index; the entry floor where unset. */
   floor?: number;
   /** Holes over a floor below: transparent (`cut`, where unset) or painted as depth (`drawn`). */
@@ -24,6 +27,8 @@ export interface RenderMapOptions {
    * this many times the 1400 × 1000 the legible size is given for: the preview's.
    */
   legibleAt?: number;
+  /** A part of the map to draw, the canvas its size; the whole map where unset. */
+  window?: { originCell: { x: number; y: number }; widthPx: number; heightPx: number };
 }
 
 /**
@@ -36,11 +41,18 @@ export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyl
   const layout = mapLayout(model, pxPerCell, view);
   const drawn = options.legibleAt ? legibleStyle(style, pxPerCell / options.legibleAt) : style;
   const env = createRenderEnv(ctx, visibleDungeon(model, view, options.floor ?? 0), drawn, view, pxPerCell, options.openings);
+  const frame = options.window ? { ...options.window, pxPerCell } : { originCell: layout.originCell, widthPx: layout.widthPx, heightPx: layout.heightPx, pxPerCell };
   ctx.save();
-  if (!options.transparent) drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome || options.plainPaper === true);
+  if (!options.transparent) {
+    // The vellum lies over the whole map: a window shows its part of it.
+    ctx.save();
+    ctx.translate((layout.originCell.x - frame.originCell.x) * pxPerCell, (layout.originCell.y - frame.originCell.y) * pxPerCell);
+    drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome || options.vector === true);
+    ctx.restore();
+  }
   ctx.scale(pxPerCell, pxPerCell);
-  ctx.translate(-layout.originCell.x, -layout.originCell.y);
-  drawDungeon(env);
+  ctx.translate(-frame.originCell.x, -frame.originCell.y);
+  drawDungeon(env, frame, options.vector !== true);
   ctx.restore();
   return layout;
 }

@@ -55,9 +55,12 @@ function modelOf(name: string): DungeonModel {
   return model;
 }
 
+/** Stone & shadow inks only the line where wall meets floor; Engraved cuts its rock in ink too. */
+const LEAST_INK = 0.001;
+
 function expectSane(canvas: OffscreenCanvas, styleId: DungeonStyleId): void {
   const stats = pixelStats(canvas, parseHex(dungeonStyle(styleId).colors.ink));
-  expect(stats.ink).toBeGreaterThan(0.005);
+  expect(stats.ink).toBeGreaterThan(LEAST_INK);
   expect(stats.ink).toBeLessThan(0.6);
   expect(stats.transparent).toBe(0);
 }
@@ -90,7 +93,7 @@ function map(model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number, vi
 function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number): string[] {
   const style = dungeonStyle(styleId);
   const dungeon = visibleDungeon(model, DEFAULT_VIEW);
-  const pockets = narrowPockets(dungeon, style.hatching.distance);
+  const pockets = narrowPockets(dungeon, style.surround.reach / 2);
   const { originCell } = mapLayout(model, pxPerCell, DEFAULT_VIEW);
   const ctx = canvas.getContext('2d')!;
   const [pr, pg, pb] = parseHex(style.colors.paper);
@@ -135,7 +138,7 @@ describe('generated dungeons', () => {
         const { canvas } = map(modelOf(name), styleId, 100);
         expectSane(canvas, styleId);
         if (name === 'default') expect(narrowPockets(visibleDungeon(modelOf(name), DEFAULT_VIEW), 0.5).length).toBeGreaterThan(0);
-        if (dungeonStyle(styleId).hatching.mode !== 'dots') expect(paperInPockets(canvas, modelOf(name), styleId, 100)).toEqual([]);
+        expect(paperInPockets(canvas, modelOf(name), styleId, 100)).toEqual([]);
         await savePng(canvas, `gen-map-${name}-${styleId}`);
       });
     }

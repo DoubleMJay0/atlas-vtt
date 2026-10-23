@@ -5,8 +5,12 @@ import type { PropGlyph, PropPen } from './propShapes';
 /** The props of stone and water, in the glyph family's grammar (`glyphPen.ts`). */
 
 const FOUNTAIN_R = 0.5;
-const WELL = { outer: 0.4, inner: 0.25 };
-const PLINTH = 0.6;
+/** A well's outer radius at scale 1 (`scene/objectShadows.ts` outlines it). */
+export const WELL_RADIUS = 0.4;
+const WELL = { outer: WELL_RADIUS, inner: 0.25 };
+/** The side of a statue's plinth at scale 1 (`scene/objectShadows.ts` outlines it). */
+export const STATUE_PLINTH = 0.6;
+const PLINTH = STATUE_PLINTH;
 const SARCOPHAGUS = { w: 0.52, h: 0.94 };
 const ALTAR = { w: 0.86, h: 0.44 };
 const DAIS = { half: 1.5, depth: 1.35, chamfer: 0.32, step: 0.24 };
@@ -136,22 +140,9 @@ export const STONE_AND_WATER = {
     lift: 1,
     silhouette: ctx => roundedRect(ctx, 0, 0, PLINTH, PLINTH),
     draw: pen => {
-      const { ctx } = pen;
       block(pen, 0, 0, PLINTH, PLINTH);
       bevel(pen, 0, 0, PLINTH, PLINTH);
-      // A cloaked figure seen from above, facing the room: shoulders, the cloak falling behind, the head.
-      ctx.beginPath();
-      ctx.moveTo(-0.17, 0.01);
-      ctx.quadraticCurveTo(-0.17, 0.17, 0, 0.19);
-      ctx.quadraticCurveTo(0.17, 0.17, 0.17, 0.01);
-      ctx.quadraticCurveTo(0.17, -0.07, 0, -0.07);
-      ctx.quadraticCurveTo(-0.17, -0.07, -0.17, 0.01);
-      ctx.closePath();
-      ctx.fillStyle = pen.palette.fill;
-      ctx.fill();
-      ctx.stroke();
-      fineLines(pen, [-0.07, 0.07, -0.05, 0.17, 0.07, 0.07, 0.05, 0.17]);
-      disc(pen, 0, -0.01, 0.075);
+      drawStatueFigure(pen);
     },
   },
   sarcophagus: {
@@ -175,7 +166,7 @@ export const STONE_AND_WATER = {
       const over = ALTAR.h / 2 + 0.05;
       ctx.beginPath();
       ctx.rect(-cloth, -over, cloth * 2, over * 2);
-      ctx.fillStyle = palette.fill;
+      ctx.fillStyle = pen.cloth ?? palette.fill;
       ctx.fill();
       strokeFine(pen);
       const candle = ALTAR.w / 2 - 0.15;
@@ -201,3 +192,54 @@ export const STONE_AND_WATER = {
     },
   },
 } satisfies Partial<Record<PropKind, PropGlyph>>;
+
+/**
+ * A statue's figure from above, facing −y: a cloaked warrior on a round base, shoulders broad, the
+ * cloak falling behind, both hands on the hilt of a sword whose point rests before the feet.
+ */
+export function drawStatueFigure(pen: PropPen): void {
+  const { ctx, palette } = pen;
+  disc(pen, 0, 0.02, 0.22);
+  // The cloak, falling behind the shoulders in three folds.
+  ctx.beginPath();
+  ctx.moveTo(-0.19, -0.01);
+  ctx.quadraticCurveTo(-0.22, 0.16, -0.12, 0.215);
+  ctx.quadraticCurveTo(-0.06, 0.19, 0, 0.225);
+  ctx.quadraticCurveTo(0.06, 0.19, 0.12, 0.215);
+  ctx.quadraticCurveTo(0.22, 0.16, 0.19, -0.01);
+  ctx.closePath();
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  ctx.stroke();
+  fineLines(pen, [-0.06, 0.06, -0.07, 0.19, 0.06, 0.06, 0.07, 0.19]);
+  // Shoulders and arms reaching forward to the hilt.
+  ctx.beginPath();
+  ctx.moveTo(-0.2, 0.02);
+  ctx.quadraticCurveTo(-0.2, -0.07, -0.12, -0.08);
+  ctx.lineTo(-0.035, -0.13);
+  ctx.lineTo(0.035, -0.13);
+  ctx.lineTo(0.12, -0.08);
+  ctx.quadraticCurveTo(0.2, -0.07, 0.2, 0.02);
+  ctx.quadraticCurveTo(0, 0.09, -0.2, 0.02);
+  ctx.closePath();
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  ctx.stroke();
+  // The sword: guard across the hands, the blade's point resting before the feet.
+  ctx.beginPath();
+  ctx.moveTo(-0.022, -0.145);
+  ctx.lineTo(-0.022, -0.27);
+  ctx.lineTo(0, -0.3);
+  ctx.lineTo(0.022, -0.27);
+  ctx.lineTo(0.022, -0.145);
+  ctx.closePath();
+  ctx.fillStyle = palette.fill;
+  ctx.fill();
+  strokeFine(pen);
+  fineLines(pen, [-0.075, -0.14, 0.075, -0.14]);
+  disc(pen, 0, -0.005, 0.075);
+  fineLines(pen, [0, -0.075, 0, 0.065]);
+}
+
+/** The figure alone, for a statue whose plinth is drawn apart from it. */
+export const STATUE_FIGURE: PropGlyph = { lift: 1, draw: drawStatueFigure, silhouette: ctx => circlePath(ctx, 0.22, 0, 0.02) };

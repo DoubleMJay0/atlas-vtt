@@ -39,7 +39,6 @@ export const dungeon = {
   'dungeon.view.waterByTags': 'By tags',
   'dungeon.view.props': 'Props',
   'dungeon.view.shadow': 'Shadow',
-  'dungeon.view.exits': 'Exits',
   'dungeon.view.secrets': 'Secret rooms',
   'dungeon.view.monochrome': 'Monochrome',
 

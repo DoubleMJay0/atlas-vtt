@@ -6,7 +6,8 @@ import { paletteOf, parseHex } from '../../src/app/dungeons/render/palette';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { dungeonScene } from '../../src/app/dungeons/scene/toScene';
-import { dungeonWalls, wallInkWidth } from '../../src/app/dungeons/scene/toWalls';
+import { dungeonWalls } from '../../src/app/dungeons/scene/toWalls';
+import { wallInkWidth } from '../../src/app/dungeons/render/wallInk';
 import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
 import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
 import { alphaAt, changedMask, gridAgreement, inkEdgesFromWalls, inkMask, outlinesOffObjects, wallsInTerrain, wallsOnInk, type Picture } from './dungeonFidelityChecks';
@@ -27,7 +28,7 @@ const CASES: readonly { seed: number; tags: string[]; floors: number; look: Dung
   { seed: 202, tags: ['small', 'round'], floors: 2, look: 'night', view: { smallTiles: true } },
   { seed: 303, tags: ['small', 'secret', 'temple'], floors: 2, look: 'masonry', view: { monochrome: true } },
   { seed: 404, tags: ['small', 'winding'], floors: 3, look: 'stipple', view: { smallTiles: true, grid: 'solid' } },
-  { seed: 505, tags: ['medium', 'colonnades'], floors: 1, look: 'blueprint', view: { exits: false } },
+  { seed: 505, tags: ['medium', 'colonnades'], floors: 1, look: 'blueprint', view: {} },
   // Terrain: a gallery over the arena and a bridged chasm onto the floor below, and a five-room dungeon.
   { seed: 282, tags: ['small'], floors: 2, look: 'parchment', view: {} },
   { seed: 375, tags: ['small', 'crumbling', 'dry'], floors: 2, look: 'sepia', view: { smallTiles: true } },

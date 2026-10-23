@@ -1,0 +1,72 @@
+import type { DungeonTerrain, TerrainKind } from '../../model';
+import type { Hand } from '../art/hand';
+import { drawBridges } from './bridges';
+import { drawAltar, drawCrates, drawLowWall, drawRubbleHeap, drawSarcophagus, drawTable } from './cover';
+import { drawBrokenFloor, drawMosaic, drawPews, drawScatter } from './ground';
+import { drawChannel, drawDeepWater, drawPit } from './hazards';
+import { drawHoles } from './holes';
+import { drawLever, drawPool, drawPortalRing } from './interest';
+import { shownPieces } from './pieces';
+import { drawRaised } from './raised';
+import { drawObelisk, drawPillar, drawStatue, drawWallFragment } from './tall';
+
+/**
+ * Every kind of terrain, drawn once for every look through its direction's hand, in four layers:
+ * what lies on or in the floor and raised floors before light and shade, what stands after them,
+ * holes and their bridges last.
+ */
+
+type Draw = (hand: Hand, piece: DungeonTerrain, colours: TerrainColours) => void;
+
+/** The colours a hand cannot work out alone: what water and cloth look like in the look. */
+export interface TerrainColours {
+  water: string;
+  cloth: string;
+}
+
+const GROUND: Partial<Record<TerrainKind, Draw>> = {
+  pews: drawPews,
+  'rubble-field': (hand, piece) => drawScatter(hand, piece, 0.045, 7),
+  'chasm-floor': (hand, piece) => drawScatter(hand, piece, 0.07, 6),
+  'broken-floor': drawBrokenFloor,
+  mosaic: drawMosaic,
+  pit: drawPit,
+  'deep-water': drawDeepWater,
+  channel: drawChannel,
+};
+
+const RAISED: Partial<Record<TerrainKind, Draw>> = { platform: drawRaised, ledge: drawRaised };
+
+const STANDING: Partial<Record<TerrainKind, Draw>> = {
+  'low-wall': drawLowWall,
+  crates: drawCrates,
+  table: drawTable,
+  altar: drawAltar,
+  sarcophagus: drawSarcophagus,
+  'rubble-heap': drawRubbleHeap,
+  pillar: drawPillar,
+  statue: (hand, piece, colours) => drawStatue(hand, piece, colours.water, colours.cloth),
+  'wall-fragment': drawWallFragment,
+  obelisk: drawObelisk,
+  lever: drawLever,
+  pool: drawPool,
+  'portal-ring': drawPortalRing,
+};
+
+function drawLayer(hand: Hand, table: Partial<Record<TerrainKind, Draw>>, colours: TerrainColours): void {
+  for (const piece of shownPieces(hand.scene.env)) table[piece.kind]?.(hand, piece, colours);
+}
+
+export function drawTerrainGround(hand: Hand, colours: TerrainColours): void {
+  drawLayer(hand, GROUND, colours);
+  drawLayer(hand, RAISED, colours);
+}
+
+export function drawTerrainStanding(hand: Hand, colours: TerrainColours): void {
+  drawLayer(hand, STANDING, colours);
+}
+
+export function drawTerrainOpenings(hand: Hand): void {
+  drawHoles(hand);
+  drawBridges(hand);
+}

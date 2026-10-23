@@ -36,7 +36,8 @@ function drawMap(model: DungeonModel, styleId: DungeonStyleId, view: DungeonView
 
 function expectSane(canvas: OffscreenCanvas, styleId: DungeonStyleId): void {
   const stats = pixelStats(canvas, parseHex(dungeonStyle(styleId).colors.ink));
-  expect(stats.ink).toBeGreaterThan(0.005);
+  // Stone & shadow inks only the line where wall meets floor; Engraved cuts its rock in ink too
+  expect(stats.ink).toBeGreaterThan(0.001);
   expect(stats.ink).toBeLessThan(0.6);
   expect(stats.colours).toBeGreaterThan(4);
   expect(stats.transparent).toBe(0);
@@ -68,7 +69,7 @@ describe('dungeon renderer', () => {
   const variants: [string, Partial<DungeonView>][] = [
     ['monochrome', { monochrome: true }],
     ['no-secrets', { secrets: false }],
-    ['bare', { water: false, props: false, shadow: false, exits: false }],
+    ['bare', { water: false, props: false, shadow: false }],
   ];
   for (const [name, change] of variants) {
     it(`draws the ${name} map`, async () => {
