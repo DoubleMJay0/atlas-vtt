@@ -8,6 +8,10 @@ import { visibleDungeon, type VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { floorLetter } from './roomKeys';
 import { floorFeatures } from './toFeatures';
+import { floorLiquids } from './toLiquids';
+import type { MeasurementSettings } from '../../grid/measurementFormat';
+import type { LightSource } from '../../types/lightingTypes';
+import type { LiquidSurface } from '../../types/liquidTypes';
 import { floorSurfaces } from './toSurfaces';
 import type { LevelSurface } from '../../types/sceneLevelTypes';
 import type { MapFeature } from '../../types/mapFeatureTypes';
@@ -23,6 +27,8 @@ export interface DungeonSceneParts {
   scene: MapSceneParts;
   /** The rooms of its note, each with its pin's place. */
   rooms: NoteRoom[];
+  /** Water, lava and acid of every floor, moving while maps are animated. */
+  liquids: Record<string, LiquidSurface>;
   /** The scene's levels by floor (the entry floor first); null for a dungeon of one floor, whose scene has none. */
   levelIds: string[] | null;
   doors: Partial<Record<DoorKind, number>>;
@@ -48,8 +54,9 @@ function floorWalls(dungeon: VisibleDungeon, style: DungeonStyle, view: DungeonV
  * drawn on the map (half cells with small tiles; the image's pixel 0 lies on a line of both),
  * every floor's walls and doors and its tall objects' outlines, the stairs between floors and the
  * openings into them (holes, and bridges laid over them), the
- * map features of every floor's terrain and furniture, the rooms of its note, no lights, and dynamic lighting in daylight, so nothing changes until the GM
- * dims it. A dungeon of several floors gets a level per floor; one of one floor none. Null when
+ * map features of every floor's terrain and furniture, its water, lava and acid with the light lava
+ * and acid give off over their whole surface, the rooms of its note, and dynamic lighting in
+ * daylight, so nothing changes until the GM dims it. Light ranges are in `unit`. A dungeon of several floors gets a level per floor; one of one floor none. Null when
  * the walls of a floor would crowd too much to be joined (`wallsCrowd`); a generated dungeon never does.
  */
 export function dungeonScene(
@@ -58,11 +65,14 @@ export function dungeonScene(
   view: DungeonView,
   placement: DungeonPlacement,
   image: { width: number; height: number },
+  unit: Pick<MeasurementSettings, 'unitType' | 'ruleDistance'>,
 ): DungeonSceneParts | null {
   const levelIds = model.floors.length > 1 ? model.floors.map(() => newLevelId()) : null;
   const walls: Record<string, WallSegment> = {};
   const features: Record<string, MapFeature> = {};
   const surfaces: Record<string, LevelSurface> = {};
+  const liquids: Record<string, LiquidSurface> = {};
+  const lights: Record<string, LightSource> = {};
   const doors: Partial<Record<DoorKind, number>> = {};
   let unplaced = 0;
   for (const index of model.floors.keys()) {
@@ -73,6 +83,9 @@ export function dungeonScene(
     Object.assign(walls, floor.walls);
     const letter = floorLetter(index).toLowerCase();
     Object.assign(features, floorFeatures(dungeon, view, placement, `feature_dungeon_${letter}`, level));
+    const wet = floorLiquids(dungeon, style, view, placement, unit, `dungeon_${letter}`, level);
+    Object.assign(liquids, wet.liquids);
+    Object.assign(lights, wet.lights);
     if (level) Object.assign(surfaces, floorSurfaces(dungeon, placement, `levelsurface_dungeon_${letter}`, level));
     for (const [kind, count] of Object.entries(floor.doors) as [DoorKind, number][]) doors[kind] = (doors[kind] ?? 0) + count;
     unplaced += floor.unplaced;
@@ -84,12 +97,13 @@ export function dungeonScene(
       // The map draws its own grid (or none, as the GM chose): Atlas's stays hidden, its snapping on
       grid: { size, ...normaliseGridOffset('square', size, 0, 0), visible: false },
       walls,
-      lights: {},
+      lights,
       lighting: { enabled: true, ambient: DAYLIGHT },
       ...(links && { levelLinks: links }),
       ...(Object.keys(surfaces).length > 0 && { levelSurfaces: surfaces }),
       mapFeatures: features,
     },
+    liquids,
     rooms: noteRooms(model, view, placement, levelIds),
     levelIds,
     doors,

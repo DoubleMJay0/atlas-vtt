@@ -1,4 +1,4 @@
-import { difference, EndType, FillRule, inflatePaths, JoinType, union, type Path64, type Paths64 } from 'clipper2-ts';
+import { difference, EndType, FillRule, inflatePaths, intersect, JoinType, union, type Path64, type Paths64 } from 'clipper2-ts';
 import type { Q, QPolygon, QShape } from '../types/shapeTypes';
 import { canonicalForm } from './canonicalForm';
 import { assertQ } from './quantizedPoint';
@@ -23,6 +23,10 @@ function canonicalOutput(paths: Paths64): QShape {
 /** Normalized NonZero union with deterministic integer contour order. */
 export function unionShapes(subject: QShape, clip: QShape): QShape {
   return canonicalOutput(union(subject.map(pathOf), clip.map(pathOf), FillRule.NonZero));
+}
+
+export function intersectShapes(subject: QShape, clip: QShape): QShape {
+  return canonicalOutput(intersect(subject.map(pathOf), clip.map(pathOf), FillRule.NonZero));
 }
 
 export function subtractShapes(subject: QShape, clip: QShape): QShape {

@@ -1,4 +1,5 @@
 import type { App } from 'obsidian';
+import { resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import { IMAGE_PRESETS, optimizeImage, type ProcessedImage } from '../../imageProcessing/imageProcessing';
 import { mapSceneFile, writeMapScene, type MapSceneDeps, type MapToWrite } from '../../import/writeMapScene';
@@ -122,12 +123,12 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
   // Every floor lies on one grid: their images must have one size
   if (sizes.some((size) => size.width !== saved.width || size.height !== saved.height)) return refused(t('dungeon.problem.notDrawn'));
   const placement = placementOn(layout, saved);
-  const parts = dungeonScene(model, style, view, placement, saved);
+  const settings = deps.assetService.getCollectionSettings(collection.id);
+  const parts = dungeonScene(model, style, view, placement, saved, resolveMeasurementSettings(settings.gridDefaults, null));
   if (!parts) return refused(t('dungeon.problem.crowdedWalls'));
   if (parts.unplaced > 0) console.debug(`[Atlas] ${options.name}: ${parts.unplaced} doors had no walls beside them and were left open`);
 
   const { levelIds, rooms } = parts;
-  const settings = deps.assetService.getCollectionSettings(collection.id);
   const maps: MapToWrite[] = images.map((image, floor) => ({
     image,
     name: (scene) => (levelIds ? t('dungeonScene.mapName', { scene, floor: floorName(floor) }) : scene),

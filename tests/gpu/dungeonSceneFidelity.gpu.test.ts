@@ -13,6 +13,9 @@ import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleC
 import { alphaAt, changedMask, gridAgreement, inkEdgesFromWalls, inkMask, outlinesOffObjects, wallsInTerrain, wallsOnInk, type Picture } from './dungeonFidelityChecks';
 import type { WallSegment } from '../../src/app/types/wallTypes';
 
+/** The collection's units: five feet a square. */
+const FEET = { unitType: 'feet', ruleDistance: 5 } as const;
+
 /**
  * A dungeon's scene against the map images it was written for, at the 200 px per cell scenes are
  * drawn at, floor by floor (each its level's walls on its own map): every wall lies on drawn wall
@@ -79,7 +82,7 @@ describe('a dungeon scene and its map image', () => {
       const palette = paletteOf(style, view);
       const layout = mapLayout(model, PX_PER_CELL, view);
       const placement = { originCell: layout.originCell, pxPerCell: PX_PER_CELL };
-      const scene = dungeonScene(model, style, view, placement, { width: layout.widthPx, height: layout.heightPx })!;
+      const scene = dungeonScene(model, style, view, placement, { width: layout.widthPx, height: layout.heightPx }, FEET)!;
       expect(scene.scene.grid.size).toBe(view.smallTiles ? PX_PER_CELL / 2 : PX_PER_CELL);
       const halfInk = (wallInkWidth(style) / 2) * PX_PER_CELL;
       const level = (index: number): string | undefined => scene.levelIds?.[index];

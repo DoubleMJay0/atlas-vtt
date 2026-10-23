@@ -24,6 +24,9 @@ import { smallDungeon } from '../../fixtures/dungeonModels';
 
 /** A dungeon's scene parts as the scene writer gets them, without the vault: walls, stairs, features, note and pins. */
 
+/** The collection's units: five feet a square. */
+const FEET = { unitType: 'feet', ruleDistance: 5 } as const;
+
 const STYLE = dungeonStyle('parchment');
 const PX = 200;
 
@@ -31,7 +34,7 @@ function partsOf(model: DungeonModel): { parts: DungeonSceneParts; placement: { 
   const layout = mapLayout(model, PX, DEFAULT_VIEW);
   const placement = { originCell: layout.originCell, pxPerCell: PX };
   const image = { width: layout.widthPx, height: layout.heightPx };
-  const parts = dungeonScene(model, STYLE, DEFAULT_VIEW, placement, image);
+  const parts = dungeonScene(model, STYLE, DEFAULT_VIEW, placement, image, FEET);
   if (!parts) throw new Error('walls crowd');
   return { parts, placement, image };
 }

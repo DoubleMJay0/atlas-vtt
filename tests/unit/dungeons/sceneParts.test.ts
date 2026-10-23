@@ -5,6 +5,9 @@ import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import { smallDungeon } from '../../fixtures/dungeonModels';
 
+/** The collection's units: five feet a square. */
+const FEET = { unitType: 'feet', ruleDistance: 5 } as const;
+
 const STYLE = dungeonStyle('parchment');
 
 function placement(pxPerCell = 100): { originCell: { x: number; y: number }; pxPerCell: number } {
@@ -16,14 +19,14 @@ describe('a dungeon scene', () => {
   it('lays its grid on the grid drawn on the map: half cells with small tiles', () => {
     const layout = mapLayout(smallDungeon(), 100, DEFAULT_VIEW);
     const image = { width: layout.widthPx, height: layout.heightPx };
-    const small = dungeonScene(smallDungeon(), STYLE, { ...DEFAULT_VIEW, smallTiles: true }, placement(), image)!;
+    const small = dungeonScene(smallDungeon(), STYLE, { ...DEFAULT_VIEW, smallTiles: true }, placement(), image, FEET)!;
     expect(small.scene.grid).toEqual({ size: 50, offsetX: 0, offsetY: 0, visible: false });
     expect(small.scene.grid).not.toHaveProperty('autoDetect');
   });
 
   it('has the dungeon\'s cells for its grid, no lights and dynamic lighting in daylight', () => {
     const layout = mapLayout(smallDungeon(), 100, DEFAULT_VIEW);
-    const parts = dungeonScene(smallDungeon(), STYLE, DEFAULT_VIEW, placement(), { width: layout.widthPx, height: layout.heightPx })!;
+    const parts = dungeonScene(smallDungeon(), STYLE, DEFAULT_VIEW, placement(), { width: layout.widthPx, height: layout.heightPx }, FEET)!;
     expect(parts.scene.grid).toEqual({ size: 100, offsetX: 0, offsetY: 0, visible: false });
     expect(parts.scene.lights).toEqual({});
     expect(parts.scene.lighting).toEqual({ enabled: true, ambient: 1 });
