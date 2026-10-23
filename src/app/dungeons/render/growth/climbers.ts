@@ -38,7 +38,7 @@ interface Habit {
 const HABITS: Readonly<Record<ClimberKind, Habit>> = {
   ivy: { shape: 'ivy', palette: 'green', leaves: 150, leafy: 0.95, size: 0.115, branching: 0.2, up: 0.42, down: 0.26, wander: 0.13, stem: 0.011, blossoms: 0 },
   vine: { shape: 'heart', palette: 'flowering', leaves: 110, leafy: 0.85, size: 0.1, branching: 0.22, up: 0.4, down: 0.26, wander: 0.2, stem: 0.008, blossoms: 0.2 },
-  creeper: { shape: 'withered', palette: 'dead', leaves: 34, leafy: 0.3, size: 0.085, branching: 0.28, up: 0.38, down: 0.26, wander: 0.26, stem: 0.009, blossoms: 0 },
+  creeper: { shape: 'withered', palette: 'dead', leaves: 60, leafy: 0.42, size: 0.09, branching: 0.3, up: 0.38, down: 0.26, wander: 0.26, stem: 0.011, blossoms: 0 },
 };
 
 const STEP = 0.026;

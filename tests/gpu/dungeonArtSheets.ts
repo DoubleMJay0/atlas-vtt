@@ -122,4 +122,6 @@ export const GROWTH_SPOTS: readonly { name: string; dungeon: string; centre: { x
   { name: 'column', dungeon: 'overgrown-halls', centre: { x: 5, y: 11 } },
   { name: 'ferns', dungeon: 'overgrown-dwelling', centre: { x: -3, y: -4 } },
   { name: 'vine', dungeon: 'overgrown-temple', centre: { x: 0.5, y: -6 } },
+  { name: 'weeds', dungeon: 'overgrown-dwelling', centre: { x: -3.5, y: -8 } },
+  { name: 'wet-moss', dungeon: 'wet-moss', centre: { x: -1.5, y: 3 } },
 ];

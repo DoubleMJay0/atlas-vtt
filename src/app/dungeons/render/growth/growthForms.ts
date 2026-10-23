@@ -126,7 +126,7 @@ function patchGrowth(env: RenderEnv, g: DungeonGrowth, rng: Rng, picture: Growth
   const palette = PATCH_PALETTE[g.kind] ?? 'grass';
   const form = emptyForm(palette, g.kind === 'fern' ? 0.1 : 0.03);
   if (g.kind === 'fern') for (const { p, depth } of scatter(rng, g.cells, 0.5, 0.3)) fern(form, rng, p, (0.26 + 0.14 * rng()) * Math.min(1, 0.6 + depth));
-  else if (g.kind === 'fungi') for (const { p } of scatter(rng, g.cells, 0.55, 0.35)) fungi(form, rng, p, 0.12 + rng() * 0.1 * (0.5 + g.density));
+  else if (g.kind === 'fungi') for (const { p } of scatter(rng, g.cells, 0.55, 0.35)) fungi(form, rng, p, 0.14 + rng() * 0.12 * (0.5 + g.density));
   else for (const { p } of scatter(rng, g.cells, 0.7, 0.45)) if (rng() < 0.45 + 0.5 * g.density) grassClump(form, rng, rng() < 0.7 ? onJoint(p) : p, 0.1 + rng() * 0.08);
   picture.ground.push(form);
 }
