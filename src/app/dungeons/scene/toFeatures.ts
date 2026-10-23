@@ -96,7 +96,7 @@ function discCorners(x: number, y: number, radius: number): CellPoint[] {
   });
 }
 
-function propPolygon(prop: DungeonProp): CellPoint[] {
+export function propPolygon(prop: DungeonProp): CellPoint[] {
   const box = PROP_BOXES[prop.kind];
   if (!box) return discCorners(prop.x, prop.y, PROP_REACH[prop.kind] * prop.scale);
   const cos = Math.cos(prop.rotation) * prop.scale;

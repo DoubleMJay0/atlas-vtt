@@ -38,27 +38,37 @@ function dungeonWith(tags: string[], kind: LiquidSurface['liquid'], look: Dungeo
 }
 
 describe('a dungeon\'s water, lava and acid in its scene', () => {
-  it('makes a surface of every lava channel on exactly its cells, flowing along it, with a light glowing from all of it', () => {
+  it('glows from every lava channel as a whole, bridges included, and moves around what the map draws over it', () => {
     const { model, liquids, parts } = dungeonWith(['dry'], 'lava', 'parchment');
-    const channels = model.floors[0]!.terrain.filter(p => p.kind === 'channel' && p.traits.hazard === 'lava');
-    expect(liquids.length).toBeGreaterThanOrEqual(channels.length);
-    const lights = Object.values(parts.scene.lights);
-    for (const liquid of liquids) {
-      expect(liquid.flow).toBeDefined();
-      const light = lights.find(l => l.area === liquid.polygon)!;
-      expect(light).toBeDefined();
-      // A channel is a band across its room: its middle lies on it.
-      expect(inside(liquid.polygon, light.x, light.y)).toBe(true);
+    const floor = model.floors[0]!;
+    const layout = mapLayout(model, PX, DEFAULT_VIEW);
+    const world = (x: number, y: number) => ({ x: (x - layout.originCell.x) * PX, y: (y - layout.originCell.y) * PX });
+    const lights = Object.values(parts.scene.lights).filter(l => l.area);
+    for (const channel of floor.terrain.filter(p => p.kind === 'channel' && p.traits.hazard === 'lava')) {
+      for (const c of channel.cells) {
+        const p = world(c.x + 0.5, c.y + 0.5);
+        expect(lights.some(l => inside(l.area!, p.x, p.y))).toBe(true);
+      }
+    }
+    for (const light of lights) {
       expect(light.emission.dim).toBe(20);
       expect(light.emission.bright).toBe(5);
+      expect(light.emission.animation).toBe('smoulder');
     }
+    expect(liquids.some(l => l.flow)).toBe(true);
+    const over = [
+      ...floor.terrain.filter(p => p.kind === 'bridge').flatMap(p => p.cells.map(c => world(c.x + 0.5, c.y + 0.5))),
+      ...floor.stairs.map(s => world(s.x + s.w / 2, s.y + s.h / 2)),
+      ...floor.props.map(p => world(p.x, p.y)),
+    ];
+    for (const p of over) expect(liquids.some(l => inside(l.polygon, p.x, p.y) && !(l.holes ?? []).some(h => inside(h, p.x, p.y)))).toBe(false);
   });
 
   it('gives water no light, and its pools lie on the floor of their rooms', () => {
     const { liquids, parts } = dungeonWith(['wet'], 'water', 'parchment');
-    const lights = Object.values(parts.scene.lights);
+    const areas = Object.values(parts.scene.lights).flatMap(l => (l.area ? [l.area] : []));
     for (const liquid of liquids) {
-      expect(lights.some(l => l.area === liquid.polygon)).toBe(false);
+      expect(areas.some(area => inside(area, liquid.polygon[0]!.x, liquid.polygon[0]!.y))).toBe(false);
       expect(liquid.polygon.length).toBeGreaterThanOrEqual(3);
       expect(liquid.polygon.length).toBeLessThanOrEqual(128);
     }

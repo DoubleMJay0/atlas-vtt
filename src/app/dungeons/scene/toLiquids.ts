@@ -9,6 +9,7 @@ import { mixColours, paletteOf } from '../render/palette';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { cellOutlines } from './cellOutline';
+import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
 /**
@@ -72,21 +73,40 @@ function withHoles(rings: Vec[][]): { ring: Vec[]; holes: Vec[][] }[] {
   return outlines.map(ring => ({ ring, holes: holes.filter(hole => inside(ring, hole[0]!)) }));
 }
 
-/**
- * The floor's pools, on what of them lies on the floor (the map clips them there too), the columns
- * standing in them cut out as holes.
- */
+/** The floor's pools, on what of them lies on the floor (the map clips them there too). */
 function poolLiquids(dungeon: VisibleDungeon, style: DungeonStyle): Liquid[] {
   const floorRings = unionRings(dungeon.floors.map(shape => shapePolygon(shape, 0, 100)));
-  const columns = dungeon.floor.columns.filter(column => !column.shattered).map(columnRing);
   const liquid: LiquidKind = style.liquid === 'lava' ? 'lava' : 'water';
   return dungeon.floor.water.flatMap(pool => {
     const steps = Math.max(1, Math.min(6, Math.floor(MAX_CORNERS / Math.max(3, pool.outline.length))));
-    const wet = intersectRings([smoothRing(pool.outline, steps)], floorRings);
-    return withHoles(columns.length ? subtractRings(wet, columns) : wet)
-      .filter(({ ring }) => ring.length >= 3 && ring.length <= MAX_CORNERS && signedArea(ring) > 0.05)
-      .map(({ ring, holes }): Liquid => ({ liquid, ring, ...(holes.length && { holes }) }));
+    return intersectRings([smoothRing(pool.outline, steps)], floorRings).filter(ring => signedArea(ring) > 0).map((ring): Liquid => ({ liquid, ring }));
   });
+}
+
+/** Terrain that is part of the water itself, not drawn over it. */
+const UNDER_WATER: ReadonlySet<string> = new Set(['shallow-water']);
+
+/**
+ * What the map draws over its water: stairwells, every piece of terrain that is no liquid (bridges
+ * among them), furniture and columns. Cut out of the surfaces, so the motion never runs over them.
+ */
+function drawnOver(dungeon: VisibleDungeon, view: DungeonView): Vec[][] {
+  const { floor, roomShapes } = dungeon;
+  const stairs = floor.stairs.map(({ x, y, w, h }) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }]);
+  const terrain = floor.terrain
+    .filter(piece => roomShapes.has(piece.room) && !UNDER_WATER.has(piece.kind) && !(piece.traits.hazard && HAZARD_LIQUID[piece.traits.hazard]))
+    .flatMap(piece => cellOutlines(piece.cells, MAX_CORNERS));
+  const props = view.props ? floor.props.filter(prop => roomShapes.has(prop.room)).map(propPolygon) : [];
+  return [...stairs, ...terrain, ...props, ...floor.columns.map(columnRing)];
+}
+
+/** Each liquid with what the map draws over it cut out: islands as holes, a surface cut in two as two. */
+function cutOut(found: readonly Liquid[], over: readonly Vec[][]): Liquid[] {
+  if (!over.length) return [...found];
+  return found.flatMap(({ ring, ...rest }) =>
+    withHoles(subtractRings([ring], over))
+      .filter(cut => cut.ring.length >= 3 && cut.ring.length <= MAX_CORNERS && signedArea(cut.ring) > 0.05)
+      .map((cut): Liquid => ({ ...rest, ring: cut.ring, ...(cut.holes.length && { holes: cut.holes }) })));
 }
 
 /** Positive for an outline, negative for a hole, as clipping orients them. */
@@ -161,24 +181,27 @@ export function floorLiquids(
   level?: string,
 ): FloorLiquids {
   const shown = dungeon.floor.terrain.filter(piece => dungeon.roomShapes.has(piece.room));
-  const found = [...(view.water ? poolLiquids(dungeon, style) : []), ...terrainLiquids(shown)];
+  const whole = [...(view.water ? poolLiquids(dungeon, style) : []), ...terrainLiquids(shown)];
   const colours = liquidColours(style, view);
   const { originCell, pxPerCell } = placement;
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   const squares = view.smallTiles ? 2 : 1;
   const units = (cells: number): number => toGameUnits({ value: cells * squares, unit: 'squares' }, { unitType: unit.unitType, ruleDistance: unit.ruleDistance });
   const liquids: Record<string, LiquidSurface> = {};
-  const lights: Record<string, LightSource> = {};
-  found.forEach(({ liquid, ring, holes, flow }, index) => {
-    const polygon = ring.map(world);
+  cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow }, index) => {
     const liquidId = `liquid_${id}_${index + 1}`;
-    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon, ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(level && { level }) };
+    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(level && { level }) };
+  });
+  // The glow comes from the whole of the lava, under its bridges and what stands in it too
+  const lights: Record<string, LightSource> = {};
+  whole.forEach(({ liquid, ring }, index) => {
     const glow = GLOWS[liquid];
-    if (!glow) return;
-    const middle = centroid(polygon);
+    if (!glow || ring.length > MAX_CORNERS) return;
+    const area = ring.map(world);
+    const middle = centroid(area);
     const emission: LightEmission = { bright: units(glow.bright), dim: units(glow.dim), color: glow.color, intensity: glow.intensity, animation: 'smoulder', kind: 'custom' };
     const lightId = `light_${id}_${index + 1}`;
-    lights[lightId] = { id: lightId, kind: 'light', x: middle.x, y: middle.y, emission, area: polygon, ...(level && { levels: [level] }) };
+    lights[lightId] = { id: lightId, kind: 'light', x: middle.x, y: middle.y, emission, area, ...(level && { levels: [level] }) };
   });
   return { liquids, lights };
 }
