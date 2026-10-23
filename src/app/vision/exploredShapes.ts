@@ -2,7 +2,7 @@ import { perceivedLevel, showsMap } from '../gameSystems/senseRules';
 import type { SceneLighting } from '../types/lightingTypes';
 import { exploredMemoryOn } from '../lighting/sceneLightingOptions';
 import { ambientLevel } from './lightLevels';
-import type { AmbientLight, LightReach, Sight, SightRegion } from './sight';
+import { litPolygons, type AmbientLight, type LightReach, type Sight, type SightRegion } from './sight';
 import type { Polygon } from './visibility';
 import type { TexelMask } from '../levels/stackClip';
 
@@ -73,7 +73,7 @@ export function exploredShapes(
   const byLight = regions.filter(seesByLight).map((region) => region.polygon);
   const inDarkness = regions.filter(seesInDarkness).map((region) => region.polygon);
   const shining = lights.filter((light) => !light.darkness);
-  const seen = [...(byLight.length > 0 ? shining.map((light) => light.polygon) : []), ...inDarkness];
+  const seen = [...(byLight.length > 0 ? shining.flatMap(litPolygons) : []), ...inDarkness];
   // The light polygons count only inside a region that sees by light; a region that sees in darkness is seen whole.
   return seen.length > 0 ? { polygons: seen, clip: [...new Set([...byLight, ...inDarkness])], ...except } : null;
 }
@@ -88,7 +88,7 @@ function withZones(regions: readonly MapRegion[], scene: AmbientLight, lights: r
   const inDarkness = regions.filter(seesInDarkness).map((region) => region.polygon);
   const clip = [...new Set([...byLight, ...inDarkness])];
   if (clip.length === 0) return null;
-  const shining = byLight.length > 0 ? lights.filter((light) => !light.darkness).map((light) => light.polygon) : [];
+  const shining = byLight.length > 0 ? lights.filter((light) => !light.darkness).flatMap(litPolygons) : [];
   const lit = (ambient: number): boolean => ambientLevel({ ...scene, ambient }) !== 'dark';
   const ambient = { base: lit(scene.ambient), zones: (scene.zones ?? []).map((zone) => ({ polygon: zone.polygon, lit: lit(zone.ambient) })) };
   return { polygons: [...shining, ...inDarkness], clip, ...(byLight.length > 0 && { ambient }), ...except };

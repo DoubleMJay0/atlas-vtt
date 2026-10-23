@@ -3,6 +3,7 @@ import type { LightLevel } from '../types/senseTypes';
 import type { Point } from '../types/visionTypes';
 import type { AmbientLight, LightReach } from './sight';
 import { pointInPolygon } from './visibility';
+import { areaDistance } from './areaReach';
 
 /**
  * The light level the scene's ambient light alone gives every point: dark below the lit
@@ -31,12 +32,20 @@ function ambientLevelAt(point: Point, light: AmbientLight): LightLevel {
 
 /**
  * The light level the lights that outrank `above` give `point`: bright within a bright radius,
- * dim within a dim one, where no wall is between. A darkness source is no light.
+ * dim within a dim one, where no wall is between; an area light counts both from the nearest
+ * point of its area in clear view (`areaDistance`). A darkness source is no light.
  */
 function levelFromLights(point: Point, lights: readonly LightReach[], above = -Infinity): LightLevel {
   let level: LightLevel = 'dark';
   for (const light of lights) {
     if (light.darkness || (light.priority ?? 0) <= above) continue;
+    if (light.parts) {
+      const distance = areaDistance(point, light);
+      if (distance > light.dim) continue;
+      if (distance <= light.bright) return 'bright';
+      level = 'dim';
+      continue;
+    }
     const distance = Math.hypot(point.x - light.origin.x, point.y - light.origin.y);
     if (distance > light.dim || !pointInPolygon(point, light.polygon)) continue;
     if (distance <= light.bright) return 'bright';

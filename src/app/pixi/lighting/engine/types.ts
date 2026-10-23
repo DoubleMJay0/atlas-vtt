@@ -32,6 +32,14 @@ export interface EngineLight {
   area?: Polygon;
   /** Width in world pixels of the soft edge past a beam's sides and far end (`softEdge`); unset, the fade past the dim radius. */
   edge?: number;
+  /**
+   * A light that glows from a whole area (lava): its corners, at most `MAX_AREA_CORNERS`. Inside
+   * it the light is bright; `bright` and `dim` count from its outline, and `x`, `y` are its middle.
+   * Such a light has no cone and no flame of its own.
+   */
+  surface?: readonly { x: number; y: number }[];
+  /** Where the rule counts an area light's light beyond its area (`LightReach.parts`), handed on with `area` where one builder made both. */
+  parts?: readonly { origin: { x: number; y: number }; polygon: Polygon }[];
 }
 
 /** An area with ambient light of its own (`LightZone`), in world pixels; inside `polygon` the rule counts its level. */

@@ -1,10 +1,10 @@
 import { lightList } from '../../lighting/lightingObjects';
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';
-import { LIGHT_GLYPH_PATHS } from '../../lighting/lightGlyphs';
+import { LIGHT_GLYPH_PATHS, type LightGlyph } from '../../lighting/lightGlyphs';
 import { lightZoneList, withZones } from '../../lighting/lightZones';
 import type { ViewAtlasState, ViewAtlasStore } from '../../storeFactory';
-import type { LightKind, LightSource } from '../../types/lightingTypes';
+import type { LightSource } from '../../types/lightingTypes';
 import { MOTION_NORMAL_MS, prefersReducedMotion } from '../../utils/motion';
 import { ambientAt } from '../../vision/lightLevels';
 import { destroyTree } from '../utils/destroyTree';
@@ -92,7 +92,7 @@ function sameLook(a: LightMarkerLook, b: LightMarkerLook): boolean {
 export class LightMarkers {
   readonly view = new Container({ label: 'light-markers', zIndex: LIGHT_MARKERS_Z_INDEX, eventMode: 'none', interactiveChildren: false });
   private readonly markers = new Map<string, Marker>();
-  private readonly textures = new Map<LightKind, Texture | null>();
+  private readonly textures = new Map<LightGlyph, Texture | null>();
   private readonly unsubscribe: () => void;
   private readonly themeObserver: MutationObserver;
   private theme: LightMarkerTheme;
@@ -162,7 +162,7 @@ export class LightMarkers {
     return lightMarkerAt(lightList(levelObjects(this.store.getState()).lights), { x, y }, this.viewport.scale.x);
   }
 
-  private glyphTexture(kind: LightKind): Texture | null {
+  private glyphTexture(kind: LightGlyph): Texture | null {
     if (!this.textures.has(kind)) this.textures.set(kind, createGlyphTexture(LIGHT_GLYPH_PATHS[kind]));
     return this.textures.get(kind) ?? null;
   }

@@ -46,7 +46,8 @@ export type SceneLightingChanges = Partial<Pick<SceneLighting, 'enabled' | 'ambi
 
 export const DEFAULT_SCENE_LIGHTING: SceneLighting = { enabled: false, ambient: 0.1 };
 
-export type LightAnimation = 'none' | 'torch' | 'candle' | 'pulse' | 'magic';
+/** How a light moves: steady, a flame's flicker, a pulse, a shimmer, or the slow glow of a smouldering surface (lava, embers). */
+export type LightAnimation = 'none' | 'torch' | 'candle' | 'pulse' | 'magic' | 'smoulder';
 
 /** What a placed light is: it picks the light's marker. `custom` is any other light. */
 export type LightKind = 'candle' | 'torch' | 'lantern' | 'magical' | 'darkness' | 'custom';

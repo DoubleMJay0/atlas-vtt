@@ -55,7 +55,8 @@ interface FuzzOptions {
  * darkness in place: those that see in it may show it, the others show nothing there. The other
  * rooms are lit once more by their lights as beams of a random width and direction (what a beam
  * may light at all is held by `leakFuzzBeams`): nothing past the walls is lit. Ambient zones and
- * explored memory have their own fuzz over the same rooms (`leakFuzzZones`).
+ * explored memory have their own fuzz over the same rooms (`leakFuzzZones`), and so have lights
+ * that glow from an area (`leakFuzzArea`).
  */
 async function fuzz({ seed, trials, gap = false, bounds = { width: 2048, height: 2048 }, resolution = 1, wholeFootprints = false, outshine = false, quality = DEFAULT_LIGHTING_QUALITY }: FuzzOptions): Promise<Report> {
   const renderer = await createTestRenderer(SIZE, resolution);

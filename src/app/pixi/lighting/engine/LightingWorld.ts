@@ -11,7 +11,9 @@ import { LightFlicker, STEADY, type FlickerSample } from '../lightFlicker';
 import type { CapsuleField } from './CapsuleField';
 import { glOf } from './gpu';
 import { GpuPacer } from './GpuPacer';
-import { DarknessMap, type DrawnDarkness, type PierceShape } from './DarknessMap';
+import { DarknessMap, type DrawnDarkness, type LitShape, type PierceShape } from './DarknessMap';
+import { areaRadius } from '../../../lighting/lightArea';
+import { filledPieces } from '../../../lighting/polygonFill';
 import { LightMap, type DrawnLight } from './LightMap';
 import { RadianceCascades } from './RadianceCascades';
 import { TileCache, type TilePacer } from './TileCache';
@@ -257,8 +259,8 @@ export class LightingWorld {
     this.darkness ??= new DarknessMap(this.renderer, this.bounds, this.texel);
     const sources = this.lights.filter((light) => light.darkness);
     // Where a light near a darkness would shine: the darkness veils what it swallows there.
-    const lit = this.lights.filter((light) => !light.darkness && sources.some((source) => Math.hypot(source.x - light.x, source.y - light.y) < source.dim + light.dim));
-    this.darkness.draw(sources.map((light) => this.darknessOf(light)), this.pierce, lit.map((light) => ({ origin: { x: light.x, y: light.y }, polygon: this.areaOf(light) })));
+    const lit = this.lights.filter((light) => !light.darkness && sources.some((source) => Math.hypot(source.x - light.x, source.y - light.y) < source.dim + light.dim + (light.surface ? areaRadius(light.surface, light) : 0)));
+    this.darkness.draw(sources.map((light) => this.darknessOf(light)), this.pierce, lit.flatMap((light) => this.litShapes(light)));
   }
 
   private drawLightMap(sample: (light: EngineLight) => FlickerSample): void {
@@ -287,6 +289,17 @@ export class LightingWorld {
     return { origin: { x: light.x, y: light.y }, dim: light.dim, soft: Math.min(DARKNESS.rim, (LIGHT_REACH - 1) * light.dim), polygon: this.areaOf(light) };
   }
 
+  /**
+   * Where a light would shine, as shapes drawn as fans from their origins: a light's area, or an
+   * area light's area in convex pieces and the reaches of its outline the rule counts (`parts`,
+   * where the builder handed them on).
+   */
+  private litShapes(light: EngineLight): LitShape[] {
+    if (!light.surface) return [{ origin: { x: light.x, y: light.y }, polygon: this.areaOf(light) }];
+    const pieces = filledPieces(light.surface).map((piece) => ({ origin: middleOf(piece), polygon: piece }));
+    return [...pieces, ...(light.parts ?? [])];
+  }
+
   /** The area the rule counts for a light: the one it came with, else traced here and kept while the light and the walls stay. */
   private areaOf(light: EngineLight): Polygon {
     if (light.area) return light.area;
@@ -302,12 +315,17 @@ export class LightingWorld {
 
 const NO_ZONES: readonly EngineZone[] = [];
 
+/** The average of a convex piece's corners, inside it. */
+function middleOf(piece: readonly { x: number; y: number }[]): { x: number; y: number } {
+  return { x: piece.reduce((sum, p) => sum + p.x, 0) / piece.length, y: piece.reduce((sum, p) => sum + p.y, 0) / piece.length };
+}
+
 function sameLights(a: readonly EngineLight[], b: readonly EngineLight[]): boolean {
   return a.length === b.length && a.every((x, i) => {
     const y = b[i]!;
     return x.key === y.key && x.x === y.x && x.y === y.y && x.bright === y.bright && x.dim === y.dim && x.flame === y.flame
       && x.intensity === y.intensity && x.animation === y.animation && x.color.every((c, j) => c === y.color[j])
-      && !!x.darkness === !!y.darkness && (x.priority ?? 0) === (y.priority ?? 0) && sameCone(x.cone, y.cone) && x.edge === y.edge && x.area === y.area;
+      && !!x.darkness === !!y.darkness && (x.priority ?? 0) === (y.priority ?? 0) && sameCone(x.cone, y.cone) && x.edge === y.edge && x.area === y.area && x.surface === y.surface && x.parts === y.parts;
   });
 }
 
