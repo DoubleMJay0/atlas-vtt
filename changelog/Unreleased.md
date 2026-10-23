@@ -23,6 +23,8 @@
 
 ## Improved
 
+- Acid on generated maps moves gently in the artwork’s own pigments, with slow bubbles and ink outlines in engraved looks.
+
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 
 ## Important changes
