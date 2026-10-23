@@ -1,5 +1,8 @@
 ## New
-- Dungeon generator: Generate Dungeon in the asset manager's Add menu draws a dungeon from a seed and tags in sixteen looks and makes it a scene with its grid, walls and doors
+- Dungeon generator: Generate Dungeon in the asset manager's Add menu makes a ready scene with walls, doors, grid and lighting, on up to four floors joined by stairs
+- Generated dungeons have a boss arena, cover, hazards, bridges over chasms, galleries and shafts; the Five-room switch builds the classic five-room dungeon
+- Each generated dungeon gets a note with a heading per room and a GM-only numbered pin in each room (A1, B1 … on several floors)
+- Sixteen looks for generated dungeons, drawn as stone and shadow or as an engraving, on vellum
 - The note pin search offers to create a note of the name you typed, or to generate a dungeon of that name and pin it
 - A random table row that links its own table rolls that table again without itself, for rows such as "Mithral + reroll"
 - Generators: a note table whose rows are parts rolls them into one result, with a reroll and a lock per part, Give for results with a Type and Save as note; a link to a generator rolls all of it
@@ -12,6 +15,7 @@
 - Roofs: give a floor a roof image, and it fades while a player character stands under it
 - Import a building's Universal VTT files together as one scene with a floor each
 - A pin that links a scene of several floors can open it on the floor you pick
+- Following the turn shows the floor the token stands on
 - Animated maps: WebM and MP4 videos play as maps, on the map and in the player window; Animate maps in Atlas' settings shows their first frame instead
 - Replace map image: put a video, a gridless version or a larger export of the same map in its place, keeping the grid, walls, lights and tokens
 - Map features: hover rubble, a statue or a door to see its name and traits, shown only to you; right-click a feature to rename it or set its terrain
