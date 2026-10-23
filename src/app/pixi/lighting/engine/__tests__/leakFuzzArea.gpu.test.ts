@@ -211,8 +211,7 @@ function holds(report: Report, trials: number, missing = 0.01): void {
   // A point counted through a sliver of the lava past a wall's end may show next to nothing.
   // A sliver of lava shorter than the rule's spacing past a wall's end lights a little the rule does not count.
   expect(report.missing / report.counted).toBeLessThan(missing);
-  // The tail (`LIGHT_TAIL`) traces far from the shore, where narrow views past a wall's end lie: 3.1 % at 24 trials.
-  expect(report.stray / Math.max(1, report.beyond)).toBeLessThan(0.04);
+  expect(report.stray / Math.max(1, report.beyond)).toBeLessThan(0.03);
 }
 
 describe('leak fuzz: area lights', () => {

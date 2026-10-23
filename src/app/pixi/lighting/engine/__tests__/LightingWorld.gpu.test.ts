@@ -1,6 +1,6 @@
 import { Texture, type WebGLRenderer } from 'pixi.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BOUNCE, FLICKER_INTERVAL_MS, LIGHT_REACH } from '../../../../lighting/lightingConstants';
+import { BOUNCE, FLICKER_INTERVAL_MS } from '../../../../lighting/lightingConstants';
 import { LightingWorld } from '../LightingWorld';
 import { LIGHTING_QUALITY } from '../../../../lighting/lightingQuality';
 import type { DrawnLight } from '../LightMap';
@@ -52,7 +52,6 @@ describe('LightingWorld.animate', () => {
     expect(new Set(drawn.map((light) => light.bright)).size).toBeGreaterThan(10);
     for (const light of drawn) {
       expect(light.dim).toBe(torch.dim);
-      expect(light.reach).toBe(torch.dim * LIGHT_REACH);
     }
   });
 
@@ -143,7 +142,7 @@ describe('a paced LightingWorld', () => {
     const atOnce = new LightingWorld(renderer, bounds, LIGHTING_QUALITY.saver);
     try {
       const walls = [{ id: 'w', kind: 'wall' as const, type: 'solid' as const, p1: { x: 1000, y: 600 }, p2: { x: 1000, y: 3400 } }];
-      const lights = Array.from({ length: 12 }, (_, i): EngineLight => ({ ...torch, key: `l${i}`, x: 500 + (i % 4) * 1000, y: 700 + Math.floor(i / 4) * 1200, bright: 300, dim: 600, flame: 70, animation: 'none' }));
+      const lights = Array.from({ length: 12 }, (_, i): EngineLight => ({ ...torch, key: `l${i}`, x: 500 + (i % 4) * 1000, y: 700 + Math.floor(i / 4) * 1200, bright: 350, dim: 700, flame: 70, animation: 'none' }));
       paced.update(walls, lights, null);
       expect(paced.busy()).toBe(true);
       let frames = 0;

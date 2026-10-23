@@ -1,8 +1,9 @@
-import { GLSL_VERSION, TAIL_GLSL, fieldGlsl } from './glsl';
+import { REFLECTION, TILE_SMOOTH } from '../../../lighting/lightingConstants';
+import { FADE_GLSL, GLSL_VERSION, fieldGlsl } from './glsl';
 
 /**
  * A light's reflection (`ReflectionTiles`): every point it is traced from (`ReflectionPart`) as a
- * fan of its glow polygon, in world pixels, drawn into the reflection's own rectangle
+ * fan of its polygon, in world pixels, drawn into the reflection's own rectangle
  * (`uReflectRect`). `aPart` is the point, how far the rule counts its light and how lit its floor is.
  */
 export const reflectionVertex = `${GLSL_VERSION}
@@ -18,32 +19,26 @@ void main() {
 }`;
 
 // The share of the reflection's light a texel gets from one point: its floor's strength next to
-// the point, falling to uEdgeShare where the rule stops counting it (the part's reach), level
-// there, then easing out as a light's tail does (`TAIL_GLSL`) to nothing at uFade times the
-// reach, where its glow polygon ends. The fans are max-blended, so a texel takes the brightest
-// point that sees it. Like a light's tile, nothing is drawn within a wall's capsule (the trace's
-// clearance): its centre line is where the polygons end, and a bilinear read of the light map
-// must never carry light across it. The composite lights the capsule's edge from the floor in
-// front of it.
+// the point, fading as a light does (`FADE_GLSL`) over the last `REFLECTION.fade` of the part's
+// reach to nothing where the rule stops counting it. The fans are max-blended, so a texel takes
+// the brightest point that sees it. Like a light's tile, nothing is drawn within a wall's capsule
+// (the trace's clearance): its centre line is where the polygons end, and a bilinear read of the
+// light map must never carry light across it. The composite lights the capsule's edge from the
+// floor in front of it.
 export const reflectionFragment = `${GLSL_VERSION}
 in vec2 vWorld;
 in vec4 vPart;
-uniform float uEdgeShare;
-uniform float uFade;
 ${fieldGlsl('uField')}
-${TAIL_GLSL}
+${FADE_GLSL}
 out vec4 finalColor;
 void main() {
   if (uFieldClearance(vWorld) < 0.02) discard;
   float u = distance(vWorld, vPart.xy) / max(vPart.z, 1e-3);
-  float near = 1.0 - min(u, 1.0);
-  float share = mix(uEdgeShare, max(vPart.w, uEdgeShare), near * near);
-  float past = clamp((u - 1.0) / max(uFade - 1.0, 1e-3), 0.0, 1.0);
-  finalColor = vec4(share * tail(1.0 - past), 0.0, 0.0, 1.0);
+  finalColor = vec4(vPart.w * fadeOf((1.0 - u) / ${REFLECTION.fade.toFixed(4)}), 0.0, 0.0, 1.0);
 }`;
 
-/** Most texels a reflection is blurred over to either side (`reflectionBlurFragment`). */
-export const REFLECTION_BLUR_TEXELS = 16;
+/** Most texels a reflection is blurred over to either side (`reflectionBlurFragment`): as far as a light's tile is smoothed, its allowance past what the rule counts. */
+export const REFLECTION_BLUR_TEXELS = TILE_SMOOTH;
 
 /**
  * One direction (`uStep`) of the blur that melts a reflection's tile (`uSource`, over

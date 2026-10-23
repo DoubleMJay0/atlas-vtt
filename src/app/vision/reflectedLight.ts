@@ -1,4 +1,4 @@
-import { LIGHT_LEVELS, REFLECTION } from '../lighting/lightingConstants';
+import { LIGHT_LEVELS, REFLECTION, lightFade } from '../lighting/lightingConstants';
 import { distToSeg, type Seg } from '../lighting/segments';
 import { unionShapes } from '../lighting/polygonClip';
 import { quantizeCoordinate } from '../lighting/quantizedPoint';
@@ -6,7 +6,6 @@ import { Q_SCALE } from '../types/shapeTypes';
 import type { Point } from '../types/visionTypes';
 import type { WallSegment } from '../types/wallTypes';
 import { nearbySegments, twoWayWalls, type LightReachPart } from './areaReach';
-import { clipToDisc } from './clipToDisc';
 import { computeVisibility, pointInPolygon, type Polygon } from './visibility';
 
 /**
@@ -29,10 +28,8 @@ export interface ReflectionPart {
   reach: number;
   /** How lit the floor is there, 1 in the light's bright range, down to its dim level's share of that (`floorLight`). */
   strength: number;
-  /** What the rule counts lit by it: what a clear line from `origin` reaches within `reach`. */
+  /** What the rule counts lit by it, and the picture draws: what a clear line from `origin` reaches within `reach`. */
   polygon: Polygon;
-  /** The same as far as the picture's fade past `reach` ends (`REFLECTION.fade`). */
-  glow: Polygon;
 }
 
 /** How a light's reflection is sampled: points along shadows this far apart, none nearer a wall than `clearance`, none reaching farther than `reach`. */
@@ -129,12 +126,13 @@ function withinAnother(point: Point, parts: readonly LightReachPart[], own: numb
 }
 
 /**
- * How lit a light's floor is at `travelled` from it, as a share of its bright level: the light's
- * own levels (`LIGHT_LEVELS`, the knee between them at the bright radius), without its halo.
+ * How lit a light's floor is at `travelled` from it, as the picture shows it, as a share of its
+ * bright level: the light's own levels (`LIGHT_LEVELS`, the knee between them at the bright
+ * radius) and its fade within the dim range (`lightFade`), without its halo.
  */
-export function floorLight(bright: number, travelled: number): number {
+export function floorLight({ bright, dim }: Pick<ReflectingReach, 'bright' | 'dim'>, travelled: number): number {
   const t = travelled / Math.max(bright, 1);
-  return (LIGHT_LEVELS.dim + (LIGHT_LEVELS.bright - LIGHT_LEVELS.dim) / (1 + t ** 4)) / LIGHT_LEVELS.bright;
+  return ((LIGHT_LEVELS.dim + (LIGHT_LEVELS.bright - LIGHT_LEVELS.dim) / (1 + t ** 4)) / LIGHT_LEVELS.bright) * lightFade(bright, dim, travelled);
 }
 
 /**
@@ -143,14 +141,14 @@ export function floorLight(bright: number, travelled: number): number {
  * where the floor is brightly lit and less as it is less lit (`floorLight`).
  */
 export function reflectionReach({ bright, dim }: Pick<ReflectingReach, 'bright' | 'dim'>, travelled: number, sampling: Pick<ReflectionSampling, 'reach'>): number {
-  return Math.min(REFLECTION.share * dim * floorLight(bright, travelled), sampling.reach, dim - travelled);
+  return Math.min(REFLECTION.share * dim * floorLight({ bright, dim }, travelled), sampling.reach, dim - travelled);
 }
 
 /**
  * Where the light `reach` lights gives some of it back: points along its shadows' edges, each
  * traced (`computeVisibility`, channel `light`, one-way walls stopping it both ways, as for area
- * lights, since the floor may lie on both sides) as far as `reflectionReach` and the picture's
- * fade past it. Points nearer a wall than the clearance give nothing past it, as with area lights.
+ * lights, since the floor may lie on both sides) as far as `reflectionReach`. Points nearer a
+ * wall than the clearance give nothing past it, as with area lights.
  */
 export function reflectionParts(reach: ReflectingReach, walls: readonly WallSegment[], sampling: ReflectionSampling): ReflectionPart[] {
   const solid = twoWayWalls(walls);
@@ -161,8 +159,7 @@ export function reflectionParts(reach: ReflectingReach, walls: readonly WallSegm
     && near.every((seg) => distToSeg(point.x, point.y, seg) >= sampling.clearance));
   return evenlyChosen(kept, MAX_REFLECTION_SAMPLES).map(({ point, travelled }) => {
     const radius = reflectionReach(reach, travelled, sampling);
-    const glow = computeVisibility(point, radius * REFLECTION.fade, solid, undefined, 'light');
-    return { origin: point, reach: radius, strength: floorLight(reach.bright, travelled), polygon: clipToDisc(glow, point, radius), glow };
+    return { origin: point, reach: radius, strength: floorLight(reach, travelled), polygon: computeVisibility(point, radius, solid, undefined, 'light') };
   });
 }
 

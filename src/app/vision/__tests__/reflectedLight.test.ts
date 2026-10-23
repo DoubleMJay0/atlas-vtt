@@ -3,7 +3,6 @@ import { REFLECTION } from '../../lighting/lightingConstants';
 import type { Point } from '../../types/visionTypes';
 import type { WallSegment } from '../../types/wallTypes';
 import type { EngineLight } from '../../pixi/lighting/engine/types';
-import { clipToDisc } from '../clipToDisc';
 import { lightLevelAt } from '../lightLevels';
 import { LightReaches } from '../lightReaches';
 import { MAX_REFLECTION_SAMPLES, floorLight, reflectedArea, reflectedAt, type ReflectionSampling } from '../reflectedLight';
@@ -71,7 +70,7 @@ describe('reflected light', () => {
       const travelled = Math.hypot(part.origin.x - light.x, part.origin.y - light.y);
       expect(travelled + part.reach).toBeLessThanOrEqual(light.dim + 1e-6);
       expect(part.reach).toBeLessThanOrEqual(REFLECTION.share * light.dim * part.strength + 1e-9);
-      expect(part.strength).toBeCloseTo(floorLight(light.bright, travelled), 12);
+      expect(part.strength).toBeCloseTo(floorLight(light, travelled), 12);
     }
     for (let y = 5; y < 400; y += 15) {
       for (let x = 5; x < 1000; x += 15) {
@@ -102,7 +101,7 @@ describe('reflected light', () => {
   });
 
   it('comes from an area light\'s lit floor too', () => {
-    const lava = torch(250, 250, { key: 'lava', bright: 50, dim: 300, flame: 0, surface: [{ x: 200, y: 200 }, { x: 300, y: 200 }, { x: 300, y: 300 }, { x: 200, y: 300 }] });
+    const lava = torch(250, 250, { key: 'lava', bright: 150, dim: 400, flame: 0, surface: [{ x: 200, y: 200 }, { x: 300, y: 200 }, { x: 300, y: 300 }, { x: 200, y: 300 }] });
     const [reach] = reachesOf([lava]);
     expect(reach!.reflection!.length).toBeGreaterThan(0);
     // The lava lights most of the corridor straight; beside the edge of its light only its reflection does.
@@ -151,41 +150,11 @@ describe('reflected light', () => {
 });
 
 describe('floorLight', () => {
-  it('is the light\'s bright level near it, halfway at its bright radius and its dim level far out', () => {
-    expect(floorLight(200, 0)).toBe(1);
-    expect(floorLight(200, 200)).toBeCloseTo((1 + 0.4 / 1.25) / 2, 12);
-    expect(floorLight(200, 2000)).toBeCloseTo(0.4 / 1.25, 3);
-    expect(floorLight(0, 50)).toBeCloseTo(0.4 / 1.25, 6);
-  });
-});
-
-describe('clipToDisc', () => {
-  it('holds what the polygon holds within the radius, and nothing else', () => {
-    const walls = rooms();
-    const origin = { x: 460, y: 360 };
-    const far = computeVisibility(origin, 300, walls);
-    const clipped = clipToDisc(far, origin, 180);
-    let differ = 0;
-    let tested = 0;
-    for (let y = 0; y < 700; y += 7) {
-      for (let x = 200; x < 900; x += 7) {
-        const p = { x, y };
-        const d = Math.hypot(x - origin.x, y - origin.y);
-        // The circle is drawn with chords in both: points right at it may fall either side.
-        if (Math.abs(d - 180) < 2) continue;
-        tested++;
-        if (pointInPolygon(p, clipped) !== (d <= 180 && pointInPolygon(p, far))) differ++;
-      }
-    }
-    expect(tested).toBeGreaterThan(5000);
-    expect(differ).toBe(0);
-  });
-
-  it('is the whole circle where no edge comes within it, and the polygon itself where it lies inside', () => {
-    const square = [{ x: -100, y: -100 }, { x: 100, y: -100 }, { x: 100, y: 100 }, { x: -100, y: 100 }];
-    const circle = clipToDisc(square, { x: 0, y: 0 }, 50);
-    expect(circle.every((p) => Math.abs(Math.hypot(p.x, p.y) - 50) < 1e-9)).toBe(true);
-    expect(circle.length).toBe(64);
-    expect(clipToDisc(square, { x: 0, y: 0 }, 200)).toEqual(square);
+  it('is the light\'s bright level near it, halfway at its bright radius, and fades to nothing at its dim radius', () => {
+    expect(floorLight({ bright: 200, dim: 400 }, 0)).toBe(1);
+    expect(floorLight({ bright: 200, dim: 400 }, 200)).toBeCloseTo((1 + 0.4 / 1.25) / 2, 12);
+    expect(floorLight({ bright: 200, dim: 400 }, 300)).toBeLessThan(0.4 / 1.25);
+    expect(floorLight({ bright: 200, dim: 400 }, 400)).toBe(0);
+    expect(floorLight({ bright: 0, dim: 400 }, 200)).toBeLessThan(0.4 / 1.25);
   });
 });

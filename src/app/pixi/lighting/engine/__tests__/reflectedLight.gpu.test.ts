@@ -49,10 +49,17 @@ describe('reflected light in the light map', () => {
     const texels = readFloats(renderer, world.lightMap.texture);
     const width = world.lightMap.texture.source.pixelWidth;
     const at = (x: number, y: number): number => texels[(Math.floor(y / 2) * width + Math.floor(x / 2)) * 4]!;
-    // In room B, round the corner, where only the reflection reaches.
+    // In room B, round the corner, where only the reflection reaches: lit next to the points it comes from, fading towards its edge.
     expect(pointInPolygon({ x: 560, y: 330 }, reach!.polygon)).toBe(false);
     expect(reflectedAt({ x: 560, y: 330 }, light.reflection)).toBe(true);
-    expect(at(560, 330)).toBeGreaterThan(0.1 * REFLECTION.level);
+    let brightest = 0;
+    for (let x = 524; x < 640; x += 2) {
+      for (let y = 322; y < 398; y += 2) {
+        const near = light.reflection.some((part) => Math.hypot(x - part.origin.x, y - part.origin.y) < 0.3 * part.reach && pointInPolygon({ x, y }, part.polygon));
+        if (near && !pointInPolygon({ x, y }, reach!.polygon)) brightest = Math.max(brightest, at(x, y));
+      }
+    }
+    expect(brightest).toBeGreaterThan(0.1 * REFLECTION.level);
     // Nothing above the corridor's roof, in the rock between the rooms, nor north of room B's south-west corner past its wall.
     for (let x = 404; x < 518; x += 2) for (let y = 4; y < 316; y += 6) expect([x, y, at(x, y)]).toEqual([x, y, 0]);
     // Without its reflection the room round the corner is dark.

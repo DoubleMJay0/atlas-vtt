@@ -165,7 +165,7 @@ export class TileCache {
       oneWay = new CapsuleField(this.renderer, rect, texel, wallRadius(texel), 'uOneWay');
       oneWay.build(blockingOneWay.map(segOf));
     }
-    const job = this.tracer.begin([placed.x, placed.y], placed.flame, rect, oneWay, light.dim);
+    const job = this.tracer.begin([placed.x, placed.y], placed.flame, rect, oneWay);
     return { light, job, placed, walls, limited: blocking.limited.length > 0 };
   }
 
