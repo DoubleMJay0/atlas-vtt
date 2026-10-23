@@ -1,16 +1,14 @@
-import { lavaPalette } from '../render/art/lavaPalette';
 import { toGameUnits } from '../../grid/statedDistance';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import { MAX_AREA_CORNERS } from '../../lighting/lightArea';
 import type { LightEmission, LightSource } from '../../types/lightingTypes';
-import type { LiquidColors, LiquidKind, LiquidSurface } from '../../types/liquidTypes';
+import type { LiquidKind, LiquidSurface } from '../../types/liquidTypes';
 import type { CellPoint, DungeonColumn, DungeonTerrain } from '../model';
 import { intersectRings, subtractRings, unionRings } from '../render/clipShapes';
 import { shapePolygon, type Vec } from '../render/geometry';
-import { mixColours, paletteOf } from '../render/palette';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
-import { acidColours } from './acidArt';
+import { liquidColours } from './liquidColours';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
@@ -190,18 +188,6 @@ function centroid(ring: readonly Vec[]): Vec {
     cy += (p.y + q.y) * cross;
   });
   return a === 0 ? ring[0]! : { x: cx / (3 * a), y: cy / (3 * a) };
-}
-
-/** The colours each liquid moves in, from the look's own: water in the look's water, lava and acid in theirs, toned down to the duotone of a monochrome map. */
-function liquidColours(style: DungeonStyle, view: DungeonView): Record<LiquidKind, LiquidColors> {
-  const palette = paletteOf(style, view);
-  const water: LiquidColors = { surface: palette.water, deep: mixColours(palette.water, palette.ink, 0.35), glint: mixColours(palette.water, '#ffffff', 0.75) };
-  if (view.monochrome) return { water, lava: lavaPalette(style, view), acid: acidColours(style, view) };
-  return {
-    water,
-    lava: lavaPalette(style, view),
-    acid: acidColours(style, view),
-  };
 }
 
 /** How lava and acid glow, in cells: lava lights its room, acid only its shore. */

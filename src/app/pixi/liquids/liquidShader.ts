@@ -21,11 +21,11 @@ void main() {
 }`;
 
 /**
- * Highlights over the painted map, in the surface's own colours, as premultiplied colour that may
- * carry light of its own (colour above alpha): drawn with normal blending it darkens the map where
- * alpha is and lights it where colour is beyond alpha, so every look keeps its art beneath. The
- * shore fades to nothing over the field's first cells, so no hard edge is drawn, and nothing is
- * drawn past the outline: the mesh is the outline.
+ * Pigment over the painted map, in the surface's own colours, as premultiplied colour never above
+ * alpha: drawn with normal blending it paints over the map and never lights it, so every look keeps
+ * its art beneath, painted or engraved (`uEngraved`). The shore fades to nothing over the field's
+ * first cells, so no hard edge is drawn, and nothing is drawn past the outline: the mesh is the
+ * outline.
  */
 const fragment = `${GLSL_VERSION}
 in vec2 vWorld;
