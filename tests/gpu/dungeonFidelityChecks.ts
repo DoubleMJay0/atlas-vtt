@@ -149,3 +149,48 @@ export function gridAgreement(floor: DungeonFloor, grid: Pick<GridState, 'size' 
   }
   return { on, off };
 }
+
+/** Pixels where two pictures differ: what drawing something added. */
+export function changedMask(a: Picture, b: Picture): Uint8Array {
+  const mask = new Uint8Array(a.width * a.height);
+  for (let p = 0; p < mask.length; p++) {
+    const i = p * 4;
+    mask[p] = Math.abs(a.data[i]! - b.data[i]!) + Math.abs(a.data[i + 1]! - b.data[i + 1]!) + Math.abs(a.data[i + 2]! - b.data[i + 2]!) > 30 ? 1 : 0;
+  }
+  return mask;
+}
+
+/**
+ * Outlines whose object is not drawn out to them, by the middle of each: more than `share` of the
+ * points along it (every 3 px) find, walking outward away from the outline's middle, no pixel the
+ * object changed within `slack` px. An outline on its drawn object has nearly none (a line of the
+ * floor's own drawing may cross the object's edge where it ends).
+ */
+export function outlinesOffObjects(outlines: readonly (readonly Point[])[], changed: Uint8Array, picture: Picture, slack: number, share: number): Point[] {
+  const strays: Point[] = [];
+  const at = (x: number, y: number): boolean => {
+    const px = Math.round(x);
+    const py = Math.round(y);
+    return px >= 0 && py >= 0 && px < picture.width && py < picture.height && changed[py * picture.width + px] === 1;
+  };
+  for (const ring of outlines) {
+    const centre = { x: ring.reduce((s, p) => s + p.x, 0) / ring.length, y: ring.reduce((s, p) => s + p.y, 0) / ring.length };
+    let points = 0;
+    let off = 0;
+    ring.forEach((a, k) => {
+      const b = ring[(k + 1) % ring.length]!;
+      const steps = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 3));
+      for (let s = 0; s < steps; s++) {
+        const p = { x: a.x + ((b.x - a.x) * s) / steps, y: a.y + ((b.y - a.y) * s) / steps };
+        const d = Math.hypot(p.x - centre.x, p.y - centre.y) || 1;
+        const out = { x: (p.x - centre.x) / d, y: (p.y - centre.y) / d };
+        let found = false;
+        for (let t = -1; t <= slack && !found; t += 0.5) found = at(p.x + out.x * t, p.y + out.y * t);
+        points++;
+        if (!found) off++;
+      }
+    });
+    if (off > points * share) strays.push(centre);
+  }
+  return strays;
+}

@@ -9,12 +9,15 @@ import { dungeonScene } from '../../src/app/dungeons/scene/toScene';
 import { dungeonWalls, wallInkWidth } from '../../src/app/dungeons/scene/toWalls';
 import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
 import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
-import { gridAgreement, inkEdgesFromWalls, inkMask, wallsOnInk, type Picture } from './dungeonFidelityChecks';
+import { changedMask, gridAgreement, inkEdgesFromWalls, inkMask, outlinesOffObjects, wallsOnInk, type Picture } from './dungeonFidelityChecks';
+import type { WallSegment } from '../../src/app/types/wallTypes';
 
 /**
- * A dungeon's scene against the map image it was written for, at the 200 px per cell scenes are
- * drawn at: every wall lies on drawn wall ink, every drawn wall face has a wall, doors stand on the
- * drawn doors, and the scene's grid is the grid drawn on the map (half cells with small tiles).
+ * A dungeon's scene against the map images it was written for, at the 200 px per cell scenes are
+ * drawn at, floor by floor (each its level's walls on its own map): every wall lies on drawn wall
+ * ink, every drawn wall face has a wall, doors stand on the drawn doors, the scene's grid is the
+ * grid drawn on the map (half cells with small tiles), and every outline of a tall object lies on
+ * the object as drawn. The outlines are no drawn walls: the wall checks leave them out.
  */
 
 const PX_PER_CELL = 200;
@@ -27,6 +30,28 @@ const CASES: readonly { seed: number; tags: string[]; floors: number; look: Dung
   { seed: 505, tags: ['medium', 'colonnades'], floors: 1, look: 'blueprint', view: { exits: false } },
 ];
 
+const TALL_TERRAIN = new Set(['pillar', 'obelisk', 'statue', 'wall-fragment']);
+
+/** The dungeon without its tall objects: the columns that stand, statues and wells, and terrain that is total cover. */
+function withoutTallObjects(model: DungeonModel): DungeonModel {
+  return {
+    ...model,
+    floors: model.floors.map(floor => ({
+      ...floor,
+      columns: floor.columns.filter(column => column.shattered),
+      props: floor.props.filter(prop => prop.kind !== 'statue' && prop.kind !== 'well'),
+      terrain: floor.terrain.filter(piece => !TALL_TERRAIN.has(piece.kind)),
+    })),
+  };
+}
+
+/** A floor's outlines of tall objects, each a ring of corners. */
+function outlinesOf(walls: readonly WallSegment[]): { x: number; y: number }[][] {
+  const rings = new Map<string, { x: number; y: number }[]>();
+  for (const wall of walls) rings.set(wall.chainId!, [...(rings.get(wall.chainId!) ?? []), wall.p1]);
+  return [...rings.values()];
+}
+
 function draw(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floor: number): Picture {
   const layout = mapLayout(model, PX_PER_CELL, view);
   const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
@@ -36,6 +61,8 @@ function draw(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floo
 }
 
 const share = (values: readonly number[], limit: number): number => values.filter(v => v <= limit).length / Math.max(1, values.length);
+
+let outlined = 0;
 
 describe('a dungeon scene and its map image', () => {
   for (const { seed, tags, floors, look, view: change } of CASES) {
@@ -50,11 +77,16 @@ describe('a dungeon scene and its map image', () => {
       const scene = dungeonScene(model, style, view, placement, { width: layout.widthPx, height: layout.heightPx })!;
       expect(scene.scene.grid.size).toBe(view.smallTiles ? PX_PER_CELL / 2 : PX_PER_CELL);
       const halfInk = (wallInkWidth(style) / 2) * PX_PER_CELL;
+      const level = (index: number): string | undefined => scene.levelIds?.[index];
       model.floors.forEach((floor, index) => {
         const where = `${label}, floor ${index}`;
         const picture = draw(model, look, view, index);
         const mask = inkMask(picture, parseHex(palette.ink));
-        const walls = Object.values(dungeonWalls(model, style, view, placement, index).walls);
+        const onFloor = Object.values(scene.scene.walls).filter(wall => wall.levels?.[0] === level(index));
+        const outlines = onFloor.filter(wall => wall.id.includes('_shadow_'));
+        const walls = onFloor.filter(wall => !wall.id.includes('_shadow_'));
+        // The floor's own walls are the scene's on its level, as the scene writer builds them alone
+        expect(walls.length, where).toBe(Object.keys(dungeonWalls(model, style, view, placement, index, { id: 'x' }).walls).length);
         const toPx = (x: number, y: number): { x: number; y: number } => ({ x: (x - layout.originCell.x) * PX_PER_CELL, y: (y - layout.originCell.y) * PX_PER_CELL });
 
         // (a) Solid walls lie on drawn ink; the sides of a secret door's passage are not drawn, as the passage is not
@@ -84,7 +116,17 @@ describe('a dungeon scene and its map image', () => {
         const { on, off } = gridAgreement(floor, scene.scene.grid, picture, placement, { grid: parseHex(palette.grid), floor: parseHex(palette.floor) });
         expect(on, `${where}: grid pixels on the scene's lines`).toBeGreaterThan(200);
         expect(off, `${where}: grid pixels between the scene's lines`).toBeLessThan(on * 0.1);
+
+        // (c) Every outline of a tall object lies on the object as drawn (both drawn without shadows, which fall beside it)
+        const plain = { ...view, shadow: false };
+        const changed = changedMask(draw(model, look, plain, index), draw(withoutTallObjects(model), look, plain, index));
+        const stray = outlinesOffObjects(outlinesOf(outlines), changed, picture, PX_PER_CELL * 0.12, 0.15).slice(0, 5).map(p => `${Math.round(p.x)},${Math.round(p.y)}`);
+        expect(stray, `${where}: outlines off their drawn object`).toEqual([]);
+        outlined += outlinesOf(outlines).length;
       });
     });
   }
+  it('outlines tall objects in the cases above', () => {
+    expect(outlined).toBeGreaterThan(20);
+  });
 });
