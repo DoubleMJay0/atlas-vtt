@@ -45,8 +45,9 @@ uniform vec2 uSeed;
 uniform vec3 uSurface;
 uniform vec3 uDeep;
 uniform vec3 uGlint;
-uniform float uAcidArt;
-uniform float uAcidDetail;
+uniform float uEngraved;
+uniform float uDetail;
+uniform float uLavaGlow;
 ${NOISE_GLSL}
 ${WATER_GLSL}
 ${LAVA_GLSL}
@@ -73,6 +74,13 @@ void main() {
   finalColor = colour * feather;
 }`;
 
+/**
+ * How much of its material a surface draws, by the lighting quality (`liquidDetail`): 2 at high,
+ * 1 at balanced, 0 at saver. Each liquid spends it its own way: fewer noise octaves, no finest
+ * layers, and lava's smoulder held steady at saver.
+ */
+export type LiquidDetail = 0 | 1 | 2;
+
 /** The uniforms of one surface: its field, colours and frame; its clock and drifts follow the layer's. */
 export interface LiquidUniforms {
   uFieldRect: Float32Array;
@@ -88,8 +96,12 @@ export interface LiquidUniforms {
   uSurface: Float32Array;
   uDeep: Float32Array;
   uGlint: Float32Array;
-  uAcidArt: number;
-  uAcidDetail: number;
+  /** 1 where the map is engraved (`LiquidSurface.art`): ink and hatching instead of paint. */
+  uEngraved: number;
+  /** `LiquidDetail`. */
+  uDetail: number;
+  /** Lava's smoulder, in step with the light it glows with; 1 holds it steady. */
+  uLavaGlow: number;
 }
 
 export interface LiquidShader {
@@ -116,8 +128,9 @@ export function createLiquidShader(field: Texture): LiquidShader {
     uSurface: { value: new Float32Array(3), type: 'vec3<f32>' },
     uDeep: { value: new Float32Array(3), type: 'vec3<f32>' },
     uGlint: { value: new Float32Array(3), type: 'vec3<f32>' },
-    uAcidArt: { value: 0, type: 'f32' },
-    uAcidDetail: { value: 3, type: 'f32' },
+    uEngraved: { value: 0, type: 'f32' },
+    uDetail: { value: 2, type: 'f32' },
+    uLavaGlow: { value: 1, type: 'f32' },
   });
   const glProgram = GlProgram.from({ vertex, fragment, name: 'atlas-liquid-surface', preferredFragmentPrecision: HIGHP });
   const shader = new Shader({ glProgram, resources: { liquid: group, uField: field.source } });

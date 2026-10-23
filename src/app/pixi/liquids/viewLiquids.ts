@@ -4,6 +4,7 @@ import { DEFAULT_LIGHTING_QUALITY, type LightingQualitySource } from '../../ligh
 import { requestRender } from '../RenderScheduler';
 import { LiquidLayer, type LiquidLayerDeps } from './LiquidLayer';
 import type { WorldBox } from './LiquidMesh';
+import type { LiquidDetail } from './liquidShader';
 
 /** The view rect, in world units. */
 interface WorldRect { left: number; top: number; right: number; bottom: number }
@@ -32,6 +33,14 @@ export function liquidFps(qualityFps: number, cellPx: number): number {
   return cellPx < HALF_RATE_BELOW_CELL_PX ? qualityFps / 2 : qualityFps;
 }
 
+/**
+ * How much of their material liquids draw at a quality (`LiquidDetail`), told by the frames a second
+ * it gives them (`LightingQuality.liquidFps`: 30 / 15 / 10 at high / balanced / saver), never by zoom.
+ */
+export function liquidDetail(qualityFps: number): LiquidDetail {
+  return qualityFps >= 30 ? 2 : qualityFps >= 15 ? 1 : 0;
+}
+
 /** The liquid surfaces of a view's scene, moving on its stage, as often as `quality` lets them. */
 export function createViewLiquids(app: Application, viewport: Viewport, store: LiquidLayerDeps['store'], quality?: LightingQualitySource): LiquidLayer {
   return new LiquidLayer({
@@ -40,10 +49,7 @@ export function createViewLiquids(app: Application, viewport: Viewport, store: L
     requestRender: () => requestRender(app),
     inView: (box) => boxInView(viewport.getVisibleBounds(), box),
     fps: () => liquidFps((quality?.current() ?? DEFAULT_LIGHTING_QUALITY).liquidFps, (store.getState().grid?.size ?? 0) * viewport.scale.x),
-    acidDetail: () => {
-      const fps = (quality?.current() ?? DEFAULT_LIGHTING_QUALITY).liquidFps;
-      return fps >= 30 ? 3 : fps >= 15 ? 2 : 1;
-    },
+    detail: () => liquidDetail((quality?.current() ?? DEFAULT_LIGHTING_QUALITY).liquidFps),
     drawable: app.renderer.name === 'webgl',
   });
 }
