@@ -2,6 +2,8 @@ import { Container, type Matrix, type Renderer, type RenderTexture } from 'pixi.
 import { hasPendingChanges } from '../../RenderScheduler';
 import { destroyTree } from '../../utils/destroyTree';
 
+/** Over the map and beneath everything on it, as on the view's own stage (`MAP_LAYER_Z.shade`). */
+const SHADE_Z = 1;
 /** Below the lighting, as on the view's own stage (`LIGHTING_Z_INDEX` is 90). */
 const TOKENS_Z = 50;
 const LIGHTING_Z = 90;
@@ -13,6 +15,8 @@ const FOG_Z = 1000;
 /** What a level below shows, in world pixels: its map, its tokens, its lighting, its roof and its fog, bottom to top. */
 export interface BelowParts {
   map: Container;
+  /** The level's shade over its map (`LevelShading`), where it has one. */
+  shade?: Container | undefined;
   tokens: Container;
   lighting: Container;
   roof: Container;
@@ -32,6 +36,10 @@ export class BelowStage {
 
   constructor(parts: BelowParts) {
     parts.map.zIndex = 0;
+    if (parts.shade) {
+      parts.shade.zIndex = SHADE_Z;
+      this.world.addChild(parts.shade);
+    }
     parts.tokens.zIndex = TOKENS_Z;
     parts.lighting.zIndex = LIGHTING_Z;
     parts.roof.zIndex = ROOF_Z;
