@@ -4,6 +4,7 @@ import { TO_LIGHT } from '../art/light';
 import { grownRings, traceRings } from '../art/outline';
 import { drawGridCanvas, pixelCanvas, rgbaCanvas } from '../art/raster';
 import { paintLayer } from '../art/strips';
+import { poolOutlines, poolsPath } from '../art/pools';
 import type { Canvas2D, Vec } from '../geometry';
 import { inView, type Leaf, type PlantForm } from '../growth/forms';
 import { growthPicture } from '../growth/growthForms';
@@ -108,12 +109,14 @@ function paintStems(ctx: Canvas2D, form: PlantForm, colours: PlantColours, line:
 /** Where a root breaks the floor: a dark gap, deepest in its middle. */
 function paintHoles(ctx: Canvas2D, form: PlantForm, colours: PlantColours): void {
   for (const hole of form.holes) {
-    for (const [scale, alpha] of [[1, 0.35], [0.62, 0.55]] as const) {
-      ctx.beginPath();
-      ctx.ellipse(hole.x, hole.y, hole.radius * 1.35 * scale, hole.radius * scale, hole.angle, 0, Math.PI * 2);
-      ctx.fillStyle = css(colours.hole, alpha);
-      ctx.fill();
-    }
+    const g = ctx.createRadialGradient(hole.x, hole.y, 0, hole.x, hole.y, hole.radius * 1.4);
+    g.addColorStop(0, css(colours.hole, 0.8));
+    g.addColorStop(0.55, css(colours.hole, 0.55));
+    g.addColorStop(1, css(colours.hole, 0));
+    ctx.beginPath();
+    ctx.ellipse(hole.x, hole.y, hole.radius * 1.4, hole.radius, hole.angle, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
   }
 }
 
@@ -181,6 +184,12 @@ function paintCaps(ctx: Canvas2D, form: PlantForm, colours: PlantColours): void 
     g.addColorStop(1, rampAt(ramp, 0.05));
     ctx.fillStyle = g;
     ctx.fill();
+    // Its rim on the side away from the light, where the cap curls under towards its gills.
+    ctx.beginPath();
+    ctx.ellipse(cap.x, cap.y, cap.radius * cap.stretch, cap.radius, cap.angle, 0, Math.PI * 2);
+    ctx.ellipse(cap.x + TO_LIGHT.x * r * 0.18, cap.y + TO_LIGHT.y * r * 0.18, cap.radius * cap.stretch * 0.92, cap.radius * 0.92, cap.angle, 0, Math.PI * 2);
+    ctx.fillStyle = rampAt(ramp, 0.05, 0.75);
+    ctx.fill('evenodd');
     // Its crown: a little darker, as most caps are at their middle.
     ctx.beginPath();
     ctx.ellipse(cap.x + TO_LIGHT.x * r * 0.08, cap.y + TO_LIGHT.y * r * 0.08, r * 0.32 * cap.stretch, r * 0.32, cap.angle, 0, Math.PI * 2);
@@ -251,9 +260,14 @@ function paintMoss(scene: ArtScene, colours: PlantColours): void {
       out[o + 3] = cover[k]! * 250;
     });
     paintLayer(layerOf(scene), 'source-over', layer => {
+      // On the floor and the wall's course, never on the rock or the water.
       layer.beginPath();
       traceRings(layer, grownRings(scene, BAND));
       layer.clip();
+      layer.beginPath();
+      layer.rect(grid.x0, grid.y0, grid.w / grid.res, grid.h / grid.res);
+      poolsPath(poolOutlines(scene))(layer);
+      layer.clip('evenodd');
       drawGridCanvas(layer, offset, under);
       drawGridCanvas(layer, grid, canvas);
     }, { minX: grid.x0, minY: grid.y0, maxX: grid.x0 + grid.w / grid.res, maxY: grid.y0 + grid.h / grid.res });

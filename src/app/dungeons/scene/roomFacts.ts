@@ -1,5 +1,5 @@
 import { formatList, t } from '../../i18n';
-import type { CellDir, CellPoint, DoorKind, DungeonDoor, DungeonRoom, DungeonTerrain, PropKind, TerrainKind } from '../model';
+import type { CellDir, CellPoint, DoorKind, DungeonDoor, DungeonRoom, DungeonTerrain, GrowthKind, PropKind, TerrainKind } from '../model';
 import { dir } from '../geometry';
 import type { VisibleFloor } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
@@ -9,7 +9,7 @@ import { terrainName } from './terrainName';
 /**
  * The one line of physical facts a room's heading in the note carries: what someone standing in
  * the room sees, never a story. Exits by compass direction (north is up on the map), stairs and
- * the floor they lead to, what stands in the room, water, and its terrain.
+ * the floor they lead to, what stands in the room, its terrain, water, and what grows there.
  */
 
 type Direction = 'north' | 'east' | 'south' | 'west';
@@ -129,6 +129,15 @@ function terrainSentences(visible: VisibleFloor, room: DungeonRoom): string[] {
   return items.length ? [t('dungeonScene.terrain', { list: formatList(items) })] : [];
 }
 
+/** Vegetation in the order the note names it: what climbs the walls first. */
+const GROWTH_ORDER: readonly GrowthKind[] = ['ivy', 'vine', 'creeper', 'roots', 'fern', 'moss', 'fungi', 'grass'];
+
+function growthSentences(visible: VisibleFloor, room: DungeonRoom): string[] {
+  const kinds = new Set(visible.floor.growth.filter(g => g.room === room.id).map(g => g.kind));
+  const items = GROWTH_ORDER.filter(kind => kinds.has(kind)).map(kind => t(`dungeonScene.growthItem.${kind}`));
+  return items.length ? [t('dungeonScene.growth', { list: formatList(items) })] : [];
+}
+
 /** The facts of a room of a floor as shown, as one line of sentences. */
 export function roomFacts(visible: VisibleFloor, room: DungeonRoom, view: Pick<DungeonView, 'props' | 'water'>): string {
   return [
@@ -137,5 +146,6 @@ export function roomFacts(visible: VisibleFloor, room: DungeonRoom, view: Pick<D
     ...contents(visible, room, view),
     ...terrainSentences(visible, room),
     ...waterSentences(visible, room, view),
+    ...growthSentences(visible, room),
   ].join(' ');
 }

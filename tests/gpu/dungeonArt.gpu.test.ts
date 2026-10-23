@@ -4,7 +4,7 @@ import { DUNGEON_STYLES, type DungeonStyleId } from '../../src/app/dungeons/styl
 import { ART_DUNGEONS, ART_SPOTS, GROWTH_SPOTS, artModel, drawClose, drawWhole } from './dungeonArtSheets';
 import { savePng } from './dungeonRenderHarness';
 import { specimen } from './dungeonArtSpecimen';
-import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
+import { DEFAULT_PX_PER_CELL, mapLayout, suggestedPxPerCell } from '../../src/app/dungeons/render/layoutSize';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { renderThumbnail } from '../../src/app/dungeons/render/thumbnail';
@@ -16,7 +16,7 @@ const CARD_DUNGEON = 'crumbling';
  * Every look on dungeons of every kind, whole and close up at 200 px per cell with tokens, written
  * to `out/dungeon-render/v2-art/` for judging by eye, when asked for: `VITE_ART=1` draws them all,
  * `VITE_ART_LOOK`, `VITE_ART_DUNGEON` and `VITE_ART_SHOT` (whole, close, mono, card, specimen,
- * spots, growth) narrow a run while iterating.
+ * spots, growth, scene) narrow a run while iterating.
  */
 
 const only = (key: string): string[] | null => {
@@ -63,6 +63,21 @@ describe.skipIf(!asked)('dungeon looks, for judging by eye', () => {
           const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
           renderMap(canvas.getContext('2d')!, model, dungeonStyle(id), DEFAULT_VIEW, { pxPerCell: 120, floor, openings });
           await savePng(canvas, `v2-art/specimen-${id}-f${floor}-${openings}`);
+        }
+      });
+    }
+    if (shots.includes('scene')) {
+      it(`${id} vegetation at a scene's resolution`, async () => {
+        // As a created scene draws it: 400 px a cell, whole (written reduced) and a window with tokens.
+        for (const name of ['overgrown-temple', 'overgrown-tomb', 'overgrown-dwelling']) {
+          if (dungeons && !dungeons.includes(name)) continue;
+          const model = artModel(name);
+          const pxPerCell = suggestedPxPerCell(model);
+          const layout = mapLayout(model, pxPerCell, DEFAULT_VIEW);
+          const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
+          renderMap(canvas.getContext('2d')!, model, dungeonStyle(id), DEFAULT_VIEW, { pxPerCell });
+          await savePng(canvas, `v2-art/scene-${id}-${name}`);
+          await savePng(drawClose(model, id as DungeonStyleId, DEFAULT_VIEW, 0, 8, 5, true, undefined, DEFAULT_PX_PER_CELL), `v2-art/scene-${id}-${name}-close`);
         }
       });
     }

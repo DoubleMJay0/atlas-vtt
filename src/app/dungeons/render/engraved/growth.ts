@@ -8,6 +8,7 @@ import { growthPicture } from '../growth/growthForms';
 import { placeLeaf, silhouette, stemRibbon } from '../growth/leafGeometry';
 import { mossField, mossResolution } from '../growth/mossField';
 import { hash2 } from '../art/noise';
+import { poolOutlines, poolsPath } from '../art/pools';
 import type { GrowthPainter } from '../stone/growth';
 import { BAND } from '../stone/walls';
 import { cellPattern } from '../stone/patterns';
@@ -202,7 +203,8 @@ function cutBlossoms(ctx: Canvas2D, form: PlantForm, pens: Pens, line: number): 
 
 function cutForm(scene: ArtScene, form: PlantForm, pens: Pens, hatches: Hatches | null, onlyAbove = -1): void {
   const { ctx } = scene.env;
-  const line = Math.max(pens.minWidth * 1.6, 0.0042);
+  // A little finer than the look's own fine line, so leaves read as drawn, not as noise.
+  const line = Math.max(pens.minWidth * 1.6, 0.0062);
   ctx.save();
   ctx.lineJoin = 'round';
   if (onlyAbove < 0) cutStems(ctx, form, pens, hatches, line);
@@ -226,6 +228,10 @@ function stippleMoss(scene: ArtScene, pens: Pens): void {
   ctx.beginPath();
   traceRings(ctx, grownRings(scene, BAND));
   ctx.clip();
+  ctx.beginPath();
+  ctx.rect(view.minX, view.minY, view.maxX - view.minX, view.maxY - view.minY);
+  poolsPath(poolOutlines(scene))(ctx);
+  ctx.clip('evenodd');
   ctx.fillStyle = pens.ink;
   for (const cluster of growthPicture(env).moss) {
     if (!cluster.some(s => s.x + s.radius > view.minX && s.x - s.radius < view.maxX && s.y + s.radius > view.minY && s.y - s.radius < view.maxY)) continue;

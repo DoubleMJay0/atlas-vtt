@@ -300,3 +300,25 @@ describe('cell outlines', () => {
     expect(rings.reduce((sum, r) => sum + area(r), 0)).toBe(8);
   });
 });
+
+describe('vegetation in the scene', () => {
+  it('names undergrowth as difficult terrain and climbers on the cells they hang over, under everything else, and lists what grows in the note', () => {
+    const model = generateDungeon({ seed: 16, tags: ['dwelling', 'overgrown'], floors: 1 });
+    const floor = model.floors[0]!;
+    const { parts } = partsOf(model);
+    const features = Object.values(parts.scene.mapFeatures ?? {});
+    const brambles = features.filter(feature => feature.name === 'Brambles');
+    expect(brambles.length).toBeGreaterThan(0);
+    for (const feature of brambles) expect(feature.terrain).toEqual({ difficult: true });
+    const ivy = features.filter(feature => feature.name === 'Ivy');
+    expect(ivy.length).toBeGreaterThan(0);
+    for (const feature of ivy) expect(feature.terrain).toBeUndefined();
+    expect(features.some(feature => feature.name === 'Weeds')).toBe(false);
+    // Vegetation lies first, so whatever stands on it is found over it.
+    const firstSolid = features.findIndex(feature => !['Ivy', 'Moss', 'Ferns', 'Roots', 'Pale fungi', 'Flowering vines', 'Dead creepers'].includes(feature.name));
+    expect(features.slice(firstSolid).some(feature => feature.name === 'Ivy')).toBe(false);
+    const grownRooms = new Set(floor.growth.filter(g => floor.rooms[g.room]?.kind === 'room').map(g => g.room)).size;
+    expect(parts.rooms.filter(room => room.facts.includes('Growing here: ')).length).toBe(grownRooms);
+    expect(parts.rooms.some(room => room.facts.includes('Terrain: ') && room.facts.includes('Brambles'))).toBe(true);
+  });
+});

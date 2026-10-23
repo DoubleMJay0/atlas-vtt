@@ -95,12 +95,12 @@ export function fern(form: PlantForm, rng: Rng, at: Vec, size: number): void {
 
 /** Fungus caps in a cluster: a few large ones, many small round them, crowding towards one side. */
 export function fungi(form: PlantForm, rng: Rng, at: Vec, size: number): void {
-  const caps = 3 + Math.floor(rng() * 9);
+  const caps = 2 + Math.floor(rng() * 6);
   const drift = rng() * Math.PI * 2;
   for (let k = 0; k < caps; k++) {
     const r = size * Math.sqrt(k / caps) * 0.75;
     const a = k * GOLDEN + drift;
-    const radius = size * (0.34 - 0.18 * (k / caps)) * (0.7 + rng() * 0.6);
+    const radius = size * (0.36 - 0.24 * (k / caps) ** 0.7) * (0.65 + rng() * 0.7);
     const c = { x: at.x + Math.cos(a) * r + Math.cos(drift) * r * 0.3, y: at.y + Math.sin(a) * r + Math.sin(drift) * r * 0.3 };
     form.caps.push({ x: c.x, y: c.y, radius, stretch: 1 + rng() * 0.25, angle: rng() * Math.PI, tone: (rng() - 0.5) * 2, layer: 1 - k / caps });
     cover(form, c, radius);
@@ -143,6 +143,8 @@ export function root(form: PlantForm, rng: Rng, at: Vec, heading: number, length
   const hole = (q: Vec, a: number, w: number): void => {
     form.holes.push({ x: q.x, y: q.y, radius: w * 1.1 + 0.012, angle: a });
   };
+  // A root that dives breaks out of the floor where it begins, too.
+  if (options.dives && depth === 0) hole(at, heading, width);
   while (walked < length) {
     const t = walked / length;
     const a = heading + (valueNoise(walked * freq, 0.5, seed) - 0.5) * 2.4;
@@ -161,7 +163,7 @@ export function root(form: PlantForm, rng: Rng, at: Vec, heading: number, length
     if (show) {
       points.push(p);
       widths.push(w);
-      if (points.length === 4 && walked > step * 4) sink(widths, false);
+      if (points.length === 4 && (walked > step * 4 || (options.dives && depth === 0))) sink(widths, false);
     }
     if (depth < 2 && t > 0.2 && t < 0.85 && rng() < 0.035) {
       root(form, rng, p, a + (rng() < 0.5 ? -1 : 1) * (0.35 + rng() * 0.4), (length - walked) * (0.45 + rng() * 0.4), w * 0.62, { ...options, depth: depth + 1 });

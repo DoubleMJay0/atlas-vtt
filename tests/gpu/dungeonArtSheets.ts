@@ -71,9 +71,8 @@ function drawToken(ctx: OffscreenCanvasRenderingContext2D, x: number, y: number,
   ctx.restore();
 }
 
-/** A window of `cells` × `rows` cells at 200 px a cell, on the busiest room, with a few tokens on open floor. */
-export function drawClose(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floor = 0, cells = 12, rows = 8, tokens = true, centre?: { x: number; y: number }): OffscreenCanvas {
-  const px = 200;
+/** A window of `cells` × `rows` cells at `px` a cell (200 unless asked), on the busiest room, with a few tokens on open floor. */
+export function drawClose(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floor = 0, cells = 12, rows = 8, tokens = true, centre?: { x: number; y: number }, px = 200): OffscreenCanvas {
   const corner = centre ? { x: Math.round(centre.x - cells / 2), y: Math.round(centre.y - rows / 2) } : floor === 0 ? thumbnailWindow(model, view, cells, rows) : (() => {
     const b = visibleDungeon(model, view, floor).bounds;
     return { x: Math.round((b.minX + b.maxX) / 2 - cells / 2), y: Math.round((b.minY + b.maxY) / 2 - rows / 2) };

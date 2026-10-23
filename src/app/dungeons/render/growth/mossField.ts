@@ -22,7 +22,7 @@ const CUSHIONS = 38;
 
 /** Samples per cell, by how large a cell is drawn: two or three pixels a sample, so each cushion has its shape. */
 export function mossResolution(pxPerCell: number): number {
-  return Math.round(Math.max(12, Math.min(170, pxPerCell / 2.4)));
+  return Math.round(Math.max(12, Math.min(120, pxPerCell / 3)));
 }
 
 function boundsOf(spots: readonly MossSpot[]): { minX: number; minY: number; maxX: number; maxY: number } {

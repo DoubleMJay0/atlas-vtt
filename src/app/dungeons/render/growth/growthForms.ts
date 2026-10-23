@@ -94,8 +94,9 @@ function wallGrowth(env: RenderEnv, g: DungeonGrowth, rng: Rng, picture: GrowthP
     const seed = Math.floor(rng() * 1e6);
     const spots: MossSpot[] = [];
     for (let s = 0; s < frame.length; s += 0.07) {
-      const full = smoothstep(0, 0.5, s) * smoothstep(0, 0.5, frame.length - s) * valueNoise(s * 1.4, 0, seed);
-      if (full > 0.15) spots.push({ ...frame.at(s, (rng() - 0.7) * 0.18), radius: 0.06 + full * 0.14, strength: (0.45 + 0.55 * full) * (0.5 + 0.5 * g.density) });
+      // In cushions and runs along the foot, with bare stone between them.
+      const full = smoothstep(0, 0.5, s) * smoothstep(0, 0.5, frame.length - s) * (valueNoise(s * 2.3, 0, seed) * 0.7 + valueNoise(s * 6, 3, seed) * 0.3);
+      if (full > 0.38) spots.push({ ...frame.at(s, (rng() - 0.75) * 0.22), radius: 0.05 + (full - 0.38) * 0.3, strength: (0.5 + full) * (0.5 + 0.5 * g.density) });
     }
     picture.moss.push(spots);
     return;
@@ -173,7 +174,7 @@ function undergrowth(env: RenderEnv, picture: GrowthPicture): void {
       const flow = rng() * Math.PI * 2;
       for (const { p } of scatter(rng, piece.cells, 0.5, 0.2)) {
         const a = flow + (rng() - 0.5) * 1.1;
-        root(form, rng, { x: p.x - Math.cos(a) * 0.3, y: p.y - Math.sin(a) * 0.3 }, a, 0.75 + rng() * 0.6, 0.04 + rng() * 0.035, { dives: true });
+        root(form, rng, { x: p.x - Math.cos(a) * 0.3, y: p.y - Math.sin(a) * 0.3 }, a, 0.75 + rng() * 0.6, 0.05 + rng() * 0.035, { dives: true });
       }
       picture.ground.push(form);
     }
