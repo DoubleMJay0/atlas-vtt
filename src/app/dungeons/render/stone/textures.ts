@@ -89,21 +89,21 @@ export function rockTile(): OffscreenCanvas {
 }
 
 /**
- * The grain of dressed stone as deviations from the surface: black and white texels whose alpha
- * moves its brightness by a few percent, so it lies over any colour.
+ * The grain of dressed stone as deviations from the surface: a soft mottle, a fine even speckle
+ * and here and there a pore, black and white texels whose alpha moves the brightness by a few
+ * percent, so it lies over any colour. No direction in it: stone is worn, not scratched.
  */
 export function grainTile(strength: number, size = 256): OffscreenCanvas {
   const key = `grain:${strength}:${size}`;
   const known = cache.get(key);
   if (known) return known;
-  const fine = periodicFbm(size, 16, 0x9a1, 3).values;
-  const broad = periodicFbm(size, 4, 0x9a2, 4).values;
-  const h = new Float32Array(size * size);
-  for (let i = 0; i < h.length; i++) h[i] = fine[i]! * 0.35 + broad[i]! * 0.65;
-  const shade = standardised(shadeOf(h, size, size * 0.15));
+  const mottle = standardised(periodicFbm(size, 3, 0x9a1, 4, 0.55).values);
+  const speckle = standardised(periodicFbm(size, 64, 0x9a2, 2, 0.5).values);
+  const pores = periodicFbm(size, 32, 0x9a3, 2, 0.5).values;
   const out = new Uint8ClampedArray(size * size * 4);
-  for (let i = 0; i < h.length; i++) {
-    const d = shade[i]! * strength;
+  for (let i = 0; i < mottle.length; i++) {
+    const pore = pores[i]! > 0.78 ? -(pores[i]! - 0.78) * 9 : 0;
+    const d = (mottle[i]! * 0.55 + speckle[i]! * 0.45 + pore) * strength;
     const v = d > 0 ? 255 : 0;
     out[i * 4] = v;
     out[i * 4 + 1] = v;

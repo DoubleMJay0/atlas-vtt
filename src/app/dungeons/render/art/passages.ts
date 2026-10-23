@@ -47,7 +47,6 @@ function drawDoor(hand: Hand, door: DungeonDoor): void {
     const band = quad(-half, v - 0.012, half, v + 0.012);
     hand.surface(polyPath(band), 'metal');
   }
-  hand.solid(polyPath(leaf), at(0, 0), 0.35, 0.7);
   hand.edges(leaf, true);
 }
 

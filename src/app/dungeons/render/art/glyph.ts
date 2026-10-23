@@ -16,6 +16,8 @@ export interface GlyphDrawing {
   silhouette?: (path: CanvasPath) => void;
   /** About half the glyph's size, in its own cells: how far the light's modelling reaches across it. */
   radius: number;
+  /** Rounded, so the light models it across its top; a flat top is lit evenly. */
+  dome?: boolean;
 }
 
 /**
@@ -39,6 +41,9 @@ export function drawGlyph(hand: Hand, place: GlyphPlace, glyph: GlyphDrawing, wa
   if (glyph.silhouette) {
     const silhouette = glyph.silhouette;
     hand.grain(path => silhouette(path), glyph.material);
+  }
+  if (glyph.silhouette && glyph.dome) {
+    const silhouette = glyph.silhouette;
     ctx.beginPath();
     silhouette(ctx);
     ctx.clip();

@@ -2,7 +2,7 @@ import { parseHex } from '../palette';
 import { layerOf, type ArtScene } from '../art/artScene';
 import { noiseSampler } from '../art/noise';
 import { clipFloors } from '../art/outline';
-import { drawField, fieldOf } from '../art/raster';
+import { drawGridCanvas, fieldOf, rgbaCanvas } from '../art/raster';
 import { paintLayer } from '../art/strips';
 import type { StoneColours } from './colours';
 
@@ -26,9 +26,9 @@ export function drawShade(scene: ArtScene, c: StoneColours): void {
     const occ = scene.occlusionAt(x, y);
     return Math.min(0.85, (0.5 * occ ** 1.25 + 0.55 * scene.shadowAt(x, y)) * strength * 1.6 + stain);
   });
-  const rgb = parseHex(c.shadow);
+  const shade = rgbaCanvas(grid, parseHex(c.shadow), alpha);
   paintLayer(layerOf(scene), c.dark ? 'source-over' : 'multiply', layer => {
     clipFloors(scene, layer);
-    drawField(layer, grid, rgb, alpha);
+    drawGridCanvas(layer, grid, shade);
   });
 }

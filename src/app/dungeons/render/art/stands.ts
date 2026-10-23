@@ -9,7 +9,7 @@ import { polysPath } from './paths';
 /** How tall a prop stands per unit of its lift. */
 const PROP_HEIGHT = 0.6;
 /** A raised floor's height per step of elevation. */
-const RAISED = 0.22;
+const RAISED = 0.4;
 
 /** Everything that stands on a floor, for the shadows and occlusion of the scene: columns, props and terrain. */
 export function standsOf(env: RenderEnv): Stand[] {

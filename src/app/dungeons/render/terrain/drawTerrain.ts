@@ -26,8 +26,8 @@ export interface TerrainColours {
 
 const GROUND: Partial<Record<TerrainKind, Draw>> = {
   pews: drawPews,
-  'rubble-field': (hand, piece) => drawScatter(hand, piece, 0.045, 7),
-  'chasm-floor': (hand, piece) => drawScatter(hand, piece, 0.07, 6),
+  'rubble-field': (hand, piece) => drawScatter(hand, piece, 0.05, 15),
+  'chasm-floor': (hand, piece) => drawScatter(hand, piece, 0.075, 9),
   'broken-floor': drawBrokenFloor,
   mosaic: drawMosaic,
   pit: drawPit,

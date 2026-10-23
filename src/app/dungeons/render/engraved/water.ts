@@ -46,10 +46,11 @@ export function paintWater(scene: ArtScene, pens: Pens, trace: PathFn, outlines:
     width: (x, y) => {
       const d = depth(x, y);
       if (d <= 0) return 0;
-      const glint = valueNoise(x * 1.4, y * 5.5, seed + 22);
-      if (glint > 0.66) return 0;
-      const body = deep ? 0.3 + 0.12 * Math.min(1, d / 0.8) : 0.1 + 0.3 * Math.exp(-d / 0.16);
-      return spacing * body * Math.min(1, (0.66 - glint) * 8);
+      // Here and there a glint breaks a line, never so often that the water turns to a pattern.
+      const glint = valueNoise(x * 0.9, y * 6, seed + 22);
+      const open = glint > 0.8 ? Math.max(0, 1 - (glint - 0.8) * 12) : 1;
+      const body = deep ? 0.3 + 0.12 * Math.min(1, d / 0.8) : 0.05 + 0.22 * Math.exp(-d / 0.14);
+      return spacing * body * open;
     },
   });
   ctx.restore();

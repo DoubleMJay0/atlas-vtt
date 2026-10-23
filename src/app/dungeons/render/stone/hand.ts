@@ -3,7 +3,7 @@ import { layerOf, type ArtScene } from '../art/artScene';
 import type { Hand, Material } from '../art/hand';
 import { shadeEdges, TO_LIGHT } from '../art/light';
 import { polysPath, runsPath } from '../art/paths';
-import { drawField, fieldOf, gridOver } from '../art/raster';
+import { drawGridCanvas, fieldOf, gridOver, rgbaCanvas } from '../art/raster';
 import { paintLayer } from '../art/strips';
 import type { Vec } from '../geometry';
 import type { StoneColours } from './colours';
@@ -12,6 +12,10 @@ import { cellPattern } from './patterns';
 import { grainTile, rockTile, woodTile, ROCK_TILE } from './textures';
 import { paintWater } from './water';
 import { lightInside } from './lightInside';
+import { depthField } from '../art/pools';
+
+/** Acid: a murky, poisonous green. */
+const ACID = '#6f8f2e';
 
 /** Line weights of Stone & shadow, in cells. */
 const WEIGHTS = { heavy: 0.028, outline: 0.013, fine: 0.007 };
@@ -25,6 +29,8 @@ export function materialColour(c: StoneColours, material: Material): string {
       return mixColours(c.wood, c.mono ? c.floor : '#cdb88e', 0.5);
     case 'floor':
       return c.floor;
+    case 'raised':
+      return c.raised;
     case 'rock':
       return c.rock;
     case 'dressed':
@@ -48,15 +54,15 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       const g = gridOver(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY, scene.grid.res);
       const deep = kind === 'depth';
       const alpha = fieldOf(g, (x, y) => Math.min(1, field(x, y)) * (deep ? 1 : 0.8));
-      const rgb = parseHex(deep ? '#000000' : c.shadow);
+      const canvas = rgbaCanvas(g, parseHex(deep ? '#000000' : c.shadow), alpha);
       paintLayer(layerOf(scene), deep || c.dark ? 'source-over' : 'multiply', layer => {
         if (clip) {
           layer.beginPath();
           clip(layer);
           layer.clip();
         }
-        drawField(layer, g, rgb, alpha);
-      });
+        drawGridCanvas(layer, g, canvas);
+      }, bounds);
     },
     surface: (path, material) => {
       ctx.save();
@@ -106,7 +112,7 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       ctx.restore();
     },
     water: (pools, depth, deep) => paintWater(scene, c, polysPath(pools), pools, depth, deep),
-    lava: (pools, tint) => drawLava(scene, c, pools, polysPath(pools), tint),
+    lava: (pools, tint) => (tint === 'acid' ? paintWater(scene, { ...c, water: c.mono ? c.water : ACID }, polysPath(pools), pools, depthField(scene, polysPath(pools), pools.flat()), true) : drawLava(scene, c, pools, polysPath(pools), tint)),
   };
   return hand;
 }

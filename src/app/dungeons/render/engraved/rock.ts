@@ -1,7 +1,7 @@
 import type { ArtScene } from '../art/artScene';
 import { viewBounds } from '../art/artScene';
-import { mouthsOf, partedRock } from '../art/mouths';
 import { fbm, valueNoise } from '../art/noise';
+import { rockCoverage } from '../art/rockEdge';
 import { activeCells, fieldOf, sampleField } from '../art/raster';
 import { hatchFill, type HatchSpec } from './hatch';
 import type { Pens } from './pens';
@@ -18,18 +18,17 @@ export function drawRock(scene: ArtScene, pens: Pens): void {
   const seed = dungeon.model.seed;
   const start = CUT.width(style) + CUT.gap + CUT.thin + 0.03;
   const base = style.surround.reach;
-  const reach = fieldOf(scene.grid, (x, y) => base * (0.5 + 0.75 * fbm(x * 0.3, y * 0.3, seed + 1, 3)));
-  const mass = fieldOf(scene.grid, (x, y) => 0.8 + 0.4 * fbm(x * 0.9, y * 0.9, seed + 2, 3));
-  const parted = partedRock(mouthsOf(dungeon));
+  const cover = rockCoverage(scene, 0.05);
+  const mass = fieldOf(scene.grid, (x, y) => 0.85 + 0.3 * fbm(x * 0.9, y * 0.9, seed + 2, 3));
   // Worked out once on the scene's grid; the lines begin crisply where the clip below lets them.
+  // Full against the wall, lighter out towards the rock's broken edge, where the lines end.
   const tone = fieldOf(scene.grid, (x, y) => {
     const d = scene.sdfAt(x, y);
-    if (d > base * 1.6 + 0.4 || d < start - 0.1) return 0;
-    const u = Math.max(0, d - start) / sampleField(scene.grid, reach, x, y);
-    const band = u >= 1 ? 0 : (1 - u) ** 1.25;
-    const near = Math.exp(-Math.max(0, d - start) / 0.12);
-    const pocket = scene.pocketAt(x, y) * 0.78;
-    return Math.min(1, Math.max((band * sampleField(scene.grid, mass, x, y) * 0.8 + near * 0.35) * parted(x, y), pocket));
+    if (d < start - 0.1) return 0;
+    const c = cover(x, y);
+    if (c <= 0) return 0;
+    const near = Math.exp(-Math.max(0, d - start) / 0.35);
+    return Math.min(1, c * (0.5 + 0.42 * near) * sampleField(scene.grid, mass, x, y));
   });
   const spec: HatchSpec = {
     angle: pens.angle,
@@ -39,7 +38,7 @@ export function drawRock(scene: ArtScene, pens: Pens): void {
     active: activeCells(scene.grid, tone),
     minWidth: pens.minWidth,
     wobble: (x, y) => (valueNoise(x * 0.55, y * 0.55, seed + 5) - 0.5) * pens.spacing * 1.2,
-    width: (x, y) => pens.spacing * 0.82 * sampleField(scene.grid, tone, x, y) ** 1.1,
+    width: (x, y) => pens.spacing * 0.8 * sampleField(scene.grid, tone, x, y),
   };
   ctx.save();
   ctx.beginPath();

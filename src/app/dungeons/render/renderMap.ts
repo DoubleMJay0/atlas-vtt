@@ -47,7 +47,8 @@ export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyl
     // The vellum lies over the whole map: a window shows its part of it.
     ctx.save();
     ctx.translate((layout.originCell.x - frame.originCell.x) * pxPerCell, (layout.originCell.y - frame.originCell.y) * pxPerCell);
-    drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome || options.vector === true);
+    // An engraving is printed on smooth paper: its skin shows less grain.
+    drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome || options.vector === true, drawn.direction === 'engraved' ? 0.35 : 1);
     ctx.restore();
   }
   ctx.scale(pxPerCell, pxPerCell);

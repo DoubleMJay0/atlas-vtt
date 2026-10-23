@@ -19,7 +19,6 @@ export function drawCrates(hand: Hand, piece: DungeonTerrain): void {
       const sq = rectPoly({ x: centre.x - s / 2, y: centre.y - s / 2, w: s, h: s }).map(p => rot(centre, a, p));
       const inner = rectPoly({ x: centre.x - s / 2 + 0.055, y: centre.y - s / 2 + 0.055, w: s - 0.11, h: s - 0.11 }).map(p => rot(centre, a, p));
       hand.surface(polyPath(sq), 'wood');
-      hand.solid(polyPath(sq), centre, s / 2, 0.8);
       hand.line([[...inner, inner[0]!], [inner[3]!, inner[1]!]], 'fine');
       hand.edges(sq, true);
     }
@@ -41,7 +40,6 @@ export function drawTable(hand: Hand, piece: DungeonTerrain): void {
   const top = rectPoly(box);
   hand.surface(polyPath(top), 'wood');
   hand.line(boardsOf(box, !lengthX(piece), 0.22), 'fine');
-  hand.solid(polyPath(top), { x: box.cx, y: box.cy }, Math.max(box.w, box.h) / 2, 0.6);
   hand.edges(top, true);
 }
 
@@ -75,7 +73,6 @@ export function bevelledBlock(hand: Hand, box: Box, bevel: number): void {
   const outer = rectPoly(box);
   const inner = rectPoly({ x: box.x + bevel, y: box.y + bevel, w: box.w - bevel * 2, h: box.h - bevel * 2 });
   hand.surface(polyPath(outer), 'dressed');
-  hand.solid(polyPath(outer), { x: box.cx, y: box.cy }, Math.max(box.w, box.h) / 2, 0.7);
   hand.line([[...inner, inner[0]!], ...[0, 1, 2, 3].map(k => [outer[k]!, inner[k]!])], 'fine');
   hand.edges(outer, true);
 }
@@ -100,7 +97,7 @@ export function drawRubbleHeap(hand: Hand, piece: DungeonTerrain): void {
   stones.sort((p, q) => p.r - q.r);
   for (const s of stones) {
     const path = polyPath(s.poly);
-    hand.surface(path, 'stone');
+    hand.surface(path, 'rock');
     hand.solid(path, s.c, s.r, 1.3);
     hand.line([s.poly], 'fine', true);
   }
@@ -116,6 +113,5 @@ export function drawLowWall(hand: Hand, piece: DungeonTerrain): void {
   const len = along ? box.w : box.h;
   for (let s = 0.32; s < len - 0.12; s += 0.34) joints.push(along ? [{ x: box.x + s, y: box.y }, { x: box.x + s, y: box.y + box.h }] : [{ x: box.x, y: box.y + s }, { x: box.x + box.w, y: box.y + s }]);
   hand.line(joints, 'fine');
-  hand.solid(polyPath(outer), { x: box.cx, y: box.cy }, Math.min(box.w, box.h), 0.6);
   hand.edges(outer, true);
 }

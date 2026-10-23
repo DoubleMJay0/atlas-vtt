@@ -1,12 +1,12 @@
-import type { Vec } from '../geometry';
+import { pointsBounds, type Vec } from '../geometry';
 import { mixColours, parseHex, withAlpha } from '../palette';
 import { insetRuns } from '../shore';
 import { layerOf, type ArtScene } from '../art/artScene';
 import { noiseSampler } from '../art/noise';
 import { clipFloors } from '../art/outline';
-import { smoothstep, type Field, type PathFn } from '../art/paths';
+import { grown, smoothstep, type Field, type PathFn } from '../art/paths';
 import { depthField, poolOutlines, poolsPath } from '../art/pools';
-import { drawField, fieldOf } from '../art/raster';
+import { drawGridCanvas, fieldOf, gridOver, rgbaCanvas } from '../art/raster';
 import { paintLayer } from '../art/strips';
 import type { StoneColours } from './colours';
 import { drawLava } from './lava';
@@ -27,7 +27,6 @@ export function drawPools(scene: ArtScene, c: StoneColours): void {
 /** Water within `trace` (shores `outlines`), its depth by `depth`; deep water falls away steeply. */
 export function paintWater(scene: ArtScene, c: StoneColours, trace: PathFn, outlines: readonly Vec[][], depth: Field, deep: boolean): void {
   const { ctx, dungeon } = scene.env;
-  const grid = scene.grid;
   const seed = dungeon.model.seed;
   // The wet margin on the floor round the water.
   ctx.save();
@@ -42,6 +41,8 @@ export function paintWater(scene: ArtScene, c: StoneColours, trace: PathFn, outl
   const shallow = c.water;
   const deepColour = c.mono ? c.line : mixColours(c.water, c.dark ? '#000000' : c.line, deep ? 0.6 : 0.42);
   if (scene.raster) {
+    const area = grown(pointsBounds(outlines.flat()), 0.1);
+    const grid = gridOver(area.minX, area.minY, area.maxX, area.maxY, scene.grid.res);
     const body = fieldOf(grid, (x, y) => {
       const d = depth(x, y);
       if (d <= 0) return 0;
@@ -50,6 +51,8 @@ export function paintWater(scene: ArtScene, c: StoneColours, trace: PathFn, outl
     });
     const sheen = noiseSampler(seed + 41, 7, 2, 3);
     const glint = fieldOf(grid, (x, y) => (depth(x, y) > 0.05 ? Math.max(0, sheen(x + y * 0.35, y) - 0.52) * (c.dark ? 0.25 : 0.55) : 0));
+    const bodyCanvas = rgbaCanvas(grid, parseHex(deepColour), body);
+    const glintCanvas = c.mono ? null : rgbaCanvas(grid, parseHex(c.dark ? c.light : '#ffffff'), glint);
     paintLayer(layerOf(scene), 'source-over', layer => {
       clipFloors(scene, layer);
       layer.beginPath();
@@ -59,9 +62,9 @@ export function paintWater(scene: ArtScene, c: StoneColours, trace: PathFn, outl
       layer.fillStyle = shallow;
       layer.fillRect(grid.x0, grid.y0, grid.w / grid.res, grid.h / grid.res);
       layer.globalAlpha = 1;
-      drawField(layer, grid, parseHex(deepColour), body);
-      if (!c.mono) drawField(layer, grid, parseHex(c.dark ? c.light : '#ffffff'), glint);
-    });
+      drawGridCanvas(layer, grid, bodyCanvas);
+      if (glintCanvas) drawGridCanvas(layer, grid, glintCanvas);
+    }, area);
   } else {
     ctx.save();
     ctx.beginPath();

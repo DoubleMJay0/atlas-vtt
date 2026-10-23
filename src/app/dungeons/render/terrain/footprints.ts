@@ -25,7 +25,7 @@ export const CRATE_SPOTS = [
 ] as const;
 /** The standing stones of a portal ring, and each one's radius. */
 export const RING_STONES = 8;
-export const RING_STONE = 0.13;
+export const RING_STONE = 0.2;
 
 /** How tall each piece stands, a wall's height being 1. */
 export const HEIGHT: Readonly<Partial<Record<TerrainKind, number>>> = {
@@ -86,7 +86,7 @@ export function lowWallBox(piece: DungeonTerrain): Box {
 /** The portal ring's radius in its box. */
 export function ringRadius(piece: DungeonTerrain): number {
   const box = boxOf(piece, 0.04);
-  return Math.min(box.w, box.h) / 2 - 0.12;
+  return Math.min(box.w, box.h) / 2 - 0.24;
 }
 
 const rectPath = (box: Box, r = 0.03): PathFn => path => roundedRect(path as CanvasRenderingContext2D, box.cx, box.cy, box.w, box.h, r);

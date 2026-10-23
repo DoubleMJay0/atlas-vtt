@@ -16,7 +16,7 @@ import { chiselled } from './stones';
  */
 
 /** The face a cut hole keeps before it opens onto the level below, in cells. */
-const CUT_FACE = 0.16;
+const CUT_FACE = 0.2;
 
 /** A hole's outline: chiselled rock, or the straight edges of a built well. */
 export function holeRings(piece: DungeonTerrain): Vec[][] {

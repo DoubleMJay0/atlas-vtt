@@ -18,7 +18,7 @@ export function drawRaised(hand: Hand, piece: DungeonTerrain): void {
   const rings = cellRings(piece.cells);
   const own = cellSet(piece.cells);
   hachures(hand, piece.cells, height, c => !own.has(`${c.x},${c.y}`) && onFloor(hand.scene.env, c), cellSet(piece.steps ?? []));
-  hand.surface(polysPath(rings), 'dressed');
+  hand.surface(polysPath(rings), 'raised');
   const slabs: Vec[][] = [];
   for (const c of piece.cells) {
     if (own.has(`${c.x + 1},${c.y}`)) slabs.push([{ x: c.x + 1, y: c.y }, { x: c.x + 1, y: c.y + 1 }]);
@@ -31,8 +31,8 @@ export function drawRaised(hand: Hand, piece: DungeonTerrain): void {
 
 /** Short ticks standing out from every open side of a raised floor, longer and closer the higher it stands; none where steps lead up. */
 function hachures(hand: Hand, cells: readonly CellPoint[], height: number, open: (c: CellPoint) => boolean, steps: ReadonlySet<string>): void {
-  const length = 0.05 + 0.06 * height;
-  const spacing = 0.12 / Math.sqrt(height);
+  const length = 0.07 + 0.07 * height;
+  const spacing = 0.14 / Math.sqrt(height);
   const runs: Vec[][] = [];
   for (const e of edgesFacing(cells, open)) {
     const d = { x: e.to.x - e.from.x, y: e.to.y - e.from.y };
@@ -47,7 +47,7 @@ function hachures(hand: Hand, cells: readonly CellPoint[], height: number, open:
       runs.push([{ x: p.x + out.x * 0.012, y: p.y + out.y * 0.012 }, { x: p.x + out.x * (0.012 + l), y: p.y + out.y * (0.012 + l) }]);
     }
   }
-  hand.line(runs, 'fine');
+  hand.line(runs, 'outline');
 }
 
 /** A cell of steps descending towards `down`: treads across it, each one's foot in the shadow of the one above. */

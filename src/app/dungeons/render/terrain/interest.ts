@@ -52,7 +52,7 @@ export function drawPortalRing(hand: Hand, piece: DungeonTerrain): void {
     const a = (k / RING_STONES) * Math.PI * 2;
     const c = { x: centre.x + Math.cos(a) * r, y: centre.y + Math.sin(a) * r };
     const stone = stoneOutline(rng, c, RING_STONE);
-    hand.surface(polyPath(stone), 'stone');
+    hand.surface(polyPath(stone), 'rock');
     hand.solid(polyPath(stone), c, RING_STONE, 1.3);
     hand.edges(stone, true);
   }

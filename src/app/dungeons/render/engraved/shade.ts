@@ -23,7 +23,7 @@ export function drawShade(scene: ArtScene, pens: Pens): void {
     step: pens.step,
     minWidth: pens.minWidth,
     active: activeCells(scene.grid, depth),
-    width: (x, y) => pens.spacing * 0.4 * strength * sampleField(scene.grid, depth, x, y),
+    width: (x, y) => pens.spacing * 0.32 * strength * sampleField(scene.grid, depth, x, y),
   });
   ctx.restore();
 }

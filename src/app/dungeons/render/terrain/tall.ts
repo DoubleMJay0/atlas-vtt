@@ -32,7 +32,7 @@ export function drawStatue(hand: Hand, piece: DungeonTerrain, water: string, clo
   const rotation = facing(piece.facing ?? { x: -axis.x as -1 | 0 | 1, y: -axis.y as -1 | 0 | 1 });
   // The plinth keeps to the cells; the figure on it may face any way, a diagonal too.
   bevelledBlock(hand, box, 0.06);
-  drawGlyph(hand, { x: box.cx, y: box.cy, rotation, scale: Math.min(box.w, box.h) / STATUE_PLINTH }, { material: 'stone', radius: 0.24, draw: STATUE_FIGURE.draw, silhouette: path => STATUE_FIGURE.silhouette!(path as CanvasRenderingContext2D) }, water, cloth);
+  drawGlyph(hand, { x: box.cx, y: box.cy, rotation, scale: Math.min(box.w, box.h) / STATUE_PLINTH }, { material: 'stone', radius: 0.24, dome: true, draw: STATUE_FIGURE.draw, silhouette: path => STATUE_FIGURE.silhouette!(path as CanvasRenderingContext2D) }, water, cloth);
 }
 
 /** A standing piece of wall: a slab of the wall's course, its ends broken, its joints irregular. */
@@ -64,7 +64,6 @@ export function drawWallFragment(hand: Hand, piece: DungeonTerrain): void {
   const len = along ? box.w : box.h;
   for (let s = 0.28 + rng() * 0.1; s < len - 0.12; s += 0.3 + rng() * 0.12) joints.push(along ? [{ x: box.x + s, y: box.y }, { x: box.x + s, y: box.y + box.h }] : [{ x: box.x, y: box.y + s }, { x: box.x + box.w, y: box.y + s }]);
   hand.line(joints, 'fine');
-  hand.solid(polyPath(poly), { x: box.cx, y: box.cy }, Math.min(box.w, box.h), 0.8);
   hand.edges(poly, true);
   hand.line([[...poly, poly[0]!]], 'heavy');
 }

@@ -34,7 +34,7 @@ export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, per
   const rng = pieceRng(hand.scene.env, piece);
   const rings = cellRings(piece.cells).map(r => chiselled(r, piece.id * 7 + 3, 0.06));
   const bounds = pointsBounds(rings.flat());
-  hand.tone((x, y) => 0.14 + 0.1 * valueNoise(x * 3, y * 3, piece.id), grown(bounds, 0.1), polysPath(rings), 'shade');
+  hand.tone((x, y) => 0.06 + 0.08 * valueNoise(x * 3, y * 3, piece.id), grown(bounds, 0.1), polysPath(rings), 'shade');
   const stones: { poly: Vec[]; c: Vec; r: number }[] = [];
   for (const c of piece.cells) {
     for (let k = 0; k < perCell; k++) {
@@ -45,7 +45,7 @@ export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, per
   }
   const all: PathFn = path => stones.forEach(st => polyPath(st.poly)(path));
   castShadow(hand, all, 0.05, bounds, 0.55);
-  hand.surface(all, 'stone');
+  hand.surface(all, 'rock');
   for (const st of stones) if (st.r > size * 0.9) hand.solid(polyPath(st.poly), st.c, st.r, 1.2);
   hand.line(stones.map(st => st.poly), 'fine', true);
 }

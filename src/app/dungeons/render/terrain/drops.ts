@@ -37,13 +37,13 @@ export function dropTone(depth: Field, inward: (x: number, y: number) => Vec, bo
     const d = depth(x, y);
     if (d <= 0) return 0;
     const n = inward(x, y);
-    // A face looks out of the drop, against the way in: lit when that is towards the light.
-    const lit = -(n.x * TO_LIGHT.x + n.y * TO_LIGHT.y);
-    const faceTone = 0.3 - 0.26 * lit + 0.4 * (d / face) ** 1.4 + 0.06 * (valueNoise(x * 7, y * 7, 3) - 0.5);
+    // The face under the far lip looks back towards the light; the one under the near lip lies in its shadow.
+    const lit = n.x * TO_LIGHT.x + n.y * TO_LIGHT.y;
+    const faceTone = 0.36 - 0.3 * lit + 0.42 * (d / face) ** 1.4 + 0.06 * (valueNoise(x * 7, y * 7, 3) - 0.5);
     if (d < face) return Math.max(0, Math.min(1, faceTone));
-    if (bottom === 'pit') return 0.66 - 0.1 * lit;
+    if (bottom === 'pit') return 0.5 - 0.1 * lit;
     if (bottom === 'floor') return 0.62;
-    return Math.min(1, 0.74 + 0.26 * smoothstep(face, face + 1.1, d));
+    return Math.min(1, 0.86 + 0.14 * smoothstep(face, face + 0.6, d));
   };
 }
 

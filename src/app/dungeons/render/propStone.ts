@@ -199,6 +199,19 @@ export const STONE_AND_WATER = {
  */
 export function drawStatueFigure(pen: PropPen): void {
   const { ctx, palette } = pen;
+  // Drawn at 1.25 of the numbers below: the figure fills its plinth.
+  ctx.save();
+  ctx.scale(FIGURE, FIGURE);
+  const scaled = { ...pen, fine: pen.fine / FIGURE };
+  ctx.lineWidth /= FIGURE;
+  drawFigure(scaled, palette);
+  ctx.restore();
+}
+
+const FIGURE = 1.25;
+
+function drawFigure(pen: PropPen, palette: PropPen['palette']): void {
+  const { ctx } = pen;
   disc(pen, 0, 0.02, 0.22);
   // The cloak, falling behind the shoulders in three folds.
   ctx.beginPath();
@@ -242,4 +255,4 @@ export function drawStatueFigure(pen: PropPen): void {
 }
 
 /** The figure alone, for a statue whose plinth is drawn apart from it. */
-export const STATUE_FIGURE: PropGlyph = { lift: 1, draw: drawStatueFigure, silhouette: ctx => circlePath(ctx, 0.22, 0, 0.02) };
+export const STATUE_FIGURE: PropGlyph = { lift: 1, draw: drawStatueFigure, silhouette: ctx => circlePath(ctx, 0.22 * FIGURE, 0, 0.02 * FIGURE) };

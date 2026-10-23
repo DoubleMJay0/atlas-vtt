@@ -3,6 +3,10 @@ import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
 import { DUNGEON_STYLES, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
 import { ART_DUNGEONS, ART_SPOTS, artModel, drawClose, drawWhole } from './dungeonArtSheets';
 import { savePng } from './dungeonRenderHarness';
+import { specimen } from './dungeonArtSpecimen';
+import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
+import { renderMap } from '../../src/app/dungeons/render/renderMap';
+import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 
 /**
  * Every look on dungeons of every kind, whole and close up at 200 px per cell with tokens, written
@@ -33,6 +37,17 @@ describe('dungeon looks, for judging by eye', () => {
             if (shots.includes('whole')) await savePng(drawWhole(model, id as DungeonStyleId, view, floor), `v2-art/${id}-${name}${f}${suffix}`);
             if (shots.includes('close')) await savePng(drawClose(model, id as DungeonStyleId, view, floor), `v2-art/${id}-${name}${f}${suffix}-close`);
           }
+        }
+      });
+    }
+    if (shots.includes('specimen')) {
+      it(`${id} specimen`, async () => {
+        const model = specimen();
+        const layout = mapLayout(model, 120, DEFAULT_VIEW);
+        for (const [floor, openings] of [[0, 'cut'], [0, 'drawn'], [1, 'cut']] as const) {
+          const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
+          renderMap(canvas.getContext('2d')!, model, dungeonStyle(id), DEFAULT_VIEW, { pxPerCell: 120, floor, openings });
+          await savePng(canvas, `v2-art/specimen-${id}-f${floor}-${openings}`);
         }
       });
     }

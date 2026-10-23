@@ -12,6 +12,8 @@ export interface StoneColours {
   /** The course of dressed blocks lining every room. */
   band: string;
   floor: string;
+  /** The top of a raised floor: nearer the light than the floor round it. */
+  raised: string;
   /** Between the flagstones. */
   joint: string;
   wood: string;
@@ -39,7 +41,7 @@ export function stoneColours(palette: Palette, mono: boolean): StoneColours {
   const dark = isDarkColour(floor);
   if (mono) {
     const tone = (t: number): string => mixColours(floor, ink, t);
-    return { line: ink, rock: tone(0.32), band: tone(0.16), floor, joint: tone(0.1), wood: tone(0.38), stone: tone(0.1), metal: tone(0.55), cloth: tone(0.45), water: tone(0.14), shadow: ink, light: dark ? ink : '#ffffff', dark, mono };
+    return { line: ink, rock: tone(0.32), band: tone(0.16), floor, raised: dark ? tone(0.12) : floor, joint: tone(0.1), wood: tone(0.38), stone: tone(0.1), metal: tone(0.55), cloth: tone(0.45), water: tone(0.14), shadow: ink, light: dark ? ink : '#ffffff', dark, mono };
   }
   if (dark) {
     return {
@@ -47,6 +49,7 @@ export function stoneColours(palette: Palette, mono: boolean): StoneColours {
       rock: palette.rock,
       band: mixColours(floor, ink, 0.14),
       floor,
+      raised: mixColours(floor, ink, 0.12),
       joint: mixColours(floor, '#000000', 0.32),
       wood: mixColours(mixColours(floor, '#7a5232', 0.5), ink, 0.06),
       stone: mixColours(floor, ink, 0.22),
@@ -64,6 +67,7 @@ export function stoneColours(palette: Palette, mono: boolean): StoneColours {
     rock: palette.rock,
     band: mixColours(floor, palette.rock, 0.42),
     floor,
+    raised: mixColours(floor, '#ffffff', 0.3),
     joint: mixColours(floor, ink, 0.13),
     wood: mixColours(mixColours('#8a5a34', floor, 0.3), ink, 0.08),
     stone: mixColours(floor, ink, 0.1),

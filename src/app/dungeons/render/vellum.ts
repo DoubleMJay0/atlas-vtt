@@ -97,7 +97,7 @@ function paints(ctx: Canvas2D): boolean {
  * Fills the map's `layout` with the vellum. Monochrome, and a context without gradients (the SVG
  * export), get the plain paper; a context outside a browser gets the colours without the grain.
  */
-export function drawVellum(ctx: Canvas2D, paper: string, layout: MapLayout, seed: number, plain: boolean): void {
+export function drawVellum(ctx: Canvas2D, paper: string, layout: MapLayout, seed: number, plain: boolean, grain = 1): void {
   const { widthPx: w, heightPx: h, pxPerCell } = layout;
   ctx.save();
   ctx.fillStyle = paper;
@@ -126,6 +126,7 @@ export function drawVellum(ctx: Canvas2D, paper: string, layout: MapLayout, seed
       ctx.scale(scale, scale);
       ctx.translate(ox, oy);
       ctx.fillStyle = pattern;
+      ctx.globalAlpha = grain;
       ctx.fillRect(-ox, -oy, w / scale, h / scale);
       ctx.restore();
     }
