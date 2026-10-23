@@ -83,12 +83,15 @@ export function placeWater(seed: number, floor: number, rooms: readonly DungeonR
   const wetFloor = new Uint8Array(grid.w * grid.h);
   if (request.level > 0) noiseFloor(rng, grid, floors, request.level, wetFloor);
   rooms.filter((room) => request.pools.has(room.id)).forEach((room) => poolIn(room, grid, wetFloor));
+  const keepDry = new Uint8Array(grid.w * grid.h);
   for (const key of request.dry ?? []) {
     const [x, y] = key.split(',').map(Number) as [number, number];
     const i = indexOf(grid, x, y);
-    if (i >= 0) wetFloor[i] = DRY;
+    if (i < 0) continue;
+    wetFloor[i] = DRY;
+    keepDry[i] = 1;
   }
-  const wet = wetGrid(grid, rooms, wetFloor);
+  const wet = wetGrid(grid, rooms, wetFloor, keepDry);
   const waterCells = floors.filter((c) => wet[indexOf(grid, c.x, c.y)] === WET);
   if (waterCells.length === 0) return { water: [], waterCells: [] };
   const water = traceLoops(grid, wet).map((loop) => ({ outline: shoreline(rng, loop) }));

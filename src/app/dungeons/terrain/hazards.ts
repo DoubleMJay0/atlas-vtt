@@ -70,14 +70,14 @@ const LEFT_FREE = 4;
 
 /** Whether a hazard on `cells` (crossed by `bridge`) leaves the room enough of itself, room for cover among it. */
 function leavesRoom(rc: RoomCells, cells: readonly CellPoint[], bridge: readonly CellPoint[] = []): boolean {
-  return cells.length <= rc.floorCount * HAZARD_SHARE && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells, bridge);
+  return !cells.some((c) => rc.nearStairs(c)) && cells.length <= rc.floorCount * HAZARD_SHARE && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells, bridge);
 }
 
 /** Whether both ends of the band's bridge land on floor nothing blocks, outside the band. */
 function landsOnFloor(rc: RoomCells, band: Band): boolean {
   if (band.bridge.length === 0) return true;
   const own = new Set(band.cells.map((c) => `${c.x},${c.y}`));
-  return landings(rc, band).every((c) => rc.isFloor(c) && !rc.isBlocked(c) && !own.has(`${c.x},${c.y}`));
+  return landings(rc, band).every((c) => rc.isFloor(c) && !rc.isBlocked(c) && !rc.nearStairs(c) && !own.has(`${c.x},${c.y}`));
 }
 
 /**
@@ -217,7 +217,7 @@ function placePits(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boole
   const i = int(rng, 1, Math.max(1, rc.depth - size - 1));
   if (size === 1 && rc.width >= 5 && chance(rng, 0.5)) {
     const pair = [rc.block(i, 1, 1, 1), rc.block(i, rc.width - 2, 1, 1)];
-    if (pair.every((cells) => rc.allows(cells, 'block'))) {
+    if (pair.every((cells) => rc.allows(cells, 'block') && !cells.some((c) => rc.nearStairs(c)))) {
       pair.forEach((cells) => floor.place(draft('pit', rc.room.id, cells)));
       return true;
     }

@@ -31,6 +31,8 @@ export class RoomCells {
   private readonly held = new Set<string>();
   /** The cells every way through the room must reach: before its doors and onto its stairs. */
   readonly needed: CellPoint[];
+  /** Stairwells, the rows they are reached from and every cell beside them, by key: no hazard lies there and no bridge lands there. */
+  private readonly byStairs = new Set<string>();
 
   constructor(
     readonly room: DungeonRoom,
@@ -48,6 +50,8 @@ export class RoomCells {
     const approaches = inside.flatMap((s) => approachCells(s, s.to > floorIndex ? 'upper' : 'lower'));
     this.needed = [...doorApproaches(room, doors), ...approaches].filter((c) => inRect(rect, c.x, c.y));
     for (const c of [...stairCells, ...this.needed]) this.clear.add(cellKey(c.x, c.y));
+    const stairway = [...stairCells, ...approaches];
+    for (const c of stairway) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) this.byStairs.add(cellKey(c.x + dx, c.y + dy));
     for (const c of cellsOf(rect)) {
       if (!this.inside(c, [0.5], 0)) continue;
       const key = cellKey(c.x, c.y);
@@ -93,6 +97,11 @@ export class RoomCells {
   isFree(c: CellPoint): boolean {
     const key = cellKey(c.x, c.y);
     return this.open.has(key) && !this.taken.has(key) && !this.held.has(key);
+  }
+
+  /** Whether the cell is a stairwell, the row it is reached from, or beside either: a hazard keeps off it and no bridge lands on it. */
+  nearStairs(c: CellPoint): boolean {
+    return this.byStairs.has(cellKey(c.x, c.y));
   }
 
   /** Whether the cell is floor of this room, taken or not. */

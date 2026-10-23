@@ -54,7 +54,7 @@ const NEAR4: readonly (readonly [number, number])[] = [
 ];
 const NEAR8: readonly (readonly [number, number])[] = [...NEAR4, [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
-function fillPockets(grid: CellGrid, wet: Uint8Array): void {
+function fillPockets(grid: CellGrid, wet: Uint8Array, keepDry?: Uint8Array): void {
   const outside = new Uint8Array(wet.length);
   const stack = [0];
   outside[0] = 1;
@@ -73,12 +73,12 @@ function fillPockets(grid: CellGrid, wet: Uint8Array): void {
     }
   }
   outside.forEach((out, i) => {
-    if (!out) wet[i] = WET;
+    if (!out && !keepDry?.[i]) wet[i] = WET;
   });
 }
 
-/** The wet cells: `wetFloor` holds wet floor cells by grid index. */
-export function wetGrid(grid: CellGrid, rooms: readonly DungeonRoom[], wetFloor: Uint8Array): Uint8Array {
+/** The wet cells: `wetFloor` holds wet floor cells by grid index; cells set in `keepDry` stay dry, an island where water surrounds them. */
+export function wetGrid(grid: CellGrid, rooms: readonly DungeonRoom[], wetFloor: Uint8Array, keepDry?: Uint8Array): Uint8Array {
   const floor = markRects(
     grid,
     rooms.map((r) => ({ x0: r.x, y0: r.y, x1: r.x + r.w - 1, y1: r.y + r.h - 1 })),
@@ -95,6 +95,6 @@ export function wetGrid(grid: CellGrid, rooms: readonly DungeonRoom[], wetFloor:
       if (nearWet && !nearDry) wet[i] = WET;
     }
   }
-  fillPockets(grid, wet);
+  fillPockets(grid, wet, keepDry);
   return wet;
 }

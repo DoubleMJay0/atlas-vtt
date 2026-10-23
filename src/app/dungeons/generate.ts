@@ -7,7 +7,9 @@
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { fiveRoomParams } from './layout/fiveRoom';
-import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, requestedFloors } from './model';
+import { approachCells, spotRect } from './floors/stairSpots';
+import { cellKey, cellsOf } from './geometry';
+import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, type DungeonStair, requestedFloors } from './model';
 import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './params';
 import { floorColumns, placeProps } from './props';
 import { roomRoles, type RoomRoles } from './props/roles';
@@ -28,10 +30,16 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const { rooms, doors, stairs } = planned;
   const dry = level <= 0 && params.tags.has('dry');
   const pools = dry ? new Set<number>() : poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance);
-  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: terrain.takenCells() });
+  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set([...terrain.takenCells(), ...stairsAndAround(stairs)]) });
   const pieces = addShallowWater(terrain, waterCells);
   const { props, rubble, cracks } = placeProps({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, roles, params });
   return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces };
+}
+
+/** Every stairwell, the rows it is reached from at either end and the cells round them, by key: no pool reaches them. */
+function stairsAndAround(stairs: readonly DungeonStair[]): string[] {
+  const cells = stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, 'upper'), ...approachCells(s, 'lower')]);
+  return cells.flatMap((c) => [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => cellKey(c.x + dx, c.y + dy))));
 }
 
 export function generateDungeon(request: DungeonRequest): DungeonModel {

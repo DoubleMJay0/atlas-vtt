@@ -3,7 +3,7 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { doorProblems, emptyRooms, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, stairProblems } from './floorsInvariants';
-import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, isHazard, routeProblems } from './terrainInvariants';
+import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
@@ -195,6 +195,10 @@ export function describeInvariants(floors: number): void {
 
     it('lay terrain on whole cells of one room each, never on doors, stairwells or the cells they are reached from', () => {
       expect(failures(eachFloor((run, i) => [...cellProblems(run.model.floors[i]!), ...clearanceProblems(run.model.floors[i]!, i)]))).toEqual([]);
+    });
+
+    it('keep stairwells clear of hazards, bridges and water, on them and beside them', () => {
+      expect(failures(eachFloor((run, i) => stairClearanceProblems(run.model.floors[i]!, i)))).toEqual([]);
     });
 
     it('keep a way through every floor that steps into no hazard, cover or hole, and bridge what they lay across a room', () => {

@@ -66,7 +66,7 @@ export function shaftDown(work: TerrainWork, k: number, rng: Rng): void {
     const rc = floor.room(room.id);
     if (!rc) continue;
     for (const cells of shaftSpots(rc, rng, chance(rng, 0.3) ? 2 : 1)) {
-      if (!rc.allows(cells, 'block')) continue;
+      if (!rc.allows(cells, 'block') || cells.some((c) => rc.nearStairs(c))) continue;
       const drop = dropBelow(work, k, cells, rng, false);
       if (drop?.bottom?.floor === k + 1 && cutHole(work, k, rc, 'shaft', cells, drop) !== null) return;
     }

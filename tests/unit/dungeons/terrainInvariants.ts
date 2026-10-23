@@ -49,6 +49,18 @@ function stairCells(floor: DungeonFloor): CellPoint[] {
   });
 }
 
+/**
+ * Stairwells stand clear: no hazard (lava, acid, water, a chasm or pit) and no bridge lies on a
+ * stairwell, the row it is reached from or any cell beside them, and no pool reaches them.
+ */
+export function stairClearanceProblems(floor: DungeonFloor, index: number): string[] {
+  const near = new Set<string>();
+  for (const c of [...stairCells(floor), ...stairApproaches(floor, index)]) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.add(key({ x: c.x + dx, y: c.y + dy }));
+  const pieces = floor.terrain.filter((p) => (isHazard(p) || p.kind === 'bridge') && p.kind !== 'chasm-floor' && p.cells.some((c) => near.has(key(c)))).map((p) => `${p.kind} ${p.id} beside a stairwell`);
+  const water = floor.waterCells.some((c) => near.has(key(c))) ? ['water beside a stairwell'] : [];
+  return [...pieces, ...water];
+}
+
 /** The row each stair end on this floor is reached from: before its high end above, past its low end below. */
 function stairApproaches(floor: DungeonFloor, index: number): CellPoint[] {
   return floor.stairs.flatMap((s) => {
