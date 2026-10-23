@@ -57,6 +57,12 @@ export interface DungeonWalls {
   unplaced: number;
 }
 
+/** Which floor of a scene walls stand on: their ids begin with `id`, and they carry `levels` where the scene has several. */
+export interface WallsOf {
+  id: string;
+  levels?: string[];
+}
+
 /**
  * The walls and doors of one floor of a dungeon in world pixels, along the centre line of its drawn walls:
  * one chain per wall outline, every wall drawn once (rooms side by side have walls of their own,
@@ -64,7 +70,14 @@ export interface DungeonWalls {
  * light and sight find no gap. Entrances stay open to the outside. Rooms the view hides (a secret
  * wing) have no walls. Pure.
  */
-export function dungeonWalls(model: DungeonModel, style: DungeonStyle, view: Pick<DungeonView, 'secrets'>, placement: DungeonPlacement, floor = 0): DungeonWalls {
+export function dungeonWalls(
+  model: DungeonModel,
+  style: DungeonStyle,
+  view: Pick<DungeonView, 'secrets'>,
+  placement: DungeonPlacement,
+  floor = 0,
+  of: WallsOf = { id: 'dungeon' },
+): DungeonWalls {
   const { doors, floors } = visibleFloor(model, view, floor);
   const half = wallInkWidth(style) / 2;
   const rings = wallRings(floors, doors.filter(door => door.kind === 'secret'), half);
@@ -92,14 +105,14 @@ export function dungeonWalls(model: DungeonModel, style: DungeonStyle, view: Pic
   let count = 0;
   const add = (from: { x: number; y: number }, to: { x: number; y: number }, rest: Omit<WallSegment, 'id' | 'kind' | 'p1' | 'p2'>): void => {
     if (from.x === to.x && from.y === to.y) return;
-    const id = `wall_dungeon_${++count}`;
-    walls[id] = { id, kind: 'wall', p1: world(from), p2: world(to), ...rest };
+    const id = `wall_${of.id}_${++count}`;
+    walls[id] = { id, kind: 'wall', p1: world(from), p2: world(to), ...rest, ...(of.levels && { levels: of.levels }) };
   };
 
   const mouths = doors.filter(door => door.from === null).map(door => entranceMouth(door, half));
   const onMouth = (a: Vec, b: Vec): boolean => mouths.some(mouth => mouth(a) && mouth(b));
   outlines.forEach((ring, index) => {
-    const chainId = `chain_dungeon_${index + 1}`;
+    const chainId = `chain_${of.id}_${index + 1}`;
     ring.forEach((corner, i) => {
       const next = ring[(i + 1) % ring.length]!;
       if (!onMouth(corner, next)) add(corner, next, { type: 'solid', chainId });

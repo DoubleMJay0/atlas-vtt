@@ -90,7 +90,7 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); AssetService.resetInstance(); });
 
 describe('creating a dungeon scene', () => {
-  it('adds a map and a scene of the GM\'s name with grid, walls, doors and lighting, and nothing else', async () => {
+  it('adds a map, a scene of the GM\'s name with grid, walls, doors, pins and lighting, and its note', async () => {
     const b = await bench();
 
     const result = created(await createDungeonSceneWith(b.deps, options()));
@@ -112,8 +112,8 @@ describe('creating a dungeon scene', () => {
     const walls = Object.values(state.objects.walls);
     expect(walls.filter(w => w.type === 'door')).toHaveLength(5);
     expect(walls.filter(w => w.type === 'secret-door')).toHaveLength(1);
-    expect(Object.keys(state.objects.pins ?? {})).toEqual([]);
-    expect(filesOf(b).filter(path => path.endsWith('.md'))).toEqual([]);
+    expect(Object.keys(state.objects.pins ?? {})).toHaveLength(7);
+    expect(filesOf(b).filter(path => path.endsWith('.md'))).toEqual([`atlas-vtt/collections/${COLLECTION}/notes/${TITLE}.md`]);
   });
 
   it('numbers a second dungeon of the same name', async () => {
