@@ -21,7 +21,8 @@ export const COLLECTION_GONE = 'The collection no longer exists. Choose another 
 
 /** What a scene file takes of a map Atlas made or imported: a grid that fits its image, and what stands on it, in world pixels. */
 export interface MapSceneParts {
-  grid: Pick<GridState, 'size' | 'offsetX' | 'offsetY'>;
+  /** `visible` only where the map's own drawing makes Atlas's grid a second one. */
+  grid: Pick<GridState, 'size' | 'offsetX' | 'offsetY'> & Partial<Pick<GridState, 'visible'>>;
   walls: Record<string, WallSegment>;
   lights: Record<string, LightSource>;
   lighting: SceneLighting;

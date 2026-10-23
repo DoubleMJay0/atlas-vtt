@@ -17,14 +17,14 @@ describe('a dungeon scene', () => {
     const layout = mapLayout(smallDungeon(), 100, DEFAULT_VIEW);
     const image = { width: layout.widthPx, height: layout.heightPx };
     const small = dungeonScene(smallDungeon(), STYLE, { ...DEFAULT_VIEW, smallTiles: true }, placement(), image)!;
-    expect(small.scene.grid).toEqual({ size: 50, offsetX: 0, offsetY: 0 });
+    expect(small.scene.grid).toEqual({ size: 50, offsetX: 0, offsetY: 0, visible: false });
     expect(small.scene.grid).not.toHaveProperty('autoDetect');
   });
 
   it('has the dungeon\'s cells for its grid, no lights and dynamic lighting in daylight', () => {
     const layout = mapLayout(smallDungeon(), 100, DEFAULT_VIEW);
     const parts = dungeonScene(smallDungeon(), STYLE, DEFAULT_VIEW, placement(), { width: layout.widthPx, height: layout.heightPx })!;
-    expect(parts.scene.grid).toEqual({ size: 100, offsetX: 0, offsetY: 0 });
+    expect(parts.scene.grid).toEqual({ size: 100, offsetX: 0, offsetY: 0, visible: false });
     expect(parts.scene.lights).toEqual({});
     expect(parts.scene.lighting).toEqual({ enabled: true, ambient: 1 });
     expect(parts.doors).toEqual({ door: 5, secret: 1 });

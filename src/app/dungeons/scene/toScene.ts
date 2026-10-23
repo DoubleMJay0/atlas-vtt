@@ -81,7 +81,8 @@ export function dungeonScene(
   const links = levelIds && stairLinks(model, levelIds, placement);
   return {
     scene: {
-      grid: { size, ...normaliseGridOffset('square', size, 0, 0) },
+      // The map draws its own grid (or none, as the GM chose): Atlas's stays hidden, its snapping on
+      grid: { size, ...normaliseGridOffset('square', size, 0, 0), visible: false },
       walls,
       lights: {},
       lighting: { enabled: true, ambient: DAYLIGHT },
