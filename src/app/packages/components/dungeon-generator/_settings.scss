@@ -190,19 +190,25 @@
 // ── Tags ────────────────────────────────────────────────────────────────────
 
 .atlas-dungeon-tags {
-  @include atlas-flex-col($gap: $spacing-s);
-}
-
-.atlas-dungeon-tags__group {
   @include atlas-flex-col($gap: $spacing-xs);
 }
 
+.atlas-dungeon-tags__group {
+  display: flex;
+  align-items: baseline;
+  gap: $spacing-s;
+}
+
+// The group's name stands at the start of its chips' first row, in a column as wide as the longest, so the chips line up.
 .atlas-dungeon-tags__label {
+  flex: 0 0 5.5em;
   color: var(--text-faint);
   font-size: $font-ui-smaller;
 }
 
 .atlas-dungeon-tags__chips {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: $spacing-xs;
