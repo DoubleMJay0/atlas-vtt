@@ -25,6 +25,10 @@ export type TerrainKind =
   | 'rubble-field'
   | 'broken-floor'
   | 'shallow-water'
+  // Undergrowth too thick to walk through freely: difficult terrain.
+  | 'brambles'
+  | 'thicket'
+  | 'tangled-roots'
   // Where a fall from a hole above ends: loose rubble, difficult terrain.
   | 'chasm-floor'
   // Hazards.

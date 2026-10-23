@@ -14,7 +14,7 @@ describe('generateDungeon', () => {
     const model = generateDungeon({ seed: 77, tags: ['temple'], floors: 2 });
     expect(Object.keys(model).sort()).toEqual(['floors', 'seed', 'tags', 'version']);
     for (const floor of model.floors) {
-      expect(Object.keys(floor).sort()).toEqual(['columns', 'cracks', 'doors', 'props', 'rooms', 'rubble', 'stairs', 'terrain', 'water', 'waterCells']);
+      expect(Object.keys(floor).sort()).toEqual(['columns', 'cracks', 'doors', 'growth', 'props', 'rooms', 'rubble', 'stairs', 'terrain', 'water', 'waterCells']);
       for (const room of floor.rooms) expect(['regular', 'secret']).toContain(room.wing);
       for (const door of floor.doors) expect(['opening', 'door', 'secret', 'steps']).toContain(door.kind);
     }

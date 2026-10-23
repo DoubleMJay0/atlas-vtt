@@ -18,6 +18,11 @@ export const ART_DUNGEONS: readonly { name: string; request: DungeonRequest }[] 
   { name: 'crumbling', request: { seed: 202, tags: ['crumbling', 'medium'], floors: 1 } },
   { name: 'two-floors', request: { seed: 282, tags: ['small'], floors: 2 } },
   { name: 'three-floors', request: { seed: 404, tags: ['deep'], floors: 3 } },
+  { name: 'overgrown-temple', request: { seed: 404, tags: ['round', 'colonnades', 'temple', 'overgrown'], floors: 1 } },
+  { name: 'overgrown-tomb', request: { seed: 909, tags: ['wet', 'tomb', 'overgrown'], floors: 1, waterLevel: 0.4 } },
+  { name: 'overgrown-dwelling', request: { seed: 16, tags: ['dwelling', 'overgrown'], floors: 1 } },
+  { name: 'overgrown-halls', request: { seed: 202, tags: ['crumbling', 'medium', 'overgrown'], floors: 1 } },
+  { name: 'wet-moss', request: { seed: 909, tags: ['wet'], floors: 1, waterLevel: 0.45 } },
 ];
 
 const models = new Map<string, DungeonModel>();
@@ -66,9 +71,8 @@ function drawToken(ctx: OffscreenCanvasRenderingContext2D, x: number, y: number,
   ctx.restore();
 }
 
-/** A window of `cells` × `rows` cells at 200 px a cell, on the busiest room, with a few tokens on open floor. */
-export function drawClose(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floor = 0, cells = 12, rows = 8, tokens = true, centre?: { x: number; y: number }): OffscreenCanvas {
-  const px = 200;
+/** A window of `cells` × `rows` cells at `px` a cell (200 unless asked), on the busiest room, with a few tokens on open floor. */
+export function drawClose(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floor = 0, cells = 12, rows = 8, tokens = true, centre?: { x: number; y: number }, px = 200): OffscreenCanvas {
   const corner = centre ? { x: Math.round(centre.x - cells / 2), y: Math.round(centre.y - rows / 2) } : floor === 0 ? thumbnailWindow(model, view, cells, rows) : (() => {
     const b = visibleDungeon(model, view, floor).bounds;
     return { x: Math.round((b.minX + b.maxX) / 2 - cells / 2), y: Math.round((b.minY + b.maxY) / 2 - rows / 2) };
@@ -105,4 +109,19 @@ export const ART_SPOTS: readonly { name: string; dungeon: string; floor: number;
   { name: 'shaft-gallery', dungeon: 'three-floors', floor: 1, centre: { x: 19.5, y: 0 } },
   { name: 'chasm-void', dungeon: 'three-floors', floor: 1, centre: { x: -1, y: -8 } },
   { name: 'deep-arena', dungeon: 'three-floors', floor: 2, centre: { x: 19, y: 3 } },
+];
+
+/** Close-ups of vegetation, one kind each: climbers on walls and columns, plants, undergrowth. */
+export const GROWTH_SPOTS: readonly { name: string; dungeon: string; centre: { x: number; y: number } }[] = [
+  { name: 'brambles', dungeon: 'overgrown-dwelling', centre: { x: 8.5, y: -11.5 } },
+  { name: 'thicket', dungeon: 'overgrown-halls', centre: { x: -17.5, y: 4 } },
+  { name: 'tangled-roots', dungeon: 'overgrown-tomb', centre: { x: -6.5, y: 12 } },
+  { name: 'roots', dungeon: 'overgrown-tomb', centre: { x: -9.5, y: 9 } },
+  { name: 'creeper', dungeon: 'overgrown-tomb', centre: { x: 2, y: 6.5 } },
+  { name: 'fungi', dungeon: 'overgrown-tomb', centre: { x: 1, y: 5 } },
+  { name: 'column', dungeon: 'overgrown-halls', centre: { x: 5, y: 11 } },
+  { name: 'ferns', dungeon: 'overgrown-dwelling', centre: { x: -3, y: -4 } },
+  { name: 'vine', dungeon: 'overgrown-temple', centre: { x: 0.5, y: -6 } },
+  { name: 'weeds', dungeon: 'overgrown-dwelling', centre: { x: -3.5, y: -8 } },
+  { name: 'wet-moss', dungeon: 'wet-moss', centre: { x: -1.5, y: 3 } },
 ];

@@ -1,7 +1,8 @@
 import { t } from '../../i18n';
 import { MAX_FEATURE_CORNERS, MAX_MAP_FEATURES } from '../../mapFeatures/mapFeatures';
 import type { FeatureTerrain, MapFeature } from '../../types/mapFeatureTypes';
-import type { CellPoint, DungeonColumn, DungeonProp, DungeonTerrain, PropKind } from '../model';
+import type { CellPoint, DungeonColumn, DungeonGrowth, DungeonProp, DungeonTerrain, GrowthKind, PropKind } from '../model';
+import { GROWTH_KINDS } from '../growthModel';
 import { PROP_REACH } from '../props/space';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
@@ -12,8 +13,9 @@ import type { DungeonPlacement } from './toWalls';
 /**
  * What a floor holds as the map features of its level, so the GM reads its name and what it does
  * to play on hover: every piece of terrain (cover, difficult ground, hazards, bridges, set pieces)
- * on exactly its cells, every piece of furniture and every column on what the map draws of it.
- * One builder per kind of thing; terrain first, so furniture standing on it lies over it.
+ * on exactly its cells, every piece of furniture and every column on what the map draws of it, and
+ * the vegetation worth naming on its cells. One builder per kind of thing; vegetation first, then
+ * terrain, so what stands on them lies over them.
  */
 
 /** A feature before its id and level: its area in cells, its name and what it does to play. */
@@ -54,6 +56,17 @@ function parapetDrafts(pieces: readonly DungeonTerrain[], onFloor: (cell: CellPo
       }
     }
     return cellOutlines([...rim.values()], MAX_FEATURE_CORNERS).map((polygon): Draft => ({ polygon, name: t('dungeon.terrain.parapet'), terrain: { cover: 'half' } }));
+  });
+}
+
+/** Growth a GM may want to name at the table: what can be climbed, hidden in or slipped on. Weeds are not worth a label. */
+const NAMED_GROWTH: ReadonlySet<GrowthKind> = new Set(['ivy', 'vine', 'creeper', 'roots', 'fern', 'moss', 'fungi']);
+
+/** Vegetation on the cells it lies on or hangs over, one feature per ring of them; it changes nothing in play. */
+function growthDrafts(growth: readonly DungeonGrowth[]): Draft[] {
+  return growth.filter(g => NAMED_GROWTH.has(g.kind) && g.cells.length > 0).flatMap(g => {
+    const name = terrainName({ name: GROWTH_KINDS[g.kind].name, kind: g.kind });
+    return cellOutlines(g.cells, MAX_FEATURE_CORNERS).map((polygon): Draft => ({ polygon, name }));
   });
 }
 
@@ -125,17 +138,21 @@ function columnDrafts(columns: readonly DungeonColumn[]): Draft[] {
 /**
  * The map features of one floor as shown, in world px on `level` (unset in a scene of one floor),
  * with ids beginning `id`: the first `MAX_MAP_FEATURES` of its terrain, furniture (where the view
- * shows props) and columns, in that order. Only rooms the view shows have any.
+ * shows props) and columns, in that order, and under them as much vegetation as fits. Only rooms
+ * the view shows have any.
  */
 export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, 'props'>, placement: DungeonPlacement, id: string, level?: string): Record<string, MapFeature> {
   const { floor, roomShapes, field } = dungeon;
   const shown = floor.terrain.filter(piece => roomShapes.has(piece.room));
-  const drafts = [
+  const solid = [
     ...terrainDrafts(shown),
     ...parapetDrafts(shown, cell => field.distance(cell.x + 0.5, cell.y + 0.5) < 0),
     ...(view.props ? propDrafts(floor.props.filter(prop => roomShapes.has(prop.room))) : []),
     ...columnDrafts(floor.columns.filter(column => field.distance(column.x, column.y) < 0)),
   ].slice(0, MAX_MAP_FEATURES);
+  // Vegetation lies under everything else and takes what room the rest leaves.
+  const growth = growthDrafts(floor.growth.filter(g => roomShapes.has(g.room))).slice(0, MAX_MAP_FEATURES - solid.length);
+  const drafts = [...growth, ...solid];
   const { originCell, pxPerCell } = placement;
   const world = (p: CellPoint): CellPoint => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   return Object.fromEntries(drafts.map((draft, index): [string, MapFeature] => {

@@ -15,10 +15,10 @@ const TAG_SETS: readonly string[][] = [
   [],
   ['small'],
   ['large'],
-  ['medium', 'ordered', 'temple', 'colonnades'],
+  ['medium', 'ordered', 'temple', 'colonnades', 'overgrown'],
   ['chaotic', 'winding', 'wet', 'tomb'],
   ['string', 'deep', 'flooded'],
-  ['secret', 'round', 'dwelling'],
+  ['secret', 'round', 'dwelling', 'overgrown'],
   ['no-secrets', 'square', 'flat', 'dry', 'compact'],
   ['cramped', 'crumbling', 'large'],
 ];
