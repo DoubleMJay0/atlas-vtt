@@ -3,20 +3,24 @@ import { StatblockTokenSync } from '../plugin/StatblockTokenSync';
 import { TokenCollectionSync } from '../plugin/TokenCollectionSync';
 import type { ResourceDefsProvider } from '../resources/resourceTypes';
 import { fitTokenArtwork, syncTokenArtwork } from './token-renderer/tokenArtwork';
-import type { AtlasSettings } from '../services/SettingsService';
+import { SettingsService, type AtlasSettings } from '../services/SettingsService';
 import { HIDDEN_TOKEN_ALPHA, gmTokenLayers, type HideableLayer, type LayerVisibility } from './playerSafeFrame';
 import type { TokenPerception } from '../vision/tokenPerception';
+import { TokenExit } from './token-renderer/TokenExit';
 import { NOTHING_SEEN, PlayerSightTokens, seenByPlayers, seenTokens } from './token-renderer/PlayerSightTokens';
 import { PlayersViewWatch } from './token-renderer/PlayersViewWatch';
-import { PlayerInstanceBadges } from './token-renderer/PlayerInstanceBadges';
+import { TurnMarkers } from './token-renderer/turnMarker/TurnMarkers';
+import { PlayerInstanceBadges, type PlayerBadgeNumbers } from './token-renderer/PlayerInstanceBadges';
 import type { TokenSeen } from '../vision/measureOrigin';
 import { Sprite, Container, Graphics, Application, FederatedPointerEvent } from "pixi.js";
 import { Viewport } from "pixi-viewport";
 import { App as ObsidianApp } from 'obsidian';
 import type { TokenEntity } from "../types";
+import type { GroupTurnHost } from "./selection/GroupRotation";
+import { gridPivot } from "./selection/groupTurn";
+import { isHexGridType } from "../grid/hexGeometry";
 import type { TokenGestureEventDetail } from '../types/atlasWindowEvents';
 import type { GridSystem } from "../grid/GridSystem";
-import { getDrawingBounds } from "./drawingGeometry";
 import type { ViewAtlasStore } from '../storeFactory';
 import { EventEmitter } from 'events';
 import { AssetValidationService } from '../services/AssetValidationService';
@@ -26,9 +30,10 @@ import { computeTokenPixelSize } from './token-renderer/tokenSizing';
 import { TextureCache } from './token-renderer/TextureCache';
 import { UIManager } from './token-renderer/UIManager';
 import { InteractionController } from './token-renderer/InteractionController';
-import { DragRuler } from './token-renderer/DragRuler';
+import { DragRuler, type DragRulerPath } from './token-renderer/DragRuler';
 import { DragRulerView } from './token-renderer/DragRulerView';
 import { SyncService } from './token-renderer/SyncService';
+import { tokenSyncState } from './token-renderer/tokenSyncState';
 import { TokenGlide, placedAtOnce } from './token-renderer/TokenGlide';
 import type { ShownPlaces } from '../lighting/shownPlaces';
 import type { Point } from '../types/visionTypes';
@@ -43,8 +48,11 @@ import { requestRender } from './RenderScheduler';
 import { normalizeImagePath } from '../utils/pathUtils';
 import { prefersReducedMotion } from '../utils/motion';
 import { destroyTree } from './utils/destroyTree';
-import type { TokenGroupContainer } from './token-renderer/types';
+import type { BarsSpan, TokenGroupContainer } from './token-renderer/types';
+import type { TokenPreview } from './tokenPlacement/PlacementGhost';
+import type { TokenInput } from '../types/viewState';
 import { setCanvasCursor } from './utils/canvasCursor';
+import { usesCanvasRenderer } from './utils/rendererType';
 import { markHandled, resetHandled } from './utils/handledEvents';
 import { watchClick } from './utils/clickRelease';
 import type { HexLinkPointerHandlers } from './hexLinks/HexLinkInteraction';
@@ -52,7 +60,9 @@ import type { LightPointerHandlers } from './lighting/LightInteraction';
 import { runInBackground } from '../utils/backgroundTask';
 import { isModHeld } from '../keyboard/modKey';
 import type { AreaToolPointer } from './areas/PolygonAreaEditor';
-import { levelObjects } from '../levels/levelObjects';
+import { everyLevelObjects, levelObjects } from '../levels/levelObjects';
+import { mapTokens, sceneTokens } from '../tokens/offMap';
+import { defeatedCombatants } from '../initiative/defeated';
 
 /** What the lighting controller answers about a right-click on a door's badge. */
 export interface DoorMenuHandlers {
@@ -67,6 +77,8 @@ export class TokenRenderer {
   private gridSystem: GridSystem;
   private tokenContainer: Container;
   private tokenSprites: Record<string, TokenGroupContainer | null> = {};
+  /** The ways the tokens of a group being turned face until it is put down (`showFacings`). */
+  private groupFacings: ReadonlyMap<string, number> | null = null;
   private tokenRings: Record<string, Graphics | Sprite> = {};
   private _unsubscribeFromStore?: () => void;
   private _unsubscribeFromViewport?: () => void;
@@ -88,6 +100,13 @@ export class TokenRenderer {
     () => this.pixiApp?.ticker ?? null,
   );
   private readonly glide: TokenGlide;
+  private readonly exit = new TokenExit({
+    getTicker: () => this.pixiApp?.ticker ?? null,
+    reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
+    requestRender: () => {
+      if (this.pixiApp) requestRender(this.pixiApp);
+    },
+  });
   /** Whether a token may be drawn on its way between two places; set by the lighting while it lights the view. */
   private glideWay?: (from: Point, to: Point) => boolean;
   private uiManager: UIManager;
@@ -124,6 +143,8 @@ export class TokenRenderer {
   private fogHitTestProvider?: (worldX: number, worldY: number) => string | null;
   private fogClickHandler?: (fogId: string, e: FederatedPointerEvent) => void;
   private drawingHitTestProvider?: (worldX: number, worldY: number) => string | null;
+  /** Whether a world point lies inside the frame drawn around a selection of two or more. */
+  private groupFrameHitTest?: (worldX: number, worldY: number) => boolean;
   private drawingClickHandler?: (drawingId: string, e: FederatedPointerEvent) => void;
   private drawingDragStartHandler?: (e: FederatedPointerEvent) => void;
 
@@ -134,13 +155,17 @@ export class TokenRenderer {
   private hexLinkHandlers?: HexLinkPointerHandlers;
   /** Ends the watch on a right press that opens a hex or fog menu on release. */
   private stopMenuPress?: () => void;
+  /** Whether the GM holds spawned tokens to place (`TokenPlacer`): the pointer is theirs then. */
+  private placementActive: () => boolean = () => false;
   private doorClickHandler?: (worldX: number, worldY: number) => boolean;
   /** A right-click on a door's badge, with any tool but the lighting tool, whose own menu has the door's entries. */
   private doorMenuHandlers?: DoorMenuHandlers;
   /** The tokens as the players' sight shows them: which are left out, and the outlines of sensed ones. */
-  private readonly playerSight = new PlayerSightTokens({ tokens: () => levelObjects(this.store.getState()).tokens, sprites: () => this.tokenSprites, held: () => this.heldTokenIds });
+  private readonly playerSight = new PlayerSightTokens({ tokens: () => mapTokens(levelObjects(this.store.getState())), sprites: () => this.tokenSprites, held: () => this.heldTokenIds });
   private readonly playersView = new PlayersViewWatch();
   private readonly playerBadges = new PlayerInstanceBadges({ state: () => this.store.getState(), sprites: () => this.tokenSprites });
+  /** The marker on the tokens whose turn it is. */
+  private turnMarkers!: TurnMarkers;
   private lightHandlers?: LightPointerHandlers;
   /** Tokens held by the pointer; lighting alone does not hide them until release. */
   private heldTokenIds: ReadonlySet<string> = new Set();
@@ -207,6 +232,7 @@ export class TokenRenderer {
     
     // Provide token sprite access to UI manager
     this.uiManager.setTokenSpriteProvider((tokenId: string) => this.tokenSprites[tokenId] || null);
+    this.uiManager.onSelectionUIChange = () => this.selectionOverlayUpdater();
     
     // Initialize interaction controller
     this.interactionController = new InteractionController(
@@ -243,6 +269,17 @@ export class TokenRenderer {
       }
     });
     
+    // Before the collection's rules arrive: their refresh works the turn out again
+    this.turnMarkers = new TurnMarkers({
+      parent: this.viewport,
+      getState: () => this.store.getState(),
+      subscribe: (listener) => this.store.subscribe(listener),
+      spriteOf: (tokenId) => this.tokenSprites[tokenId] ?? null,
+      ticker: () => this.pixiApp?.ticker ?? null,
+      reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
+      defeated: (state) => defeatedCombatants(state.initiative.entries, sceneTokens(everyLevelObjects(state)), this.resourceDefsProvider()),
+      canMask: () => !this.pixiApp?.renderer || !usesCanvasRenderer(this.pixiApp.renderer),
+    });
     this.collectionSync = new TokenCollectionSync(obsApp, store.getState, {
       refreshRules: () => this.refreshCollectionRules(),
       refreshArt: (path) => this.refreshArt(path),
@@ -256,11 +293,7 @@ export class TokenRenderer {
 
     // Initialize sync service
     this.syncService = new SyncService(
-      createSceneSource(this.store, state => ({
-        tokens: levelObjects(state).tokens,
-        isMapLoading: state.isMapLoading,
-        selectedIds: state.selectedIds,
-      })),
+      createSceneSource(this.store, tokenSyncState),
       (tokenId, x, y) => this.store.getState().moveToken(tokenId, x, y),
       this.eventBus,
     );
@@ -293,6 +326,7 @@ export class TokenRenderer {
     this.tokenContainer.zIndex = 0;
     this.viewport.addChild(this.tokenContainer);
     this.viewport.addChild(this.playerSight.outlineLayer);
+    this.watchCanvasTurn();
     this.playersView.listen(() => this.playerSight.whenSettled(() => this.syncCanvasBadges()));
 
     this.dragRuler = new DragRuler(
@@ -314,7 +348,7 @@ export class TokenRenderer {
     // This prevents syncing with stale tokens from previous maps
     const currentMapPath = this.store.getState().mapPath;
     if (currentMapPath) {
-      runInBackground(this.syncTokens(levelObjects(this.store.getState()).tokens, {}), 'Initial token sync');
+      runInBackground(this.syncTokens(mapTokens(levelObjects(this.store.getState())), {}), 'Initial token sync');
       // Ensure all existing tokens (including ones without explicit ringColor)
       // get their ring rebuilt with the current renderer implementation.
       this.onWhenAllTokensLoaded(() => this.updateAllTokenSizes());
@@ -366,6 +400,7 @@ export class TokenRenderer {
       // Sprites still loading belong to the previous load and are discarded when they finish
       this.mapLoadGeneration++;
       this.tokensLoading = new Set();
+      this.exit.finishAll();
 
       // First, clear all existing token sprites (tokenSprites is an object, not a Map)
       for (const [id, tokenGroup] of Object.entries(this.tokenSprites)) {
@@ -385,7 +420,7 @@ export class TokenRenderer {
       this.store.getState().clearSelection();
       
       // Then sync with the new map's tokens, keeping only their art decoded
-      const currentTokens = levelObjects(this.store.getState()).tokens;
+      const currentTokens = mapTokens(levelObjects(this.store.getState()));
       this.evictUnusedArt();
       runInBackground(this.syncTokens(currentTokens, {}), 'Token sync after map change');
       this.onWhenAllTokensLoaded(() => this.updateAllTokenSizes());
@@ -404,7 +439,7 @@ export class TokenRenderer {
     // Listen for rotation updates during drag
     this._handleRotationUpdate = (event): void => {
       const tokenIds = event.detail?.tokenIds || [];
-      const tokens = levelObjects(this.store.getState()).tokens;
+      const tokens = mapTokens(levelObjects(this.store.getState()));
 
       // Apply the temporary rotation directly; syncTokens would skip the
       // token as unchanged because the store value has not moved yet.
@@ -416,6 +451,8 @@ export class TokenRenderer {
           this.uiManager.updateHandlePositions();
         }
       }
+      // Art shown without a ring is outlined as it turns
+      this.selectionOverlayUpdater();
     };
 
     window.addEventListener('atlas-tokens-rotation-update', this._handleRotationUpdate);
@@ -430,6 +467,7 @@ export class TokenRenderer {
         // Show resize handles for all selected tokens
         this.uiManager.getResizeUI()?.showHandles(selectedIds, this.getTokenSprites());
       }
+      this.selectionOverlayUpdater();
     });
 
     // Listen for resize end events to re-show rotation handles
@@ -442,6 +480,7 @@ export class TokenRenderer {
         // Show rotation handles for all selected tokens
         this.uiManager.getRotationUI()?.showHandles(selectedIds, this.getTokenSprites());
       }
+      this.selectionOverlayUpdater();
     });
 
     window.addEventListener('atlas-token-rotation-ended', this._handleRotationEnded);
@@ -450,7 +489,7 @@ export class TokenRenderer {
     // Listen for resize updates during drag
     this._handleResizeUpdate = (event): void => {
       const tokenIds = event.detail?.tokenIds || [];
-      const tokens = levelObjects(this.store.getState()).tokens;
+      const tokens = mapTokens(levelObjects(this.store.getState()));
 
       // Get temporary sizes from resize UI
       for (const tokenId of tokenIds) {
@@ -551,7 +590,7 @@ export class TokenRenderer {
   }
 
   private updateTokenRing(tokenId: string, tokenGroup: TokenGroupContainer, size: number, ringColor?: string): void {
-    const current = levelObjects(this.store.getState()).tokens[tokenId];
+    const current = mapTokens(levelObjects(this.store.getState()))[tokenId];
     if (current) tokenGroup.tokenData = current;
     const sizeWithMultiplier = size * (this.store.getState().tokenSettings?.tokenRingSize ?? 1);
     const resolvedRingColor = ringColor || '#ffffff';
@@ -576,7 +615,8 @@ export class TokenRenderer {
    * Tokens whose sprite is still loading get their badge from `refreshInstanceBadge` once loaded.
    */
   private refreshInstanceBadges(): void {
-    const tokens = Object.values(levelObjects(this.store.getState()).tokens);
+    // Counted among every token of the scene, those beside the map too, so a badge is the number its tracker card shows
+    const tokens = Object.values(sceneTokens(levelObjects(this.store.getState())));
     const countByImage = new Map<string, number>();
     for (const token of tokens) {
       countByImage.set(token.imagePath, (countByImage.get(token.imagePath) ?? 0) + 1);
@@ -591,14 +631,14 @@ export class TokenRenderer {
 
   /** Draws the badge of a single token, e.g. one whose sprite finished loading after the last sync. */
   private refreshInstanceBadge(tokenId: string): void {
-    const token = levelObjects(this.store.getState()).tokens[tokenId];
+    const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
     const tokenGroup = this.tokenSprites[tokenId];
     if (token && tokenGroup) this.drawInstanceBadge(token, tokenGroup, this.countTokensWithImage(token.imagePath));
     this.notifyPlayersView();
   }
 
   private countTokensWithImage(imagePath: string): number {
-    const tokens = Object.values(levelObjects(this.store.getState()).tokens);
+    const tokens = Object.values(sceneTokens(levelObjects(this.store.getState())));
     return tokens.filter((token) => token.imagePath === imagePath).length;
   }
 
@@ -621,6 +661,12 @@ export class TokenRenderer {
   /** Whether the canvas leaves `token` out: a hidden one in the players' perspective, and one the players' sight leaves out. */
   private hidesToken(token: TokenEntity, perception = this.playerSight.perception()): boolean {
     return ((token.isHidden ?? false) && this.isInPlayerMode()) || this.playerSight.hides(token.id, perception);
+  }
+
+  /** Whether the canvas shows the token: it is on the map and neither the players' perspective nor their sight leaves it out. */
+  public showsToken(tokenId: string): boolean {
+    const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
+    return token !== undefined && !this.hidesToken(token);
   }
 
   /** A token the canvas no longer shows cannot stay selected: its handles would float over nothing. */
@@ -695,6 +741,38 @@ export class TokenRenderer {
     return (!!token.isHidden && !!prevToken.isHidden) || (alwaysSeen(token) && alwaysSeen(prevToken));
   }
 
+  /** The way a token faces on the canvas: as a turn under way shows it, else as the store has it. */
+  private shownRotation(token: TokenEntity): number {
+    return this.uiManager.getRotationUI()?.getTemporaryRotation(token.id) ?? this.groupFacings?.get(token.id) ?? token.rotation ?? 0;
+  }
+
+  /** What a group turned from the button above its selection frame asks of the tokens (`GroupRotation`). */
+  public groupTurnHost(): GroupTurnHost {
+    return {
+      pivot: (middle) => {
+        if (!(this.store.getState().grid?.snapToGrid ?? true)) return middle;
+        const hex = isHexGridType(this.gridSystem.getOptions().type);
+        return gridPivot(middle, hex, (point, size) => this.gridSystem.snapTokenCenter(point.x, point.y, size));
+      },
+      showFacings: (facings) => this.showFacings(facings),
+    };
+  }
+
+  /** Shows the tokens of a group being turned facing these ways until it is put down; null shows them as the store has them. */
+  private showFacings(facings: ReadonlyMap<string, number> | null): void {
+    const turned = facings ?? this.groupFacings;
+    this.groupFacings = facings;
+    if (!turned) return;
+    const tokens = mapTokens(levelObjects(this.store.getState()));
+    for (const id of turned.keys()) {
+      const group = this.tokenSprites[id];
+      const token = tokens[id];
+      if (group && token) this.spriteFactory.updateTokenRotation(group, this.shownRotation(token));
+    }
+    // Art shown without a ring is outlined as it turns
+    this.selectionOverlayUpdater();
+  }
+
   /** Takes along what stands with a token's sprite as it glides: its UI, its controls and the selection frame. */
   private followToken(tokenId: string, x: number, y: number): void {
     this.uiManager.syncUIPosition(tokenId, x, y);
@@ -710,13 +788,13 @@ export class TokenRenderer {
 
   /** Movement can lead the store; apply fog before the displayed position is rendered. */
   private refreshDisplayedToken(tokenId: string): void {
-    const token = levelObjects(this.store.getState()).tokens[tokenId];
+    const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
     const sprite = this.tokenSprites[tokenId];
     const perception = this.playerSight.perception();
     if (!token || !sprite || !perception) return;
     this.applyTokenVisibilityPolicy(token, sprite, token, perception);
     this.playerSight.syncOutline(tokenId, perception);
-    this.playersView.moved(tokenId, seenByPlayers(levelObjects(this.store.getState()).tokens, perception)(tokenId));
+    this.playersView.moved(tokenId, seenByPlayers(mapTokens(levelObjects(this.store.getState())), perception)(tokenId));
   }
 
   /** The tokens the canvas shows: those a selection may take. */
@@ -726,7 +804,7 @@ export class TokenRenderer {
 
   /** The players' sight changed, or whether the canvas shows it: tokens entering or leaving it show or hide. */
   public refreshPlayerSight(): void {
-    const tokens = levelObjects(this.store.getState()).tokens;
+    const tokens = mapTokens(levelObjects(this.store.getState()));
     const perception = this.playerSight.perception();
     for (const [id, tokenGroup] of Object.entries(this.tokenSprites)) {
       const token = tokens[id];
@@ -735,6 +813,7 @@ export class TokenRenderer {
     }
     this.playerSight.syncOutlines(perception);
     this.uiManager.setPlayersView(this.playerSight.showsPlayers() || this.isInPlayerMode());
+    this.syncCanvasTurn();
     this.dragRuler.refreshVisibility();
     this.notifyPlayersView();
   }
@@ -750,9 +829,36 @@ export class TokenRenderer {
     else if (!this.store.getState().isMapLoading) this.playerBadges.syncCanvas(this.playerSight.sightIsCurrent() ? seen : NOTHING_SEEN);
   }
 
+  /**
+   * The turn flashes on the canvas: while it shows the players' view (session view, the peek, the
+   * palette's player mode) only where the players are shown their initiative list, as their frame.
+   */
+  private syncCanvasTurn(): void {
+    const showsPlayers = this.playerSight.showsPlayers() || this.isInPlayerMode();
+    const view = SettingsService.forApp(this.obsApp)?.getLocalPlayerViewSettings();
+    this.turnMarkers.showOnCanvas(!showsPlayers || ((view?.showInitiative ?? false) && this.store.getState().initiativeTrackerOpen));
+  }
+
+  /** Keeps the canvas's turn flashes in step with the players' view, the player view's settings and the tracker. */
+  private watchCanvasTurn(): void {
+    const stopView = this.playersView.listen(() => this.syncCanvasTurn());
+    const stopSettings = SettingsService.forApp(this.obsApp)?.onChange(() => this.syncCanvasTurn());
+    const stopStore = this.store.subscribe((state, previous) => {
+      if (state.initiativeTrackerOpen !== previous.initiativeTrackerOpen) this.syncCanvasTurn();
+    });
+    const earlier = this._unsubscribeFromStore;
+    this._unsubscribeFromStore = () => {
+      stopView();
+      stopSettings?.();
+      stopStore();
+      earlier?.();
+    };
+    this.syncCanvasTurn();
+  }
+
   /** Tells whoever follows the players' view (`onPlayersViewChange`) which tokens they see now. */
   private notifyPlayersView(): void {
-    this.playersView.passed(() => Object.keys(levelObjects(this.store.getState()).tokens), this.playersSeeOnCanvas());
+    this.playersView.passed(() => Object.keys(mapTokens(levelObjects(this.store.getState()))), this.playersSeeOnCanvas());
   }
 
   /** The layer of the sensed tokens' outlines, for the list of what the players' view shows. */
@@ -801,21 +907,12 @@ export class TokenRenderer {
 
     const totalChanges = changedTokenIds.size + newTokenIds.size + deletedTokenIds.size;
 
-    // Handle deleted tokens
-    for (const id of deletedTokenIds) {
-      const tokenGroup = this.tokenSprites[id];
-
-      this.glide.cancel(id);
-      if (tokenGroup) {
-        this.destroyTokenGroup(id, tokenGroup);
-        delete this.tokenSprites[id];
-        // Clean up ring tracking (ring is destroyed with tokenGroup)
-        delete this.tokenRings[id];
-        // Clean up token UI
-        this.uiManager.destroyTokenUI(id);
-      }
-    }
-    if (deletedTokenIds.size > 0) this.evictUnusedArt();
+    // Deleted tokens leave the renderer at once and play out on their own
+    const leaving = this.releaseLeavingTokens(deletedTokenIds);
+    this.exit.play(leaving, (group) => {
+      this.freeTokenGroup(group);
+      this.evictUnusedArt();
+    });
 
     // Process only changed and new tokens (skip unchanged tokens entirely)
     for (const token of Object.values(tokensRecord)) {
@@ -860,8 +957,7 @@ export class TokenRenderer {
         
         // Update rotation if it changed or if there's a temporary rotation
         const tempRotation = this.uiManager.getRotationUI()?.getTemporaryRotation(token.id);
-        const displayRotation = tempRotation !== undefined ? tempRotation : (token.rotation || 0);
-        this.spriteFactory.updateTokenRotation(existingTokenGroup, displayRotation);
+        this.spriteFactory.updateTokenRotation(existingTokenGroup, this.shownRotation(token));
         
         // Update rotation handle positions when token rotates
         if (!prevToken || prevToken.rotation !== token.rotation || tempRotation !== undefined) {
@@ -962,7 +1058,7 @@ export class TokenRenderer {
           }
 
           // Syncs skip tokens whose sprite is still loading, so check what happened meanwhile.
-          const latest = levelObjects(this.store.getState()).tokens[token.id];
+          const latest = mapTokens(levelObjects(this.store.getState()))[token.id];
           if (!latest) {
             // Removed while loading, e.g. a paste undone straight away: never show it.
             this.destroyTokenGroup(token.id, tokenGroup);
@@ -1014,7 +1110,7 @@ export class TokenRenderer {
           // Changes made while loading (an Alt-drag copy moving, a pasted token rotated) go
           // through the regular update path, diffed against the state the sprite was built from.
           if (latest !== token) {
-            const current = levelObjects(this.store.getState()).tokens;
+            const current = mapTokens(levelObjects(this.store.getState()));
             runInBackground(this.syncTokens(current, { ...current, [token.id]: token }), 'Token sync after sprite load');
           }
         } catch (error) {
@@ -1125,9 +1221,37 @@ export class TokenRenderer {
     return false;
   }
 
+  /**
+   * Takes the sprites of tokens that left the map (deleted, or gone beside it by an undone Place on
+   * Map) out of the renderer and the selection, and hands back their groups to play out. A token
+   * beside the map keeps no selection: Delete would take it unseen.
+   */
+  private releaseLeavingTokens(ids: Iterable<string>): TokenGroupContainer[] {
+    const leaving: TokenGroupContainer[] = [];
+    for (const id of ids) {
+      const tokenGroup = this.tokenSprites[id];
+      this.glide.cancel(id);
+      this.deselect(id);
+      if (tokenGroup) {
+        this.interactionController.removeInteractionHandlers(id, tokenGroup);
+        delete this.tokenSprites[id];
+        // Clean up ring tracking (ring is destroyed with tokenGroup)
+        delete this.tokenRings[id];
+        this.uiManager.destroyTokenUI(id);
+        leaving.push(tokenGroup);
+      }
+    }
+    return leaving;
+  }
+
   /** Detaches a token group's pointer handlers, destroys it with all of its children and drops its hold on its art. */
   private destroyTokenGroup(id: string, tokenGroup: TokenGroupContainer): void {
     this.interactionController.removeInteractionHandlers(id, tokenGroup);
+    this.freeTokenGroup(tokenGroup);
+  }
+
+  /** Destroys a token group no longer listening to the pointer, with all of its children, and drops its hold on its art. */
+  private freeTokenGroup(tokenGroup: TokenGroupContainer): void {
     this.downedTokenOverlay.release(tokenGroup);
     this.spriteFactory.destroyTokenSprite(tokenGroup);
     this.textureCache.release(tokenGroup.artPath);
@@ -1140,12 +1264,13 @@ export class TokenRenderer {
 
   /** Frees decoded art no token holds, keeping the art of every token on the map. */
   private evictUnusedArt(): void {
-    const tokens = Object.values(levelObjects(this.store.getState()).tokens);
+    const tokens = Object.values(mapTokens(levelObjects(this.store.getState())));
     this.textureCache.evictUnused(tokens.map((token) => token.imagePath ?? ''));
   }
 
   public destroy(): void {
     this.isDestroyed = true;
+    this.exit.finishAll();
 
     // Unsubscribe from store
     this._unsubscribeFromStore?.();
@@ -1187,6 +1312,7 @@ export class TokenRenderer {
     this.dragRuler.destroy();
     this.glide.destroy();
     this.playerSight.destroy();
+    this.turnMarkers.destroy();
     
     // Clean up theme observer
     if (this.themeObserver) {
@@ -1254,6 +1380,7 @@ export class TokenRenderer {
   /** Redraws what tokens show of their collection's rules (conditions, resources) and starts the resources they lack. */
   private refreshCollectionRules(): void {
     if (this.isDestroyed) return;
+    this.turnMarkers.refresh();
     this.uiManager.refreshConditions();
     this.uiManager.refreshResources();
     this.fillMissingResources();
@@ -1297,7 +1424,7 @@ export class TokenRenderer {
       return;
     }
     
-    const tokens = levelObjects(currentState).tokens;
+    const tokens = mapTokens(levelObjects(currentState));
     const tokenUpdates: Array<{id: string, x: number, y: number}> = [];
     
     // Re-snap each token to the new grid type
@@ -1332,6 +1459,7 @@ export class TokenRenderer {
     this.pixiApp = app;
     this.setCanvasListeners(true);
     this.syncService.setPixiApp(app);
+    this.turnMarkers.followTicker();
     if (app) {
       this.textureCache.setPixiApp(app);
     }
@@ -1345,15 +1473,20 @@ export class TokenRenderer {
     return this.playerSight.framePerception(lighting);
   }
 
+  /** The numbers the players' instance badges show, as their last frame numbered them. */
+  public playerBadgeNumbers(): PlayerBadgeNumbers {
+    return this.playerBadges;
+  }
+
   /** Whether the players see each token in their frame, by `lighting` with committed fog; never a hidden or missing one. */
   public playersSeeInFrame(lighting?: TokenPerception): TokenSeen {
-    return seenByPlayers(levelObjects(this.store.getState()).tokens, this.playerFramePerception(lighting));
+    return seenByPlayers(mapTokens(levelObjects(this.store.getState())), this.playerFramePerception(lighting));
   }
 
   /** The same by the canvas's own sight while it shows the players' view (session view, the peek, the palette's player mode); null in the GM view. */
   public playersSeeOnCanvas(): TokenSeen | null {
     const shows = this.playerSight.showsPlayers() || this.isInPlayerMode();
-    return shows ? seenByPlayers(levelObjects(this.store.getState()).tokens, this.playerSight.perception()) : null;
+    return shows ? seenByPlayers(mapTokens(levelObjects(this.store.getState())), this.playerSight.perception()) : null;
   }
 
   /** Calls `listener` whenever what the players see of the tokens may have changed. Returns the function that stops it. */
@@ -1368,18 +1501,27 @@ export class TokenRenderer {
   public getPlayerViewLayers(settings: AtlasSettings['localPlayerView'], perception?: TokenPerception): LayerVisibility[] {
     perception = this.playerFramePerception(perception);
     const isSeen = seenTokens(perception);
-    this.playerBadges.pass(this.playerSight.sightIsCurrent() ? seenByPlayers(levelObjects(this.store.getState()).tokens, perception) : NOTHING_SEEN);
-    return [...this.playerSight.frameLayers(perception), ...this.uiManager.getPlayerViewLayers(settings, isSeen), ...this.playerBadges.layers(), ...this.dragRuler.getPlayerViewLayers(isSeen)];
+    const state = this.store.getState();
+    this.playerBadges.pass(this.playerSight.sightIsCurrent() ? seenByPlayers(mapTokens(levelObjects(state)), perception) : NOTHING_SEEN);
+    // Players learn of the turn only where their initiative list shows it
+    const turnShown = settings.showInitiative && state.initiativeTrackerOpen;
+    return [...this.playerSight.frameLayers(perception), ...this.uiManager.getPlayerViewLayers(settings, isSeen), ...this.playerBadges.layers(), ...this.dragRuler.getPlayerViewLayers(isSeen), ...this.exit.playerViewLayers(),
+      ...this.turnMarkers.playerLayers(seenByPlayers(mapTokens(levelObjects(state)), perception), turnShown)];
   }
 
-  /** How far a selected token's resources reach beyond its bottom, right and top edges, in world units. */
-  public barsReach(tokenId: string): number {
-    return this.uiManager.barsReach(tokenId);
+  /** How far a selected token's bars stand out from it, in world units. */
+  public bars(tokenId: string): BarsSpan {
+    return this.uiManager.bars(tokenId);
+  }
+
+  /** What the ruler of the drag under way measures, or null while it shows none. */
+  public dragRulerPath(): DragRulerPath | null {
+    return this.dragRuler.path();
   }
 
   /** Tokens and their bars, nameplates and badges as the GM view shows them, whatever view the canvas is in: for a picture of the scene. */
   public getGmViewLayers(): LayerVisibility[] {
-    return [...gmTokenLayers(levelObjects(this.store.getState()).tokens, this.tokenSprites), ...this.uiManager.getGmViewLayers(), ...this.playerSight.gmLayers(), ...this.playerBadges.gmLayers()];
+    return [...gmTokenLayers(mapTokens(levelObjects(this.store.getState())), this.tokenSprites), ...this.uiManager.getGmViewLayers(), ...this.playerSight.gmLayers(), ...this.playerBadges.gmLayers(), ...this.turnMarkers.pictureLayers()];
   }
 
   /** Get all token sprites for external systems like SelectionManager. */
@@ -1402,6 +1544,10 @@ export class TokenRenderer {
     this.fogClickHandler = fn;
   }
 
+  public setGroupFrameHitTest(fn: (worldX: number, worldY: number) => boolean): void {
+    this.groupFrameHitTest = fn;
+  }
+
   public setDrawingHitTestProvider(fn: (worldX: number, worldY: number) => string | null): void {
     this.drawingHitTestProvider = fn;
   }
@@ -1413,6 +1559,32 @@ export class TokenRenderer {
   /** Called when a group drag starts, so selected drawings follow the tokens. */
   public setDrawingDragStartHandler(fn: (e: FederatedPointerEvent) => void): void {
     this.drawingDragStartHandler = fn;
+  }
+
+  public setPlacementGuard(active: () => boolean): void {
+    this.placementActive = active;
+  }
+
+  /**
+   * `token` drawn as it will look once placed, by the factory that draws placed tokens, for the GM's
+   * hand (`TokenPlacer`). It holds its art until released.
+   */
+  public async previewToken(token: TokenInput): Promise<TokenPreview> {
+    const art = token.imagePath;
+    const texture = await this.textureCache.acquire(art);
+    const group = await this.spriteFactory.createTokenSprite({ ...token, id: 'placement-preview', kind: token.kind ?? 'token' } as TokenEntity, texture);
+    group.zIndex = 0;
+    const ringScale = this.store.getState().tokenSettings?.tokenRingSize ?? 1;
+    if (ringScale !== 1) this.spriteFactory.createTokenRing(group, token.ringColor || '#ffffff', group.tokenSize * ringScale);
+    return {
+      group,
+      diameter: group.tokenSize,
+      rotate: (degrees) => this.spriteFactory.updateTokenRotation(group, degrees),
+      release: () => {
+        this.spriteFactory.destroyTokenSprite(group);
+        this.textureCache.release(art);
+      },
+    };
   }
 
   public setPinHitTestProvider(fn: (worldX: number, worldY: number) => string | null): void {
@@ -1483,23 +1655,6 @@ export class TokenRenderer {
     this.interactionController.setArtFloors(provider);
   }
 
-  /** The view's lighting is gone: nothing takes the pointer for lights, walls and doors any more, no sight hides tokens, and tokens glide on any way. */
-  public clearLighting(): void {
-    delete this.glideWay;
-    this.interactionController.setArtFloors(undefined);
-    delete this.lightHandlers;
-    delete this.doorClickHandler;
-    delete this.doorMenuHandlers;
-    delete this.wallPointerDownHandler;
-    delete this.wallPointerMoveHandler;
-    delete this.wallPointerUpHandler;
-    delete this.wallDoubleClickHandler;
-    delete this.wallContextMenuHandler;
-    delete this.wallCursorProvider;
-    this.playerSight.setProvider(() => undefined);
-    this.refreshPlayerSight();
-  }
-
   /** The stairs tool's editor: it takes every left press, move and release while the stairs tool is active. */
   public setStairsTool(tool: AreaToolPointer): void {
     this.stairsTool = tool;
@@ -1517,7 +1672,7 @@ export class TokenRenderer {
 
   /** Circle-collision hit test against all visible token sprites; in a pile the token drawn on top wins. */
   public hitTestTokens(worldX: number, worldY: number): string | null {
-    const tokens = levelObjects(this.store.getState()).tokens;
+    const tokens = mapTokens(levelObjects(this.store.getState()));
     const gridSize = this.gridSystem.getOptions().size;
     const drawOrder = this.tokenContainer.children;
     let topId: string | null = null;
@@ -1546,12 +1701,11 @@ export class TokenRenderer {
     return topId;
   }
 
-  /** Returns true if (worldX, worldY) is within the bounding box of the given selected tokens. */
   /** Drag the selected tokens; a no-op when the selection holds none. */
   private startTokenGroupDrag(e: FederatedPointerEvent): void {
     const state = this.store.getState();
-    const objects = levelObjects(state);
-    const tokenIds = state.selectedIds.filter((id) => objects.tokens[id]);
+    const tokens = mapTokens(levelObjects(state));
+    const tokenIds = state.selectedIds.filter((id) => tokens[id]);
     if (tokenIds.length > 0) this.interactionController.handleViewportGroupDragStart(tokenIds, e);
   }
 
@@ -1560,51 +1714,6 @@ export class TokenRenderer {
     e.stopPropagation();
     this.startTokenGroupDrag(e);
     this.drawingDragStartHandler?.(e);
-  }
-
-  private isPointInSelectionBounds(worldX: number, worldY: number, selectedIds: string[]): boolean {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let found = false;
-    const drawings = levelObjects(this.store.getState()).drawings;
-
-    for (const id of selectedIds) {
-      const drawing = drawings[id];
-      const drawingBounds = drawing && getDrawingBounds(drawing);
-      if (drawingBounds) {
-        minX = Math.min(minX, drawingBounds.x);
-        minY = Math.min(minY, drawingBounds.y);
-        maxX = Math.max(maxX, drawingBounds.x + drawingBounds.width);
-        maxY = Math.max(maxY, drawingBounds.y + drawingBounds.height);
-        found = true;
-        continue;
-      }
-
-      const tokenGroup = this.tokenSprites[id];
-      if (!tokenGroup || !tokenGroup.visible) continue;
-
-      // Match SelectionManager.updateSelectionOverlay bounds calculation:
-      // use actual sprite dimensions, not grid size
-      const sprite = tokenGroup.children[0];
-      if (!sprite || !('width' in sprite)) continue;
-
-      const halfW = sprite.width / 2;
-      const halfH = sprite.height / 2;
-      const x = tokenGroup.position.x;
-      const y = tokenGroup.position.y;
-
-      if (x - halfW < minX) minX = x - halfW;
-      if (y - halfH < minY) minY = y - halfH;
-      if (x + halfW > maxX) maxX = x + halfW;
-      if (y + halfH > maxY) maxY = y + halfH;
-      found = true;
-    }
-
-    if (!found) return false;
-
-    // Same 12px padding as the selection overlay
-    const pad = 12;
-    return worldX >= minX - pad && worldX <= maxX + pad &&
-           worldY >= minY - pad && worldY <= maxY + pad;
   }
 
   /** Set up viewport-level pointer handlers. Called once during init. */
@@ -1636,6 +1745,8 @@ export class TokenRenderer {
   private onViewportPointerDown = (e: FederatedPointerEvent): void => {
     // PIXI v8 reuses FederatedPointerEvent objects — clear custom flags from previous events
     resetHandled(e);
+    // Held tokens take the pointer: a right-drag still pans, but nothing on the map opens its menu
+    if (this.placementActive()) return;
 
     const activeTool = this.store.getState().activeTool;
     const worldPos = this.viewport.toWorld(e.global);
@@ -1740,19 +1851,16 @@ export class TokenRenderer {
     if (tokenId) {
       markHandled(e);
       this.interactionController.handleViewportTokenPointerDown(tokenId, e);
-      // Drawings selected alongside the token follow its drag
-      if (e.button === 0) this.drawingDragStartHandler?.(e);
+      // Drawings selected alongside the token follow its drag; a token from outside the selection moves alone
+      if (e.button === 0 && this.store.getState().selectedIds.includes(tokenId)) this.drawingDragStartHandler?.(e);
       return;
     }
 
-    // 2. Hit-test selection bounding box (drag from within the selected group; shift is picking, not dragging)
-    if (e.button === 0 && !e.shiftKey) {
-      const selectedIds = this.store.getState().selectedIds;
-      if (selectedIds.length > 1 && this.isPointInSelectionBounds(worldPos.x, worldPos.y, selectedIds)) {
-        markHandled(e);
-        this.startGroupDrag(e);
-        return;
-      }
+    // 2. Hit-test the frame drawn around a selection of two or more (drag the group; shift is picking, not dragging)
+    if (e.button === 0 && !e.shiftKey && this.groupFrameHitTest?.(worldPos.x, worldPos.y)) {
+      markHandled(e);
+      this.startGroupDrag(e);
+      return;
     }
 
     // 3. Hit-test drawings (select + drag, or context menu; tokens selected alongside follow a drag)
@@ -1825,6 +1933,12 @@ export class TokenRenderer {
     // If dragging, InteractionController already has viewport listeners — skip hover
     if (this.interactionController.isDraggingTokens()) return;
     if (!this.isPointerOverCanvas(e)) return;
+    // Held tokens are the cursor (`bindPlacementInput` hides the system one): nothing is hovered
+    if (this.placementActive()) {
+      this.interactionController.handleViewportTokenHover(null);
+      this.uiManager.setHoverState(null);
+      return;
+    }
 
     const worldPos = this.viewport.toWorld(e.global);
     const activeTool = this.store.getState().activeTool;
@@ -1945,7 +2059,7 @@ export class TokenRenderer {
    * Updates all token sizes (typically after grid change)
    */
   public updateAllTokenSizes(): void {
-    const tokens = levelObjects(this.store.getState()).tokens;
+    const tokens = mapTokens(levelObjects(this.store.getState()));
     for (const [tokenId, token] of Object.entries(tokens)) {
       const tokenGroup = this.tokenSprites[tokenId];
       if (tokenGroup instanceof Container) {

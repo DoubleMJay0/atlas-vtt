@@ -4,6 +4,7 @@ import { hexLayoutOfGrid, pinDisplayPoint } from '../grid/hexLinks';
 import { t } from '../i18n';
 import type { WorldMapEntrance, WorldMapLevel, WorldMapQuest, WorldMapTree } from '../online/gm/book/worldMapGate.ts';
 import { noteFile } from '../online/gm/pins/foundNotes.ts';
+import { sentPinFace } from '../online/gm/pins/sentPinFace.ts';
 import { readQuest } from '../campaigns/quests/questProperties';
 import { linksReadableNote, pinNoteLink } from '../tools/pinNoteLink';
 import type { NotePin } from '../types';
@@ -13,7 +14,7 @@ import { isRecord } from '../utils/guards';
 import { AssetService, type Asset } from './AssetService';
 import { isPersistedMapEnvelope } from './MapPersistence';
 import { linkedMapPath, sceneLinkTarget } from './sceneLinks';
-import { inAtlasFolders, worldMapArtwork } from './worldMap';
+import { worldMapArtwork } from './worldMap';
 import { readSceneLevels } from '../levels/levelFile';
 import { levelAlignmentsOf, levelImagePlacement } from '../levels/levelAlignment';
 import { pinSceneLevel } from '../levels/pinSceneLevel';
@@ -76,10 +77,9 @@ function linkedNote(app: App, pin: NotePin, mapPath: string): { path: string; id
   return { path: file.path, id: quest?.id };
 }
 
-/** The map image of a floor above a scene's first, where it lies in Atlas's own folders for the scene's collection. */
-function floorImage(asset: Asset, levels: SceneLevel[] | undefined, floor: string): string | null {
-  const image = levelById(levels, floor)?.background ?? null;
-  return image !== null && inAtlasFolders(image, asset.collection) ? image : null;
+/** The map image of a floor above a scene's first, as the scene file names it; null where the floor has none. */
+function floorImage(levels: SceneLevel[] | undefined, floor: string): string | null {
+  return levelById(levels, floor)?.background ?? null;
 }
 
 /**
@@ -111,16 +111,16 @@ class TreeReader {
     if (asset === undefined || targetPath === undefined) return null;
     const levels = (await this.scene(targetPath))?.levels;
     const floor = pinSceneLevel(pin, levels);
-    return { asset, floor: floor === null || floor === firstLevelId(levels) || floorImage(asset, levels, floor) === null ? null : floor };
+    return { asset, floor: floor === null || floor === firstLevelId(levels) || floorImage(levels, floor) === null ? null : floor };
   }
 
-  /** One map of the tree and the maps its pins open; null when it has no image in Atlas's own folders. */
+  /** One map of the tree and the maps its pins open; null when it has no artwork. */
   async read(map: TreeMap): Promise<{ level: WorldMapLevel; leadsTo: TreeMap[] } | null> {
     const { asset, floor } = map;
     const mapPath = asset.type === 'scene' ? asset.data?.mapPath : undefined;
     const scene = mapPath ? await this.scene(mapPath) : null;
-    const image = floor === null ? await worldMapArtwork(this.app, asset) : floorImage(asset, scene?.levels, floor);
-    if (image === null || !inAtlasFolders(image, asset.collection)) return null;
+    const image = floor === null ? await worldMapArtwork(this.app, asset) : floorImage(scene?.levels, floor);
+    if (image === null) return null;
     const key = keyOf(map);
     const level = levelById(scene?.levels, floor);
     const title = scene?.levels && level ? t('levels.worldMapFloor', { scene: asset.name, level: levelLabel(scene.levels, level) }) : asset.name;
@@ -143,7 +143,7 @@ class TreeReader {
       const target = await this.target(mapPath, pin);
       const to = target === null ? key : keyOf(target);
       if (target === null || to === key) continue;
-      entrances.push({ x: point.x, y: point.y, to });
+      entrances.push({ x: point.x, y: point.y, to, ...sentPinFace(pin) });
       if (!leadsTo.some((known) => keyOf(known) === to)) leadsTo.push(target);
     }
     return { level: { key, title, image, stretch: placement, entrances, ...(quests.length > 0 && { quests }) }, leadsTo };
@@ -157,8 +157,8 @@ class TreeReader {
  * link into another collection opens the scene at the same place in its own, as on the map); a map
  * without scene has no pins. A pin that opens its scene on a floor above the first leads into that
  * floor's map, a map of its own in the tree, as it opens on the GM's map. Every image must be its
- * map's artwork (a floor's: its map) in Atlas's own folders: a map without one is left out with the
- * maps only it leads to, and a world map without one is none. A pin that links a quest note places
+ * map's artwork (a floor's: the map its scene file names for it), wherever it lies in the vault: a
+ * map without one is left out with the maps only it leads to, and a world map without one is none. A pin that links a quest note places
  * the quest on its map (`WorldMapLevel.quests`) once the note has its id.
  */
 export async function worldMapTree(app: App, assetId: string, maxLevels: number): Promise<WorldMapTreeRead | null> {

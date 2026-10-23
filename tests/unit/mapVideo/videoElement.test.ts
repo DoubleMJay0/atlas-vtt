@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openVideoElement, type ObjectUrls } from '../../../src/app/pixi/mapImage/video/videoElement';
 

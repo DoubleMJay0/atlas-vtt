@@ -3,6 +3,7 @@ import type { MeasurementSettings } from '../../../grid/measurementFormat';
 import { levelImagePlacement } from '../../../levels/levelAlignment';
 import { levelBackground } from '../../../levels/levelEdits';
 import { everyLevelObjects, levelObjectsOn } from '../../../levels/levelObjects';
+import { mapTokens } from '../../../tokens/offMap';
 import { partyPlaces } from '../../../levels/roofs';
 import { exploredMaskOf, levelMapKey } from '../../../levels/sceneLevels';
 import type { LevelStack } from '../../../levels/levelStack';
@@ -196,12 +197,12 @@ export class BelowLevel {
       sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, ...sceneLook(state.lighting),
     });
     const objects = levelObjectsOn(state, id);
-    this.tokens.sync(objects.tokens, state.grid?.size ?? DEFAULT_CELL_SIZE);
+    this.tokens.sync(mapTokens(objects), state.grid?.size ?? DEFAULT_CELL_SIZE);
     this.fog.sync(objects.fog, bounds, levelMapKey(state.mapPath, seen));
     // The level's roof: faded where its party stands, seen as the players see this level from above.
     this.roof.update({
-      ...levelRoof(state, id), background: this.deps.image.imageSize, party: partyPlaces(objects.tokens), selected: NO_PLACES,
-      lit: { lighting: state.lighting, zones: model.ambient.zones ?? NO_ZONES, bounds, sight: player, tokens: everyLevelObjects(state).tokens },
+      ...levelRoof(state, id), background: this.deps.image.imageSize, party: partyPlaces(mapTokens(objects)), selected: NO_PLACES,
+      lit: { lighting: state.lighting, zones: model.ambient.zones ?? NO_ZONES, bounds, sight: player, tokens: mapTokens(everyLevelObjects(state)) },
     });
   }
 

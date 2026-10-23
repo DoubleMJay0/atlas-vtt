@@ -1,6 +1,7 @@
 import { OutlineFilter } from 'pixi-filters';
 import { getObsidianAccentColor, cssColorToHexNumber } from './colorUtils';
 import type { AtlasView } from '../../atlas-view';
+import type { ViewAtlasState } from '../../storeFactory';
 import { requestRender } from '../RenderScheduler';
 import { addFilter, removeFilter } from './filterList';
 import { everyLevelObjects } from '../../levels/levelObjects';
@@ -15,13 +16,19 @@ interface ZoomToTokenOptions {
   glowThickness?: number;
 }
 
-/** Shows the level token `tokenId` stands on, where the view shows another: a token is found on its own floor. */
-function showLevelOfToken(view: AtlasView, tokenId: string): void {
-  const state = view.getStore().getState();
+/** What showing a token's level reads and writes of a view's state. */
+export type TokenLevelState = Pick<ViewAtlasState, 'objects' | 'levels' | 'viewedLevel' | 'setViewedLevel'>;
+
+/**
+ * Shows the level token `tokenId` stands on, where the view (`state`) shows another: a token is
+ * found on its own floor. Returns whether it showed another level.
+ */
+export function showLevelOfToken(state: TokenLevelState, tokenId: string): boolean {
   const token = everyLevelObjects(state).tokens[tokenId];
   const shown = viewedLevelId(state);
-  if (!token || !hasLevels(state.levels) || shown === null || onLevel(token, shown, state.levels)) return;
+  if (!token || !hasLevels(state.levels) || shown === null || onLevel(token, shown, state.levels)) return false;
   state.setViewedLevel(resolveLevel(state.levels, token.level));
+  return true;
 }
 
 /**
@@ -52,18 +59,18 @@ export function zoomToTokenWithHighlight(
     return;
   }
 
-  showLevelOfToken(view, tokenId);
+  showLevelOfToken(view.getStore().getState(), tokenId);
   viewport.setZoom(zoomLevel);
   viewport.moveCenter(tokenPosition.x, tokenPosition.y);
 
-  whenSpriteShown(view, tokenId, SPRITE_WAIT_MS, () => addTokenHighlight(view, tokenId, { highlightDuration, glowThickness }));
+  whenSpriteShown(view, tokenId, () => addTokenHighlight(view, tokenId, { highlightDuration, glowThickness }));
 }
 
 /** How long a highlight waits for the sprite of a token on a level just shown, which is drawn once its art has loaded. */
 const SPRITE_WAIT_MS = 2000;
 
-/** Calls `then` once token `tokenId` has a sprite on the canvas, or after `ms` without one. */
-function whenSpriteShown(view: AtlasView, tokenId: string, ms: number, then: () => void): void {
+/** Calls `then` once token `tokenId` has a sprite on the canvas, or after `ms` without one: a token on a level just shown is drawn once its art has loaded. */
+export function whenSpriteShown(view: AtlasView, tokenId: string, then: () => void, ms = SPRITE_WAIT_MS): void {
   const hasSprite = (): boolean => Boolean(view.renderer?.getTokenRenderer()?.getTokenSprites()[tokenId]);
   const ticker = view.renderer?.getAppInstance()?.ticker;
   if (!ticker || hasSprite()) {

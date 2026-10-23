@@ -27,11 +27,12 @@ export function raiseTokens(tokens: Record<string, TokenEntity>, ids: readonly s
   });
 }
 
-/** Where a token is put down. */
+/** Where a token is put down, and which way it faces once it is (a group turned as one); unset keeps its facing. */
 export interface TokenPlace {
   id: string;
   x: number;
   y: number;
+  rotation?: number;
 }
 
 /** What putting tokens down writes: the tokens, and the flag that tells spatial audio a token moved; and the stairs and openings it reads. */
@@ -42,12 +43,13 @@ export interface PlacedTokensState {
 }
 
 /**
- * Puts tokens down: each at its place, all of them on top of every other token (`raiseTokens`),
- * and flags the move for spatial audio. A token put down inside stairs (`linkLandings`) that lead
- * to one level goes to that level, at the same place, in the same write; where they offer several,
- * it stays and the caller may offer the choice (`linkChoice`). A token that ends where its level has
- * no floor (an opening, or where the view draws its map transparent: `art`, `floorBelow`) falls to
- * the first level below that has, in the same write; over a chasm it stays. Changes only what the scene saves and undoes (the tokens' places, order and
+ * Puts tokens down: each at its place (facing the way it is given, if it is), all of them on top of
+ * every other token (`raiseTokens`), and flags the move for spatial audio. A token put down inside
+ * stairs (`linkLandings`) that lead to one level goes to that level, at the same place, in the same
+ * write; where they offer several, it stays and the caller may offer the choice (`linkChoice`). A
+ * token that ends where its level has no floor (an opening, or where the view draws its map
+ * transparent: `art`, `floorBelow`) falls to the first level below that has, in the same write; over
+ * a chasm it stays. Changes only what the scene saves and undoes (the tokens' places, order and
  * levels) and the audio flag; letting go of held tokens is pointer state, which `dropTokens` does.
  * Tokens not listed keep their objects. Changes `state` in place (a store draft); returns nothing,
  * so a recipe may hand its call on.
@@ -55,11 +57,12 @@ export interface PlacedTokensState {
 export function placeTokens(state: PlacedTokensState, positions: readonly TokenPlace[], art?: ArtFloors): void {
   const { tokens } = state.objects;
   const landings = linkLandings(state, positions);
-  for (const { id, x, y } of positions) {
+  for (const { id, x, y, rotation } of positions) {
     const token = tokens[id];
     if (token) {
       token.x = x;
       token.y = y;
+      if (rotation !== undefined) token.rotation = rotation;
     }
   }
   for (const { tokenId, targets } of landings) {

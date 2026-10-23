@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { TFile } from 'obsidian';
 import type { Renderer } from 'pixi.js';

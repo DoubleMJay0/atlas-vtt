@@ -17,6 +17,8 @@ interface Pin {
   readonly notePath: string;
   readonly gmOnly?: boolean;
   readonly sceneLevel?: string;
+  readonly icon?: string;
+  readonly label?: string;
 }
 
 const sceneFile = (background: string | null, pins: readonly Pin[] = [], grid: object | null = null): string => JSON.stringify({
@@ -38,11 +40,11 @@ function vaultWithEvents(): InMemoryApp {
   const memory = createInMemoryApp({ files: {
     [`${ART}/world.webp`]: 'IMG', [`${ART}/town.webp`]: 'IMG', [`${ART}/house.webp`]: 'IMG', [`${ART}/secret.webp`]: 'IMG', 'atlas-vtt/assets/region.webp': 'IMG',
     [path('World')]: sceneFile(`${ART}/world.webp`, [
-      { x: 100, y: 50, notePath: path('Town') },
+      { x: 100, y: 50, notePath: path('Town'), icon: 'castle' },
       { x: 10, y: 10, notePath: path('Secret'), gmOnly: true },
       { x: 20, y: 20, notePath: 'Notes/Lore.md' },
       // A link made into another collection before such links were refused opens the scene at the same place in this one.
-      { x: 30, y: 30, notePath: 'atlas-vtt/collections/other/scenes/Town.atlasmap#Night' },
+      { x: 30, y: 30, notePath: 'atlas-vtt/collections/other/scenes/Town.atlasmap#Night', icon: 'number', label: '3' },
       { x: 40, y: 40, notePath: path('Gone') },
       { x: 50, y: 50, notePath: path('World') },
     ], { type: 'square', size: 70, offsetX: 0, offsetY: 0, mapStretch: { x: 1.2, y: 1 } }),
@@ -72,12 +74,12 @@ describe('the maps a world map leads into', () => {
     ]);
     const [world, town, house] = read?.tree.levels ?? [];
     // The GM's hidden pin, a note, a scene that is gone and the map itself lead nowhere.
-    expect(world?.entrances).toEqual([{ x: 100, y: 50, to: 'town' }, { x: 30, y: 30, to: 'town' }]);
+    expect(world?.entrances).toEqual([{ x: 100, y: 50, to: 'town', icon: 'castle' }, { x: 30, y: 30, to: 'town', icon: 'number', label: '3' }]);
     expect(world?.stretch).toEqual({ x: 1.2, y: 1 });
     // A pin back to the world map is an entrance as well: the page leads back along the path.
-    expect(town?.entrances).toEqual([{ x: 5, y: 6, to: 'house' }, { x: 7, y: 8, to: 'world' }]);
+    expect(town?.entrances).toEqual([{ x: 5, y: 6, to: 'house', icon: 'pin' }, { x: 7, y: 8, to: 'world', icon: 'pin' }]);
     // A scene without a background has no image to show: it is left out, the pin into it stays for the page to drop.
-    expect(house?.entrances).toEqual([{ x: 1, y: 2, to: 'bare' }]);
+    expect(house?.entrances).toEqual([{ x: 1, y: 2, to: 'bare', icon: 'pin' }]);
     expect(read?.scenePaths).toEqual([path('World'), path('Town'), path('House'), path('Bare')]);
   });
 
@@ -93,7 +95,7 @@ describe('the maps a world map leads into', () => {
     memory.files.set(path('Town'), JSON.stringify(town));
 
     const read = await worldMapTree(memory.app, 'world', 32);
-    expect(read?.tree.levels.find((level) => level.key === 'town')?.entrances).toEqual([{ x: 7, y: 8, to: 'world' }]);
+    expect(read?.tree.levels.find((level) => level.key === 'town')?.entrances).toEqual([{ x: 7, y: 8, to: 'world', icon: 'pin' }]);
     expect(read?.tree.levels.map((level) => level.key)).toEqual(['world', 'town']);
   });
 
@@ -101,15 +103,16 @@ describe('the maps a world map leads into', () => {
     const memory = vaultWithEvents();
     const world = JSON.parse(memory.files.get(path('World'))!) as { state: { objects: { pins: Record<string, Record<string, unknown>> } } };
     world.state.objects.pins['pin-0']!.sceneLevel = 'roofs';
-    // A floor whose map lies outside Atlas's folders is no map players may be shown: that pin opens the first floor.
+    // A floor without a map of its own is no map players may be shown: that pin opens the first floor.
     world.state.objects.pins['pin-3']!.sceneLevel = 'attic';
     memory.files.set(path('World'), JSON.stringify(world));
     const town = JSON.parse(memory.files.get(path('Town'))!) as { version: number; state: { levels?: unknown; objects: { pins: Record<string, Record<string, unknown>> } } };
     town.version = 5;
     town.state.levels = [
       { id: 'street', name: 'Street', elevation: { bottom: 0, top: 10 }, background: `${ART}/town.webp` },
-      { id: 'roofs', name: 'Roofs', elevation: { bottom: 10, top: 20 }, background: `${ART}/roofs.webp`, alignment: { offset: { x: 70, y: 0 }, scale: 2 } },
-      { id: 'attic', name: 'Attic', elevation: { bottom: 20, top: 30 }, background: 'Elsewhere/attic.webp' },
+      // A floor's map may lie anywhere in the vault, as the scene's own does.
+      { id: 'roofs', name: 'Roofs', elevation: { bottom: 10, top: 20 }, background: 'Elsewhere/roofs.webp', alignment: { offset: { x: 70, y: 0 }, scale: 2 } },
+      { id: 'attic', name: 'Attic', elevation: { bottom: 20, top: 30 } },
     ];
     town.state.objects.pins['pin-0']!.level = 'roofs';
     memory.files.set(path('Town'), JSON.stringify(town));
@@ -118,15 +121,15 @@ describe('the maps a world map leads into', () => {
     const levels = read?.tree.levels ?? [];
     expect(levels.map((level) => [level.key, level.title, level.image])).toEqual([
       ['world', 'World', `${ART}/world.webp`],
-      ['town#roofs', 'Town: Roofs', `${ART}/roofs.webp`],
+      ['town#roofs', 'Town: Roofs', 'Elsewhere/roofs.webp'],
       ['town', 'Town', `${ART}/town.webp`],
       ['house', 'House', `${ART}/house.webp`],
     ]);
-    expect(levels[0]?.entrances).toEqual([{ x: 100, y: 50, to: 'town#roofs' }, { x: 30, y: 30, to: 'town' }]);
+    expect(levels[0]?.entrances).toEqual([{ x: 100, y: 50, to: 'town#roofs', icon: 'castle' }, { x: 30, y: 30, to: 'town', icon: 'number', label: '3' }]);
     // The floor's own pins lead on, placed on its map as the floor's alignment draws it.
-    expect(levels[1]?.entrances).toEqual([{ x: 5, y: 6, to: 'house' }]);
+    expect(levels[1]?.entrances).toEqual([{ x: 5, y: 6, to: 'house', icon: 'pin' }]);
     expect(levels[1]?.stretch).toMatchObject({ x: 2, y: 2, offset: { x: 70, y: 0 } });
-    expect(levels[2]?.entrances).toEqual([{ x: 7, y: 8, to: 'world' }]);
+    expect(levels[2]?.entrances).toEqual([{ x: 7, y: 8, to: 'world', icon: 'pin' }]);
     expect(read?.scenePaths).toEqual([path('World'), path('Town'), path('House'), path('Bare')]);
   });
 
@@ -152,7 +155,7 @@ describe('the maps a world map leads into', () => {
     const read = await worldMapTree(memory.app, 'world', 32);
     // The GM's own pin places nothing, a quest without an id yet and a note that is no quest neither.
     expect(read?.tree.levels[0]?.quests).toEqual([{ x: 60, y: 70, id: crown }, { x: 80, y: 90, id: crown }]);
-    expect(read?.tree.levels[0]?.entrances).toEqual([{ x: 100, y: 50, to: 'town' }, { x: 30, y: 30, to: 'town' }]);
+    expect(read?.tree.levels[0]?.entrances).toEqual([{ x: 100, y: 50, to: 'town', icon: 'castle' }, { x: 30, y: 30, to: 'town', icon: 'number', label: '3' }]);
     expect(read?.tree.levels[1]).not.toHaveProperty('quests');
     expect(read?.notePaths).toEqual(['Notes/Lore.md', 'Quests/Crown.md', 'Quests/Ledger.md']);
 

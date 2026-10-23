@@ -3,13 +3,14 @@ import { Viewport } from 'pixi-viewport';
 import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
 import { getTokenRingCenterRadius } from './token-renderer/tokenRingMetrics';
-import { computeTokenPixelSize, computeTokenStrokeWidth, RESIZE_HANDLE_SIZE, tokenUIScale } from './token-renderer/tokenSizing';
+import { computeTokenPixelSize, computeTokenStrokeWidth, RESIZE_HANDLE_SIZE, TOKEN_HANDLE_LABEL, tokenUIScale } from './token-renderer/tokenSizing';
 import { toError } from '../utils/errors';
 import type { TokenHandleContainer } from './token-renderer/types';
 import { findTokenGroup } from './token-renderer/findTokenGroup';
 import { destroyTree } from './utils/destroyTree';
 import { resizedTokenCenter } from '../grid/gridPlacement';
 import { levelObjects } from '../levels/levelObjects';
+import { mapTokens } from '../tokens/offMap';
 
 export class TokenResizeUI {
   private viewport: Viewport;
@@ -149,7 +150,7 @@ export class TokenResizeUI {
     
     // Create handles for each selected token
     for (const tokenId of tokenIds) {
-      const token = levelObjects(this.store.getState()).tokens[tokenId];
+      const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
       if (!token) continue;
       
       // Get the token container if provided
@@ -207,7 +208,7 @@ export class TokenResizeUI {
    */
   public updateHandlePositions(tokenSprites?: Record<string, Container>): void {
     for (const [tokenId, handles] of this.resizeHandles) {
-      const token = levelObjects(this.store.getState()).tokens[tokenId];
+      const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
       if (!token) continue;
       
       const gridSize = this.store.getState().grid?.size || 70;
@@ -240,7 +241,7 @@ export class TokenResizeUI {
     // Get theme colors - matching status badges
     const isDarkMode = document.body.classList.contains('theme-dark');
     const bg = new Graphics();
-    const handle: TokenHandleContainer = Object.assign(new Container(), { bg, isDarkMode });
+    const handle: TokenHandleContainer = Object.assign(new Container({ label: TOKEN_HANDLE_LABEL }), { bg, isDarkMode });
     handle.eventMode = 'static';
     handle.interactive = true;
     handle.cursor = 'ew-resize';
@@ -321,7 +322,7 @@ export class TokenResizeUI {
     this.resizeStartX = worldPos.x;
     
     for (const tokenId of this.resizingTokenIds) {
-      const token = levelObjects(this.store.getState()).tokens[tokenId];
+      const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
       if (token) {
         // Get current size or default to 1
         const currentSize = token.size || 1;
@@ -378,7 +379,7 @@ export class TokenResizeUI {
       // Clamp size between 1 (1x1 grid) and 5 (9x9 grid)
       newSize = Math.max(1, Math.min(5, newSize));
       
-      const token = levelObjects(this.store.getState()).tokens[tokenId];
+      const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
       const lastTempSize = this.temporarySizes[tokenId];
       if (token && lastTempSize !== newSize) {
         anyChanged = true;
@@ -426,7 +427,7 @@ export class TokenResizeUI {
       for (const tokenId of this.resizingTokenIds) {
         const tempSize = this.temporarySizes[tokenId];
         const startSize = this.startSizes[tokenId] || 1;
-        const token = objects.tokens[tokenId];
+        const token = mapTokens(objects)[tokenId];
         
         // Check if size actually changed from start
         if (token && tempSize !== undefined && tempSize !== startSize) {

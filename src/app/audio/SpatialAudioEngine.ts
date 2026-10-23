@@ -5,6 +5,7 @@ import type { AudioBufferCache } from './AudioBufferCache';
 import { countWallsBetween, computeWallDampening, computeDistanceGain } from './audioOcclusion';
 import { runInBackground } from '../utils/backgroundTask';
 import { levelObjects } from '../levels/levelObjects';
+import { mapTokens } from '../tokens/offMap';
 
 const UPDATE_THROTTLE_MS = 100; // ~10fps during drag
 const FADE_DURATION = 0.2; // 200ms fade for start/stop
@@ -167,7 +168,7 @@ export class SpatialAudioEngine {
     if (state.selectedIds.length === 0) return null;
 
     for (const id of state.selectedIds) {
-      const token = levelObjects(state).tokens[id];
+      const token = mapTokens(levelObjects(state))[id];
       if (token) return { x: token.x, y: token.y };
     }
 

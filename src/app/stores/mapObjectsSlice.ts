@@ -8,7 +8,8 @@ import { isPinLabelKind, nextPinLabel } from '../tools/pinLabels';
 import { collectMapObjects, countMapObjects, type CopyableCollections, type MapObjectContent } from '../clipboard/mapObjectContent';
 import { duplicateStep, placeMapObjects } from '../clipboard/mapObjectPlacement';
 import { computeNextInstanceNumber } from './tokenInstanceNumbers';
-import { raiseTokens } from './tokenStacking';
+import { placeTokens, raiseTokens } from './tokenStacking';
+import { isOffMap } from '../tokens/offMap';
 import type { SceneLevel } from '../types/sceneLevelTypes';
 import { placedOnViewedLevel, viewedLevelId } from '../levels/sceneLevels';
 import { levelObjects } from '../levels/levelObjects';
@@ -27,6 +28,8 @@ export interface MapObjectsSlice {
   duplicateMapObjects: (ids: string[]) => string[];
   /** Removes tokens, drawings, texts, pins and stairs with the given ids; other ids stay selected. */
   removeMapObjects: (ids: string[]) => void;
+  /** Puts a token kept beside the map (`offMap`) on it at (x, y), on top of every other token, and selects it. */
+  placeOffMapToken: (id: string, x: number, y: number) => void;
 }
 
 interface MapObjectsStoreState {
@@ -118,6 +121,16 @@ export function createMapObjectsActions(set: ImmerSet, get: () => MapObjectsStor
       // Copies step aside from what stands on the level shown, where they land: other floors are out of the way.
       return insert(placeMapObjects(content, duplicateStep(state.grid), state.grid, levelObjects(state)));
     },
+
+    placeOffMapToken: (id, x, y) => set((draft) => {
+      const token = draft.objects.tokens[id];
+      if (!token || !isOffMap(token)) return;
+      delete token.offMap;
+      // It is put on the map the view shows: in a scene of several levels, the level shown
+      Object.assign(token, placedOnViewedLevel(draft));
+      placeTokens(draft, [{ id, x, y }]);
+      draft.selectedIds = [id];
+    }),
 
     removeMapObjects: (ids) => set((draft) => {
       const { tokens, drawings, texts, pins, levelLinks } = draft.objects;

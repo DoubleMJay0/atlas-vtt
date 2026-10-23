@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { ASSET_CHUNK_BYTES } from '../../../../src/app/online/protocol/index.ts';
+import { ASSET_CHUNK_BYTES, MARKS_INTERVAL_MS } from '../../../../src/app/online/protocol/index.ts';
 import { describe, expect, it } from 'vitest';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { imageMimeType, LIGHTING_REFUSAL, REPEAT_REQUEST_MS } from '../../../../src/app/online/gm/SceneShare.ts';
@@ -43,14 +42,12 @@ describe('the shared scene', () => {
     expect(scenes(table.sent)).toHaveLength(1);
   });
 
-  it('is lit while its lighting and Atlas\'s dynamic lighting are on, and withdrawn with a notice while the GM\'s lighting cannot be read', async () => {
+  it('is lit while its lighting is on, and withdrawn with a notice while the GM\'s lighting cannot be read', async () => {
     const table = harness();
     table.share.start();
     const lit = state({ lighting: { enabled: true, ambient: 0 } });
     await table.set(lit);
-    table.settings = { dynamicLighting: false, showNames: true, showDiceRolls: false, showInitiative: true, showWidgets: true, showCursors: false };
-    await table.set(state({ lighting: { enabled: true, ambient: 0.5 } }));
-    table.settings = { dynamicLighting: null, showNames: true, showDiceRolls: false, showInitiative: true, showWidgets: true, showCursors: false };
+    await table.set(state({ lighting: { enabled: false, ambient: 0.5 } }));
     table.lighting = null;
     await table.set(lit);
     table.lighting = GENERIC_SOURCE;
@@ -68,6 +65,20 @@ describe('the shared scene', () => {
     const [first, again] = table.sent.filter(({ body }) => body.t === 'scene');
     expect(again?.to).toBe('alice');
     expect(again?.body).toEqual(first?.body);
+  });
+
+  it('takes the marks of the scene before along with it: none of them follow the next scene', async () => {
+    const table = shareHarness(state(), new Map([['maps/cave.webp', MAP], ['maps/other.webp', MAP.slice(1)]]));
+    table.share.start();
+    await table.set(state());
+    const [first] = scenes(table.sent) as { id: string }[];
+    table.share.receive('a'.repeat(20), { t: 'measure', scene: first?.id, color: '#66ffa9', live: { shape: 'line', a: [10, 10], b: [80, 10] }, kept: [] });
+    await table.advance(MARKS_INTERVAL_MS);
+    expect(table.sent.some(({ body }) => body.t === 'marks' && body.scene === first?.id)).toBe(true);
+    await table.set(state({ background: 'maps/other.webp' }));
+    const switched = table.sent.findIndex(({ body }) => body.t === 'scene' && body.scene?.id !== first?.id);
+    expect(switched).toBeGreaterThan(0);
+    expect(table.sent.slice(switched).filter(({ body }) => body.t === 'marks' && body.scene === first?.id)).toEqual([]);
   });
 
   it('withdraws an image players cannot be sent, such as an SVG', async () => {

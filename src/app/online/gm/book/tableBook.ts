@@ -2,6 +2,7 @@ import { normalizePath, type App } from 'obsidian';
 import type { GmMessage } from '../../protocol/index.ts';
 import { setLootRecipientSource } from '../../../loot/lootRecipients';
 import { scaleInWindow } from '../assetVariants.ts';
+import type { ArmedCards } from '../armedCards.ts';
 import { companionTimers } from '../companionTimers.ts';
 import type { Ownership } from '../ownership.ts';
 import type { VaultImage } from '../TokenShare.ts';
@@ -10,7 +11,10 @@ import { BookShare } from './BookShare.ts';
 import { writeCharacterValue } from './characterValues.ts';
 import type { ResourceWrites } from './resourceWrites.ts';
 import { gatedQuestAsset, gatedQuests, onQuestsChange } from './questGate.ts';
+import { gatedRests } from './restGate.ts';
+import { gatedStatblocks } from './statblockGate.ts';
 import { gatedWorldMap, onWorldMapChange } from './worldMapGate.ts';
+import { showNotice } from '../../../ui/notice';
 import type { BookShelf } from './BookShelf.ts';
 
 export interface TableBookPorts {
@@ -25,6 +29,10 @@ export interface TableBookPorts {
   randomId(): string;
   /** Where players' edits of their tokens in the shared scene are written; null while no scene is shared. */
   tokenWrites(): ResourceWrites | null;
+  /** The arming clock of the cards over the online control. */
+  readonly cards: ArmedCards;
+  /** The rest requests' cards changed. */
+  cardsChanged(): void;
 }
 
 /** A running table's books, and what they hang on while it runs. */
@@ -39,7 +47,8 @@ export interface TableBook {
  * once when tokens change hands or the world map or the quests may be others, and named to the
  * loot roller as the people an item can be handed to for as long as the table runs. A player's edit
  * of a resource goes to their token in the shared scene, else to the values the played campaign
- * keeps of their character.
+ * keeps of their character; their character's statblock is read and written through the statblock
+ * gate, and followed while its note or a template changes.
  */
 export function tableBook(ports: TableBookPorts): TableBook {
   const { app, ownership } = ports;
@@ -53,21 +62,32 @@ export function tableBook(ports: TableBookPorts): TableBook {
     randomId: () => ports.randomId(),
     scene: () => ports.scene(),
     players: () => ownership.list(),
-    ownerOf: (tokenId) => ownership.ownerOf(tokenId),
+    ownerOf: (tokenId, token) => ownership.ownerOf(tokenId, token),
     readImage: (path) => ports.readImage(path),
     stat: (path) => {
       const file = app.vault.getFileByPath(normalizePath(path));
       return file === null ? null : { mtime: file.stat.mtime, size: file.stat.size };
     },
     worldMap: () => gatedWorldMap(),
+    notice: (text) => showNotice(text),
     quests: () => gatedQuests(),
     questAsset: (hash) => gatedQuestAsset(hash),
     editResource: (edit, answer) => {
-      if (edit.kind === 'character') return answer(writeCharacterValue(app, edit));
+      if (edit.kind === 'character') {
+        const taken = writeCharacterValue(app, edit);
+        return taken === null ? answer(null) : answer(taken.current, edit.max === undefined ? undefined : taken.max);
+      }
       const writes = ports.tokenWrites();
       if (writes === null) answer(null);
       else writes.write(edit, answer);
     },
+    libraryStatblock: (placed) => gatedStatblocks.libraryStatblock(placed),
+    readStatblock: (path) => gatedStatblocks.read(path),
+    writeStatblock: (path, patches) => gatedStatblocks.write(path, patches),
+    statblockPanelWidth: () => gatedStatblocks.panelWidth?.(),
+    rests: gatedRests,
+    cards: ports.cards,
+    cardsChanged: () => ports.cardsChanged(),
     scaleImage: scaleInWindow,
   }, ports.shelf);
   let stops: (() => void)[] = [];
@@ -79,6 +99,7 @@ export function tableBook(ports: TableBookPorts): TableBook {
         ownership.onChange(() => share.update()),
         onWorldMapChange(() => share.worldMapChanged()),
         onQuestsChange(() => share.questsChanged()),
+        gatedStatblocks.onChange((path) => share.statblockChanged(path)),
         () => setLootRecipientSource(null),
         () => share.stop(),
       ];

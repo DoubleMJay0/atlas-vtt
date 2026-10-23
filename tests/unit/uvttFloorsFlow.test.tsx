@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { Blob as NodeBlob, File as NodeFile } from 'node:buffer';
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,7 +9,6 @@ import { useUvttImport } from '../../src/app/packages/components/asset-manager/h
 import { AssetService } from '../../src/app/services/AssetService';
 import { parseSceneFile } from '../../src/app/services/MapPersistence';
 import { daTowerFloor, keepFloor } from '../fixtures/uvttFloorFiles';
-import { withDynamicLighting } from '../mocks/experimentalFeatures';
 import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
 
 /**
@@ -64,7 +64,6 @@ beforeEach(async () => {
   vi.stubGlobal('File', NodeFile);
   vi.mocked(optimizeImage).mockImplementation(async (image) => ({ image, thumbnail: new NodeBlob(['THUMB']) as unknown as Blob, preview: null, sourcePreview: null }));
   vault = createInMemoryApp();
-  withDynamicLighting(vault.app);
   Object.assign(vault.app.workspace, { getLeaf: () => ({ openFile }) });
   AssetService.resetInstance();
   assets = AssetService.getInstance(vault.app);

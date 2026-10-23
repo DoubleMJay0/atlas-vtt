@@ -1,4 +1,4 @@
-import { CursorOverlay, CursorTap, MarkOverlay, PointerTap, type CursorViewport, type MeasureRules, type OverlayHost, type TapViewport } from '../marks/index.ts';
+import { CursorOverlay, CursorTap, MarkOverlay, PointerTap, type CursorViewport, type MeasureRules, type OverlayHost, type RemoteDrag, type TapViewport } from '../marks/index.ts';
 import type { SharedCursor } from '../protocol/index.ts';
 import type { App } from 'obsidian';
 import type { SceneSource } from '../../host/sceneSource';
@@ -9,6 +9,7 @@ import { atlasLaserLook, field } from './atlasLighting.ts';
 import { asTokenSource, call, type SceneState, type SceneStore } from './atlasView.ts';
 import type { GmMarkSource, PlayerMarks } from './MarkShare.ts';
 import { levelObjects } from '../../levels/levelObjects';
+import { mapTokens } from '../../tokens/offMap';
 
 type Viewport = TapViewport & CursorViewport & OverlayHost['viewport'];
 
@@ -39,7 +40,7 @@ function rendererParts(renderer: unknown): { readonly measurements: SceneSource<
  * The GM's marks on a shared Atlas tab, read from its renderer: the measure renderer's records, a
  * `PointerTap` on its viewport for Atlas's laser (whose state is private), and what the players see of
  * the tokens (`playerRollTokens`, the token list's own source). Built anew when the tab builds its
- * renderer anew. Also draws the players' marks over the tab (`MarkOverlay`) and their cursors
+ * renderer anew. Also draws the players' marks and the rulers of their drags over the tab (`MarkOverlay`) and their cursors
  * (`CursorOverlay`), and follows the GM's own cursor (`CursorTap`).
  */
 export class GmMarks {
@@ -49,6 +50,8 @@ export class GmMarks {
   private readonly store: SceneStore;
   private readonly overlay: MarkOverlay;
   private readonly cursors = new CursorOverlay((cursor) => cursor.name ?? '');
+  /** What the overlay shows: the players' marks and the rulers of their drags, each kept until it changes. */
+  private shown: { players: PlayerMarks; drags: readonly RemoteDrag[] } = { players: { lasers: [], measures: [] }, drags: [] };
   private built: { readonly renderer: unknown; readonly source: GmMarkSource; readonly taps: readonly { destroy(): void }[]; readonly host: OverlayHost } | null = null;
 
   constructor(app: App, renderer: () => unknown, store: SceneStore, rules: () => MeasureRules | null) {
@@ -93,8 +96,14 @@ export class GmMarks {
 
   /** Draws the players' marks over the tab's map. */
   showPlayers(marks: PlayerMarks): void {
-    this.source();
-    if (this.built !== null) this.overlay.show(marks, this.built.host);
+    this.shown.players = marks;
+    this.showOverlay();
+  }
+
+  /** Draws the rulers of the players' drags over the tab's map. */
+  showPlayerDrags(drags: readonly RemoteDrag[]): void {
+    this.shown.drags = drags;
+    this.showOverlay();
   }
 
   /** Draws the players' cursors over the tab's map. */
@@ -111,11 +120,16 @@ export class GmMarks {
     this.cursors.dispose();
   }
 
+  private showOverlay(): void {
+    this.source();
+    if (this.built !== null) this.overlay.show({ ...this.shown.players, drags: this.shown.drags }, this.built.host);
+  }
+
   /** Where every token stands, hidden ones included, as Atlas's measurements judge their start. */
   private footprints(tokens: unknown, state: SceneState & Partial<Pick<ViewState, 'tokenSettings'>>): TokenFootprint[] {
     const sprites = call(tokens, 'getTokenSprites');
     const displayed = typeof sprites === 'object' && sprites !== null ? (sprites as Record<string, { x: number; y: number } | null>) : {};
     const size = asTokenSource(this.renderer())?.getGridOptions()?.size ?? state.grid?.size ?? 0;
-    return tokenFootprints(levelObjects(state).tokens, displayed, size, state.tokenSettings?.tokenRingSize ?? 1);
+    return tokenFootprints(mapTokens(levelObjects(state)), displayed, size, state.tokenSettings?.tokenRingSize ?? 1);
   }
 }

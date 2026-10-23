@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { vi, describe, expect, it } from 'vitest';
 import type { TFile } from 'obsidian';
 import { parseGmMessage, type GmMessage, type SharedPin } from '../../../../src/app/online/protocol/index.ts';
@@ -107,6 +106,15 @@ describe('readable pins players are sent', () => {
     const [listed] = shown();
     expect(listed).toEqual({ id: expect.stringMatching(/^[0-9a-f]{24}$/), x: 300, y: 400, icon: 'pin', found: null });
     expect(JSON.stringify(shown())).not.toContain('Keep');
+    expect(parseGmMessage(ofKindLast(shown()))).not.toBeNull();
+  });
+
+  it('send each pin with the face the GM sees: its icon, and the label of a numbered or lettered pin', async () => {
+    const { shown } = await table({
+      keep: pin('keep', 300, { icon: 'castle' }), room: pin('room', 400, { icon: 'number', label: '7' }), bare: pin('bare', 500, { icon: 'letter' }),
+    });
+    const faces = shown().map(({ icon, label }) => ({ icon, label }));
+    expect(faces).toEqual(expect.arrayContaining([{ icon: 'castle', label: undefined }, { icon: 'number', label: '7' }, { icon: 'pin', label: undefined }]));
     expect(parseGmMessage(ofKindLast(shown()))).not.toBeNull();
   });
 

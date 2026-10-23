@@ -9,6 +9,7 @@ import { levelLinkList, MAX_LEVEL_LINKS } from '../levels/levelLinks';
 import { hasLevels } from '../levels/sceneLevels';
 import { t } from '../i18n';
 import { showNotice } from '../ui/notice';
+import { withoutOffMap } from '../tokens/offMap';
 
 type ClipboardStore = Pick<StoreApi<ViewAtlasState>, 'getState'>;
 
@@ -17,11 +18,14 @@ function canEditMapObjects(state: ViewAtlasState): boolean {
   return !state.isPlayerView && state.activeTool !== 'wall';
 }
 
-/** Ids that copy, cut and duplicate act on: in the stairs tool the stairs whose popover is open, which is how it selects them. */
+/**
+ * Ids that copy, cut and duplicate act on: in the stairs tool the stairs whose popover is open, which
+ * is how it selects them; never a combatant beside the map, which a cut would delete unseen.
+ */
 function editableSelection(state: ViewAtlasState): string[] {
   if (!canEditMapObjects(state)) return [];
   if (state.activeTool === 'stairs') return state.levelLinkPopover ? [state.levelLinkPopover] : [];
-  return state.selectedIds;
+  return withoutOffMap(state.objects, state.selectedIds);
 }
 
 function copyableContent(state: ViewAtlasState, ids: readonly string[]): MapObjectContent | null {

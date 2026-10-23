@@ -8,6 +8,7 @@ import type { ViewState } from '../types/viewState';
 import type { FogOperation } from '../types/fogTypes';
 import type { Point } from './hexGeometry';
 import type { MapMove } from './mapStretch';
+import { isOffMap, sceneTokens } from '../tokens/offMap';
 
 type SceneObjects = ViewState['objects'];
 
@@ -48,7 +49,8 @@ function movedFog(operation: FogOperation, move: MapMove): FogOperation {
 export function objectsMovedWithMap(objects: SceneObjects, move: MapMove, moves?: MovesWithMap): SceneObjects {
   return {
     ...objects,
-    tokens: mapRecord(objects.tokens, placed(move), moves),
+    // A combatant kept beside the map has no place on its image and stays where it waits
+    tokens: mapRecord(sceneTokens(objects), (token) => (isOffMap(token) ? token : placed<typeof token>(move)(token)), moves),
     pins: mapRecord(objects.pins, placed(move), moves),
     texts: mapRecord(objects.texts, placed(move), moves),
     lights: mapRecord(objects.lights, placed(move), moves),

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { TFile } from 'obsidian';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MapVideoSlot, type MapVideoDeps, type MapVideoProblem } from '../../../src/app/pixi/mapImage/video/MapVideoSlot';

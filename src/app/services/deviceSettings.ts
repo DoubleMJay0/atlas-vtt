@@ -11,6 +11,8 @@ export const INPUT_MODE_STORAGE_KEY = 'atlas-vtt:input-mode';
 export const LIGHTING_QUALITY_STORAGE_KEY = 'atlas-vtt:lighting-quality';
 /** Whether animated maps play on this device; unset follows the system's reduced motion (`animateMapsOn`). */
 export const ANIMATE_MAPS_STORAGE_KEY = 'atlas-vtt:animate-maps';
+/** Whether the initiative tracker is collapsed on this device: `collapsed` or `expanded`, never a falsy value Obsidian would drop. */
+export const INITIATIVE_COLLAPSED_STORAGE_KEY = 'atlas-vtt:initiative-tracker';
 
 /**
  * The vault's local storage. Obsidian stores a value only when it is truthy: `false`, `0` and `''`
@@ -80,5 +82,23 @@ export function saveAnimateMaps(storage: DeviceStorage, on: boolean): void {
     storage.saveLocalStorage(ANIMATE_MAPS_STORAGE_KEY, on ? ANIMATE_ON : ANIMATE_OFF);
   } catch (error) {
     console.error('[Atlas] Could not save whether this device animates maps', error);
+  }
+}
+
+/** Whether the GM collapsed the initiative tracker on this device; expanded until chosen. */
+export function loadInitiativeCollapsed(storage: DeviceStorage): boolean {
+  try {
+    return storage.loadLocalStorage(INITIATIVE_COLLAPSED_STORAGE_KEY) === 'collapsed';
+  } catch (error) {
+    console.error('[Atlas] Could not read how this device shows the initiative tracker', error);
+    return false;
+  }
+}
+
+export function saveInitiativeCollapsed(storage: DeviceStorage, collapsed: boolean): void {
+  try {
+    storage.saveLocalStorage(INITIATIVE_COLLAPSED_STORAGE_KEY, collapsed ? 'collapsed' : 'expanded');
+  } catch (error) {
+    console.error('[Atlas] Could not save how this device shows the initiative tracker', error);
   }
 }

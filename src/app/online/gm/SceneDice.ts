@@ -1,3 +1,4 @@
+import type { AdvantageSide, DiceSet } from '../../types/diceSetTypes';
 import type { PlayerRoll, SharedRoll } from '../protocol/index.ts';
 import type { RollSceneLookup } from '../../services/playerRollSource';
 import type { DiceSource } from './atlasDice.ts';
@@ -9,6 +10,7 @@ import { PlayerRolls } from './PlayerRolls.ts';
 import { quietRoll } from './quietRoll.ts';
 import { RollShare, type RollNotes } from './RollShare.ts';
 import type { SceneSharePorts } from './SceneShare.ts';
+import { ownerIn } from './seatSource.ts';
 import type { TokenShare } from './TokenShare.ts';
 
 /** What the dice read of the rest of the shared scene. */
@@ -49,12 +51,12 @@ export class SceneDice {
         scene: tokens.listedScene,
         mapPath: store.getState().mapPath,
         listedToken: (alias) => tokens.listedToken(alias),
-        ownerOf: (tokenId) => seats?.ownerOf(tokenId),
+        ownerOf: ownerIn(seats, store),
         tokens: store.getState().objects.tokens,
       }),
       dice: () => ports.dice?.() ?? null,
       rollAs: (who, run, notes) => this.share.rollAs(who, run, notes),
-      quietRoll: (formula) => this.quietRoll(formula),
+      quietRoll: (formula, set, setAppearance, advantage) => this.quietRoll(formula, set, setAppearance, advantage),
       request: (from, answer) => ports.rollRequest?.(from, answer) ?? null,
       logged: (roll) => ports.logRoll?.(roll),
       alias: (id) => tokens.alias(id),
@@ -84,14 +86,14 @@ export class SceneDice {
       tokens: this.store.getState().objects.tokens,
       listedToken: (alias) => tokens.listedToken(alias),
       listedAlias: (tokenId) => tokens.listedAlias(tokenId),
-      ownerOf: (tokenId) => seats?.ownerOf(tokenId),
+      ownerOf: ownerIn(seats, this.store),
     });
   }
 
   /** A formula rolled by the shared map's rules without a throw; null where it does not roll or the tab has no dice now. */
-  quietRoll(formula: string): SharedRoll | null {
+  quietRoll(formula: string, set?: DiceSet, setAppearance?: true, advantage?: AdvantageSide): SharedRoll | null {
     const dice = this.ports.dice?.() ?? null;
-    return dice === null ? null : quietRoll(formula, dice.rules(), this.ports.randomId(), Date.now());
+    return dice === null ? null : quietRoll(formula, set ?? dice.rules(), this.ports.randomId(), Date.now(), undefined, setAppearance, advantage);
   }
 
   /** Runs a GM's roll on the shared tab's dice, carrying `notes` into the log; false where the tab has no dice or nothing was rolled. */

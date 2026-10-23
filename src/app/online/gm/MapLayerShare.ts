@@ -14,6 +14,7 @@ import type { VaultImage } from './TokenShare.ts';
 import { WidgetShare } from './WidgetShare.ts';
 import { levelObjects } from '../../levels/levelObjects';
 import { levelMapKey } from '../../levels/sceneLevels';
+import { mapTokens } from '../../tokens/offMap';
 
 export interface MapLayerSharePorts extends PacerClock {
   send(body: GmMessage, to?: string): void;
@@ -25,6 +26,10 @@ export interface MapLayerSharePorts extends PacerClock {
   randomId(): string;
   /** The log entry that tells who found the pin `pinId` of the map `mapPath`, or null while nobody has. */
   foundPin?(mapPath: string, pinId: string): string | null;
+  /** The number a token's look-alike badge shows the players (`TokenShare.badgeOf`); none without. */
+  badgeOf?(tokenId: string): number | null;
+  /** The id players know a token by in their token list (`TokenShare.listedAlias`); none for a token they are not sent. */
+  tokenAlias?(tokenId: string): string | undefined;
 }
 
 /** The shortest time between two sends of the map's layers, as for the token list. */
@@ -130,7 +135,10 @@ export class MapLayerShare {
     }
     const art = new Map<string, string>();
     const list = sharedInitiative({
-      state, shown: settings.showInitiative, showNames: settings.showNames, rules: source.rules(),
+      state, shown: settings.showInitiative, showNames: settings.showNames, fromTurn: settings.initiativeFromTurn === true, rules: source.rules(),
+      bannerOff: settings.turnBanner === false, movesOnTurn: settings.movesOnTurn === true, dock: settings.initiativeDock ?? 'right',
+      badge: (tokenId) => this.ports.badgeOf?.(tokenId) ?? null,
+      tokenAlias: (tokenId) => this.ports.tokenAlias?.(tokenId),
       art: (path) => {
         const ref = this.art.get(path);
         if (ref !== null) art.set(ref.hash, path);
@@ -144,7 +152,7 @@ export class MapLayerShare {
     if (!scene.lit) return;
     const seen = source.doorsSeen(levelObjects(state).walls, fog);
     if (seen !== null) this.publish({ t: 'doors', scene: scene.id, doors: sharedDoors(levelObjects(state).walls, seen) });
-    const sensed = source.sensed(levelObjects(state).tokens);
+    const sensed = source.sensed(mapTokens(levelObjects(state)));
     if (sensed !== null) this.publish({ t: 'sensed', scene: scene.id, tokens: sensed });
   }
 

@@ -3,6 +3,7 @@ import type { LevelLink } from '../types/sceneLevelTypes';
 import { copiedLevelLink, type CopiedLevelLink } from '../levels/levelLinkCopies';
 import { levelLinkList } from '../levels/levelLinks';
 import { viewedLevelId, type LevelView } from '../levels/sceneLevels';
+import { mapTokens } from '../tokens/offMap';
 
 export interface Point {
   x: number;
@@ -39,7 +40,7 @@ export function collectMapObjects(objects: CopyableCollections, ids: readonly st
   const links = view ? levelLinkList(objects.levelLinks) : [];
   const from = view ? viewedLevelId(view) : null;
   return {
-    tokens: pick(objects.tokens),
+    tokens: pick(mapTokens(objects)),
     drawings: pick(objects.drawings),
     texts: pick(objects.texts),
     pins: pick(objects.pins),
@@ -116,18 +117,25 @@ export function anchorKey(kind: string, point: Point): string {
   return `${kind}:${Math.round(point.x)},${Math.round(point.y)}`;
 }
 
+/** Whether `source` is copied content (lists) rather than a scene's collections (records). */
+function isCopiedContent(source: CopyableCollections | MapObjectContent): source is MapObjectContent {
+  return Array.isArray(source.tokens);
+}
+
 /** The anchor of every object: tokens by image, texts and pins by position, drawings and stairs by their first point. */
-export function objectAnchors(objects: CopyableCollections | MapObjectContent): ObjectAnchor[] {
+export function objectAnchors(source: CopyableCollections | MapObjectContent): ObjectAnchor[] {
   const values = <T>(collection: Record<string, T> | T[]): T[] => (Array.isArray(collection) ? collection : Object.values(collection));
   const anchors: ObjectAnchor[] = [];
   const add = (kind: string, point: Point | undefined, tokenSize?: number): void => {
     if (point) anchors.push({ kind, point: { x: point.x, y: point.y }, ...(tokenSize !== undefined && { tokenSize }) });
   };
-  values(objects.tokens).forEach((token) => add(`token:${token.imagePath}`, token, token.size || 1));
-  values(objects.texts).forEach((text) => add('text', text));
-  values(objects.pins).forEach((pin) => add('pin', pin));
-  values(objects.drawings).forEach((drawing) => add('drawing', drawing.points[0]));
-  const links = Array.isArray(objects.levelLinks) ? objects.levelLinks : levelLinkList(objects.levelLinks);
+  // Of a scene only the tokens on the map stand where a copy is put down
+  const tokens = isCopiedContent(source) ? source.tokens : mapTokens(source);
+  values(tokens).forEach((token) => add(`token:${token.imagePath}`, token, token.size || 1));
+  values(source.texts).forEach((text) => add('text', text));
+  values(source.pins).forEach((pin) => add('pin', pin));
+  values(source.drawings).forEach((drawing) => add('drawing', drawing.points[0]));
+  const links = Array.isArray(source.levelLinks) ? source.levelLinks : levelLinkList(source.levelLinks);
   links.forEach((link) => add('stairs', link.polygon[0]));
   return anchors;
 }

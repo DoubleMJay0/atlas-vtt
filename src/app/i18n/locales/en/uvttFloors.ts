@@ -16,7 +16,6 @@ export const uvttFloors = {
   'uvttFloors.walls': { one: '{count} wall', other: '{count} walls' },
   'uvttFloors.doors': { one: '{count} door', other: '{count} doors' },
   'uvttFloors.lights': { one: '{count} light', other: '{count} lights' },
-  'uvttFloors.lightingOff': 'They show once you switch on dynamic lighting under Experimental features in the command palette.',
   'uvttFloors.lightsOff': 'Lights whose glow the image already shows are switched off.',
   'uvttFloors.scaledDown': 'The images of {files} were scaled down to the largest size a map keeps.',
   'uvttFloors.title': 'Import {count} maps',

@@ -24,6 +24,7 @@ import type { EngineLight, EngineZone } from '../pixi/lighting/engine/types';
 import { LightReaches } from './lightReaches';
 import { activeLights, engineLight } from './lightSources';
 import { everyLevelObjects, levelObjects } from '../levels/levelObjects';
+import { mapTokens } from '../tokens/offMap';
 
 /** What a scene's lighting works out on the CPU, in world pixels: the engine draws it and the rules read it. */
 export interface SceneModel {
@@ -174,7 +175,7 @@ export class SceneSpots {
   constructor(private readonly policy: SightPolicy = PLAYER_SIGHT_POLICY) {}
 
   update(model: SceneModel, state: SceneState, measurement: () => MeasurementSettings, sightRules?: () => SightRules, sight: Sight = model.sight): SeenSpot[] {
-    const inputs: SpotInputs = { sight, model, tokens: levelObjects(state).tokens, held: heldForSight(state), lighting: state.lighting, grid: state.grid, rules: sightRules?.() };
+    const inputs: SpotInputs = { sight, model, tokens: mapTokens(levelObjects(state)), held: heldForSight(state), lighting: state.lighting, grid: state.grid, rules: sightRules?.() };
     const last = this.inputs;
     this.inputs = inputs;
     if (last && (Object.keys(inputs) as (keyof SpotInputs)[]).every((key) => last[key] === inputs[key])) return this.spots;

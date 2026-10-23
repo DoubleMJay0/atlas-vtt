@@ -27,7 +27,8 @@ export class MapLinkPreview {
   /** Delay (ms) before the preview hides after mouse leaves. */
   private static readonly HIDE_DELAY = 150;
 
-  constructor(app: App, file: TFile, pin: PreviewAnchor, manager: NotePreviewUIManager, position: { x: number; y: number }) {
+  /** `doc`: the document of the window the pin was hovered in, which may be a popout's. */
+  constructor(app: App, file: TFile, pin: PreviewAnchor, manager: NotePreviewUIManager, position: { x: number; y: number }, private readonly doc: Document = document) {
     this.app = app;
     this.file = file;
     this.notePath = file.path;
@@ -63,7 +64,7 @@ export class MapLinkPreview {
   destroy(): void {
     this.clearHideTimeout();
     if (this.escapeHandler) {
-      document.removeEventListener('keydown', this.escapeHandler, true);
+      this.doc.removeEventListener('keydown', this.escapeHandler, true);
       this.escapeHandler = null;
     }
     this.wrapperEl?.remove();
@@ -82,7 +83,7 @@ export class MapLinkPreview {
 
   private render(position: { x: number; y: number }): void {
     // Outer wrapper for SCSS scoping (all styles are nested under .atlas-vtt-plugin)
-    this.wrapperEl = document.body.createDiv({ cls: 'atlas-vtt-plugin atlas-vtt-root' });
+    this.wrapperEl = this.doc.body.createDiv({ cls: 'atlas-vtt-plugin atlas-vtt-root' });
 
     // Inner card — carries the actual visual styles
     this.cardEl = this.wrapperEl.createDiv({ cls: 'atlas-map-link-preview' });
@@ -98,7 +99,7 @@ export class MapLinkPreview {
         this.hide();
       }
     };
-    document.addEventListener('keydown', this.escapeHandler, true);
+    this.doc.addEventListener('keydown', this.escapeHandler, true);
 
     this.buildContent();
 
@@ -173,8 +174,8 @@ export class MapLinkPreview {
 
     const margin = 10;
     const offset = 12;
-    const winW = window.innerWidth;
-    const winH = window.innerHeight;
+    const winW = this.cardEl.win.innerWidth;
+    const winH = this.cardEl.win.innerHeight;
     const elW = this.cardEl.offsetWidth;
     const elH = this.cardEl.offsetHeight;
 

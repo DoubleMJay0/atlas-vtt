@@ -15,12 +15,22 @@ import type { ViewAtlasState } from '../../storeFactory';
 import type { LayerVisibility } from '../playerSafeFrame';
 import type { DragRulerView } from './DragRulerView';
 import { levelObjects } from '../../levels/levelObjects';
+import { computeTokenPixelSize } from './tokenSizing';
+import { mapTokens } from '../../tokens/offMap';
+
+/** What a drag ruler measures: the token and the points it runs through (its start, each waypoint, its landing). */
+export interface DragRulerPath {
+  readonly tokenId: string;
+  readonly points: readonly Point[];
+}
 
 export class DragRuler {
   private tokenId: string | null = null;
   /** The snapped start followed by every waypoint. */
   private waypoints: Point[] = [];
   private landing: Point | null = null;
+  /** Where the dragged token is drawn now: the line ends under its centre, wherever it snaps to. */
+  private tip: Point | null = null;
   private keyWindow: Window | null = null;
 
   constructor(
@@ -40,10 +50,11 @@ export class DragRuler {
     this.keyWindow.addEventListener('keydown', this.onKeyDown, true);
   }
 
-  /** Moves the ruler's end to the cell a token at `position` would snap to. */
+  /** Measures to the cell a token at `position` would snap to, and draws the line to `position` itself. */
   update(position: Point): void {
     if (!this.tokenId) return;
     this.landing = this.snap(position);
+    this.tip = { x: position.x, y: position.y };
     this.redraw();
   }
 
@@ -53,12 +64,20 @@ export class DragRuler {
     this.tokenId = null;
     this.waypoints = [];
     this.landing = null;
+    this.tip = null;
     this.view.clear();
+  }
+
+  /** The path the ruler shows now, or null while it shows none (no drag, or one that has not left its start). */
+  path(): DragRulerPath | null {
+    const landing = this.landing;
+    if (!this.tokenId || !landing || this.waypoints.every(point => samePoint(point, landing))) return null;
+    return { tokenId: this.tokenId, points: [...this.waypoints, landing] };
   }
 
   /** Players never see the ruler of a token hidden from them, or of one they do not see (`isSeen`, with dynamic lighting). */
   getPlayerViewLayers(isSeen: (tokenId: string) => boolean = () => true): LayerVisibility[] {
-    const token = this.tokenId ? levelObjects(this.store.getState()).tokens[this.tokenId] : undefined;
+    const token = this.tokenId ? mapTokens(levelObjects(this.store.getState()))[this.tokenId] : undefined;
     const shown = !token || (!token.isHidden && isSeen(token.id));
     return shown ? [] : this.view.layers.map(layer => ({ layer, visible: false }));
   }
@@ -88,17 +107,16 @@ export class DragRuler {
   };
 
   private redraw(): void {
-    const landing = this.landing;
-    if (!landing) return;
-    const points = [...this.waypoints, landing];
-    if (points.every(point => samePoint(point, landing))) {
+    const points = this.path()?.points;
+    if (!points) {
       this.view.clear();
       return;
     }
     const grid = this.gridSystem.getOptions();
     const settings = this.settingsProvider();
     const cells = pathLengthInCells(grid, this.cellPath(points, grid), settings.diagonalRule);
-    this.view.draw(points, formatDistance(cells, settings));
+    const drawn = this.tip ? [...points.slice(0, -1), this.tip] : points;
+    this.view.draw(drawn, formatDistance(cells, settings), computeTokenPixelSize(grid.size, this.tokenSize()) / 2, grid.size);
     this.refreshVisibility();
   }
 
@@ -123,7 +141,7 @@ export class DragRuler {
   }
 
   private tokenSize(): number {
-    const size = this.tokenId ? levelObjects(this.store.getState()).tokens[this.tokenId]?.size : undefined;
+    const size = this.tokenId ? mapTokens(levelObjects(this.store.getState()))[this.tokenId]?.size : undefined;
     return size || 1;
   }
 }

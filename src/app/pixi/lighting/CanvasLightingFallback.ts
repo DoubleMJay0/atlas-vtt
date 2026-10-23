@@ -28,6 +28,7 @@ import { everyLevelObjects, levelObjects, levelObjectsOn } from '../../levels/le
 import { levelStack, levelsBelow, stackGrid, type LevelStack } from '../../levels/levelStack';
 import { levelSurfaceList } from '../../levels/levelSurfaces';
 import { hasLevels, viewedLevelId } from '../../levels/sceneLevels';
+import { mapTokens } from '../../tokens/offMap';
 
 /** Full ambient light: everything in sight counts as lit. */
 const FULL_DAYLIGHT: AmbientLight = { ambient: 1 };
@@ -128,8 +129,8 @@ export class CanvasLightingFallback implements SceneLightingView {
     const rules = this.deps.rules?.();
     const measurement = this.deps.measurement();
     const held = heldForSight(state);
-    const hasVision = sceneHasVision(everyLevelObjects(state).tokens);
-    const inputs = [state.lighting, levelObjects(state).tokens, hasVision, levelObjects(state).walls, levelObjects(state).lights, state.grid, held, rules, bounds?.width, bounds?.height, measurement.unitDistance, state.levels, state.viewedLevel, everyLevelObjects(state).levelSurfaces];
+    const hasVision = sceneHasVision(mapTokens(everyLevelObjects(state)));
+    const inputs = [state.lighting, mapTokens(levelObjects(state)), hasVision, levelObjects(state).walls, levelObjects(state).lights, state.grid, held, rules, bounds?.width, bounds?.height, measurement.unitDistance, state.levels, state.viewedLevel, everyLevelObjects(state).levelSurfaces];
     if (inputs.every((input, i) => input === this.inputs[i]) && inputs.length === this.inputs.length) return;
     this.inputs = inputs;
     if (!state.lighting.enabled || !bounds) {
@@ -152,7 +153,7 @@ export class CanvasLightingFallback implements SceneLightingView {
     // The same regions are the same sight: what was worked out from it (who is seen) stays good.
     if (!sameSight(sight, this.sight)) this.sight = sight;
     this.sightBuilt = true;
-    const spots = seenSpots(this.sight, FULL_DAYLIGHT, this.reaches, levelObjects(state).tokens, scale.cellSize, walls, { conditions: rules?.conditions ?? [], held, policy: PLAYER_SIGHT_POLICY });
+    const spots = seenSpots(this.sight, FULL_DAYLIGHT, this.reaches, mapTokens(levelObjects(state)), scale.cellSize, walls, { conditions: rules?.conditions ?? [], held, policy: PLAYER_SIGHT_POLICY });
     this.setDarkness(bounds, spots, this.openings(state, bounds));
     this.deps.onSightChange?.();
   }

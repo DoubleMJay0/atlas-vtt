@@ -5,6 +5,7 @@ import type { TokenEntity } from '../types';
 import type { Point } from '../types/visionTypes';
 import { sightOnDropOn } from './sceneLightingOptions';
 import { levelObjects } from '../levels/levelObjects';
+import { mapTokens } from '../tokens/offMap';
 
 interface HeldTokenSource {
   getState(): Pick<ViewState, 'objects' | 'heldTokens' | 'levels' | 'viewedLevel'> & { setHeldTokens: (held: HeldTokens) => void };
@@ -22,7 +23,7 @@ export function holdTokens(store: HeldTokenSource, tokenIds: readonly string[]):
   if (before.length === tokenIds.length && tokenIds.every((id) => heldTokens[id])) return;
   const held: Record<string, Point> = {};
   for (const id of tokenIds) {
-    const token = objects.tokens[id];
+    const token = mapTokens(objects)[id];
     const start = heldTokens[id] ?? (token && { x: token.x, y: token.y });
     if (start) held[id] = start;
   }
@@ -59,7 +60,7 @@ export class SightTokens {
   private last: Tokens | null = null;
 
   read(state: SceneTokens): Tokens {
-    const tokens = this.withHeldAtStart(levelObjects(state).tokens, heldForSight(state));
+    const tokens = this.withHeldAtStart(mapTokens(levelObjects(state)), heldForSight(state));
     this.last = tokens;
     return tokens;
   }

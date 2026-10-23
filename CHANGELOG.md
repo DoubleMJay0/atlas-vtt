@@ -2,6 +2,129 @@
 
 <!-- Generated from changelog/*.md. Run npm run changelog:generate. -->
 
+## 0.9.1 — Dynamic lighting for everyone and a richer player sheet online
+
+2026-10-22
+
+### New
+- Turn several selected tokens at once with the button above their selection
+- Dynamic lighting is no longer experimental
+### Improved
+- Improved UI for selected tokens, rulers, templates and drag rulers, sharp at any zoom
+- Turn spotlight of the initiative tracker now only flashes temporarily instead of always showing
+- Improved behaviour of resource wheels on zoomed out tokens
+
+### Fixed
+- Maps work in a scene moved to its own window
+- Dice in statblock tables roll, and so does any formula or bonus such as +4+1
+- An tracked value written in a note, such as 15 (natural armor), shows on its token
+- Holding Backspace in a statblock's Abilities component no longer erases the entry above it
+- Random tables from notes can be added when a collection already has tables
+- Statblock previews can be moved, pinned and shown to players again, and can no longer be dragged out of reach
+- @ references also find a value by its label, such as @str for Strength
+- Fixed issue where sometimes dice rolls triggered from within the encounter builder would show twice
+
+### Atlas Online
+- The played campaign auto stops when a stable goes offline
+- Aligned character sheet sidebar with statblock layout
+- Typing @ in a statblock field suggests values to reference like 2d8+@strength
+- Rolls name the values they use: 2d8 + @agility shows Agility, and so does a click on Agility in a table of traits
+- Players can change every value on their sheet, even max values etc.
+- Players roll with advantage or disadvantage: right-click or long-press a die
+- Players can click a combatant in the initiative list to find its token
+- Better error logging for world map issues
+- Performance improvements for Notes, Abilities and Inventory panels
+
+
+Thanks to my Patreon supporters @ekorngutt  , @theandrew93, @giodude  , @imhkr , @ionazh  , @menacingspade  , @m0eb1us  , @.orlon  , @.samdark  , @scaradeus  , @sero_sen  , @xethgnur  , @_zlf__21340  and @zookus  . You mean everything to me :heart:
+
+Help me develop Atlas: https://www.patreon.com/cw/atlas_vtt
+
+## 0.9.0 — Encounter builder, recovery actions and a new initiative tracker
+
+2026-10-20
+
+### New
+- Smarter Token Placement: A preview now shows where tokens land before you accept their position and orientation
+- New Encounter Builder feature: Access through the plus button in the Asset Manager
+- Send specific items to players right from a Table or Base while an online session is active
+- Statblock templates: recovery actions such as Short rest and Long rest can now be configured
+- Statblock templates: counters, tracked numbers, clickable bonuses and `@` references such as `1d8 + @str.mod`
+- Initiative by cards, more sides, and sides that roll their order each round
+- Initiative: add combatants without placing them, start a fight from an encounter, and roll hit points
+- Initiative: delay turns, a turn banner, a ring on the active token, and many new tracker options
+- Change HP of several tokens at once
+- Atlas now shows a notification message when a new update is available
+- DM Screen: Filter to only those statblocks currently in a fight
+- Simplified Chinese Translation. Contributed by kun041011
+
+### Improved/Fixed
+- Statblock numbers can show as boxes or a gauge
+- Many initiative tracker improvements: typing numbers, skipping defeated combatants, tie-breaks, and more. With a contribution by Jackson98Tomphson
+- Dragging a token no longer selects it
+- Smaller improvements to filters, random tables, HP input, messages and animations
+- Improvements to Dynamic Lighting on integrated graphics
+- Various improvements in initiative, dice, statblocks, menus and online play. With contributions by aecorn, young-george and ISorokaI (Russian translations)
+
+### Atlas Online
+- Optimisations to online play performance
+- Tokens of the same player character share their hit points
+- Statblocks assigned to player tokens now show in the online character sheet
+- New Abilities tab which allows players to input their character's abilities
+- Let players move only on their turn
+- Atlas Dice Chrome Extension - Rolls on DnDBeyond or for Daggerheart on Demiplane  
+  sync with Atlas Online: https://github.com/atlas-vtt/atlas-dice
+
+Thanks to my Patreon supporters @ekorngutt  , @theandrew93, @giodude  , @imhkr , @ionazh  , @menacingspade  , @m0eb1us  , @.orlon  , @.samdark  , @scaradeus  , @sero_sen  , @xethgnur  , @_zlf__21340  and @zookus  . You mean everything to me :heart:
+
+Help me develop Atlas: https://www.patreon.com/cw/atlas_vtt
+
+## 0.8.0 — Online play and native statblocks
+
+2026-10-14
+
+### What's New
+#### New Feature: Online Play
+- Online play (closed beta): host a table that your players join in their web browser. It is off until you turn it on under Experimental features in the command palette.
+- Campaigns on the dashboard: create and search campaigns, and play one to track its scenes and player characters.
+- Right-click a token to make it a player character. Player characters have their own Players tab in the asset manager.
+- A campaign keeps one set of values for each player character. Hit points changed on one scene show on every scene and sync to your other devices.
+- The token and map creators have a From vault tab, so you can use images already in your vault.
+- Dice formulas support the notation of Foundry and Roll20: keep and drop (2d20kh1), rerolls, explosions, success counts, d%, Fate dice, labels and brackets. Dropped and rerolled dice are shown struck through.
+- Initiative rolls add each creature's modifier from its statblock. With a contribution by anacletoTM.
+
+#### New Feature: Native Statblocks
+- Atlas draws statblocks itself, so they show without the Fantasy Statblocks plugin.
+- Statblock templates for 5E (2014 and 2024), Cairn, Draw Steel and Fate, plus general ones for creatures, NPCs and hazards.
+- A template value can be limited to a list of choices, picked from a dropdown.
+- A template value can be shown in a box, with a small label over a large number, like hit points in a printed statblock.
+#### General
+- The Loot Feature is now "Random Tables": roll on tables in your notes and on your loot bases.
+- Each collection sets its item rarities and their colours in its Random tables settings.
+- New table: paste a table from a PDF, web page or spreadsheet and save it as a file.
+- You can give a combatant your own initiative modifier in its edit dialog, which replaces the statblock's modifier until you clear it. With a contribution by anacletoTM.
+- The initial opening of scenes is now faster. The Spectral Engine now visualises grid detection with an animation
+- Added Toggle to turn off Grid Detection in the Grid Settings
+### What's Fixed / Improved
+
+- The asset manager's Characters tab is now called Tokens.
+- Tokens no longer snap to a default hidden grid if no grid was found during automatic detection
+- Improved UX for Grid Alignment panel
+- Atlas' toast messages now match the look of your theme.
+- Several tokens can share one statblock, for example colour variants of a creature.
+- Linking a token no longer replaces a statblock's own picture. A token copied to another collection keeps its statblock.
+- The creature filter Layout is now called Template. `layout:` still works in the search.
+- Fixed bug where note pin and statblock previews would open in a shifted position while an Obsidian sidebar was open
+- Measured distances show one decimal place, so a 1.5 m cell reads 1.5 m. Contributed by giopalma.
+- The fog brush draws an even stroke while you drag it. Contributed by MavethGH.
+- The first fog stroke after deleting all fog shows while you draw it. Contributed by MavethGH.
+- Saving an encounter from the asset manager or scene browser no longer opens the name dialog behind it.
+- Cmd+A (Ctrl+A) in an asset manager text field selects the text, not every asset.
+- Creating maps, tokens and scenes only offers the tags of the chosen collection.
+- A fixed value such as armour class now shows on its token when it is 0.
+- A ring colour picked from the right-click menu colours all selected tokens, in one undo step.
+- Resource wheels that players may see now show in the player window. Every resource has its own switch in the player view settings.
+
 ## 0.7.1 — Local player window and more precise grid alignment
 
 2026-10-10
