@@ -1,4 +1,4 @@
-import { TILE_RAYS } from '../../../lighting/lightingConstants';
+import { TAIL_RAYS, TILE_RAYS } from '../../../lighting/lightingConstants';
 import { GLSL_VERSION, MAX_STEPS, TRACE_GLSL, fieldGlsl } from './glsl';
 
 /**
@@ -34,7 +34,9 @@ float clearance(vec2 w) {
  * straight paths that sphere tracing proved clear of every capsule. The cone test proves the
  * whole cone to the flame clear (each ball of clearance covers the widening cone up to the next
  * step); otherwise `uRays` rays (at most TILE_RAYS) to equal-area strips of the flame, at
- * `uOffsets` across it (`chordOffsets`), jittered within their strip.
+ * `uOffsets` across it (`chordOffsets`), jittered within their strip. Past `uTailFrom` from the
+ * light, in its faint tail, every so many of those rays (`TAIL_RAYS` of them), each jittered over
+ * the strips it stands for: the tail costs a share of what the light's own range does.
  * This is the raw tile: `tileSmoothFragment` smooths it.
  */
 export const tileFragment = `${GLSL_VERSION}
@@ -44,6 +46,7 @@ uniform vec2 uLight;
 uniform float uFlame;
 uniform float uRays;
 uniform float uOffsets[${TILE_RAYS}];
+uniform float uTailFrom;
 out vec4 finalColor;
 ${TILE_CLEARANCE_GLSL}
 ${TRACE_GLSL}
@@ -76,15 +79,18 @@ void main() {
       vec2 across = vec2(-dir.y, dir.x) * uFlame;
       float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
       int rays = int(uRays);
+      int stride = distance(p, uLight) > uTailFrom ? max(1, rays / ${TAIL_RAYS}) : 1;
+      int count = rays / stride;
       float hit = 0.0;
       for (int k = 0; k < ${TILE_RAYS}; k++) {
-        if (k >= rays) break;
-        float lo = k > 0 ? uOffsets[k - 1] : -1.0;
-        float hi = k + 1 < rays ? uOffsets[k + 1] : 1.0;
-        float x = uOffsets[k] + jitter * (jitter < 0.0 ? uOffsets[k] - lo : hi - uOffsets[k]);
+        if (k >= count) break;
+        int i = k * stride + stride / 2;
+        float lo = i >= stride ? uOffsets[i - stride] : -1.0;
+        float hi = i + stride < rays ? uOffsets[i + stride] : 1.0;
+        float x = uOffsets[i] + jitter * (jitter < 0.0 ? uOffsets[i] - lo : hi - uOffsets[i]);
         if (reaches(p, uLight + across * x)) hit += 1.0;
       }
-      vis = hit / float(rays);
+      vis = hit / float(count);
     }
   }
   finalColor = vec4(vis, 0.0, 0.0, 1.0);

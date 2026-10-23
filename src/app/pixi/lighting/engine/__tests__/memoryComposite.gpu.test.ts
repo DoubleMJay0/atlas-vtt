@@ -31,11 +31,12 @@ function scene(options: MemoryOptions & Partial<EngineScene>): EngineScene {
  * Hashes of this scene with no scene option set, on the maintainer's machine (Apple silicon,
  * Chromium through ANGLE on Metal). They pin the whole look: first taken from the composite
  * before the scene options existed (commit 55c33d23), and recorded anew each time the light
- * falloff changed (the dim range lit out to its edge, then held on dark maps). Another GPU or
+ * falloff changed (the dim range lit out to its edge, then held on dark maps, then the
+ * tail past the dim radius and the beams' soft sides, 2026-10-23). Another GPU or
  * driver may round a channel differently: record them there from what the first test below
  * reports.
  */
-const RECORDED = { player: 'e6fb64f5', gm: 'fb04ade6' } as const;
+const RECORDED = { player: 'd0154163', gm: 'd0096798' } as const;
 /**
  * The same scene without its lights, under an ambient light of 0.2: sight, darkvision, explored
  * memory and the GM's ghosted map. Recorded on beta before the light falloff changed (commit

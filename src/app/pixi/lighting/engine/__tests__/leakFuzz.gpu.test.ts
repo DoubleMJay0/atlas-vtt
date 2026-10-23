@@ -206,7 +206,8 @@ describe('leak fuzz', () => {
     expect(Math.min(report.doors, report.oneWay, report.twoLights)).toBeGreaterThan(TRIALS / 8);
     expect(report.checked).toBeGreaterThan(TRIALS * 1000);
     expect(report.litInside).toBeGreaterThan(TRIALS * 100);
-    expect(report.bounceInside).toBeGreaterThan(TRIALS * 10);
+    // Few of a room's pixels lie past a light's tail (half its dim radius past it), where only bounce lights them.
+    expect(report.bounceInside).toBeGreaterThan(TRIALS / 8);
     expect(report.senseInside).toBeGreaterThan(TRIALS * 100);
     expect(report.spots).toBeGreaterThan(TRIALS * 4);
     expect(report.spotInside).toBeGreaterThan(TRIALS * 100);
@@ -248,7 +249,7 @@ describe('leak fuzz', () => {
       expect(Math.min(report.doors, report.oneWay, report.twoLights)).toBeGreaterThan(0);
       expect(report.checked).toBeGreaterThan(8000);
       expect(report.litInside).toBeGreaterThan(800);
-      if (quality.bounceMaxSide >= bounds.width) expect(report.bounceInside).toBeGreaterThan(80);
+      // Bounce past the lights' tails (`LIGHT_TAIL`) hardly fits these rooms; the main run counts it.
       expect(report.senseInside).toBeGreaterThan(800);
       expect(report.spotInside).toBeGreaterThan(400);
       expect(report.darkInside).toBeGreaterThan(50);

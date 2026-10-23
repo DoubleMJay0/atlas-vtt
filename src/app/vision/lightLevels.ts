@@ -4,6 +4,7 @@ import type { Point } from '../types/visionTypes';
 import type { AmbientLight, LightReach } from './sight';
 import { pointInPolygon } from './visibility';
 import { areaDistance } from './areaReach';
+import { reflectedAt } from './reflectedLight';
 
 /**
  * The light level the scene's ambient light alone gives every point: dark below the lit
@@ -33,25 +34,25 @@ function ambientLevelAt(point: Point, light: AmbientLight): LightLevel {
 /**
  * The light level the lights that outrank `above` give `point`: bright within a bright radius,
  * dim within a dim one, where no wall is between; an area light counts both from the nearest
- * point of its area in clear view (`areaDistance`). A darkness source is no light.
+ * point of its area in clear view (`areaDistance`). Where a light's reflection reaches
+ * (`reflectedAt`) it is dim. A darkness source is no light.
  */
 function levelFromLights(point: Point, lights: readonly LightReach[], above = -Infinity): LightLevel {
   let level: LightLevel = 'dark';
   for (const light of lights) {
     if (light.darkness || (light.priority ?? 0) <= above) continue;
-    if (light.parts) {
-      const distance = areaDistance(point, light);
-      if (distance > light.dim) continue;
-      if (distance <= light.bright) return 'bright';
-      level = 'dim';
-      continue;
-    }
-    const distance = Math.hypot(point.x - light.origin.x, point.y - light.origin.y);
-    if (distance > light.dim || !pointInPolygon(point, light.polygon)) continue;
-    if (distance <= light.bright) return 'bright';
-    level = 'dim';
+    const direct = directLevel(point, light);
+    if (direct === 'bright') return 'bright';
+    if (direct === 'dim' || (level === 'dark' && light.reflection?.length && reflectedAt(point, light.reflection))) level = 'dim';
   }
   return level;
+}
+
+/** The light level `light` gives `point` straight from itself, without its reflection. */
+function directLevel(point: Point, light: LightReach): LightLevel {
+  const distance = light.parts ? areaDistance(point, light) : Math.hypot(point.x - light.origin.x, point.y - light.origin.y);
+  if (distance > light.dim || (!light.parts && !pointInPolygon(point, light.polygon))) return 'dark';
+  return distance <= light.bright ? 'bright' : 'dim';
 }
 
 /** The priority of the strongest darkness source that covers `point`; none covers it at -Infinity. */

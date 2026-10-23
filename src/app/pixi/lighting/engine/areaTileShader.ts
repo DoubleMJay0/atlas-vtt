@@ -1,6 +1,6 @@
 import { MAX_AREA_CORNERS } from '../../../lighting/lightArea';
 import { TILE_RAYS } from '../../../lighting/lightingConstants';
-import { GLSL_VERSION, MAX_STEPS } from './glsl';
+import { GLSL_VERSION, MAX_STEPS, TAIL_GLSL } from './glsl';
 import { TILE_CLEARANCE_GLSL } from './tileShader';
 
 /** vec4s that hold an area light's corners, two to each. */
@@ -59,7 +59,7 @@ void main() {
  * area fills as seen from it (all around where it wraps round the texel) and jittered within
  * their strip, march towards the area (`uDistance`, the signed distance field of its outline)
  * through the wall field. A ray that reaches the area within `uAreaReach` counts with the light's
- * own falloff at the distance it met the area (bright, knee, fade), so near parts of the area
+ * own falloff at the distance it met the area (bright, knee, tail), so near parts of the area
  * weigh more than far ones; it is lit where no wall stopped it first. Sphere tracing never steps
  * past a wall's capsule (steps never exceed its conservative clearance), so the tile is
  * leak-proof as a point light's is. Inside the area every texel outside the walls sees it whole.
@@ -89,14 +89,14 @@ float areaDistance(vec2 w) {
   return textureLod(uDistance, (w - lo) / uTileRect.zw, 0.0).r - 0.75 * uTexel;
 }
 
-float smoother(float u) { return u * u * u * (u * (u * 6.0 - 15.0) + 10.0); }
+${TAIL_GLSL}
 
-// The light's own falloff at d from its outline, as the light map draws it, without its halo.
+// The light's own falloff at d from its outline, as the light map draws it (its tail too), without its halo.
 float falloff(float d) {
   float t = d / max(uAreaBright, 1.0);
   float t2 = t * t;
   float e = mix(uDimLevel, uBrightLevel, 1.0 / (1.0 + t2 * t2));
-  return e * smoother(clamp((uAreaReach - d) / max(uAreaReach - uAreaDim, 1e-3), 0.0, 1.0));
+  return e * tail((uAreaReach - d) / max(uAreaReach - uAreaDim, 1e-3));
 }
 
 void main() {

@@ -66,8 +66,7 @@ async function fuzz({ seed, trials, allAround = false, turned = false, bounds = 
       const lights: EngineLight[] = room.lights.map(([x, y], i) => {
         const dim = 150 + rand() * 500;
         const cone: VisionCone = { facing: rand() * 2 * Math.PI, angle: 0.2 + rand() * 4.5, ...(rand() < 0.5 && { apex: 10 + rand() * 60 }) };
-        // The soft edge of a grid of 30 to 110 px cells.
-        return { key: `l${i}`, x, y, bright: dim / 2, dim, flame: 2 + rand() * 90, color: [1, 1, 1], intensity: 1, animation: 'none', cone, edge: softEdge(dim, 30 + rand() * 80) };
+        return { key: `l${i}`, x, y, bright: dim / 2, dim, flame: 2 + rand() * 90, color: [1, 1, 1], intensity: 1, animation: 'none', cone, edge: softEdge(dim) };
       });
       const read = (drawn: EngineLight[]): Float32Array => {
         world.update(walls, drawn, null);

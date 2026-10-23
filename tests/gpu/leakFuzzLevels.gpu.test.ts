@@ -22,7 +22,7 @@ import type { LevelSurface } from '../../src/app/types/sceneLevelTypes';
 import { lightLevelAt } from '../../src/app/vision/lightLevels';
 import { perceive, regionContains } from '../../src/app/vision/perception';
 import { SceneModelBuilder, SceneSpots } from '../../src/app/vision/sceneModel';
-import type { Sight } from '../../src/app/vision/sight';
+import { litPolygons, type Sight } from '../../src/app/vision/sight';
 import { belowTokenPerception, sightBelow, type BelowSight } from '../../src/app/vision/throughSight';
 import type { MapBounds } from '../../src/app/vision/visibility';
 import { fuzzRooms, insidePolygon, rng, type FuzzRoom, type P } from '../../src/app/pixi/lighting/engine/__tests__/fuzzRooms';
@@ -235,7 +235,7 @@ async function fuzz({ seed, trials, map = 2048, resolution = 1, quality, belowRe
       const mapRegions = below.sight.regions.filter((region) => showsMap(region.sense));
       const spots = new SceneSpots().update(model, seen, measurement).map((spot) => spot.polygon);
       const sightEdges = [...mapRegions.flatMap((region) => (region.polygon ? [region.polygon] : [])), ...spots];
-      const lightEdges = [...sightEdges, ...model.reaches.map((reach) => reach.polygon), ...Object.values(zones).map((zone) => zone.polygon)];
+      const lightEdges = [...sightEdges, ...model.reaches.flatMap(litPolygons), ...Object.values(zones).map((zone) => zone.polygon)];
       // The level below is lit a tier down (`belowQuality`): its walls' faces are as wide as its own texels make them.
       const texel = worldTexel(belowBounds, belowQuality(quality ?? LIGHTING_QUALITY.high).maxTexels);
       const lowerWalls = Object.values(wallsOn(lower, 'b', 'ground'));

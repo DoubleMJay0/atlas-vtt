@@ -90,8 +90,8 @@ export function areaSamples(area: readonly Point[], walls: readonly WallSegment[
   return samples;
 }
 
-/** The walls that block light within `margin` of the area's bounds, as segments. */
-function nearbySegments(area: readonly Point[], walls: readonly WallSegment[], margin: number): Seg[] {
+/** The walls that block light within `margin` of the bounds of `points`, as segments. */
+export function nearbySegments(area: readonly Point[], walls: readonly WallSegment[], margin: number): Seg[] {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const { x, y } of area) {
     x0 = Math.min(x0, x);

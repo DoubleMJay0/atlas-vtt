@@ -1,6 +1,6 @@
 import { Container, Mesh, Shader, UniformGroup, type Renderer, type RenderTexture } from 'pixi.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HALO, LIGHT_LEVELS } from '../../../../lighting/lightingConstants';
+import { HALO, LIGHT_LEVELS, TAIL_POWER } from '../../../../lighting/lightingConstants';
 import { GLSL_VERSION } from '../glsl';
 import { createQuad, createTarget, HIGHP, quadGeometry, renderInto } from '../gpu';
 import { LightMap, type DrawnLight } from '../LightMap';
@@ -34,10 +34,10 @@ function makeTile(renderer: Renderer, size: number, lit: readonly [number, numbe
   return target;
 }
 
-/** The fade from the dim radius to the reach: a smootherstep, 1 up to `dim` and 0 from `reach` on. */
+/** The tail from the dim radius to the reach (`TAIL_GLSL`): 1 up to `dim` and 0 from `reach` on. */
 function fade(d: number, dim: number, reach: number): number {
   const u = Math.min(1, Math.max(0, (reach - d) / (reach - dim)));
-  return u * u * u * (u * (u * 6 - 15) + 10);
+  return (u * u * u * (4 - 3 * u)) ** TAIL_POWER;
 }
 
 /** The two levels and the knee between them, without the halo: dim + (bright − dim) / (1 + (d / b)⁴). */

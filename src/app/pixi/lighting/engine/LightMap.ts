@@ -1,5 +1,6 @@
 import { Container, Mesh, UniformGroup, type Geometry, type Renderer, type RenderTexture, type Shader } from 'pixi.js';
-import { HALO, LIGHT_LEVELS, LIGHT_REACH } from '../../../lighting/lightingConstants';
+import { HALO, LIGHT_LEVELS, LIGHT_REACH, REFLECTION } from '../../../lighting/lightingConstants';
+import type { Rect } from '../../../lighting/segments';
 import type { VisionCone } from '../../../vision/visionCone';
 import type { MapBounds } from '../../../vision/visibility';
 import { destroyTree } from '../../utils/destroyTree';
@@ -7,6 +8,7 @@ import { ENGINE_SHADERS } from './engineShaders';
 import { createDarknessMesh, destroyDarknessMesh, setDarknessMesh, type DarknessMesh, type DrawnDarkness } from './DarknessMap';
 import { createPlaceholder, createQuad, createShader, createTarget, destroyQuad, quadGeometry, renderInto, type Quad } from './gpu';
 import type { Tile } from './TileCache';
+import type { ReflectionTile } from './ReflectionTiles';
 
 /** One light's contribution this frame (bright radius and intensity already flickered). */
 export interface DrawnLight {
@@ -20,12 +22,16 @@ export interface DrawnLight {
   cone?: VisionCone | undefined;
   /** Width of the soft edge past a beam's sides, in world pixels; unset, the fade past the dim radius. */
   edge?: number | undefined;
+  /** The light its lit floor gives back (`ReflectionTiles`). */
+  reflection?: ReflectionTile | undefined;
 }
 
 interface Slot {
   mesh: Mesh<Geometry, Shader>;
   uniforms: UniformGroup;
   rect: Float32Array;
+  tileOrigin: Float32Array;
+  reflectOrigin: Float32Array;
   light: Float32Array;
   color: Float32Array;
   cone: Float32Array;
@@ -73,7 +79,12 @@ export class LightMap {
       slot.mesh.visible = !!light;
       if (!light) return;
       const u = slot.uniforms.uniforms;
-      slot.rect.set(light.tile.rect);
+      const { reflection } = light;
+      slot.rect.set(reflection ? union(light.tile.rect, reflection.rect) : light.tile.rect);
+      slot.tileOrigin.set([light.tile.rect[0], light.tile.rect[1]]);
+      u.uHasReflection = reflection ? 1 : 0;
+      if (reflection) slot.reflectOrigin.set([reflection.rect[0], reflection.rect[1]]);
+      slot.mesh.shader!.resources.uReflection = (reflection?.texture ?? this.placeholder).source;
       slot.light[0] = light.tile.x;
       slot.light[1] = light.tile.y;
       u.uBright = light.bright;
@@ -100,6 +111,7 @@ export class LightMap {
     for (const slot of this.slots) {
       slot.mesh.shader!.resources.uTile = this.placeholder.source;
       slot.mesh.shader!.resources.uDistance = this.placeholder.source;
+      slot.mesh.shader!.resources.uReflection = this.placeholder.source;
     }
   }
 
@@ -121,6 +133,8 @@ export class LightMap {
 
   private createSlot(): Slot {
     const rect = new Float32Array(4);
+    const tileOrigin = new Float32Array(2);
+    const reflectOrigin = new Float32Array(2);
     const light = new Float32Array(2);
     const color = new Float32Array(3);
     const cone = new Float32Array(ALL_AROUND);
@@ -141,12 +155,17 @@ export class LightMap {
       uCone: { value: cone, type: 'vec4<f32>' },
       uEdge: { value: 1, type: 'f32' },
       uIsArea: { value: 0, type: 'f32' },
+      uTileOrigin: { value: tileOrigin, type: 'vec2<f32>' },
+      uHasReflection: { value: 0, type: 'f32' },
+      uReflectOrigin: { value: reflectOrigin, type: 'vec2<f32>' },
+      uReflectLevel: { value: REFLECTION.level, type: 'f32' },
+      uReflectLift: { value: LIGHT_LEVELS.bright / LIGHT_LEVELS.dim, type: 'f32' },
     });
-    const shader = createShader(ENGINE_SHADERS.lightMap, { lightUniforms: uniforms, uTile: this.placeholder.source, uDistance: this.placeholder.source });
+    const shader = createShader(ENGINE_SHADERS.lightMap, { lightUniforms: uniforms, uTile: this.placeholder.source, uDistance: this.placeholder.source, uReflection: this.placeholder.source });
     const mesh = new Mesh({ geometry: this.geometry, shader });
     mesh.blendMode = 'add';
     this.scene.addChild(mesh);
-    return { mesh, uniforms, rect, light, color, cone };
+    return { mesh, uniforms, rect, tileOrigin, reflectOrigin, light, color, cone };
   }
 
   destroy(): void {
@@ -161,4 +180,10 @@ export class LightMap {
     this.placeholder.destroy(true);
     this.texture.destroy(true);
   }
+}
+
+/** The smallest rectangle around both. */
+function union([ax, ay, aw, ah]: Rect, [bx, by, bw, bh]: Rect): Rect {
+  const x = Math.min(ax, bx), y = Math.min(ay, by);
+  return [x, y, Math.max(ax + aw, bx + bw) - x, Math.max(ay + ah, by + bh) - y];
 }

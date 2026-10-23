@@ -20,7 +20,7 @@ import type { LevelAlignment, LevelSurface, SceneLevel } from '../../src/app/typ
 import { lightLevelAt } from '../../src/app/vision/lightLevels';
 import { perceive, regionContains } from '../../src/app/vision/perception';
 import { SceneModelBuilder, SceneSpots } from '../../src/app/vision/sceneModel';
-import type { Sight } from '../../src/app/vision/sight';
+import { litPolygons, type Sight } from '../../src/app/vision/sight';
 import { belowTokenPerception, sightBelow, type BelowSight } from '../../src/app/vision/throughSight';
 import type { MapBounds } from '../../src/app/vision/visibility';
 import { cyan, inPlainView, inside, light, lit, maskAlpha, nearAllowed, surface, toEdges, token, wallsOn } from '../helpers/levelsFuzz';
@@ -273,7 +273,7 @@ export async function fuzzArt({ seed, trials, case: kind, map = 2048, quality, r
         const regions = below.sight.regions.filter((region) => showsMap(region.sense));
         const spots = new SceneSpots().update(model, seen, measurement).map((spot) => spot.polygon);
         const sightEdges = [...regions.flatMap((region) => (region.polygon ? [region.polygon] : [])), ...spots];
-        const lightEdges = [...sightEdges, ...model.reaches.map((reach) => reach.polygon)];
+        const lightEdges = [...sightEdges, ...model.reaches.flatMap(litPolygons)];
         const texel = worldTexel(rects[id]!, belowQuality(quality ?? LIGHTING_QUALITY.high).maxTexels);
         const walls = Object.values(wallsOn(trialLevels[id]!.room, '', id));
         const isShown = (p: { x: number; y: number }): boolean => below.sight.all || regions.some((region) => regionContains(region, p)) || spots.some((polygon) => insidePolygon(p, polygon));
