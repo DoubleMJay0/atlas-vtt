@@ -7,7 +7,7 @@
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { fiveRoomParams } from './layout/fiveRoom';
-import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, floorCount } from './model';
+import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, requestedFloors } from './model';
 import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './params';
 import { floorColumns, placeProps } from './props';
 import { roomRoles, type RoomRoles } from './props/roles';
@@ -41,7 +41,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const base = dungeonParams(tags);
   const params = fiveRoom ? fiveRoomParams(base) : base;
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
-  const count = fiveRoom ? 1 : floorCount(request.floors);
+  const count = requestedFloors(request);
   const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom);
   const parts = planned.map((floor, index): FloorParts => {
     const floorPar = floorParams(params, index);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { App } from 'obsidian';
 import { applyDungeonEdits, NO_EDITS, withWingHidden, type DungeonEdits } from '../../../dungeons/edits';
 import { DEFAULT_DUNGEON_GENERATOR_SETTINGS, type DungeonGeneratorSettings } from '../../../dungeons/generatorSettings';
-import { floorCount, type DungeonModel, type DungeonRequest } from '../../../dungeons/model';
+import { floorCount, requestedFloors, type DungeonModel, type DungeonRequest } from '../../../dungeons/model';
 import { randomSeed } from '../../../dungeons/rng';
 import { secretWingOf } from '../../../dungeons/secretWings';
 import type { DungeonView } from '../../../dungeons/style';
@@ -58,11 +58,6 @@ function readSettings(app: App): DungeonGeneratorSettings {
   return SettingsService.forApp(app)?.getDungeonGenerator() ?? DEFAULT_DUNGEON_GENERATOR_SETTINGS;
 }
 
-/** How many floors a request makes: a five-room dungeon has one whatever `floors` says. */
-export function requestedFloors(request: DungeonRequest): number {
-  return request.fiveRoom === true ? 1 : floorCount(request.floors);
-}
-
 /** The floor shown: the one picked, or the deepest there is where the dungeon has fewer. */
 function shownFloor(picked: number, request: DungeonRequest, model: DungeonModel | null): number {
   const count = Math.min(requestedFloors(request), model?.floors.length ?? Infinity);
@@ -72,15 +67,17 @@ function shownFloor(picked: number, request: DungeonRequest, model: DungeonModel
 const sameTags = (a: readonly DungeonTag[], b: readonly DungeonTag[]): boolean => a.length === b.length && a.every((tag) => b.includes(tag));
 
 /**
- * The generator's state. Style, view and the tags generated with are the GM's preferences and
- * kept in Atlas' settings as they change; the seed, the floors, the boss room and five-room
- * switches, the name and the edits belong to this one dungeon and go with the panel. A new seed,
+ * The generator's state. Style, view, the tags generated with, the floors and the boss room and
+ * five-room switches are the GM's preferences and kept in Atlas' settings as they change; the
+ * seed, the name and the edits belong to this one dungeon and go with the panel. A new seed,
  * tags, floor count or switch is another dungeon: edits are dropped. The name only names the
  * scene, and the floor shown only which floor the preview and exports draw.
  */
 export function useDungeonState(app: App, initialName = ''): DungeonState {
   const [settings, setSettings] = useState<DungeonGeneratorSettings>(() => readSettings(app));
-  const [request, setRequest] = useState<DungeonRequest>(() => ({ seed: randomSeed(), tags: settings.tags, floors: 1, bossRoom: true, fiveRoom: false }));
+  const [request, setRequest] = useState<DungeonRequest>(() => ({
+    seed: randomSeed(), tags: settings.tags, floors: settings.floors, bossRoom: settings.bossRoom, fiveRoom: settings.fiveRoom,
+  }));
   const [pickedFloor, setPickedFloor] = useState(0);
   const [name, setNameState] = useState(initialName.trim());
   const requestRef = useRef(request);
@@ -139,9 +136,18 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     floors: requestedFloors(request),
     floor,
     setFloor: setPickedFloor,
-    setFloors: useCallback((floors) => changeRequest((current) => (current.floors === floors ? current : { ...current, floors: floorCount(floors) })), [changeRequest]),
-    setBossRoom: useCallback((on) => changeRequest((current) => (current.bossRoom === on ? current : { ...current, bossRoom: on })), [changeRequest]),
-    setFiveRoom: useCallback((on) => changeRequest((current) => (current.fiveRoom === on ? current : { ...current, fiveRoom: on })), [changeRequest]),
+    setFloors: useCallback((floors) => {
+      changeRequest((current) => (current.floors === floors ? current : { ...current, floors: floorCount(floors) }));
+      persist({ floors: floorCount(floors) });
+    }, [changeRequest, persist]),
+    setBossRoom: useCallback((on) => {
+      changeRequest((current) => (current.bossRoom === on ? current : { ...current, bossRoom: on }));
+      persist({ bossRoom: on });
+    }, [changeRequest, persist]),
+    setFiveRoom: useCallback((on) => {
+      changeRequest((current) => (current.fiveRoom === on ? current : { ...current, fiveRoom: on }));
+      persist({ fiveRoom: on });
+    }, [changeRequest, persist]),
     setGenerated: useCallback((asked, next) => setGeneratedState({ request: asked, model: next }), []),
     setName: setNameState,
     setSeed: useCallback((seed) => changeRequest((current) => (current.seed === seed ? current : { ...current, seed })), [changeRequest]),

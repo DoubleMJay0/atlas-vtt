@@ -1,23 +1,31 @@
 import { isRecord } from '../utils/guards';
+import { floorCount } from './model';
 import { DEFAULT_VIEW, GRID_STYLES, type DungeonView } from './style';
 import { DEFAULT_STYLE_ID, isDungeonStyleId, type DungeonStyleId } from './styleCatalog';
 import { readTags, type DungeonTag } from './tags';
 
 /**
  * The GM's preferences for the dungeon generator, kept in Atlas' settings: the style dungeons are
- * drawn in, what they show, and the tags asked for last. Never a dungeon itself: that becomes a scene.
+ * drawn in, what they show, and what was asked for last (tags, floors, the boss room and five-room
+ * switches). Never a dungeon itself: that becomes a scene.
  */
 export interface DungeonGeneratorSettings {
   /** The look picked in the gallery, by id. */
   style: DungeonStyleId;
   view: DungeonView;
   tags: DungeonTag[];
+  floors: number;
+  bossRoom: boolean;
+  fiveRoom: boolean;
 }
 
 export const DEFAULT_DUNGEON_GENERATOR_SETTINGS: DungeonGeneratorSettings = {
   style: DEFAULT_STYLE_ID,
   view: DEFAULT_VIEW,
   tags: [],
+  floors: 1,
+  bossRoom: true,
+  fiveRoom: false,
 };
 
 function oneOf<T extends string>(value: unknown, options: readonly T[], base: T): T {
@@ -54,5 +62,8 @@ export function readDungeonGeneratorSettings(stored: unknown): DungeonGeneratorS
     style: isDungeonStyleId(record.style) ? record.style : DEFAULT_STYLE_ID,
     view: readDungeonView(record.view),
     tags: Array.isArray(record.tags) ? readTags(record.tags.filter((tag): tag is string => typeof tag === 'string')) : [],
+    floors: floorCount(record.floors),
+    bossRoom: flag(record.bossRoom, true),
+    fiveRoom: flag(record.fiveRoom, false),
   };
 }

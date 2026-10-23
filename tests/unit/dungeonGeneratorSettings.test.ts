@@ -41,8 +41,13 @@ describe('reading the generator settings', () => {
 
   it('keeps what the GM chose in Atlas settings', () => {
     const settings = new SettingsService({} as App);
-    settings.setDungeonGenerator({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint' });
-    expect(settings.getDungeonGenerator()).toEqual({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint' });
+    settings.setDungeonGenerator({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint', floors: 3, bossRoom: false, fiveRoom: true });
+    expect(settings.getDungeonGenerator()).toEqual({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint', floors: 3, bossRoom: false, fiveRoom: true });
+  });
+
+  it('reads floors and the switches from stored data, defaults where they are missing or broken', () => {
+    expect(readDungeonGeneratorSettings({})).toMatchObject({ floors: 1, bossRoom: true, fiveRoom: false });
+    expect(readDungeonGeneratorSettings({ floors: 9, bossRoom: 'yes', fiveRoom: true })).toMatchObject({ floors: 4, bossRoom: true, fiveRoom: true });
   });
 });
 

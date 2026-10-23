@@ -199,3 +199,8 @@ export const MAX_FLOORS = 4;
 export function floorCount(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.min(MAX_FLOORS, Math.max(1, Math.round(value))) : 1;
 }
+
+/** How many floors a request makes: a five-room dungeon has one whatever `floors` says. */
+export function requestedFloors(request: Pick<DungeonRequest, 'floors' | 'fiveRoom'>): number {
+  return request.fiveRoom === true ? 1 : floorCount(request.floors);
+}
