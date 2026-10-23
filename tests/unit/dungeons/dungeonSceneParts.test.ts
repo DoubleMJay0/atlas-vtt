@@ -111,6 +111,30 @@ describe('a dungeon of several floors as one scene', () => {
   });
 });
 
+describe('the parapet round a gallery', () => {
+  it('is half cover on the floor cells beside the hole, never on the hole', () => {
+    let galleries = 0;
+    for (let seed = 1; seed <= 200 && galleries < 3; seed++) {
+      const model = generateDungeon({ seed, tags: [], floors: 2 });
+      const gallery = model.floors[0]!.terrain.find(piece => piece.kind === 'gallery');
+      if (!gallery) continue;
+      galleries++;
+      const { parts, placement } = partsOf(model);
+      const parapets = Object.values(parts.scene.mapFeatures ?? {}).filter(feature => feature.name === 'Parapet' && feature.level === parts.levelIds![0]);
+      expect(parapets.length).toBeGreaterThan(0);
+      const hole = new Set(gallery.cells.map(cellKey));
+      for (const feature of parapets) {
+        expect(feature.terrain).toEqual({ cover: 'half' });
+        const xs = feature.polygon.map(p => p.x / placement.pxPerCell + placement.originCell.x);
+        const ys = feature.polygon.map(p => p.y / placement.pxPerCell + placement.originCell.y);
+        const centre = { x: Math.floor((Math.min(...xs) + Math.max(...xs)) / 2), y: Math.floor((Math.min(...ys) + Math.max(...ys)) / 2) };
+        expect(hole.has(cellKey(centre))).toBe(false);
+      }
+    }
+    expect(galleries).toBeGreaterThan(0);
+  });
+});
+
 describe('the holes and bridges of a dungeon of several floors', () => {
   it('open the floor over the floor below on exactly their cells, bridges laid over them, none on the deepest floor', () => {
     let holes = 0;

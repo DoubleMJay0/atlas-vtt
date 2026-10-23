@@ -156,6 +156,7 @@ export const dungeon = {
   'dungeon.terrain.deepWater': 'Deep water',
   'dungeon.terrain.pit': 'Pit',
   'dungeon.terrain.gallery': 'Gallery',
+  'dungeon.terrain.parapet': 'Parapet',
   'dungeon.terrain.bridge': 'Bridge',
   'dungeon.terrain.ropeBridge': 'Rope bridge',
   'dungeon.terrain.stoneBridge': 'Stone bridge',

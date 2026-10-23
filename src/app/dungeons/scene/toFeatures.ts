@@ -39,6 +39,24 @@ function terrainDrafts(pieces: readonly DungeonTerrain[]): Draft[] {
   });
 }
 
+/**
+ * The parapet along a gallery's rim: the floor cells beside the hole, where the map draws the low
+ * rail (`render/terrain/terrainOpenings.ts`). Standing there behind it is half cover.
+ */
+function parapetDrafts(pieces: readonly DungeonTerrain[], onFloor: (cell: CellPoint) => boolean): Draft[] {
+  return pieces.filter(piece => piece.kind === 'gallery').flatMap(piece => {
+    const hole = new Set(piece.cells.map(c => `${c.x},${c.y}`));
+    const rim = new Map<string, CellPoint>();
+    for (const { x, y } of piece.cells) {
+      for (const cell of [{ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 }]) {
+        const key = `${cell.x},${cell.y}`;
+        if (!hole.has(key) && onFloor(cell)) rim.set(key, cell);
+      }
+    }
+    return cellOutlines([...rim.values()], MAX_FEATURE_CORNERS).map((polygon): Draft => ({ polygon, name: t('dungeon.terrain.parapet'), terrain: { cover: 'half' } }));
+  });
+}
+
 /** A box in a prop's own frame, before its turn and scale (y up the prop's facing is negative). */
 interface Box {
   x0: number;
@@ -111,8 +129,10 @@ function columnDrafts(columns: readonly DungeonColumn[]): Draft[] {
  */
 export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, 'props'>, placement: DungeonPlacement, id: string, level?: string): Record<string, MapFeature> {
   const { floor, roomShapes, field } = dungeon;
+  const shown = floor.terrain.filter(piece => roomShapes.has(piece.room));
   const drafts = [
-    ...terrainDrafts(floor.terrain.filter(piece => roomShapes.has(piece.room))),
+    ...terrainDrafts(shown),
+    ...parapetDrafts(shown, cell => field.distance(cell.x + 0.5, cell.y + 0.5) < 0),
     ...(view.props ? propDrafts(floor.props.filter(prop => roomShapes.has(prop.room))) : []),
     ...columnDrafts(floor.columns.filter(column => field.distance(column.x, column.y) < 0)),
   ].slice(0, MAX_MAP_FEATURES);
