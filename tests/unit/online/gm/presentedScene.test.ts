@@ -252,7 +252,7 @@ describe('what Atlas presents', () => {
     expect(findPresentedTab(leaves, { tabId: 'gone', filePath: 'Scenes/None.atlasmap' })).toBeNull();
   });
 
-  it('is the presented level of a scene with several: another level the GM looks at is held, as the player window holds', () => {
+  it('names the presented level of a scene with several, and shows the scene whichever level the GM looks at: players see their own floors', () => {
     const levels = [
       { id: 'ground', name: 'Ground', elevation: { bottom: 0, top: 10 }, background: 'maps/cave.png' },
       { id: 'upper', name: 'Upper', elevation: { bottom: 10, top: 20 }, background: 'maps/hall.png' },
@@ -264,9 +264,7 @@ describe('what Atlas presents', () => {
     expect(tab.levelId).toBe('upper');
     expect(showsPresented(cave(), tab)).toBe(true);
     expect(showsPresented({ ...cave(), levels, viewedLevel: 'upper' }, tab)).toBe(true);
-    expect(showsPresented({ ...cave(), levels, viewedLevel: 'ground' }, tab)).toBe(false);
-    const { levelId: _presented, ...firstLevel } = tab;
-    expect(showsPresented({ ...cave(), levels, viewedLevel: 'ground' }, firstLevel)).toBe(true);
+    expect(showsPresented({ ...cave(), levels, viewedLevel: 'ground' }, tab)).toBe(true);
   });
 
   it('tells Atlas it shows the presented scene, and tells nothing to an Atlas without the call', () => {

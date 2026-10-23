@@ -64,7 +64,11 @@ export interface ShareHarness {
   requests: (from: string, answer: RollRequestAnswer) => RollRequest | null;
   /** The log entry of whoever found a readable pin; nobody by default. */
   foundPin: (mapPath: string, pinId: string) => string | null;
+  /** The level of a scene with several Atlas presents to its player view; unset is the first. */
+  presented: string | undefined;
   set(next: SceneState): Promise<void>;
+  /** The store's state now, as the share's own writes (players' moves) leave it. */
+  state(): SceneState;
   /** Moves the clock on, running the timers that fall due, and lets reads settle. */
   advance(ms: number): Promise<void>;
   settle(): Promise<void>;
@@ -107,7 +111,9 @@ export function shareHarness(initial: SceneState, images: ReadonlyMap<string, Ui
     logged: [],
     requests: () => null,
     foundPin: () => null,
+    presented: undefined,
     share: new SceneShare(store, {
+      presentedLevel: () => harness.presented,
       logRoll: (roll) => harness.logged.push(roll),
       rollRequest: (from, answer) => harness.requests(from, answer),
       foundPin: (mapPath, pinId) => harness.foundPin(mapPath, pinId),
@@ -138,6 +144,7 @@ export function shareHarness(initial: SceneState, images: ReadonlyMap<string, Ui
       clearTimer: (timer) => void timers.delete(timer),
       seats,
     }),
+    state: () => store.getState(),
     set: async (next) => {
       current = next;
       for (const listener of listeners) listener(next);

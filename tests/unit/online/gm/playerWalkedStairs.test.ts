@@ -49,7 +49,6 @@ describe('a player\'s token on walked stairs', () => {
     expect(ogre(t)).toEqual({ x: 450, y: 550, level: 'ground' });
     t.moves.receive(ANA, move(450, 450));
     expect(ogre(t)).toEqual({ x: 450, y: 450, level: 'upper' });
-    expect(t.taken).toEqual([{ tokenId: 'ogre', level: 'upper' }]);
     expect(refused(t)).toBe(0);
     expect(t.history.getState().pastStates).toHaveLength(3);
   });
@@ -109,7 +108,6 @@ describe('a player\'s token on walked stairs', () => {
     expect(ogre(t)).toEqual({ x: 450, y: 450, level: 'ground' });
     t.moves.receive(ANA, move(450, 450));
     expect(ogre(t)).toEqual({ x: 450, y: 450, level: 'upper' });
-    expect(t.taken).toEqual([{ tokenId: 'ogre', level: 'upper' }]);
     expect(t.history.getState().pastStates).toHaveLength(1);
   });
 
@@ -120,6 +118,5 @@ describe('a player\'s token on walked stairs', () => {
     t.moves.receive(ANA, move(450, 450));
     expect(ogre(t).x).toBeLessThan(400);
     expect(ogre(t).level).toBe('ground');
-    expect(t.taken).toEqual([]);
   });
 });

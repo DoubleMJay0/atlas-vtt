@@ -40,6 +40,8 @@ export interface TokenSharePorts {
   now(): number;
   setTimer(run: () => void, ms: number): number;
   clearTimer(timer: number): void;
+  /** The random ids players know tokens by, by GM id, where several shares name tokens alike (the floors of one scene); else the share's own. */
+  aliases?: Map<string, string>;
 }
 
 /**
@@ -72,7 +74,7 @@ export class TokenShare {
   private lastAt = Number.NEGATIVE_INFINITY;
   private timer: number | undefined;
   private poll: number | undefined;
-  private readonly aliases = new Map<string, string>();
+  private readonly aliases: Map<string, string>;
   private readonly art: ArtRefs;
   /** Vault paths of the artwork the last list shows, by hash. */
   private shownArt = new Map<string, string>();
@@ -93,6 +95,7 @@ export class TokenShare {
     this.ports = ports;
     this.listed = listed;
     this.list = new SequencedList('tokens', ports);
+    this.aliases = ports.aliases ?? new Map<string, string>();
     this.art = new ArtRefs((path) => ports.readImage(path), () => this.update());
   }
 

@@ -11,13 +11,22 @@ export interface AssetAnswerPorts {
   scaleImage?: ScaleImage | undefined;
 }
 
+/** An image of the picture held in memory: the map and its shade. */
+export interface PictureImage {
+  readonly hash: string;
+  readonly bytes: Uint8Array;
+  readonly mime: string;
+}
+
 /**
  * What a player may be sent now: the assets of their current picture. Each question names the player
  * who asks, for a picture that is not the same for everyone (a player's own book).
  */
 export interface PictureAssets {
   /** The shared map's image, while one is shared. */
-  map(player: string): { readonly hash: string; readonly bytes: Uint8Array; readonly mime: string } | null;
+  map(player: string): PictureImage | null;
+  /** The shadows multiplied over the shared map (`SharedScene.shade`), while the map has them. */
+  shade?(player: string): PictureImage | null;
   /** The explored memory by hash, while it is the one players were sent. */
   explored(hash: string, player: string): Uint8Array | undefined;
   /** The vault path of artwork the picture shows (a token's or an initiative portrait's, an image of a quest's text), by hash. */
@@ -42,8 +51,8 @@ export class AssetAnswers {
   answer(from: string, request: PlayerAssetRequest): void {
     const { hash, maxSide } = request;
     const first = request.from ?? 0;
-    const map = this.picture.map(from);
-    const isMap = map?.hash === hash;
+    const map = this.mapImage(hash, from);
+    const isMap = map !== null;
     const explored = isMap ? undefined : this.picture.explored(hash, from);
     const art = isMap || explored !== undefined ? undefined : this.picture.artPath(hash, from);
     const bytes = explored ?? (isMap || art !== undefined ? undefined : this.picture.text?.(hash, from));
@@ -78,7 +87,15 @@ export class AssetAnswers {
   }
 
   private inPicture(hash: string, player: string): boolean {
-    return this.picture.map(player)?.hash === hash || this.picture.artPath(hash, player) !== undefined;
+    return this.mapImage(hash, player) !== null || this.picture.artPath(hash, player) !== undefined;
+  }
+
+  /** The map or its shade by hash, while the player's picture shows it. */
+  private mapImage(hash: string, player: string): PictureImage | null {
+    const map = this.picture.map(player);
+    if (map?.hash === hash) return map;
+    const shade = this.picture.shade?.(player) ?? null;
+    return shade?.hash === hash ? shade : null;
   }
 
   private serve(hash: string, bytes: Uint8Array, to: string, first: number): void {
