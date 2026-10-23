@@ -11,6 +11,7 @@ import { ambientLevel } from './lightLevels';
 import { GENERIC_SIGHT_RULES, tokenEffects, type SightRules } from './sightRules';
 import { resolveSenses, tokenSenses } from './tokenSenses';
 import { computeVisibility, type MapBounds, type Polygon } from './visibility';
+import { areaParts, type AreaSampling, type LightReachPart } from './areaReach';
 import { tokenFacing, visionCone, type VisionCone } from './visionCone';
 import { computeTokenPixelSize } from '../pixi/token-renderer/tokenSizing';
 
@@ -103,6 +104,12 @@ export interface LightReach {
   priority?: number;
   /** A light that shines one way: `polygon` is cut to it. */
   cone?: VisionCone;
+  /**
+   * A light that glows from an area (lava): `polygon` is that area, bright throughout, and
+   * `parts` say where its light reaches beyond it, each within `dim` of a point along the area's
+   * outline (`areaParts`); `bright` and `dim` count from that point. `origin` is the area's middle.
+   */
+  parts?: readonly LightReachPart[];
 }
 
 /** What a reach is besides its radii. */
@@ -261,6 +268,19 @@ export function computeSight(
  */
 export function lightReach(origin: Point, dim: number, walls: readonly WallSegment[], bright = 0, kind: LightReachKind = {}): LightReach {
   return { origin, bright, dim, polygon: computeVisibility(origin, dim, walls, kind.cone, 'light'), ...kindOf(kind) };
+}
+
+/**
+ * Where a light that glows from `area` reaches (`LightReach.parts`): the area itself and, within
+ * `dim` of its outline, what a clear line from the outline reaches. `origin` is the light's middle.
+ */
+export function areaLightReach(origin: Point, area: readonly Point[], dim: number, walls: readonly WallSegment[], sampling: AreaSampling, bright = 0, kind: LightReachKind = {}): LightReach {
+  return { origin, bright, dim, polygon: area as Polygon, parts: areaParts(area, dim, walls, sampling), ...kindOf(kind) };
+}
+
+/** Every polygon a light lights: its reach, or an area light's area and the reaches of its outline. */
+export function litPolygons(reach: LightReach): Polygon[] {
+  return reach.parts ? [reach.polygon, ...reach.parts.map((part) => part.polygon)] : [reach.polygon];
 }
 
 /** The fields of `kind` that say something: a light without them is stored as it always was. */

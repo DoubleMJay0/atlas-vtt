@@ -85,6 +85,9 @@ export class LightMap {
       slot.cone.set(cone ? [Math.cos(cone.facing), Math.sin(cone.facing), cone.angle / 2, cone.apex ?? 0] : ALL_AROUND);
       u.uEdge = light.edge ?? (LIGHT_REACH - 1) * light.dim;
       slot.mesh.shader!.resources.uTile = light.tile.texture.source;
+      // An area light counts its distances from its outline (`Tile.distance`).
+      u.uIsArea = light.tile.distance ? 1 : 0;
+      slot.mesh.shader!.resources.uDistance = (light.tile.distance ?? this.placeholder).source;
     });
     this.darkSlots.forEach((slot, i) => {
       const darkness = dark[i];
@@ -94,7 +97,10 @@ export class LightMap {
     // Without a darkness the meshes stay in the order they were made: lights only add up.
     if (dark.length > 0 || this.ordered) this.order(lights, shining, dark);
     renderInto(this.renderer, this.scene, this.texture, [0, 0, 0, 0]);
-    for (const slot of this.slots) slot.mesh.shader!.resources.uTile = this.placeholder.source;
+    for (const slot of this.slots) {
+      slot.mesh.shader!.resources.uTile = this.placeholder.source;
+      slot.mesh.shader!.resources.uDistance = this.placeholder.source;
+    }
   }
 
   /** Puts the meshes in the order of `lights`, so each darkness erases exactly the lights listed before it. */
@@ -134,8 +140,9 @@ export class LightMap {
       uTexel: { value: this.texel, type: 'f32' },
       uCone: { value: cone, type: 'vec4<f32>' },
       uEdge: { value: 1, type: 'f32' },
+      uIsArea: { value: 0, type: 'f32' },
     });
-    const shader = createShader(ENGINE_SHADERS.lightMap, { lightUniforms: uniforms, uTile: this.placeholder.source });
+    const shader = createShader(ENGINE_SHADERS.lightMap, { lightUniforms: uniforms, uTile: this.placeholder.source, uDistance: this.placeholder.source });
     const mesh = new Mesh({ geometry: this.geometry, shader });
     mesh.blendMode = 'add';
     this.scene.addChild(mesh);

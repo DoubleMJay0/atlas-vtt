@@ -16,6 +16,7 @@ const FLICKERS: { value: LightAnimation; label: string }[] = [
   { value: 'candle', label: 'Candle' },
   { value: 'pulse', label: 'Pulse' },
   { value: 'magic', label: 'Shimmer' },
+  { value: 'smoulder', label: 'Smoulder' },
 ];
 
 const NOTHING = (): void => undefined;

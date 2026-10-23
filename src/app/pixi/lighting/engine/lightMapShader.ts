@@ -29,6 +29,9 @@ void main() {
 // there is lit and not counted): `uEdge` world pixels, or `BEAM_EDGE` of the beam's half-width
 // at that distance where that is less, though never under a texel (`beamEdge`). Past its own space it falls off over the
 // edge it has at that radius. The tile knows nothing of the cone, so turning a light traces nothing.
+// An area light (`uIsArea`) counts every distance from its outline instead of from its middle:
+// `uDistance` holds the signed distance to it on the tile's texel grid (`areaDistanceFragment`),
+// and inside the area, where it is negative, the light is at its brightest, halo and all.
 // The colour is `uLightColor`: PIXI sets `uColor` itself, as a vec4, on every mesh shader that declares it.
 export const lightMapFragment = `${GLSL_VERSION}
 in vec2 vWorld;
@@ -46,7 +49,9 @@ uniform float uHaloSize;
 uniform float uTexel;
 uniform vec4 uCone;
 uniform float uEdge;
+uniform float uIsArea;
 uniform sampler2D uTile;
+uniform sampler2D uDistance;
 out vec4 finalColor;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 float smoother(float u) { return u * u * u * (u * (u * 6.0 - 15.0) + 10.0); }
@@ -68,7 +73,7 @@ void main() {
   ivec2 texel = ivec2(floor((vWorld - uRect.xy) / uTexel));
   ivec2 size = textureSize(uTile, 0);
   if (any(lessThan(texel, ivec2(0))) || any(greaterThanEqual(texel, size))) discard;
-  float d = distance(vWorld, uLight);
+  float d = uIsArea > 0.5 ? max(texelFetch(uDistance, texel, 0).r, 0.0) : distance(vWorld, uLight);
   float reach = max(uReach, 1.0);
   float t = d / max(uBright, 1.0);
   float t2 = t * t;

@@ -8,6 +8,7 @@ import { limitedFragment, limitedVertex } from './limitedShader';
 import { sightFragment, sightVertex } from './sightShader';
 import { tileFragment, tileVertex } from './tileShader';
 import { tileSmoothFragment } from './tileSmoothShader';
+import { areaBlurFragment, areaDistanceFragment, areaTileFragment } from './areaTileShader';
 import { zoneFragment } from './zoneShader';
 import { roofFragment } from './roofShader';
 
@@ -26,6 +27,9 @@ export const ENGINE_SHADERS = {
   capsuleField: { name: 'atlas-capsule-field', vertex: capsuleFieldVertex, fragment: capsuleFieldFragment },
   tile: { name: 'atlas-visibility-tile', vertex: tileVertex, fragment: tileFragment },
   tileSmooth: { name: 'atlas-visibility-tile-smooth', vertex: tileVertex, fragment: tileSmoothFragment },
+  areaDistance: { name: 'atlas-area-light-distance', vertex: tileVertex, fragment: areaDistanceFragment },
+  areaTile: { name: 'atlas-area-light-tile', vertex: tileVertex, fragment: areaTileFragment },
+  areaBlur: { name: 'atlas-area-light-blur', vertex: tileVertex, fragment: areaBlurFragment },
   tileLimited: { name: 'atlas-visibility-tile-limited', vertex: limitedVertex, fragment: limitedFragment },
   lightMap: { name: 'atlas-light-map', vertex: lightMapVertex, fragment: lightMapFragment },
   darkness: { name: 'atlas-darkness', vertex: darknessVertex, fragment: darknessFragment },

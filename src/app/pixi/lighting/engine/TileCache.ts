@@ -2,6 +2,7 @@ import type { Renderer, RenderTexture } from 'pixi.js';
 import type { WallSegment } from '../../../types/wallTypes';
 import { LIGHT_REACH, wallRadius } from '../../../lighting/lightingConstants';
 import { placeLight } from '../../../lighting/lightPlacement';
+import { areaBounds } from '../../../lighting/lightArea';
 import { segOf, solidSegments, splitBlocking, type BlockingWalls, type Rect } from '../../../lighting/segments';
 import { blocksFrom, type MapBounds } from '../../../vision/visibility';
 import { CapsuleField } from './CapsuleField';
@@ -17,6 +18,8 @@ export interface Tile {
   flame: number;
   rect: Rect;
   texture: RenderTexture;
+  /** An area light's: the signed distance to its outline on the tile's texel grid, which its falloff counts from. */
+  distance?: RenderTexture;
 }
 
 /** How much tile work may go to the graphics device now (`GpuPacer`). */
@@ -150,6 +153,7 @@ export class TileCache {
   }
 
   private begin(light: EngineLight, blocking: BlockingWalls, walls: readonly WallSegment[]): Build | null {
+    if (light.surface) return this.beginArea(light, light.surface, blocking, walls);
     const { texel } = this.field;
     const placed = placeLight(light.x, light.y, light.flame, solidSegments(blocking), texel);
     if (!placed) return null;
@@ -165,13 +169,34 @@ export class TileCache {
     return { light, job, placed, walls, limited: blocking.limited.length > 0 };
   }
 
+  /**
+   * An area light's tile: over its area grown by its reach, traced from no single place, so it is
+   * not placed like a flame. A one-way wall stops it from both sides, as the rule has it
+   * (`twoWayWalls`): the area may lie on both. Limited walls, which no trace can count, are not
+   * taken out of it (they are switched off, `LIMITED_WALLS`).
+   */
+  private beginArea(light: EngineLight, surface: NonNullable<EngineLight['surface']>, blocking: BlockingWalls, walls: readonly WallSegment[]): Build | null {
+    const { texel } = this.field;
+    const reach = light.dim * LIGHT_REACH;
+    const [x, y, width, height] = areaBounds(surface);
+    const rect = this.boxRect(x - reach, y - reach, x + width + reach, y + height + reach);
+    if (!rect) return null;
+    let oneWay: CapsuleField | null = null;
+    if (blocking.oneWay.length > 0) {
+      oneWay = new CapsuleField(this.renderer, rect, texel, wallRadius(texel), 'uOneWay');
+      oneWay.build(blocking.oneWay.map(segOf));
+    }
+    const job = this.tracer.beginArea([light.x, light.y], { corners: surface, bright: light.bright, dim: light.dim, reach, blur: areaBlur(light.dim, texel) }, rect, oneWay);
+    return { light, job, placed: { x: light.x, y: light.y, flame: 0 }, walls, limited: false };
+  }
+
   private finish(entry: Entry, build: Build): void {
     const { job, placed, light } = build;
     job.oneWay?.destroy();
     // The rule counts from where the light is, wherever a wall it stands in made the engine place it.
     const texture = build.limited ? this.limited.apply(job.tile, job.rect, { x: light.x, y: light.y }, build.walls) : job.tile;
-    entry.tile?.texture.destroy(true);
-    entry.tile = { x: placed.x, y: placed.y, flame: placed.flame, rect: job.rect, texture };
+    destroyTile(entry.tile);
+    entry.tile = { x: placed.x, y: placed.y, flame: placed.flame, rect: job.rect, texture, ...(job.area && { distance: job.area.distance }) };
     entry.light = light;
     entry.build = null;
   }
@@ -180,6 +205,7 @@ export class TileCache {
     if (!entry.build) return;
     entry.build.job.oneWay?.destroy();
     entry.build.job.tile.destroy(true);
+    entry.build.job.area?.distance.destroy(true);
     entry.build = null;
   }
 
@@ -191,23 +217,42 @@ export class TileCache {
   /** Destroys the tile shown; true when there was one. */
   private dropTile(entry: Entry): boolean {
     if (!entry.tile) return false;
-    entry.tile.texture.destroy(true);
+    destroyTile(entry.tile);
     entry.tile = null;
     return true;
   }
 
   /** The square of half-size `half` around (x, y) on the texel grid, clipped to the map; null if empty. */
   private tileRect(x: number, y: number, half: number): Rect | null {
+    return this.boxRect(x - half, y - half, x + half, y + half);
+  }
+
+  /** The box from (x0, y0) to (x1, y1) grown to the texel grid, clipped to the map; null if empty. */
+  private boxRect(left: number, top: number, right: number, bottom: number): Rect | null {
     const { texel } = this.field;
     const width = Math.ceil(this.bounds.width / texel) * texel, height = Math.ceil(this.bounds.height / texel) * texel;
-    const x0 = Math.max(0, Math.floor((x - half) / texel) * texel), y0 = Math.max(0, Math.floor((y - half) / texel) * texel);
-    const x1 = Math.min(width, Math.ceil((x + half) / texel) * texel), y1 = Math.min(height, Math.ceil((y + half) / texel) * texel);
+    const x0 = Math.max(0, Math.floor(left / texel) * texel), y0 = Math.max(0, Math.floor(top / texel) * texel);
+    const x1 = Math.min(width, Math.ceil(right / texel) * texel), y1 = Math.min(height, Math.ceil(bottom / texel) * texel);
     return x1 > x0 && y1 > y0 ? [x0, y0, x1 - x0, y1 - y0] : null;
   }
 }
 
+/**
+ * How widely an area light's distance field is blurred (sigma, world pixels): a sixteenth of its
+ * dim range, so the corners of its light round off alike at any size, never under two texels.
+ */
+export function areaBlur(dim: number, texel: number): number {
+  return Math.max(2 * texel, dim / 16);
+}
+
+function destroyTile(tile: Tile | null): void {
+  tile?.texture.destroy(true);
+  tile?.distance?.destroy(true);
+}
+
+/** Whether two lights trace the same tile: an area light's by its area, its reach and its bright range, which weigh its rays. */
 function sameShape(a: EngineLight, b: EngineLight): boolean {
-  return a.x === b.x && a.y === b.y && a.dim === b.dim && a.flame === b.flame;
+  return a.x === b.x && a.y === b.y && a.dim === b.dim && a.flame === b.flame && a.surface === b.surface && (!a.surface || a.bright === b.bright);
 }
 
 function touches(rect: Rect | null, changed: readonly Rect[] | 'all'): boolean {

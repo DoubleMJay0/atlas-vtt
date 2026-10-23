@@ -3,7 +3,8 @@ import { selectSight } from './selectSight';
 import type { MeasurementSettings } from '../grid/measurementFormat';
 import { sleeps } from '../lighting/lightActivity';
 import { lightZoneList, withZones } from '../lighting/lightZones';
-import { worldTexel } from '../lighting/lightingConstants';
+import { wallRadius, worldTexel } from '../lighting/lightingConstants';
+import { AREA_SAMPLE_SPACING } from './areaReach';
 import { unitScaleOf } from '../lighting/lightingUnits';
 import { sealedWalls } from '../lighting/sealWalls';
 import { SightTokens, heldForSight } from '../lighting/sightOnDrop';
@@ -121,13 +122,14 @@ export class SceneModelBuilder {
     const zoneList = lightZoneList(levelObjects(state).lightZones);
     const ambient = withZones(state.lighting, zoneList);
     const shining = activeLights(levelObjects(state).lights, tokens, ambient).map((light) => engineLight(light, scale));
-    const everyReach = this.lightReaches.sync(shining, walls);
+    // An area light's outline is traced a quarter cell apart, clear of the capsules the picture puts around walls.
+    const everyReach = this.lightReaches.sync(shining, walls, { spacing: scale.cellSize * AREA_SAMPLE_SPACING, clearance: wallRadius(worldTexel(bounds)) });
     // A light whose flame stands in magical darkness it does not outshine gives nothing: the picture and the rule both leave it out.
     const out = shining.map((light) => !light.darkness && quenched(light, light.priority ?? 0, everyReach));
     // A darkness is drawn as the polygon the rule counts, and veils the light it swallows where the
     // rule counts that light: the reaches' polygons, handed on rather than traced again.
     const dark = shining.some((light) => light.darkness);
-    const lights = shining.flatMap((light, i) => (out[i] ? [] : [dark ? { ...light, area: everyReach[i]!.polygon } : light]));
+    const lights = shining.flatMap((light, i) => (out[i] ? [] : [dark ? withRuleArea(light, everyReach[i]!) : light]));
     const reaches = everyReach.filter((_, i) => !out[i]);
     const sources = sourcesInDarkness(sightSources(tokens, scale, reach, rules, GM_SIGHT_POLICY), ambient, reaches);
     this.sightCache.retain(new Set(sources.map(source => source.tokenId)));
@@ -140,6 +142,11 @@ export class SceneModelBuilder {
 }
 
 const NO_ZONES: readonly EngineZone[] = [];
+
+/** A light with the area the rule counts for it, for the darkness map: its reach's polygon, and an area light's parts beyond its area. */
+function withRuleArea(light: EngineLight, reach: LightReach): EngineLight {
+  return { ...light, area: reach.polygon, ...(reach.parts && { parts: reach.parts }) };
+}
 
 /** Whether a light that follows the ambient light wakes or falls asleep between two ambient lights. */
 function awakeLightsChanged(lights: ViewState['objects']['lights'], before: AmbientLight, after: AmbientLight): boolean {
