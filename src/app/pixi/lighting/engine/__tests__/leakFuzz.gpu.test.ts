@@ -67,7 +67,7 @@ async function fuzz({ seed, trials, gap = false, bounds = { width: 2048, height:
     engine.setEnabled(true);
     engine.setMode('player');
     const rand = rng(seed + 1);
-    const report: Report = { rooms: 0, doors: 0, oneWay: 0, twoLights: 0, checked: 0, leaks: 0, sightChecked: 0, sightLeaks: 0, senseLeaks: 0, senseInside: 0, spots: 0, spotLeaks: 0, spotInside: 0, litInside: 0, bounceInside: 0, darkRooms: 0, darkLeaks: 0, darkInside: 0, darkRevealed: 0, senseDarkInside: 0, senseDarkRevealed: 0, beamRooms: 0, beamInside: 0, beamLeaks: 0 };
+    const report: Report = { rooms: 0, doors: 0, oneWay: 0, twoLights: 0, checked: 0, leaks: 0, sightChecked: 0, sightLeaks: 0, senseLeaks: 0, senseInside: 0, spots: 0, spotLeaks: 0, spotInside: 0, litInside: 0, bounceInside: 0, darkRooms: 0, darkLeaks: 0, darkInside: 0, darkRevealed: 0, senseDarkInside: 0, senseDarkRevealed: 0, beamRooms: 0, beamInside: 0, beamLeaks: 0, movingInside: 0, movingLeaks: 0 };
     for (const room of fuzzRooms(seed, trials, gap)) {
       // The rules seal at the map's texel; the picture is held to the texel the engine draws at.
       const texel = worldTexel(bounds, quality.maxTexels);
@@ -99,6 +99,10 @@ async function fuzz({ seed, trials, gap = false, bounds = { width: 2048, height:
       };
       const lit = shoot(false);
       const seen = shoot(true);
+      // The same lights carried along a drag: traced at once, on coarse texels, without smoothing.
+      engine.update({ bounds, albedo: null, walls, lights: lights.map((light) => ({ ...light, moving: true as const })), sight: SEES_ALL, sightRadius, ambient: 0 });
+      engine.flush();
+      const moving = renderView(renderer, engine, target, bounds, scale, x, y);
       const senses = SENSE_SETS[report.rooms % SENSE_SETS.length]!;
       const last = room.lights[room.lights.length - 1]!;
       const darkness: EngineLight | null = report.rooms % 2 === 0
@@ -152,6 +156,7 @@ async function fuzz({ seed, trials, gap = false, bounds = { width: 2048, height:
           const o = (sy * device + sx) * 4;
           const inside = insidePolygon(p, outline);
           const d = distToOutline(p, outline);
+          if (inside && moving[o]! > 0) report.movingInside++;
           if (inside && lit[o]! > 0) {
             report.litInside++;
             if (beyondReach(p)) report.bounceInside++;
@@ -159,6 +164,7 @@ async function fuzz({ seed, trials, gap = false, bounds = { width: 2048, height:
           if (!inside && d > 0.01) {
             report.checked++;
             if (lit[o]! + lit[o + 1]! + lit[o + 2]! > 0) report.leaks++;
+            if (moving[o]! + moving[o + 1]! + moving[o + 2]! > 0) report.movingLeaks++;
             if (beamed && beamed[o]! + beamed[o + 1]! + beamed[o + 2]! > 0) report.beamLeaks++;
           }
           if (inside && beamed && beamed[o]! > 0) report.beamInside++;
@@ -196,7 +202,7 @@ async function fuzz({ seed, trials, gap = false, bounds = { width: 2048, height:
 }
 
 /** What every run of closed rooms holds. */
-const NO_LEAKS = { leaks: 0, sightLeaks: 0, senseLeaks: 0, spotLeaks: 0, darkLeaks: 0, darkRevealed: 0, senseDarkRevealed: 0, beamLeaks: 0 };
+const NO_LEAKS = { leaks: 0, movingLeaks: 0, sightLeaks: 0, senseLeaks: 0, spotLeaks: 0, darkLeaks: 0, darkRevealed: 0, senseDarkRevealed: 0, beamLeaks: 0 };
 
 describe('leak fuzz', () => {
   it('lets no light, bounce, sight, sense or token footprint past the walls of closed rooms', { timeout: 3_600_000 }, async () => {
@@ -206,6 +212,7 @@ describe('leak fuzz', () => {
     expect(Math.min(report.doors, report.oneWay, report.twoLights)).toBeGreaterThan(TRIALS / 8);
     expect(report.checked).toBeGreaterThan(TRIALS * 1000);
     expect(report.litInside).toBeGreaterThan(TRIALS * 100);
+    expect(report.movingInside).toBeGreaterThan(report.litInside / 2);
     expect(report.bounceInside).toBeGreaterThan(TRIALS * 10);
     expect(report.senseInside).toBeGreaterThan(TRIALS * 100);
     expect(report.spots).toBeGreaterThan(TRIALS * 4);
@@ -276,6 +283,7 @@ describe('leak fuzz', () => {
     expect(report.senseLeaks).toBeGreaterThan(1000);
     expect(report.darkLeaks).toBeGreaterThan(1000);
     expect(report.beamLeaks).toBeGreaterThan(1000);
+    expect(report.movingLeaks).toBeGreaterThan(1000);
   });
 
   it('finds light inside a darkness that every light outranks (the check can fail)', async () => {

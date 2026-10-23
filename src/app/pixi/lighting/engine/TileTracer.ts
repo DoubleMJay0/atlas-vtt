@@ -1,6 +1,6 @@
 import { Mesh, UniformGroup, type Geometry, type Renderer, type RenderTexture, type Shader } from 'pixi.js';
 import { chordOffsets } from '../../../lighting/chordOffsets';
-import { LIGHT_LEVELS, TILE_BAND_TEXELS, TILE_RAYS } from '../../../lighting/lightingConstants';
+import { LIGHT_LEVELS, MOVING_TILE_RAYS, MOVING_TILE_SCALE, TILE_BAND_TEXELS, TILE_RAYS } from '../../../lighting/lightingConstants';
 import { AREA_CORNER_VECTORS } from './areaTileShader';
 import type { Rect } from '../../../lighting/segments';
 import { CapsuleField } from './CapsuleField';
@@ -17,7 +17,8 @@ export interface TileTracerOptions {
 /**
  * One light's tile being built: traced into a raw target, then smoothed into `tile`, one band of
  * rows after another (`TileTracer.step`). Once stepped, a job is finished or dropped before
- * another is stepped; the caller owns `oneWay` and, once done, `tile`.
+ * another is stepped, unless it is a moving light's (`moving`), which is built whole at once on a
+ * raw target of its own, between the bands of another; the caller owns `oneWay` and, once done, `tile`.
  */
 export interface TileJob {
   readonly at: readonly [number, number];
@@ -25,6 +26,12 @@ export interface TileJob {
   readonly rect: Rect;
   readonly oneWay: CapsuleField | null;
   readonly tile: RenderTexture;
+  /** A moving light's tile (`EngineLight.moving`): traced with `MOVING_TILE_RAYS`, built at once. */
+  readonly moving: boolean;
+  /** How far from `at` the light reaches (world px): texels beyond stay dark without a trace. */
+  readonly reach: number;
+  /** Its texels are this many of the field's wide: `MOVING_TILE_SCALE` for a moving light's coarse tile, else 1. */
+  readonly scale: number;
   /** An area light's tile: its outline is drawn into a distance field first, then traced towards. */
   readonly area?: AreaJob;
   /** One of the tracer's raw targets, taken at the first step. */
@@ -68,6 +75,8 @@ export class TileTracer {
     uTileRect: { value: new Float32Array(4), type: 'vec4<f32>' },
     uLight: { value: new Float32Array(2), type: 'vec2<f32>' },
     uFlame: { value: 1, type: 'f32' },
+    uReach: { value: NO_REACH, type: 'f32' },
+    uFree: { value: 0, type: 'f32' },
     uRays: { value: TILE_RAYS, type: 'f32' },
     uOffsets: { value: new Float32Array(TILE_RAYS), type: 'f32', size: TILE_RAYS },
     uTexel: { value: 1, type: 'f32' },
@@ -116,11 +125,13 @@ export class TileTracer {
    */
   private readonly raws: (RenderTexture | null)[] = [null, null];
   private turn = 0;
+  /** The light's own rays (`LightingQuality.tileRays`) and a moving light's, each with its offsets across the flame. */
+  private readonly rays: { full: [number, Float32Array]; moving: [number, Float32Array] };
 
   constructor(private readonly renderer: Renderer, private readonly field: CapsuleField, options: TileTracerOptions = {}) {
     const rays = Math.min(TILE_RAYS, Math.max(1, Math.round(options.rays ?? TILE_RAYS)));
-    this.uniforms.uniforms.uRays = rays;
-    this.uniforms.uniforms.uOffsets.set(chordOffsets(rays));
+    const moving = Math.min(rays, MOVING_TILE_RAYS);
+    this.rays = { full: [rays, offsetsOf(rays)], moving: [moving, offsetsOf(moving)] };
     this.bandTexels = options.bandTexels ?? TILE_BAND_TEXELS;
     this.noOneWay = new CapsuleField(renderer, [0, 0, 1, 1], 1, 0, 'uOneWay');
     const resources = { tileUniforms: this.uniforms, ...field.resources(), ...this.noOneWay.resources() };
@@ -143,11 +154,15 @@ export class TileTracer {
     return job.tile;
   }
 
-  /** A tile to build with `step`; draws nothing yet. */
-  begin(at: readonly [number, number], flame: number, rect: Rect, oneWay: CapsuleField | null): TileJob {
-    const { texel } = this.field;
+  /**
+   * A tile to build with `step` of a light reaching `reach`, a moving light's (`moving`) to build
+   * whole, on coarse texels where `coarse` (`MOVING_TILE_SCALE`); draws nothing yet.
+   */
+  begin(at: readonly [number, number], flame: number, rect: Rect, oneWay: CapsuleField | null, { moving = false, coarse = false, reach = Infinity }: { moving?: boolean; coarse?: boolean; reach?: number } = {}): TileJob {
+    const scale = moving && coarse ? MOVING_TILE_SCALE : 1;
+    const texel = this.field.texel * scale;
     const tile = createTarget(rect[2] / texel, rect[3] / texel, 'r8unorm', 'nearest');
-    return { at, flame, rect, oneWay, tile, raw: null, phase: 'trace', row: 0 };
+    return { at, flame, rect, oneWay, tile, moving, reach, scale, raw: null, phase: 'trace', row: 0 };
   }
 
   /**
@@ -165,12 +180,13 @@ export class TileTracer {
       corners[2 * i + 1] = shape.corners[i]!.y;
     }
     const area: AreaJob = { corners, count, bright: shape.bright, dim: shape.dim, reach: shape.reach, blur: shape.blur, distance };
-    return { at, flame: 0, rect, oneWay, tile, area, raw: null, phase: 'distance', row: 0 };
+    return { at, flame: 0, rect, oneWay, tile, area, moving: false, reach: Infinity, scale: 1, raw: null, phase: 'distance', row: 0 };
   }
 
   /**
    * Draws bands of `job` until `texels` are spent (at least one band, so every step gets on) or
-   * the tile is done; returns the texels drawn. Jobs must not be stepped in turn with each other.
+   * the tile is done; returns the texels drawn. Jobs must not be stepped in turn with each other,
+   * but a moving light's may be stepped whole between the steps of another.
    */
   step(job: TileJob, texels: number): number {
     if (job.phase === 'done') return 0;
@@ -179,17 +195,24 @@ export class TileTracer {
       this.noOneWay.build([]);
       this.noOneWayBuilt = true;
     }
-    const { texel } = this.field;
+    const texel = this.field.texel * job.scale;
     const { pixelWidth: width, pixelHeight: height } = job.tile.source;
+    // A moving light's tile is traced straight into itself: it is not smoothed.
     if (!job.raw) {
-      this.turn = 1 - this.turn;
-      job.raw = this.rawFor(width, height);
+      if (!job.moving) this.turn = 1 - this.turn;
+      job.raw = job.moving ? job.tile : this.rawFor(this.turn, width, height);
     }
     const raw = job.raw;
     const u = this.uniforms.uniforms;
+    const [rays, offsets] = job.moving ? this.rays.moving : this.rays.full;
+    u.uRays = rays;
+    u.uOffsets.set(offsets);
     u.uTileRect.set([job.rect[0], job.rect[1], width * texel, height * texel]);
     u.uLight.set(job.at);
     u.uFlame = job.flame;
+    // A texel more than the reach, so the last texels a light reaches are traced whole.
+    u.uReach = Number.isFinite(job.reach) ? job.reach + 2 * texel : NO_REACH;
+    u.uFree = job.scale > 1 ? texel * Math.SQRT1_2 : 0;
     u.uTexel = texel;
     u.uHasOneWay = job.oneWay ? 1 : 0;
     u.uTexels.set([width, height]);
@@ -233,7 +256,7 @@ export class TileTracer {
     const { area } = job;
     switch (job.phase) {
       case 'distance': return { target: area!.distance, mesh: this.distanceMesh, next: 'trace' };
-      case 'trace': return { target: raw, mesh: area ? this.areaMesh : this.mesh, next: area ? 'blurX' : 'smooth' };
+      case 'trace': return { target: raw, mesh: area ? this.areaMesh : this.mesh, next: area ? 'blurX' : job.moving ? 'done' : 'smooth' };
       case 'blurX': {
         const scratch = this.scratchFor(width, height);
         this.setBlur(area!, area!.distance, [1, 0]);
@@ -310,14 +333,24 @@ export class TileTracer {
     Object.assign(this.areaShader.resources, field.resources());
   }
 
-  /** This turn's raw target, at least `width` × `height`: grown to the largest tile it held. */
-  private rawFor(width: number, height: number): RenderTexture {
-    const raw = this.raws[this.turn];
+  /** Raw target `slot`, at least `width` × `height`: grown to the largest tile it held. */
+  private rawFor(slot: number, width: number, height: number): RenderTexture {
+    const raw = this.raws[slot];
     const current = raw?.source;
     if (raw && current && current.pixelWidth >= width && current.pixelHeight >= height) return raw;
     const grown = createTarget(Math.max(width, current?.pixelWidth ?? 0), Math.max(height, current?.pixelHeight ?? 0), 'r8unorm', 'nearest');
     raw?.destroy(true);
-    this.raws[this.turn] = grown;
+    this.raws[slot] = grown;
     return grown;
   }
+}
+
+/** A reach no light has: every texel of the tile is traced. */
+const NO_REACH = 1e30;
+
+/** The offsets of `rays` rays across a flame, as the trace's uniform holds them. */
+function offsetsOf(rays: number): Float32Array {
+  const offsets = new Float32Array(TILE_RAYS);
+  offsets.set(chordOffsets(rays));
+  return offsets;
 }

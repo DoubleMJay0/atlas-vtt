@@ -43,6 +43,12 @@ export interface EngineLight {
   parts?: readonly { origin: { x: number; y: number }; polygon: Polygon }[];
   /** Where its lit floor gives light back (`LightReach.reflection`), as the rule counts it; the same list while it stays. */
   reflection?: readonly ReflectionPart[];
+  /**
+   * The light is moving (`LightMotion`): its tile is traced with few rays and at once, wherever
+   * the device stands, so it is drawn where it is in this frame, and the bounce waits for it to
+   * rest. Once it rests it is built without this, in full.
+   */
+  moving?: true;
 }
 
 /** An area with ambient light of its own (`LightZone`), in world pixels; inside `polygon` the rule counts its level. */
