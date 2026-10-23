@@ -1,27 +1,15 @@
 import { Buffer, BufferUsage, Color, Container, Geometry, Matrix, Mesh, Sprite, Texture, UniformGroup, type Shader } from 'pixi.js';
-import { EXPOSURE } from '../../../lighting/lightingConstants';
-import { DEFAULT_AMBIENT_COLOR } from '../../../lighting/sceneLightingOptions';
-import { srgbToLinear } from '../../../lighting/srgb';
 import type { ShadeHatch } from '../../../lighting/shadeHatch';
 import { destroyTree } from '../../utils/destroyTree';
 import { ENGINE_SHADERS } from './engineShaders';
 import { createPlaceholder, createShader } from './gpu';
 
-/** The scene's light as the shade reads it (`ambientShadeFragment`); the lighting's own textures, which it owns. */
-export interface AmbientShading {
-  lightMap: Texture;
-  lightWorld: readonly [number, number];
-  /** The zone map, while the scene has ambient zones. */
-  zones: Texture | null;
-  /** The darkness map, while the scene has magical darkness. */
-  darkness: Texture | null;
-  ambient: number;
-  ambientColor?: string | undefined;
-}
-
-/** Whoever draws a level's shade under the scene's light: the lighting hands its light over while it lights the scene, and null before its textures go. */
+/**
+ * Whoever draws a level's shade: the lighting says while it lights the scene, when the shade is not
+ * drawn at all (every shadow is then a light's own, from the relief), and when it stops.
+ */
 export interface ShadeSink {
-  setLight(light: AmbientShading | null): void;
+  setLit(lit: boolean): void;
 }
 
 /** A shade image and where it lies: its corners (0..1 across and down) to world pixels, the map's own placement; how an engraving cuts it, where it does. */
@@ -35,11 +23,11 @@ const CORNERS = [0, 0, 1, 0, 0, 1, 1, 1];
 
 /**
  * A level's shade (`levelShading`), multiplied over its map beneath everything else on it, the
- * tokens too (`MAP_LAYER_Z.shade`). Without lighting it is the shadows the map was drawn without,
- * as they were drawn; while the lighting lights the scene it is the shadow of the ambient light
- * alone (`ambientShadeFragment`). On a renderer without WebGL (PIXI's Canvas renderer) it is a
- * sprite multiplied as it is, which is what an unlit scene shows. The caller owns the texture:
- * set the next one (or none) before destroying it.
+ * tokens too (`MAP_LAYER_Z.shade`): the shadows the map was drawn without, as they were drawn, so an
+ * unlit scene looks as the map always did. While the lighting lights the scene it is not drawn:
+ * shadows that all fall one way contradict the lights, which cast their own from the relief
+ * (Fabian, 2026-10-23). On a renderer without WebGL (PIXI's Canvas renderer) it is a sprite
+ * multiplied as it is. The caller owns the texture: set the next one (or none) before destroying it.
  */
 export class ShadeLayer implements ShadeSink {
   readonly view = new Container({ label: 'shade' });
@@ -48,12 +36,6 @@ export class ShadeLayer implements ShadeSink {
   private readonly positions = new Buffer({ data: new Float32Array(8), usage: BufferUsage.VERTEX | BufferUsage.COPY_DST });
   private readonly placeholder = createPlaceholder();
   private readonly uniforms = new UniformGroup({
-    uLightWorld: { value: new Float32Array([1, 1]), type: 'vec2<f32>' },
-    uHasZones: { value: 0, type: 'f32' },
-    uHasDarkness: { value: 0, type: 'f32' },
-    uAmbient: { value: new Float32Array([1, 1, 1]), type: 'vec3<f32>' },
-    uExposure: { value: EXPOSURE, type: 'f32' },
-    uLit: { value: 0, type: 'f32' },
     uHatched: { value: 0, type: 'f32' },
     uHatchInk: { value: new Float32Array(3), type: 'vec3<f32>' },
     uHatch: { value: new Float32Array([1, 0, 1, 0]), type: 'vec4<f32>' },
@@ -62,6 +44,7 @@ export class ShadeLayer implements ShadeSink {
     uShadePerWorld: { value: 1, type: 'f32' },
   });
   private image: PlacedShade | null = null;
+  private lit = false;
 
   /** `gpu`: the renderer runs WebGL, so the shade can follow the scene's light. */
   constructor(gpu: boolean) {
@@ -76,8 +59,8 @@ export class ShadeLayer implements ShadeSink {
         },
         indexBuffer: new Buffer({ data: new Uint32Array([0, 1, 2, 1, 3, 2]), usage: BufferUsage.INDEX }),
       });
-      const resources = { shadeUniforms: this.uniforms, uShade: this.placeholder.source, uLightMap: this.placeholder.source, uZones: this.placeholder.source, uDarkness: this.placeholder.source };
-      this.mesh = new Mesh({ geometry, shader: createShader(ENGINE_SHADERS.ambientShade, resources) });
+      const resources = { shadeUniforms: this.uniforms, uShade: this.placeholder.source };
+      this.mesh = new Mesh({ geometry, shader: createShader(ENGINE_SHADERS.shade, resources) });
       this.mesh.blendMode = 'multiply';
       this.view.addChild(this.mesh);
     } else {
@@ -88,7 +71,7 @@ export class ShadeLayer implements ShadeSink {
   /** The level's shade and where it lies; null, none. */
   setImage(image: PlacedShade | null): void {
     this.image = image;
-    this.view.visible = !!image;
+    this.view.visible = !!image && !this.lit;
     const texture = image?.texture ?? Texture.EMPTY;
     if (this.mesh) {
       this.mesh.shader!.resources.uShade = (image ? texture : this.placeholder).source;
@@ -122,26 +105,12 @@ export class ShadeLayer implements ShadeSink {
     return this.image;
   }
 
-  setLight(light: AmbientShading | null): void {
-    if (!this.mesh) return;
-    const u = this.uniforms.uniforms;
-    const resources = this.mesh.shader!.resources;
-    u.uLit = light ? 1 : 0;
-    resources.uLightMap = (light?.lightMap ?? this.placeholder).source;
-    resources.uZones = (light?.zones ?? this.placeholder).source;
-    resources.uDarkness = (light?.darkness ?? this.placeholder).source;
-    if (light) {
-      u.uLightWorld.set(light.lightWorld);
-      u.uHasZones = light.zones ? 1 : 0;
-      u.uHasDarkness = light.darkness ? 1 : 0;
-      const colour = new Color(light.ambientColor ?? DEFAULT_AMBIENT_COLOR);
-      u.uAmbient.set([srgbToLinear(colour.red) * light.ambient, srgbToLinear(colour.green) * light.ambient, srgbToLinear(colour.blue) * light.ambient]);
-    }
-    this.uniforms.update();
+  setLit(lit: boolean): void {
+    this.lit = lit;
+    this.view.visible = !!this.image && !lit;
   }
 
   destroy(): void {
-    this.setLight(null);
     this.setImage(null);
     this.mesh?.shader?.destroy();
     destroyTree(this.view);

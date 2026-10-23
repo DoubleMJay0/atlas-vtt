@@ -14,7 +14,7 @@ import { zoneFragment } from './zoneShader';
 import { roofFragment } from './roofShader';
 import { reflectionBlurFragment, reflectionFragment, reflectionVertex } from './reflectionShader';
 import { reliefAreaFragment, reliefPointFragment } from './reliefShader';
-import { ambientShadeFragment, ambientShadeVertex } from './shadeShader';
+import { shadeFragment, shadeVertex } from './shadeShader';
 
 export interface EngineShaderSource {
   readonly name: string;
@@ -49,5 +49,5 @@ export const ENGINE_SHADERS = {
   sight: { name: 'atlas-sight', vertex: sightVertex, fragment: sightFragment },
   composite: { name: 'atlas-lighting-composite', vertex: defaultFilterVert, fragment: compositeFragment },
   roof: { name: 'atlas-roof', vertex: defaultFilterVert, fragment: roofFragment },
-  ambientShade: { name: 'atlas-ambient-shade', vertex: ambientShadeVertex, fragment: ambientShadeFragment },
+  shade: { name: 'atlas-shade', vertex: shadeVertex, fragment: shadeFragment },
 } as const satisfies Record<string, EngineShaderSource>;

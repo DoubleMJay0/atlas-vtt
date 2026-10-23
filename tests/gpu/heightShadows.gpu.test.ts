@@ -81,17 +81,16 @@ describe('shadows from heights on a generated dungeon', () => {
       expect(d.farShare).toBeLessThan(engraved ? 0.015 : 0.0005);
     });
 
-    it(`${look}: lit in daylight, it looks as a baked map lit in daylight`, async () => {
+    it(`${look}: lit, it draws no shadow that falls one way: in daylight the map is as it was drawn, without its shade`, async () => {
       const floor = floorOf(look);
       const camera = whole(floor);
       const day: Lit = { ambient: 1, lights: [] };
-      const before = shoot(renderer, floor, { ...day, baked: true }, camera);
       const now = shoot(renderer, floor, day, camera);
       await save(now, camera, `${look}-3-daylight`);
-      const d = difference(before, now);
-      console.log(`${look} daylight: mean ${d.mean.toFixed(3)}, far ${(d.farShare * 100).toFixed(3)} %`);
-      expect(d.mean).toBeLessThan(look === 'print' ? 1 : 0.2);
-      expect(d.farShare).toBeLessThan(look === 'print' ? 0.015 : 0.0005);
+      const bare = shoot(renderer, floor, { ...day, shade: false }, camera);
+      const d = difference(bare, now);
+      expect(d.mean).toBe(0);
+      expect(d.farShare).toBe(0);
     });
 
     it(`${look}: dimmed with a torch, the torch's shadows take the baked ones' place`, async () => {
@@ -111,34 +110,14 @@ describe('shadows from heights on a generated dungeon', () => {
       await save(shoot(renderer, floor, null, near, true), near, `${look}-8-baked-close`);
     });
 
-    it(`${look}: the shade is the ambient light's shadow: it fades where a lamp outshines a dimmed day`, async () => {
+    it(`${look}: dimmed with a torch, the shade adds nothing: every shadow there is the torch's`, async () => {
       const floor = floorOf(look);
       const { thing, lamp } = standingThing(floor.model);
       const torch = torchAt(floor, 'torch', lamp(-2.4));
       const near = closeUp(floor, thing, 80, 6, 4);
-      // Where the torch itself lights the floor (in the dimmed picture without the torch it is dark).
-      const unlit = shoot(renderer, floor, { ambient: 0.12, lights: [] }, near);
-      const lit = shoot(renderer, floor, { ambient: 0.12, lights: [torch] }, near);
-      const byTorch = (k: number): boolean => lit[k]! + lit[k + 1]! + lit[k + 2]! > 3 * (unlit[k]! + unlit[k + 1]! + unlit[k + 2]!) + 60;
-      // How much darker the shade makes each pixel, as a share of its brightness without it.
-      const darkening = (light: Lit): Float32Array => {
-        const shaded = shoot(renderer, floor, light, near);
-        const bare = shoot(renderer, floor, { ...light, shade: false }, near);
-        return Float32Array.from({ length: shaded.length / 4 }, (_, i) => Math.max(0, 1 - (shaded[i * 4]! + shaded[i * 4 + 1]! + shaded[i * 4 + 2]! + 1) / (bare[i * 4]! + bare[i * 4 + 1]! + bare[i * 4 + 2]! + 1)));
-      };
-      const day = darkening({ ambient: 1, lights: [] });
-      const dusk = darkening({ ambient: 0.12, lights: [torch] });
-      // Over the floor the day's shade darkens and the torch lights.
-      let daySum = 0, duskSum = 0, counted = 0;
-      day.forEach((d, i) => {
-        if (d < 0.08 || !byTorch(i * 4)) return;
-        daySum += d;
-        duskSum += dusk[i]!;
-        counted++;
-      });
-      console.log(`${look} shade near a torch: daylight ${(daySum / counted).toFixed(3)}, dimmed ${(duskSum / counted).toFixed(3)} over ${counted} px`);
-      expect(counted).toBeGreaterThan(200);
-      expect(duskSum).toBeLessThan(daySum * 0.35);
+      const lit: Lit = { ambient: 0.12, lights: [torch] };
+      const d = difference(shoot(renderer, floor, { ...lit, shade: false }, near), shoot(renderer, floor, lit, near));
+      expect(d.mean).toBe(0);
     });
   }
 
