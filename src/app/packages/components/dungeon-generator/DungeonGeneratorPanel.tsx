@@ -4,6 +4,7 @@ import type { CollectionMetadata } from '../../../services/AssetService';
 import { dungeonStyle } from '../../../dungeons/styleCatalog';
 import { DungeonWorkerClient } from '../../../dungeons/worker/DungeonWorkerClient';
 import { ContextMenuProvider } from '../../../react/root/ContextMenuContext';
+import { FloorSwitcher } from './FloorSwitcher';
 import { GeneratorFooter } from './GeneratorFooter';
 import { GeneratorSettings } from './GeneratorSettings';
 import { MapPreview } from './MapPreview';
@@ -30,8 +31,9 @@ export interface DungeonGeneratorPanelProps {
 
 /**
  * The dungeon generator, filling the Atlas view (`DungeonGeneratorOverlay`): a live map preview
- * drawn off the main thread fills the main area, the settings stand in a sidebar on the right
- * under the header row, with Export and Create scene at its foot.
+ * drawn off the main thread fills the main area (with the floor switcher above it where the
+ * dungeon has several floors), the settings stand in a sidebar on the right under the header row,
+ * with Export and Create scene at its foot.
  */
 export function DungeonGeneratorPanel(props: DungeonGeneratorPanelProps): React.JSX.Element {
   return (
@@ -54,6 +56,7 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
     model: state.model,
     style: dungeonStyle(settings.style),
     view: settings.view,
+    floor: state.floor,
     size,
   }, state.setGenerated);
 
@@ -73,6 +76,7 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
         {header}
       </div>
       <div className="atlas-dungeon-generator__preview">
+        <FloorSwitcher floors={state.floors} floor={state.floor} onFloor={state.setFloor} />
         <MapPreview
           preview={preview}
           view={settings.view}

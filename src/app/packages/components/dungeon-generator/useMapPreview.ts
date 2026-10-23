@@ -15,6 +15,8 @@ export interface MapPicture {
   map: MapLayout;
   /** The dungeon it shows, for hit-testing. */
   model: DungeonModel;
+  /** The floor it shows, by index. */
+  floor: number;
 }
 
 export interface MapPreviewInput {
@@ -25,6 +27,8 @@ export interface MapPreviewInput {
   model: DungeonModel | null;
   style: DungeonStyle;
   view: DungeonView;
+  /** The floor drawn, by index. */
+  floor: number;
   /** Device pixels the map is fitted into; null until the preview's frame was measured. */
   size: { width: number; height: number } | null;
 }
@@ -41,13 +45,14 @@ interface Drawn {
   model: DungeonModel | null;
   style: DungeonStyle;
   view: DungeonView;
+  floor: number;
   width: number;
   height: number;
 }
 
 const sameDrawing = (a: Drawn | null, b: Drawn): boolean => a !== null
   && a.request === b.request && a.model === b.model && a.style === b.style && a.view === b.view
-  && a.width === b.width && a.height === b.height;
+  && a.floor === b.floor && a.width === b.width && a.height === b.height;
 
 /**
  * The live map preview, fitted into the preview's frame and drawn by the dungeon worker so the
@@ -63,17 +68,17 @@ export function useMapPreview(renderer: PreviewRenderer, input: MapPreviewInput,
   const drawn = useRef<Drawn | null>(null);
   const onGeneratedRef = useRef(onGenerated);
   onGeneratedRef.current = onGenerated;
-  const { request, generated, model, style, view, size } = input;
+  const { request, generated, model, style, view, floor, size } = input;
 
   useEffect(() => {
     if (!size) return;
     // The generated dungeon drawn as it came needs no second drawing once it is stored.
     const shown = model === generated ? null : model;
-    const next: Drawn = { request, model: generated ? shown : null, style, view, width: size.width, height: size.height };
+    const next: Drawn = { request, model: generated ? shown : null, style, view, floor, width: size.width, height: size.height };
     if (generated && model === generated && sameDrawing(drawn.current, { ...next, model: null })) return;
     const id = ++asked.current;
     setDrawing(true);
-    const job: DungeonJob = { request, ...(generated && model ? { model } : {}), style, view, output: { kind: 'preview', width: size.width, height: size.height } };
+    const job: DungeonJob = { request, ...(generated && model ? { model } : {}), style, view, output: { kind: 'preview', width: size.width, height: size.height, floor } };
     renderer.preview(job).then((result) => {
       if (!result) return;
       if (id !== asked.current || result.image.type !== 'bitmap') {
@@ -84,7 +89,7 @@ export function useMapPreview(renderer: PreviewRenderer, input: MapPreviewInput,
       const bitmap = result.image.bitmap;
       setPicture((old) => {
         old?.bitmap.close();
-        return { bitmap, map: result.map, model: result.model };
+        return { bitmap, map: result.map, model: result.model, floor };
       });
       setFailed(false);
       setDrawing(false);
@@ -95,7 +100,7 @@ export function useMapPreview(renderer: PreviewRenderer, input: MapPreviewInput,
       setFailed(true);
       setDrawing(false);
     });
-  }, [renderer, request, generated, model, style, view, size]);
+  }, [renderer, request, generated, model, style, view, floor, size]);
 
   // The last picture's pixels go with the panel.
   const pictureRef = useRef(picture);

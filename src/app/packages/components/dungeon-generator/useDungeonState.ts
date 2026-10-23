@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { App } from 'obsidian';
 import { applyDungeonEdits, NO_EDITS, withWingHidden, type DungeonEdits } from '../../../dungeons/edits';
 import { DEFAULT_DUNGEON_GENERATOR_SETTINGS, type DungeonGeneratorSettings } from '../../../dungeons/generatorSettings';
-import type { DungeonModel, DungeonRequest } from '../../../dungeons/model';
+import { floorCount, type DungeonModel, type DungeonRequest } from '../../../dungeons/model';
 import { randomSeed } from '../../../dungeons/rng';
 import { secretWingOf } from '../../../dungeons/secretWings';
 import type { DungeonView } from '../../../dungeons/style';
@@ -23,6 +23,16 @@ export interface DungeonState {
   generated: DungeonModel | null;
   /** The dungeon as shown: the generated one with the GM's edits. */
   model: DungeonModel | null;
+  /** How many floors the request gives the dungeon: one for a five-room dungeon. */
+  floors: number;
+  /** The floor the preview shows and exports draw, by index (0 the entry floor). */
+  floor: number;
+  /** Shows another floor; the dungeon stays as it is. */
+  setFloor: (floor: number) => void;
+  /** The floors stepper: another dungeon. */
+  setFloors: (floors: number) => void;
+  setBossRoom: (on: boolean) => void;
+  setFiveRoom: (on: boolean) => void;
   setGenerated: (request: DungeonRequest, model: DungeonModel) => void;
   /** The Name field: names the scene, changes nothing of the dungeon. */
   setName: (name: string) => void;
@@ -38,8 +48,8 @@ export interface DungeonState {
   setView: (changes: Partial<DungeonView>) => void;
   /** The look picked in the style gallery. */
   setStyle: (style: DungeonStyleId) => void;
-  /** Hides the secret wing `room` lies in (Hide room). */
-  hideWing: (room: number) => void;
+  /** Hides the secret wing `room` of floor `floor` lies in (Hide room). */
+  hideWing: (floor: number, room: number) => void;
   /** Shows every secret wing hidden by hand again. */
   showHiddenWings: () => void;
 }
@@ -48,17 +58,30 @@ function readSettings(app: App): DungeonGeneratorSettings {
   return SettingsService.forApp(app)?.getDungeonGenerator() ?? DEFAULT_DUNGEON_GENERATOR_SETTINGS;
 }
 
+/** How many floors a request makes: a five-room dungeon has one whatever `floors` says. */
+export function requestedFloors(request: DungeonRequest): number {
+  return request.fiveRoom === true ? 1 : floorCount(request.floors);
+}
+
+/** The floor shown: the one picked, or the deepest there is where the dungeon has fewer. */
+function shownFloor(picked: number, request: DungeonRequest, model: DungeonModel | null): number {
+  const count = Math.min(requestedFloors(request), model?.floors.length ?? Infinity);
+  return Math.max(0, Math.min(picked, count - 1));
+}
+
 const sameTags = (a: readonly DungeonTag[], b: readonly DungeonTag[]): boolean => a.length === b.length && a.every((tag) => b.includes(tag));
 
 /**
  * The generator's state. Style, view and the tags generated with are the GM's preferences and
- * kept in Atlas' settings as they change; the seed, the name and the edits belong to this one
- * dungeon and go with the panel. A new seed or tags is another dungeon: edits are dropped. The
- * name only names the scene.
+ * kept in Atlas' settings as they change; the seed, the floors, the boss room and five-room
+ * switches, the name and the edits belong to this one dungeon and go with the panel. A new seed,
+ * tags, floor count or switch is another dungeon: edits are dropped. The name only names the
+ * scene, and the floor shown only which floor the preview and exports draw.
  */
 export function useDungeonState(app: App, initialName = ''): DungeonState {
   const [settings, setSettings] = useState<DungeonGeneratorSettings>(() => readSettings(app));
-  const [request, setRequest] = useState<DungeonRequest>(() => ({ seed: randomSeed(), tags: settings.tags, floors: 1 }));
+  const [request, setRequest] = useState<DungeonRequest>(() => ({ seed: randomSeed(), tags: settings.tags, floors: 1, bossRoom: true, fiveRoom: false }));
+  const [pickedFloor, setPickedFloor] = useState(0);
   const [name, setNameState] = useState(initialName.trim());
   const requestRef = useRef(request);
   requestRef.current = request;
@@ -103,6 +126,8 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     return applyDungeonEdits(generated.model, edits);
   }, [generated, request, edits]);
 
+  const floor = shownFloor(pickedFloor, request, model);
+
   return {
     request,
     name,
@@ -111,6 +136,12 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     edits,
     generated: generated?.request === request ? generated.model : null,
     model,
+    floors: requestedFloors(request),
+    floor,
+    setFloor: setPickedFloor,
+    setFloors: useCallback((floors) => changeRequest((current) => (current.floors === floors ? current : { ...current, floors: floorCount(floors) })), [changeRequest]),
+    setBossRoom: useCallback((on) => changeRequest((current) => (current.bossRoom === on ? current : { ...current, bossRoom: on })), [changeRequest]),
+    setFiveRoom: useCallback((on) => changeRequest((current) => (current.fiveRoom === on ? current : { ...current, fiveRoom: on })), [changeRequest]),
     setGenerated: useCallback((asked, next) => setGeneratedState({ request: asked, model: next }), []),
     setName: setNameState,
     setSeed: useCallback((seed) => changeRequest((current) => (current.seed === seed ? current : { ...current, seed })), [changeRequest]),
@@ -126,10 +157,10 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     }), []),
     setView: useCallback((changes) => persist({ view: { ...settingsRef.current.view, ...changes } }), [persist]),
     setStyle: useCallback((style) => persist({ style }), [persist]),
-    hideWing: useCallback((room) => {
-      const floor = generated?.model.floors[0];
-      const wing = floor ? secretWingOf(floor.rooms, room) : null;
-      if (wing !== null) setEdits((current) => withWingHidden(current, 0, wing));
+    hideWing: useCallback((index, room) => {
+      const rooms = generated?.model.floors[index]?.rooms;
+      const wing = rooms ? secretWingOf(rooms, room) : null;
+      if (wing !== null) setEdits((current) => withWingHidden(current, index, wing));
     }, [generated]),
     showHiddenWings: useCallback(() => setEdits(NO_EDITS), []),
   };

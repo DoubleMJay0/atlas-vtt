@@ -98,6 +98,43 @@ describe('the dungeon generator over the Atlas view', () => {
     expect(cards.filter((card) => card.top === cards[0]!.top).length).toBeGreaterThanOrEqual(3);
   });
 
+  it('stands the floors stepper beside the seed, level with the seed field and as tall', async () => {
+    await openTab(1440, 860);
+    const seed = box('.atlas-dungeon-field__seed');
+    const stepper = box('.atlas-dungeon-stepper');
+    expect(Math.abs(stepper.top + stepper.height / 2 - (seed.top + seed.height / 2))).toBeLessThanOrEqual(0.5);
+    expect(stepper.height).toBe(seed.height);
+    expect(stepper.left).toBeGreaterThan(box('.atlas-dungeon-identity__reroll').right);
+    expect(stepper.right).toBe(box('.atlas-dungeon-generator__settings').right - 16);
+  });
+
+  it('puts the floor switcher of a dungeon of several floors centred above the map, the map fitted below it', async () => {
+    await openTab(1440, 860);
+    expect(tab.querySelector('.atlas-dungeon-floor-switcher')).toBeNull();
+    const more = [...tab.querySelectorAll<HTMLButtonElement>('.atlas-dungeon-stepper__button')].at(-1)!;
+    act(() => more.click());
+    act(() => more.click());
+    await expect.poll(() => tab.querySelectorAll('.atlas-dungeon-floor-switcher [role="radio"]').length).toBe(3);
+    const preview = box('.atlas-dungeon-generator__preview');
+    const switcher = box('.atlas-dungeon-floor-switcher');
+    const frame = box('.atlas-dungeon-preview');
+    expect(switcher.top).toBe(preview.top + 24);
+    expect(Math.abs((switcher.left + switcher.right) / 2 - (preview.left + preview.right) / 2)).toBeLessThanOrEqual(0.5);
+    expect(frame.top).toBe(switcher.bottom + 24);
+    expect([frame.left, frame.right, frame.bottom]).toEqual([preview.left + 24, preview.right - 24, preview.bottom - 24]);
+    // The options are as wide as each other
+    const options = [...tab.querySelectorAll('.atlas-dungeon-floor-switcher [role="radio"]')].map((option) => option.getBoundingClientRect().width);
+    expect(new Set(options).size).toBe(1);
+
+    // The map is drawn as large as the room under the switcher allows
+    await expect.poll(() => {
+      const canvas = tab.querySelector('canvas.atlas-dungeon-preview__canvas')?.getBoundingClientRect();
+      return canvas ? Math.max(canvas.width / frame.width, canvas.height / frame.height) : 0;
+    }, { timeout: 20_000 }).toBeCloseTo(1, 1);
+    const canvas = box('canvas.atlas-dungeon-preview__canvas');
+    expect(canvas.top).toBeGreaterThanOrEqual(frame.top - 0.5);
+  });
+
   it('stacks the sidebar under the map in a narrow view, the close button still in the top right corner', async () => {
     await openTab(600, 900);
     const frame = tab.getBoundingClientRect();

@@ -1,14 +1,16 @@
 import type { App } from 'obsidian';
 import type { DungeonModel, DungeonRequest } from '../../../dungeons/model';
 import { dungeonSceneName } from '../../../dungeons/scene/createDungeonScene';
+import { floorLetter } from '../../../dungeons/scene/roomKeys';
 import type { DungeonStyle, DungeonView } from '../../../dungeons/style';
 import type { DungeonJob, DungeonRendered } from '../../../dungeons/worker/dungeonJob';
 import { ensureFolder, isPathTaken } from '../../../plugin/vaultFolders';
 import { collectionFolderPath } from '../../../services/assetPaths';
 import { freePathIn } from '../../../services/collectionBundle/pathRemap';
+import { t } from '../../../i18n';
 
 /**
- * Saving a dungeon as files: the map as PNG or SVG, and the model as JSON.
+ * Saving a dungeon as files: the map of one floor as PNG or SVG, and the whole model as JSON.
  * Every file goes into the collection's `dungeon-exports` folder, which no tab of the asset
  * manager reads, so nothing saved there becomes an asset.
  */
@@ -29,6 +31,8 @@ export interface DungeonExportInput {
   style: DungeonStyle;
   view: DungeonView;
   collectionId: string;
+  /** Map PNG and SVG: the floor drawn, by index; the entry floor where unset. */
+  floor?: number;
   /** Map PNG only. */
   pxPerCell?: number;
   /** Map PNG only: without the paper, for a map laid over other art. */
@@ -52,6 +56,7 @@ async function pngOf(rendered: DungeonRendered): Promise<Blob> {
 
 async function contentOf(deps: DungeonExportDeps, kind: DungeonExportKind, input: DungeonExportInput): Promise<string | Blob> {
   const { request, model, style, view } = input;
+  const floor = input.floor ? { floor: input.floor } : {};
   switch (kind) {
     case 'map':
       return pngOf(await deps.render({
@@ -59,10 +64,10 @@ async function contentOf(deps: DungeonExportDeps, kind: DungeonExportKind, input
         model,
         style,
         view,
-        output: { kind: 'map', pxPerCell: input.pxPerCell ?? 70, ...(input.transparent ? { transparent: true } : {}) },
+        output: { kind: 'map', pxPerCell: input.pxPerCell ?? 70, ...(input.transparent ? { transparent: true } : {}), ...floor },
       }));
     case 'svg': {
-      const { image } = await deps.render({ request, model, style, view, output: { kind: 'map', pxPerCell: SVG_PX_PER_CELL, svg: true } });
+      const { image } = await deps.render({ request, model, style, view, output: { kind: 'map', pxPerCell: SVG_PX_PER_CELL, svg: true, ...floor } });
       if (image.type !== 'svg') throw new Error('The map was not drawn as SVG.');
       return image.svg;
     }
@@ -71,11 +76,17 @@ async function contentOf(deps: DungeonExportDeps, kind: DungeonExportKind, input
   }
 }
 
+/** A map of a dungeon of several floors is named for its floor as the scene names its map. */
+function mapNameOf(base: string, input: DungeonExportInput): string {
+  if (input.model.floors.length < 2) return base;
+  return t('dungeonScene.mapName', { scene: base, floor: t('dungeonScene.floor', { letter: floorLetter(input.floor ?? 0) }) });
+}
+
 function fileNameOf(kind: DungeonExportKind, input: DungeonExportInput): string {
   const base = dungeonSceneName(input.name ?? '');
   switch (kind) {
-    case 'map': return `${base}.png`;
-    case 'svg': return `${base}.svg`;
+    case 'map': return `${mapNameOf(base, input)}.png`;
+    case 'svg': return `${mapNameOf(base, input)}.svg`;
     case 'json': return `${base}.json`;
   }
 }

@@ -10,13 +10,16 @@ interface MapPreviewProps {
   preview: Preview;
   view: Pick<DungeonView, 'secrets'>;
   onFrame: (frame: HTMLDivElement | null) => void;
-  /** Hides the secret wing a room lies in. */
-  onHideWing: (room: number) => void;
+  /** Hides the secret wing a room of a floor lies in. */
+  onHideWing: (floor: number, room: number) => void;
   /** Shows the wings hidden by hand again; unset while none is. */
   onShowHiddenWings?: (() => void) | undefined;
 }
 
-/** The map preview; right-click a secret room to hide its wing, or show the hidden wings again. */
+/**
+ * The map preview of the floor shown; right-click a secret room to hide its wing on that floor, or
+ * show the hidden wings again.
+ */
 export function MapPreview({ preview, view, onFrame, onHideWing, onShowHiddenWings }: MapPreviewProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
@@ -31,10 +34,11 @@ export function MapPreview({ preview, view, onFrame, onHideWing, onShowHiddenWin
     const canvas = canvasRef.current?.getBoundingClientRect();
     if (!picture || !canvas || !menu) return;
     const point = mapPointOf({ x: event.clientX, y: event.clientY }, canvas, picture.bitmap.width);
-    const room = roomAt(picture.model, view, picture.map, point);
+    const { floor } = picture;
+    const room = roomAt(picture.model, view, picture.map, point, floor);
     const entries: ContextMenuEntry[] = [];
-    if (room !== null && picture.model.floors[0]?.rooms.find((entry) => entry.id === room)?.wing === 'secret') {
-      entries.push({ type: 'item', label: t('dungeon.room.hide'), icon: 'eye-off', onClick: () => onHideWing(room) });
+    if (room !== null && picture.model.floors[floor]?.rooms.find((entry) => entry.id === room)?.wing === 'secret') {
+      entries.push({ type: 'item', label: t('dungeon.room.hide'), icon: 'eye-off', onClick: () => onHideWing(floor, room) });
     }
     if (onShowHiddenWings) entries.push({ type: 'item', label: t('dungeon.room.showHidden'), icon: 'eye', onClick: onShowHiddenWings });
     if (entries.length === 0) return;

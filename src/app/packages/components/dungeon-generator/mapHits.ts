@@ -16,10 +16,10 @@ export function mapPointOf(client: MapPoint, frame: Pick<DOMRect, 'left' | 'top'
   return { x: (client.x - frame.left) * scale, y: (client.y - frame.top) * scale };
 }
 
-/** The shown room under a map pixel, or null. */
-export function roomAt(model: DungeonModel, view: Pick<DungeonView, 'secrets'>, map: MapLayout, p: MapPoint): number | null {
+/** The shown room of floor `floor` under a map pixel, or null. */
+export function roomAt(model: DungeonModel, view: Pick<DungeonView, 'secrets'>, map: MapLayout, p: MapPoint, floor = 0): number | null {
   const x = p.x / map.pxPerCell + map.originCell.x;
   const y = p.y / map.pxPerCell + map.originCell.y;
-  const room = visibleFloor(model, view).rooms.find((entry) => shapeDistance(roomShape(entry), x, y) <= 0);
+  const room = visibleFloor(model, view, floor).rooms.find((entry) => shapeDistance(roomShape(entry), x, y) <= 0);
   return room?.id ?? null;
 }

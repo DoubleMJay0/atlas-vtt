@@ -3,7 +3,7 @@ import type { CollectionMetadata } from '../../../services/AssetService';
 import { CollectionSelect } from '../asset-manager/token-creator/CollectionSelect';
 import { t } from '../../../i18n';
 import { DungeonIdentity } from './DungeonIdentity';
-import { SettingsSection } from './fields';
+import { SettingsSection, SwitchRow } from './fields';
 import { StyleSettings } from './StyleSettings';
 import { TagChips } from './TagChips';
 import type { DungeonState } from './useDungeonState';
@@ -22,7 +22,7 @@ interface GeneratorSettingsProps {
 
 /**
  * The sidebar's settings, in the order a dungeon is made: where its scene goes and what it is
- * called, which tags, how it is drawn, what the map shows.
+ * called, its seed, floors and shape, which tags, how it is drawn, what the map shows.
  */
 export function GeneratorSettings({ state, layer, collection, thumbnails }: GeneratorSettingsProps): React.JSX.Element {
   const { request, settings } = state;
@@ -42,6 +42,23 @@ export function GeneratorSettings({ state, layer, collection, thumbnails }: Gene
           onName={state.setName}
           onSeed={state.setSeed}
           onNew={state.newSeed}
+          floors={state.floors}
+          onFloors={state.setFloors}
+          floorsFixed={request.fiveRoom === true}
+        />
+        {/* A five-room dungeon's fourth room is its boss room whatever the switch says */}
+        <SwitchRow
+          label={t('dungeon.bossRoom')}
+          hint={t('dungeon.bossRoom.hint')}
+          value={request.bossRoom !== false || request.fiveRoom === true}
+          disabled={request.fiveRoom === true}
+          onChange={state.setBossRoom}
+        />
+        <SwitchRow
+          label={t('dungeon.fiveRoom')}
+          hint={t('dungeon.fiveRoom.hint')}
+          value={request.fiveRoom === true}
+          onChange={state.setFiveRoom}
         />
       </div>
       <SettingsSection title={t('dungeon.tags')}>

@@ -6,6 +6,7 @@ import type { App } from 'obsidian';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import { DEFAULT_STYLE_ID, DUNGEON_STYLES, dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
+import { roomCentre } from '../../src/app/dungeons/render/geometry';
 import { createDungeonScene } from '../../src/app/dungeons/scene/createDungeonScene';
 import type { DungeonJob, DungeonRendered } from '../../src/app/dungeons/worker/dungeonJob';
 import { DungeonGeneratorPanel } from '../../src/app/packages/components/dungeon-generator/DungeonGeneratorPanel';
@@ -184,6 +185,111 @@ describe('the dungeon generator panel', () => {
   });
 });
 
+describe('floors, the boss room and five-room dungeons', () => {
+  const floorSwitcher = (): HTMLElement | null => screen.queryByRole('radiogroup', { name: 'Floor shown' });
+
+  it('asks for as many floors as the stepper says, one to four', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    const fewer = screen.getByRole('button', { name: 'Fewer floors' });
+    const more = screen.getByRole('button', { name: 'More floors' });
+    expect(lastJob().request.floors).toBe(1);
+    expect(fewer.hasAttribute('disabled')).toBe(true);
+    for (let floors = 2; floors <= 4; floors++) {
+      fireEvent.click(more);
+      await waitFor(() => expect(lastJob().request.floors).toBe(floors));
+    }
+    expect(more.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(fewer);
+    await waitFor(() => expect(lastJob().request.floors).toBe(3));
+  });
+
+  it('shows the floor picked above the preview, drawing that floor of the same dungeon', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    expect(floorSwitcher()).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More floors' }));
+    const switcher = await screen.findByRole('radiogroup', { name: 'Floor shown' });
+    expect(within(switcher).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['A', 'B']);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Export/ }).hasAttribute('disabled')).toBe(false));
+    const { request } = lastJob();
+    const thumbnails = worker.thumbnail.mock.calls.length;
+
+    fireEvent.click(within(switcher).getByRole('radio', { name: 'B' }));
+    await waitFor(() => expect(lastJob().output).toMatchObject({ kind: 'preview', floor: 1 }));
+    expect(lastJob().request).toBe(request);
+    expect(within(switcher).getByRole('radio', { name: 'B' }).getAttribute('aria-checked')).toBe('true');
+    // The style cards keep showing floor A
+    await act(async () => { await Promise.resolve(); });
+    expect(worker.thumbnail.mock.calls.length).toBe(thumbnails);
+  });
+
+  it('builds the boss room unless switched off', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    const boss = screen.getByRole('switch', { name: 'Boss room' });
+    expect(boss.getAttribute('aria-checked')).toBe('true');
+    expect(lastJob().request.bossRoom).not.toBe(false);
+    fireEvent.click(boss);
+    await waitFor(() => expect(lastJob().request.bossRoom).toBe(false));
+  });
+
+  it('makes a five-room dungeon one floor, its boss room fixed', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'More floors' }));
+    await screen.findByRole('radiogroup', { name: 'Floor shown' });
+    fireEvent.click(screen.getByRole('switch', { name: 'Boss room' }));
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Five-room dungeon' }));
+    await waitFor(() => expect(lastJob().request.fiveRoom).toBe(true));
+    expect(floorSwitcher()).toBeNull();
+    expect(lastJob().output).toMatchObject({ kind: 'preview', floor: 0 });
+    const floors = screen.getByRole('group', { name: 'Floors' });
+    expect(floors.getAttribute('aria-disabled')).toBe('true');
+    expect(floors.querySelector('output')?.textContent).toBe('1');
+    const boss = screen.getByRole('switch', { name: 'Boss room' });
+    expect([boss.getAttribute('aria-checked'), boss.getAttribute('aria-disabled')]).toEqual(['true', 'true']);
+
+    // Switched off again, the dungeon has the floors asked for before
+    fireEvent.click(screen.getByRole('switch', { name: 'Five-room dungeon' }));
+    expect(await screen.findByRole('radiogroup', { name: 'Floor shown' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Boss room' }).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('hides the secret rooms right-clicked on the floor shown', async () => {
+    const seed = Array.from({ length: 40 }, (_, k) => k + 1)
+      .find((candidate) => generateDungeon({ seed: candidate, tags: [], floors: 2, bossRoom: true, fiveRoom: false }).floors[1]?.rooms.some((room) => room.wing === 'secret'))!;
+    renderPanel();
+    const seedField = screen.getByRole('textbox', { name: 'Seed' });
+    fireEvent.change(seedField, { target: { value: String(seed) } });
+    fireEvent.blur(seedField);
+    fireEvent.click(screen.getByRole('button', { name: 'More floors' }));
+    fireEvent.click(within(await screen.findByRole('radiogroup', { name: 'Floor shown' })).getByRole('radio', { name: 'B' }));
+    await waitFor(() => expect(lastJob().output).toMatchObject({ floor: 1 }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Export/ }).hasAttribute('disabled')).toBe(false));
+
+    // The answer is 10 px wide at 1 px a cell, the canvas 800 px wide: 80 client px a map pixel
+    const model = generateDungeon(lastJob().request);
+    const map = mapLayout(model, 1);
+    const centre = roomCentre(model.floors[1]!.rooms.find((room) => room.wing === 'secret')!);
+    const client = { clientX: (centre.x - map.originCell.x) * 80, clientY: (centre.y - map.originCell.y) * 80 };
+    fireEvent.contextMenu(screen.getByRole('img', { name: 'Dungeon preview' }), client);
+    fireEvent.click(await screen.findByText('Hide these secret rooms'));
+    await waitFor(() => expect(lastJob().model?.floors[1]?.hiddenWings).toHaveLength(1));
+    expect(lastJob().model?.floors[0]?.hiddenWings).toBeUndefined();
+    expect(lastJob().output).toMatchObject({ floor: 1 });
+  });
+
+  it('explains the two switches in a line each', () => {
+    renderPanel();
+    for (const [name, hint] of [['Boss room', 'A large arena'], ['Five-room dungeon', 'Five main rooms']] as const) {
+      const id = screen.getByRole('switch', { name }).getAttribute('aria-describedby')!;
+      expect(document.getElementById(id)?.textContent).toContain(hint);
+    }
+  });
+});
+
 describe('the style gallery', () => {
   it('offers every style as one radio group, the chosen one checked', () => {
     renderPanel();
@@ -263,5 +369,34 @@ describe('the generator state', () => {
     expect(result.current.edits.hiddenWings?.length).toBe(1);
     act(() => result.current.newSeed());
     expect(result.current.edits).toEqual({});
+  });
+
+  it('hides a secret wing on the floor it lies on', () => {
+    const seed = Array.from({ length: 40 }, (_, k) => k + 1)
+      .find((candidate) => generateDungeon({ seed: candidate, tags: [], floors: 2 }).floors[1]?.rooms.some((room) => room.wing === 'secret'));
+    expect(seed).toBeDefined();
+    const { result } = renderHook(() => useDungeonState(app));
+    act(() => result.current.setSeed(seed!));
+    act(() => result.current.setFloors(2));
+    const request = result.current.request;
+    act(() => result.current.setGenerated(request, generateDungeon(request)));
+    const secret = result.current.model!.floors[1]!.rooms.find((room) => room.wing === 'secret')!;
+    act(() => result.current.hideWing(1, secret.id));
+    expect(result.current.edits.hiddenWings).toEqual([{ floor: 1, wing: expect.any(Number) }]);
+    expect(result.current.model!.floors[1]!.hiddenWings).toHaveLength(1);
+    expect(result.current.model!.floors[0]!.hiddenWings).toBeUndefined();
+  });
+
+  it('shows the deepest floor there is while fewer are asked for, and the one picked again once they are back', () => {
+    const { result } = renderHook(() => useDungeonState(app));
+    act(() => result.current.setFloors(3));
+    act(() => result.current.setFloor(2));
+    expect(result.current.floor).toBe(2);
+    act(() => result.current.setFloors(2));
+    expect(result.current.floor).toBe(1);
+    act(() => result.current.setFloors(3));
+    expect(result.current.floor).toBe(2);
+    act(() => result.current.setFiveRoom(true));
+    expect([result.current.floors, result.current.floor]).toEqual([1, 0]);
   });
 });

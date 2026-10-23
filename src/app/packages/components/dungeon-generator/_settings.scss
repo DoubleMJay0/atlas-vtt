@@ -118,6 +118,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+// Seed and floors share a row: the seed takes what the stepper leaves, and the stepper stands
+// level with the seed field, which the taller New dungeon button centres in its line.
+.atlas-dungeon-identity__row {
+  @include atlas-flex-row($gap: $spacing-s);
+  align-items: stretch;
+
+  > .atlas-dungeon-identity__seed-field {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .atlas-dungeon-stepper {
+    margin-block: auto;
+  }
+}
+
 .atlas-dungeon-identity__seed {
   @include atlas-flex-row($gap: $spacing-s);
 
@@ -128,6 +144,45 @@
 
   > .btn {
     flex-shrink: 0;
+  }
+}
+
+// − count +, framed like the fields beside it; the buttons inset by the frame's padding.
+.atlas-dungeon-stepper {
+  @include atlas-flex-row($gap: 2px);
+  height: var(--input-height);
+  padding: 2px;
+  border: $border-width-s solid var(--background-modifier-border);
+  border-radius: $radius-m;
+  background: var(--background-modifier-form-field);
+
+  &[aria-disabled='true'] {
+    opacity: 0.5;
+  }
+}
+
+.atlas-dungeon-stepper__value {
+  min-width: 2ch;
+  font-size: $font-ui-small;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.atlas-dungeon-stepper__button.btn {
+  width: 24px;
+  height: 100%;
+  padding: 0;
+  border-radius: $radius-s;
+  box-shadow: none;
+  color: var(--text-muted);
+
+  svg {
+    width: $icon-s;
+    height: $icon-s;
+  }
+
+  &:hover:not(:disabled) {
+    color: var(--text-normal);
   }
 }
 

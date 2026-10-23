@@ -95,6 +95,8 @@
 .atlas-dungeon-generator__preview {
   grid-area: preview;
   display: flex;
+  flex-direction: column;
+  gap: $spacing-xl;
   min-width: 0;
   min-height: 0;
   padding: $spacing-xl;
@@ -114,6 +116,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+// A dungeon of several floors: which one the map shows, centred over it.
+.atlas-dungeon-floor-switcher {
+  flex-shrink: 0;
+  align-self: center;
+
+  > .atlas-segmented__option {
+    min-width: 32px;
+  }
 }
 
 // Fitted to the frame's device pixels: the largest size that fits keeps its shape while a newer one is drawn.

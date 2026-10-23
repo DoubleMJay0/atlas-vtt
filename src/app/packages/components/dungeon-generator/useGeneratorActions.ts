@@ -95,6 +95,7 @@ export function useGeneratorActions({ app, client, state, collectionId, onCreate
         name: now.name,
         style: dungeonStyle(now.settings.style),
         view: now.settings.view,
+        floor: now.floor,
         collectionId: collection,
         ...map,
       });
