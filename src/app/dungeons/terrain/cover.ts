@@ -19,7 +19,7 @@ import { standsApart } from './shapes';
 /** A room this many cells or fewer is cramped; larger is open. */
 export const CRAMPED_AREA = 20;
 
-interface Shape {
+export interface CoverShape {
   kind: TerrainKind;
   /** Rows deep and columns wide in the room's frame. */
   di: number;
@@ -27,7 +27,7 @@ interface Shape {
 }
 
 /** The low pieces a cramped room scatters, by the dungeon's theme. */
-function halfCover(tags: ReadonlySet<DungeonTag>): (readonly [Shape, number])[] {
+function halfCover(tags: ReadonlySet<DungeonTag>): (readonly [CoverShape, number])[] {
   return [
     [{ kind: 'crates', di: 1, dj: 1 }, 3],
     [{ kind: 'table', di: 1, dj: 2 }, tags.has('dwelling') ? 3 : 1],
@@ -45,7 +45,7 @@ function negate(d: CellDir): CellDir {
 }
 
 /** Places a piece of `shape` with its corner at (i, j) if the room allows it and it stands apart from the others. */
-function tryShape(floor: FloorTerrain, rc: RoomCells, shape: Shape, i: number, j: number): boolean {
+export function tryShape(floor: FloorTerrain, rc: RoomCells, shape: CoverShape, i: number, j: number): boolean {
   const cells = rc.block(i, j, shape.di, shape.dj);
   if (!standsApart(rc, cells, floor.takenCells())) return false;
   return floor.place(draft(shape.kind, rc.room.id, cells, { facing: negate(rc.axis) })) !== null;
@@ -65,7 +65,7 @@ export function scatterCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, count
 }
 
 /** Two of `shape` mirrored across the room's middle at row `i`, `inset` cells from the side walls. */
-function mirroredPair(floor: FloorTerrain, rc: RoomCells, shape: Shape, i: number, inset: number): boolean {
+function mirroredPair(floor: FloorTerrain, rc: RoomCells, shape: CoverShape, i: number, inset: number): boolean {
   const left = inset;
   const right = rc.width - inset - shape.dj;
   if (right - left < shape.dj + 1) return false;
@@ -79,7 +79,7 @@ function mirroredPair(floor: FloorTerrain, rc: RoomCells, shape: Shape, i: numbe
 /** Pillars in pairs across the room: two cells square where the room is large. */
 function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
   const size = rc.width >= 8 && rc.depth >= 7 ? 2 : 1;
-  const shape: Shape = { kind: 'pillar', di: size, dj: size };
+  const shape: CoverShape = { kind: 'pillar', di: size, dj: size };
   const rows = shuffled(rng, [Math.floor(rc.depth / 3), Math.floor(rc.depth / 2), Math.floor((rc.depth * 2) / 3) - size + 1]);
   const insets = rc.width >= 7 ? [Math.floor(rc.width / 5), 1] : [1];
   return rows.some((i) => insets.some((inset) => mirroredPair(floor, rc, shape, Math.max(1, i), inset)));
@@ -88,7 +88,7 @@ function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
 /** Wall fragments staggered across the way through: one leaning left, one right. */
 function fragments(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
   const length = Math.min(3, Math.max(2, Math.floor(rc.width / 3)));
-  const shape: Shape = { kind: 'wall-fragment', di: 1, dj: length };
+  const shape: CoverShape = { kind: 'wall-fragment', di: 1, dj: length };
   const first = Math.max(1, Math.floor(rc.depth / 3));
   const second = Math.min(rc.depth - 2, Math.floor((rc.depth * 2) / 3));
   const flip = chance(rng, 0.5);
@@ -130,6 +130,3 @@ export function ensureCover(floor: FloorTerrain, rc: RoomCells, tags: ReadonlySe
     }
   }
 }
-
-export type { Shape as CoverShape };
-export { tryShape };

@@ -29,6 +29,11 @@ const CASES: readonly { name: string; request: DungeonRequest; look: DungeonStyl
   { name: 'three-floors', request: { seed: 404, tags: ['deep'], floors: 3 }, look: 'parchment' },
   { name: 'four-floors', request: { seed: 1121, tags: ['large'], floors: 4 }, look: 'parchment' },
   { name: 'four-floors-mono', request: { seed: 515, tags: ['crumbling'], floors: 4 }, look: 'slate', view: { monochrome: true } },
+  // A sweep of seeds over every floor count, a boss room or none, and five-room dungeons.
+  ...[1, 2, 3, 4].flatMap((floors) =>
+    [11, 23, 37].map((seed) => ({ name: `sweep-${floors}f-${seed}`, request: { seed: seed * 1013 + floors, tags: [], floors, bossRoom: seed !== 23 }, look: 'parchment' as const })),
+  ),
+  ...[7, 8, 9, 10].map((seed) => ({ name: `sweep-five-room-${seed}`, request: { seed: seed * 977, tags: seed % 2 ? ['temple'] : ['wet'], floors: 1, fiveRoom: true }, look: 'masonry' as const })),
 ];
 
 function floorCanvas(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floor: number): OffscreenCanvas {
