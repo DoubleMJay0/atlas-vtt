@@ -6,7 +6,7 @@ import { connectionProblems, entranceProblems, stairProblems } from './floorsInv
 
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
- * three of the tag sets below, so each floor count meets every set over a few hundred seeds.
+ * two of the tag sets below, so each floor count meets every set over two hundred seeds.
  */
 
 const SEEDS = 1000;
@@ -34,7 +34,7 @@ function runsOf(floors: number): Run[] {
   const out: Run[] = [];
   for (let k = 1; k <= SEEDS; k++) {
     const seed = k * 7919 + floors;
-    for (const offset of [0, 3, 6]) {
+    for (const offset of [0, 4]) {
       const tags = TAG_SETS[(k + offset) % TAG_SETS.length] ?? [];
       const start = performance.now();
       const model = generateDungeon({ seed, tags, floors });

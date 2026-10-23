@@ -19,6 +19,8 @@ export const THUMBNAIL_CELLS_ACROSS = 11;
 const WATER_WEIGHT = 0.5;
 const PROP_WEIGHT = 2;
 const COLUMN_WEIGHT = 1;
+/** The most floor one room counts for, in cells: a card shows several rooms, not one large hall. */
+const ROOM_CAP = 16;
 
 function overlap(a: Bounds, b: Bounds): number {
   const w = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
@@ -32,7 +34,8 @@ function inside(box: Bounds, p: Vec): boolean {
 
 /**
  * The top left corner, in cells, of the `cellsWide` × `cellsHigh` window that holds the most of
- * the dungeon: floor, then water, props and columns, each window centred on a room or a pool.
+ * the dungeon: floor (each room up to `ROOM_CAP`), then water, props and columns, each window
+ * centred on a room or a pool.
  */
 export function thumbnailWindow(model: DungeonModel, view: DungeonView, cellsWide: number, cellsHigh: number): Vec {
   const dungeon = visibleDungeon(model, view);
@@ -46,7 +49,7 @@ export function thumbnailWindow(model: DungeonModel, view: DungeonView, cellsWid
     const corner = { x: Math.round(centre.x - cellsWide / 2), y: Math.round(centre.y - cellsHigh / 2) };
     const box = { minX: corner.x, minY: corner.y, maxX: corner.x + cellsWide, maxY: corner.y + cellsHigh };
     let score = 0;
-    for (const room of rooms) score += overlap(room, box);
+    for (const room of rooms) score += Math.min(ROOM_CAP, overlap(room, box));
     for (const pool of pools) score += overlap(pool, box) * WATER_WEIGHT;
     for (const prop of props) if (inside(box, prop)) score += PROP_WEIGHT;
     for (const column of dungeon.floor.columns) if (inside(box, column)) score += COLUMN_WEIGHT;
