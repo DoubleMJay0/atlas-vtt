@@ -1,56 +1,83 @@
 import type { WallSegment } from '../../types/wallTypes';
-import type { DungeonProp, PropKind } from '../model';
+import type { DungeonProp, DungeonTerrain, PropKind, TerrainKind } from '../model';
+import { cellBox } from '../render/terrain/cellRings';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
 import type { DungeonPlacement } from './toWalls';
 
 /**
  * Tall objects as small closed walls in their scene, so they cast shadows in its lighting and
- * block sight without walls drawn by the GM: standing columns, statues and wells. Low ones
- * (altars, chests, sarcophagi, crates, barrels, a dais) cast none. Each outline lies inside what
- * the map draws, and keeps farther than the engine's seal tolerance from every wall and every
- * other outline, so sealing never bridges an object to a wall: light still passes between them.
+ * block sight without walls drawn by the GM: standing columns, statues, wells, and the terrain
+ * that is total cover (pillars, statues, wall fragments, obelisks). Low ones (altars, chests,
+ * sarcophagi, crates, barrels, a dais, low walls) cast none. Each outline lies inside what the map
+ * draws, and keeps farther than the engine's seal tolerance from every wall and every other
+ * outline, so sealing never bridges an object to a wall: light still passes between them.
  */
 
-/** Where a tall object stands, in cells: a disc, or a square turned by `rotation`. */
+/** Where a tall object stands, in cells: a disc, or a rectangle turned by `rotation`. */
 export interface Footprint {
   x: number;
   y: number;
-  /** A disc's radius, a square's half side. */
-  size: number;
-  square: boolean;
+  /** Half its width and height; a disc's radius, both. */
+  halfW: number;
+  halfH: number;
+  round: boolean;
   rotation: number;
 }
 
 /**
  * The tall props, by the size of what the map draws of them at scale 1 (`render/propStone.ts`: a
- * statue's plinth, a well's ring). F's restyle of the props must keep these, or the fidelity test
+ * statue's plinth, a well's ring). A restyle of the props must keep these, or the fidelity test
  * finds the outline off the drawn object.
  */
-const TALL_PROPS: Partial<Record<PropKind, { size: number; square: boolean }>> = {
-  statue: { size: 0.3, square: true },
-  well: { size: 0.4, square: false },
+const TALL_PROPS: Partial<Record<PropKind, { half: number; round: boolean }>> = {
+  statue: { half: 0.3, round: false },
+  well: { half: 0.4, round: true },
 };
+
+/**
+ * The tall terrain, by how far its drawing (`render/terrain/terrainStanding.ts`) keeps inside the
+ * cells it fills; a wall fragment is a slab of `FRAGMENT` along its longer side, its broken ends short of the cells.
+ */
+const TALL_TERRAIN: Partial<Record<TerrainKind, number>> = { pillar: 0.1, obelisk: 0.14, statue: 0.18 };
+const FRAGMENT = { half: 0.17, ends: 0.12 };
 
 /** The outline's share of the footprint: inside the drawn object's ink. */
 const INSET = 0.85;
 /** An outline that must shrink below this share of its size to keep clear of walls casts no shadow. */
 const SMALLEST = 0.4;
+/** The steps an outline shrinks by while it is too close to a wall. */
+const SHRINK_STEPS = 12;
 /** Pixels an outline keeps beyond the seal tolerance. */
 const MARGIN = 1;
 
 function propFootprint(prop: DungeonProp): Footprint | null {
   const tall = TALL_PROPS[prop.kind];
-  return tall ? { x: prop.x, y: prop.y, size: tall.size * prop.scale, square: tall.square, rotation: prop.rotation } : null;
+  if (!tall) return null;
+  const half = tall.half * prop.scale;
+  return { x: prop.x, y: prop.y, halfW: half, halfH: half, round: tall.round, rotation: prop.rotation };
 }
 
-/** The tall objects of a floor as shown: columns standing on its floor, and tall props in its shown rooms where props are shown. */
+function terrainFootprint(piece: DungeonTerrain): Footprint | null {
+  const box = cellBox(piece.cells);
+  const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2, rotation: 0, round: false };
+  if (piece.kind === 'wall-fragment') {
+    const along = Math.max(box.w, box.h) / 2 - FRAGMENT.ends;
+    return box.w >= box.h ? { ...centre, halfW: along, halfH: FRAGMENT.half } : { ...centre, halfW: FRAGMENT.half, halfH: along };
+  }
+  const inset = TALL_TERRAIN[piece.kind];
+  return inset === undefined ? null : { ...centre, halfW: box.w / 2 - inset, halfH: box.h / 2 - inset };
+}
+
+/** The tall objects of a floor as shown: columns standing on its floor, tall props where props are shown, and tall terrain, in its shown rooms. */
 export function tallObjects(dungeon: VisibleDungeon, view: Pick<DungeonView, 'props'>): Footprint[] {
-  const columns = dungeon.floor.columns
-    .filter(column => !column.shattered && dungeon.field.distance(column.x, column.y) < 0)
-    .map(column => ({ x: column.x, y: column.y, size: column.radius, square: column.square, rotation: 0 }));
-  const props = view.props ? dungeon.floor.props.filter(prop => dungeon.roomShapes.has(prop.room)).flatMap(prop => propFootprint(prop) ?? []) : [];
-  return [...columns, ...props];
+  const { floor, field, roomShapes } = dungeon;
+  const columns = floor.columns
+    .filter(column => !column.shattered && field.distance(column.x, column.y) < 0)
+    .map((column): Footprint => ({ x: column.x, y: column.y, halfW: column.radius, halfH: column.radius, round: !column.square, rotation: 0 }));
+  const props = view.props ? floor.props.filter(prop => roomShapes.has(prop.room)).flatMap(prop => propFootprint(prop) ?? []) : [];
+  const terrain = floor.terrain.filter(piece => roomShapes.has(piece.room)).flatMap(piece => terrainFootprint(piece) ?? []);
+  return [...columns, ...props, ...terrain];
 }
 
 interface Point {
@@ -58,22 +85,47 @@ interface Point {
   y: number;
 }
 
-function segmentDistance(p: Point, a: Point, b: Point): number {
+/** Corners of a footprint's outline at `share` of its size, in world px. */
+function outlineCorners(footprint: Footprint, share: number, world: (p: Point) => Point): Point[] {
+  const { x, y, halfW, halfH, round, rotation } = footprint;
+  if (round) {
+    // An octagon with flat sides up and down, its corners on the disc of `share` of the radius
+    return Array.from({ length: 8 }, (_, k) => {
+      const angle = Math.PI / 8 + (k * Math.PI) / 4;
+      return world({ x: x + Math.cos(angle) * halfW * share, y: y + Math.sin(angle) * halfH * share });
+    });
+  }
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const corners: [number, number][] = [[-halfW, -halfH], [halfW, -halfH], [halfW, halfH], [-halfW, halfH]];
+  return corners.map(([u, v]) => world({ x: x + (u * cos - v * sin) * share, y: y + (u * sin + v * cos) * share }));
+}
+
+function pointToSegment(p: Point, a: Point, b: Point): number {
   const abx = b.x - a.x;
   const aby = b.y - a.y;
   const along = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / (abx * abx + aby * aby || 1)));
   return Math.hypot(p.x - a.x - abx * along, p.y - a.y - aby * along);
 }
 
-/** Corners of an outline around `centre` that reach `reach` from it, in world px. */
-function outlineCorners(footprint: Footprint, centre: Point, reach: number): Point[] {
-  const count = footprint.square ? 4 : 8;
-  // A square's corners lie at 45° from its sides; a disc's octagon has a flat top
-  const start = footprint.rotation + (footprint.square ? Math.PI / 4 : Math.PI / 8);
-  return Array.from({ length: count }, (_, k) => {
-    const angle = start + (k * Math.PI * 2) / count;
-    return { x: centre.x + Math.cos(angle) * reach, y: centre.y + Math.sin(angle) * reach };
+function crosses(a: Point, b: Point, c: Point, d: Point): boolean {
+  const side = (p: Point, q: Point, r: Point): number => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  return side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0;
+}
+
+function segmentDistance(a: Point, b: Point, c: Point, d: Point): number {
+  if (crosses(a, b, c, d)) return 0;
+  return Math.min(pointToSegment(a, c, d), pointToSegment(b, c, d), pointToSegment(c, a, b), pointToSegment(d, a, b));
+}
+
+/** The least distance between a closed ring and segments. */
+function ringDistance(ring: readonly Point[], segments: readonly (readonly [Point, Point])[]): number {
+  let least = Infinity;
+  ring.forEach((a, k) => {
+    const b = ring[(k + 1) % ring.length]!;
+    for (const [c, d] of segments) least = Math.min(least, segmentDistance(a, b, c, d));
   });
+  return least;
 }
 
 /**
@@ -91,23 +143,29 @@ export function objectShadows(
   levels?: string[],
 ): Record<string, WallSegment> {
   const { originCell, pxPerCell } = placement;
+  const world = (p: Point): Point => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   const keep = tolerance + MARGIN;
-  const placed: { centre: Point; reach: number }[] = [];
+  const segments: (readonly [Point, Point])[] = walls.map(wall => [wall.p1, wall.p2] as const);
   const out: Record<string, WallSegment> = {};
+  let placed = 0;
   for (const footprint of objects) {
-    const centre = { x: (footprint.x - originCell.x) * pxPerCell, y: (footprint.y - originCell.y) * pxPerCell };
-    // Every corner lies on the circle of the outline's reach, so the polygon lies within it
-    const full = footprint.size * (footprint.square ? Math.SQRT2 : 1) * INSET * pxPerCell;
-    const fromWalls = Math.min(Infinity, ...walls.map(wall => segmentDistance(centre, wall.p1, wall.p2)));
-    const fromOutlines = Math.min(Infinity, ...placed.map(other => Math.hypot(other.centre.x - centre.x, other.centre.y - centre.y) - other.reach));
-    const reach = Math.min(full, fromWalls - keep, fromOutlines - keep);
-    if (reach < full * SMALLEST) continue;
-    placed.push({ centre, reach });
-    const n = placed.length;
-    const corners = outlineCorners(footprint, centre, reach);
-    corners.forEach((p1, k) => {
-      const wallId = `${id}_${n}_${k + 1}`;
-      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', p1, p2: corners[(k + 1) % corners.length]!, chainId: `${id}_${n}`, ...(levels && { levels }) };
+    const centre = world(footprint);
+    const reach = Math.hypot(footprint.halfW, footprint.halfH) * INSET * pxPerCell + keep;
+    // Only what lies within its reach can come near it
+    const near = segments.filter(([a, b]) => pointToSegment(centre, a, b) <= reach);
+    let corners: Point[] | null = null;
+    for (let step = 0; step <= SHRINK_STEPS && !corners; step++) {
+      const share = INSET * (1 - ((1 - SMALLEST) * step) / SHRINK_STEPS);
+      const ring = outlineCorners(footprint, share, world);
+      if (ringDistance(ring, near) > keep) corners = ring;
+    }
+    if (!corners) continue;
+    const ring = corners;
+    placed++;
+    ring.forEach((p1, k) => {
+      const wallId = `${id}_${placed}_${k + 1}`;
+      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', p1, p2: ring[(k + 1) % ring.length]!, chainId: `${id}_${placed}`, ...(levels && { levels }) };
+      segments.push([p1, ring[(k + 1) % ring.length]!]);
     });
   }
   return out;
