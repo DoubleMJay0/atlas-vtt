@@ -87,7 +87,7 @@ describe('the dungeon generator over the map', () => {
     expect(panel.props!.collectionId).toBe('Dungeons');
     act(() => panel.props!.onCreated(SCENE));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(openCreatedScene).toHaveBeenCalledWith(app, SCENE.scenePath, 'Crypt');
+    expect(openCreatedScene).toHaveBeenCalledWith(app, SCENE.scenePath, 'Crypt', { level: undefined });
   });
 
   it('closes on Escape, but not while a scene is being written', () => {

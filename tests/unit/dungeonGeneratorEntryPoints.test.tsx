@@ -81,7 +81,15 @@ describe('the asset manager', () => {
     const scene = { path: SCENE_MAP };
     const app = { vault: { getFileByPath: vi.fn(() => scene) }, workspace: { getLeaf: () => ({ openFile }) } } as unknown as App;
     expect(await openCreatedScene(app, SCENE_MAP, 'Town')).toBe(true);
-    expect(openFile).toHaveBeenCalledWith(scene);
+    expect(openFile).toHaveBeenCalledWith(scene, undefined);
+  });
+
+  it('opens a scene of several floors on the level it names, through the view state', async () => {
+    const openFile = vi.fn(async (): Promise<void> => {});
+    const scene = { path: SCENE_MAP };
+    const app = { vault: { getFileByPath: vi.fn(() => scene) }, workspace: { getLeaf: () => ({ openFile }) } } as unknown as App;
+    expect(await openCreatedScene(app, SCENE_MAP, 'Town', { level: 'level_a' })).toBe(true);
+    expect(openFile).toHaveBeenCalledWith(scene, { state: { level: 'level_a' } });
   });
 });
 

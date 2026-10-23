@@ -51,7 +51,7 @@ function GeneratorOverlay({ request, onClose }: OverlayProps): React.JSX.Element
   const created = (scene: CreatedDungeonScene): void => {
     settleDungeonRequest(request.id, scene);
     onClose();
-    if (!request.waiting) void openCreatedScene(app, scene.scenePath, scene.name);
+    if (!request.waiting) void openCreatedScene(app, scene.scenePath, scene.name, { level: scene.entryLevel });
   };
 
   return (

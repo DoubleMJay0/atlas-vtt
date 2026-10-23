@@ -21,6 +21,8 @@ export interface MapExportOptions {
 export interface CreatedDungeonScene {
   name: string;
   scenePath: string;
+  /** The level the scene opens on: its entry floor; unset for a dungeon of one floor. */
+  entryLevel?: string;
 }
 
 export interface GeneratorActions {
@@ -71,7 +73,7 @@ export function useGeneratorActions({ app, client, state, collectionId, onCreate
         view: settings.view,
         collectionId: now.collectionId,
       });
-      if (result.ok) latest.current.onCreated({ name: result.name, scenePath: result.scenePath });
+      if (result.ok) latest.current.onCreated({ name: result.name, scenePath: result.scenePath, ...(result.entryLevel && { entryLevel: result.entryLevel }) });
       else setProblem(result.problem);
     } catch (error) {
       console.error('[Atlas] Creating a dungeon scene failed', error);

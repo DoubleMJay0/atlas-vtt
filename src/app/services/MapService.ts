@@ -40,11 +40,12 @@ export class MapService {
    * @param filePath The path to the map file
    * @param camera Where the scene is shown (its tab's own camera); without one the map is fitted to the view.
    * The loading screen waits for the tiles this camera shows.
+   * @param level The level shown first, over the camera's; unset, the camera's, else the first.
    * @returns The loaded map data, or null when loading failed or a later request replaced this one
    */
-  public loadMap(rendererService: RendererService, filePath: string, camera: ViewCamera | null = null): Promise<MapFile | null> {
+  public loadMap(rendererService: RendererService, filePath: string, camera: ViewCamera | null = null, level?: string): Promise<MapFile | null> {
     return this.loads.run(async (isSuperseded) => {
-      const load = this.runLoad(rendererService, filePath, camera, isSuperseded);
+      const load = this.runLoad(rendererService, filePath, camera, isSuperseded, level);
       if (await settledWithin(load, STALLED_LOAD_MS)) return load;
       if (isSuperseded()) return null;
       // The loading overlay covers the whole view, its tabs included: a load that never ends
@@ -65,6 +66,7 @@ export class MapService {
     filePath: string,
     camera: ViewCamera | null,
     isSuperseded: () => boolean,
+    level?: string,
   ): Promise<MapFile | null> {
     try {
       // A detection still running on the scene being left ends with it.
@@ -127,6 +129,7 @@ export class MapService {
         filePath,
         camera,
         isSuperseded,
+        level,
       );
       if (!displayed) return null;
       this.currentMapData = displayed.mapData;
@@ -281,8 +284,8 @@ export class MapService {
   }
 
   /** `loadMap` for a file of the vault. */
-  public async loadMapFromFile(rendererService: RendererService, file: TFile, camera: ViewCamera | null = null): Promise<MapFile | null> {
-    return this.loadMap(rendererService, file.path, camera);
+  public async loadMapFromFile(rendererService: RendererService, file: TFile, camera: ViewCamera | null = null, level?: string): Promise<MapFile | null> {
+    return this.loadMap(rendererService, file.path, camera, level);
   }
 
   /** The data of the loaded map, or null if none is loaded. */

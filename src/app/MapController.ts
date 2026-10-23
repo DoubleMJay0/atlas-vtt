@@ -96,6 +96,7 @@ function viewMapImage(app: App, renderer: MapRenderer): MapImage | null {
  * return the parsed mapData. Returns null without touching the renderer when
  * `isSuperseded` reports that a newer load took over while the file was read.
  * The camera goes to `camera` (a tab's own, kept from when it was last shown), else fits the map.
+ * The level shown is `level`, else the camera's, else the first.
  */
 async function loadAndDisplay(
   app: App,
@@ -103,8 +104,9 @@ async function loadAndDisplay(
   filePath: string,
   camera: ViewCamera | null = null,
   isSuperseded: () => boolean = () => false,
+  shownLevel?: string,
 ): Promise<DisplayedMap | null> {
-  const { mapData, image, level } = await MapLoader.load(app, filePath, camera?.level);
+  const { mapData, image, level } = await MapLoader.load(app, filePath, shownLevel ?? camera?.level);
   if (isSuperseded()) return null;
 
   const mapImage = viewMapImage(app, renderer);
