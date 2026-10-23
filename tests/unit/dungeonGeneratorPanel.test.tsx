@@ -198,9 +198,9 @@ describe('the style gallery', () => {
 
   it('keeps the style picked by its id and draws the map in it', async () => {
     renderPanel();
-    fireEvent.click(screen.getByRole('radio', { name: 'Night' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Lantern' }));
     expect(settings.getDungeonGenerator().style).toBe('night');
-    expect(screen.getByRole('radio', { name: 'Night' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('radio', { name: 'Lantern' }).getAttribute('aria-checked')).toBe('true');
     await waitFor(() => expect(lastJob().style).toBe(dungeonStyle('night')));
   });
 
