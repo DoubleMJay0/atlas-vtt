@@ -44,7 +44,6 @@ export const TERRAIN_KINDS: Readonly<Record<TerrainKind, KindInfo>> = {
   bridge: { name: 'dungeon.terrain.bridge', traits: {}, footing: 'walk' },
   platform: { name: 'dungeon.terrain.platform', traits: { elevation: 1 }, footing: 'walk' },
   ledge: { name: 'dungeon.terrain.ledge', traits: { elevation: 1 }, footing: 'walk' },
-  lever: { name: 'dungeon.terrain.lever', traits: { interactive: true }, footing: 'block' },
   mosaic: { name: 'dungeon.terrain.mosaic', traits: { interactive: true }, footing: 'walk' },
   pool: { name: 'dungeon.terrain.pool', traits: { interactive: true }, footing: 'block' },
   'portal-ring': { name: 'dungeon.terrain.portalRing', traits: { interactive: true }, footing: 'block' },

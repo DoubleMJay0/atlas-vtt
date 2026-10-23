@@ -1,31 +1,12 @@
 import type { DungeonTerrain } from '../../model';
-import type { Vec } from '../geometry';
 import type { Hand } from '../art/hand';
 import { polyPath } from '../art/paths';
-import { facing } from '../../props/roomFrame';
 import { circle } from './cover';
 import { boxOf, RING_STONE, RING_STONES, ringRadius } from './footprints';
-import { pieceRng, roomAxis } from './pieces';
+import { pieceRng } from './pieces';
 import { stoneOutline } from './stones';
 
-/** Points of interest a party pokes at: a lever, a basin of water, a ring of standing stones. */
-
-/** A lever: an iron plate against the wall behind it, the handle leaning out into the room. */
-export function drawLever(hand: Hand, piece: DungeonTerrain): void {
-  const box = boxOf(piece, 0);
-  const axis = roomAxis(hand.scene.env, piece);
-  const a = facing(piece.facing ?? { x: -axis.x as -1 | 0 | 1, y: -axis.y as -1 | 0 | 1 });
-  const at = (u: number, v: number): Vec => ({ x: box.cx + u * Math.cos(a) - v * Math.sin(a), y: box.cy + u * Math.sin(a) + v * Math.cos(a) });
-  const plate = [at(-0.24, 0.22), at(0.24, 0.22), at(0.24, 0.38), at(-0.24, 0.38)];
-  hand.surface(polyPath(plate), 'metal');
-  hand.edges(plate, true);
-  const slot = [at(-0.03, 0.08), at(0.03, 0.08), at(0.03, 0.3), at(-0.03, 0.3)];
-  hand.surface(polyPath(slot), 'metal');
-  hand.line([[at(0, 0.28), at(0.13, -0.08)]], 'heavy');
-  const knob = circle(at(0.13, -0.08), 0.06, 14);
-  hand.surface(polyPath(knob), 'wood');
-  hand.edges(knob, true);
-}
+/** Points of interest: a basin of water, a ring of standing stones. */
 
 /** A basin: a stone rim round still water. */
 export function drawPool(hand: Hand, piece: DungeonTerrain): void {

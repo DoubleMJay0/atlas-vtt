@@ -59,17 +59,42 @@ describe('five-room dungeons', () => {
     ).toEqual([]);
   });
 
-  it('build each stage as architecture: a guard post, a set piece, a hazard, an arena, a point of interest', () => {
+  it('build each stage as architecture, in more than one way, and without mechanisms', () => {
     const pieces = (floor: DungeonFloor, stage: FiveRoomStage) => floor.terrain.filter((p) => p.room === stageRoom(floor, stage)?.id);
-    expect(share((f) => pieces(f, 'entrance').some((p) => p.kind === 'low-wall') && hasCover(f, stageRoom(f, 'entrance')!.id))).toBeGreaterThan(0.8);
-    expect(share((f) => pieces(f, 'puzzle').some((p) => p.traits.interactive))).toBeGreaterThan(0.9);
-    expect(share((f) => pieces(f, 'setback').some((p) => p.traits.hazard))).toBeGreaterThan(0.85);
+    const way = (floor: DungeonFloor, stage: FiveRoomStage): string => [...new Set(pieces(floor, stage).map((p) => p.kind))].sort().join('+');
+    expect(share((f) => pieces(f, 'entrance').some((p) => p.kind === 'low-wall'))).toBeGreaterThan(0.2);
+    expect(share((f) => pieces(f, 'entrance').some((p) => p.kind === 'low-wall'))).toBeLessThan(0.8);
+    expect(share((f) => pieces(f, 'puzzle').length > 0)).toBeGreaterThan(0.9);
+    expect(share((f) => pieces(f, 'setback').some((p) => p.traits.hazard || p.traits.difficult || p.kind === 'ledge'))).toBeGreaterThan(0.85);
+    expect(share((f) => pieces(f, 'setback').some((p) => p.traits.hazard))).toBeLessThan(0.8);
     expect(share((f) => pieces(f, 'climax').some((p) => p.kind === 'platform'))).toBeGreaterThan(0.6);
-    expect(share((f) => pieces(f, 'reward').some((p) => p.traits.interactive))).toBeGreaterThan(0.85);
-    expect(share((f) => floor(f, 'reward')?.wing === 'secret')).toBeGreaterThan(0.4);
-    function floor(f: DungeonFloor, stage: FiveRoomStage) {
-      return stageRoom(f, stage);
+    expect(share((f) => pieces(f, 'reward').some((p) => p.traits.interactive))).toBeGreaterThan(0.6);
+    expect(share((f) => stageRoom(f, 'reward')?.wing === 'secret')).toBeGreaterThan(0.4);
+    // No stage is built the same way in most dungeons.
+    for (const stage of ['entrance', 'puzzle', 'setback', 'reward'] as const) {
+      const counts = new Map<string, number>();
+      for (const { model } of runs) counts.set(way(model.floors[0]!, stage), (counts.get(way(model.floors[0]!, stage)) ?? 0) + 1);
+      expect(Math.max(...counts.values()) / runs.length, stage).toBeLessThan(0.5);
     }
+  });
+
+  it('honour the tags that make sense for one string of rooms', () => {
+    const secretShare = (tags: string[]): number => {
+      let secret = 0;
+      for (let seed = 1; seed <= 40; seed++) if (stageRoom(generateDungeon({ seed, tags, floors: 1, fiveRoom: true }).floors[0]!, 'reward')?.wing === 'secret') secret++;
+      return secret / 40;
+    };
+    expect(secretShare(['secret'])).toBeGreaterThan(0.9);
+    expect(secretShare(['no-secrets'])).toBe(0);
+    const differs = (tag: string): number => {
+      let changed = 0;
+      for (let seed = 1; seed <= 20; seed++) {
+        const rooms = (tags: string[]) => JSON.stringify(generateDungeon({ seed, tags, floors: 1, fiveRoom: true }).floors[0]!.rooms.map((r) => [r.x, r.y, r.w, r.h, r.colonnade, r.rotunda]));
+        if (rooms([]) !== rooms([tag])) changed++;
+      }
+      return changed;
+    };
+    for (const tag of ['compact', 'winding', 'small', 'ordered', 'chaotic', 'colonnades']) expect(differs(tag), tag).toBeGreaterThan(5);
   });
 
   it('keep every rule of the layout and the terrain', () => {

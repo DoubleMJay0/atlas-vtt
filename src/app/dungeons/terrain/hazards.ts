@@ -1,8 +1,8 @@
 /**
  * Hazards a party sees at a glance and positions around (Terrain principle 3): chasms, channels of
  * lava, acid or water, deep water and pits. A hazard never cuts a room in two: a band from wall to
- * wall has a bridge across it (one cell wide, Terrain principle 4) and, where the room is wide
- * enough, stops short of one wall so a longer way leads round it. A chasm on a floor with floors
+ * wall has a bridge across it (one cell wide, Terrain principle 4), and one the way can lead round
+ * (it stops short of a wall, or lies in the room's middle) has none, since nobody needs it. A chasm on a floor with floors
  * below opens onto them (`holes.ts`).
  */
 
@@ -80,6 +80,30 @@ function landsOnFloor(rc: RoomCells, band: Band): boolean {
   return landings(rc, band).every((c) => rc.isFloor(c) && !rc.isBlocked(c) && !own.has(`${c.x},${c.y}`));
 }
 
+/**
+ * The band with its bridge only where the way cannot lead round it: where the bridge's two ends
+ * are joined by floor without it, the bridge goes, and a band that would then cut a corner of the
+ * room off is refused by the room's own checks.
+ */
+function neededBridge(rc: RoomCells, band: Band): Band {
+  const [from, to] = landings(rc, band);
+  if (!from || !to) return band;
+  const own = new Set(band.cells.map((c) => `${c.x},${c.y}`));
+  const seen = new Set([`${from.x},${from.y}`]);
+  const queue = [from];
+  while (queue.length) {
+    const c = queue.pop() as CellPoint;
+    if (c.x === to.x && c.y === to.y) return { cells: band.cells, bridge: [] };
+    for (const n of [{ x: c.x + 1, y: c.y }, { x: c.x - 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x, y: c.y - 1 }]) {
+      const k = `${n.x},${n.y}`;
+      if (seen.has(k) || own.has(k) || !rc.isFloor(n) || rc.isBlocked(n)) continue;
+      seen.add(k);
+      queue.push(n);
+    }
+  }
+  return band;
+}
+
 function bridgeOver(work: TerrainWork, k: number, rc: RoomCells, band: Band, spans: number, name: string): void {
   const floor = work.floors[k];
   if (!floor || band.bridge.length === 0) return;
@@ -117,7 +141,8 @@ function overRoomBelow(work: TerrainWork, k: number, cells: readonly CellPoint[]
 
 function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
   const thickness = rc.depth >= 8 && chance(rng, 0.5) ? 2 : 1;
-  const tryBand = (band: Band): boolean => {
+  const tryBand = (drawn: Band): boolean => {
+    const band = neededBridge(rc, drawn);
     if (!leavesRoom(rc, band.cells, band.bridge) || !overRoomBelow(work, k, band.cells) || !landsOnFloor(rc, band) || !rc.allows(band.cells, 'block', band.bridge)) return false;
     const drop = dropBelow(work, k, band.cells, rng);
     const id = drop && cutHole(work, k, rc, 'chasm', band.cells, drop, { bridge: band.bridge });
@@ -155,7 +180,7 @@ export function placeChasmOver(work: TerrainWork, k: number, rc: RoomCells, rng:
     }),
   );
   return shapes.some((cells) => {
-    const band = blobBridge(rc, cells);
+    const band = neededBridge(rc, blobBridge(rc, cells));
     if (!leavesRoom(rc, cells, band.bridge) || !landsOnFloor(rc, band) || !rc.allows(band.cells, 'block', band.bridge)) return false;
     const drop = dropBelow(work, k, band.cells, rng);
     const id = drop && cutHole(work, k, rc, 'chasm', band.cells, drop, { bridge: band.bridge });
@@ -168,7 +193,8 @@ export function placeChasmOver(work: TerrainWork, k: number, rc: RoomCells, rng:
 function placeChannel(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
   const { hazard, name } = substance(rng, work.tags);
   const floor = work.floors[k];
-  for (const band of bands(rc, rng, 1, false).slice(0, 12)) {
+  for (const drawn of bands(rc, rng, 1, false).slice(0, 12)) {
+    const band = neededBridge(rc, drawn);
     if (!leavesRoom(rc, band.cells, band.bridge) || !landsOnFloor(rc, band)) continue;
     const id = floor?.place(draft('channel', rc.room.id, band.cells, { name, traits: { hazard }, facing: rc.across }), band.bridge);
     if (id === null || id === undefined) continue;

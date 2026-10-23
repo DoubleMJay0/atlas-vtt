@@ -79,7 +79,7 @@ function attempt(seed: number, request: FloorRequest, index: number): Built | nu
   const placed = !request.boss || placeBossRoom(work, request.galleries ?? []);
   if (!request.fiveRoom) addLoops(rngOf, work, params);
   addBossDoor(rngOf, work);
-  const boss = placed && (!request.fiveRoom || addRewardRoom(rngOf, work));
+  const boss = placed && (!request.fiveRoom || addRewardRoom(rngOf, work, params));
   if (!request.fiveRoom) {
     placeSecretWings(rngOf, work, params);
     addSecretLoops(rngOf, work, params);

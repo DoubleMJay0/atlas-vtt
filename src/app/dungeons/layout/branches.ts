@@ -99,8 +99,10 @@ function freeBranches(rng: Rng, room: WorkRoom, flip: boolean): Branch[][] {
 }
 
 /** A string has one way on from every room, the others held back in case it is blocked; corridors prefer to run straight. */
-function stringBranches(rng: Rng, room: WorkRoom, flip: boolean): Branch[][] {
-  const first = pick<Exit>(rng, isNormal(room) ? ['left', 'right', 'forward'] : ['left', 'right', 'forward', 'forward']);
+function stringBranches(rng: Rng, room: WorkRoom, flip: boolean, tags: ReadonlySet<string>): Branch[][] {
+  // Ordered strings run mostly straight on, chaotic ones turn at almost every room.
+  const exits: Exit[] = tags.has('ordered') ? ['forward', 'forward', 'forward', 'left', 'right'] : tags.has('chaotic') ? ['left', 'right', 'left', 'right', 'forward'] : isNormal(room) ? ['left', 'right', 'forward'] : ['left', 'right', 'forward', 'forward'];
+  const first = pick<Exit>(rng, exits);
   const rest = shuffled(rng, (['left', 'right', 'forward'] as Exit[]).filter((exit) => exit !== first));
   const fallbacks = rest.map((exit) => exitBranch(rng, room, exit, flip));
   return [[{ ...exitBranch(rng, room, first, flip), fallbacks }]];
@@ -108,6 +110,6 @@ function stringBranches(rng: Rng, room: WorkRoom, flip: boolean): Branch[][] {
 
 /** The branches of a placed room, grouped: branches of one group share a seed and a mirror group. */
 export function branchesOf(rng: Rng, room: WorkRoom, flip: boolean, params: DungeonParams): Branch[][] {
-  if (params.string) return stringBranches(rng, room, flip);
+  if (params.string) return stringBranches(rng, room, flip, params.tags);
   return pick(rng, params.symmetry) ? mirroredBranches(rng, room, flip) : freeBranches(rng, room, flip);
 }

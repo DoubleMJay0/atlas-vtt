@@ -39,7 +39,6 @@ export const HEIGHT: Readonly<Partial<Record<TerrainKind, number>>> = {
   statue: 0.85,
   'wall-fragment': 1,
   obelisk: 1,
-  lever: 0.18,
   pool: 0.14,
   'portal-ring': 0.6,
   pews: 0.18,
@@ -134,7 +133,6 @@ export function footprint(piece: DungeonTerrain, axis: CellDir): PathFn | null {
           path.rect(b.x, b.y, b.w, b.h);
         }
       };
-    case 'lever':
     case 'table':
     case 'altar':
     case 'sarcophagus':

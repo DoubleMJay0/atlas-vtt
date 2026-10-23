@@ -56,7 +56,6 @@ function upper(): DungeonFloor {
   place(f, 'obelisk', 0, box(14, 9));
   place(f, 'pool', 0, box(16, 8, 2, 2));
   place(f, 'portal-ring', 0, box(19, 8, 3, 3));
-  place(f, 'lever', 0, box(0, 10), { facing: { x: 1, y: 0 } });
   const chasm = place(f, 'chasm', 2, box(3, 15, 3, 3), { opening: { bottom: 1, link: 1 } });
   place(f, 'bridge', 2, box(4, 15, 1, 3), { facing: down, spans: chasm.id });
   place(f, 'shaft', 2, box(9, 15), { opening: { bottom: 1, link: 2 } });

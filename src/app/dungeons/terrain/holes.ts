@@ -18,6 +18,8 @@ const OPEN_ON = 0.6;
 const MOST_OF_ROOM = 0.6;
 /** ...and this many free cells besides, for the room's own cover. */
 const LEFT_FREE = 4;
+/** A fall that ends in a room leaves it at least this many free cells, so its rubble never fills the room. */
+const LEFT_UNDER = 2;
 
 /** Where a hole over `cells` on floor `k` leads: the floors it opens through below, and the floor it ends on (null: bottomless). */
 export interface Drop {
@@ -34,7 +36,7 @@ export function dropBelow(work: TerrainWork, k: number, cells: readonly CellPoin
     const last = floor === work.floors.length - 1;
     const roomy = rc.depth >= 4 && rc.width >= 4 && cells.length <= rc.floorCount * (1 - MOST_OF_ROOM) && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells);
     const canOpen = mayOpenOn && roomy && rc.allows(cells, 'block');
-    const canEnd = rc.fits(cells);
+    const canEnd = rc.fits(cells) && rc.freeCount() - cells.length >= LEFT_UNDER;
     if (canOpen && (!canEnd || chance(rng, OPEN_ON))) {
       through.push({ floor, rc });
       if (last) return { through, bottom: null };

@@ -5,7 +5,7 @@
  */
 
 import type { CompactLayout } from './compact';
-import type { DungeonParams } from '../params';
+import type { DungeonParams, SizeStyle } from '../params';
 import type { FiveRoomStage } from '../model';
 import { FIVE_ROOM_STAGES } from '../model';
 import { dir, perpendicular } from '../geometry';
@@ -16,23 +16,43 @@ import { REGULAR_ZONE, type WorkLayout, type WorkRoom, doorMayOpen, localCell, r
 
 /** The main rooms before the reward: entrance, puzzle, setback and the boss room. */
 const MAIN_ROOMS = 4;
-/** How often the reward lies behind a secret door. */
-const SECRET_REWARD = 0.6;
+/** How often the reward lies behind a secret door, by the dungeon's tags. */
+function secretReward(tags: ReadonlySet<string>): number {
+  if (tags.has('no-secrets')) return 0;
+  return tags.has('secret') ? 1 : 0.6;
+}
 
-/** A floor's params for a five-room dungeon: a string of four large rooms with passages between them, no colonnades. */
+/**
+ * The main rooms and the passages between them, by the tags: small and cramped dungeons mix in
+ * small rooms, large and spacious ones only large; compact ones set the rooms close, winding ones
+ * lead long passages between them.
+ */
+function fiveRoomSizes(tags: ReadonlySet<string>): SizeStyle[] {
+  const rooms: SizeStyle[] = tags.has('small') || tags.has('cramped') ? [0, 1, 1] : tags.has('large') || tags.has('spacious') ? [1, 1, 1, 1] : [1, 1, 1];
+  const passages: SizeStyle[] = tags.has('compact') ? [3] : tags.has('winding') ? [2, 2, 2, 3, 3, 3, 3] : [2, 2, 3];
+  return [...rooms, ...passages];
+}
+
+/**
+ * A floor's params for a five-room dungeon: a string of four main rooms with passages between
+ * them. Tags that make sense for one string of rooms still apply (sizes, passages, secrets,
+ * colonnades); counts of rooms and side wings do not.
+ */
 export function fiveRoomParams(params: DungeonParams): DungeonParams {
+  const { tags } = params;
   return {
     ...params,
     minRooms: MAIN_ROOMS,
     maxRooms: MAIN_ROOMS,
     string: true,
     symmetry: [false],
-    sizeStyles: [1, 1, 1, 2, 2, 3],
+    sizeStyles: fiveRoomSizes(tags),
     secretWings: { chance: 0, extra: 0 },
     secretLoopChance: 0,
     secretEntranceWeight: 0,
-    // Columns along the walls would leave a guard post or a set piece no room.
-    colonnadeFactor: 0,
+    secretReward: secretReward(tags),
+    // Columns along every wall would leave a guard post or a set piece no room; only asked for.
+    colonnadeFactor: tags.has('colonnades') ? 1 : 0,
   };
 }
 
@@ -56,11 +76,11 @@ function exitsOf(boss: WorkRoom): { origin: WorkRoom['origin']; axis: WorkRoom['
 }
 
 /** Grows the reward room beyond the boss room; false where the rock leaves no room for it. */
-export function addRewardRoom(rngOf: KeyedRng, layout: WorkLayout): boolean {
+export function addRewardRoom(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams): boolean {
   const boss = layout.rooms.find((room) => room.boss && !room.removed);
   if (!boss) return false;
   const rng = rngOf('reward');
-  const secret = chance(rng, SECRET_REWARD);
+  const secret = chance(rng, params.secretReward);
   for (const exit of shuffled(rng, exitsOf(boss))) {
     for (const size of shuffled(rng, REWARD_SIZES)) {
       const room: WorkRoom = {

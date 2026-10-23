@@ -140,7 +140,7 @@ describe('the holes and bridges of a dungeon of several floors', () => {
     let holes = 0;
     let bridges = 0;
     const area = (ring: { x: number; y: number }[]): number => Math.abs(ring.reduce((sum, p, i) => sum + p.x * ring[(i + 1) % ring.length]!.y - ring[(i + 1) % ring.length]!.x * p.y, 0) / 2);
-    for (let seed = 1; seed <= 30 && holes < 5; seed++) {
+    for (let seed = 1; seed <= 60 && (holes < 5 || bridges === 0); seed++) {
       const model = generateDungeon({ seed, tags: ['large'], floors: 3 });
       const { parts } = partsOf(model);
       const ids = parts.levelIds!;

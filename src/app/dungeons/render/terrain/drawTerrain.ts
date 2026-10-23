@@ -5,7 +5,7 @@ import { drawAltar, drawCrates, drawLowWall, drawRubbleHeap, drawSarcophagus, dr
 import { drawBrokenFloor, drawMosaic, drawPews, drawScatter } from './ground';
 import { drawChannel, drawDeepWater, drawPit } from './hazards';
 import { drawHoles } from './holes';
-import { drawLever, drawPool, drawPortalRing } from './interest';
+import { drawPool, drawPortalRing } from './interest';
 import { shownPieces } from './pieces';
 import { drawRaised } from './raised';
 import { drawObelisk, drawPillar, drawStatue, drawWallFragment } from './tall';
@@ -48,7 +48,6 @@ const STANDING: Partial<Record<TerrainKind, Draw>> = {
   statue: (hand, piece, colours) => drawStatue(hand, piece, colours.water, colours.cloth),
   'wall-fragment': drawWallFragment,
   obelisk: drawObelisk,
-  lever: drawLever,
   pool: drawPool,
   'portal-ring': drawPortalRing,
 };

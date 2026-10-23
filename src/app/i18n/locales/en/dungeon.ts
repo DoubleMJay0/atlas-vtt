@@ -161,7 +161,6 @@ export const dungeon = {
   'dungeon.terrain.stoneBridge': 'Stone bridge',
   'dungeon.terrain.platform': 'Platform',
   'dungeon.terrain.ledge': 'Ledge',
-  'dungeon.terrain.lever': 'Lever',
   'dungeon.terrain.mosaic': 'Mosaic',
   'dungeon.terrain.pool': 'Basin',
   'dungeon.terrain.portalRing': 'Ring of standing stones',

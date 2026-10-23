@@ -33,7 +33,6 @@ const BLOCKING: ReadonlySet<TerrainKind> = new Set<TerrainKind>([
   'deep-water',
   'pit',
   'gallery',
-  'lever',
   'pool',
   'portal-ring',
 ]);
@@ -183,8 +182,30 @@ export function bridgeProblems(floor: DungeonFloor): string[] {
       { x: first.x - along.x, y: first.y - along.y },
       { x: last.x + along.x, y: last.y + along.y },
     ];
-    return ends.filter((c) => !inFloor(room, c) || !open.has(key(c)) || own.has(key(c))).map((c) => `${where} lands at ${key(c)}, which is no open floor`);
+    const landing = ends.filter((c) => !inFloor(room, c) || !open.has(key(c)) || own.has(key(c))).map((c) => `${where} lands at ${key(c)}, which is no open floor`);
+    if (landing.length) return landing;
+    // A bridge is laid only where the way cannot lead round what it spans.
+    const bridged = new Set(bridge.cells.map(key));
+    return linked(ends[0]!, ends[1]!, (c) => inFloor(room, c) && open.has(key(c)) && !bridged.has(key(c))) ? [`${where} crosses what the way leads round`] : [];
   });
+}
+
+/** Whether `to` can be reached from `from` in steps across cells `may` allows. */
+function linked(from: CellPoint, to: CellPoint, may: (c: CellPoint) => boolean): boolean {
+  const seen = new Set([key(from)]);
+  const queue = [from];
+  while (queue.length) {
+    const c = queue.pop()!;
+    if (c.x === to.x && c.y === to.y) return true;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const n = { x: c.x + dx, y: c.y + dy };
+      if (!seen.has(key(n)) && may(n)) {
+        seen.add(key(n));
+        queue.push(n);
+      }
+    }
+  }
+  return false;
 }
 
 /**

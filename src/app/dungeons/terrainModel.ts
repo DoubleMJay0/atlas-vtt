@@ -40,7 +40,6 @@ export type TerrainKind =
   | 'platform'
   | 'ledge'
   // Points of interest.
-  | 'lever'
   | 'mosaic'
   | 'pool'
   | 'portal-ring';
@@ -57,7 +56,7 @@ export interface TerrainTraits {
   hazard?: HazardKind;
   /** Its top above the room's floor in steps of 5 ft (2 is 10 ft); negative is a drop. */
   elevation?: number;
-  /** Something a party can poke at: a lever, a mosaic, a ring of standing stones. */
+  /** Something a party can look at or poke at: a mosaic, a basin, a ring of standing stones. */
   interactive?: true;
 }
 

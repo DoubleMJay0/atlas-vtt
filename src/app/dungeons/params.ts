@@ -33,6 +33,8 @@ export interface DungeonParams {
   secretLoopChance: number;
   /** Weight of a secret door for the second entrance, against an opening's 2 and a door's 1. */
   secretEntranceWeight: number;
+  /** Five-room dungeons: the chance the reward room lies behind a secret door. */
+  secretReward: number;
   /** 0..1, or null to roll one. */
   waterLevel: number | null;
   /** Chance of a pool in a room the architecture suits for one (wet and flooded dungeons). */
@@ -132,6 +134,7 @@ export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
     secretWings: secretWings(has),
     secretLoopChance: secretLoopChance(has),
     secretEntranceWeight: has('no-secrets') || has('string') ? 0 : has('secret') ? 2 : 1,
+    secretReward: 0,
     waterLevel: waterLevel(has),
     poolChance: has('flooded') ? 0.35 : has('wet') ? 0.25 : 0,
     tapestryChance,

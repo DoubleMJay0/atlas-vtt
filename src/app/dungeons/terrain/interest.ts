@@ -1,12 +1,13 @@
 /**
  * Points of interest spread through the quieter rooms (Terrain principle 7, Perkins' "escape room"
- * map): a lever in a wall, a mosaic in the floor, an obelisk, a basin of water, a statue facing the
- * way in. Things to poke at, which stand out; what they do is the GM's.
+ * map): a mosaic in the floor, an obelisk, a basin of water, a statue facing the
+ * way in. Things to look at, which stand out and do nothing by themselves: no levers or other
+ * mechanisms, which would ask the GM for a story.
  */
 
 import type { CellDir, TerrainKind } from '../model';
 import { dir } from '../geometry';
-import { type Rng, int, weighted } from '../rng';
+import { type Rng, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
 import type { FloorTerrain } from './floorTerrain';
@@ -17,11 +18,10 @@ function negate(d: CellDir): CellDir {
   return dir(-d.x, -d.y);
 }
 
-export type InterestKind = Extract<TerrainKind, 'lever' | 'mosaic' | 'obelisk' | 'pool' | 'statue' | 'altar'>;
+export type InterestKind = Extract<TerrainKind, 'mosaic' | 'obelisk' | 'pool' | 'statue' | 'altar'>;
 
 function weightsOf(tags: ReadonlySet<DungeonTag>): (readonly [InterestKind, number])[] {
   return [
-    ['lever', 2],
     ['mosaic', tags.has('temple') ? 3 : 1.5],
     ['obelisk', 1],
     ['pool', tags.has('dry') ? 0 : tags.has('wet') || tags.has('flooded') ? 2.5 : 1],
@@ -45,20 +45,6 @@ function middle(rc: RoomCells, size: number): [number, number] {
 export function placeInterest(floor: FloorTerrain, rc: RoomCells, rng: Rng, kind: InterestKind): boolean {
   const facing = negate(rc.axis);
   switch (kind) {
-    case 'lever': {
-      // In a side wall or the far wall, where nothing else stands.
-      const spots = [
-        ...Array.from({ length: rc.depth }, (_, i) => [i, 0] as const),
-        ...Array.from({ length: rc.depth }, (_, i) => [i, rc.width - 1] as const),
-        ...Array.from({ length: rc.width }, (_, j) => [rc.depth - 1, j] as const),
-      ];
-      for (let tries = 0; tries < 8; tries++) {
-        const [i, j] = spots[int(rng, 0, spots.length - 1)] as readonly [number, number];
-        const towards = j === 0 && i < rc.depth - 1 ? rc.across : j === rc.width - 1 && i < rc.depth - 1 ? negate(rc.across) : facing;
-        if (at(floor, rc, 'lever', i, j, 1, towards)) return true;
-      }
-      return false;
-    }
     case 'mosaic': {
       const size = rc.depth >= 7 && rc.width >= 7 ? 3 : 2;
       const [i, j] = middle(rc, size);
