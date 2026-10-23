@@ -6,7 +6,7 @@
  */
 export const ACID_GLSL = `
 vec4 acid(vec2 q, float d, float px, float near) {
-  float current = fbm((q - uDriftA.xy) * 0.75, vec2(TILE * 0.75), int(uAcidDetail), px * 0.75);
+  float current = fbm((q - uDriftA.xy) * 0.75, vec2(TILE * 0.75), int(uDetail) + 1, px * 0.75);
   float bank = 1.0 - smoothstep(0.08, 0.32, d + current * 0.06);
 
   // One candidate per jittered cell, fewer than the old 3x3 lattice. A new location at each
@@ -35,7 +35,7 @@ vec4 acid(vec2 q, float d, float px, float near) {
   rim *= 1.0 - pop * smoothstep(-0.3, 0.7, at.x / max(radius, 0.001));
   float bubble = live * has;
 
-  if (uAcidArt > 0.5) {
+  if (uEngraved > 0.5) {
     // Static art uses a 45-degree burin hatch. Keep it still, let density breathe in slow
     // patches, and cut a fine meniscus with the same ink. Never wash a gradient over paper.
     vec2 paper = vWorld / uCell;

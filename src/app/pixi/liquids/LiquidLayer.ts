@@ -8,6 +8,7 @@ import { destroyTree } from '../utils/destroyTree';
 import { frameTime } from '../utils/animationFrames';
 import { LIQUID_FPS, liquidFrameDue } from './liquidMotion';
 import { LiquidMesh, type WorldBox } from './LiquidMesh';
+import type { LiquidDetail } from './liquidShader';
 
 /** How long building surfaces may take in one frame; one that takes longer is still built whole. */
 const BUILD_BUDGET_MS = 6;
@@ -31,8 +32,8 @@ export interface LiquidLayerDeps {
    * their detail is too fine to see move. Unset, `LIQUID_FPS`.
    */
   fps?: () => number;
-  /** Acid material octaves (3 / 2 / 1), independent of zoom throttling. */
-  acidDetail?: () => number;
+  /** How much of its material each surface draws (`LiquidDetail`), by quality alone, never by zoom; unset, 2. */
+  detail?: () => LiquidDetail;
   /** The time of the display frame (ms); unset, the ticker's, which every animation of the map shares (`frameTime`). */
   now?: () => number;
 }
@@ -55,12 +56,14 @@ export class LiquidLayer {
   private readonly built = new Map<string, Built>();
   private pending: LiquidSurface[] = [];
   private cell = 0;
+  private detail: LiquidDetail = 2;
   private record: unknown = undefined;
   private mode: MapVideoMode = 'pause';
   /** Seconds of motion, which only playing advances. */
   private seconds = 0;
   /** The moment on screen: a pause holds it, and the clock resumes from it. */
   private shownSeconds = 0;
+  private shownLightTime = 0;
   private lastTick: number | null = null;
   private lastFrame: number | null = null;
   private readonly unsubscribe: () => void;
@@ -88,7 +91,7 @@ export class LiquidLayer {
   stillFor(): () => void {
     for (const { mesh } of this.built.values()) mesh.setTime(0);
     return (): void => {
-      for (const { mesh } of this.built.values()) mesh.setTime(this.shownSeconds);
+      for (const { mesh } of this.built.values()) mesh.setTime(this.shownSeconds, this.shownLightTime);
     };
   }
 
@@ -137,13 +140,14 @@ export class LiquidLayer {
   /** Builds waiting surfaces for up to `budget` ms (at least one), then puts every surface in its order. */
   private build(budget: number): void {
     if (this.pending.length === 0) return;
+    this.followDetail();
     const start = this.now();
     const record = this.record as Record<string, unknown> | undefined;
     while (this.pending.length > 0) {
       const surface = this.pending.shift()!;
       const mesh = new LiquidMesh(surface, this.cell);
-      mesh.setAcidDetail(this.deps.acidDetail?.() ?? 3);
-      mesh.setTime(this.shownSeconds);
+      mesh.setDetail(this.detail);
+      mesh.setTime(this.shownSeconds, this.shownLightTime);
       this.built.set(surface.id, { entry: record?.[surface.id], mesh });
       if (this.now() - start >= budget) break;
     }
@@ -160,11 +164,18 @@ export class LiquidLayer {
   /** Shows `seconds` of motion on every surface and asks for the frame. */
   private show(seconds: number): void {
     this.shownSeconds = seconds;
-    for (const { mesh } of this.built.values()) {
-      mesh.setAcidDetail(this.deps.acidDetail?.() ?? 3);
-      mesh.setTime(seconds);
-    }
+    this.shownLightTime = this.mode === 'play' ? this.now() : this.mode === 'poster' ? 0 : this.shownLightTime;
+    for (const { mesh } of this.built.values()) mesh.setTime(seconds, this.shownLightTime);
     if (this.built.size > 0) this.deps.requestRender();
+  }
+
+  /** Takes a new quality's detail onto every surface, paused or not, and shows it. */
+  private followDetail(): void {
+    const detail = this.deps.detail?.() ?? 2;
+    if (detail === this.detail) return;
+    this.detail = detail;
+    for (const { mesh } of this.built.values()) mesh.setDetail(detail);
+    this.show(this.shownSeconds);
   }
 
   private inView(): boolean {
@@ -173,6 +184,7 @@ export class LiquidLayer {
   }
 
   private readonly tick = (): void => {
+    this.followDetail();
     if (this.pending.length > 0) this.build(BUILD_BUDGET_MS);
     if (this.mode !== 'play' || this.built.size === 0) return;
     const now = this.now();

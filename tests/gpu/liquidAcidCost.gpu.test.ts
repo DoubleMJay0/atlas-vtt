@@ -20,7 +20,7 @@ it('measures acid fragment cost with GPU elapsed queries at each quality', async
   const drawsPerQuery = 16;
   try {
     for (const quality of ['high', 'balanced', 'saver']) {
-      mesh.setAcidDetail(quality === 'high' ? 3 : quality === 'balanced' ? 2 : 1);
+      mesh.setDetail(quality === 'high' ? 2 : quality === 'balanced' ? 1 : 0);
       const render = (): void => {
         for (let draw = 0; draw < drawsPerQuery; draw++) renderer.render({ container: world, target, clear: true });
       };

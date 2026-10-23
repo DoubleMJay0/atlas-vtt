@@ -1,61 +1,60 @@
 /**
- * Water: the painted water darkens towards \`uDeep\` away from the shore, soft ripples drift across
- * it (along the flow on a channel, stretched into streaks; in place on a pool), the light they
- * gather on the bottom draws a slowly moving net of caustics in \`uGlint\`, brightest where its
- * lines cross, and a channel carries thin lines of foam downstream. Everything fine fades as the map is zoomed out.
- * \`near\` is 0 far out (about 45 screen pixels a cell) and 1 close in (120 and more).
+ * The map's own illustration in motion. Painted water carries broad, matte reflections;
+ * engraved water carries only tapered ink strokes and small openings in the hatch. All
+ * blending stays between the map's pigments (no additive white caustics). The existing
+ * signed shore distance protects banks and islands; the static drawing supplies fine grain.
+ * High/balanced/saver use 3/2/1 noise octaves and omit finer marks. No extra texture samples.
  */
 export const WATER_GLSL = `
+// An antialiased ribbon, its width in cells. Never sharpen a subpixel line into shimmer.
+float waterRibbon(float distance, float width, float px) {
+  return (1.0 - smoothstep(max(0.0, width - px), width + px, abs(distance)))
+    * min(1.0, width / max(px, 0.0001));
+}
+
 vec4 water(vec2 q, float d, float px, float near) {
-  bool flowing = uFlowing > 0.5;
-  float depth = smoothstep(0.05, 1.8, d);
-  float shallow = 1.0 - smoothstep(0.0, 1.2, d);
-  vec2 stretch = flowing ? vec2(1.5, 0.5) : vec2(1.0);
-  float pxS = px * max(stretch.x, stretch.y);
+  int octaves = uDetail > 1.5 ? 3 : uDetail > 0.5 ? 2 : 1;
+  vec2 stretch = uFlowing > 0.5 ? vec2(0.75, 0.375) : vec2(0.5, 0.5);
+  vec2 p = (q - uDriftA.xy) * stretch;
+  float body = fbm(p, TILE * stretch, octaves, px * 0.75);
+  float bend = gnoise((q - uDriftA.zw) * vec2(0.5, 1.0), TILE * vec2(0.5, 1.0));
+  float depth = smoothstep(0.08, 1.6, d);
+  float bank = 1.0 - smoothstep(0.08, 0.45, d);
+  float lap = 0.5 + 0.5 * sin(TAU * cycles(192.0) + body * 5.0);
 
-  vec2 w0 = (q - uDriftA.xy) * 0.5;
-  vec2 warp = vec2(fbm(w0, vec2(TILE * 0.5), 3, px * 0.5), fbm(w0 + vec2(5.0, 9.0), vec2(TILE * 0.5), 3, px * 0.5));
-  vec2 p = q + warp * 0.8;
-
-  float r1 = fbm((p - uDriftA.zw) * stretch * 1.5, TILE * stretch * 1.5, 4, pxS * 1.5);
-  float r2 = fbm((p - uDriftB.xy) * stretch * 3.0, TILE * stretch * 3.0, 3, pxS * 3.0);
-  float ripple = r1 * 0.65 + r2 * 0.35;
-
-  // Caustics: the edges of slowly turning cells, bent by the ripples, two scales drifting apart.
-  // On a channel the cells are drawn out along the flow.
-  vec2 drawnOut = flowing ? vec2(1.0, 0.5) : vec2(1.0);
-  vec2 c = p + vec2(r1, r2) * (flowing ? 0.45 : 0.7) - uDriftB.zw;
-  float causticShown = shown(0.6, px * 1.5) * mix(0.35, 1.0, near);
-  float caustic = 0.0;
-  if (causticShown > 0.0) {
-    float e1 = voronoiFast(c * drawnOut * 1.5, TILE * drawnOut * 1.5, 0.18).y;
-    float line1 = 1.0 - smoothstep(0.0, 0.09 + px * 3.0, e1);
-    caustic = line1 * line1 * 0.5;
-    // The finer net only where it can be told apart.
-    if (near > 0.0) {
-      float e2 = voronoiFast(c * drawnOut * 2.5 + vec2(r2, r1) * 0.6 + 11.0, TILE * drawnOut * 2.5, 0.22).y;
-      float line2 = (1.0 - smoothstep(0.0, 0.07 + px * 5.0, e2)) * near;
-      caustic += line2 * line2 * 0.3 + line1 * line2 * 0.7;
+  if (uEngraved > 0.5) {
+    // Level burin marks, like the static water hatch. Flow advects their envelopes, not
+    // their orientation: a vertical channel must not turn an engraving's lines vertical.
+    vec2 mapCell = vWorld / uCell;
+    float phase = mapCell.y * 4.0 + bend * 0.18 - cycles(96.0);
+    float lineDistance = (fract(phase + 0.5) - 0.5) / 4.0;
+    float envelope = smoothstep(-0.05, 0.24, body + bend * 0.4);
+    float width = (0.004 + 0.008 * depth) * envelope;
+    float stroke = waterRibbon(lineDistance, width, px) * envelope;
+    // The sounding's contour moves by only a fraction of its width, broken in places.
+    float shore = waterRibbon(d - (0.12 + lap * 0.018), 0.008, px)
+      * smoothstep(-0.15, 0.18, bend);
+    float open = 0.0;
+    if (uDetail > 0.5) {
+      open = waterRibbon(lineDistance + 0.025, 0.013, px)
+        * smoothstep(0.06, 0.22, -body) * 0.12;
     }
-    caustic *= causticShown;
+    float ink = (stroke * (0.19 + depth * 0.13) + shore * 0.13) * shown(0.12, px);
+    return vec4(uDeep * ink + uGlint * open * (1.0 - ink), ink + open * (1.0 - ink));
   }
 
-  // Foam lines carried downstream on a channel.
-  float foam = 0.0;
-  if (flowing) {
-    float streak = 1.0 - abs(gnoise((p - uDriftA.zw) * vec2(5.0, 0.75), vec2(TILE * 5.0, TILE * 0.75)) * 2.4);
-    foam = pow(clamp(streak, 0.0, 1.0), 6.0) * smoothstep(-0.1, 0.25, r1) * shown(0.2, px * 5.0) * (0.5 + 0.5 * shallow);
+  // Wide, softly bent reflections; no network or regular wave train over the painted floor.
+  float sheen = smoothstep(-0.02, 0.23, body + bend * 0.12);
+  float glint = 0.0;
+  if (uDetail > 0.5) {
+    float fine = gnoise((q - uDriftB.xy) * vec2(1.0, 2.0), TILE * vec2(1.0, 2.0));
+    float reflection = abs(bend + body * 0.65 + fine * 0.08);
+    glint = (1.0 - smoothstep(0.015, 0.065 + px, reflection))
+      * smoothstep(0.0, 0.2, body) * mix(0.35, 1.0, near);
   }
-
-  // A soft band breathing in from the shore.
-  float lap = (1.0 - smoothstep(0.0, 0.35, d)) * (0.5 + 0.5 * sin(TAU * (cycles(368.0) - d * 1.5) + r1 * 4.0));
-
-  float alpha = clamp(0.05 + depth * 0.3 - ripple * 0.14, 0.0, 0.55);
-  vec3 colour = uDeep * alpha;
-  colour += mix(uSurface, uGlint, 0.4) * smoothstep(0.0, 0.3, ripple) * 0.06;
-  colour += uGlint * caustic * mix(0.2, 0.09, depth);
-  colour += uGlint * foam * 0.22;
-  colour += uGlint * lap * 0.05;
-  return vec4(colour, alpha);
+  float shade = 0.025 + depth * 0.065 + smoothstep(-0.03, 0.24, -body) * 0.035;
+  float light = sheen * 0.20 + glint * 0.22 + bank * lap * 0.018;
+  // Ordinary source-over pigment: colour never exceeds alpha, including monochrome.
+  return vec4(uDeep * shade * (1.0 - light) + uGlint * light, shade * (1.0 - light) + light);
 }
 `;

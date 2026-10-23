@@ -13,15 +13,15 @@ it('keeps engraved acid in the map ink palette through a scene round trip', () =
   const read = liquidList(liquidsFromFile(JSON.parse(JSON.stringify(liquids))));
   const acid = read.filter(surface => surface.liquid === 'acid');
   expect(acid.length).toBeGreaterThan(0);
-  expect(acid[0]).toMatchObject({ acidArt: 'engraved', colors: { deep: style.colors.ink, glint: style.colors.ink } });
+  expect(acid[0]).toMatchObject({ art: 'engraved', colors: { deep: style.colors.ink, glint: style.colors.ink } });
 });
 
 it('reads old acid surfaces without inventing an art direction and ignores unknown directions', () => {
   const base = { liquid: 'acid', polygon: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 100 }] };
-  const surfaces = liquidList(liquidsFromFile({ old: base, bad: { ...base, acidArt: 'neon' }, ink: { ...base, acidArt: 'engraved' } }));
-  expect(surfaces[0]).not.toHaveProperty('acidArt');
-  expect(surfaces[1]).not.toHaveProperty('acidArt');
-  expect(surfaces[2]).toHaveProperty('acidArt', 'engraved');
+  const surfaces = liquidList(liquidsFromFile({ old: base, bad: { ...base, art: 'neon' }, ink: { ...base, art: 'engraved' } }));
+  expect(surfaces[0]).not.toHaveProperty('art');
+  expect(surfaces[1]).not.toHaveProperty('art');
+  expect(surfaces[2]).toHaveProperty('art', 'engraved');
 });
 
 it('keeps monochrome acid between the illustration’s two pigments', () => {

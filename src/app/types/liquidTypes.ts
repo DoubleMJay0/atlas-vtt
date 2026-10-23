@@ -29,8 +29,10 @@ export interface LiquidSurface extends OnOneLevel {
   holes?: { x: number; y: number }[][] | undefined;
   /** Where it flows, a unit vector in world space; absent, it stands still. */
   flow?: { x: number; y: number } | undefined;
-  /** Acid drawn in burin lines; absent, the painted treatment used by existing scenes. */
-  acidArt?: 'engraved' | undefined;
+  /** Drawn in the engraved looks' ink and hatching; absent, painted, as every scene was before. */
+  art?: 'engraved' | undefined;
+  /** The area light this lava glows with (`LightSource.area`), so the pieces a bridge cuts it into smoulder as one. */
+  lavaLight?: string | undefined;
   colors: LiquidColors;
 }
 

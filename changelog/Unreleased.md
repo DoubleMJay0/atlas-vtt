@@ -26,6 +26,8 @@
 - On Balanced and Saver lighting quality, a high-resolution screen draws the lit map at standard resolution, which takes the graphics less work; the edges of what players see never reach further
 - A device without a lighting quality chosen in the settings starts on one picked for its graphics: Balanced on graphics built into the processor, Saver where WebGL draws on the CPU
 - Acid on generated maps moves gently in the artwork’s own pigments, with slow bubbles and ink outlines in engraved looks.
+- Lava moves as slowly drifting crust and molten channels, with hatching on engraved maps and matching tones on Monochrome maps
+- Water on generated dungeon maps moves in the drawing’s own style: soft painted reflections or quiet engraved ripples, with gentler banks and cheaper shading at lower graphics quality.
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 
 ## Important changes

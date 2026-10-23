@@ -2,14 +2,13 @@ import { toGameUnits } from '../../grid/statedDistance';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import { MAX_AREA_CORNERS } from '../../lighting/lightArea';
 import type { LightEmission, LightSource } from '../../types/lightingTypes';
-import type { LiquidColors, LiquidKind, LiquidSurface } from '../../types/liquidTypes';
+import type { LiquidKind, LiquidSurface } from '../../types/liquidTypes';
 import type { CellPoint, DungeonColumn, DungeonTerrain } from '../model';
 import { intersectRings, subtractRings, unionRings } from '../render/clipShapes';
 import { shapePolygon, type Vec } from '../render/geometry';
-import { mixColours, paletteOf } from '../render/palette';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
-import { acidColours } from './acidArt';
+import { liquidColours } from './liquidColours';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
@@ -31,6 +30,7 @@ interface Liquid {
   /** Islands and what stands in it, in cells. */
   holes?: Vec[][];
   flow?: Vec;
+  lavaLight?: string;
 }
 
 /** The closed curve `traceSmoothClosed` draws through a pool's corners, as points `steps` to a corner. */
@@ -190,18 +190,6 @@ function centroid(ring: readonly Vec[]): Vec {
   return a === 0 ? ring[0]! : { x: cx / (3 * a), y: cy / (3 * a) };
 }
 
-/** The colours each liquid moves in, from the look's own: water in the look's water, lava and acid in theirs, toned down to the duotone of a monochrome map. */
-function liquidColours(style: DungeonStyle, view: DungeonView): Record<LiquidKind, LiquidColors> {
-  const palette = paletteOf(style, view);
-  const water: LiquidColors = { surface: palette.water, deep: mixColours(palette.water, palette.ink, 0.35), glint: mixColours(palette.water, '#ffffff', 0.75) };
-  if (view.monochrome) return { water, lava: water, acid: acidColours(style, view) };
-  return {
-    water,
-    lava: { surface: '#d6602a', deep: '#5c1a0c', glint: '#ffd27a' },
-    acid: acidColours(style, view),
-  };
-}
-
 /** How lava and acid glow, in cells: lava lights its room, acid only its shore. */
 const GLOWS: Readonly<Partial<Record<LiquidKind, { bright: number; dim: number; color: string; intensity: number }>>> = {
   lava: { bright: 1, dim: 4, color: '#ff8a3d', intensity: 1 },
@@ -227,16 +215,16 @@ export function floorLiquids(
   level?: string,
 ): FloorLiquids {
   const shown = dungeon.floor.terrain.filter(piece => dungeon.roomShapes.has(piece.room));
-  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(shown)];
+  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(shown)].map((piece, index) => ({ ...piece, ...(piece.liquid === 'lava' && { lavaLight: `light_${id}_${index + 1}` }) }));
   const colours = liquidColours(style, view);
   const { originCell, pxPerCell } = placement;
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   const squares = view.smallTiles ? 2 : 1;
   const units = (cells: number): number => toGameUnits({ value: cells * squares, unit: 'squares' }, { unitType: unit.unitType, ruleDistance: unit.ruleDistance });
   const liquids: Record<string, LiquidSurface> = {};
-  cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow }, index) => {
+  cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow, lavaLight }, index) => {
     const liquidId = `liquid_${id}_${index + 1}`;
-    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(liquid === 'acid' && style.direction === 'engraved' && { acidArt: 'engraved' }), ...(level && { level }) };
+    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(style.direction === 'engraved' && { art: 'engraved' }), ...(lavaLight && { lavaLight }), ...(level && { level }) };
   });
   // The glow comes from the whole of the lava, under its bridges and what stands in it too
   const lights: Record<string, LightSource> = {};
@@ -245,7 +233,7 @@ export function floorLiquids(
     if (!glow) return;
     const area = fitCorners(ring).map(world);
     const middle = centroid(area);
-    const emission: LightEmission = { bright: units(glow.bright), dim: units(glow.dim), color: glow.color, intensity: glow.intensity, animation: 'smoulder', kind: 'custom' };
+    const emission: LightEmission = { bright: units(glow.bright), dim: units(glow.dim), color: liquid === 'lava' && (style.direction === 'engraved' || view.monochrome) ? colours.lava.glint : glow.color, intensity: glow.intensity, animation: 'smoulder', kind: 'custom' };
     const lightId = `light_${id}_${index + 1}`;
     lights[lightId] = { id: lightId, kind: 'light', x: middle.x, y: middle.y, emission, area, ...(level && { levels: [level] }) };
   });
