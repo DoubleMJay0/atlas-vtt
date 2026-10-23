@@ -114,11 +114,11 @@ function softened(values: Float32Array, size: number): Float32Array {
   });
 }
 
-/** The small tile: the pores, a twice softened random grain (the backdrop's 1 %). */
+/** The small tile: the pores, a softened random grain (the backdrop's 1 %), one texel a map pixel. */
 export function poreTile(size: number, seed: number): Float32Array {
   const rng = rngFrom(seed);
   const raw = Float32Array.from({ length: size * size }, () => rng());
-  return normalised(softened(softened(raw, size), size)).map(v => v * 0.01);
+  return normalised(softened(raw, size)).map(v => v * 0.01);
 }
 
 /**

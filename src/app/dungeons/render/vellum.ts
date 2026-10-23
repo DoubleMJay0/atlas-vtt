@@ -7,7 +7,7 @@
 
 import { stream } from '../rng';
 import type { Canvas2D } from './geometry';
-import type { MapLayout } from './layoutSize';
+import { DEFAULT_PX_PER_CELL, type MapLayout } from './layoutSize';
 import { luminance, mixColours, parseHex, type Rgb } from './palette';
 import { cloudTile, deviationPixels, poreTile } from './vellumSkin';
 
@@ -18,9 +18,14 @@ interface TileSpec {
   cells: number;
 }
 
+/**
+ * The pores are made at a scene map's own resolution (`DEFAULT_PX_PER_CELL`), one texel a pixel, so
+ * the grain stays crisp where it matters; smaller pictures draw them reduced. The clouds are soft
+ * by nature and need far fewer texels.
+ */
 const TILES: readonly TileSpec[] = [
-  { kind: 'clouds', px: 512, cells: 32 },
-  { kind: 'pores', px: 256, cells: 3 },
+  { kind: 'clouds', px: 1024, cells: 32 },
+  { kind: 'pores', px: 3 * DEFAULT_PX_PER_CELL, cells: 3 },
 ];
 
 /** One skin for every dungeon; the seed only picks where on it a dungeon lies. */
