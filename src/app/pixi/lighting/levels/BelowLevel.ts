@@ -33,8 +33,6 @@ import { BelowFog } from './BelowFog';
 import { BelowStage } from './BelowStage';
 import { BelowTokens, type BelowTokenLook, type TokenArt } from './BelowTokens';
 import { levelRoof, Roof, type RoofHost } from './Roof';
-import { LevelShading, type ShadingPixels } from './LevelShading';
-import { levelShading } from '../../../levels/levelShading';
 
 const DEFAULT_CELL_SIZE = 70;
 const NO_PLACES: readonly Point[] = [];
@@ -68,8 +66,6 @@ export interface BelowLevelDeps {
   art: TokenArt;
   /** What the level's roof is made with. */
   roofs: RoofHost;
-  /** Reads the level's relief and shade (`LevelShading`); without it the level is drawn without them. */
-  readShading?: (path: string) => Promise<ShadingPixels>;
   /** How long a piece of the roof takes to fade. */
   fadeMs: number;
   requestRender: () => void;
@@ -102,8 +98,6 @@ export class BelowLevel {
   private readonly tokens: BelowTokens;
   private readonly fog: BelowFog;
   private readonly roof: Roof;
-  /** The level's relief, which its lights cast shadows from, and its shade over its map. */
-  private readonly shading: LevelShading | null;
   private readonly builder = new SceneModelBuilder();
   private readonly spots = new SceneSpots();
   private readonly gmSpots = new SceneSpots(GM_SIGHT_POLICY);
@@ -150,10 +144,7 @@ export class BelowLevel {
       edits: false,
     });
     this.roof = new Roof({ host: deps.roofs, requestRender: this.changed, onReady: deps.onReady, fadeMs: deps.fadeMs });
-    const read = deps.readShading;
-    this.shading = read ? new LevelShading({ gpu: true, read, requestRender: this.changed, onRead: deps.onReady, onReliefChange: deps.onReady }) : null;
-    if (this.shading) this.engine.setShade(this.shading.layer);
-    this.stage = new BelowStage({ map: deps.image.layer, shade: this.shading?.layer.view, tokens: this.tokens.view, lighting: this.engine.layer, roof: this.roof.layer.view, fog: this.fog.view });
+    this.stage = new BelowStage({ map: deps.image.layer, tokens: this.tokens.view, lighting: this.engine.layer, roof: this.roof.layer.view, fog: this.fog.view });
   }
 
   get id(): string {
@@ -205,8 +196,6 @@ export class BelowLevel {
     const seen = { ...state, viewedLevel: id };
     this.memory.sync(bounds, exploredMaskOf(state, id), id);
     const { model, rebuilt } = this.builder.update(seen, bounds, measurement, rules);
-    const size = this.deps.image.imageSize;
-    this.shading?.follow(levelShading(state, id), size && { size, drawn: this.deps.image.mapStretch, placed: levelImagePlacement(state, id) });
     this.model = model;
     if (rebuilt && model.explored) this.memory.record(model.explored);
     const own = model.gmSight ?? model.sight;
@@ -217,7 +206,7 @@ export class BelowLevel {
     this.rule = { sight: player, ambient: model.ambient, reaches: model.reaches };
     this.engine.setEnabled(true);
     this.engine.update({
-      bounds, walls: model.walls, lights: model.lights, albedo: null, zones: model.zones, relief: this.shading?.relief() ?? null,
+      bounds, walls: model.walls, lights: model.lights, albedo: null, zones: model.zones,
       sight: gm, spots: gmSpots, ...(gm !== player && { playerSight: player, playerSpots: spots }),
       sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, cellSize: state.grid?.size ?? DEFAULT_CELL_SIZE, ...sceneLook(state.lighting),
     });
@@ -303,9 +292,7 @@ export class BelowLevel {
     if (flush) this.deps.guard(() => this.memory.beforeMapUnload());
     this.stage.release();
     this.roof.destroy();
-    // The engine lets go of the shade's light and of the relief before they go.
     this.engine.destroy();
-    this.shading?.destroy();
     this.memory.destroy();
     this.tokens.destroy();
     this.fog.destroy();

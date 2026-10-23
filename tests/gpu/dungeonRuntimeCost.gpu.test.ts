@@ -1,10 +1,9 @@
 /// <reference types="vite/client" />
 import '../setup/obsidianDom';
-import { Matrix, Texture, type TextureSource, type WebGLRenderer } from 'pixi.js';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { Texture, type TextureSource, type WebGLRenderer } from 'pixi.js';
+import { describe, expect, it, vi } from 'vitest';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import { mapLayout, suggestedPxPerCell } from '../../src/app/dungeons/render/layoutSize';
-import { renderRelief, type RasterImage } from '../../src/app/dungeons/render/shading/reliefImage';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { dungeonScene } from '../../src/app/dungeons/scene/toScene';
 import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
@@ -12,8 +11,6 @@ import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { LEVEL_HEIGHT } from '../../src/app/levels/levelEdits';
 import { holdTokens } from '../../src/app/lighting/sightOnDrop';
 import { LIGHTING_QUALITY, type LightingQualityLevel } from '../../src/app/lighting/lightingQuality';
-import { ReliefMap } from '../../src/app/pixi/lighting/engine/ReliefMap';
-import { ShadeLayer } from '../../src/app/pixi/lighting/engine/ShadeLayer';
 import { createViewLiquids } from '../../src/app/pixi/liquids/viewLiquids';
 import type { TokenEntity } from '../../src/app/types';
 import type { LightEmission, LightSource } from '../../src/app/types/lightingTypes';
@@ -26,9 +23,9 @@ vi.mock('events', async () => import('eventemitter3'));
 /**
  * What a generated dungeon of three floors costs at runtime, on a Retina-sized canvas, as Fabian
  * plays one: the entry floor viewed, the floors below seen through its openings, lava, water and
- * plants, relief on every floor, torches in the rooms and a vision token. Printed, nothing timed is
+ * plants, torches in the rooms and a vision token. Printed, nothing timed is
  * asserted: `VITE_QUALITY` picks a level, `VITE_PROFILE=idle|drag|torch` prints a CPU profile, `VITE_STEADY` keeps the
- * torches from flickering and `VITE_NO_RELIEF` leaves the viewed floor's relief out.
+ * torches from flickering.
  */
 
 const [WIDTH, HEIGHT, RESOLUTION] = [1440, 900, 2];
@@ -47,11 +44,9 @@ interface Built {
   scene: NonNullable<ReturnType<typeof dungeonScene>>;
   levels: SceneLevel[];
   maps: Record<string, FakeMap>;
-  reliefs: Map<string, RasterImage>;
   width: number;
   height: number;
   pxPerCell: number;
-  relief: ReliefMap;
   viewed: string;
   /** Where the camera looks: the entry floor's opening. */
   look: { x: number; y: number };
@@ -73,16 +68,10 @@ function dungeon(): Built {
   const scene = dungeonScene(model, style, DEFAULT_VIEW, { originCell: layout.originCell, pxPerCell }, image, { unitType: 'ft', ruleDistance: 5 })!;
   const ids = scene.levelIds!;
   const maps: Record<string, FakeMap> = {};
-  const reliefs = new Map<string, RasterImage>();
   const levels = ids.map((id, floor): SceneLevel => {
     maps[`floor${floor}.png`] = { texture: Texture.WHITE, width: image.width, height: image.height };
-    reliefs.set(`floor${floor}-relief.png`, renderRelief(model, style, DEFAULT_VIEW, floor)!);
-    return { id, name: `Floor ${floor}`, elevation: { bottom: -floor * LEVEL_HEIGHT, top: (1 - floor) * LEVEL_HEIGHT }, background: `floor${floor}.png`, relief: `floor${floor}-relief.png` };
+    return { id, name: `Floor ${floor}`, elevation: { bottom: -floor * LEVEL_HEIGHT, top: (1 - floor) * LEVEL_HEIGHT }, background: `floor${floor}.png` };
   }).reverse();
-  const own = reliefs.get('floor0-relief.png')!;
-  const heights = new Uint8Array(own.width * own.height);
-  for (let k = 0; k < heights.length; k++) heights[k] = own.data[k * 4]!;
-  const relief = new ReliefMap({ width: own.width, height: own.height, heights }, new Matrix(image.width, 0, 0, image.height, 0, 0));
   const opening = Object.values(scene.scene.levelSurfaces ?? {}).find((surface) => surface.level === ids[0] && surface.open)!;
   const look = middle(opening.polygon);
   const world = (r: { x: number; y: number; w: number; h: number }): { x: number; y: number } => ({ x: (r.x + r.w / 2 + 0.3 - layout.originCell.x) * pxPerCell, y: (r.y + r.h / 2 + 0.3 - layout.originCell.y) * pxPerCell });
@@ -91,7 +80,7 @@ function dungeon(): Built {
     .sort((a, b) => Math.hypot(world(a).x - look.x, world(a).y - look.y) - Math.hypot(world(b).x - look.x, world(b).y - look.y));
   const hero = world(rooms[0]!);
   const torches = Object.fromEntries(rooms.slice(1, 7).map((room, i): [string, LightSource] => [`torch${i}`, { id: `torch${i}`, kind: 'light', levels: [ids[0]!], ...world(room), emission: TORCH }]));
-  return { scene, levels, maps, reliefs, ...image, pxPerCell, relief, viewed: ids[0]!, look, hero, torches };
+  return { scene, levels, maps, ...image, pxPerCell, viewed: ids[0]!, look, hero, torches };
 }
 
 interface Measured { cpu: number; cpuMax: number; frame: number }
@@ -103,19 +92,12 @@ interface Opened { view: LevelsView; frame: () => void; counts: Counts; gl: WebG
 
 describe('the cost of a generated dungeon of three floors at runtime (printed)', () => {
   const built = dungeon();
-  afterAll(() => built.relief.destroy());
 
   /** The view of the entry floor; with `openings` false the floors below are never seen (no opening on any floor). */
   async function open(level: LightingQualityLevel, openings: boolean): Promise<Opened> {
-    const shade = new ShadeLayer(true);
     const view = await openLevelsView({
       map: Math.max(built.width, built.height), pane: WIDTH, paneHeight: HEIGHT, resolution: RESOLUTION,
       levels: built.levels, maps: built.maps, viewedLevel: built.viewed, quality: LIGHTING_QUALITY[level],
-      shading: { relief: () => (import.meta.env.VITE_NO_RELIEF ? null : built.relief.relief), layer: shade },
-      readShading: (path) => {
-        const pixels = built.reliefs.get(path);
-        return pixels ? Promise.resolve({ ...pixels, hatch: null }) : Promise.reject(new Error(`No image ${path}`));
-      },
     });
     const { scene } = built;
     const hero = { id: 'hero', kind: 'token', imagePath: '', x: built.hero.x, y: built.hero.y, level: built.viewed, vision: { enabled: true } } as TokenEntity;
@@ -154,7 +136,7 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
     return {
       view, gl: renderer.gl, counts,
       frame: () => { view.app.ticker.update(time = Math.max(time + 16, performance.now())); },
-      destroy: () => { liquids.destroy(); view.dispose(); shade.destroy(); },
+      destroy: () => { liquids.destroy(); view.dispose(); },
     };
   }
 
@@ -278,7 +260,7 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
         console.info(`${name} profile, self:\n${taken.self.map(([n, ms]) => `${ms}\t${n}`).join('\n')}\ntotal:\n${taken.total.map(([n, ms]) => `${ms}\t${n}`).join('\n')}`);
       };
       await profile('drag');
-      // The hero takes up a torch: its light, reflection and relief shadows follow every step.
+      // The hero takes up a torch: its light and reflection follow every step.
       view.store.getState().updateTokens([{ id: 'hero', changes: { light: TORCH } }]);
       await measure(ctx, 10, step);
       const torchDrag = await measure(ctx, 40, step);

@@ -5,7 +5,6 @@ import { mapImageSourceFor } from '../../MapLoader';
 import { MISSING_ASSET_SIZE } from '../../services/AssetValidationService';
 import type { LevelArt } from '../../levels/artRaster';
 import { MapImage } from '../mapImage/MapImage';
-import { readShadingImage } from '../shading/shadingImages';
 import { MapImageService } from '../mapImage/MapImageService';
 import type { MapImageViewport } from '../mapImage/mapImageTypes';
 import type { PixelRect } from '../mapImage/pyramid';
@@ -121,6 +120,5 @@ export function createBelowLevelsHost({ obsApp, app, viewport, viewedFog, viewed
     viewedFog,
     viewedRoof,
     placeEraser,
-    readShading: (path) => readShadingImage(obsApp, path),
   };
 }

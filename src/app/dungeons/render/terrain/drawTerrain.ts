@@ -2,7 +2,7 @@ import type { DungeonTerrain, TerrainKind } from '../../model';
 import type { Hand } from '../art/hand';
 import { drawBridges } from './bridges';
 import { drawAltar, drawCrates, drawLowWall, drawRubbleHeap, drawSarcophagus, drawTable } from './cover';
-import { drawBrokenFloor, drawMosaic, drawPews, drawScatter, SCATTER } from './ground';
+import { drawBrokenFloor, drawMosaic, drawPews, drawScatter } from './ground';
 import { drawChannel, drawDeepWater, drawPit } from './hazards';
 import { drawHoles } from './holes';
 import { drawPool, drawPortalRing } from './interest';
@@ -26,8 +26,8 @@ export interface TerrainColours {
 
 const GROUND: Partial<Record<TerrainKind, Draw>> = {
   pews: drawPews,
-  'rubble-field': (hand, piece) => drawScatter(hand, piece, SCATTER['rubble-field']!.size, SCATTER['rubble-field']!.perCell),
-  'chasm-floor': (hand, piece) => drawScatter(hand, piece, SCATTER['chasm-floor']!.size, SCATTER['chasm-floor']!.perCell),
+  'rubble-field': (hand, piece) => drawScatter(hand, piece, 0.05, 15),
+  'chasm-floor': (hand, piece) => drawScatter(hand, piece, 0.075, 9),
   'broken-floor': drawBrokenFloor,
   mosaic: drawMosaic,
   pit: drawPit,

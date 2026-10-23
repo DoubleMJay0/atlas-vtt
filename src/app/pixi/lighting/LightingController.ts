@@ -45,8 +45,6 @@ import { glideWayIsClear } from '../../lighting/glideWay';
 import type { ShownPlaces } from '../../lighting/shownPlaces';
 import { followShownPlaces } from '../../lighting/shownTokens';
 import { mapTokens } from '../../tokens/offMap';
-import type { EngineRelief } from './engine/ReliefMap';
-import type { ShadeSink } from './engine/ShadeLayer';
 
 export interface LightingControllerDeps {
   viewport: Viewport;
@@ -74,8 +72,6 @@ export interface LightingControllerDeps {
   roofs?: { readonly modeLayer: HideableLayer; covers(point: Point): boolean };
   /** How long a piece of a roof below takes to fade; unset, the window's motion decides. */
   roofFadeMs?: number;
-  /** The viewed level's relief and shade (`ViewShading`): the engine casts its lights' shadows from the one and lights the other. */
-  shading?: { relief(): EngineRelief | null; readonly layer: ShadeSink };
 }
 
 /**
@@ -136,7 +132,6 @@ export class LightingController {
       scene,
       ...(deps.below && { below: deps.below }),
       ...(deps.roofFadeMs !== undefined && { roofFadeMs: deps.roofFadeMs }),
-      ...(deps.shading && { relief: () => deps.shading!.relief(), shade: deps.shading.layer }),
     });
     this.sightAids = new GmSightAids({
       viewport, store: scene, measurement, bounds: deps.bounds,

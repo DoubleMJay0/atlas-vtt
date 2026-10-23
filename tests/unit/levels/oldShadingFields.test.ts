@@ -6,8 +6,6 @@ import { fakeMapRenderer } from '../../helpers/fakeMapRenderer';
 import { createViewAtlasStore, type ViewAtlasStore } from '../../../src/app/storeFactory';
 import { MapService } from '../../../src/app/services/MapService';
 import type { RendererService } from '../../../src/app/services/RendererService';
-import { levelShading } from '../../../src/app/levels/levelShading';
-import { viewedLevelId } from '../../../src/app/levels/sceneLevels';
 
 const ONE = 'maps/crypt.atlasmap';
 const FLOORS = 'maps/tower.atlasmap';
@@ -41,7 +39,7 @@ function setup(): Harness {
   });
   app.vault.getFileByPath = app.vault.getAbstractFileByPath;
   app.vault.getFolderByPath = app.vault.getAbstractFileByPath;
-  const store = createViewAtlasStore(app, 'scene-shading-persistence-test');
+  const store = createViewAtlasStore(app, 'old-shading-fields-test');
   const eventBus = new EventEmitter();
   eventBus.on('wait-for-tokens-loaded', (done: () => void) => done());
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -60,38 +58,26 @@ const saved = (h: Harness, path: string): Record<string, unknown> => (JSON.parse
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-describe('a scene\'s relief and shade on disk', () => {
-  it('come back from a scene of one map, and are saved again as they were', async () => {
+/** Scenes a build with height shadows (2026-10-23) generated name a relief and a shade, which Atlas no longer reads. */
+describe('a scene that names a relief and a shade', () => {
+  it('of one map loads with its map and saves without them', async () => {
     const h = setup();
     await h.service.loadMap(h.rendererService, ONE);
-    expect(levelShading(h.store.getState(), viewedLevelId(h.store.getState()))).toEqual({ relief: 'maps/crypt relief.png', shade: 'maps/crypt shade.png' });
+    expect(h.store.getState()).toMatchObject({ mapLoaded: true, mapPath: ONE, background: 'maps/ground.webp' });
 
     h.store.getState().addToken({ x: 5, y: 5, imagePath: 'tokens/rogue.png' });
     await save(h.store);
-    expect(saved(h, ONE)).toMatchObject({ relief: 'maps/crypt relief.png', shade: 'maps/crypt shade.png' });
+    expect(saved(h, ONE)).not.toHaveProperty('relief');
+    expect(saved(h, ONE)).not.toHaveProperty('shade');
+    expect(Object.keys(saved(h, ONE).objects as Record<string, unknown>)).toContain('tokens');
   });
 
-  it('come back on each level of a scene of several, and are saved on their levels', async () => {
+  it('of several floors loads every level with its map', async () => {
     const h = setup();
     await h.service.loadMap(h.rendererService, FLOORS, { centerX: 0, centerY: 0, scale: 1, level: 'upper' });
-    expect(levelShading(h.store.getState(), viewedLevelId(h.store.getState()))).toEqual({ relief: 'maps/upper relief.png', shade: null });
-    expect(levelShading(h.store.getState(), 'ground').shade).toBe('maps/ground shade.png');
-
-    h.store.getState().addToken({ x: 5, y: 5, imagePath: 'tokens/rogue.png' });
-    await save(h.store);
-    expect(saved(h, FLOORS).levels).toEqual(LEVELS);
-    expect(saved(h, FLOORS)).not.toHaveProperty('relief');
-  });
-
-  it('are none in the next scene without them, which keeps its file as it was', async () => {
-    const h = setup();
-    await h.service.loadMap(h.rendererService, ONE);
-    await h.service.loadMap(h.rendererService, PLAIN);
-    expect(levelShading(h.store.getState(), null)).toEqual({ relief: null, shade: null });
-
-    h.store.getState().addToken({ x: 5, y: 5, imagePath: 'tokens/rogue.png' });
-    await save(h.store);
-    expect(saved(h, PLAIN)).not.toHaveProperty('relief');
-    expect(saved(h, PLAIN)).not.toHaveProperty('shade');
+    const state = h.store.getState();
+    expect(state.mapLoaded).toBe(true);
+    expect(state.viewedLevel).toBe('upper');
+    expect(state.levels?.map((level) => [level.id, level.background])).toEqual([['ground', 'maps/ground.webp'], ['upper', 'maps/upper.webp']]);
   });
 });

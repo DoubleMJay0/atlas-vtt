@@ -20,7 +20,6 @@ import { RulesShare } from './RulesShare.ts';
 import { TOKEN_POLL_MS, TokenShare } from './TokenShare.ts';
 import { levelObjects } from '../../levels/levelObjects';
 import { levelBackground } from '../../levels/levelEdits';
-import { levelShading } from '../../levels/levelShading';
 import { viewedLevelId } from '../../levels/sceneLevels';
 
 export interface FloorSharePorts extends SceneSharePorts {
@@ -30,7 +29,7 @@ export interface FloorSharePorts extends SceneSharePorts {
 
 /**
  * What the players on one floor see of the shared scene (the whole scene where it has one floor): the
- * floor's map image and shade and the tokens they see, sent whole to them when it changes, to a player
+ * floor's map image and the tokens they see, sent whole to them when it changes, to a player
  * who joins, and after a reconnect. Its store shows the floor (`FloorStore`), so every share it holds
  * reads that floor's objects. Nothing goes out while the scene loads; a scene this step cannot share is
  * withdrawn. Assets go only to a player whose current picture holds them.
@@ -39,7 +38,7 @@ export class FloorShare {
   private readonly store: SceneStore;
   private readonly ports: FloorSharePorts;
   private scene: SharedScene | null = null;
-  private images: Pick<FloorImages, 'map' | 'shade'> = { map: null, shade: null };
+  private images: Pick<FloorImages, 'map'> = { map: null };
   /** The floor map's size, by which players' moves are kept on it; null when it is unknown. */
   private mapSize: MapSize | null = null;
   /** The map path, floor and images of the scene sent or being read: a change starts a new scene. */
@@ -101,7 +100,6 @@ export class FloorShare {
     this.dragRulers = new PlayerDragRulers((drags) => ports.showPlayerDrags?.(drags));
     this.assets = new AssetAnswers({ send: (body, to) => ports.send(body, to), now: () => ports.now(), readImage: (path) => ports.readImage(path), scaleImage: ports.scaleImage }, {
       map: () => this.images.map,
-      shade: () => this.images.shade,
       explored: (hash) => this.inputs.exploredBytes(hash),
       artPath: (hash) => this.artPath(hash),
     });
@@ -183,7 +181,7 @@ export class FloorShare {
 
   /**
    * A player's message on this floor: a drag, drop or cancelled drag of their own token, a laser,
-   * measurement or cursor, a resync, or an asset request, answered only for the map, its shade, the
+   * measurement or cursor, a resync, or an asset request, answered only for the map, the
    * explored memory or a token's artwork of the current picture.
    */
   receive(from: string, message: PlayerMessage): void {
@@ -238,9 +236,8 @@ export class FloorShare {
     // The map of the floor shown, whose objects the shares send (`levelObjects`)
     const level = viewedLevelId(state);
     const background = levelBackground(state, level);
-    const { shade } = levelShading(state, level);
     const floor = this.ports.floor?.();
-    const key = JSON.stringify([state.mapPath, level, background, shade, lit, floor ?? null]);
+    const key = JSON.stringify([state.mapPath, level, background, lit, floor ?? null]);
     if (key === this.key) {
       this.marks.update();
       this.tokens.update();
@@ -253,20 +250,20 @@ export class FloorShare {
     this.tokens.setScene(null);
     this.inputs.setScene(null);
     this.layers.setScene(null);
-    const built = await readFloorImages((path) => this.ports.readImage(path), background, shade);
+    const built = await readFloorImages((path) => this.ports.readImage(path), background);
     if (this.key !== key) return;
     if (built === null) {
       this.ports.notice('Atlas Online cannot send this scene\'s map image.');
       this.publish(null, null);
       return;
     }
-    const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }), ...(built.shade !== null && { shade: built.shade.ref }) };
+    const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }) };
     this.publish(scene, built);
   }
 
   private publish(scene: SharedScene | null, built: FloorImages | null): void {
     this.scene = scene;
-    this.images = { map: built?.map ?? null, shade: built?.shade ?? null };
+    this.images = { map: built?.map ?? null };
     this.mapSize = built?.size ?? null;
     this.moves.sceneChanged();
     this.dragRulers.clear();

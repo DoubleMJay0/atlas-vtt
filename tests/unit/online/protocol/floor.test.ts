@@ -6,19 +6,15 @@ const MAP = { hash: HASH, size: 10, mime: 'image/webp' };
 const scene = (extra: Record<string, unknown>): unknown => ({ t: 'scene', scene: { id: 's1', map: MAP, lit: true, ...extra } });
 
 describe('a floor of a scene with several', () => {
-  it('names its floor and shade, which an older GM leaves out', () => {
+  it('names its floor, which an older GM leaves out', () => {
     expect(parseGmMessage(scene({}))).toEqual({ t: 'scene', scene: { id: 's1', map: MAP, lit: true } });
     const floor = { group: 'g1', level: 2, name: 'Tower top' };
-    const shade = { hash: 'b'.repeat(64), size: 5, mime: 'image/png' };
-    expect(parseGmMessage(scene({ floor, shade }))).toEqual({ t: 'scene', scene: { id: 's1', map: MAP, lit: true, floor, shade } });
+    expect(parseGmMessage(scene({ floor }))).toEqual({ t: 'scene', scene: { id: 's1', map: MAP, lit: true, floor } });
   });
 
-  it('leaves out a malformed floor or shade and still shows the scene', () => {
+  it('leaves out a malformed floor and still shows the scene', () => {
     for (const floor of [null, 'upper', { group: '', level: 0, name: 'A' }, { group: 'g', level: -1, name: 'A' }, { group: 'g', level: 1.5, name: 'A' }, { group: 'g', level: 0, name: '' }, { group: 'g', level: 0, name: 'x'.repeat(81) }]) {
       expect(parseGmMessage(scene({ floor }))).toEqual({ t: 'scene', scene: { id: 's1', map: MAP, lit: true } });
-    }
-    for (const shade of [null, { hash: 'b'.repeat(64), size: 5, mime: 'image/jpeg' }, { hash: 'nope', size: 5, mime: 'image/png' }]) {
-      expect(parseGmMessage(scene({ shade }))).toEqual({ t: 'scene', scene: { id: 's1', map: MAP, lit: true } });
     }
   });
 

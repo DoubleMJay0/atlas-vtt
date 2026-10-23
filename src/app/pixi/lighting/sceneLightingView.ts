@@ -40,8 +40,6 @@ export interface SceneLightingView {
   /** The ambient light the CPU checks tokens against. */
   ambientLight(): AmbientLight;
   refreshBounds(): void;
-  /** The viewed level's relief changed: the view takes the new one at once; none where the view casts no shadows from heights (the fallback). */
-  followShading?(): void;
   /** Forgets all the scene remembers: an undo step where the memory can be edited. */
   resetExplored(): void;
   /**

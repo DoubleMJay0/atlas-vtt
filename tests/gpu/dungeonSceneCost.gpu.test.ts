@@ -10,7 +10,6 @@ import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleC
 import type { DungeonTag } from '../../src/app/dungeons/tags';
 import { DungeonWorkerClient } from '../../src/app/dungeons/worker/DungeonWorkerClient';
 import DungeonWorker from '../../src/app/dungeons/worker/dungeonWorker?worker&inline';
-import { DungeonHelpers } from '../../src/app/dungeons/worker/dungeonHelpers';
 import { AssetService } from '../../src/app/services/AssetService';
 import { AssetThumbnailService, THUMBNAIL_SPEC } from '../../src/app/services/AssetThumbnailService';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
@@ -52,13 +51,12 @@ describe.skipIf(!run)('what creating a dungeon scene costs', () => {
       const observer = new PerformanceObserver((list) => { for (const entry of list.getEntries()) longest = Math.max(longest, entry.duration); });
       observer.observe({ type: 'longtask', buffered: false });
       const sizes: number[] = [];
-      const helpers = new DungeonHelpers(3);
       const deps: DungeonSceneDeps = {
         app: vault.app,
         assetService,
         render: async (job) => {
           const start = at();
-          const result = await (job.output.kind === 'shading' && job.output.floor ? helpers.render(job) : client.render(job));
+          const result = await client.render(job);
           events.push(`${job.output.kind}${'floor' in job.output && job.output.floor ? ` f${job.output.floor}` : ''} ${start}–${at()}`);
           return result;
         },
@@ -75,7 +73,6 @@ describe.skipIf(!run)('what creating a dungeon scene costs', () => {
       const model = generateDungeon(request);
       const result = await createDungeonSceneWith(deps, { name: `Perf Gen ${name}`, request, model, style: dungeonStyle(styleId), view: DEFAULT_VIEW, collectionId: 'Perf' });
       const total = at();
-      helpers.dispose();
       observer.disconnect();
       if (!result.ok) throw new Error(result.problem);
       rows.push(`${name}: total ${total} ms, longest main-thread task ${Math.round(longest)} ms, maps ${sizes.map((s) => (s / 1e6).toFixed(1)).join(' / ')} MB\n  ${events.join('\n  ')}`);

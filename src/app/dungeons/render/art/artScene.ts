@@ -13,12 +13,6 @@ export interface ArtFrame {
   widthPx: number;
   heightPx: number;
   pxPerCell: number;
-  /**
-   * The pixels per cell whose detail the picture takes (its soft fields, the finest hatch it cuts):
-   * a picture drawn smaller than the map it stands for (`renderShade`) keeps the map's shapes.
-   * `pxPerCell` where unset.
-   */
-  detailPxPerCell?: number;
 }
 
 /**
@@ -70,7 +64,7 @@ export function buildArtScene(env: RenderEnv, frame: ArtFrame, stands: readonly 
   const { dungeon } = env;
   const floors = dungeon.floors;
   const floorRings = unionRings(floors.map(shape => shapePolygon(shape, 0, frame.pxPerCell)));
-  const res = fieldResolution(frame.detailPxPerCell ?? frame.pxPerCell);
+  const res = fieldResolution(frame.pxPerCell);
   const b = viewBounds(frame, 1);
   const grid = gridOver(b.minX, b.minY, b.maxX, b.maxY, res);
   // Distance is piecewise smooth: half the samples, read bilinearly, are as good and twice as quick.
@@ -78,7 +72,7 @@ export function buildArtScene(env: RenderEnv, frame: ArtFrame, stands: readonly 
   const sdf = fieldOf(sdfGrid, (x, y) => dungeon.field.distance(x, y));
   const pockets = narrowPockets(dungeon, env.style.surround.reach).map(p => p.ring);
   const relief = rasterRelief(grid, floors, pockets, stands, (x, y) => dungeon.field.distance(x, y) > 0);
-  const shadow = env.view.shadow && env.castShadows ? castShadow(grid, relief.heights) : new Float32Array(relief.heights.length);
+  const shadow = env.view.shadow ? castShadow(grid, relief.heights) : new Float32Array(relief.heights.length);
   const occlusion = occlusionOf(grid, relief.heights);
   return {
     env,

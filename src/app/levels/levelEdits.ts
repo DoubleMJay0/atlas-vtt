@@ -4,7 +4,6 @@ import { levelsWithBackground } from './levelFile';
 import { objectsAfterLevelEdit, type MembershipEdit } from './levelMembershipEdits';
 import { firstLevelId } from './sceneLevels';
 import type { LevelAlignments } from './levelAlignment';
-import { shadingFields } from './levelShading';
 
 /** What an edit of the levels reads and writes of a scene. */
 export type LevelScene = Pick<ViewState, 'levels' | 'background' | 'objects' | 'exploredMask' | 'exploredMasks' | 'levelAlignments' | 'grid'>;
@@ -28,11 +27,6 @@ export function levelBackground(scene: Pick<ViewState, 'levels' | 'background'>,
 export function levelForeground(scene: { levels?: readonly SceneLevel[] | undefined }, id: string | null): string | null {
   const foreground = id === null ? null : scene.levels?.find((level) => level.id === id)?.foreground;
   return typeof foreground === 'string' && foreground !== '' ? foreground : null;
-}
-
-/** The level a scene without levels is made into, named `firstName`: everything the scene had, its map and its shading. */
-function firstLevelOf(scene: Pick<ViewState, 'background' | 'relief' | 'shade'>, firstName: string): SceneLevel {
-  return { id: newLevelId(), name: firstName, elevation: { bottom: 0, top: LEVEL_HEIGHT }, background: scene.background, ...shadingFields(scene) };
 }
 
 /** The explored memory of every level, by id; the first level's is `exploredMask`. */
@@ -72,8 +66,8 @@ function withLevels(scene: LevelScene, levels: SceneLevel[], objects: ViewState[
  * The scene's levels with `level` added on top. A scene without levels gets its first level too,
  * named `firstName`, which holds everything the scene had.
  */
-export function withLevelAdded(scene: Pick<ViewState, 'levels' | 'background' | 'relief' | 'shade'>, added: { name: string; background: string | null }, firstName: string): SceneLevel[] {
-  const levels = scene.levels?.length ? scene.levels : [firstLevelOf(scene, firstName)];
+export function withLevelAdded(scene: Pick<ViewState, 'levels' | 'background'>, added: { name: string; background: string | null }, firstName: string): SceneLevel[] {
+  const levels = scene.levels?.length ? scene.levels : [{ id: newLevelId(), name: firstName, elevation: { bottom: 0, top: LEVEL_HEIGHT }, background: scene.background }];
   const bottom = Math.max(...levels.map((level) => level.elevation.top));
   return [...levels, { id: newLevelId(), name: added.name, elevation: { bottom, top: bottom + LEVEL_HEIGHT }, background: added.background }];
 }
@@ -95,8 +89,8 @@ export function withLevelChanged(levels: readonly SceneLevel[], id: string, chan
  * made, named `firstName`, to carry it) set to `foreground`; null removes it, written as no field.
  * Null where nothing changes (no roof removed from a scene without levels).
  */
-export function withLevelRoof(scene: Pick<ViewState, 'levels' | 'background' | 'relief' | 'shade'>, id: string | null, foreground: string | null, firstName: string): SceneLevel[] | null {
-  const levels = scene.levels?.length ? scene.levels : foreground ? [firstLevelOf(scene, firstName)] : null;
+export function withLevelRoof(scene: Pick<ViewState, 'levels' | 'background'>, id: string | null, foreground: string | null, firstName: string): SceneLevel[] | null {
+  const levels = scene.levels?.length ? scene.levels : foreground ? [{ id: newLevelId(), name: firstName, elevation: { bottom: 0, top: LEVEL_HEIGHT }, background: scene.background }] : null;
   if (!levels) return null;
   const target = id ?? levels[0]!.id;
   return levels.map((level) => {

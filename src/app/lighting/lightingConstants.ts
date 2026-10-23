@@ -141,26 +141,6 @@ export const REFLECTION = {
   blur: 0.1,
 } as const;
 
-/**
- * Shadows from heights (a level's relief, `EngineRelief`): heights are shares of a wall's (the
- * relief's 1). A placed or carried light stands `lightHeight` above what it stands on (a torch
- * held, a lamp on a post); an area light glows `areaHeight` above its surface (lava), so whatever
- * stands near it throws a long low shadow. A point of the floor is in an object's shadow where the
- * straight line from its own height to the light passes under something standing higher than both
- * that line and the point itself: what stands never shades its own top, which stays lit, and only
- * what is taller shades a top. Each shadow is soft by `flame` of the light's flame, from `rays`
- * rays across it. `bias` is the height a point must stand above the line to count, against the
- * relief's steps; a ray takes at most `steps` steps (beyond, nothing shades it).
- */
-export const RELIEF = {
-  lightHeight: 0.5,
-  areaHeight: 0.04,
-  flame: 0.55,
-  rays: 8,
-  bias: 0.02,
-  steps: 384,
-} as const;
-
 export const BOUNCE = {
   probe: 16,
   interval: 16,

@@ -12,13 +12,13 @@ import { computeVisibility, pointInPolygon } from '../../../src/app/vision/visib
 import { wallList } from '../../../src/app/vision/wallList';
 
 /**
- * A column's outline stops sight (cover) but is no hole: a token that sees a column's faces sees
- * its top, the way the players' picture draws it, and what stands right behind the column stays
- * hidden from it. Before, the outline was a closed wall from both sides and every column top was
- * a black octagon in the players' picture.
+ * A column's outline stops sight and light (cover, and a lamp's shadow) but is no hole: a token
+ * that sees a column's faces sees its top, a lamp that lights its faces lights its top, the way the
+ * players' picture draws it, and what stands right behind the column stays hidden and dark. Before,
+ * the outline was a closed wall from both sides and every column top was a black octagon.
  */
-describe('the outline of a tall object, as sight sees it', () => {
-  it('shows the top of every column a token sees the faces of, and hides what lies behind it', () => {
+describe('the outline of a tall object, as sight and light see it', () => {
+  it.each(['sight', 'light'] as const)('shows the top of every column a %s source reaches the faces of, and hides what lies behind it', (channel) => {
     const model = generateDungeon({ seed: 3, tags: ['colonnades', 'temple', 'large'], floors: 1 });
     const pxPerCell = DEFAULT_PX_PER_CELL;
     const layout = mapLayout(model, pxPerCell, DEFAULT_VIEW);
@@ -38,7 +38,7 @@ describe('the outline of a tall object, as sight sees it', () => {
       for (const angle of [0, Math.PI / 2, Math.PI, 1.5 * Math.PI]) {
         const [dx, dy] = [Math.cos(angle), Math.sin(angle)];
         const viewer = { x: middle.x + dx * (radius + pxPerCell * 0.6), y: middle.y + dy * (radius + pxPerCell * 0.6) };
-        const sight = computeVisibility(viewer, pxPerCell * 20, walls, undefined, 'sight');
+        const sight = computeVisibility(viewer, pxPerCell * 20, walls, undefined, channel);
         // Only where the token sees the near face, which another wall or object may hide.
         const near = { x: middle.x + dx * radius * 0.95, y: middle.y + dy * radius * 0.95 };
         const nearOutside = { x: middle.x + dx * (radius + 4), y: middle.y + dy * (radius + 4) };

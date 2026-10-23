@@ -13,13 +13,12 @@ const BEN = 'b'.repeat(20);
 const CARA = 'c'.repeat(20);
 const GROUND_MAP = new Uint8Array(64).map((_, index) => index);
 const UPPER_MAP = new Uint8Array(64).map((_, index) => 255 - index);
-const SHADE = new Uint8Array(32).map((_, index) => index * 3);
 
 const LEVELS: SceneLevel[] = [
   { id: 'ground', name: 'Ground', elevation: { bottom: 0, top: 10 }, background: 'maps/ground.webp' },
-  { id: 'upper', name: 'Tower top', elevation: { bottom: 10, top: 20 }, background: 'maps/upper.webp', shade: 'maps/upper-shade.png' },
+  { id: 'upper', name: 'Tower top', elevation: { bottom: 10, top: 20 }, background: 'maps/upper.webp' },
 ];
-const IMAGES = new Map([['maps/ground.webp', GROUND_MAP], ['maps/upper.webp', UPPER_MAP], ['maps/upper-shade.png', SHADE]]);
+const IMAGES = new Map([['maps/ground.webp', GROUND_MAP], ['maps/upper.webp', UPPER_MAP]]);
 const OWNERS: Readonly<Record<string, string>> = { ana: ANA, ben: BEN };
 
 /** A scene of two floors with Ana's token and a goblin on the ground and Ben's token and an ogre upstairs; `changes` over it. */
@@ -58,14 +57,13 @@ const aliasesOf = (table: ShareHarness): Map<string, string> => (table.share as 
 const names = (sent: readonly Sent[]): string[] => (tokenLists(sent).at(-1)?.tokens ?? []).map((entry) => entry.name ?? '?').sort();
 
 describe('players on different floors of one scene', () => {
-  it('sends each player the floor their token stands on, with its map, shade and name, and players without a token the presented floor', async () => {
+  it('sends each player the floor their token stands on, with its map and name, and players without a token the presented floor', async () => {
     const table = await started(floors({ ana: { kind: 'character', name: 'Ana' } as Partial<TokenEntity>, goblin: { kind: 'character', name: 'Goblin' } as Partial<TokenEntity>, ben: { kind: 'character', name: 'Ben' } as Partial<TokenEntity>, ogre: { kind: 'character', name: 'Ogre' } as Partial<TokenEntity> }));
     const ana = sceneOf(toPlayer(table.sent, ANA));
     const ben = sceneOf(toPlayer(table.sent, BEN));
     const cara = sceneOf(toPlayer(table.sent, CARA));
     expect(ana).toMatchObject({ map: { hash: await sha256Hex(GROUND_MAP) }, floor: { level: 0, name: 'Ground' } });
-    expect(ana?.shade).toBeUndefined();
-    expect(ben).toMatchObject({ map: { hash: await sha256Hex(UPPER_MAP) }, shade: { hash: await sha256Hex(SHADE), mime: 'image/png' }, floor: { level: 1, name: 'Tower top' } });
+    expect(ben).toMatchObject({ map: { hash: await sha256Hex(UPPER_MAP) }, floor: { level: 1, name: 'Tower top' } });
     expect(cara?.id).toBe(ana?.id);
     expect(ben?.floor?.group).toBe(ana?.floor?.group);
     expect(names(toPlayer(table.sent, ANA))).toEqual(['Ana', 'Goblin']);

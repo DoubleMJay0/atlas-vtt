@@ -6,7 +6,6 @@ import type { Sight } from '../../../vision/sight';
 import type { MapBounds, Polygon } from '../../../vision/visibility';
 import type { VisionCone } from '../../../vision/visionCone';
 import type { ReflectionPart } from '../../../vision/reflectedLight';
-import type { EngineRelief } from './ReliefMap';
 
 /** A light in world pixels with its steady settings; colour is linear and already tinted. */
 export interface EngineLight {
@@ -81,8 +80,6 @@ export interface EngineScene extends Pick<SceneLighting, 'ambientColor' | 'explo
   ambient: number;
   /** The scene's ambient zones in their order, the same list while they stay; none draws exactly as before zones existed. */
   zones?: readonly EngineZone[];
-  /** How high what stands on the map stands: every light casts its shadows from it. None draws exactly as before reliefs. */
-  relief?: EngineRelief | null;
 }
 
 /**

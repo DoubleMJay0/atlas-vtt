@@ -29,13 +29,6 @@ export interface RenderMapOptions {
   legibleAt?: number;
   /** A part of the map to draw, the canvas its size; the whole map where unset. */
   window?: { originCell: { x: number; y: number }; widthPx: number; heightPx: number };
-  /**
-   * False leaves out the shadows the one light casts (a scene's map, whose shade image holds them);
-   * occlusion at every foot stays. Unset paints them, as every picture of a dungeon did.
-   */
-  castShadows?: boolean;
-  /** The pixels per cell whose detail the picture takes, where it is drawn smaller than the map it stands for (`ArtFrame.detailPxPerCell`). */
-  detailAt?: number;
 }
 
 /**
@@ -47,9 +40,8 @@ export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyl
   const { pxPerCell } = options;
   const layout = mapLayout(model, pxPerCell, view);
   const drawn = options.legibleAt ? legibleStyle(style, pxPerCell / options.legibleAt) : style;
-  const env = createRenderEnv(ctx, visibleDungeon(model, view, options.floor ?? 0), drawn, view, pxPerCell, options.openings, options.castShadows !== false);
-  const detail = options.detailAt !== undefined ? { detailPxPerCell: options.detailAt } : {};
-  const frame = options.window ? { ...options.window, pxPerCell, ...detail } : { originCell: layout.originCell, widthPx: layout.widthPx, heightPx: layout.heightPx, pxPerCell, ...detail };
+  const env = createRenderEnv(ctx, visibleDungeon(model, view, options.floor ?? 0), drawn, view, pxPerCell, options.openings);
+  const frame = options.window ? { ...options.window, pxPerCell } : { originCell: layout.originCell, widthPx: layout.widthPx, heightPx: layout.heightPx, pxPerCell };
   ctx.save();
   if (!options.transparent) {
     // The vellum lies over the whole map: a window shows its part of it.

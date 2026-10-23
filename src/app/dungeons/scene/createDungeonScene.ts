@@ -2,23 +2,21 @@ import type { App } from 'obsidian';
 import { resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import { IMAGE_PRESETS, optimizeBitmap, type ProcessedImage } from '../../imageProcessing/imageProcessing';
-import { mapSceneFile, writeMapScene, type MapSceneDeps, type MapToWrite, type SceneShadingImages, type ShadingPaths } from '../../import/writeMapScene';
+import { mapSceneFile, writeMapScene, type MapSceneDeps, type MapToWrite } from '../../import/writeMapScene';
 import { LEVEL_HEIGHT } from '../../levels/levelEdits';
 import type { SceneLevel } from '../../types/sceneLevelTypes';
 import type { AssetService } from '../../services/AssetService';
 import { AssetThumbnailService, THUMBNAIL_SPEC } from '../../services/AssetThumbnailService';
 import { t } from '../../i18n';
 import { INVALID_NAME_CHARACTERS } from '../../services/assetPaths';
-import { MAX_FLOORS, type DungeonModel, type DungeonRequest } from '../model';
+import type { DungeonModel, DungeonRequest } from '../model';
 import { DEFAULT_PX_PER_CELL, SCENE_MAP_PIXELS, SCENE_MAP_QUALITY, type MapLayout } from '../render/layoutSize';
 import type { DungeonStyle, DungeonView } from '../style';
 import { DungeonWorkerClient } from '../worker/DungeonWorkerClient';
-import { DungeonHelpers } from '../worker/dungeonHelpers';
 import type { DungeonJob, DungeonRendered } from '../worker/dungeonJob';
 import { floorLetter } from './roomKeys';
 import { dungeonNote, roomPins } from './toNote';
 import { dungeonScene } from './toScene';
-import { shadowsApart } from '../render/shading/shadeImage';
 import type { DungeonPlacement } from './toWalls';
 
 export interface DungeonSceneDeps extends MapSceneDeps {
@@ -69,41 +67,32 @@ const floorName = (floor: number): string => t('dungeonScene.floor', { letter: f
  * The scene's levels, bottom first: the deepest floor first, the entry floor last, each a floor
  * high (the entry floor from 0 up, each floor below it one lower), each on its floor's map.
  */
-function floorLevels(levelIds: readonly string[], backgrounds: readonly string[], shading: readonly (ShadingPaths | undefined)[]): SceneLevel[] {
+function floorLevels(levelIds: readonly string[], backgrounds: readonly string[]): SceneLevel[] {
   return levelIds
     .map((id, floor): SceneLevel => ({
       id,
       name: floorName(floor),
       elevation: { bottom: -floor * LEVEL_HEIGHT, top: (1 - floor) * LEVEL_HEIGHT },
       background: backgrounds[floor] ?? null,
-      ...shadingFields(shading[floor]),
     }))
     .reverse();
-}
-
-/** A floor's relief and shade as the scene names them: no field for an image there is none of. */
-function shadingFields(paths: ShadingPaths | undefined): { relief?: string; shade?: string } {
-  return { ...(paths?.relief && { relief: paths.relief }), ...(paths?.shade && { shade: paths.shade }) };
 }
 
 interface DrawnFloors {
   model: DungeonModel;
   layout: MapLayout;
-  /** Each floor's map as a map stores it, the entry floor first: drawn without the shadows its shade holds. */
+  /** Each floor's map as a map stores it, the entry floor first. */
   images: ProcessedImage[];
-  /** Each floor's relief and shade (`renderRelief`, `renderShade`), PNGs, in the order of `images`. */
-  shading: SceneShadingImages[];
 }
 
 /** Raised where the dungeon worker answered a floor with something else than asked for. */
 class NotDrawn extends Error {}
 
 /**
- * Every floor's map at the same layout, each converted as a map stores it, and each floor's
- * shading. Every job is asked for at once: a floor's map goes to the image workers as a bitmap as
- * soon as it is drawn, so its conversion runs while the next floor is drawn, and the shading may
- * run beside both (`createDungeonScene` hands it to helper workers). The first job generates the
- * dungeon where no model was given; the others draw that one. Null where a floor could not be drawn.
+ * Every floor's map at the same layout, each converted as a map stores it. Every job is asked for
+ * at once: a floor's map goes to the image workers as a bitmap as soon as it is drawn, so its
+ * conversion runs while the next floor is drawn. The first job generates the dungeon where no
+ * model was given; the others draw that one. Null where a floor could not be drawn.
  */
 async function drawFloors(deps: DungeonSceneDeps, options: DungeonSceneOptions): Promise<DrawnFloors | null> {
   const size = { pxPerCell: options.pxPerCell ?? DEFAULT_PX_PER_CELL, maxPixels: SCENE_MAP_PIXELS };
@@ -114,29 +103,20 @@ async function drawFloors(deps: DungeonSceneDeps, options: DungeonSceneOptions):
     view: options.view,
     output,
   });
-  // The map leaves its cast shadows to the shade image, where they can lie apart: the scene's lights cast their own.
-  const apart = shadowsApart(options.style, options.view);
-  const mapOf = (floor: number): DungeonJob['output'] => ({ kind: 'map', ...size, bitmap: true, ...(apart && { castShadows: false }), ...(floor > 0 && { floor }) });
-  const shadingOf = (floor: number): DungeonJob['output'] => ({ kind: 'shading', ...size, ...(floor > 0 && { floor }) });
+  const mapOf = (floor: number): DungeonJob['output'] => ({ kind: 'map', ...size, bitmap: true, ...(floor > 0 && { floor }) });
   // Every bitmap that arrives goes to a conversion, which takes it over.
   const converted = (drawn: Promise<DungeonRendered>): Promise<ProcessedImage> => drawn.then(({ image }) => {
     if (image.type !== 'bitmap') throw new NotDrawn();
     return deps.convertImage(image.bitmap);
-  });
-  const shaded = (drawn: Promise<DungeonRendered>): Promise<SceneShadingImages> => drawn.then(({ image }) => {
-    if (image.type !== 'shading') throw new NotDrawn();
-    return { relief: image.relief, shade: image.shade };
   });
   const first = deps.render(job(options.model, mapOf(0)));
   const firstImage = converted(first);
   const pending: Promise<unknown>[] = [firstImage];
   try {
     const { model, map: layout } = await first;
-    const floors = model.floors.map((_, floor) => floor);
-    const images = [firstImage, ...floors.slice(1).map((floor) => converted(deps.render(job(model, mapOf(floor)))))];
-    const shading = floors.map((floor) => shaded(deps.render(job(model, shadingOf(floor)))));
-    pending.push(...images.slice(1), ...shading);
-    return { model, layout, images: await Promise.all(images), shading: await Promise.all(shading) };
+    const images = [firstImage, ...model.floors.slice(1).map((_, i) => converted(deps.render(job(model, mapOf(i + 1)))))];
+    pending.push(...images.slice(1));
+    return { model, layout, images: await Promise.all(images) };
   } catch (error) {
     if (error instanceof NotDrawn) return null;
     throw error;
@@ -153,7 +133,7 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
 
   const drawn = await drawFloors(deps, options);
   if (!drawn) return refused(t('dungeon.problem.notDrawn'));
-  const { model, layout, images, shading } = drawn;
+  const { model, layout, images } = drawn;
   // A map within the limits is kept as drawn; one the workers scaled down has smaller cells
   const sizes = await Promise.all(images.map(async (image) => (await imageDimensions(image.image)) ?? image.scaledDown?.to ?? { width: layout.widthPx, height: layout.heightPx }));
   const saved = sizes[0]!;
@@ -169,19 +149,17 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
   const maps: MapToWrite[] = images.map((image, floor) => ({
     image,
     name: (scene) => (levelIds ? t('dungeonScene.mapName', { scene, floor: floorName(floor) }) : scene),
-    shading: shading[floor]!,
   }));
   const written = await writeMapScene(deps, {
     collection,
     baseName: dungeonSceneName(options.name),
     maps,
     note: { text: () => dungeonNote(options.name.trim() || dungeonSceneName(options.name), rooms) },
-    content: (paths, notePath, shadingPaths) => {
-      const levels = levelIds && floorLevels(levelIds, paths, shadingPaths);
-      // The first level's map is the scene's background; a scene of one floor carries its shading itself.
+    content: (paths, notePath) => {
+      const levels = levelIds && floorLevels(levelIds, paths);
+      // The first level's map is the scene's background
       const background = levels?.[0]?.background ?? paths[0]!;
-      const own = levels ? {} : shadingFields(shadingPaths[0]);
-      return mapSceneFile(settings, background, { ...parts.scene, ...own, ...(levels && { levels }), pins: roomPins(rooms, notePath!) });
+      return mapSceneFile(settings, background, { ...parts.scene, ...(levels && { levels }), pins: roomPins(rooms, notePath!) });
     },
   });
   if (!written.ok) {
@@ -209,27 +187,21 @@ export async function createDungeonSceneWith(deps: DungeonSceneDeps, options: Du
 
 /**
  * `createDungeonSceneWith` on the app's dungeon worker and image workers; the asset manager is told
- * of the new scene. The shading of every floor but the first is drawn by helper workers beside
- * the app's, which draws the maps.
+ * of the new scene.
  */
 export async function createDungeonScene(app: App, assetService: AssetService, options: DungeonSceneOptions): Promise<DungeonSceneResult> {
   const client = DungeonWorkerClient.forApp(app);
-  const helpers = new DungeonHelpers(MAX_FLOORS - 1);
-  try {
-    const result = await createDungeonSceneWith(
-      {
-        app,
-        assetService,
-        render: (job) => (job.output.kind === 'shading' && job.output.floor ? helpers.render(job) : client.render(job)),
-        // A generated map is all fine grain, which a PNG cannot pack: stored as WebP, a thirtieth of the size
-        convertImage: (image) => optimizeBitmap(image, { ...IMAGE_PRESETS.map, quality: SCENE_MAP_QUALITY }, { thumbnail: THUMBNAIL_SPEC }),
-        thumbnails: AssetThumbnailService.getInstance(app, assetService),
-      },
-      options,
-    );
-    if (result.ok) app.workspace.trigger('atlas-vtt:refresh-assets');
-    return result;
-  } finally {
-    helpers.dispose();
-  }
+  const result = await createDungeonSceneWith(
+    {
+      app,
+      assetService,
+      render: (job) => client.render(job),
+      // A generated map is all fine grain, which a PNG cannot pack: stored as WebP, a thirtieth of the size
+      convertImage: (image) => optimizeBitmap(image, { ...IMAGE_PRESETS.map, quality: SCENE_MAP_QUALITY }, { thumbnail: THUMBNAIL_SPEC }),
+      thumbnails: AssetThumbnailService.getInstance(app, assetService),
+    },
+    options,
+  );
+  if (result.ok) app.workspace.trigger('atlas-vtt:refresh-assets');
+  return result;
 }

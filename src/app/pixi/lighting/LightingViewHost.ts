@@ -84,7 +84,6 @@ export class LightingViewHost implements SceneLightingView {
   lightReaches(): LightReach[] { return this.view.lightReaches(); }
   ambientLight(): AmbientLight { return this.view.ambientLight(); }
   refreshBounds(): void { this.view.refreshBounds(); }
-  followShading(): void { this.view.followShading?.(); }
   resetExplored(): void { this.view.resetExplored(); }
   editExplored(edit: ExploredEdit): boolean { return this.view.editExplored(edit); }
   beforeMapUnload(): void { this.view.beforeMapUnload(); }
