@@ -20,6 +20,7 @@ import { ReflectionTiles } from './ReflectionTiles';
 import { TileCache, type TilePacer } from './TileCache';
 import type { EngineLight, EngineZone } from './types';
 import { WallFields } from './WallFields';
+import type { EngineRelief } from './ReliefMap';
 import { ZoneMap, sameZoneLook, type ZoneLook } from './ZoneMap';
 
 /**
@@ -104,11 +105,13 @@ export class LightingWorld {
   /**
    * `pierce` is what the senses that see in magical darkness perceive (`pierceShapes`), the same
    * list while nothing changed; it is drawn into the darkness map, so it costs nothing on a map
-   * without a darkness source.
+   * without a darkness source. `relief` is what stands on the map (`EngineRelief`): every tile is
+   * built anew when it changes, with the shadows of what stands; null, none (unset keeps the last).
    */
-  update(walls: readonly WallSegment[], lights: readonly EngineLight[], albedo: Texture | null, pierce: readonly PierceShape[] = this.pierce): void {
+  update(walls: readonly WallSegment[], lights: readonly EngineLight[], albedo: Texture | null, pierce: readonly PierceShape[] = this.pierce, relief?: EngineRelief | null): void {
     const pierceChanged = pierce !== this.pierce;
     this.pierce = pierce;
+    const reliefChanged = relief !== undefined && this.tiles.setRelief(relief);
     let changed: Rect[] | 'all' = [];
     if (walls !== this.walls) {
       changed = this.walls ? changedWallRects(this.walls, walls, tileWallReach(this.texel)) : 'all';
@@ -121,7 +124,7 @@ export class LightingWorld {
     }
     // A darkness has no tile: its area is the rule's polygon, which changes with any wall.
     const shining = lights.filter((light) => !light.darkness);
-    const tilesChanged = this.tiles.sync(shining, walls, changed, this.pacer);
+    const tilesChanged = this.tiles.sync(shining, walls, reliefChanged ? 'all' : changed, this.pacer);
     // After the fields: a reflection ends at the walls' capsules as a tile does.
     const reflectionsChanged = this.reflections.sync(shining, this.fieldAll());
     const lightsChanged = !sameLights(this.lights, lights);

@@ -1,8 +1,9 @@
 import { Mesh, UniformGroup, type Geometry, type Renderer, type RenderTexture, type Shader } from 'pixi.js';
 import { chordOffsets } from '../../../lighting/chordOffsets';
-import { LIGHT_LEVELS, TILE_BAND_TEXELS, TILE_RAYS } from '../../../lighting/lightingConstants';
+import { LIGHT_LEVELS, RELIEF, TILE_BAND_TEXELS, TILE_RAYS } from '../../../lighting/lightingConstants';
 import { AREA_CORNER_VECTORS } from './areaTileShader';
 import type { Rect } from '../../../lighting/segments';
+import type { EngineRelief } from './ReliefMap';
 import { CapsuleField } from './CapsuleField';
 import { ENGINE_SHADERS } from './engineShaders';
 import { createPlaceholder, createQuad, createShader, createTarget, destroyQuad, glOf, quadGeometry, renderInto, type Quad } from './gpu';
@@ -29,9 +30,11 @@ export interface TileJob {
   readonly tailFrom: number;
   /** An area light's tile: its outline is drawn into a distance field first, then traced towards. */
   readonly area?: AreaJob;
+  /** The shadows of what stands (`EngineRelief`), traced after the walls' and taken into the smoothing; none without a relief. */
+  readonly relief: ReliefJob | null;
   /** One of the tracer's raw targets, taken at the first step. */
   raw: RenderTexture | null;
-  phase: 'distance' | 'trace' | 'blurX' | 'blurY' | 'smooth' | 'done';
+  phase: 'distance' | 'trace' | 'relief' | 'blurX' | 'blurY' | 'smooth' | 'done';
   /** The next row of the current pass to draw. */
   row: number;
 }
@@ -48,6 +51,20 @@ export interface AreaJob {
   readonly blur: number;
   /** The signed distance to the outline on the tile's texel grid (`r16float`); the caller owns it once the job is done. */
   readonly distance: RenderTexture;
+}
+
+/**
+ * A tile's relief shadow: traced on a grid of its own over the tile's rect, no finer than a texel of
+ * the relief or of the tile, into one of the tracer's relief targets (`reliefPointFragment`,
+ * `reliefAreaFragment`).
+ */
+export interface ReliefJob {
+  readonly relief: EngineRelief;
+  /** World rect: the tile's corner, whole texels of the shadow's grid past its far side. */
+  readonly rect: Rect;
+  readonly texels: readonly [number, number];
+  /** Taken from the tracer at the job's first step. */
+  raw: RenderTexture | null;
 }
 
 /** An area light as `beginArea` takes it. */
@@ -93,12 +110,23 @@ export class TileTracer {
     uStep: { value: new Float32Array([1, 0]), type: 'vec2<f32>' },
     uSigma: { value: 1, type: 'f32' },
   });
+  /** The relief a tile's shadows of what stands are traced over (`reliefShader.ts`), and where that shadow lies. */
+  private readonly reliefUniforms = new UniformGroup({
+    uHasRelief: { value: 0, type: 'f32' },
+    uReliefRect: { value: new Float32Array(4), type: 'vec4<f32>' },
+    uReliefTexels: { value: new Float32Array([1, 1, 1, 1]), type: 'vec4<f32>' },
+    uWorldToRelief: { value: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]), type: 'mat3x3<f32>' },
+    uReliefSize: { value: new Float32Array([1, 1]), type: 'vec2<f32>' },
+    uReliefOffsets: { value: new Float32Array(chordOffsets(RELIEF.rays)), type: 'f32', size: RELIEF.rays },
+  });
   private readonly bandTexels: number;
   private readonly shader: Shader;
   private readonly blurShader: Shader;
   private readonly smoothShader: Shader;
   private readonly distanceShader: Shader;
   private readonly areaShader: Shader;
+  private readonly reliefShader: Shader;
+  private readonly reliefAreaShader: Shader;
   private readonly quad: Quad = createQuad();
   private readonly geometry: Geometry = quadGeometry(this.quad);
   private readonly mesh: Mesh<Geometry, Shader>;
@@ -106,6 +134,12 @@ export class TileTracer {
   private readonly distanceMesh: Mesh<Geometry, Shader>;
   private readonly areaMesh: Mesh<Geometry, Shader>;
   private readonly blurMesh: Mesh<Geometry, Shader>;
+  private readonly reliefMesh: Mesh<Geometry, Shader>;
+  private readonly reliefAreaMesh: Mesh<Geometry, Shader>;
+  /** What stands on the map, whose shadows each tile begun from now on takes; none, and tiles are as they were without reliefs. */
+  private relief: EngineRelief | null = null;
+  /** The relief shadows' targets, used in turn like the raw ones; freed by `release`. */
+  private readonly reliefRaws: (RenderTexture | null)[] = [null, null];
   /** The first direction of an area light's blur, freed by `release` like the raw targets. */
   private blurScratch: RenderTexture | null = null;
   /** Bound as the smoothing input between traces, so the program never keeps a raw target. */
@@ -127,8 +161,11 @@ export class TileTracer {
     this.bandTexels = options.bandTexels ?? TILE_BAND_TEXELS;
     this.noOneWay = new CapsuleField(renderer, [0, 0, 1, 1], 1, 0, 'uOneWay');
     const resources = { tileUniforms: this.uniforms, ...field.resources(), ...this.noOneWay.resources() };
+    const reliefReads = { reliefUniforms: this.reliefUniforms, uRelief: this.placeholder.source, uReliefBlocks: this.placeholder.source };
     this.shader = createShader(ENGINE_SHADERS.tile, resources);
-    this.smoothShader = createShader(ENGINE_SHADERS.tileSmooth, { ...resources, uRaw: this.placeholder.source });
+    this.smoothShader = createShader(ENGINE_SHADERS.tileSmooth, { ...resources, uRaw: this.placeholder.source, reliefUniforms: this.reliefUniforms, uReliefShadow: this.placeholder.source });
+    this.reliefShader = createShader(ENGINE_SHADERS.reliefPoint, { tileUniforms: this.uniforms, ...reliefReads });
+    this.reliefAreaShader = createShader(ENGINE_SHADERS.reliefArea, { tileUniforms: this.uniforms, areaUniforms: this.areaUniforms, uDistance: this.placeholder.source, ...reliefReads });
     this.distanceShader = createShader(ENGINE_SHADERS.areaDistance, { tileUniforms: this.uniforms, areaUniforms: this.areaUniforms });
     this.areaShader = createShader(ENGINE_SHADERS.areaTile, { ...resources, areaUniforms: this.areaUniforms, uDistance: this.placeholder.source });
     this.blurShader = createShader(ENGINE_SHADERS.areaBlur, { tileUniforms: this.uniforms, blurUniforms: this.blurUniforms, uSource: this.placeholder.source });
@@ -137,6 +174,16 @@ export class TileTracer {
     this.smoothMesh = new Mesh({ geometry: this.geometry, shader: this.smoothShader });
     this.distanceMesh = new Mesh({ geometry: this.geometry, shader: this.distanceShader });
     this.areaMesh = new Mesh({ geometry: this.geometry, shader: this.areaShader });
+    this.reliefMesh = new Mesh({ geometry: this.geometry, shader: this.reliefShader });
+    this.reliefAreaMesh = new Mesh({ geometry: this.geometry, shader: this.reliefAreaShader });
+  }
+
+  /**
+   * The relief whose shadows the tiles begun from now on take; null, none. The caller owns it and
+   * rebuilds every tile when it changes (`TileCache.setRelief`); a job begun before keeps its own.
+   */
+  setRelief(relief: EngineRelief | null): void {
+    this.relief = relief;
   }
 
   /** The whole tile at once. `rect` must be snapped to the field's texel grid; `oneWay` holds this light's one-way walls. */
@@ -150,7 +197,16 @@ export class TileTracer {
   begin(at: readonly [number, number], flame: number, rect: Rect, oneWay: CapsuleField | null, tailFrom = Infinity): TileJob {
     const { texel } = this.field;
     const tile = createTarget(rect[2] / texel, rect[3] / texel, 'r8unorm', 'nearest');
-    return { at, flame, rect, oneWay, tile, tailFrom, raw: null, phase: 'trace', row: 0 };
+    return { at, flame, rect, oneWay, tile, tailFrom, relief: this.reliefJob(rect), raw: null, phase: 'trace', row: 0 };
+  }
+
+  /** The relief shadow of a tile over `rect`, while there is a relief. */
+  private reliefJob(rect: Rect): ReliefJob | null {
+    const { relief } = this;
+    if (!relief) return null;
+    const step = Math.max(this.field.texel, relief.texelWorld);
+    const texels: [number, number] = [Math.max(1, Math.ceil(rect[2] / step)), Math.max(1, Math.ceil(rect[3] / step))];
+    return { relief, rect: [rect[0], rect[1], texels[0] * step, texels[1] * step], texels, raw: null };
   }
 
   /**
@@ -168,7 +224,7 @@ export class TileTracer {
       corners[2 * i + 1] = shape.corners[i]!.y;
     }
     const area: AreaJob = { corners, count, bright: shape.bright, dim: shape.dim, reach: shape.reach, blur: shape.blur, distance };
-    return { at, flame: 0, rect, oneWay, tile, area, tailFrom: Infinity, raw: null, phase: 'distance', row: 0 };
+    return { at, flame: 0, rect, oneWay, tile, area, tailFrom: Infinity, relief: this.reliefJob(rect), raw: null, phase: 'distance', row: 0 };
   }
 
   /**
@@ -187,6 +243,7 @@ export class TileTracer {
     if (!job.raw) {
       this.turn = 1 - this.turn;
       job.raw = this.rawFor(width, height);
+      if (job.relief) job.relief.raw = this.reliefRawFor(job.relief.texels[0], job.relief.texels[1]);
     }
     const raw = job.raw;
     const u = this.uniforms.uniforms;
@@ -200,18 +257,19 @@ export class TileTracer {
     this.bindOneWay(job.oneWay ?? this.noOneWay);
     this.smoothShader.resources.uRaw = raw.source;
     if (job.area) this.setArea(job.area);
-    const rows = Math.max(1, Math.floor(this.bandTexels / width));
+    this.bindRelief(job);
     let spent = 0;
     while (job.phase !== 'done' && (spent === 0 || spent < texels)) {
-      const { target, mesh, next } = this.pass(job, raw, width, height);
-      const last = Math.min(job.row + rows, height);
-      this.setExtent(target, width, height);
-      u.uBand.set([job.row / height, last / height]);
+      const { target, mesh, next, columns, rows: total } = this.pass(job, raw, width, height);
+      const rows = Math.max(1, Math.floor(this.bandTexels / columns));
+      const last = Math.min(job.row + rows, total);
+      this.setExtent(target, columns, total);
+      u.uBand.set([job.row / total, last / total]);
       // The raw bands write every texel the smoothing reads, and the distance bands every texel the trace reads, so neither target needs a clear.
       renderInto(this.renderer, mesh, target, job.phase === 'smooth' && job.row === 0 ? [0, 0, 0, 0] : undefined);
-      spent += (last - job.row) * width;
+      spent += (last - job.row) * columns;
       job.row = last;
-      if (last === height) {
+      if (last === total) {
         job.phase = next;
         job.row = 0;
       }
@@ -224,30 +282,76 @@ export class TileTracer {
     this.smoothShader.resources.uRaw = this.placeholder.source;
     this.areaShader.resources.uDistance = this.placeholder.source;
     this.blurShader.resources.uSource = this.placeholder.source;
+    this.unbindRelief();
     if (job.oneWay) this.bindOneWay(this.noOneWay);
     return spent;
   }
 
   /**
-   * What the job's current phase draws, into which target, and the phase after it. An area
-   * light's distance field is drawn first and traced through, then blurred for the light map,
-   * across into the scratch target and back down into itself.
+   * What the job's current phase draws, into which target over how many texels, and the phase
+   * after it. An area light's distance field is drawn first and traced through, then blurred for
+   * the light map, across into the scratch target and back down into itself. Where the scene has a
+   * relief, its shadow is traced after the walls' (while an area's field is still exact) and taken
+   * into the smoothing.
    */
-  private pass(job: TileJob, raw: RenderTexture, width: number, height: number): { target: RenderTexture; mesh: Mesh<Geometry, Shader>; next: TileJob['phase'] } {
-    const { area } = job;
+  private pass(job: TileJob, raw: RenderTexture, width: number, height: number): { target: RenderTexture; mesh: Mesh<Geometry, Shader>; next: TileJob['phase']; columns: number; rows: number } {
+    const { area, relief } = job;
+    const tile = { columns: width, rows: height };
+    const afterRelief: TileJob['phase'] = area ? 'blurX' : 'smooth';
     switch (job.phase) {
-      case 'distance': return { target: area!.distance, mesh: this.distanceMesh, next: 'trace' };
-      case 'trace': return { target: raw, mesh: area ? this.areaMesh : this.mesh, next: area ? 'blurX' : 'smooth' };
+      case 'distance': return { target: area!.distance, mesh: this.distanceMesh, next: 'trace', ...tile };
+      case 'trace': return { target: raw, mesh: area ? this.areaMesh : this.mesh, next: relief ? 'relief' : afterRelief, ...tile };
+      case 'relief': return { target: relief!.raw!, mesh: area ? this.reliefAreaMesh : this.reliefMesh, next: afterRelief, columns: relief!.texels[0], rows: relief!.texels[1] };
       case 'blurX': {
         const scratch = this.scratchFor(width, height);
         this.setBlur(area!, area!.distance, [1, 0]);
-        return { target: scratch, mesh: this.blurMesh, next: 'blurY' };
+        return { target: scratch, mesh: this.blurMesh, next: 'blurY', ...tile };
       }
       case 'blurY':
         this.setBlur(area!, this.blurScratch!, [0, 1]);
-        return { target: area!.distance, mesh: this.blurMesh, next: 'smooth' };
-      default: return { target: job.tile, mesh: this.smoothMesh, next: 'done' };
+        return { target: area!.distance, mesh: this.blurMesh, next: 'smooth', ...tile };
+      default: return { target: job.tile, mesh: this.smoothMesh, next: 'done', ...tile };
     }
+  }
+
+  /** Binds the job's relief and its shadow's target to the passes that read them; a job without one smooths as before reliefs. */
+  private bindRelief(job: TileJob): void {
+    const r = this.reliefUniforms.uniforms;
+    const { relief } = job;
+    r.uHasRelief = relief ? 1 : 0;
+    if (!relief?.raw) return;
+    const target = relief.raw.source;
+    r.uReliefRect.set(relief.rect);
+    r.uReliefTexels.set([relief.texels[0], relief.texels[1], target.pixelWidth, target.pixelHeight]);
+    r.uWorldToRelief.set(relief.relief.worldToRelief);
+    r.uReliefSize.set([relief.relief.width, relief.relief.height]);
+    for (const shader of [this.reliefShader, this.reliefAreaShader]) {
+      shader.resources.uRelief = relief.relief.heights.source;
+      shader.resources.uReliefBlocks = relief.relief.blocks.source;
+    }
+    if (job.area) this.reliefAreaShader.resources.uDistance = job.area.distance.source;
+    this.smoothShader.resources.uReliefShadow = target;
+  }
+
+  /** Nothing of a relief stays bound: its owner may destroy it, and the targets go with `release`. */
+  private unbindRelief(): void {
+    for (const shader of [this.reliefShader, this.reliefAreaShader]) {
+      shader.resources.uRelief = this.placeholder.source;
+      shader.resources.uReliefBlocks = this.placeholder.source;
+    }
+    this.reliefAreaShader.resources.uDistance = this.placeholder.source;
+    this.smoothShader.resources.uReliefShadow = this.placeholder.source;
+  }
+
+  /** This turn's relief shadow target, at least `width` × `height`, read bilinearly by the smoothing. */
+  private reliefRawFor(width: number, height: number): RenderTexture {
+    const raw = this.reliefRaws[this.turn];
+    const current = raw?.source;
+    if (raw && current && current.pixelWidth >= width && current.pixelHeight >= height) return raw;
+    const grown = createTarget(Math.max(width, current?.pixelWidth ?? 0), Math.max(height, current?.pixelHeight ?? 0), 'r8unorm', 'linear');
+    raw?.destroy(true);
+    this.reliefRaws[this.turn] = grown;
+    return grown;
   }
 
   private setBlur(area: AreaJob, source: RenderTexture, step: [number, number]): void {
@@ -282,6 +386,8 @@ export class TileTracer {
     this.distanceMesh.destroy();
     this.areaMesh.destroy();
     this.blurMesh.destroy();
+    this.reliefMesh.destroy();
+    this.reliefAreaMesh.destroy();
     this.geometry.destroy();
     destroyQuad(this.quad);
     this.shader.destroy();
@@ -289,6 +395,8 @@ export class TileTracer {
     this.distanceShader.destroy();
     this.areaShader.destroy();
     this.blurShader.destroy();
+    this.reliefShader.destroy();
+    this.reliefAreaShader.destroy();
     this.placeholder.destroy(true);
     this.noOneWay.destroy();
     this.release();
@@ -299,6 +407,8 @@ export class TileTracer {
     for (let i = 0; i < this.raws.length; i++) {
       this.raws[i]?.destroy(true);
       this.raws[i] = null;
+      this.reliefRaws[i]?.destroy(true);
+      this.reliefRaws[i] = null;
     }
     this.blurScratch?.destroy(true);
     this.blurScratch = null;

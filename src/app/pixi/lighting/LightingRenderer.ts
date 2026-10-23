@@ -22,6 +22,8 @@ import { contextLost } from './engine/gpu';
 import { AttemptProgress } from './AttemptProgress';
 import { LightingEngine } from './engine/LightingEngine';
 import type { EngineScene, SceneFrame } from './engine/types';
+import type { EngineRelief } from './engine/ReliefMap';
+import type { ShadeSink } from './engine/ShadeLayer';
 import type { BelowShown } from './engine/LightingEngine';
 import { ExploredMemory, type ExploredMemoryState } from './ExploredMemory';
 import type { LightingAttempt } from './lightingAttempts';
@@ -64,6 +66,13 @@ export interface LightingRendererDeps {
   albedo: () => Texture | null;
   /** The grid the composite draws unlit, while there is one (`UnlitGrid`). */
   grid?: () => UnlitGrid | null;
+  /**
+   * How high what stands on the viewed level's map stands (`EngineRelief`), while it has a relief:
+   * every light casts its shadows from it. Call `followShading` when it changes.
+   */
+  relief?: () => EngineRelief | null;
+  /** Who draws the viewed level's shade under the scene's light (`ShadeLayer`). */
+  shade?: ShadeSink;
   /** The senses and conditions of the map's collection; the generic ones without it. */
   rules?: () => SightRules;
   /** The device-local record of attempts to light this map; without one every attempt is made. */
@@ -113,6 +122,8 @@ export class LightingRenderer implements SceneLightingView {
   private lastScene: SceneWithoutLook | null = null;
   /** The albedo the engine was last given. */
   private albedo: Texture | null = null;
+  /** The relief the engine was last given. */
+  private relief: EngineRelief | null = null;
   private readonly attempt: AttemptProgress;
   private stopped = false;
   /** A scene build worked out new sight; reported once the guarded work is over. */
@@ -134,6 +145,7 @@ export class LightingRenderer implements SceneLightingView {
     this.quality = deps.quality?.current() ?? DEFAULT_LIGHTING_QUALITY;
     this.engine = new LightingEngine(renderer, this.quality, { paced: true });
     this.attempt = new AttemptProgress(renderer, deps.attempt);
+    if (deps.shade) this.engine.setShade(deps.shade);
     this.layer = this.engine.layer;
     this.memory = new ExploredMemory({
       renderer,
@@ -241,6 +253,14 @@ export class LightingRenderer implements SceneLightingView {
     requestRender(this.deps.app);
   }
 
+  /**
+   * The viewed level's relief changed: the engine takes the new one at once (every light's tile is
+   * built anew), so nothing holds the old one when its owner lets it go.
+   */
+  followShading(): void {
+    if (this.deps.relief?.() !== this.relief) this.run(() => this.update(this.deps.store.getState()));
+  }
+
   /** The map image changed size or finished loading. */
   refreshBounds(): void {
     this.run(() => {
@@ -343,7 +363,8 @@ export class LightingRenderer implements SceneLightingView {
     // Both pictures always show the same tokens (`GM_SIGHT_POLICY`), so the same sight gives the same footprints.
     const gmSpots = gmSight === model.sight ? spots : this.gmSpots.update(model, state, this.deps.measurement, this.deps.rules, gmSight);
     this.albedo = this.deps.albedo();
-    this.engine.update({ ...base, albedo: this.albedo, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(state.lighting) });
+    this.relief = this.deps.relief?.() ?? null;
+    this.engine.update({ ...base, albedo: this.albedo, relief: this.relief, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(state.lighting) });
     this.levelsBelow?.update(state, bounds, { sight: model.sight, gmSight });
     if (this.levelsBelow?.failed()) this.engine.fail(new Error('The lighting of a level below stopped'));
     requestRender(this.deps.app);

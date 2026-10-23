@@ -2,7 +2,7 @@ import type { App } from 'obsidian';
 import { resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import { IMAGE_PRESETS, optimizeImage, type ProcessedImage } from '../../imageProcessing/imageProcessing';
-import { mapSceneFile, writeMapScene, type MapSceneDeps, type MapToWrite } from '../../import/writeMapScene';
+import { mapSceneFile, writeMapScene, type MapSceneDeps, type MapToWrite, type SceneShadingImages, type ShadingPaths } from '../../import/writeMapScene';
 import { LEVEL_HEIGHT } from '../../levels/levelEdits';
 import type { SceneLevel } from '../../types/sceneLevelTypes';
 import type { AssetService } from '../../services/AssetService';
@@ -17,6 +17,7 @@ import type { DungeonJob, DungeonRendered } from '../worker/dungeonJob';
 import { floorLetter } from './roomKeys';
 import { dungeonNote, roomPins } from './toNote';
 import { dungeonScene } from './toScene';
+import { shadowsApart } from '../render/shading/shadeImage';
 import type { DungeonPlacement } from './toWalls';
 
 export interface DungeonSceneDeps extends MapSceneDeps {
@@ -67,22 +68,30 @@ const floorName = (floor: number): string => t('dungeonScene.floor', { letter: f
  * The scene's levels, bottom first: the deepest floor first, the entry floor last, each a floor
  * high (the entry floor from 0 up, each floor below it one lower), each on its floor's map.
  */
-function floorLevels(levelIds: readonly string[], backgrounds: readonly string[]): SceneLevel[] {
+function floorLevels(levelIds: readonly string[], backgrounds: readonly string[], shading: readonly (ShadingPaths | undefined)[]): SceneLevel[] {
   return levelIds
     .map((id, floor): SceneLevel => ({
       id,
       name: floorName(floor),
       elevation: { bottom: -floor * LEVEL_HEIGHT, top: (1 - floor) * LEVEL_HEIGHT },
       background: backgrounds[floor] ?? null,
+      ...shadingFields(shading[floor]),
     }))
     .reverse();
+}
+
+/** A floor's relief and shade as the scene names them: no field for an image there is none of. */
+function shadingFields(paths: ShadingPaths | undefined): { relief?: string; shade?: string } {
+  return { ...(paths?.relief && { relief: paths.relief }), ...(paths?.shade && { shade: paths.shade }) };
 }
 
 interface DrawnFloors {
   model: DungeonModel;
   layout: MapLayout;
-  /** Each floor's map as a map stores it, the entry floor first. */
+  /** Each floor's map as a map stores it, the entry floor first: drawn without the shadows its shade holds. */
   images: ProcessedImage[];
+  /** Each floor's relief and shade (`renderRelief`, `renderShade`), PNGs, in the order of `images`. */
+  shading: SceneShadingImages[];
 }
 
 /**
@@ -91,22 +100,30 @@ interface DrawnFloors {
  * others draw that one. Null where a floor could not be drawn.
  */
 async function drawFloors(deps: DungeonSceneDeps, options: DungeonSceneOptions): Promise<DrawnFloors | null> {
-  const job = (model: DungeonModel | undefined, floor: number): DungeonJob => ({
+  const pxPerCell = options.pxPerCell ?? DEFAULT_PX_PER_CELL;
+  const job = (model: DungeonModel | undefined, output: DungeonJob['output']): DungeonJob => ({
     request: options.request,
     ...(model && { model }),
     style: options.style,
     view: options.view,
-    output: { kind: 'map', pxPerCell: options.pxPerCell ?? DEFAULT_PX_PER_CELL, ...(floor > 0 && { floor }) },
+    output,
   });
-  const first: DungeonRendered = await deps.render(job(options.model, 0));
+  // The map leaves its cast shadows to the shade image, where they can lie apart: the scene's lights cast their own.
+  const apart = shadowsApart(options.style, options.view);
+  const mapOf = (floor: number): DungeonJob['output'] => ({ kind: 'map', pxPerCell, ...(apart && { castShadows: false }), ...(floor > 0 && { floor }) });
+  const first: DungeonRendered = await deps.render(job(options.model, mapOf(0)));
   const { model, map: layout } = first;
   const converting: Promise<ProcessedImage>[] = [];
+  const shading: SceneShadingImages[] = [];
   for (let floor = 0; floor < model.floors.length; floor++) {
-    const { image } = floor === 0 ? first : await deps.render(job(model, floor));
+    const { image } = floor === 0 ? first : await deps.render(job(model, mapOf(floor)));
     if (image.type !== 'png') return null;
     converting.push(deps.convertImage(image.blob));
+    const shaded = (await deps.render(job(model, { kind: 'shading', pxPerCell, ...(floor > 0 && { floor }) }))).image;
+    if (shaded.type !== 'shading') return null;
+    shading.push({ relief: shaded.relief, shade: shaded.shade });
   }
-  return { model, layout, images: await Promise.all(converting) };
+  return { model, layout, images: await Promise.all(converting), shading };
 }
 
 async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Promise<DungeonSceneResult> {
@@ -116,7 +133,7 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
 
   const drawn = await drawFloors(deps, options);
   if (!drawn) return refused(t('dungeon.problem.notDrawn'));
-  const { model, layout, images } = drawn;
+  const { model, layout, images, shading } = drawn;
   // A map within the limits is kept as drawn; one the workers scaled down has smaller cells
   const sizes = await Promise.all(images.map(async (image) => (await imageDimensions(image.image)) ?? image.scaledDown?.to ?? { width: layout.widthPx, height: layout.heightPx }));
   const saved = sizes[0]!;
@@ -132,17 +149,19 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
   const maps: MapToWrite[] = images.map((image, floor) => ({
     image,
     name: (scene) => (levelIds ? t('dungeonScene.mapName', { scene, floor: floorName(floor) }) : scene),
+    shading: shading[floor]!,
   }));
   const written = await writeMapScene(deps, {
     collection,
     baseName: dungeonSceneName(options.name),
     maps,
     note: { text: () => dungeonNote(options.name.trim() || dungeonSceneName(options.name), rooms) },
-    content: (paths, notePath) => {
-      const levels = levelIds && floorLevels(levelIds, paths);
-      // The first level's map is the scene's background
+    content: (paths, notePath, shadingPaths) => {
+      const levels = levelIds && floorLevels(levelIds, paths, shadingPaths);
+      // The first level's map is the scene's background; a scene of one floor carries its shading itself.
       const background = levels?.[0]?.background ?? paths[0]!;
-      return mapSceneFile(settings, background, { ...parts.scene, ...(levels && { levels }), pins: roomPins(rooms, notePath!) });
+      const own = levels ? {} : shadingFields(shadingPaths[0]);
+      return mapSceneFile(settings, background, { ...parts.scene, ...own, ...(levels && { levels }), pins: roomPins(rooms, notePath!) });
     },
   });
   if (!written.ok) {

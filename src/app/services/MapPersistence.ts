@@ -51,6 +51,9 @@ export interface MapFile {
   background: string | null;
   /** The scene's levels, bottom first; absent for a scene with one level. The first level's background is `background`. */
   levels?: SceneLevel[] | undefined;
+  /** The relief and shade of a scene without levels (`SceneShading`); absent until a map has them. */
+  relief?: string | null | undefined;
+  shade?: string | null | undefined;
   grid: GridState | null;
   objects: {
     tokens: Record<string, TokenEntity>;

@@ -20,6 +20,7 @@ import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import { isLegacyTokenRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { isRecord } from '../utils/guards';
+import { sceneFileShading } from './sceneShadingFiles';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { t } from '../i18n';
 import { trashVaultItem } from '../utils/trashVaultItem';
@@ -1107,6 +1108,7 @@ export class AssetService {
 
     // For scene assets, also delete the map file and close any open leaves
     if (asset.type === 'scene') {
+      let shading: string[] = [];
       // Load the scene data from the JSON file if not already loaded
       let sceneData = asset.data;
       if (!sceneData) {
@@ -1130,6 +1132,8 @@ export class AssetService {
           // Delete the map file
           const mapFile = this.app.vault.getAbstractFileByPath(mapPath);
           if (mapFile instanceof TFile) {
+            // Its relief and shade belong to it alone, unless another scene names them too (a copy outside Atlas).
+            shading = await sceneFileShading(this.app, mapFile);
             // Close any leaves showing this file
             const leaves = this.app.workspace.getLeavesOfType('atlas-view');
             for (const leaf of leaves) {
@@ -1159,6 +1163,7 @@ export class AssetService {
       } catch (error) {
         console.error('[AssetService] Error deleting scene snapshots:', error);
       }
+      await this.trashUnsharedShading(asset.id, shading);
     }
 
     const emptiedGroups = asset.type === 'token' ? await this.getGroupsUsingTokens([asset.id]) : [];
@@ -1173,6 +1178,23 @@ export class AssetService {
     await this.saveMetadata();
 
     await this.deleteEmptiedGroups(emptiedGroups);
+  }
+
+  /**
+   * Trashes the relief and shade images (`levelShading`) a deleted scene named, except those another
+   * scene's file still names: they are no assets of their own, and nothing else would ever remove them.
+   */
+  private async trashUnsharedShading(sceneId: string, paths: readonly string[]): Promise<void> {
+    if (paths.length === 0) return;
+    const named = new Set<string>();
+    for (const other of Object.values(this.metadata!.assets)) {
+      if (other.type !== 'scene' || other.id === sceneId || !other.data?.mapPath) continue;
+      const file = this.app.vault.getAbstractFileByPath(other.data.mapPath);
+      if (!(file instanceof TFile)) continue;
+      const text = await this.app.vault.cachedRead(file).catch(() => '');
+      for (const path of paths) if (text.includes(JSON.stringify(path))) named.add(path);
+    }
+    for (const path of paths) if (!named.has(path)) await this.trashFileIfPresent(path);
   }
 
   /** An encounter's thumbnail goes with it, unless another encounter (a copy) still shows the same file. */

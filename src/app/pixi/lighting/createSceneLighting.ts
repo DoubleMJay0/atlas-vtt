@@ -17,6 +17,8 @@ import { showLightingUnavailableNotice } from './lightingNotices';
 import { LightingViewHost } from './LightingViewHost';
 import type { ExploredMemoryWatcher } from './sceneLightingView';
 import type { BelowLevelsHost } from './levels/LevelsBelow';
+import type { EngineRelief } from './engine/ReliefMap';
+import type { ShadeSink } from './engine/ShadeLayer';
 
 export interface SceneLightingDeps {
   viewport: Viewport;
@@ -43,20 +45,24 @@ export interface SceneLightingDeps {
   below?: BelowLevelsHost;
   /** How long a piece of a roof below takes to fade; unset, the window's motion decides. */
   roofFadeMs?: number;
+  /** The viewed level's relief (`ViewShading`), whose shadows the engine casts. */
+  relief?: () => EngineRelief | null;
+  /** Who draws the viewed level's shade under the scene's light. */
+  shade?: ShadeSink;
 }
 
 /**
  * The scene lighting of a map view: the GPU engine where the graphics device runs it, the
  * line-of-sight fallback where it does not (`LightingViewHost` swaps them).
  */
-export function createSceneLighting({ viewport, app, store, obsApp, measurement, bounds, albedo, grid, rules, onSightChange, exploredWatcher, quality, scene = store, below, roofFadeMs }: SceneLightingDeps): LightingViewHost {
+export function createSceneLighting({ viewport, app, store, obsApp, measurement, bounds, albedo, grid, rules, onSightChange, exploredWatcher, quality, scene = store, below, roofFadeMs, relief, shade }: SceneLightingDeps): LightingViewHost {
   const attempt = new StoredLightingAttempt(obsApp, () => store.getState().mapPath);
   const sight = onSightChange ? { onSightChange } : {};
   const view = { ...sight, ...(rules && { rules }) };
   return new LightingViewHost({
     store,
     canvasRenderer: usesCanvasRenderer(app.renderer),
-    createEngineView: (onUnavailable) => new LightingRenderer({ viewport, app, store: scene, measurement, bounds, albedo, attempt, onUnavailable, ...view, ...(grid && { grid }), ...(exploredWatcher && { exploredWatcher }), ...(quality && { quality }), ...(below && { below }), ...(roofFadeMs !== undefined && { roofFadeMs }) }),
+    createEngineView: (onUnavailable) => new LightingRenderer({ viewport, app, store: scene, measurement, bounds, albedo, attempt, onUnavailable, ...view, ...(grid && { grid }), ...(exploredWatcher && { exploredWatcher }), ...(quality && { quality }), ...(below && { below }), ...(roofFadeMs !== undefined && { roofFadeMs }), ...(relief && { relief }), ...(shade && { shade }) }),
     createFallback: () => new CanvasLightingFallback({ viewport, store: scene, measurement, bounds, requestRender: () => requestRender(app), ...view }),
     forgetAttempt: () => attempt.forget(),
     notify: showLightingUnavailableNotice,

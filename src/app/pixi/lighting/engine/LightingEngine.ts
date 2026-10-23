@@ -11,6 +11,7 @@ import { ambientLift, darkLooks } from './senseDrawing';
 import { describeShaderFailures, failedEngineShaders } from './shaderCheck';
 import { SceneSightLayers } from './SceneSightLayers';
 import type { BoundFields } from './WallFields';
+import type { ShadeSink } from './ShadeLayer';
 import type { EngineScene, SceneFrame } from './types';
 
 /** How an engine draws: on the canvas as the view's own lighting, or off-screen as a level below the view's (`LevelsBelow`). */
@@ -65,6 +66,8 @@ export class LightingEngine {
   private viewHeld = false;
   private scene: EngineScene | null = null;
   private grid: UnlitGrid | null = null;
+  /** The level's shade, lit by the scene's ambient light while the engine lights it (`ShadeLayer`). */
+  private shade: ShadeSink | null = null;
   private enabled = false;
   private stopped = false;
   /** The shaders link on the current context. */
@@ -136,14 +139,15 @@ export class LightingEngine {
     const composite = this.composite!;
     this.sightLayers.update(scene);
     const frame = this.sightLayers.select(this.viewHeld ? 'gm' : this.mode)!;
-    world.update(scene.walls, scene.lights, scene.albedo, frame.pierce);
+    world.update(scene.walls, scene.lights, scene.albedo, frame.pierce, scene.relief ?? null);
     if (world.fields.bound() !== this.boundFields) {
       this.boundFields = world.fields.bound();
       composite.setWorld(world);
     }
     world.setZones(scene.zones, scene);
     composite.setMaps(world.darknessMap(), world.zoneMap());
-    // The composite has let go of a darkness map and a zone map the scene no longer needs.
+    this.pushShade(world, scene);
+    // The composite and the shade have let go of a darkness map and a zone map the scene no longer needs.
     world.trim();
     composite.setAllSeen(frame.sight.all);
     composite.setDarkLooks(darkLooks(frame.sight, !!frame.spots?.length, scene));
@@ -211,8 +215,9 @@ export class LightingEngine {
     const { scene, world, composite } = this;
     const frame = this.sightLayers.select(mode);
     if (!scene || !world || !composite || !frame) return;
-    world.update(scene.walls, scene.lights, scene.albedo, frame.pierce);
+    world.update(scene.walls, scene.lights, scene.albedo, frame.pierce, scene.relief ?? null);
     composite.setMaps(world.darknessMap(), world.zoneMap());
+    this.pushShade(world, scene);
     composite.setAllSeen(frame.sight.all);
     composite.setDarkLooks(darkLooks(frame.sight, !!frame.spots?.length, scene));
     composite.setMode(mode);
@@ -276,6 +281,29 @@ export class LightingEngine {
     if (area?.width === this.coverage?.width && area?.height === this.coverage?.height) return;
     this.coverage = area;
     this.drawBounds();
+  }
+
+  /**
+   * Who draws the level's shade (`ShadeLayer`): while the engine lights the scene it hands it the
+   * scene's light, and takes it back before the textures it gave go.
+   */
+  setShade(shade: ShadeSink | null): void {
+    if (shade === this.shade) return;
+    this.shade?.setLight(null);
+    this.shade = shade;
+    if (this.world && this.scene) this.attempt(() => this.pushShade(this.world!, this.scene!));
+  }
+
+  /** The scene's light as the shade reads it: the world's light map, zone and darkness maps, and the ambient light. */
+  private pushShade(world: LightingWorld, scene: EngineScene): void {
+    this.shade?.setLight({
+      lightMap: world.lightMap.texture,
+      lightWorld: world.lightMap.world,
+      zones: world.zoneMap()?.texture ?? null,
+      darkness: world.darknessMap()?.texture ?? null,
+      ambient: scene.ambient,
+      ambientColor: scene.ambientColor,
+    });
   }
 
   /** The caller owns `texture`; set its replacement before destroying it. */
@@ -352,6 +380,7 @@ export class LightingEngine {
   /** The composite goes with the world, so it never holds the world's destroyed textures. */
   private dropWorld(): void {
     this.grid?.setMarking(false);
+    this.shade?.setLight(null);
     this.layer.filters = null;
     this.composite?.filter.destroy();
     this.composite = null;
@@ -380,6 +409,8 @@ export class LightingEngine {
       this.composite.setBelow(this.below.pictures, this.below.dim);
       this.layer.filters = [this.composite.filter];
     }
+    // The shade reads the new world's light once it is built; nothing of the old one stays bound.
+    this.shade?.setLight(null);
     previous?.destroy();
     this.drawBounds();
     this.sightLayers.clear();

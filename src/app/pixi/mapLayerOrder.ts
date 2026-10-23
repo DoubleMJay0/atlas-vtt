@@ -8,6 +8,8 @@
 export const MAP_LAYER_Z = {
   /** The map image, beneath everything. */
   mapImage: -2,
+  /** The level's shade (`ShadeLayer`): the shadows its map was drawn without, multiplied over it, beneath the liquids as when they were painted into it. */
+  shade: -1.5,
   /** Water, lava and acid moving on the map image, beneath the grid and all the lighting lights after the map. */
   liquids: -1,
   /** The cells under tokens being placed by hand, and their ripples when put down (GM only). */
