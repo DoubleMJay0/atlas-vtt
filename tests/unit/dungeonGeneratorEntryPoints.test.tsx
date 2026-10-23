@@ -119,16 +119,17 @@ describe('generating a dungeon from the note pin search', () => {
       input.dispatchEvent(new Event('input'));
       const entry = [...document.querySelectorAll<HTMLElement>('.pin-create-item')].find((item) => item.textContent?.includes('Generate dungeon'));
       expect(entry).toBeDefined();
-      let finish!: (scene: { scenePath: string }) => void;
+      let finish!: (scene: { scenePath: string; entryLevel?: string }) => void;
       vi.mocked(generateDungeonFor).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
       entry!.click();
       // The generator works over the map: the dropdown waits unseen meanwhile
       const dropdown = document.querySelector<HTMLElement>('#atlas-note-pin-dropdown')!;
       await waitFor(() => expect(dropdown.classList.contains('atlas-away')).toBe(true));
-      finish({ scenePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap' });
+      finish({ scenePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap', entryLevel: 'floor-a' });
       await waitFor(() => expect(Object.values(store.getState().objects.pins)).toHaveLength(1));
       expect(generateDungeonFor).toHaveBeenCalledWith(store, { name: 'Crypt', collectionId: 'Dungeons' });
-      expect(Object.values(store.getState().objects.pins)[0]).toMatchObject({ notePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap' });
+      // The pin opens the dungeon on its entry floor
+      expect(Object.values(store.getState().objects.pins)[0]).toMatchObject({ notePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap', sceneLevel: 'floor-a' });
     } finally {
       tool.destroy();
     }

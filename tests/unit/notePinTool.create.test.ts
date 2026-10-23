@@ -24,13 +24,13 @@ describe('noteCreateEntry', () => {
     const { app, getNewFileParent } = vaultWithNotesFolder({ 'Notes/Inn.md': '' });
     const path = await noteCreateEntry(app, MAP_PATH).create('Cellar');
     expect(getNewFileParent).toHaveBeenCalledWith(MAP_PATH);
-    expect(path).toBe('Notes/Cellar.md');
+    expect(path).toEqual({ path: 'Notes/Cellar.md' });
     expect(await app.vault.adapter.read('Notes/Cellar.md')).toBe('');
   });
 
   it('numbers a name the folder already holds, in any letter case', async () => {
     const { app } = vaultWithNotesFolder({ 'Notes/Inn.md': '', 'Notes/inn 2.md': '' });
-    expect(await noteCreateEntry(app, MAP_PATH).create('Inn')).toBe('Notes/Inn 3.md');
+    expect(await noteCreateEntry(app, MAP_PATH).create('Inn')).toEqual({ path: 'Notes/Inn 3.md' });
   });
 });
 

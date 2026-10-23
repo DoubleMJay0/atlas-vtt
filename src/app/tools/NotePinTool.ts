@@ -24,6 +24,8 @@ interface NotePinDropdownResult {
   accepted: boolean;
   notePath?: string;
   icon?: string;
+  /** The floor a scene made for the pin opens on. */
+  sceneLevel?: string;
 }
 
 /**
@@ -179,9 +181,9 @@ export class NotePinTool {
         app: this.obsidianApp,
         mapPath,
         createEntries: this.createEntries(mapPath),
-        onPick: (notePath) => {
+        onPick: (notePath, sceneLevel) => {
           this.closeDropdown();
-          resolve({ accepted: true, notePath, icon: selectedIcon });
+          resolve({ accepted: true, notePath, icon: selectedIcon, ...(sceneLevel && { sceneLevel }) });
         },
         onCancel: () => {
           this.closeDropdown();
@@ -317,7 +319,7 @@ export class NotePinTool {
     const result = await this.showNotePinDropdown(worldX, worldY);
 
     if (result.accepted && result.notePath) {
-      this.store.getState().addNotePin(worldX, worldY, result.notePath, result.icon);
+      this.store.getState().addNotePin(worldX, worldY, result.notePath, result.icon, { ...(result.sceneLevel && { sceneLevel: result.sceneLevel }) });
     }
     this.releasePreviewAfterDropdown();
   }
@@ -337,7 +339,7 @@ export class NotePinTool {
     } else {
       const result = await this.showNotePinDropdown(center.x, center.y);
       if (result.accepted && result.notePath) {
-        this.store.getState().addNotePin(center.x, center.y, result.notePath, result.icon, { hex: true });
+        this.store.getState().addNotePin(center.x, center.y, result.notePath, result.icon, { hex: true, ...(result.sceneLevel && { sceneLevel: result.sceneLevel }) });
       }
     }
     this.releasePreviewAfterDropdown();

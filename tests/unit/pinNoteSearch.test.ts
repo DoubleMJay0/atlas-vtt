@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { App, TFile } from 'obsidian';
 import { createPinNoteSearch } from '../../src/app/tools/pinNoteSearch';
-import { noteNameProblem, type PinCreateEntry } from '../../src/app/tools/pinCreateEntries';
+import { noteNameProblem, type PinCreateEntry, type PinLinkTarget } from '../../src/app/tools/pinCreateEntries';
 
 let container: HTMLElement;
 
@@ -187,7 +187,7 @@ describe('pin note search create entries', () => {
   });
   afterEach(() => container.remove());
 
-  const noteEntry = (create: (name: string) => Promise<string | null>): PinCreateEntry => ({
+  const noteEntry = (create: (name: string) => Promise<PinLinkTarget | null>): PinCreateEntry => ({
     id: 'note',
     label: (name) => `Create note “${name}”`,
     icon: 'file-plus',
@@ -211,7 +211,7 @@ describe('pin note search create entries', () => {
   });
 
   it('lists them first and active, in the order given, and moves past them with the keys', async () => {
-    const dungeon = vi.fn(async () => 'Dungeons/Crypt.atlasmap');
+    const dungeon = vi.fn(async () => ({ path: 'Dungeons/Crypt.atlasmap', sceneLevel: 'floor-a' }));
     const { onPick } = setup({
       createEntries: [noteEntry(async () => null), { id: 'dungeon', label: (name) => `Generate “${name}”`, icon: 'castle', create: dungeon }],
     });
@@ -222,12 +222,13 @@ describe('pin note search create entries', () => {
     press('Enter');
     expect(dungeon).toHaveBeenCalledWith('Te');
     await settle();
-    expect(onPick).toHaveBeenCalledWith('Dungeons/Crypt.atlasmap');
+    // A scene made for the pin names the floor it opens on
+    expect(onPick).toHaveBeenCalledWith('Dungeons/Crypt.atlasmap', 'floor-a');
   });
 
   it('picks the path created on Enter, once, with the name as typed', async () => {
-    let finish: (path: string) => void = () => undefined;
-    const create = vi.fn(() => new Promise<string | null>((resolve) => { finish = resolve; }));
+    let finish: (target: PinLinkTarget) => void = () => undefined;
+    const create = vi.fn(() => new Promise<PinLinkTarget | null>((resolve) => { finish = resolve; }));
     const { onPick } = setup({ createEntries: [noteEntry(create)] });
     type(' Cellar ');
     press('Enter');
@@ -237,10 +238,10 @@ describe('pin note search create entries', () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledWith('Cellar');
     expect(onPick).not.toHaveBeenCalled();
-    finish('Notes/Cellar.md');
+    finish({ path: 'Notes/Cellar.md' });
     await settle();
     expect(onPick).toHaveBeenCalledTimes(1);
-    expect(onPick).toHaveBeenCalledWith('Notes/Cellar.md');
+    expect(onPick).toHaveBeenCalledWith('Notes/Cellar.md', undefined);
   });
 
   it('picks nothing when the create is cancelled, and lets the search go on', async () => {

@@ -44,9 +44,9 @@ export async function showDungeonGenerator(app: App, collectionId: string): Prom
  * collection fixed. Resolves with the scene once it was created (the generator closes and the
  * map shows again), or null when the generator closed without one.
  */
-export function generateDungeonFor(store: StoreApi<ViewAtlasState>, options: { name: string; collectionId: string }): Promise<{ scenePath: string } | null> {
+export function generateDungeonFor(store: StoreApi<ViewAtlasState>, options: { name: string; collectionId: string }): Promise<{ scenePath: string; entryLevel?: string } | null> {
   return new Promise((resolve) => {
     const id = open(store, options.collectionId, options.name, true);
-    waiting.set(id, (scene) => resolve(scene ? { scenePath: scene.scenePath } : null));
+    waiting.set(id, (scene) => resolve(scene ? { scenePath: scene.scenePath, ...(scene.entryLevel && { entryLevel: scene.entryLevel }) } : null));
   });
 }

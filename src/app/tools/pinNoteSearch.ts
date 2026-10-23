@@ -4,7 +4,7 @@ import { t } from '../i18n';
 import { baseName, parentPath } from '../utils/pathUtils';
 import { STANDING_LIST } from '../keyboard/tooltipEscape';
 import { runInBackground } from '../utils/backgroundTask';
-import type { PinCreateEntry } from './pinCreateEntries';
+import type { PinCreateEntry, PinLinkTarget } from './pinCreateEntries';
 
 const RESULT_LIMIT = 30;
 
@@ -12,8 +12,8 @@ export interface PinNoteSearchOptions {
   app: App;
   /** The map the pin goes on; it may only link to scenes of its own collection. */
   mapPath: string | null;
-  /** A note (optionally `path#heading`) was chosen. */
-  onPick: (notePath: string) => void;
+  /** A note (optionally `path#heading`) was chosen; a scene made for the pin names the floor it opens on. */
+  onPick: (notePath: string, sceneLevel?: string) => void;
   onCancel: () => void;
   /** Ways to make what a typed name names, offered first while no file carries that name. */
   createEntries?: readonly PinCreateEntry[];
@@ -128,14 +128,14 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
   const createAndPick = async (entry: PinCreateEntry, name: string): Promise<void> => {
     creating = true;
     if (entry.away) container.addClass('atlas-away');
-    let path: string | null;
+    let target: PinLinkTarget | null;
     try {
-      path = await entry.create(name);
+      target = await entry.create(name);
     } finally {
       creating = false;
       container.removeClass('atlas-away');
     }
-    if (path !== null) options.onPick(path);
+    if (target !== null) options.onPick(target.path, target.sceneLevel);
   };
 
   /** The create entries for a typed name no file carries; one whose name is unusable shows why, and is skipped by the keys. */

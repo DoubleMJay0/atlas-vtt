@@ -20,8 +20,14 @@ export interface PinCreateEntry {
   away?: boolean;
   /** Why `name` cannot be used, shown under a disabled entry; null where it can. */
   problem?: (name: string) => string | null;
-  /** Makes it and returns the vault path the pin links, or null when the GM cancelled. */
-  create: (name: string) => Promise<string | null>;
+  /** Makes it and returns what the pin links, or null when the GM cancelled. */
+  create: (name: string) => Promise<PinLinkTarget | null>;
+}
+
+/** What a new pin links: a vault path, and for a scene of several floors the floor it opens on. */
+export interface PinLinkTarget {
+  path: string;
+  sceneLevel?: string;
 }
 
 /** Why `name` cannot name a note, or null when it can. */
@@ -44,7 +50,7 @@ export function noteCreateEntry(app: App, mapPath: string | null): PinCreateEntr
     create: async (name) => {
       const folder = app.fileManager.getNewFileParent(mapPath ?? '');
       const file = await app.vault.create(freeNotePath(app, folder, name), '');
-      return file.path;
+      return { path: file.path };
     },
   };
 }
@@ -62,6 +68,9 @@ export function dungeonCreateEntry(store: StoreApi<ViewAtlasState>, mapPath: str
     label: (name) => t('pin.search.generateDungeon', { name }),
     icon: 'castle',
     away: true,
-    create: async (name) => (await generateDungeonFor(store, { name, collectionId }))?.scenePath ?? null,
+    create: async (name) => {
+      const scene = await generateDungeonFor(store, { name, collectionId });
+      return scene ? { path: scene.scenePath, ...(scene.entryLevel && { sceneLevel: scene.entryLevel }) } : null;
+    },
   };
 }
