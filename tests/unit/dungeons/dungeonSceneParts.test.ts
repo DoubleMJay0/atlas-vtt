@@ -111,11 +111,43 @@ describe('a dungeon of several floors as one scene', () => {
   });
 });
 
+describe('the holes and bridges of a dungeon of several floors', () => {
+  it('open the floor over the floor below on exactly their cells, bridges laid over them, none on the deepest floor', () => {
+    let holes = 0;
+    let bridges = 0;
+    const area = (ring: { x: number; y: number }[]): number => Math.abs(ring.reduce((sum, p, i) => sum + p.x * ring[(i + 1) % ring.length]!.y - ring[(i + 1) % ring.length]!.x * p.y, 0) / 2);
+    for (let seed = 1; seed <= 30 && holes < 5; seed++) {
+      const model = generateDungeon({ seed, tags: ['large'], floors: 3 });
+      const { parts } = partsOf(model);
+      const ids = parts.levelIds!;
+      const surfaces = Object.values(parts.scene.levelSurfaces ?? {});
+      expect(surfaces.filter(surface => surface.level === ids[2])).toEqual([]);
+      model.floors.slice(0, 2).forEach((floor, index) => {
+        const on = surfaces.filter(surface => surface.level === ids[index]);
+        const open = on.filter(surface => surface.open);
+        const laid = on.filter(surface => !surface.open);
+        const cut = floor.terrain.filter(piece => piece.opening && ['chasm', 'shaft', 'gallery'].includes(piece.kind));
+        const over = floor.terrain.filter(piece => piece.kind === 'bridge' && cut.some(hole => hole.id === piece.spans));
+        holes += cut.length;
+        bridges += over.length;
+        expect(open.reduce((sum, s) => sum + area(s.polygon), 0)).toBeCloseTo(cut.reduce((sum, piece) => sum + piece.cells.length, 0) * PX * PX);
+        expect(laid.reduce((sum, s) => sum + area(s.polygon), 0)).toBeCloseTo(over.reduce((sum, piece) => sum + piece.cells.length, 0) * PX * PX);
+        // A bridge lies over its hole: after every opening
+        const order = on.map(surface => surface.open);
+        expect(order).toEqual([...open.map(() => true), ...laid.map(() => false)]);
+      });
+    }
+    expect(holes).toBeGreaterThan(0);
+    expect(bridges).toBeGreaterThan(0);
+  });
+});
+
 describe('a dungeon of one floor', () => {
   it('has no levels, and its walls, pins and features none either', () => {
     const { parts } = partsOf(generateDungeon({ seed: 11, tags: ['small'], floors: 1 }));
     expect(parts.levelIds).toBeNull();
     expect(parts.scene.levelLinks).toBeUndefined();
+    expect(parts.scene.levelSurfaces).toBeUndefined();
     expect(Object.values(parts.scene.walls).every(wall => wall.levels === undefined)).toBe(true);
     expect(Object.keys(parts.scene.walls).every(id => id.startsWith('wall_dungeon_'))).toBe(true);
     expect(parts.rooms.map(room => room.key).slice(0, 3)).toEqual(['1', '2', '3']);

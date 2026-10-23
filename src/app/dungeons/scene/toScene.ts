@@ -8,6 +8,8 @@ import { visibleDungeon, type VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { floorLetter } from './roomKeys';
 import { floorFeatures } from './toFeatures';
+import { floorSurfaces } from './toSurfaces';
+import type { LevelSurface } from '../../types/sceneLevelTypes';
 import type { MapFeature } from '../../types/mapFeatureTypes';
 import { objectShadows, tallObjects } from './objectShadows';
 import { noteRooms, type NoteRoom } from './toNote';
@@ -44,7 +46,8 @@ function floorWalls(dungeon: VisibleDungeon, style: DungeonStyle, view: DungeonV
 /**
  * What a dungeon brings to its scene on images of `image` pixels drawn at `placement`: the grid
  * drawn on the map (half cells with small tiles; the image's pixel 0 lies on a line of both),
- * every floor's walls and doors and its tall objects' outlines, the stairs between floors, the
+ * every floor's walls and doors and its tall objects' outlines, the stairs between floors and the
+ * openings into them (holes, and bridges laid over them), the
  * map features of every floor's terrain and furniture, the rooms of its note, no lights, and dynamic lighting in daylight, so nothing changes until the GM
  * dims it. A dungeon of several floors gets a level per floor; one of one floor none. Null when
  * the walls of a floor would crowd too much to be joined (`wallsCrowd`); a generated dungeon never does.
@@ -59,6 +62,7 @@ export function dungeonScene(
   const levelIds = model.floors.length > 1 ? model.floors.map(() => newLevelId()) : null;
   const walls: Record<string, WallSegment> = {};
   const features: Record<string, MapFeature> = {};
+  const surfaces: Record<string, LevelSurface> = {};
   const doors: Partial<Record<DoorKind, number>> = {};
   let unplaced = 0;
   for (const index of model.floors.keys()) {
@@ -67,7 +71,9 @@ export function dungeonScene(
     const floor = floorWalls(dungeon, style, view, placement, image, level);
     if (wallsCrowd(Object.values(floor.walls), image)) return null;
     Object.assign(walls, floor.walls);
-    Object.assign(features, floorFeatures(dungeon, view, placement, `feature_dungeon_${floorLetter(index).toLowerCase()}`, level));
+    const letter = floorLetter(index).toLowerCase();
+    Object.assign(features, floorFeatures(dungeon, view, placement, `feature_dungeon_${letter}`, level));
+    if (level) Object.assign(surfaces, floorSurfaces(dungeon, placement, `levelsurface_dungeon_${letter}`, level));
     for (const [kind, count] of Object.entries(floor.doors) as [DoorKind, number][]) doors[kind] = (doors[kind] ?? 0) + count;
     unplaced += floor.unplaced;
   }
@@ -80,6 +86,7 @@ export function dungeonScene(
       lights: {},
       lighting: { enabled: true, ambient: DAYLIGHT },
       ...(links && { levelLinks: links }),
+      ...(Object.keys(surfaces).length > 0 && { levelSurfaces: surfaces }),
       mapFeatures: features,
     },
     rooms: noteRooms(model, view, placement, levelIds),
