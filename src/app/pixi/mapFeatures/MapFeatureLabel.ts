@@ -7,6 +7,8 @@ const HOVER_DELAY_MS = 300;
 const POINTER_GAP = 14;
 /** How close to the window's edge the label may come before it moves to the pointer's other side. */
 const EDGE = 8;
+/** What hides the label at once, heard on the window in the capture phase. */
+const DISMISS_EVENTS = ['keydown', 'pointerdown', 'wheel', 'contextmenu'] as const;
 
 /**
  * The GM's hover label over the map, in Atlas's tooltip look (`.tooltip-content`): a DOM element in
@@ -32,7 +34,7 @@ export class MapFeatureLabel {
     const inner = this.el.createDiv({ cls: 'tooltip-inner' });
     this.title = inner.createSpan({ cls: 'tooltip-label' });
     this.traits = inner.createSpan({ cls: 'atlas-map-feature-label__traits' });
-    for (const type of ['keydown', 'pointerdown', 'wheel', 'contextmenu'] as const) this.win.addEventListener(type, this.dismiss, true);
+    for (const type of DISMISS_EVENTS) this.win.addEventListener(type, this.dismiss, true);
   }
 
   /** Whether the label names something, shown or waiting for the delay. */
@@ -74,7 +76,7 @@ export class MapFeatureLabel {
 
   destroy(): void {
     this.hide();
-    for (const type of ['keydown', 'pointerdown', 'wheel', 'contextmenu'] as const) this.win.removeEventListener(type, this.dismiss, true);
+    for (const type of DISMISS_EVENTS) this.win.removeEventListener(type, this.dismiss, true);
     this.el.remove();
   }
 

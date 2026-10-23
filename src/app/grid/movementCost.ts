@@ -39,7 +39,7 @@ export function movementCostInCells(grid: GridGeometry, points: readonly Point[]
   if (rules.difficultTerrain !== 'double' || !rules.difficult || points.length < 2 || !(grid.size > 0)) return length;
   return length + (isHexGridType(grid.type)
     ? hexExtra(createHexLayout(grid.type, grid.size, grid.offsetX ?? 0, grid.offsetY ?? 0), points, rules.difficult)
-    : squareExtra(grid, points, rules, Math.max(1, Math.round(footprint))));
+    : squareExtra(grid, points, rules.diagonalRule, rules.difficult, Math.max(1, Math.round(footprint))));
 }
 
 function hexExtra(layout: HexLayout, points: readonly Point[], difficult: DifficultCells): number {
@@ -57,11 +57,10 @@ function hexExtra(layout: HexLayout, points: readonly Point[], difficult: Diffic
   return extra;
 }
 
-function squareExtra(grid: GridGeometry, points: readonly Point[], rules: MovementRules, footprint: number): number {
+function squareExtra(grid: GridGeometry, points: readonly Point[], diagonalRule: DiagonalRule, difficult: DifficultCells, footprint: number): number {
   const { size } = grid;
   const offsetX = grid.offsetX ?? 0;
   const offsetY = grid.offsetY ?? 0;
-  const difficult = rules.difficult!;
   // The footprint's cells around the cell it starts from: an even footprint starts up and left of its centre.
   const low = -(Math.ceil(footprint / 2) - 1);
   const high = Math.floor(footprint / 2);
@@ -85,7 +84,7 @@ function squareExtra(grid: GridGeometry, points: readonly Point[], rules: Moveme
     const rows = Math.floor((b.y - offsetY) / size) - row0;
     const steps = Math.max(Math.abs(cols), Math.abs(rows));
     if (steps === 0) continue;
-    const share = pathLengthInCells(grid, [a, b], rules.diagonalRule) / steps;
+    const share = pathLengthInCells(grid, [a, b], diagonalRule) / steps;
     let col = col0;
     let row = row0;
     for (let step = 1; step <= steps; step++) {
@@ -93,7 +92,7 @@ function squareExtra(grid: GridGeometry, points: readonly Point[], rules: Moveme
       const nextRow = row0 + Math.round((rows * step) / steps);
       const diagonal = nextCol !== col && nextRow !== row;
       let cost = share;
-      if (rules.diagonalRule === 'alternating') cost = diagonal ? (diagonals % 2 === 0 ? 1 : 2) : 1;
+      if (diagonalRule === 'alternating') cost = diagonal && diagonals % 2 === 1 ? 2 : 1;
       if (diagonal) diagonals++;
       col = nextCol;
       row = nextRow;
