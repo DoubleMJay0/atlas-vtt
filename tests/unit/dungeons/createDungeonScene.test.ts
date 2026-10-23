@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
-import { mapLayout, suggestedPxPerCell } from '../../../src/app/dungeons/render/layoutSize';
+import { DEFAULT_PX_PER_CELL, mapLayout, suggestedPxPerCell } from '../../../src/app/dungeons/render/layoutSize';
 import { createDungeonSceneWith, dungeonSceneName, type DungeonSceneDeps, type DungeonSceneResult } from '../../../src/app/dungeons/scene/createDungeonScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
@@ -96,7 +96,7 @@ describe('creating a dungeon scene', () => {
     const result = created(await createDungeonSceneWith(b.deps, options()));
 
     expect(result).toEqual({ ok: true, name: TITLE, scenePath: `${SCENES}/${TITLE}.atlasmap` });
-    expect(b.jobs[0]!.output).toEqual({ kind: 'map', pxPerCell: 100 });
+    expect(b.jobs[0]!.output).toEqual({ kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL });
     const records = await recordsOf(b);
     expect(records.map(r => r.type).sort()).toEqual(['map', 'scene']);
     const map = records.find(r => r.type === 'map');
@@ -105,7 +105,7 @@ describe('creating a dungeon scene', () => {
 
     const state = sceneState(b, result.scenePath);
     expect(state.background).toBe(map.mapFilePath);
-    expect(state.grid).toMatchObject({ size: 100, offsetX: 0, offsetY: 0 });
+    expect(state.grid).toMatchObject({ size: DEFAULT_PX_PER_CELL, offsetX: 0, offsetY: 0 });
     expect(state.grid.autoDetect).toBeUndefined();
     expect(state.lighting).toEqual({ enabled: true, ambient: 1 });
     expect(state.objects.lights).toEqual({});
@@ -137,7 +137,7 @@ describe('creating a dungeon scene', () => {
     const result = created(await createDungeonSceneWith(b.deps, options()));
 
     const state = sceneState(b, result.scenePath);
-    expect(state.grid.size).toBe(50);
+    expect(state.grid.size).toBe(DEFAULT_PX_PER_CELL / 2);
   });
 
   it('leaves no file and no record when the scene cannot be written', async () => {
