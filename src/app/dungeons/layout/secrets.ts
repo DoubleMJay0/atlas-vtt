@@ -33,7 +33,7 @@ function isDeadEnd(layout: WorkLayout, root: number, members: ReadonlySet<number
 function isCandidate(layout: WorkLayout, id: number, limit: number): boolean {
   if (id === 0) return false;
   const wing = subtree(layout, id);
-  if (wing.length > limit || !wing.every((member) => roomAt(layout, member).zone === REGULAR_ZONE)) return false;
+  if (wing.length > limit || !wing.every((member) => roomAt(layout, member).zone === REGULAR_ZONE && !roomAt(layout, member).boss)) return false;
   return wing.some((member) => isNormal(roomAt(layout, member))) && isDeadEnd(layout, id, new Set(wing));
 }
 

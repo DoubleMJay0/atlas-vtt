@@ -85,13 +85,14 @@ function linkFloor(seed: number, above: FloorShape, below: FloorShape, index: nu
  * Floor `index`, grown from the landing of `descent`: under the floor above where it can keep every
  * rule there, else wherever it can.
  */
-function floorBelow(seed: number, params: DungeonParams, above: FloorShape, index: number, last: boolean, landing: DungeonStair): CompactLayout | null {
+function floorBelow(seed: number, params: DungeonParams, above: FloorShape, index: number, last: boolean, landing: DungeonStair, boss: boolean): CompactLayout | null {
   const request: FloorRequest = {
     floor: index,
     params: floorParams(params, index),
     rootOf: (rng) => landingRoot(rng, landing),
     reserved: null,
     within: underneath(above),
+    boss: boss && last,
     blocked: landingCells(landing),
     accept: (built) => linkFloor(seed, above, { ...built, stairs: [landing] }, index, last) !== null,
   };
@@ -100,13 +101,14 @@ function floorBelow(seed: number, params: DungeonParams, above: FloorShape, inde
   return (buildFloorLayout(seed, { ...request, within: null }) ?? under)?.layout ?? null;
 }
 
-export function planFloors(seed: number, params: DungeonParams, count: number): PlannedFloor[] {
+export function planFloors(seed: number, params: DungeonParams, count: number, boss: boolean): PlannedFloor[] {
   const entry = buildFloorLayout(seed, {
     floor: 0,
     params: floorParams(params, 0),
     rootOf: (rng) => ({ origin: { x: 0, y: 0 }, axis: pick(rng, AXES), seed: int(rng, 1, MAX_SEED) }),
     reserved: ENTRANCE_BLOCK,
     within: null,
+    boss: boss && count === 1,
     blocked: new Set(),
     accept: (layout) => count === 1 || chooseDescent(stairsRng(seed, 0, 'descent'), { ...layout, stairs: [] }, 0) !== null,
   });
@@ -120,7 +122,7 @@ export function planFloors(seed: number, params: DungeonParams, count: number): 
     const [down, up] = stairPair(descent.spot, index - 1, link++);
     const aboveWithStairs = { ...above, stairs: [...above.stairs, down] };
     const last = index === count - 1;
-    const layout = floorBelow(seed, params, aboveWithStairs, index, last, up);
+    const layout = floorBelow(seed, params, aboveWithStairs, index, last, up, boss);
     if (!layout) break;
     const extra = linkFloor(seed, aboveWithStairs, { ...layout, stairs: [up] }, index, last)?.extra ?? [];
     const pairs = extra.map((spot) => stairPair(spot, index - 1, link++));

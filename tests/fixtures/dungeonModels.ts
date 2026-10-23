@@ -15,7 +15,7 @@ export function smallDungeon(): DungeonModel {
   const corridor = addRoom(f, { x: 4, y: -3, w: 4, h: 1, parent: 0, axis: { x: 1, y: 0 } });
   const junction = addRoom(f, { x: 9, y: -3, w: 1, h: 1, parent: 2, axis: { x: 1, y: 0 } });
   const pond = addRoom(f, { x: 7, y: -9, w: 5, h: 5, parent: 3 });
-  const throne = addRoom(f, { x: 6, y: -1, w: 7, h: 6, parent: 3, colonnade: true, axis: { x: 0, y: 1 } });
+  const throne = addRoom(f, { x: 6, y: -1, w: 7, h: 6, parent: 3, colonnade: true, boss: true, axis: { x: 0, y: 1 } });
   const secret = addRoom(f, { x: -7, y: -5, w: 4, h: 5, parent: 0, wing: 'secret', axis: { x: -1, y: 0 } });
   const store = addRoom(f, { x: -8, y: -11, w: 5, h: 5, parent: 1, axis: { x: -1, y: 0 } });
   const shrine = addRoom(f, { x: 4, y: -11, w: 2, h: 5, parent: 1, axis: { x: 1, y: 0 } });

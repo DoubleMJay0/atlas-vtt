@@ -42,7 +42,7 @@ export function placeEntrances(rngOf: KeyedRng, layout: WorkLayout, params: Dung
   const reach = Math.max(...distances.filter(Number.isFinite));
   const near = Math.max(2, Math.ceil(reach * SECOND_ENTRANCE_REACH));
   const options = liveRooms(layout)
-    .filter((room) => room.id !== 0 && isNormal(room) && (distances[room.id] ?? 0) >= near)
+    .filter((room) => room.id !== 0 && !room.boss && isNormal(room) && (distances[room.id] ?? 0) >= near)
     .map((room) => ({ room, cells: freeOuterCells(layout, room, ground).filter(({ out }) => !sameDir(out, away)) }))
     .filter((option) => option.cells.length > 0);
   if (options.length === 0) return normalCount(layout) < TWO_ENTRANCES_FROM;

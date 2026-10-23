@@ -17,8 +17,16 @@ interface Edge {
   b: number;
 }
 
+/** One edge per pair of rooms a door joins: two doors between the same rooms are no loop. */
 function edgesOf(doors: readonly GraphDoor[], include: (door: GraphDoor) => boolean): Edge[] {
-  return doors.flatMap((door) => (door.from !== null && door.to !== null && include(door) ? [{ a: door.from, b: door.to }] : []));
+  const seen = new Set<string>();
+  return doors.flatMap((door) => {
+    if (door.from === null || door.to === null || !include(door)) return [];
+    const key = `${Math.min(door.from, door.to)}:${Math.max(door.from, door.to)}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ a: door.from, b: door.to }];
+  });
 }
 
 /** Every door between two rooms. */

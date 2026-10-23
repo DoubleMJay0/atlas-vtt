@@ -64,6 +64,7 @@ function newRoom(layout: WorkLayout, item: QueuedRoom, size: RoomSize, fixed: bo
     rotunda: false,
     colonnade: false,
     fixed,
+    boss: false,
   };
 }
 

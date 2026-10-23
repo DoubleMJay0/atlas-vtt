@@ -1,7 +1,8 @@
 /**
  * Loops: extra doors between rooms that share a long enough wall. The first closes a ring through
  * the way from the first room to the farthest, so a party has a choice where it matters; the rest,
- * about one per eight rooms, cut the longest ways short. Secret shortcuts come later
+ * about one per eight rooms, cut the longest ways short. None leads into the boss room, which
+ * stays behind the one room before it. Secret shortcuts come later
  * (`addSecretLoops`), once the secret wings are known.
  */
 
@@ -61,8 +62,11 @@ function sharedWallSpots(a: WorkRoom, b: WorkRoom): LoopSpot[] {
   return length >= 3 ? spots : [];
 }
 
-/** Pairs of rooms not yet joined that a door could join, with where it could stand; `allow` picks the pairs. */
-export function loopCandidates(layout: WorkLayout, allow: (a: WorkRoom, b: WorkRoom) => boolean): LoopCandidate[] {
+/**
+ * Pairs of rooms that a door could join, with where it could stand; `allow` picks the pairs, and
+ * pairs already joined count only with `relink`.
+ */
+export function loopCandidates(layout: WorkLayout, allow: (a: WorkRoom, b: WorkRoom) => boolean, relink = false): LoopCandidate[] {
   const linked = new Set(layout.doors.map((d) => `${Math.min(d.from ?? -1, d.to ?? -1)}:${Math.max(d.from ?? -1, d.to ?? -1)}`));
   const doorCells = new Set(layout.doors.map((d) => `${d.x},${d.y}`));
   const nearDoor = (c: CellPoint): boolean =>
@@ -74,7 +78,7 @@ export function loopCandidates(layout: WorkLayout, allow: (a: WorkRoom, b: WorkR
     for (let m = k + 1; m < rooms.length; m++) {
       const b = rooms[m] as WorkRoom;
       if (!rectsTouch(rects[k] as CellRect, rects[m] as CellRect) || !allow(a, b)) continue;
-      if (linked.has(`${Math.min(a.id, b.id)}:${Math.max(a.id, b.id)}`)) continue;
+      if (!relink && linked.has(`${Math.min(a.id, b.id)}:${Math.max(a.id, b.id)}`)) continue;
       const spots = sharedWallSpots(a, b).filter((spot) => !nearDoor(spot.cell) && doorMayOpen(layout, spot.cell, spot.dir));
       if (spots.length > 0) out.push({ a: a.id, b: b.id, spots });
     }
@@ -130,7 +134,7 @@ function ringMeets(layout: WorkLayout, candidate: LoopCandidate, way: ReadonlySe
 export function addLoops(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams): void {
   const rng = rngOf('loops');
   const target = loopTarget(rng, normalCount(layout), params);
-  let pending = loopCandidates(layout, (a, b) => a.zone === REGULAR_ZONE && b.zone === REGULAR_ZONE);
+  let pending = loopCandidates(layout, (a, b) => a.zone === REGULAR_ZONE && b.zone === REGULAR_ZONE && !a.boss && !b.boss);
   if (target === 0 || pending.length === 0) return;
   const way = new Set(mainWay(layout));
   const main = longCandidate(rng, layout, pending.filter((c) => ringMeets(layout, c, way)), MIN_MAIN_LOOP_COST - 1);
@@ -150,7 +154,7 @@ export function addLoops(rngOf: KeyedRng, layout: WorkLayout, params: DungeonPar
 export function addSecretLoops(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams): void {
   const rng = rngOf('secret-loops');
   if (!chance(rng, params.secretLoopChance)) return;
-  const pending = loopCandidates(layout, (a, b) => a.zone === b.zone || a.zone === REGULAR_ZONE || b.zone === REGULAR_ZONE);
+  const pending = loopCandidates(layout, (a, b) => !a.boss && !b.boss && (a.zone === b.zone || a.zone === REGULAR_ZONE || b.zone === REGULAR_ZONE));
   const shortcut = longCandidate(rng, layout, pending, MIN_LOOP_COST);
   if (shortcut) placeLoop(rng, layout, shortcut, 'secret', pending);
 }

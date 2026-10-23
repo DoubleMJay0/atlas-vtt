@@ -59,7 +59,7 @@ function distanceFrom(floor: FloorShape, from: readonly number[]): number[] {
 }
 
 function holdsStairs(room: DungeonRoom): boolean {
-  return room.kind === 'room' && !room.rotunda && room.wing === 'regular';
+  return room.kind === 'room' && !room.rotunda && !room.boss && room.wing === 'regular';
 }
 
 /** Where the first stairwell down from floor `index` stands: a room the farther from its entry and other stairs, the likelier. */

@@ -1,6 +1,7 @@
 /**
  * What a room is, read from the architecture alone: its size and shape, its place among the doors
- * (a dead end, a hub, the largest hall, the deepest room), and whether a stairwell stands in it.
+ * (a dead end, a hub, the largest hall, the deepest room, the boss room), and whether a stairwell
+ * stands in it.
  * Furniture follows from it; nothing here implies treasure or a fight.
  */
 
@@ -9,7 +10,7 @@ import { floorRect } from '../geometry';
 import { type Rng, weighted } from '../rng';
 import { hops, neighbours } from '../roomGraph';
 
-export type RoomRole = 'hall' | 'deepest' | 'stairs' | 'hub' | 'dead-end' | 'plain';
+export type RoomRole = 'boss' | 'hall' | 'deepest' | 'stairs' | 'hub' | 'dead-end' | 'plain';
 
 /** The largest hall must have at least this much floor. */
 const HALL_AREA = 12;
@@ -18,7 +19,7 @@ const DEEPEST_AREA = 6;
 /** The share of normal rooms left empty lies between these. */
 const EMPTY_SHARE: readonly [number, number] = [0.24, 0.36];
 /** How readily a room of each role is the one left empty. */
-const EMPTY_WEIGHT: Readonly<Record<RoomRole, number>> = { hall: 0, deepest: 1, stairs: 3, hub: 1, 'dead-end': 2, plain: 3 };
+const EMPTY_WEIGHT: Readonly<Record<RoomRole, number>> = { boss: 0, hall: 0, deepest: 1, stairs: 3, hub: 1, 'dead-end': 2, plain: 3 };
 /** Rooms this small are hard to furnish, so they are left empty first. */
 const TINY_AREA = 4;
 
@@ -54,6 +55,7 @@ export function roomRoles(rng: Rng, floor: { rooms: readonly DungeonRoom[]; door
   const deep = normal.reduce<DungeonRoom | undefined>((best, room) => (!best || (distance[room.id] ?? -1) > (distance[best.id] ?? -1) ? room : best), undefined);
   const deepRole = deep && roles.get(deep.id);
   if (deep && deepRole !== 'hall' && deepRole !== 'stairs' && area(deep) >= DEEPEST_AREA) roles.set(deep.id, 'deepest');
+  for (const room of normal) if (room.boss) roles.set(room.id, 'boss');
   return { roles, empty: emptyRooms(rng, normal, roles) };
 }
 

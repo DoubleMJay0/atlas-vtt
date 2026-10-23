@@ -45,6 +45,11 @@ export interface DungeonRoom {
   axis: CellDir;
   /** Column rows along the long walls, or a ring in a rotunda. */
   colonnade: boolean;
+  /**
+   * The boss room: the deepest floor's room farthest from where it is entered, larger than the
+   * rooms around it and reached through one room only. An arena, not a story: nothing is locked.
+   */
+  boss: boolean;
 }
 
 /**
@@ -168,6 +173,8 @@ export interface DungeonRequest {
   tags: string[];
   /** How many floors, 1 to `MAX_FLOORS`. */
   floors: number;
+  /** Whether the deepest floor has a boss room (`DungeonRoom.boss`); unset is yes. */
+  bossRoom?: boolean;
   /** 0..1; unset follows the tags (dry 0, wet 0.3, flooded 0.6, else random). */
   waterLevel?: number;
 }

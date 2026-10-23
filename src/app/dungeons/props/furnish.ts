@@ -1,8 +1,8 @@
 /**
- * Furniture from what a room is (`roles.ts`) and the dungeon's theme: the largest hall gets a dais
- * at its far wall or a centrepiece, the deepest room a shrine, a tomb or a seat, hubs a fountain,
- * well or statue, dead ends storage, shrines or tombs, other rooms a little of everything. Temple,
- * tomb and dwelling decide what stands where; nothing implies treasure or a fight.
+ * Furniture from what a room is (`roles.ts`) and the dungeon's theme: the boss room and the largest
+ * hall get a dais at the far wall or a centrepiece, the deepest room a shrine, a tomb or a seat,
+ * hubs a fountain, well or statue, dead ends storage, shrines or tombs, other rooms a little of
+ * everything. Temple, tomb and dwelling decide what stands where; nothing implies treasure.
  */
 
 import type { DungeonDoor, DungeonProp, PropKind } from '../model';
@@ -106,6 +106,7 @@ export function furnishRoom(rng: Rng, space: RoomSpace, role: RoomRole, doors: r
   const theme = themeOf(rng, floor.tags);
   const props = ((): DungeonProp[] => {
     switch (role) {
+      case 'boss':
       case 'hall':
         return hall(rng, space, doors, theme, floor);
       case 'deepest':

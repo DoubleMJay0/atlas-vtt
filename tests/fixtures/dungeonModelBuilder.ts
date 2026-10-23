@@ -47,6 +47,7 @@ export function addRoom(model: DungeonFloor, input: RoomInput): DungeonRoom {
     parent: null,
     axis: { x: 0, y: -1 },
     colonnade: false,
+    boss: false,
     ...input,
   };
   model.rooms.push(room);

@@ -27,6 +27,7 @@ export function compactLayout(layout: WorkLayout): CompactLayout {
       parent: renumber(room.parent),
       axis: room.axis,
       colonnade: room.colonnade,
+      boss: room.boss,
     };
   });
   const doors = layout.doors.map(

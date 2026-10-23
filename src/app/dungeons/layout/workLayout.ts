@@ -26,6 +26,7 @@ export interface WorkRoom {
   colonnade: boolean;
   /** Holds the landing of the stairs a floor grows from: it keeps its size and corners. */
   fixed: boolean;
+  boss: boolean;
 }
 
 export interface WorkDoor {

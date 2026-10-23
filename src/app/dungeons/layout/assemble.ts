@@ -7,6 +7,7 @@
 import type { CellRect } from '../geometry';
 import type { DungeonParams } from '../params';
 import { type KeyedRng, type Rng, floorStream } from '../rng';
+import { addBossDoor, placeBossRoom } from './boss';
 import { cleanUp } from './cleanup';
 import { type CompactLayout, compactLayout } from './compact';
 import { placeEntrances } from './entrances';
@@ -32,6 +33,8 @@ export interface FloorRequest {
   within: CellRect | null;
   /** Cells no door may open onto: the landing of the stairs from above. */
   blocked: ReadonlySet<string>;
+  /** Whether the floor has the boss room. */
+  boss: boolean;
   /** What else the finished floor must allow: the stairwells it needs to and from the floors beside it. */
   accept: (layout: CompactLayout) => boolean;
 }
@@ -41,11 +44,11 @@ interface Built {
   normals: number;
   /** Keeps the rules between floors, which no fallback may break. */
   linked: boolean;
-  /** How many of the floor's own rules it keeps: its fewest rooms, its loop, its entrances. */
+  /** How many of the floor's own rules it keeps: its fewest rooms, its entrances, its boss room, its loop. */
   kept: number;
 }
 
-const FLOOR_RULES = 3;
+const FLOOR_RULES = 4;
 
 function sound(built: Built): boolean {
   return built.linked && built.kept === FLOOR_RULES;
@@ -65,7 +68,9 @@ function attempt(seed: number, request: FloorRequest, index: number): Built | nu
   const work = growTree(rngOf, params, root, { reserved: request.reserved, within: request.within, blocked: request.blocked });
   const normals = normalCount(work);
   growPass(rngOf, work);
+  const boss = !request.boss || placeBossRoom(work);
   addLoops(rngOf, work, params);
+  addBossDoor(rngOf, work);
   placeSecretWings(rngOf, work, params);
   addSecretLoops(rngOf, work, params);
   cleanUp(work);
@@ -73,7 +78,7 @@ function attempt(seed: number, request: FloorRequest, index: number): Built | nu
   addSteps(rngOf, work, params);
   shapeRooms(rngOf, work, params);
   const layout = compactLayout(work);
-  const kept = [normals >= params.minRooms, entrances, floorRulesHold(layout)].filter(Boolean).length;
+  const kept = [normals >= params.minRooms, entrances, boss, floorRulesHold(layout)].filter(Boolean).length;
   return { layout, normals, linked: request.accept(layout), kept };
 }
 

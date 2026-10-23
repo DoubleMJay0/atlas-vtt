@@ -25,7 +25,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const tags = dungeonTags(seed, request.tags);
   const params = dungeonParams(tags);
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
-  const planned = planFloors(seed, params, floorCount(request.floors));
+  const planned = planFloors(seed, params, floorCount(request.floors), request.bossRoom !== false);
   const floors = planned.map((floor, index) => finishFloor(seed, index, floor, floorParams(params, index), level));
   return { version: DUNGEON_GENERATOR_VERSION, seed, tags, floors };
 }

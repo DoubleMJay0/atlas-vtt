@@ -132,6 +132,34 @@ export function describeInvariants(floors: number): void {
       ).toEqual([]);
     });
 
+    it('make one boss room on the deepest floor: the farthest dead end there, larger than the rooms around it, reached from one room', () => {
+      expect(
+        failures((run) => {
+          const deepest = run.model.floors.length - 1;
+          const problems: string[] = [];
+          run.model.floors.forEach((floor, i) => {
+            const bosses = floor.rooms.filter((room) => room.boss);
+            if (bosses.length !== (i === deepest ? 1 : 0)) problems.push(`floor ${i}: ${bosses.length} boss rooms`);
+            for (const boss of bosses) {
+              if (boss.kind !== 'room' || boss.wing !== 'regular' || floor.stairs.some((s) => s.x >= boss.x && s.x < boss.x + boss.w && s.y >= boss.y && s.y < boss.y + boss.h)) problems.push('a boss room that is no plain room');
+              const before = new Set(floor.doors.filter((d) => d.to === boss.id || d.from === boss.id).map((d) => (d.to === boss.id ? d.from : d.to)));
+              if (before.size !== 1 || before.has(null)) problems.push(`boss room entered from ${[...before].join(', ')}`);
+            }
+          });
+          return problems;
+        }),
+      ).toEqual([]);
+      const bosses = runs.map((run) => run.model.floors.at(-1)!).map((floor) => {
+        const boss = floor.rooms.find((room) => room.boss)!;
+        const others = normals(floor).filter((room) => !room.boss);
+        const mean = others.reduce((sum, room) => sum + room.w * room.h, 0) / Math.max(1, others.length);
+        return boss.w * boss.h > mean;
+      });
+      expect(bosses.filter(Boolean).length / bosses.length).toBeGreaterThan(0.85);
+      const without = generateDungeon({ seed: 5, tags: [], floors, bossRoom: false });
+      expect(without.floors.some((floor) => floor.rooms.some((room) => room.boss))).toBe(false);
+    });
+
     it('let the tags show', () => {
       const share = (tag: string, check: (model: DungeonModel) => boolean): number => {
         const tagged = runs.filter((run) => has(run, tag));

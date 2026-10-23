@@ -141,9 +141,21 @@ export function unreachableRooms(floor: DungeonFloor): number[] {
 
 const openDoors = (floor: DungeonFloor): DungeonDoor[] => floor.doors.filter((door) => door.kind !== 'secret');
 
+/** The doors a party finds between rooms, one per pair of rooms: two doors between the same rooms are no loop. */
+function linkDoors(floor: DungeonFloor): DungeonDoor[] {
+  const seen = new Set<string>();
+  return openDoors(floor).filter((door) => {
+    if (door.from === null || door.to === null) return false;
+    const key = `${Math.min(door.from, door.to)}:${Math.max(door.from, door.to)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /** Rooms on a loop of doors a party finds: those with a door whose loss leaves its two rooms joined. */
 export function roomsOnLoops(floor: DungeonFloor): Set<number> {
-  const doors = openDoors(floor).filter((door) => door.from !== null && door.to !== null);
+  const doors = linkDoors(floor);
   const out = new Set<number>();
   doors.forEach((door, k) => {
     const others = doors.filter((_, j) => j !== k);
@@ -157,7 +169,7 @@ export function roomsOnLoops(floor: DungeonFloor): Set<number> {
 
 /** E − V + C over the rooms and the doors a party finds. */
 export function independentLoops(floor: DungeonFloor): number {
-  const doors = openDoors(floor).filter((door) => door.from !== null && door.to !== null);
+  const doors = linkDoors(floor);
   const seen = new Set<number>();
   let parts = 0;
   for (const room of floor.rooms) {
