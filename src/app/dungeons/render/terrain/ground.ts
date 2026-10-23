@@ -43,7 +43,7 @@ export const SCATTER: Readonly<Partial<Record<TerrainKind, { size: number; perCe
   'chasm-floor': { size: 0.075, perCell: 9 },
 };
 
-/** The stones of a piece of scattered ground, the same every time it is drawn: the relief reads them too (`groundStones`). */
+/** The stones of a piece of scattered ground, the same every time it is drawn. */
 export function scatterStones(env: RenderEnv, piece: DungeonTerrain, size: number, perCell: number): ScatterStone[] {
   const rng = pieceRng(env, piece);
   const stones: ScatterStone[] = [];

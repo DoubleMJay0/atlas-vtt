@@ -6,8 +6,6 @@ import { standsOf } from '../art/stands';
 import { mapLayout } from '../layoutSize';
 import { createRenderEnv } from '../renderEnv';
 import { visibleDungeon } from '../visibleDungeon';
-import { groundStones } from './groundStones';
-import { plantStands } from './plantStands';
 
 /**
  * Pixels per cell of a floor's relief image: the detail of the soft fields the map's own shadows
@@ -25,8 +23,9 @@ export interface RasterImage {
 /**
  * How high everything on a floor stands, as a greyscale image over the map's whole layout (black
  * the floor, white a wall's height): the rock round the rooms and the walls, columns, props and
- * terrain that stands, raised floors, and loose stones and plants low. The scene's lighting casts each light's
- * shadows from it. Null outside a browser (no canvas to draw the relief on).
+ * terrain that stands and raised floors. What lies on the ground (loose stones, plants) is left out:
+ * a lamp casting their shadows was too much (Fabian, 2026-10-23); their small baked shadows stay on
+ * the shade. The scene's lighting casts each light's shadows from it. Null outside a browser (no canvas to draw the relief on).
  */
 export function renderRelief(model: DungeonModel, style: DungeonStyle, view: DungeonView, floor = 0): RasterImage | null {
   if (typeof OffscreenCanvas === 'undefined') return null;
@@ -36,7 +35,7 @@ export function renderRelief(model: DungeonModel, style: DungeonStyle, view: Dun
   const env = createRenderEnv(ctx, visibleDungeon(model, view, floor), style, view, RELIEF_PX_PER_CELL);
   const { originCell, cellsWide, cellsHigh } = layout;
   const grid = gridOver(originCell.x, originCell.y, originCell.x + cellsWide, originCell.y + cellsHigh, RELIEF_PX_PER_CELL);
-  const relief = rasterRelief(grid, env.dungeon.floors, [], [...standsOf(env), ...groundStones(env), ...plantStands(env)], (x, y) => env.dungeon.field.distance(x, y) > 0);
+  const relief = rasterRelief(grid, env.dungeon.floors, [], standsOf(env), (x, y) => env.dungeon.field.distance(x, y) > 0);
   const data = new Uint8ClampedArray(grid.w * grid.h * 4);
   relief.heights.forEach((height, k) => {
     const v = Math.round(height * 255);

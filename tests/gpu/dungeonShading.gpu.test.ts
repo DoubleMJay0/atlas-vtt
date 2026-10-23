@@ -27,7 +27,7 @@ describe('a generated floor\'s shading', () => {
   const model = generateDungeon(TEMPLE);
   const dungeon = visibleDungeon(model, DEFAULT_VIEW, 0);
 
-  it('has a relief: rock and walls a wall high, the floor flat, what stands as tall as it stands, loose stones low', () => {
+  it('has a relief: rock and walls a wall high, the floor flat, what stands as tall as it stands, loose stones left flat', () => {
     const relief = renderRelief(model, dungeonStyle('parchment'), DEFAULT_VIEW, 0)!;
     const layout = mapLayout(model, RELIEF_PX_PER_CELL, DEFAULT_VIEW);
     expect([relief.width, relief.height]).toEqual([layout.widthPx, layout.heightPx]);
@@ -48,14 +48,17 @@ describe('a generated floor\'s shading', () => {
     expect(heightAt(model, relief, middle(tall.cells))).toBeCloseTo(HEIGHT[tall.kind]!, 1);
     const column = dungeon.floor.columns.find((c) => !c.shattered && dungeon.field.distance(c.x, c.y) < 0);
     if (column) expect(heightAt(model, relief, column)).toBe(1);
-    // Rubble: low, but standing.
-    const stone = dungeon.floor.rubble.find((s) => s.points.length >= 3)!;
-    const low = heightAt(model, relief, { x: stone.points.reduce((sum, p) => sum + p.x, 0) / stone.points.length, y: stone.points.reduce((sum, p) => sum + p.y, 0) / stone.points.length });
-    expect(low).toBeGreaterThan(0.02);
-    expect(low).toBeLessThan(0.12);
+    // Rubble lies on the floor: no lamp casts its shadow (Fabian, 2026-10-23).
+    const centre = (points: readonly Point[]): Point => ({ x: points.reduce((sum, p) => sum + p.x, 0) / points.length, y: points.reduce((sum, p) => sum + p.y, 0) / points.length });
+    const stones = dungeon.floor.rubble.filter((s) => s.points.length >= 3).map((s) => centre(s.points))
+      .filter((p) => dungeon.field.distance(p.x, p.y) < -0.6 && !dungeon.floor.props.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 1.2)
+        && !dungeon.floor.columns.some((c) => Math.hypot(c.x - p.x, c.y - p.y) < 0.8)
+        && !dungeon.floor.terrain.some((piece) => piece.cells.some((c) => Math.abs(c.x + 0.5 - p.x) < 1.1 && Math.abs(c.y + 0.5 - p.y) < 1.1)));
+    expect(stones.length).toBeGreaterThan(0);
+    for (const p of stones) expect(heightAt(model, relief, p)).toBe(0);
   });
 
-  it('lets the plants on the floor of an overgrown dungeon stand in its relief, low', () => {
+  it('leaves the plants on the floor of an overgrown dungeon out of its relief', () => {
     const overgrown = generateDungeon({ seed: 12, tags: ['overgrown', 'wet'], floors: 1 });
     const style = dungeonStyle('moss');
     const relief = renderRelief(overgrown, style, DEFAULT_VIEW, 0)!;
@@ -63,8 +66,8 @@ describe('a generated floor\'s shading', () => {
     const forms = growthPicture(env).ground.filter((form) => form.leaves.length > 0);
     expect(forms.length).toBeGreaterThan(3);
     const heights = forms.map((form) => heightAt(overgrown, relief, { x: (form.bounds.minX + form.bounds.maxX) / 2, y: (form.bounds.minY + form.bounds.maxY) / 2 }));
-    expect(heights.filter((h) => h > 0.02).length).toBeGreaterThan(forms.length / 3);
-    expect(Math.max(...heights)).toBeLessThanOrEqual(0.41);
+    // Where a plant grows the floor is flat, unless something that stands (a prop, a raised floor) is there too.
+    expect(heights.filter((h) => h === 0).length).toBeGreaterThan(forms.length * 0.8);
   });
 
   it('leaves its map without the shadows the shade holds, and the shade darkens where they fell', () => {
