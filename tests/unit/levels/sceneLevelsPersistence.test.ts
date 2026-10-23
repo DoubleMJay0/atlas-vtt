@@ -85,6 +85,22 @@ describe('a scene with several levels on disk', () => {
     expect(tokens.map((token) => token.level)).toEqual(['upper', 'upper']);
   });
 
+  it('keeps stairs as the file has them, walked or not, with fields it does not know', async () => {
+    const square = [{ x: 0, y: 0 }, { x: 140, y: 0 }, { x: 140, y: 210 }, { x: 0, y: 210 }];
+    const levelLinks = {
+      walked: { id: 'walked', kind: 'level-link', polygon: square, levels: ['ground', 'upper'], flight: { foot: 2, rows: 3 }, future: 'kept' },
+      plain: { id: 'plain', kind: 'level-link', polygon: square, levels: ['ground', 'upper'], direction: 'up' },
+      odd: { id: 'odd', kind: 'level-link', polygon: square, levels: ['ground', 'upper'], flight: { foot: 9, rows: 3 } },
+    };
+    const harness = setup(JSON.stringify({ version: 5, state: sceneState({ version: 5, levels: LEVELS, objects: { ...(sceneState().objects as object), levelLinks } }) }));
+    expect(await harness.service.loadMap(harness.rendererService, SCENE, { centerX: 0, centerY: 0, scale: 1, level: 'ground' })).not.toBeNull();
+
+    harness.store.getState().addToken({ x: 5, y: 5, imagePath: 'tokens/rogue.png' });
+    await save(harness.store);
+
+    expect((savedFile(harness).state.objects as { levelLinks: unknown }).levelLinks).toEqual(levelLinks);
+  });
+
   it('opens on the first level where the tab names a level the scene lacks', async () => {
     const harness = setup(JSON.stringify({ version: 5, state: sceneState({ version: 5, levels: LEVELS }) }));
 

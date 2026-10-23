@@ -1,5 +1,6 @@
 import type { Viewport } from 'pixi-viewport';
-import { firstLinkTarget, levelLinkList, linkHeading, MAX_LEVEL_LINKS, MAX_LINK_CORNERS } from '../../levels/levelLinks';
+import { firstLinkTarget, flightOnLevel, levelLinkList, linkHeading, MAX_LEVEL_LINKS, MAX_LINK_CORNERS } from '../../levels/levelLinks';
+import { flightRows, type FlightEnds } from '../../levels/stairFlights';
 import { everyLevelObjects, levelObjects } from '../../levels/levelObjects';
 import { hasLevels, viewedLevelId } from '../../levels/sceneLevels';
 import type { ViewAtlasState, ViewAtlasStore } from '../../storeFactory';
@@ -52,11 +53,16 @@ export class LevelLinkEditor extends PolygonAreaEditor<LevelLink> {
       const from = viewedLevelId(state);
       return from === null ? 'none' : linkHeading(link, from, state.levels);
     };
+    const flight = (link: LevelLink): FlightEnds | null => {
+      const state = store.getState();
+      const from = viewedLevelId(state);
+      return from === null ? null : flightOnLevel(link, from, state.levels);
+    };
     super({
       viewport,
       canvas,
       store,
-      overlay: levelLinkOverlay(viewport, heading),
+      overlay: levelLinkOverlay(viewport, heading, flight),
       handleOf: (link) => areaHandlePoint(link.polygon),
       areas: {
         list: shownLinks,
@@ -70,7 +76,12 @@ export class LevelLinkEditor extends PolygonAreaEditor<LevelLink> {
           if (from === null || to === null) return;
           state.openLevelLinkPopover(state.addLevelLink({ polygon, levels: [from, to] }));
         },
-        reshape: (id, polygon) => store.getState().updateLevelLink(id, { polygon }),
+        reshape: (id, polygon) => {
+          // Walked stairs keep their foot, and as many rows as they are cells long.
+          const state = store.getState();
+          const flight = levelLinkList(everyLevelObjects(state).levelLinks).find((link) => link.id === id)?.flight;
+          state.updateLevelLink(id, { polygon, ...(flight && { flight: { ...flight, rows: flightRows(polygon, flight.foot, state.grid?.size ?? 0) } }) });
+        },
         remove: (id) => store.getState().deleteLevelLink(id),
         mayBegin: () => {
           // The map's limit counts the stairs of every level.

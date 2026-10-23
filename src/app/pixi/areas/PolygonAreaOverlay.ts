@@ -40,6 +40,8 @@ export interface AreaLook<Area extends PolygonArea> {
   handleOf: (area: Area) => Point;
   /** Draws what the handle shows of the area inside its badge (`AreaBadge`). */
   decorate: (g: Graphics, area: Area, badge: AreaBadge) => void;
+  /** Draws marks inside the area, under its outline (`at` is the handle's place). */
+  mark?: (g: Graphics, area: Area, badge: AreaBadge) => void;
   /** How strongly an area's outline shows while it is not edited; 0 shows nothing then. */
   restingAlpha: number;
 }
@@ -87,6 +89,8 @@ export class PolygonAreaOverlay<Area extends PolygonArea> {
     };
     for (const area of areas) {
       const color = area.id === selected ? theme.accent : theme.stroke;
+      const handle = this.look.handleOf(area);
+      this.look.mark?.(g, area, { at: handle, pixel, theme, alpha });
       outline(area.polygon, true, color);
       if (editing) {
         area.polygon.forEach((point, index) => {
@@ -94,7 +98,6 @@ export class PolygonAreaOverlay<Area extends PolygonArea> {
           dot(point, AREA_CORNER_RADIUS * (held ? 1.3 : 1), held ? color : theme.background, color);
         });
       }
-      const handle = this.look.handleOf(area);
       dot(handle, AREA_HANDLE_RADIUS, theme.background, color);
       this.look.decorate(g, area, { at: handle, pixel, theme, alpha });
     }

@@ -46,6 +46,8 @@ export const levels = {
   'levels.stairsUp': 'Up only',
   'levels.stairsDown': 'Down only',
   'levels.stairsBoth': 'Both ways',
+  'levels.stairsWalked': 'Walked from one end',
+  'levels.stairsTurn': 'Turn',
   'levels.stairsNowhere': 'From this level they lead nowhere. Pick a level above or below, or let them lead both ways.',
   'levels.stairsGoUp': 'Up to {name}',
   'levels.stairsGoDown': 'Down to {name}',

@@ -1,8 +1,9 @@
 import React, { useId, useRef } from 'react';
 import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
-import { Trash2 } from 'lucide-react';
+import { RotateCw, Trash2 } from 'lucide-react';
 import { t } from '../../../i18n';
 import { linkDirection, linkLevels, linkTargets } from '../../../levels/levelLinks';
+import { flightRows, mayHoldFlight } from '../../../levels/stairFlights';
 import { levelObjects } from '../../../levels/levelObjects';
 import { viewedLevelId } from '../../../levels/sceneLevels';
 import { Button } from '../../../packages/components/primitives/button';
@@ -12,7 +13,7 @@ import { ToggleSwitch } from '../../../packages/components/primitives/Toggle';
 import { TooltipProvider } from '../../../packages/components/primitives/tooltip';
 import { AREA_HANDLE_RADIUS } from '../../../pixi/areas/areaGeometry';
 import { useMapPopoverPosition } from '../../../pixi/lighting/useLightPopoverPosition';
-import type { LevelLinkDirection, SceneLevel } from '../../../types/sceneLevelTypes';
+import type { LevelLink, LevelLinkDirection, SceneLevel } from '../../../types/sceneLevelTypes';
 import { areaHandlePoint } from '../../../vision/polygonArea';
 import { useAtlasStore, useViewStoreHook } from '../../ViewStoreContext';
 import { levelLabel } from './levelEditing';
@@ -28,8 +29,8 @@ const DIRECTIONS: readonly { value: LevelLinkDirection; label: string }[] = [
 
 /**
  * The popover of the stairs the GM edits (store `levelLinkPopover`), beside their badge on the map:
- * which other levels they join, which way they lead, and Delete. Every control writes to the store
- * at once, one undo step each.
+ * which other levels they join, which way they lead, whether they are walked (`FlightRow`), and
+ * Delete. Every control writes to the store at once, one undo step each.
  */
 export function LevelLinkPopoverHost(): React.ReactElement {
   const linkId = useAtlasStore((state) => state.levelLinkPopover);
@@ -102,6 +103,7 @@ function LevelLinkPopover({ linkId }: { linkId: string }): React.ReactElement | 
           onChange={(direction) => store.getState().updateLevelLink(link.id, { direction: direction === 'both' ? undefined : direction })}
         />
         {linkTargets(link, here, levels).length === 0 && <p className="atlas-light-popover__hint">{t('levels.stairsNowhere')}</p>}
+        <FlightRow link={link} walkable={mayHoldFlight(link.polygon) && joined.length === 2} />
       </div>
       <div className="atlas-light-popover__section atlas-light-popover__actions">
         <span />
@@ -125,3 +127,33 @@ function LevelRow({ name, joined, locked, onToggle }: { name: string; joined: bo
   );
 }
 
+/** The edge stairs are stepped on from at first: the shorter of two neighbouring edges, as stairs are longer than wide. */
+function firstFoot(polygon: LevelLink['polygon']): number {
+  const length = (index: number): number => Math.hypot(polygon[(index + 1) % 4]!.x - polygon[index]!.x, polygon[(index + 1) % 4]!.y - polygon[index]!.y);
+  return length(0) <= length(1) ? 0 : 1;
+}
+
+/**
+ * Whether stairs of four corners joining two levels are walked (`LevelLink.flight`): stepped on only
+ * at the end marked with a chevron and changing level in the row filled at the far end. Turn moves
+ * the foot to the next edge; the rows follow the grid. Disabled, not removed, where stairs cannot be walked.
+ */
+function FlightRow({ link, walkable }: { link: LevelLink; walkable: boolean }): React.ReactElement {
+  const store = useViewStoreHook();
+  const cell = useAtlasStore((state) => state.grid?.size ?? 0);
+  const id = useId();
+  const walked = walkable && link.flight !== undefined;
+  const setFoot = (foot: number | null): void => {
+    store.getState().updateLevelLink(link.id, { flight: foot === null ? undefined : { foot, rows: flightRows(link.polygon, foot, cell) } });
+  };
+  return (
+    <div className="atlas-light-popover__flicker">
+      <span id={id}>{t('levels.stairsWalked')}</span>
+      <Button variant="ghost" size="sm" disabled={!walked} onClick={() => setFoot(((link.flight?.foot ?? 0) + 1) % 4)}>
+        <RotateCw />
+        <span>{t('levels.stairsTurn')}</span>
+      </Button>
+      <ToggleSwitch size="s" value={walked} labelledBy={id} disabled={!walkable} onChange={() => setFoot(walked ? null : firstFoot(link.polygon))} />
+    </div>
+  );
+}

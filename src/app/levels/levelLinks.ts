@@ -1,7 +1,8 @@
 /**
  * Stairs and other level links (Foundry's Change Level region): areas that join the levels they
  * stand on. A token put down inside one goes to another of its levels at the same place, as far as
- * the link's direction lets it. The one place that decides where a link leads.
+ * the link's direction lets it; inside walked stairs only in their last row (`flightOnLevel`). The
+ * one place that decides where a link leads.
  */
 
 import type { LevelLink, LevelLinkDirection } from '../types/sceneLevelTypes';
@@ -10,6 +11,7 @@ import { isRecord } from '../utils/guards';
 import { hasArea } from '../vision/polygonArea';
 import { pointInPolygon } from '../vision/visibility';
 import { hasLevels, onLevel, resolveLevel, type SceneLevels } from './sceneLevels';
+import { flightEnds, readFlight, type FlightEnds } from './stairFlights';
 
 /** The corners a link may have. */
 export const MAX_LINK_CORNERS = 64;
@@ -25,18 +27,23 @@ function isPoint(value: unknown): value is Point {
   return isRecord(value) && typeof value.x === 'number' && typeof value.y === 'number' && Number.isFinite(value.x) && Number.isFinite(value.y);
 }
 
-/** A link as it is read: `id` is its place in the record; a direction it does not know reads as both ways. */
+/**
+ * A link as it is read: `id` is its place in the record; a direction it does not know reads as both
+ * ways, and a flight it cannot have (`readFlight`) as none.
+ */
 function readLink(id: string, value: unknown): LevelLink | null {
   if (!isRecord(value)) return null;
   const { polygon, levels, direction } = value;
   if (!Array.isArray(polygon) || polygon.length < 3 || polygon.length > MAX_LINK_CORNERS || !polygon.every(isPoint) || !hasArea(polygon)) return null;
   const set = levels === 'all' ? 'all' : Array.isArray(levels) ? levels.filter((entry): entry is string => typeof entry === 'string') : undefined;
+  const flight = readFlight(value.flight, polygon.length);
   return {
     id,
     kind: 'level-link',
     polygon,
     ...(set !== undefined && { levels: set }),
     ...(DIRECTIONS.includes(direction as LevelLinkDirection) && direction !== 'both' && { direction: direction as LevelLinkDirection }),
+    ...(flight && { flight }),
   };
 }
 
@@ -90,13 +97,35 @@ export function linkTargets(link: LevelLink, from: string, levels: SceneLevels):
   return ends.filter((id) => id !== from && (direction === 'both' || (direction === 'up' ? index(id) > at : index(id) < at)));
 }
 
-/** The link a token standing at `point` on level `from` steps into: the latest drawn that contains the point and leads somewhere. */
+/**
+ * A walked flight's ends on level `from` (`flightEnds`): null where the link has no flight, or does
+ * not join exactly two levels with `from` among them; such a link changes a token's level anywhere inside.
+ */
+export function flightOnLevel(link: LevelLink, from: string, levels: SceneLevels): FlightEnds | null {
+  const { flight } = link;
+  if (!flight) return null;
+  const ends = linkLevels(link, levels);
+  if (ends.length !== 2 || !ends.includes(from)) return null;
+  return flightEnds(link.polygon, flight, ends[0] === from);
+}
+
+/**
+ * The link a token put down at `point` on level `from` takes: the latest drawn that contains the
+ * point and leads somewhere; of walked stairs only their last row at the far end (`flightOnLevel`).
+ */
 export function linkAt(links: readonly LevelLink[], point: Point, from: string, levels: SceneLevels): LevelLink | null {
   for (let i = links.length - 1; i >= 0; i--) {
     const link = links[i]!;
-    if (pointInPolygon(point, link.polygon) && linkTargets(link, from, levels).length > 0) return link;
+    if (!pointInPolygon(point, link.polygon) || linkTargets(link, from, levels).length === 0) continue;
+    const flight = flightOnLevel(link, from, levels);
+    if (!flight || pointInPolygon(point, flight.band)) return link;
   }
   return null;
+}
+
+/** The edges of walked stairs on level `level` that a walking token may not cross: all but each flight's ground end there. */
+export function flightSides(links: readonly LevelLink[], level: string, levels: SceneLevels): [Point, Point][] {
+  return links.flatMap((link) => flightOnLevel(link, level, levels)?.closed ?? []);
 }
 
 /** What a drop reads of a scene. */
