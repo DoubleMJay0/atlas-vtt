@@ -18,6 +18,8 @@ export interface BelowPicture {
 type SnapshotLook = LightingMode | 'picture';
 
 interface Snapshot {
+  look: SnapshotLook;
+  levelId: string;
   texture: RenderTexture;
   /** What the texture was last drawn at; null before its first draw. */
   drawn: SnapshotDrawn | null;
@@ -46,12 +48,12 @@ export class BelowSnapshots {
   draw(levels: Iterable<BelowLevel>, stack: LevelStack, grid: SnapshotGrid, picture: BelowPicture, tokens: (token: TokenEntity) => BelowTokenLook): BelowPictures {
     const look: SnapshotLook = picture.key === 'thumbnail' ? 'picture' : picture.mode;
     this.use(picture.key, look);
+    const belowLook: BelowLook = { mode: look === 'player' ? 'player' : 'gm', picture: look === 'picture' };
     const shown: [Texture | null, Texture | null] = [null, null];
     for (const level of levels) {
       if (!level.ready() || !showsBelow(stack, level.index)) continue;
       const snapshot = this.snapshotFor(look, level.id, grid);
-      const looks: BelowLook = { mode: look === 'player' ? 'player' : 'gm', picture: look === 'picture' };
-      snapshot.drawn = level.draw(looks, snapshot.texture, tokens, snapshot.drawn);
+      snapshot.drawn = level.draw(belowLook, snapshot.texture, tokens, snapshot.drawn);
       if (snapshot.drawn) shown[level.index - 1] = snapshot.texture;
     }
     return { textures: shown, x: grid.x, y: grid.y, sub: grid.sub };
@@ -62,11 +64,12 @@ export class BelowSnapshots {
     const box = stack.box;
     if (!box) return false;
     const inverse = camera.clone().invert();
-    const corners = [[0, 0], [width, 0], [0, height], [width, height]].map(([x, y]) => inverse.apply({ x: x!, y: y! }));
+    const corners = [{ x: 0, y: 0 }, { x: width, y: 0 }, { x: 0, y: height }, { x: width, y: height }].map((corner) => inverse.apply(corner));
+    const xs = corners.map((p) => p.x);
+    const ys = corners.map((p) => p.y);
     const { texel } = stack.grid;
-    const [minX, maxX] = [Math.min(...corners.map((p) => p.x)), Math.max(...corners.map((p) => p.x))];
-    const [minY, maxY] = [Math.min(...corners.map((p) => p.y)), Math.max(...corners.map((p) => p.y))];
-    return maxX >= box.x * texel && minX <= (box.x + box.columns) * texel && maxY >= box.y * texel && minY <= (box.y + box.rows) * texel;
+    return Math.max(...xs) >= box.x * texel && Math.min(...xs) <= (box.x + box.columns) * texel
+      && Math.max(...ys) >= box.y * texel && Math.min(...ys) <= (box.y + box.rows) * texel;
   }
 
   /**
@@ -86,7 +89,7 @@ export class BelowSnapshots {
 
   /** A level's snapshots go with the level. */
   releaseLevel(levelId: string): void {
-    for (const [key, snapshot] of [...this.snapshots]) if (key.slice(key.indexOf('/') + 1) === levelId) this.drop(key, snapshot);
+    for (const [key, snapshot] of [...this.snapshots]) if (snapshot.levelId === levelId) this.drop(key, snapshot);
   }
 
   destroy(): void {
@@ -103,7 +106,7 @@ export class BelowSnapshots {
 
   private dropUnused(look: SnapshotLook): void {
     if ([...this.looks.values()].includes(look)) return;
-    for (const [key, snapshot] of [...this.snapshots]) if (key.startsWith(`${look}/`)) this.drop(key, snapshot);
+    for (const [key, snapshot] of [...this.snapshots]) if (snapshot.look === look) this.drop(key, snapshot);
   }
 
   /** The snapshot of level `levelId` in `look`, made anew where the grid's size changed. */
@@ -113,7 +116,7 @@ export class BelowSnapshots {
     if (current && current.texture.source.pixelWidth === grid.width && current.texture.source.pixelHeight === grid.height) return current;
     if (current) this.drop(key, current);
     const texture = RenderTexture.create({ width: grid.width, height: grid.height, resolution: 1, antialias: false, scaleMode: 'nearest' });
-    const made: Snapshot = { texture, drawn: null };
+    const made: Snapshot = { look, levelId, texture, drawn: null };
     this.snapshots.set(key, made);
     return made;
   }

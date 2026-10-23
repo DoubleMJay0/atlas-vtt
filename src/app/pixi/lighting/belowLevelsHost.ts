@@ -20,12 +20,15 @@ import { LiquidLayer, type LiquidLayerDeps } from '../liquids/LiquidLayer';
 import type { RoofHost, RoofImageRead } from './levels/Roof';
 import type { Point } from '../../types/visionTypes';
 
+type LiquidStore = LiquidLayerDeps['store'];
+type LiquidsState = ReturnType<LiquidStore['getState']>;
+
 export interface BelowLevelsHostDeps {
   obsApp: App;
   app: Application;
   viewport: Viewport;
   /** The view's store, whose liquids the levels below draw on their own level. */
-  store: LiquidLayerDeps['store'];
+  store: LiquidStore;
   /** The committed fog of the level the view shows. */
   viewedFog: () => FogCover;
   /** Whether the roof of the level the view shows covers a point in the players' picture. */
@@ -103,8 +106,8 @@ function createViewMapImage(obsApp: App, app: Application, viewport: Viewport, c
 }
 
 /** The liquids of `level`, held still (a level below shows them in its snapshot, which never moves). */
-function createLevelLiquids(app: Application, store: LiquidLayerDeps['store'], level: string, changed: () => void): BelowLiquids {
-  const onLevel = (state: ReturnType<LiquidLayerDeps['store']['getState']>): ReturnType<LiquidLayerDeps['store']['getState']> => ({ objects: everyLevelObjects(state), levels: state.levels, grid: state.grid, viewedLevel: level });
+function createLevelLiquids(app: Application, store: LiquidStore, level: string, changed: () => void): BelowLiquids {
+  const onLevel = (state: LiquidsState): LiquidsState => ({ objects: everyLevelObjects(state), levels: state.levels, grid: state.grid, viewedLevel: level });
   const layer = new LiquidLayer({
     store: { getState: () => onLevel(store.getState()), subscribe: (listener) => store.subscribe((state) => listener(onLevel(state))) },
     ticker: app.ticker,

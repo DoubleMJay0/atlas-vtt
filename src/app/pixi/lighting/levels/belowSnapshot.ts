@@ -34,8 +34,12 @@ export function snapshotGrid(stack: LevelStack | null): SnapshotGrid | null {
   const box = stack?.box;
   if (!stack || !box) return null;
   const { texel } = stack.grid;
-  const sub = Math.max(1, Math.min(Math.floor(SNAPSHOT_MAX_SIDE / Math.max(box.columns, box.rows)), Math.floor(texel / SNAPSHOT_MIN_TEXEL)));
-  return { x: box.x, y: box.y, columns: box.columns, rows: box.rows, sub, texel: texel / sub, width: box.columns * sub, height: box.rows * sub };
+  const fitting = Math.floor(SNAPSHOT_MAX_SIDE / Math.max(box.columns, box.rows));
+  const sub = Math.max(1, Math.min(fitting, Math.floor(texel / SNAPSHOT_MIN_TEXEL)));
+  return {
+    x: box.x, y: box.y, columns: box.columns, rows: box.rows,
+    sub, texel: texel / sub, width: box.columns * sub, height: box.rows * sub,
+  };
 }
 
 export function sameSnapshotGrid(a: SnapshotGrid | null, b: SnapshotGrid | null): boolean {
