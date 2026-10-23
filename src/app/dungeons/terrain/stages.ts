@@ -26,10 +26,14 @@ function negate(d: CellDir): CellDir {
 function guardPost(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
   const floor = work.floors[k];
   if (!floor) return;
-  const length = Math.max(2, Math.min(4, rc.width - 2));
-  const rows = [Math.floor(rc.depth * 0.6), Math.floor(rc.depth * 0.5), rc.depth - 2].filter((i) => i >= 1 && i < rc.depth);
-  const sides = chance(rng, 0.5) ? [0, rc.width - length] : [rc.width - length, 0];
-  const built = rows.some((i) => sides.some((j) => tryShape(floor, rc, { kind: 'low-wall', di: 1, dj: length }, i, j)));
+  const longest = Math.max(2, Math.min(4, rc.width - 2));
+  const rows = [Math.floor(rc.depth * 0.6), Math.floor(rc.depth * 0.5), rc.depth - 2, Math.floor(rc.depth * 0.4), rc.depth - 1].filter((i, k, all) => i >= 1 && i < rc.depth && all.indexOf(i) === k);
+  const left = chance(rng, 0.5);
+  const tries = [longest, 3, 2].filter((n, k, all) => n <= longest && all.indexOf(n) === k).flatMap((length) => {
+    const sides = [0, rc.width - length, Math.floor((rc.width - length) / 2), 1, rc.width - length - 1].filter((j, k, all) => j >= 0 && j + length <= rc.width && all.indexOf(j) === k);
+    return rows.flatMap((i) => (left ? sides : [...sides].reverse()).map((j) => ({ i, j, length })));
+  });
+  const built = tries.some(({ i, j, length }) => tryShape(floor, rc, { kind: 'low-wall', di: 1, dj: length }, i, j));
   scatterCover(floor, rc, rng, built ? 1 : 2, work.tags);
 }
 
@@ -66,7 +70,8 @@ export function furnishStage(work: TerrainWork, k: number, rc: RoomCells, rng: R
     case 'puzzle':
       return puzzle(work, k, rc, rng);
     case 'setback':
-      placeHazard(work, k, rc, rng, pick(rng, ['chasm', 'chasm', 'channel', 'deep-water', 'pit'] as const));
+      // The strongest hazard that fits: a chasm across the way, else a channel, deep water, pits.
+      placeHazard(work, k, rc, rng, chance(rng, 0.75) ? 'chasm' : 'channel');
       return;
     case 'climax':
       return furnishArena(work, k, rc, rng, tags);

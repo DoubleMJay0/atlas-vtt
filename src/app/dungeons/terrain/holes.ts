@@ -14,6 +14,10 @@ import type { TerrainWork } from './work';
 
 /** How likely an abyss opens on through the floor below where it could. */
 const OPEN_ON = 0.6;
+/** A hole opens on through a room below only where the room is four cells across both ways and keeps most of its floor. */
+const MOST_OF_ROOM = 0.6;
+/** ...and this many free cells besides, for the room's own cover. */
+const LEFT_FREE = 4;
 
 /** Where a hole over `cells` on floor `k` leads: the floors it opens through below, and the floor it ends on (null: bottomless). */
 export interface Drop {
@@ -28,7 +32,8 @@ export function dropBelow(work: TerrainWork, k: number, cells: readonly CellPoin
     const rc = work.floors[floor]?.roomHolding(cells);
     if (!rc || rc.room.wing !== 'regular') return null;
     const last = floor === work.floors.length - 1;
-    const canOpen = mayOpenOn && rc.allows(cells, 'block');
+    const roomy = rc.depth >= 4 && rc.width >= 4 && cells.length <= rc.floorCount * (1 - MOST_OF_ROOM) && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells);
+    const canOpen = mayOpenOn && roomy && rc.allows(cells, 'block');
     const canEnd = rc.fits(cells);
     if (canOpen && (!canEnd || chance(rng, OPEN_ON))) {
       through.push({ floor, rc });

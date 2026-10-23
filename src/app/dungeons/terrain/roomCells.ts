@@ -114,6 +114,21 @@ export class RoomCells {
     return this.whole(extra);
   }
 
+  /**
+   * Whether, with `cells` blocked (but `over`), one more free cell could still take cover and
+   * leave the room whole: a hazard never takes the last place for cover.
+   */
+  keepsCover(cells: readonly CellPoint[], over: readonly CellPoint[] = []): boolean {
+    const own = new Set(cells.map((c) => cellKey(c.x, c.y)));
+    for (let i = 0; i < this.depth; i++) {
+      for (let j = 0; j < this.width; j++) {
+        const c = this.cell(i, j);
+        if (!own.has(cellKey(c.x, c.y)) && this.isFree(c) && this.allows([...cells, c], 'block', over)) return true;
+      }
+    }
+    return false;
+  }
+
   /** Takes `cells`; a bridge passes `walk` over cells of the hole it crosses. */
   take(cells: readonly CellPoint[], footing: Footing): void {
     for (const c of cells) this.taken.set(cellKey(c.x, c.y), footing);
@@ -127,6 +142,13 @@ export class RoomCells {
   /** Keeps cells clear of any later piece: where a bridge lands, before a platform's steps. */
   keepClear(cells: readonly CellPoint[]): void {
     for (const c of cells) this.held.add(cellKey(c.x, c.y));
+  }
+
+  /** How many cells can still take a piece. */
+  freeCount(): number {
+    let n = 0;
+    for (const key of this.open) if (!this.taken.has(key) && !this.held.has(key)) n++;
+    return n;
   }
 
   /** How many floor cells are taken by pieces that cannot be walked. */

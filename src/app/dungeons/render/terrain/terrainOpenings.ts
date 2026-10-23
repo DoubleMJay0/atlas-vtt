@@ -26,21 +26,24 @@ function cuts(env: RenderEnv): boolean {
   return env.openings === 'cut' && env.dungeon.index < env.dungeon.model.floors.length - 1;
 }
 
-/** Depth: the hole filled dark, rock faces from its rim down to a darker bottom. */
+/** Depth: the hole's rock faces going down from its rim, darker the deeper, to a dark bottom. */
 function depth(env: RenderEnv, pen: GlyphPen, rings: readonly Vec[][]): void {
   const { ctx } = pen;
   const colours = terrainColours(env);
-  ctx.beginPath();
-  traceRings(ctx, rings);
-  ctx.fillStyle = colours.deep;
-  ctx.fill();
-  const bottom = rings.map((r) => insetRing(r, 0.22));
-  ctx.beginPath();
-  traceRings(ctx, bottom);
-  ctx.fillStyle = env.palette.ink;
-  ctx.fill();
+  const layers: [number, string][] = [
+    [0, colours.face],
+    [0.14, colours.deep],
+    [0.3, env.palette.ink],
+  ];
+  for (const [inset, colour] of layers) {
+    ctx.beginPath();
+    traceRings(ctx, rings.map((r) => insetRing(r, inset)));
+    ctx.fillStyle = colour;
+    ctx.fill();
+  }
+  const bottom = rings.map((r) => insetRing(r, 0.3));
   ctx.save();
-  ctx.strokeStyle = env.view.monochrome ? env.palette.fill : colours.shade;
+  ctx.strokeStyle = env.view.monochrome ? env.palette.fill : colours.face;
   rings.forEach((ring, k) => fineLines(pen, ring.flatMap((p, i) => [p.x, p.y, bottom[k]![i]!.x, bottom[k]![i]!.y])));
   ctx.restore();
 }
@@ -60,33 +63,28 @@ function lip(pen: GlyphPen, edges: readonly CellEdge[]): void {
   ctx.restore();
 }
 
-/** A parapet round a gallery's hole: a low rail on the floor beside the rim, posts at a steady beat. */
-function parapet(pen: GlyphPen, rings: readonly Vec[][]): void {
+/** A parapet along a gallery's rim where it meets floor: a low rail on the floor beside the rim, posts at a steady beat. */
+function parapet(pen: GlyphPen, edges: readonly CellEdge[]): void {
   const { ctx } = pen;
-  const outer = rings.map((r) => insetRing(r, -PARAPET));
+  const rails: Vec[][] = edges.map((e) => {
+    const d = { x: e.to.x - e.from.x, y: e.to.y - e.from.y };
+    // Outwards is on the left of the way along the edge (the hole lies on its right).
+    const out = { x: d.y * PARAPET, y: -d.x * PARAPET };
+    return [e.from, e.to, { x: e.to.x + out.x, y: e.to.y + out.y }, { x: e.from.x + out.x, y: e.from.y + out.y }];
+  });
   ctx.beginPath();
-  traceRings(ctx, outer);
-  traceRings(ctx, rings.map((r) => [...r].reverse()));
+  traceRings(ctx, rails);
   ctx.fillStyle = pen.palette.fill;
   ctx.fill();
-  ctx.beginPath();
-  traceRings(ctx, outer);
   ctx.stroke();
   const posts: number[] = [];
-  for (const ring of rings) {
-    const mid = insetRing(ring, -PARAPET / 2);
-    mid.forEach((p, i) => {
-      const q = mid[(i + 1) % mid.length] as Vec;
-      const length = Math.hypot(q.x - p.x, q.y - p.y);
-      const count = Math.max(1, Math.round(length / 0.33));
-      for (let k = 0; k <= count; k++) {
-        const x = p.x + ((q.x - p.x) * k) / count;
-        const y = p.y + ((q.y - p.y) * k) / count;
-        const nx = ((q.y - p.y) / length) * PARAPET * 0.5;
-        const ny = (-(q.x - p.x) / length) * PARAPET * 0.5;
-        posts.push(x - nx, y - ny, x + nx, y + ny);
-      }
-    });
+  for (const [a, b, c] of rails as [Vec, Vec, Vec, Vec][]) {
+    const count = 3;
+    for (let k = 1; k < count; k++) {
+      const x = a.x + ((b.x - a.x) * k) / count;
+      const y = a.y + ((b.y - a.y) * k) / count;
+      posts.push(x, y, x + (c.x - b.x), y + (c.y - b.y));
+    }
   }
   fineLines(pen, posts);
 }
@@ -148,7 +146,7 @@ export function drawTerrainOpenings(env: RenderEnv): void {
     const rings = cellRings(hole.cells);
     const own = new Set(hole.cells.map((c) => `${c.x},${c.y}`));
     const rim = edgesFacing(hole.cells, (c) => !own.has(`${c.x},${c.y}`));
-    if (hole.kind === 'gallery') parapet(pen, rings);
+    if (hole.kind === 'gallery') parapet(pen, edgesFacing(hole.cells, (c) => !own.has(`${c.x},${c.y}`) && env.dungeon.field.distance(c.x + 0.5, c.y + 0.5) < 0));
     if (cut) {
       lip(pen, rim);
       ctx.save();

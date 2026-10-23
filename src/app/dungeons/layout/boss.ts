@@ -23,7 +23,7 @@ const MAX_DEPTH = 12;
 const FAR_SHARE = 0.75;
 /** Under a room above that could hold a gallery over it, a boss room counts as this many cells larger. */
 const GALLERY_BONUS = 16;
-/** How much of a boss room's floor (less its walls' ring) must lie under such a room for a gallery. */
+/** How much of a boss room's floor must lie under such a room's for a gallery. */
 const GALLERY_CELLS = 4;
 
 /** The largest size the room may grow to: it has no doors but the one it grew through, in its near wall's middle. */
@@ -33,10 +33,10 @@ function largest(layout: WorkLayout, room: WorkRoom): RoomSize {
   return options.find((size) => roomFits(layout, roomRect({ ...room, ...size }), new Set([room.id]), false)) ?? room;
 }
 
-/** Whether a gallery from the floor above could look into a room of this size: its floor, less a ring, lies under a room's. */
+/** Whether a gallery from the floor above could look into a room of this size: its floor lies under a room's. */
 function underGallery(room: WorkRoom, size: RoomSize, galleries: readonly CellRect[]): boolean {
   const r = roomRect({ ...room, ...size });
-  const inner = { x0: r.x0 + 2, y0: r.y0 + 2, x1: r.x1 - 2, y1: r.y1 - 2 };
+  const inner = { x0: r.x0 + 1, y0: r.y0 + 1, x1: r.x1 - 1, y1: r.y1 - 1 };
   return galleries.some((g) => {
     const o = intersection(inner, g);
     return o !== null && o.x1 > o.x0 && o.y1 > o.y0 && (o.x1 - o.x0 + 1) * (o.y1 - o.y0 + 1) >= GALLERY_CELLS;

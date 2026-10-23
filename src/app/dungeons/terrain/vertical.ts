@@ -5,7 +5,7 @@
  */
 
 import type { CellPoint } from '../model';
-import { cellsOf, type CellRect, intersection } from '../geometry';
+import { cellsOf, type CellRect, floorRect, intersection } from '../geometry';
 import { type Rng, chance, int, shuffled } from '../rng';
 import { draft } from './catalog';
 import { cutHole, dropBelow } from './holes';
@@ -13,22 +13,21 @@ import type { RoomCells } from './roomCells';
 import type { TerrainWork } from './work';
 
 /** How often the arena is two floors high, where a room lies over it. */
-const GALLERY_CHANCE = 0.7;
+const GALLERY_CHANCE = 0.85;
+/** A gallery's hole leaves at least this share of its room's floor to stand on. */
+const GALLERY_FLOOR = 0.5;
 /** How often a floor has a shaft down to the next. */
 const SHAFT_CHANCE = 0.35;
 
-/** A room's floor less the ring of cells along its walls. */
-function inner(room: { x: number; y: number; w: number; h: number }): CellRect {
-  return { x0: room.x + 1, y0: room.y + 1, x1: room.x + room.w - 2, y1: room.y + room.h - 2 };
-}
-
-/** The rectangle and the ones a row or column smaller, largest first. */
+/** The rectangle and those up to two rows and columns smaller on each side, at least 2 × 2, largest first. */
 function shrinks(r: CellRect): CellRect[] {
-  const out = [r, { ...r, x0: r.x0 + 1 }, { ...r, x1: r.x1 - 1 }, { ...r, y0: r.y0 + 1 }, { ...r, y1: r.y1 - 1 }];
-  return out.filter((s) => s.x1 - s.x0 >= 1 && s.y1 - s.y0 >= 1);
+  const out: CellRect[] = [];
+  for (const a of [0, 1, 2]) for (const b of [0, 1, 2]) for (const c of [0, 1, 2]) for (const d of [0, 1, 2]) out.push({ x0: r.x0 + a, x1: r.x1 - b, y0: r.y0 + c, y1: r.y1 - d });
+  const area = (s: CellRect): number => (s.x1 - s.x0 + 1) * (s.y1 - s.y0 + 1);
+  return out.filter((s) => s.x1 - s.x0 >= 1 && s.y1 - s.y0 >= 1).sort((p, q) => area(q) - area(p));
 }
 
-/** A railed hole in a room of the floor above the arena, over the arena's middle. */
+/** A railed hole in a room of the floor above the arena, over the arena's floor: a gallery looking down into it. */
 export function galleryOverArena(work: TerrainWork, rng: Rng): void {
   const deepest = work.floors.length - 1;
   const arena = work.floors[deepest]?.plan.rooms.find((room) => room.boss);
@@ -38,14 +37,14 @@ export function galleryOverArena(work: TerrainWork, rng: Rng): void {
     .filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda)
     .flatMap((room) => {
       const rc = above.room(room.id);
-      const over = intersection(inner(room), inner(arena));
+      const over = intersection(floorRect(room), floorRect(arena));
       return rc && over && over.x1 > over.x0 && over.y1 > over.y0 ? [{ rc, over }] : [];
     })
     .sort((a, b) => cellsOf(b.over).length - cellsOf(a.over).length);
   for (const { rc, over } of candidates) {
     for (const rect of shrinks(over)) {
       const cells = cellsOf(rect);
-      if (!rc.allows(cells, 'block')) continue;
+      if (cells.length > rc.floorCount * (1 - GALLERY_FLOOR) || !rc.allows(cells, 'block')) continue;
       above.place({ ...draft('gallery', rc.room.id, cells), opening: { bottom: deepest, link: work.nextLink() } });
       return;
     }

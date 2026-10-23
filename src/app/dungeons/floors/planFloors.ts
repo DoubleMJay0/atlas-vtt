@@ -11,7 +11,7 @@ import { type DungeonParams, floorParams } from '../params';
 import { MAX_SEED, floorStream, int, pick } from '../rng';
 import { type FloorRequest, buildFloorLayout } from '../layout/assemble';
 import type { CompactLayout } from '../layout/compact';
-import { dir, wallRect } from '../geometry';
+import { dir, floorRect, wallRect } from '../geometry';
 import { TWO_CONNECTIONS_FROM, type FloorShape, chooseDescent, extraConnection, normalRooms } from './connections';
 import { landingCells, landingRoot } from './landing';
 import type { StairSpot } from './stairSpots';
@@ -93,7 +93,7 @@ function floorBelow(seed: number, params: DungeonParams, above: FloorShape, inde
     reserved: null,
     within: underneath(above),
     boss: boss && last,
-    galleries: above.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda).map((room) => ({ x0: room.x + 1, y0: room.y + 1, x1: room.x + room.w - 2, y1: room.y + room.h - 2 })),
+    galleries: above.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda).map(floorRect),
     blocked: landingCells(landing),
     accept: (built) => linkFloor(seed, above, { ...built, stairs: [landing] }, index, last) !== null,
   };

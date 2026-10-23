@@ -5,6 +5,7 @@
  */
 
 import type { CellDir, DungeonTerrain, TerrainKind } from '../../model';
+import { clipToFloors } from '../floors';
 import { glyphWeights, type GlyphPen } from '../glyphPen';
 import { mixColours } from '../palette';
 import type { RenderEnv } from '../renderEnv';
@@ -31,6 +32,8 @@ export interface TerrainColours {
   raised: string;
   /** A shade of the floor for depth. */
   shade: string;
+  /** The rock face of a hole, part way down. */
+  face: string;
   /** Deep shade, the bottom of what is far down. */
   deep: string;
   lava: string;
@@ -43,14 +46,15 @@ export interface TerrainColours {
 export function terrainColours(env: RenderEnv): TerrainColours {
   const { palette, view } = env;
   if (view.monochrome) {
-    return { raised: palette.fill, shade: palette.floor, deep: palette.ink, lava: palette.floor, acid: palette.floor, deepWater: palette.floor };
+    return { raised: palette.fill, shade: palette.floor, face: palette.ink, deep: palette.ink, lava: palette.floor, acid: palette.floor, deepWater: palette.floor };
   }
   return {
-    raised: mixColours(palette.floor, palette.fill, 0.55),
-    shade: mixColours(palette.floor, palette.ink, 0.25),
-    deep: mixColours(palette.floor, palette.ink, 0.72),
-    lava: mixColours('#d2532a', palette.floor, 0.15),
-    acid: mixColours('#8fb03a', palette.floor, 0.2),
+    raised: mixColours(palette.floor, '#ffffff', 0.25),
+    shade: mixColours(palette.floor, palette.ink, 0.14),
+    face: mixColours(palette.floor, palette.ink, 0.5),
+    deep: mixColours(palette.floor, palette.ink, 0.78),
+    lava: mixColours('#c8582e', palette.floor, 0.3),
+    acid: mixColours('#93a84a', palette.floor, 0.4),
     deepWater: mixColours(palette.water, palette.ink, 0.3),
   };
 }
@@ -62,7 +66,7 @@ export function roomAxis(env: RenderEnv, piece: DungeonTerrain): CellDir {
 
 /**
  * The soft shadow of whatever `trace` adds to the path, cast towards the bottom right and `lift`
- * as long as a column's. The caller draws the thing itself over it.
+ * as long as a column's, onto the floor alone. The caller draws the thing itself over it.
  */
 export function castShadow(env: RenderEnv, lift: number, trace: () => void): void {
   const { ctx, palette } = env;
@@ -71,6 +75,8 @@ export function castShadow(env: RenderEnv, lift: number, trace: () => void): voi
   // Shadow offset and blur are in device pixels, outside the context's transform.
   const distance = env.style.shadow.distance * lift * Math.sqrt(Math.abs(a * d - b * c));
   ctx.save();
+  // Shadows fall on the floor only, never over the walls' ink.
+  clipToFloors(env);
   ctx.beginPath();
   trace();
   ctx.globalCompositeOperation = 'multiply';

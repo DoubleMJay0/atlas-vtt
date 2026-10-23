@@ -26,16 +26,17 @@ function sameDir(a: CellDir, b: CellDir): boolean {
 }
 
 /**
- * Checks the first entrance and adds the second where the floor wants one. False when the first
+ * Checks the first entrance and adds the second where the floor wants one (never where `second`
+ * is false: a five-room dungeon has one way in, past its guard post). False when the first
  * opens onto rock the rooms grew round, or a second is wanted and none can stand: the floor is
  * then grown anew.
  */
-export function placeEntrances(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams): boolean {
+export function placeEntrances(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams, second = true): boolean {
   const rng = rngOf('entrances');
   const first = layout.doors.find((door) => door.from === null);
   const ground = openGround(layout);
   if (!first || !ground.has(cellKey(first.x - first.dir.x, first.y - first.dir.y))) return false;
-  const wanted = normalCount(layout) >= TWO_ENTRANCES_FROM || chance(rng, SMALL_SECOND_CHANCE);
+  const wanted = second && (normalCount(layout) >= TWO_ENTRANCES_FROM || chance(rng, SMALL_SECOND_CHANCE));
   if (!wanted) return true;
   const away = dir(-first.dir.x, -first.dir.y);
   const distances = hops(neighbours(layout.rooms.length, layout.doors), 0);

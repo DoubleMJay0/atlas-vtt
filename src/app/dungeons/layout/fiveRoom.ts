@@ -19,7 +19,7 @@ const MAIN_ROOMS = 4;
 /** How often the reward lies behind a secret door. */
 const SECRET_REWARD = 0.6;
 
-/** A floor's params for a five-room dungeon: a string of four rooms with passages between them. */
+/** A floor's params for a five-room dungeon: a string of four large rooms with passages between them, no colonnades. */
 export function fiveRoomParams(params: DungeonParams): DungeonParams {
   return {
     ...params,
@@ -27,10 +27,12 @@ export function fiveRoomParams(params: DungeonParams): DungeonParams {
     maxRooms: MAIN_ROOMS,
     string: true,
     symmetry: [false],
-    sizeStyles: [0, 1, 1, 1, 2, 2, 3],
+    sizeStyles: [1, 1, 1, 2, 2, 3],
     secretWings: { chance: 0, extra: 0 },
     secretLoopChance: 0,
     secretEntranceWeight: 0,
+    // Columns along the walls would leave a guard post or a set piece no room.
+    colonnadeFactor: 0,
   };
 }
 

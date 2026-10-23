@@ -64,7 +64,10 @@ export function drawTerrainRaised(env: RenderEnv): void {
     traceRings(ctx, rings);
     ctx.fillStyle = raised;
     ctx.fill();
+    ctx.save();
+    ctx.lineWidth *= 1.4;
     ctx.stroke();
+    ctx.restore();
     ticks(env, pen, piece, (c) => own.has(`${c.x},${c.y}`));
     if (piece.steps && piece.facing) treads(pen, piece.steps, piece.facing);
   }

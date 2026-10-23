@@ -12,7 +12,7 @@ import { dir } from '../geometry';
 import { type Rng, chance, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
-import { tryShape } from './cover';
+import { ensureCover, tryShape } from './cover';
 import { platformAtFarWall } from './elevation';
 import type { FloorTerrain } from './floorTerrain';
 import { placeHazard } from './hazards';
@@ -106,5 +106,6 @@ export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: R
   const first = weighted(rng, pieces);
   const placed = [first, ...pieces.map(([p]) => p).filter((p) => p !== first)].some((p) => setPiece(floor, rc, rng, p, platformDepth));
   wideCover(floor, rc, rng, platformDepth);
+  ensureCover(floor, rc, tags);
   if (chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) placeHazard(work, k, rc, rng, chance(rng, 0.6) ? 'channel' : 'pit');
 }

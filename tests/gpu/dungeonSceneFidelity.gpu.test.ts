@@ -9,7 +9,7 @@ import { dungeonScene } from '../../src/app/dungeons/scene/toScene';
 import { dungeonWalls, wallInkWidth } from '../../src/app/dungeons/scene/toWalls';
 import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
 import { dungeonStyle, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
-import { changedMask, gridAgreement, inkEdgesFromWalls, inkMask, outlinesOffObjects, wallsOnInk, type Picture } from './dungeonFidelityChecks';
+import { alphaAt, changedMask, gridAgreement, inkEdgesFromWalls, inkMask, outlinesOffObjects, wallsInTerrain, wallsOnInk, type Picture } from './dungeonFidelityChecks';
 import type { WallSegment } from '../../src/app/types/wallTypes';
 
 /**
@@ -22,12 +22,16 @@ import type { WallSegment } from '../../src/app/types/wallTypes';
 
 const PX_PER_CELL = 200;
 
-const CASES: readonly { seed: number; tags: string[]; floors: number; look: DungeonStyleId; view: Partial<DungeonView> }[] = [
+const CASES: readonly { seed: number; tags: string[]; floors: number; look: DungeonStyleId; view: Partial<DungeonView>; fiveRoom?: boolean }[] = [
   { seed: 101, tags: ['medium'], floors: 1, look: 'parchment', view: {} },
   { seed: 202, tags: ['small', 'round'], floors: 2, look: 'night', view: { smallTiles: true } },
   { seed: 303, tags: ['small', 'secret', 'temple'], floors: 2, look: 'masonry', view: { monochrome: true } },
   { seed: 404, tags: ['small', 'winding'], floors: 3, look: 'stipple', view: { smallTiles: true, grid: 'solid' } },
   { seed: 505, tags: ['medium', 'colonnades'], floors: 1, look: 'blueprint', view: { exits: false } },
+  // Terrain: a gallery over the arena and a bridged chasm onto the floor below, and a five-room dungeon.
+  { seed: 282, tags: ['small'], floors: 2, look: 'parchment', view: {} },
+  { seed: 375, tags: ['small', 'crumbling', 'dry'], floors: 2, look: 'sepia', view: { smallTiles: true } },
+  { seed: 42, tags: [], floors: 1, look: 'masonry', view: {}, fiveRoom: true },
 ];
 
 const TALL_TERRAIN = new Set(['pillar', 'obelisk', 'statue', 'wall-fragment']);
@@ -65,11 +69,11 @@ const share = (values: readonly number[], limit: number): number => values.filte
 let outlined = 0;
 
 describe('a dungeon scene and its map image', () => {
-  for (const { seed, tags, floors, look, view: change } of CASES) {
+  for (const { seed, tags, floors, look, view: change, fiveRoom } of CASES) {
     const view: DungeonView = { ...DEFAULT_VIEW, ...change };
     const label = `seed ${seed} [${tags.join(',')}], ${floors} floors, ${look}${view.monochrome ? ' monochrome' : ''}${view.smallTiles ? ', small tiles' : ''}`;
     it(`agree on walls, doors and grid: ${label}`, () => {
-      const model = generateDungeon({ seed, tags, floors });
+      const model = generateDungeon({ seed, tags, floors, ...(fiveRoom && { fiveRoom }) });
       const style = dungeonStyle(look);
       const palette = paletteOf(style, view);
       const layout = mapLayout(model, PX_PER_CELL, view);
@@ -111,6 +115,18 @@ describe('a dungeon scene and its map image', () => {
         const loose = edges.filter(e => e.distance > halfInk + 3).slice(0, 5).map(e => `${e.at.x},${e.at.y} (${e.distance.toFixed(1)} px)`);
         expect(edges.length, `${where}: wall faces found`).toBeGreaterThan(1000);
         expect(loose, `${where}: drawn wall faces without a wall`).toEqual([]);
+
+        // No wall stands in a hole or on a bridge: sight passes over a chasm. A hole over a floor below is cut out of the image; a bridge is not
+        expect(wallsInTerrain(floor, walls, placement), `${where}: walls in holes or on bridges`).toEqual([]);
+        const deepest = index === model.floors.length - 1;
+        const bridged = new Set(floor.terrain.filter(p => p.kind === 'bridge').flatMap(p => p.cells.map(c => `${c.x},${c.y}`)));
+        for (const hole of floor.terrain.filter(p => p.opening)) {
+          for (const c of hole.cells) {
+            const alpha = alphaAt(picture, placement, c);
+            if (bridged.has(`${c.x},${c.y}`)) expect(alpha, `${where}: bridge at ${c.x},${c.y}`).toBe(255);
+            else expect(alpha, `${where}: ${hole.kind} at ${c.x},${c.y}`).toBe(deepest ? 255 : 0);
+          }
+        }
 
         // The scene's grid lines are the drawn ones, and no drawn line lies between them
         const { on, off } = gridAgreement(floor, scene.scene.grid, picture, placement, { grid: parseHex(palette.grid), floor: parseHex(palette.floor) });

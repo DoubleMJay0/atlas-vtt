@@ -3,6 +3,7 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { doorProblems, emptyRooms, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, stairProblems } from './floorsInvariants';
+import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, isHazard, routeProblems } from './terrainInvariants';
 
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
@@ -190,6 +191,58 @@ export function describeInvariants(floors: number): void {
           });
         })),
       ).toEqual([]);
+    });
+
+    it('lay terrain on whole cells of one room each, never on doors, stairwells or the cells they are reached from', () => {
+      expect(failures(eachFloor((run, i) => [...cellProblems(run.model.floors[i]!), ...clearanceProblems(run.model.floors[i]!, i)]))).toEqual([]);
+    });
+
+    it('keep a way through every floor that steps into no hazard, cover or hole, and bridge what they lay across a room', () => {
+      expect(failures(eachFloor((run, i) => [...routeProblems(run.model.floors[i]!), ...bridgeProblems(run.model.floors[i]!)]))).toEqual([]);
+    });
+
+    it('open holes only over rooms of the floors below, down to rubble or a bottomless void', () => {
+      expect(failures((run) => holeProblems(run.model))).toEqual([]);
+      if (floors === 1) expect(runs.every((run) => run.model.floors[0]!.terrain.every((p) => !p.opening || p.opening.bottom === null))).toBe(true);
+      else {
+        const share = (check: (run: Run) => boolean): number => runs.filter(check).length / runs.length;
+        expect(share((run) => run.model.floors.some((f, k) => k < floors - 1 && f.terrain.some((p) => p.opening && p.kind === 'chasm')))).toBeGreaterThan(0.1);
+        expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'gallery')))).toBeGreaterThan(0.08);
+        expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'shaft')))).toBeGreaterThan(0.15);
+      }
+    });
+
+    it('give every furnished room that can hold a fight some cover', () => {
+      expect(
+        failures(eachFloor((run, i) => {
+          const floor = run.model.floors[i]!;
+          return normals(floor)
+            .filter((room) => room.w * room.h >= 12 && floor.props.some((p) => p.room === room.id) && !hasCover(floor, room.id))
+            .map((room) => `room ${room.id} (${room.w}×${room.h}) has no cover`);
+        })),
+      ).toEqual([]);
+    });
+
+    it('place about one hazard per six rooms', () => {
+      const floorsOf = runs.flatMap((run) => run.model.floors);
+      const hazards = floorsOf.reduce((sum, floor) => sum + floor.terrain.filter(isHazard).length, 0);
+      const rooms = floorsOf.reduce((sum, floor) => sum + normals(floor).length, 0);
+      expect(hazards / rooms).toBeGreaterThan(0.12);
+      expect(hazards / rooms).toBeLessThan(0.26);
+    });
+
+    it('furnish the boss room as an open arena: high ground, a set piece, cover, two thirds of it free', () => {
+      const arenas = runs.map((run) => run.model.floors.at(-1)!).map((floor) => ({ floor, boss: floor.rooms.find((room) => room.boss)! }));
+      const share = (check: (a: (typeof arenas)[number]) => boolean): number => arenas.filter(check).length / arenas.length;
+      const pieces = ({ floor, boss }: (typeof arenas)[number]): DungeonModel['floors'][number]['terrain'] => floor.terrain.filter((p) => p.room === boss.id);
+      expect(share((a) => pieces(a).some((p) => p.kind === 'platform'))).toBeGreaterThan(0.6);
+      expect(share((a) => pieces(a).some((p) => ['statue', 'altar', 'portal-ring', 'pillar'].includes(p.kind)))).toBeGreaterThan(0.9);
+      expect(share((a) => hasCover(a.floor, a.boss.id))).toBeGreaterThan(0.9);
+      expect(failures((run) => {
+        const floor = run.model.floors.at(-1)!;
+        const boss = floor.rooms.find((room) => room.boss)!;
+        return blockedCells(floor, boss.id) > (boss.w * boss.h) * 0.4 ? [`the arena is ${blockedCells(floor, boss.id)} of ${boss.w * boss.h} cells blocked`] : [];
+      })).toEqual([]);
     });
 
     it('generate within the time budget', () => {

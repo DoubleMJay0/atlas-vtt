@@ -10,7 +10,7 @@
 import type { CellPoint, DungeonRoom, DungeonTerrain } from '../model';
 import { cellKey } from '../geometry';
 import type { RoomRole } from '../props/roles';
-import { type Rng, chance, weighted } from '../rng';
+import { type Rng, chance, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import { furnishArena } from './arena';
 import { draft } from './catalog';
@@ -18,7 +18,7 @@ import { CRAMPED_AREA, crampedCover, ensureCover, openRoomCover } from './cover'
 import { difficultGround } from './difficult';
 import { ledgeAlongWall, platformAtFarWall } from './elevation';
 import { type FloorPlan, FloorTerrain } from './floorTerrain';
-import { hazardWeights, placeHazard } from './hazards';
+import { hazardWeights, placeChasmOver, placeHazard } from './hazards';
 import { anyInterest } from './interest';
 import { furnishStage } from './stages';
 import { galleryOverArena, shaftDown } from './vertical';
@@ -28,6 +28,8 @@ import { type TerrainWork, terrainWork } from './work';
 export const FIGHT_AREA = 12;
 /** One hazard per this many normal rooms. */
 const ROOMS_PER_HAZARD = 6;
+/** How often a floor's first hazard is an abyss onto the floor below, where a room lies under it. */
+const CHASM_OVER_CHANCE = 0.6;
 /** How likely a quiet room of each role holds a point of interest. */
 const INTEREST_CHANCE: Readonly<Record<RoomRole, number>> = { boss: 0, hall: 0.3, deepest: 0.6, stairs: 0.15, hub: 0.25, 'dead-end': 0.45, plain: 0.2 };
 
@@ -47,9 +49,21 @@ function hazards(work: TerrainWork, k: number, rooms: readonly DungeonRoom[], rn
   if (!floor) return;
   const target = rooms.length / ROOMS_PER_HAZARD;
   const wanted = Math.floor(target) + (chance(rng, target % 1) ? 1 : 0) - hazardCount(floor);
-  let pool = rooms.filter((room) => room.wing === 'regular' && !room.boss && room.stage === undefined && (floor.room(room.id)?.floorCount ?? 0) >= 9 && floor.inRoom(room.id).length === 0);
+  let pool = rooms.filter((room) => room.wing === 'regular' && !room.boss && room.stage === undefined && !(room.rotunda && room.w < 7) && (floor.room(room.id)?.floorCount ?? 0) >= 9 && floor.inRoom(room.id).length === 0);
   const weights = hazardWeights(work.tags).filter(([, w]) => w > 0);
-  for (let placed = 0; placed < wanted && pool.length > 0; ) {
+  let placed = 0;
+  // A floor with a floor below opens onto it where it can: an abyss over a room down there.
+  if (wanted > 0 && k + 1 < work.floors.length && chance(rng, CHASM_OVER_CHANCE)) {
+    const opened = shuffled(rng, pool).find((room) => {
+      const rc = floor.room(room.id);
+      return rc !== undefined && placeChasmOver(work, k, rc, rng);
+    });
+    if (opened) {
+      placed++;
+      pool = pool.filter((r) => r !== opened);
+    }
+  }
+  while (placed < wanted && pool.length > 0) {
     const room = weighted(rng, pool.map((r) => [r, r.w * r.h] as const));
     pool = pool.filter((r) => r !== room);
     const rc = floor.room(room.id);

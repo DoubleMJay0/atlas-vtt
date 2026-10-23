@@ -7,6 +7,7 @@
  */
 
 import type { CellPoint } from '../model';
+import { type CellRect, cellsOf, floorRect, intersection } from '../geometry';
 import { type Rng, chance, int, pick, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
@@ -62,6 +63,23 @@ function landings(rc: RoomCells, band: Band): CellPoint[] {
   ];
 }
 
+/** A hazard takes at most this share of a room's floor... */
+const HAZARD_SHARE = 0.4;
+/** ...and leaves this many free cells, for the room's own cover. */
+const LEFT_FREE = 4;
+
+/** Whether a hazard on `cells` (crossed by `bridge`) leaves the room enough of itself, room for cover among it. */
+function leavesRoom(rc: RoomCells, cells: readonly CellPoint[], bridge: readonly CellPoint[] = []): boolean {
+  return cells.length <= rc.floorCount * HAZARD_SHARE && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells, bridge);
+}
+
+/** Whether both ends of the band's bridge land on floor nothing blocks, outside the band. */
+function landsOnFloor(rc: RoomCells, band: Band): boolean {
+  if (band.bridge.length === 0) return true;
+  const own = new Set(band.cells.map((c) => `${c.x},${c.y}`));
+  return landings(rc, band).every((c) => rc.isFloor(c) && !rc.isBlocked(c) && !own.has(`${c.x},${c.y}`));
+}
+
 function bridgeOver(work: TerrainWork, k: number, rc: RoomCells, band: Band, spans: number, name: string): void {
   const floor = work.floors[k];
   if (!floor || band.bridge.length === 0) return;
@@ -100,7 +118,7 @@ function overRoomBelow(work: TerrainWork, k: number, cells: readonly CellPoint[]
 function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
   const thickness = rc.depth >= 8 && chance(rng, 0.5) ? 2 : 1;
   const tryBand = (band: Band): boolean => {
-    if (!overRoomBelow(work, k, band.cells) || !rc.allows(band.cells, 'block', band.bridge)) return false;
+    if (!leavesRoom(rc, band.cells, band.bridge) || !overRoomBelow(work, k, band.cells) || !landsOnFloor(rc, band) || !rc.allows(band.cells, 'block', band.bridge)) return false;
     const drop = dropBelow(work, k, band.cells, rng);
     const id = drop && cutHole(work, k, rc, 'chasm', band.cells, drop, { bridge: band.bridge });
     if (id === null || id === undefined) return false;
@@ -113,10 +131,45 @@ function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): bool
   return order.some(tryBand);
 }
 
+/** Rectangles of the room's floor that lie over the floor of a regular room on the floor below, at least 2 × 2. */
+function overlapsBelow(work: TerrainWork, k: number, rc: RoomCells): CellRect[] {
+  const below = work.floors[k + 1];
+  if (!below) return [];
+  return below.plan.rooms.flatMap((room) => {
+    if (room.kind !== 'room' || room.wing !== 'regular') return [];
+    const o = intersection(floorRect(rc.room), floorRect(room));
+    return o && o.x1 > o.x0 && o.y1 > o.y0 ? [o] : [];
+  });
+}
+
+/**
+ * A chasm that opens onto the floor below: a hole over a stretch of this room that lies over a
+ * room there, bridged where it is three cells across. False where the room lies over none.
+ */
+export function placeChasmOver(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
+  const shapes = overlapsBelow(work, k, rc).flatMap((o) =>
+    ([[3, 3], [2, 3], [3, 2], [2, 2]] as const).flatMap(([w, h]) => {
+      const out: CellPoint[][] = [];
+      for (let y = o.y0; y + h - 1 <= o.y1; y++) for (let x = o.x0; x + w - 1 <= o.x1; x++) out.push(cellsOf({ x0: x, y0: y, x1: x + w - 1, y1: y + h - 1 }));
+      return shuffled(rng, out).slice(0, 4);
+    }),
+  );
+  return shapes.some((cells) => {
+    const band = blobBridge(rc, cells);
+    if (!leavesRoom(rc, cells, band.bridge) || !landsOnFloor(rc, band) || !rc.allows(band.cells, 'block', band.bridge)) return false;
+    const drop = dropBelow(work, k, band.cells, rng);
+    const id = drop && cutHole(work, k, rc, 'chasm', band.cells, drop, { bridge: band.bridge });
+    if (id === null || id === undefined) return false;
+    if (band.bridge.length > 0) bridgeOver(work, k, rc, band, id, 'dungeon.terrain.ropeBridge');
+    return true;
+  });
+}
+
 function placeChannel(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
   const { hazard, name } = substance(rng, work.tags);
   const floor = work.floors[k];
   for (const band of bands(rc, rng, 1, false).slice(0, 12)) {
+    if (!leavesRoom(rc, band.cells, band.bridge) || !landsOnFloor(rc, band)) continue;
     const id = floor?.place(draft('channel', rc.room.id, band.cells, { name, traits: { hazard }, facing: rc.across }), band.bridge);
     if (id === null || id === undefined) continue;
     bridgeOver(work, k, rc, band, id, 'dungeon.terrain.stoneBridge');
@@ -127,7 +180,7 @@ function placeChannel(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): bo
 
 function placePool(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
   const floor = work.floors[k];
-  return blobs(rc, rng, [[3, 3], [2, 3], [3, 2], [2, 2]]).some((cells) => floor?.place(draft('deep-water', rc.room.id, cells)) != null);
+  return blobs(rc, rng, [[3, 3], [2, 3], [3, 2], [2, 2]]).some((cells) => leavesRoom(rc, cells) && floor?.place(draft('deep-water', rc.room.id, cells)) != null);
 }
 
 /** One pit, or two flanking the way through the room. */
@@ -143,12 +196,12 @@ function placePits(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boole
       return true;
     }
   }
-  return blobs(rc, rng, [[size, size]]).some((cells) => floor.place(draft('pit', rc.room.id, cells)) !== null);
+  return blobs(rc, rng, [[size, size]]).some((cells) => leavesRoom(rc, cells) && floor.place(draft('pit', rc.room.id, cells)) !== null);
 }
 
 /** One hazard of `choice` in the room, else of another kind that fits; false where none does. */
 export function placeHazard(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, choice: HazardChoice): boolean {
-  const order: HazardChoice[] = [choice, ...(['chasm', 'channel', 'pit', 'deep-water'] as const).filter((c) => c !== choice)];
+  const order: HazardChoice[] = [choice, ...(['chasm', 'channel', 'deep-water', 'pit'] as const).filter((c) => c !== choice)];
   const allowed = new Set(hazardWeights(work.tags).filter(([, w]) => w > 0).map(([c]) => c));
   return order.filter((c) => allowed.has(c)).some((c) => {
     switch (c) {

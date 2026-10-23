@@ -118,7 +118,12 @@ export function inkEdgesFromWalls(
  */
 export function gridAgreement(floor: DungeonFloor, grid: Pick<GridState, 'size' | 'offsetX' | 'offsetY'>, picture: Picture, placement: DungeonPlacement, colours: { grid: Rgb; floor: Rgb }): { on: number; off: number } {
   const { originCell, pxPerCell } = placement;
+  // Terrain covers the grid where it lies, a little beyond its cells (shadows, a bridge's ends), and a
+  // column's hatching lies on the cells round it: both are left out, as they are drawn over the grid.
+  const around = (x: number, y: number): string[] => [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => `${x + dx},${y + dy}`));
+  const terrain = new Set([...floor.terrain.flatMap(piece => piece.cells.flatMap(c => around(c.x, c.y))), ...floor.columns.flatMap(c => around(Math.floor(c.x), Math.floor(c.y)))]);
   const gridLike = (x: number, y: number): boolean => {
+    if (terrain.has(`${Math.floor(x / pxPerCell + originCell.x)},${Math.floor(y / pxPerCell + originCell.y)}`)) return false;
     const i = (Math.floor(y) * picture.width + Math.floor(x)) * 4;
     const d = picture.data;
     const toGrid = Math.abs(d[i]! - colours.grid[0]) + Math.abs(d[i + 1]! - colours.grid[1]) + Math.abs(d[i + 2]! - colours.grid[2]);
@@ -128,6 +133,7 @@ export function gridAgreement(floor: DungeonFloor, grid: Pick<GridState, 'size' 
   let on = 0;
   let off = 0;
   for (const room of floor.rooms.filter(r => r.kind === 'room' && !r.rotunda && !floor.stairs.some(s => s.x >= r.x && s.x < r.x + r.w && s.y >= r.y && s.y < r.y + r.h))) {
+    // A room terrain fills half of has too few grid lines left to count.
     const x0 = (room.x + 0.3 - originCell.x) * pxPerCell;
     const x1 = (room.x + room.w - 0.3 - originCell.x) * pxPerCell;
     const y0 = (room.y + 0.3 - originCell.y) * pxPerCell;
@@ -193,4 +199,33 @@ export function outlinesOffObjects(outlines: readonly (readonly Point[])[], chan
     if (off > points * share) strays.push(centre);
   }
   return strays;
+}
+
+/** Walls of the scene that pass through a hole or a bridge more than a hair inside its cells: there are to be none. */
+export function wallsInTerrain(floor: DungeonFloor, walls: readonly WallSegment[], placement: DungeonPlacement): string[] {
+  const { originCell, pxPerCell } = placement;
+  const cells = new Set(floor.terrain.filter(p => p.opening || p.kind === 'bridge').flatMap(p => p.cells.map(c => `${c.x},${c.y}`)));
+  const out: string[] = [];
+  for (const { p1, p2 } of walls) {
+    const steps = Math.max(2, Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) / 4));
+    for (let k = 0; k <= steps; k++) {
+      const x = (p1.x + ((p2.x - p1.x) * k) / steps) / pxPerCell + originCell.x;
+      const y = (p1.y + ((p2.y - p1.y) * k) / steps) / pxPerCell + originCell.y;
+      const fx = x - Math.floor(x);
+      const fy = y - Math.floor(y);
+      if (fx < 0.05 || fx > 0.95 || fy < 0.05 || fy > 0.95) continue;
+      if (cells.has(`${Math.floor(x)},${Math.floor(y)}`)) {
+        out.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** The alpha of the picture at the middle of a cell. */
+export function alphaAt(picture: Picture, placement: DungeonPlacement, c: Point): number {
+  const x = Math.floor((c.x + 0.5 - placement.originCell.x) * placement.pxPerCell);
+  const y = Math.floor((c.y + 0.5 - placement.originCell.y) * placement.pxPerCell);
+  return picture.data[(y * picture.width + x) * 4 + 3] ?? 0;
 }

@@ -37,8 +37,8 @@ export interface FloorRequest {
   /** Whether the floor has the boss room. */
   boss: boolean;
   /**
-   * Where a gallery could look down into the boss room: the floors of the rooms above, less
-   * their walls' ring. A boss room under one of them is preferred, so it can be two floors high.
+   * Where a gallery could look down into the boss room: the floors of the rooms above. A boss
+   * room under one of them is preferred, so it can be two floors high.
    */
   galleries?: readonly CellRect[];
   /** A five-room dungeon: no loops or secret wings, a reward room beyond the boss room, stages named. */
@@ -85,7 +85,7 @@ function attempt(seed: number, request: FloorRequest, index: number): Built | nu
     addSecretLoops(rngOf, work, params);
   }
   cleanUp(work);
-  const entrances = floor > 0 || placeEntrances(rngOf, work, params);
+  const entrances = floor > 0 || placeEntrances(rngOf, work, params, !request.fiveRoom);
   addSteps(rngOf, work, params);
   shapeRooms(rngOf, work, params);
   const layout = request.fiveRoom ? withStages(compactLayout(work)) : compactLayout(work);

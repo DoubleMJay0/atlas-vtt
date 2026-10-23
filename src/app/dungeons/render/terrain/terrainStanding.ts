@@ -11,7 +11,7 @@ import { bevel, block, circlePath, disc, fineLines, fineRing, inkDot, roundedRec
 import { drawPropShape } from '../propShapes';
 import type { RenderEnv } from '../renderEnv';
 import { cellBox } from './cellRings';
-import { castShadow, pieceRng, roomAxis, shownPieces, terrainPen } from './terrainPen';
+import { castShadow, pieceRng, roomAxis, shownPieces, terrainColours, terrainPen } from './terrainPen';
 
 const STANDING: ReadonlySet<TerrainKind> = new Set<TerrainKind>([
   'low-wall',
@@ -46,6 +46,18 @@ const LIFT: Readonly<Partial<Record<TerrainKind, number>>> = {
   'portal-ring': 0.8,
 };
 
+/** How far inside its cells each block-shaped piece is drawn. */
+const INSET: Readonly<Partial<Record<TerrainKind, number>>> = { table: 0.12, altar: 0.14, sarcophagus: 0.16, pillar: 0.1, obelisk: 0.14, statue: 0.18 };
+/** Where a cell's crates stand and how large they are: x, y and side, in cells. */
+const CRATE_SPOTS = [
+  [0.3, 0.3, 0.42],
+  [0.7, 0.32, 0.36],
+  [0.5, 0.7, 0.44],
+] as const;
+const LOW_WALL = 0.42;
+const FRAGMENT = 0.34;
+const RING_STONES = 8;
+
 interface Box {
   x: number;
   y: number;
@@ -62,12 +74,7 @@ function boxOf(piece: DungeonTerrain, inset: number): Box {
 
 function crates(pen: GlyphPen, rng: () => number, piece: DungeonTerrain): void {
   for (const c of piece.cells) {
-    const spots = [
-      [0.3, 0.3, 0.42],
-      [0.7, 0.32, 0.36],
-      [0.5, 0.7, 0.44],
-    ] as const;
-    for (const [dx, dy, s] of spots) {
+    for (const [dx, dy, s] of CRATE_SPOTS) {
       const x = c.x + dx;
       const y = c.y + dy;
       pen.ctx.save();
@@ -133,7 +140,7 @@ function rubbleHeap(pen: GlyphPen, rng: () => number, piece: DungeonTerrain): vo
 }
 
 function lowWall(pen: GlyphPen, box: Box, alongJ: boolean): void {
-  const [w, h] = alongJ ? [box.w, 0.42] : [0.42, box.h];
+  const [w, h] = alongJ ? [box.w, LOW_WALL] : [LOW_WALL, box.h];
   block(pen, box.cx, box.cy, w, h);
   const stones = Math.max(2, Math.round((alongJ ? w : h) / 0.33));
   const lines: number[] = [];
@@ -145,10 +152,9 @@ function lowWall(pen: GlyphPen, box: Box, alongJ: boolean): void {
   fineLines(pen, lines);
 }
 
-function wallFragment(pen: GlyphPen, box: Box, alongJ: boolean): void {
+function wallFragment(pen: GlyphPen, box: Box, alongJ: boolean, face: string): void {
   const { ctx } = pen;
-  const thick = 0.34;
-  const [w, h] = alongJ ? [box.w, thick] : [thick, box.h];
+  const [w, h] = alongJ ? [box.w, FRAGMENT] : [FRAGMENT, box.h];
   ctx.beginPath();
   // Broken ends: the long sides stop at different lengths.
   if (alongJ) {
@@ -166,9 +172,12 @@ function wallFragment(pen: GlyphPen, box: Box, alongJ: boolean): void {
     ctx.lineTo(box.cx - w / 2, box.cy + h / 2 - 0.1);
   }
   ctx.closePath();
-  ctx.fillStyle = pen.palette.ink;
+  ctx.fillStyle = face;
   ctx.fill();
+  ctx.save();
+  ctx.lineWidth *= 1.5;
   ctx.stroke();
+  ctx.restore();
 }
 
 function pillar(pen: GlyphPen, box: Box): void {
@@ -234,10 +243,9 @@ function pool(pen: GlyphPen, box: Box, fine: number): void {
 
 function portalRing(pen: GlyphPen, box: Box): void {
   const r = Math.min(box.w, box.h) / 2 - 0.1;
-  const stones = 8;
   fineRing(pen, box.cx, box.cy, r * 0.62);
-  for (let k = 0; k < stones; k++) {
-    const a = (k / stones) * Math.PI * 2;
+  for (let k = 0; k < RING_STONES; k++) {
+    const a = (k / RING_STONES) * Math.PI * 2;
     const { ctx } = pen;
     ctx.save();
     ctx.translate(box.cx + Math.cos(a) * r, box.cy + Math.sin(a) * r);
@@ -257,23 +265,23 @@ function drawPiece(env: RenderEnv, pen: GlyphPen, piece: DungeonTerrain, fine: n
     case 'crates':
       return crates(pen, rng, piece);
     case 'table':
-      return table(pen, boxOf(piece, 0.12), !lengthX);
+      return table(pen, boxOf(piece, INSET.table ?? 0), !lengthX);
     case 'altar':
-      return altar(pen, boxOf(piece, 0.14), !lengthX);
+      return altar(pen, boxOf(piece, INSET.altar ?? 0), !lengthX);
     case 'sarcophagus':
-      return sarcophagus(pen, boxOf(piece, 0.16), lengthX);
+      return sarcophagus(pen, boxOf(piece, INSET.sarcophagus ?? 0), lengthX);
     case 'rubble-heap':
       return rubbleHeap(pen, rng, piece);
     case 'low-wall':
       return lowWall(pen, boxOf(piece, 0.04), lengthX);
     case 'wall-fragment':
-      return wallFragment(pen, boxOf(piece, 0.02), lengthX);
+      return wallFragment(pen, boxOf(piece, 0.02), lengthX, terrainColours(env).face);
     case 'pillar':
-      return pillar(pen, boxOf(piece, 0.1));
+      return pillar(pen, boxOf(piece, INSET.pillar ?? 0));
     case 'obelisk':
-      return obelisk(pen, boxOf(piece, 0.14));
+      return obelisk(pen, boxOf(piece, INSET.obelisk ?? 0));
     case 'statue':
-      return statue(pen, boxOf(piece, 0.18), rotation, fine);
+      return statue(pen, boxOf(piece, INSET.statue ?? 0), rotation, fine);
     case 'lever':
       return lever(pen, boxOf(piece, 0), rotation);
     case 'pool':
@@ -285,14 +293,45 @@ function drawPiece(env: RenderEnv, pen: GlyphPen, piece: DungeonTerrain, fine: n
   }
 }
 
-/** The outline a standing piece casts its shadow from. */
+/** The outline a standing piece casts its shadow from: the shape it is drawn as, never its whole cells. */
 function silhouette(env: RenderEnv, piece: DungeonTerrain): void {
-  const box = boxOf(piece, piece.kind === 'portal-ring' || piece.kind === 'crates' ? 0.18 : 0.12);
-  if (piece.kind === 'pool') {
-    circlePath(env.ctx, Math.min(box.w, box.h) / 2, box.cx, box.cy);
-    return;
+  const { ctx } = env;
+  const b = cellBox(piece.cells);
+  const lengthX = b.w >= b.h;
+  const rect = (box: Box, w = box.w, h = box.h): void => roundedRect(ctx, box.cx, box.cy, w, h);
+  switch (piece.kind) {
+    case 'crates':
+      for (const c of piece.cells) for (const [dx, dy, s] of CRATE_SPOTS) roundedRect(ctx, c.x + dx, c.y + dy, s, s);
+      return;
+    case 'rubble-heap':
+      for (const c of piece.cells) circlePath(ctx, 0.32, c.x + 0.5, c.y + 0.5);
+      return;
+    case 'low-wall': {
+      const box = boxOf(piece, 0.04);
+      return lengthX ? rect(box, box.w, LOW_WALL) : rect(box, LOW_WALL, box.h);
+    }
+    case 'wall-fragment': {
+      const box = boxOf(piece, 0.02);
+      return lengthX ? rect(box, box.w, FRAGMENT) : rect(box, FRAGMENT, box.h);
+    }
+    case 'pool': {
+      const box = boxOf(piece, 0.1);
+      return circlePath(ctx, Math.min(box.w, box.h) / 2, box.cx, box.cy);
+    }
+    case 'portal-ring': {
+      const box = boxOf(piece, 0.04);
+      const r = Math.min(box.w, box.h) / 2 - 0.1;
+      for (let k = 0; k < RING_STONES; k++) {
+        const a = (k / RING_STONES) * Math.PI * 2;
+        circlePath(ctx, 0.13, box.cx + Math.cos(a) * r, box.cy + Math.sin(a) * r);
+      }
+      return;
+    }
+    case 'lever':
+      return;
+    default:
+      return rect(boxOf(piece, INSET[piece.kind] ?? 0.12));
   }
-  roundedRect(env.ctx, box.cx, box.cy, box.w, box.h);
 }
 
 export function drawTerrainStanding(env: RenderEnv): void {
