@@ -297,6 +297,8 @@ export class TileTracer {
   }
 
   destroy(): void {
+    // Its shaders hold the placeholder: they go first.
+    this.relief.destroy();
     this.mesh.destroy();
     this.smoothMesh.destroy();
     this.distanceMesh.destroy();
@@ -312,7 +314,6 @@ export class TileTracer {
     this.placeholder.destroy(true);
     this.noOneWay.destroy();
     this.release();
-    this.relief.destroy();
   }
 
   /** Frees the raw targets; the next trace allocates them again. Call it only while no job is under way (stepped and not done). */
