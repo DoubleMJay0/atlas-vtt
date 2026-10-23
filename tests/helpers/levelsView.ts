@@ -13,7 +13,7 @@ import type { BelowLevelsHost } from '../../src/app/pixi/lighting/levels/LevelsB
 import type { TokenArt } from '../../src/app/pixi/lighting/levels/BelowTokens';
 import type { FogCover } from '../../src/app/vision/throughSight';
 import type { App } from 'obsidian';
-import type { LightingQuality } from '../../src/app/lighting/lightingQuality';
+import type { LightingQuality, LightingQualitySource } from '../../src/app/lighting/lightingQuality';
 import type { MapBounds } from '../../src/app/vision/visibility';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { roofPieces } from '../../src/app/levels/roofs';
@@ -133,6 +133,8 @@ export interface LevelsViewOptions {
   viewedFog?: () => FogCover;
   /** The lighting quality the view is lit at; the default one without it. */
   quality?: LightingQuality;
+  /** Where the view reads its lighting quality, when it changes during the test (instead of `quality`). */
+  qualitySource?: LightingQualitySource;
   /** The level below's map, where it is not the whole map (a level fitted elsewhere, smaller than the view's). */
   belowRect?: MapBounds;
   /** The level below's image loads only once `releaseBelowImage` is called. */
@@ -201,7 +203,7 @@ export function belowNoise(map: number): Texture {
  * on a real renderer, as far as its lighting and its levels below go. The map images are
  * sprites, the tokens below take one art: nothing loads from the vault.
  */
-export async function openLevelsView({ map, pane, paneHeight = pane, resolution = 1, viewed, below, tokenArt, viewedFog, quality, belowRect, holdBelowImage = false, levels = LEVELS, maps: extraMaps = {}, viewedLevel = 'upper', viewedPlacement = NO_STRETCH, roofs: withRoofs = false, shading, readShading }: LevelsViewOptions): Promise<LevelsView> {
+export async function openLevelsView({ map, pane, paneHeight = pane, resolution = 1, viewed, below, tokenArt, viewedFog, quality, qualitySource, belowRect, holdBelowImage = false, levels = LEVELS, maps: extraMaps = {}, viewedLevel = 'upper', viewedPlacement = NO_STRETCH, roofs: withRoofs = false, shading, readShading }: LevelsViewOptions): Promise<LevelsView> {
   const app = new Application();
   await app.init({ width: pane, height: paneHeight, resolution, preference: 'webgl', antialias: false, autoStart: false, backgroundColor: 0x000000, useBackBuffer: true });
   const scheduler = new RenderScheduler(app);
@@ -265,6 +267,7 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
     viewport, app, store, eventBus: new EventEmitter(), obsApp, viewId: 'levels-view',
     bounds, albedo: () => null, below: host, roofFadeMs: 0, ...(roofs && { roofs }), ...(shading && { shading }),
     ...(quality && { quality: { current: () => quality, onChange: () => () => undefined } }),
+    ...(qualitySource && { quality: qualitySource }),
   });
   made.controller = controller;
   const ignore = (): void => undefined;

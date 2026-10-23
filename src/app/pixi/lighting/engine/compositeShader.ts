@@ -1,6 +1,7 @@
 import { BOUNCE_GATHER_GLSL } from './cascadeShaders';
 import { GLSL_VERSION, SRGB_GLSL, TONEMAP_GLSL, TRACE_GLSL, fieldGlsl, traceGlsl } from './glsl';
 import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
+import { SHOWN_GLSL } from './compositeUpscaleShader';
 
 /**
  * The lighting layer's final pass. uTexture is the layer itself, what the vision tokens
@@ -49,6 +50,10 @@ import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
  * very picture, texel on pixel, where uBelowShown says it was) dimmed by uBelowDim once per level
  * down, or nothing (black for the GM, the unexplored colour for the players). In a level below's
  * composite (uLevelIndex 1 or 2) nothing is seen outside the texels that show it.
+ * Worked out on fewer pixels than the render's (uShownOut: how many of the render's pixels across
+ * one of them covers; 0 while it is not, `CompositeUpscale`), the alpha says how much the pixel shows
+ * of the map (`SHOWN_GLSL`), so that darkness wins as it is drawn up, and what the tokens perceive
+ * is the least of the render's pixels it covers: a sliver they do not see is never drawn over.
  */
 export const compositeFragment = `${GLSL_VERSION}
 in vec2 vTextureCoord;
@@ -104,6 +109,7 @@ uniform sampler2D uBelow1;
 uniform sampler2D uBelow2;
 uniform vec2 uBelowShown;
 uniform float uBelowDim;
+uniform float uShownOut;
 ${fieldGlsl('uField')}
 ${fieldGlsl('uSightField')}
 float clearance(vec2 w) { return uFieldClearance(w); }
@@ -115,6 +121,7 @@ ${wallPushGlsl('uSightField', 'Sight')}
 ${BOUNCE_GATHER_GLSL}
 ${SRGB_GLSL}
 ${TONEMAP_GLSL}
+${SHOWN_GLSL}
 
 // Share of its colour an area no token sees loses in the GM view.
 const float UNSEEN_FADE = 0.4;
@@ -130,6 +137,19 @@ int stackAt(vec2 w) {
   vec2 local = cell - uStackBox.xy;
   if (any(lessThan(local, vec2(0.0))) || any(greaterThanEqual(local, uStackBox.zw))) return 0;
   return int(texelFetch(uStack, ivec2(local), 0).r * 255.0 + 0.5);
+}
+
+vec4 sightTexel(vec2 device) {
+  return texelFetch(uTexture, clamp(ivec2(floor(device)), ivec2(0), ivec2(uInputPixel.xy) - 1), 0);
+}
+
+// What the vision tokens perceive at this pixel; on fewer pixels than the render's, the least of the render's pixels it covers.
+vec4 sightHere() {
+  if (uShownOut <= 0.0) return textureLod(uTexture, vTextureCoord, 0.0);
+  vec2 device = vTextureCoord * uInputPixel.xy;
+  float h = max(0.5 * uShownOut - 0.5, 0.0);
+  vec4 near = min(sightTexel(device + vec2(-h, -h)), sightTexel(device + vec2(h, -h)));
+  return min(near, min(sightTexel(device + vec2(-h, h)), sightTexel(device + vec2(h, h))));
 }
 
 // Explored memory is stamped with hard-edged polygons: blur it over a disc of two memory texels,
@@ -256,7 +276,7 @@ void main() {
   }
   vec3 ambient = ambientGiven * lightLeft;
   bounce *= lightLeft;
-  vec4 sight = textureLod(uTexture, vTextureCoord, 0.0) * gate;
+  vec4 sight = sightHere() * gate;
   // Senses: what is perceived without light is seen too.
   float seen = max(uAllSeen * gate, max(sight.r, max(sight.g, sight.b)));
   vec3 direct = lamps.rgb;
@@ -297,7 +317,7 @@ void main() {
   // sight, and in sight where no light and no sense shows the map (recalls: memory is on and a
   // token has vision). The memory is read only where it can show: out of sight, or where the
   // live picture is no brighter than the brightest the memory can be.
-  vec3 remembered = vec3(grey) * 0.07 * uExploredTint;
+  vec3 remembered = vec3(grey) * MEMORY_SHOWN * uExploredTint;
   float recalls = uMode > 0.5 && uMemory > 0.5 && uAllSeen < 0.5 ? 1.0 : 0.0;
   float dimmest = dot(visible, LUMA) - max(dot(uUnexplored, LUMA), dot(remembered, LUMA));
   float explored = uMode > 0.5 && uMemory > 0.5 && (seen < 1.0 || (recalls > 0.5 && dimmest < 0.0)) ? exploredAt(world) : 0.0;
@@ -324,6 +344,10 @@ void main() {
   vec3 gm = mix(unseen, 1.0 - (1.0 - visible) * (1.0 - floorColor), seen) + uGmVeil * dark.r;
 
   vec3 color = max(uMode > 0.5 ? player : gm, 0.0);
+  // How much of the map shows here, whatever its colour: the light and senses where perceived now, the memory where remembered.
+  float liveShown = max(level, max(sight.g, sight.b) * sensed);
+  float memoryShown = explored * MEMORY_SHOWN;
+  float shownHere = uMode > 0.5 ? mix(memoryShown, max(liveShown, recalls * memoryShown), seen) : liveShown;
   vec3 shown = toSrgb(color);
   if (grid > 0.0) {
     // The players see the grid where a light or a sense shows them the map, or where they remember it; never over what they have not seen.
@@ -345,7 +369,8 @@ void main() {
       under = texelFetch(uBelow2, clamp(pixel, ivec2(0), textureSize(uBelow2, 0) - 1), 0).rgb * (uBelowDim * uBelowDim);
     }
     shown = mix(under, shown, clamp(back.a, 0.0, 1.0));
+    shownHere = min(shownHere, dot(shown, LUMA));
   }
   float dither = (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
-  finalColor = vec4(shown + dither, 1.0);
+  finalColor = vec4(shown + dither, uShownOut > 0.0 ? shownEncoded(shownHere) : 1.0);
 }`;

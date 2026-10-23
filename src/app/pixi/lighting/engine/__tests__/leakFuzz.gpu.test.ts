@@ -267,6 +267,23 @@ describe('leak fuzz', () => {
     expect(report).toMatchObject(NO_LEAKS);
   });
 
+  // At resolution 2 the lower qualities work the composite out on a quarter of the pixels and draw it up (`CompositeUpscale`).
+  for (const name of ['balanced', 'saver'] as const) {
+    it(`holds at the ${name} lighting quality at renderer resolution 2`, { timeout: 600_000 }, async () => {
+      const quality = LIGHTING_QUALITY[name];
+      expect(quality.compositePixelRatio).toBeLessThan(2);
+      const report = await fuzz({ seed: 13, trials: SIDE_TRIALS, resolution: 2, quality });
+      console.info(`leak fuzz (${name}, resolution 2): ${JSON.stringify({ trials: SIDE_TRIALS, ...report })}`);
+      expect(report.checked).toBeGreaterThan(8 * 4000);
+      expect(report.litInside).toBeGreaterThan(800);
+      expect(report.senseInside).toBeGreaterThan(800);
+      expect(report.spotInside).toBeGreaterThan(400);
+      expect(report.darkInside).toBeGreaterThan(50);
+      expect(report.beamInside).toBeGreaterThan(400);
+      expect(report).toMatchObject(NO_LEAKS);
+    });
+  }
+
   it('finds light and sight past a wall with a gap (the check can fail)', async () => {
     // Nine tenths of one wall open.
     const report = await fuzz({ seed: 11, trials: 20, gap: 0.9 });

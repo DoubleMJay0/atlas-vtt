@@ -99,7 +99,16 @@ interface Measured { cpu: number; cpuMax: number; frame: number }
 /** Every frame the stage rendered, and every picture of a level below drawn for one. */
 interface Counts { stage: number; below: number }
 
-interface Opened { view: LevelsView; frame: () => void; counts: Counts; gl: WebGL2RenderingContext; destroy: () => void }
+interface Opened {
+  level: LightingQualityLevel;
+  view: LevelsView;
+  frame: () => void;
+  counts: Counts;
+  gl: WebGL2RenderingContext;
+  /** Draws the composite on every pixel of the canvas (true) or at the quality's pixel ratio (false). */
+  fullRatio: (on: boolean) => void;
+  destroy: () => void;
+}
 
 describe('the cost of a generated dungeon of three floors at runtime (printed)', () => {
   const built = dungeon();
@@ -108,9 +117,12 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
   /** The view of the entry floor; with `openings` false the floors below are never seen (no opening on any floor). */
   async function open(level: LightingQualityLevel, openings: boolean): Promise<Opened> {
     const shade = new ShadeLayer(true);
+    let quality = LIGHTING_QUALITY[level];
+    const listeners = new Set<() => void>();
     const view = await openLevelsView({
       map: Math.max(built.width, built.height), pane: WIDTH, paneHeight: HEIGHT, resolution: RESOLUTION,
-      levels: built.levels, maps: built.maps, viewedLevel: built.viewed, quality: LIGHTING_QUALITY[level],
+      levels: built.levels, maps: built.maps, viewedLevel: built.viewed,
+      qualitySource: { current: () => quality, onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener); } },
       shading: { relief: () => (import.meta.env.VITE_NO_RELIEF ? null : built.relief.relief), layer: shade },
       readShading: (path) => {
         const pixels = built.reliefs.get(path);
@@ -152,7 +164,12 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
     }) as typeof renderer.render;
     let time = performance.now();
     return {
-      view, gl: renderer.gl, counts,
+      level, view, gl: renderer.gl, counts,
+      fullRatio: (on) => {
+        quality = { ...LIGHTING_QUALITY[level] };
+        if (on) delete quality.compositePixelRatio;
+        for (const listener of listeners) listener();
+      },
       frame: () => { view.app.ticker.update(time = Math.max(time + 16, performance.now())); },
       destroy: () => { liquids.destroy(); view.dispose(); shade.destroy(); },
     };
@@ -233,6 +250,32 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
     const moving = (): void => { view.viewport.x = x0 + (nudge++ % 2); };
     const out: Record<string, number> = {};
     out.atRest = await time(() => undefined);
+    if (ctx.view.app.renderer.resolution > (LIGHTING_QUALITY[ctx.level].compositePixelRatio ?? Infinity)) {
+      // The composite on every pixel against the quality's ratio, in turn, as the device's clocks drift:
+      // back to back (the device's throughput) and one render at a time (what a frame waits for).
+      const single = async (): Promise<number> => {
+        const runs: number[] = [];
+        for (let i = 0; i < 20; i++) {
+          settleGpu(gl);
+          const started = performance.now();
+          view.controller.renderer.prepareBelow?.();
+          view.app.renderer.render({ container: view.app.stage });
+          settleGpu(gl);
+          runs.push(performance.now() - started);
+        }
+        return median(runs);
+      };
+      const samples: Record<string, number[]> = { atRestEveryPixel: [], atRestReduced: [], frameEveryPixel: [], frameReduced: [] };
+      for (let round = 0; round < 3; round++) {
+        ctx.fullRatio(true);
+        samples.atRestEveryPixel!.push(await time(() => undefined));
+        samples.frameEveryPixel!.push(await single());
+        ctx.fullRatio(false);
+        samples.atRestReduced!.push(await time(() => undefined));
+        samples.frameReduced!.push(await single());
+      }
+      for (const [name, values] of Object.entries(samples)) out[name] = round(median(values));
+    }
     out.moving = await time(moving);
     liquids.visible = false;
     out.movingNoLiquids = await time(moving);

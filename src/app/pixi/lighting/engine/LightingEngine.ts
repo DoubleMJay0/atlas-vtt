@@ -126,6 +126,7 @@ export class LightingEngine {
    */
   setQuality(quality: LightingQuality): void {
     this.quality = quality;
+    this.composite?.setPixelRatio(this.pixelRatio());
     this.world?.setFlicker(quality.flickerMs);
     const { scene } = this;
     if (scene && this.world && !this.world.fits(quality, scene.cellSize)) this.attempt(() => this.build(scene));
@@ -241,6 +242,8 @@ export class LightingEngine {
     // Off or stopped, the engine has no composite: the render is as it is without lighting.
     if (!this.composite) return render();
     this.viewHeld = true;
+    // A thumbnail is drawn on every pixel it has.
+    this.composite?.setPixelRatio(undefined);
     this.attempt(() => this.applySightMode('gm'));
     // Without a camera a frame pixel is 1 / resolution world pixels, counted from (x, y).
     this.composite?.setView(new Matrix(1, 0, 0, 1, frame.x, frame.y), frame.resolution);
@@ -250,6 +253,7 @@ export class LightingEngine {
       return render();
     } finally {
       this.viewHeld = false;
+      this.composite?.setPixelRatio(this.pixelRatio());
       this.attempt(() => this.applySightMode(this.mode));
       this.composite?.setView(this.view.screenToWorld, this.view.zoom);
       this.composite?.setBelow(this.below.pictures, this.below.dim);
@@ -344,6 +348,15 @@ export class LightingEngine {
     return true;
   }
 
+  /**
+   * Device pixels per screen pixel the composite may take (`LightingQuality.compositePixelRatio`).
+   * Only the view's own level: a level below draws its picture texel on pixel for the view's
+   * composite, which reads it as it is.
+   */
+  private pixelRatio(): number | undefined {
+    return this.levelIndex === 0 ? this.quality.compositePixelRatio : undefined;
+  }
+
   /** The world, rebuilt from the last scene when a restored context took it. */
   private currentWorld(): LightingWorld | null {
     if (!this.world && this.scene) this.build(this.scene);
@@ -391,6 +404,7 @@ export class LightingEngine {
       this.composite.setMode(this.mode);
       this.composite.setView(this.view.screenToWorld, this.view.zoom);
       this.composite.setLevelIndex(this.levelIndex);
+      this.composite.setPixelRatio(this.pixelRatio());
       this.composite.setStack(this.stack);
       this.composite.setBelow(this.below.pictures, this.below.dim);
       this.layer.filters = [this.composite.filter];
