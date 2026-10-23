@@ -168,13 +168,6 @@ export class TileTracer {
     return { at, flame: 0, rect, oneWay, tile, area, raw: null, phase: 'distance', row: 0 };
   }
 
-  /** The whole area light's tile at once (`beginArea`); the caller owns the tile and its distance field. */
-  traceArea(at: readonly [number, number], shape: AreaLightShape, rect: Rect, oneWay: CapsuleField | null): TileJob {
-    const job = this.beginArea(at, shape, rect, oneWay);
-    this.step(job, Infinity);
-    return job;
-  }
-
   /**
    * Draws bands of `job` until `texels` are spent (at least one band, so every step gets on) or
    * the tile is done; returns the texels drawn. Jobs must not be stepped in turn with each other.
