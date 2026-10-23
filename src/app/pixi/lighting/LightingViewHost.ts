@@ -5,9 +5,8 @@ import type { HideableLayer } from '../playerSafeFrame';
 import type { SceneFrame } from './engine/types';
 import type { LightingUnavailable } from './LightingRenderer';
 import type { SceneLightingView } from './sceneLightingView';
-import type { TileView } from '../mapImage/levelOfDetail';
 import type { TokenPerception } from '../../vision/tokenPerception';
-import type { BelowPicture } from './levels/LevelsBelow';
+import type { BelowRender } from './levels/LevelsBelow';
 import type { ArtFloors } from '../../levels/levelSurfaces';
 
 export interface LightingViewHostDeps {
@@ -87,8 +86,7 @@ export class LightingViewHost implements SceneLightingView {
   resetExplored(): void { this.view.resetExplored(); }
   editExplored(edit: ExploredEdit): boolean { return this.view.editExplored(edit); }
   beforeMapUnload(): void { this.view.beforeMapUnload(); }
-  prepareBelow(picture?: Omit<BelowPicture, 'camera'>): void { this.view.prepareBelow?.(picture); }
-  addBelowDemandRegion(view: TileView): () => void { return this.view.addBelowDemandRegion?.(view) ?? ((): void => undefined); }
+  prepareBelow(picture?: BelowRender): void { this.view.prepareBelow?.(picture); }
   releaseBelowPicture(): void { this.view.releaseBelowPicture?.(); }
   belowTokenPerception(): TokenPerception { return this.view.belowTokenPerception?.() ?? ((): 'unseen' => 'unseen'); }
   artFloors(): ArtFloors | undefined { return this.view.artFloors?.(); }

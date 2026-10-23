@@ -61,6 +61,7 @@ export class LiquidMesh {
     uniforms.uFieldCode.set([field.outside, field.near, field.far, 0]);
     uniforms.uCell = cell;
     uniforms.uKind = KIND_CODE[surface.liquid];
+    uniforms.uAcidArt = surface.acidArt === 'engraved' ? 1 : 0;
     const { flow } = surface;
     uniforms.uFlowing = flow ? 1 : 0;
     // Its frame: across the flow, then along it; a still surface keeps the map's axes.
@@ -83,6 +84,11 @@ export class LiquidMesh {
     this.uniforms.uDriftA.set(this.drifts.subarray(0, 4));
     this.uniforms.uDriftB.set(this.drifts.subarray(4, 8));
     this.uniforms.uTime = loopTime(seconds);
+  }
+
+  /** Acid uses three, two or one noise octaves; other liquids keep their material. */
+  setAcidDetail(detail: number): void {
+    this.uniforms.uAcidDetail = Number.isFinite(detail) ? Math.max(1, Math.min(3, Math.floor(detail))) : 3;
   }
 
   /** Frees the mesh, its geometry, field and shader; the GL program stays shared in PIXI's cache. */

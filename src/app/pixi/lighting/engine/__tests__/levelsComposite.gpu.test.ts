@@ -1,9 +1,10 @@
-import { Container, Graphics, Matrix, RenderTexture, Sprite, Texture, type WebGLRenderer } from 'pixi.js';
+import { BufferImageSource, Container, Graphics, Matrix, RenderTexture, Sprite, Texture, type WebGLRenderer } from 'pixi.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { levelStack, shownAt, stackGrid, VIEWED } from '../../../../levels/levelStack';
 import type { LevelSurface } from '../../../../types/sceneLevelTypes';
 import { SEES_ALL, computeSight } from '../../../../vision/sight';
 import { LevelStackTexture } from '../../levels/LevelStackTexture';
+import { snapshotGrid, type SnapshotGrid } from '../../levels/belowSnapshot';
 import { LightingEngine } from '../LightingEngine';
 import type { EngineScene } from '../types';
 import { createTestRenderer, readRgba } from './gpuTestUtils';
@@ -18,20 +19,29 @@ function scene(overrides: Partial<EngineScene> = {}): EngineScene {
 }
 
 /**
- * A picture standing for the level below: every pixel its own colour, so a pixel taken from the
- * wrong place, row or orientation shows.
+ * A snapshot standing for the level below over `grid`: every texel its own colour, so a texel
+ * taken from the wrong place, row or orientation shows. Returns the texture and its pixels.
  */
-function patternPicture(renderer: WebGLRenderer, resolution: number): RenderTexture {
-  const target = RenderTexture.create({ width: SIZE, height: SIZE, resolution });
-  const g = new Graphics();
-  const cells = 24;
-  const step = SIZE / cells;
-  for (let y = 0; y < cells; y++) {
-    for (let x = 0; x < cells; x++) g.rect(x * step, y * step, step, step).fill({ color: ((x * 10 + 15) << 16) | ((y * 10 + 15) << 8) | 0x40 });
+function patternSnapshot(grid: SnapshotGrid): { texture: Texture; pixels: Uint8Array } {
+  const pixels = new Uint8Array(grid.width * grid.height * 4);
+  for (let y = 0; y < grid.height; y++) {
+    for (let x = 0; x < grid.width; x++) {
+      const o = (y * grid.width + x) * 4;
+      pixels.set([(x * 37 + 15) % 256, (y * 53 + 15) % 256, (x * 11 + y * 29 + 64) % 256, 255], o);
+    }
   }
-  renderer.render({ container: g, target, clear: true, clearColor: [0, 0, 0, 1] });
-  g.destroy();
-  return target;
+  const source = new BufferImageSource({ resource: pixels, width: grid.width, height: grid.height, format: 'rgba8unorm', scaleMode: 'nearest', alphaMode: 'premultiplied-alpha', autoGenerateMipmaps: false });
+  return { texture: new Texture({ source }), pixels };
+}
+
+/** The snapshot texel that holds world point `w` (`snapshotTexel` in the composite), from the stack texel holding it. */
+function snapshotTexelAt(grid: SnapshotGrid, stackTexel: number, w: { x: number; y: number }): { x: number; y: number } {
+  const of = (value: number, origin: number): number => {
+    const cell = Math.floor(value / stackTexel);
+    const inside = Math.min(grid.sub - 1, Math.max(0, Math.floor(((value - cell * stackTexel) * grid.sub) / stackTexel)));
+    return (cell - origin) * grid.sub + inside;
+  };
+  return { x: of(w.x, grid.x), y: of(w.y, grid.y) };
 }
 
 /** Renders a white map, the eraser and the engine's layer through a camera at `scale`, offset (x, y). */
@@ -62,7 +72,7 @@ describe('the composite over openings', () => {
     while (cleanup.length) cleanup.pop()!();
   });
 
-  it.each([1, 2])('shows the picture below texel on pixel where the stack shows it, and the viewed level as before everywhere else (resolution %i)', async (resolution) => {
+  it.each([[1, MAP], [2, MAP], [1, 8192], [2, 8192]])('shows the snapshot below where the stack shows it, each pixel from the snapshot texel in its own stack texel, and the viewed level as before everywhere else (resolution %i, stack over %i px)', async (resolution, stackSide) => {
     const renderer = await createTestRenderer(SIZE, resolution);
     cleanup.push(() => renderer.destroy());
     const watch = watchGl(renderer.gl);
@@ -79,13 +89,15 @@ describe('the composite over openings', () => {
 
     const [scale, x, y] = [0.61, -13.3, 7.7];
     const before = shoot(renderer, engine, null, scale, x, y, resolution);
-    const stack = levelStack({ id: 'upper', surfaces: [{ id: 'hole', kind: 'level-surface', open: true, polygon: rect(60.3, 80.7, 140, 97) }] }, [{ id: 'ground', surfaces: [] }], ['ground'], stackGrid({ width: MAP, height: MAP }));
+    // On a stack over 8,192 px a stack texel is 4 px, split into snapshot texels of a world pixel.
+    const stack = levelStack({ id: 'upper', surfaces: [{ id: 'hole', kind: 'level-surface', open: true, polygon: rect(60.3, 80.7, 140, 97) }] }, [{ id: 'ground', surfaces: [] }], ['ground'], stackGrid({ width: stackSide, height: stackSide }));
     stackTexture.update(stack, (bound) => engine.setStack(bound));
-    const picture = patternPicture(renderer, resolution);
-    cleanup.push(() => picture.destroy(true));
-    engine.setBelow([picture, null], 1);
+    const grid = snapshotGrid(stack)!;
+    expect(grid.sub).toBe(stackSide === MAP ? 1 : 4);
+    const snapshot = patternSnapshot(grid);
+    cleanup.push(() => snapshot.texture.destroy(true));
+    engine.setBelow({ textures: [snapshot.texture, null], x: grid.x, y: grid.y, sub: grid.sub }, 1);
     const after = shoot(renderer, engine, stackTexture.eraser, scale, x, y, resolution);
-    const below = readRgba(renderer, picture);
 
     const device = SIZE * resolution;
     let holes = 0;
@@ -96,14 +108,16 @@ describe('the composite over openings', () => {
         const world = { x: ((sx + 0.5) / resolution - x) / scale, y: ((sy + 0.5) / resolution - y) / scale };
         if (world.x < 0 || world.y < 0 || world.x > MAP || world.y > MAP) continue;
         const o = (sy * device + sx) * 4;
-        // Pixels whose centre lies on a texel's edge may read either texel.
-        const cell = { x: world.x / stack.grid.texel, y: world.y / stack.grid.texel };
+        // Pixels whose centre lies on a snapshot texel's edge (and so on a stack texel's) may read either texel.
+        const cell = { x: world.x / grid.texel, y: world.y / grid.texel };
         if (Math.abs(cell.x - Math.round(cell.x)) < 1e-3 || Math.abs(cell.y - Math.round(cell.y)) < 1e-3) continue;
         if (shownAt(stack, world) === VIEWED) {
           if (Math.abs(after[o]! - before[o]!) + Math.abs(after[o + 1]! - before[o + 1]!) + Math.abs(after[o + 2]! - before[o + 2]!) > 0) moved++;
         } else {
           holes++;
-          if (Math.abs(after[o]! - below[o]!) > 1 || Math.abs(after[o + 1]! - below[o + 1]!) > 1 || Math.abs(after[o + 2]! - below[o + 2]!) > 1) wrong++;
+          const t = snapshotTexelAt(grid, stack.grid.texel, world);
+          const e = (t.y * grid.width + t.x) * 4;
+          if ([0, 1, 2].some((c) => Math.abs(after[o + c]! - snapshot.pixels[e + c]!) > 1)) wrong++;
         }
       }
     }

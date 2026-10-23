@@ -3,6 +3,7 @@ import { FULLSCREEN_VERTEX } from './glsl';
 import { capsuleFieldFragment, capsuleFieldVertex } from './capsuleFieldShader';
 import { cascadeFragment, cascadeVertex, emissionFragment, resolveFragment } from './cascadeShaders';
 import { compositeFragment } from './compositeShader';
+import { compositeUpscaleFragment } from './compositeUpscaleShader';
 import { darknessFragment, darknessVertex, pierceFragment, pierceVertex } from './darknessShader';
 import { lightMapFragment, lightMapVertex } from './lightMapShader';
 import { limitedFragment, limitedVertex } from './limitedShader';
@@ -44,5 +45,6 @@ export const ENGINE_SHADERS = {
   bounceResolve: { name: 'atlas-bounce-resolve', vertex: cascadeVertex, fragment: resolveFragment },
   sight: { name: 'atlas-sight', vertex: sightVertex, fragment: sightFragment },
   composite: { name: 'atlas-lighting-composite', vertex: defaultFilterVert, fragment: compositeFragment },
+  compositeUpscale: { name: 'atlas-lighting-composite-upscale', vertex: defaultFilterVert, fragment: compositeUpscaleFragment },
   roof: { name: 'atlas-roof', vertex: defaultFilterVert, fragment: roofFragment },
 } as const satisfies Record<string, EngineShaderSource>;

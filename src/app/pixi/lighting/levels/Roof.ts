@@ -15,6 +15,7 @@ import type { MapBounds } from '../../../vision/visibility';
 import type { TileView } from '../../mapImage/levelOfDetail';
 import type { BelowMapImage } from './BelowLevel';
 import { RoofLayer, type RoofMode } from './RoofLayer';
+import type { SnapshotView } from './belowSnapshot';
 
 /** A roof image as read for drawing: its own size and its pieces (`roofPieces`). */
 export interface RoofImageRead {
@@ -25,7 +26,8 @@ export interface RoofImageRead {
 
 /** What a view gives a roof: a map image to draw it with, and a way to read an image's pieces. */
 export interface RoofHost {
-  createMapImage(): BelowMapImage;
+  /** A map image through the view's camera, or through `camera` (a level below's snapshot) where given. */
+  createMapImage(camera?: SnapshotView): BelowMapImage;
   /** A roof image's size and pieces; rejects where it cannot be read. */
   readRoof(path: string): Promise<RoofImageRead>;
 }
@@ -64,6 +66,8 @@ export interface RoofDeps {
   onReady: () => void;
   /** How long a piece takes to fade; 0 at once. */
   fadeMs: number;
+  /** The camera the roof image reads its tiles through, where not the view's (a level below's snapshot). */
+  camera?: SnapshotView;
 }
 
 const NO_FADED: ReadonlySet<number> = new Set();
@@ -100,7 +104,7 @@ export class Roof {
   private destroyed = false;
 
   constructor(private readonly deps: RoofDeps) {
-    this.image = deps.host.createMapImage();
+    this.image = deps.host.createMapImage(deps.camera);
     this.layer = new RoofLayer(this.image.layer, deps.fadeMs);
   }
 

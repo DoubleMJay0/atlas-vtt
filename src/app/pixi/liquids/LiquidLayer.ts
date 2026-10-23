@@ -31,6 +31,8 @@ export interface LiquidLayerDeps {
    * their detail is too fine to see move. Unset, `LIQUID_FPS`.
    */
   fps?: () => number;
+  /** Acid material octaves (3 / 2 / 1), independent of zoom throttling. */
+  acidDetail?: () => number;
   /** The time of the display frame (ms); unset, the ticker's, which every animation of the map shares (`frameTime`). */
   now?: () => number;
 }
@@ -140,6 +142,7 @@ export class LiquidLayer {
     while (this.pending.length > 0) {
       const surface = this.pending.shift()!;
       const mesh = new LiquidMesh(surface, this.cell);
+      mesh.setAcidDetail(this.deps.acidDetail?.() ?? 3);
       mesh.setTime(this.shownSeconds);
       this.built.set(surface.id, { entry: record?.[surface.id], mesh });
       if (this.now() - start >= budget) break;
@@ -157,7 +160,10 @@ export class LiquidLayer {
   /** Shows `seconds` of motion on every surface and asks for the frame. */
   private show(seconds: number): void {
     this.shownSeconds = seconds;
-    for (const { mesh } of this.built.values()) mesh.setTime(seconds);
+    for (const { mesh } of this.built.values()) {
+      mesh.setAcidDetail(this.deps.acidDetail?.() ?? 3);
+      mesh.setTime(seconds);
+    }
     if (this.built.size > 0) this.deps.requestRender();
   }
 

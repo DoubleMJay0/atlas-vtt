@@ -9,6 +9,7 @@ import { shapePolygon, type Vec } from '../render/geometry';
 import { mixColours, paletteOf } from '../render/palette';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
+import { acidColours } from './acidArt';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
@@ -193,11 +194,11 @@ function centroid(ring: readonly Vec[]): Vec {
 function liquidColours(style: DungeonStyle, view: DungeonView): Record<LiquidKind, LiquidColors> {
   const palette = paletteOf(style, view);
   const water: LiquidColors = { surface: palette.water, deep: mixColours(palette.water, palette.ink, 0.35), glint: mixColours(palette.water, '#ffffff', 0.75) };
-  if (view.monochrome) return { water, lava: water, acid: water };
+  if (view.monochrome) return { water, lava: water, acid: acidColours(style, view) };
   return {
     water,
     lava: { surface: '#d6602a', deep: '#5c1a0c', glint: '#ffd27a' },
-    acid: { surface: '#86b43a', deep: '#3a4e1a', glint: '#d8f59a' },
+    acid: acidColours(style, view),
   };
 }
 
@@ -235,7 +236,7 @@ export function floorLiquids(
   const liquids: Record<string, LiquidSurface> = {};
   cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow }, index) => {
     const liquidId = `liquid_${id}_${index + 1}`;
-    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(level && { level }) };
+    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(liquid === 'acid' && style.direction === 'engraved' && { acidArt: 'engraved' }), ...(level && { level }) };
   });
   // The glow comes from the whole of the lava, under its bridges and what stands in it too
   const lights: Record<string, LightSource> = {};

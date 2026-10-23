@@ -476,6 +476,7 @@ export class PixiRendererOrchestrator { // Renamed class
           obsApp: this.obsApp,
           app: this.pixiAppManager.app,
           viewport,
+          store: this.store,
           viewedFog: () => this.fogRenderer?.getCommittedCoverage(),
           viewedRoof: () => {
             const roofs = this.roofs;
@@ -865,8 +866,8 @@ export class PixiRendererOrchestrator { // Renamed class
     const restoreMapImage = this.mapImage?.drawFor(tiles);
     const restoreRoof = this.roofs?.drawFor(tiles);
     const render = (): void => {
-      // The levels below the openings, for this frame's camera and size: the DM's own are drawn again before the DM's render.
-      this.lighting?.renderer.prepareBelow?.({ key: 'frame', width: frame.width / frame.resolution, height: frame.height / frame.resolution, resolution: frame.resolution, mode: 'player', tiles });
+      // The levels below the openings, in the players' look: the DM's own are bound again before the DM's render.
+      this.lighting?.renderer.prepareBelow?.({ key: 'frame', width: frame.width / frame.resolution, height: frame.height / frame.resolution, mode: 'player' });
       frames.render(app.stage, frame);
     };
     try {
@@ -881,9 +882,9 @@ export class PixiRendererOrchestrator { // Renamed class
     }
   }
 
-  /** Keeps the map's tiles of `view` (the player window's frame) loaded: the view's own, and those of the levels below its openings. */
+  /** Keeps the map's tiles of `view` (the player window's frame) loaded: the view's own and its roof's (the levels below draw their snapshots' own). */
   public addMapDemandRegion(view: TileView): () => void {
-    const releases = [this.mapImage?.addDemandRegion(view), this.roofs?.addDemandRegion(view), this.lighting?.renderer.addBelowDemandRegion?.(view)];
+    const releases = [this.mapImage?.addDemandRegion(view), this.roofs?.addDemandRegion(view)];
     return (): void => {
       for (const release of releases) release?.();
     };

@@ -29,13 +29,28 @@ function textureMb(renderer: WebGLRenderer): number {
 
 interface Measured { cpu: number; cpuMax: number; frame: number }
 
+interface Opened extends DungeonView {
+  level: LightingQualityLevel;
+  /** Draws the composite on every pixel of the canvas (true) or at the quality's pixel ratio (false). */
+  fullRatio: (on: boolean) => void;
+}
+
 describe('the cost of a generated dungeon of three floors at runtime (printed)', () => {
   const built = generatedDungeon();
 
-  /** The view of the entry floor; with `openings` false the floors below are never seen (no opening on any floor). */
-  function open(level: LightingQualityLevel, openings: boolean): Promise<DungeonView> {
-    return openDungeonView(built, { quality: LIGHTING_QUALITY[level], openings, pane: WIDTH, paneHeight: HEIGHT, resolution: RESOLUTION });
+  /** The view of the entry floor at `level`; with `openings` false the floors below are never seen (no opening on any floor). */
+  async function open(level: LightingQualityLevel, openings: boolean): Promise<Opened> {
+    const ctx = await openDungeonView(built, { quality: LIGHTING_QUALITY[level], openings, pane: WIDTH, paneHeight: HEIGHT, resolution: RESOLUTION });
+    return {
+      ...ctx, level,
+      fullRatio: (on) => {
+        const quality = { ...LIGHTING_QUALITY[level] };
+        if (on) delete quality.compositePixelRatio;
+        ctx.setQuality(quality);
+      },
+    };
   }
+
 
   /**
    * CPU of `step` and its display frame (median and worst), and the wall time until the graphics
@@ -43,7 +58,7 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
    * use here: on ANGLE's Metal backend one spans the gaps between the command buffers a paced
    * engine commits.
    */
-  async function measure(ctx: DungeonView, count: number, step: (i: number) => void): Promise<Measured> {
+  async function measure(ctx: Opened, count: number, step: (i: number) => void): Promise<Measured> {
     const cpu: number[] = [];
     const frame: number[] = [];
     settleGpu(ctx.gl);
@@ -60,7 +75,7 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
   }
 
   /** Stage renders and pictures of levels below a second at rest, and how many ms of each second the frames take until the graphics device is done, in real time. */
-  async function idleSecond(ctx: DungeonView): Promise<{ renders: number; belowDraws: number; busyMsPerSecond: number }> {
+  async function idleSecond(ctx: Opened): Promise<{ renders: number; belowDraws: number; busyMsPerSecond: number }> {
     const before = { ...ctx.counts };
     let busy = 0;
     settleGpu(ctx.gl);
@@ -81,7 +96,7 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
    * moving (a camera a pixel off each render draws the levels below anew, as a zoom or pan does),
    * and with parts of the stage hidden.
    */
-  async function throughput(ctx: DungeonView): Promise<Record<string, number>> {
+  async function throughput(ctx: Opened): Promise<Record<string, number>> {
     const { view, gl } = ctx;
     const lighting = view.viewport.children.find((child) => child.label === 'lighting')!;
     const liquids = view.viewport.children.find((child) => child.label === 'liquids')!;
@@ -106,6 +121,32 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
     const moving = (): void => { view.viewport.x = x0 + (nudge++ % 2); };
     const out: Record<string, number> = {};
     out.atRest = await time(() => undefined);
+    if (ctx.view.app.renderer.resolution > (LIGHTING_QUALITY[ctx.level].compositePixelRatio ?? Infinity)) {
+      // The composite on every pixel against the quality's ratio, in turn, as the device's clocks drift:
+      // back to back (the device's throughput) and one render at a time (what a frame waits for).
+      const single = async (): Promise<number> => {
+        const runs: number[] = [];
+        for (let i = 0; i < 20; i++) {
+          settleGpu(gl);
+          const started = performance.now();
+          view.controller.renderer.prepareBelow?.();
+          view.app.renderer.render({ container: view.app.stage });
+          settleGpu(gl);
+          runs.push(performance.now() - started);
+        }
+        return median(runs);
+      };
+      const samples: Record<string, number[]> = { atRestEveryPixel: [], atRestReduced: [], frameEveryPixel: [], frameReduced: [] };
+      for (let round = 0; round < 3; round++) {
+        ctx.fullRatio(true);
+        samples.atRestEveryPixel!.push(await time(() => undefined));
+        samples.frameEveryPixel!.push(await single());
+        ctx.fullRatio(false);
+        samples.atRestReduced!.push(await time(() => undefined));
+        samples.frameReduced!.push(await single());
+      }
+      for (const [name, values] of Object.entries(samples)) out[name] = round(median(values));
+    }
     out.moving = await time(moving);
     liquids.visible = false;
     out.movingNoLiquids = await time(moving);
@@ -137,7 +178,9 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
       }
       const render = await throughput(ctx);
       const zoom0 = view.viewport.scale.x;
+      const belowBeforeZoom = ctx.counts.below;
       const zoom = await measure(ctx, 30, (i) => { view.viewport.scale.set(zoom0 * (1 + 0.5 * Math.sin(i / 5))); });
+      const belowPerZoom = round((ctx.counts.below - belowBeforeZoom) / 30);
       view.viewport.scale.set(zoom0);
       holdTokens(view.store, ['hero']);
       const cell = built.pxPerCell;
@@ -151,15 +194,16 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
         console.info(`${name} profile, self:\n${taken.self.map(([n, ms]) => `${ms}\t${n}`).join('\n')}\ntotal:\n${taken.total.map(([n, ms]) => `${ms}\t${n}`).join('\n')}`);
       };
       await profile('drag');
-      // The hero takes up a torch: its light and reflection follow every step.
+      // The hero takes up a torch: its light follows every step.
       view.store.getState().updateTokens([{ id: 'hero', changes: { light: TORCH } }]);
       await measure(ctx, 10, step);
       const torchDrag = await measure(ctx, 40, step);
       await profile('torch');
       holdTokens(view.store, []);
       const s = view.store.getState();
+      const snapshot = (view.controller.renderer as unknown as { view: { levelsBelow: { grid: { width: number; height: number; texel: number } | null } } }).view.levelsBelow.grid;
       const scene = { mapPx: `${built.width}×${built.height}`, pxPerCell: built.pxPerCell, walls: Object.keys(s.objects.walls).length, lights: Object.keys(s.objects.lights).length, liquids: Object.keys(s.objects.liquids ?? {}).length };
-      console.info(`dungeon runtime cost at ${level}, floors below seen ${openings}: ${JSON.stringify({ ...scene, memoryMb, idle, render, zoom, drag, belowPerStep, torchDrag })}`);
+      console.info(`dungeon runtime cost at ${level}, floors below seen ${openings}: ${JSON.stringify({ ...scene, memoryMb, idle, render, zoom, belowPerZoom, ...(snapshot && { snapshot: `${snapshot.width}×${snapshot.height} at ${round(snapshot.texel)} px` }), drag, belowPerStep, torchDrag })}`);
       expect(drag.cpu).toBeGreaterThan(0);
     } finally {
       ctx.destroy();

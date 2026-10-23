@@ -64,6 +64,16 @@ export class BelowTokens {
     }
   }
 
+  /** How every token looks by `look`, as a key: the same key, the same tokens shown alike. */
+  lookKey(look: (token: TokenEntity) => BelowTokenLook): string {
+    let key = '';
+    for (const { token } of this.shown.values()) {
+      const decided = look(token);
+      key += decided.visible ? `${decided.alpha},` : '-,';
+    }
+    return key;
+  }
+
   /** Shows each token as `look` says, for the picture about to be drawn. */
   show(look: (token: TokenEntity) => BelowTokenLook): void {
     for (const { token, group } of this.shown.values()) {

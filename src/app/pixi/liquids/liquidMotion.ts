@@ -34,9 +34,9 @@ const DRIFTS: Readonly<Record<LiquidKind, { flowing: readonly Drift[]; still: re
     still: [{ across: 0.012, along: 0.008 }, { across: -0.006, along: 0.01 }, { across: 0.01, along: -0.012 }, { across: -0.006, along: 0.01 }],
   },
   acid: {
-    // Shimmer, a second shimmer, bubbles, unused.
-    flowing: [{ across: 0.02, along: 0.12 }, { across: -0.02, along: 0.2 }, { across: 0, along: 0.1 }, { across: 0, along: 0 }],
-    still: [{ across: 0.03, along: 0.015 }, { across: -0.025, along: 0.03 }, { across: 0, along: 0 }, { across: 0, along: 0 }],
+    // Slow pigment drift, unused, bubbles creeping downstream, unused.
+    flowing: [{ across: 0.006, along: 0.024 }, { across: -0.02, along: 0.2 }, { across: 0, along: 0.012 }, { across: 0, along: 0 }],
+    still: [{ across: 0.008, along: 0.005 }, { across: -0.025, along: 0.03 }, { across: 0, along: 0 }, { across: 0, along: 0 }],
   },
 };
 

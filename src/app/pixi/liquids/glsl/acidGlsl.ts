@@ -1,42 +1,64 @@
 /**
- * Acid: a faint shimmer over the painted pool, darker towards \`uDeep\` away from the shore, and
- * bubbles: some cells of a fine lattice hold one, which swells as a small dome with a glint on
- * it, pops into a fading ring and comes back, each at a pace of its own (whole cycles per loop).
+ * Acid is pigment over the illustration, never added light. Broad, slow currents disturb a
+ * stained meniscus; sparse bubbles stretch, swell and open into broken rings. Engraved maps
+ * express both in their own ink, with hatch density in place of smooth surface modelling.
+ * Three / two / one noise octaves at high / balanced / saver, one field sample, no extra pass.
  */
 export const ACID_GLSL = `
 vec4 acid(vec2 q, float d, float px, float near) {
-  float depth = smoothstep(0.05, 1.5, d);
-  float shimmer = fbm((q - uDriftA.xy) * 1.5, vec2(TILE * 1.5), 3, px * 1.5) + fbm((q - uDriftA.zw) * 2.5, vec2(TILE * 2.5), 2, px * 2.5) * 0.6;
+  float current = fbm((q - uDriftA.xy) * 0.75, vec2(TILE * 0.75), int(uAcidDetail), px * 0.75);
+  float bank = 1.0 - smoothstep(0.08, 0.32, d + current * 0.06);
 
-  vec2 b = (q - uDriftB.xy) * 3.0;
+  // One candidate per jittered cell, fewer than the old 3x3 lattice. A new location at each
+  // birth, changed only while invisible; integer paces and wrapped epochs keep LOOP seamless.
+  vec2 b = (q - uDriftB.xy) * 1.5;
   vec2 cell = floor(b);
-  vec4 h = hash42(mod(cell, vec2(TILE * 3.0)) + uSeed + 17.0);
-  float pace = floor(mix(420.0, 900.0, h.z));
-  float life = fract(uTime * (pace / LOOP) + h.w);
-  float has = step(h.y, 0.6) * smoothstep(0.08, 0.45, d);
-  float size = mix(0.12, 0.26, h.x);
-  vec2 centre = 0.27 + 0.46 * h.xy;
-  vec2 at = b - cell - centre;
+  vec4 h = hash42(mod(cell, vec2(TILE * 1.5)) + uSeed + 17.0);
+  float pace = floor(mix(340.0, 700.0, h.z));
+  float age = uTime * (pace / LOOP) + h.w;
+  float life = fract(age);
+  float epoch = mod(floor(age), pace);
+  vec4 birth = hash42(h.xy * 71.0 + epoch + 3.0);
+  vec2 at = b - cell - (0.28 + 0.44 * birth.xy);
+  at *= vec2(1.0 + birth.z * 0.12, 0.92 + birth.w * 0.12);
+  float size = mix(0.075, 0.18, birth.z);
+  float pop = smoothstep(0.74, 0.97, life);
+  float radius = size * (0.22 + 0.78 * smoothstep(0.04, 0.72, life) + pop * 0.35);
   float dist = length(at);
-  float edgeWidth = 0.02 + px * 2.5;
+  float aa = max(px * 1.5, 0.001);
+  float width = 0.009 * 1.5;
+  float rim = 1.0 - smoothstep(width * 0.5, width * 0.5 + aa, abs(dist - radius));
+  float dome = 1.0 - smoothstep(radius - aa, radius + aa, dist);
+  float live = smoothstep(0.04, 0.18, life) * (1.0 - smoothstep(0.78, 0.98, life));
+  float has = step(birth.w, 0.62) * smoothstep(0.10, 0.32, d) * shown(size, px * 1.5);
+  // The stretched skin opens on one side, then settles. No one-frame jump at the pop.
+  rim *= 1.0 - pop * smoothstep(-0.3, 0.7, at.x / max(radius, 0.001));
+  float bubble = live * has;
 
-  // Swelling: a dome lighter than the acid, a dark rim, a glint towards the light.
-  float swell = smoothstep(0.0, 0.85, life) * step(life, 0.88);
-  float radius = size * swell;
-  float dome = (1.0 - smoothstep(radius - edgeWidth, radius, dist)) * swell;
-  float rimLine = (1.0 - smoothstep(0.0, edgeWidth, abs(dist - radius))) * swell;
-  float glint = (1.0 - smoothstep(0.0, radius * 0.4 + edgeWidth, length(at + radius * vec2(0.35, 0.4)))) * swell;
-  // Popping: a thin ring running out and fading.
-  float burst = smoothstep(0.88, 1.0, life);
-  float ring = (1.0 - smoothstep(0.0, edgeWidth, abs(dist - size * (1.0 + burst * 1.6)))) * step(0.88, life) * (1.0 - burst);
-  float shownHere = has * shown(0.12, px * 3.0);
+  if (uAcidArt > 0.5) {
+    // Static art uses a 45-degree burin hatch. Keep it still, let density breathe in slow
+    // patches, and cut a fine meniscus with the same ink. Never wash a gradient over paper.
+    vec2 paper = vWorld / uCell;
+    float hatchAt = (paper.x - paper.y) * 22.0 + current * 0.14;
+    float hatch = 1.0 - smoothstep(0.10, 0.10 + px * 31.0, abs(fract(hatchAt) - 0.5));
+    hatch *= shown(1.0 / 31.0, px);
+    float stain = hatch * bank * 0.14;
+    float outline = rim * bubble * 0.7;
+    float alpha = clamp(stain + outline, 0.0, 0.78);
+    return vec4(uDeep * alpha, alpha);
+  }
 
-  float alpha = clamp(0.06 + depth * 0.22 - shimmer * 0.1 + rimLine * 0.3 * shownHere, 0.0, 0.5);
-  vec3 colour = uDeep * alpha;
-  colour += mix(uSurface, uGlint, 0.5) * smoothstep(0.05, 0.4, shimmer) * 0.07;
-  colour += mix(uSurface, uGlint, 0.6) * dome * (0.12 + 0.18 * smoothstep(0.0, radius, dist)) * shownHere;
-  colour += uGlint * glint * 0.4 * shownHere;
-  colour += uGlint * ring * 0.25 * shownHere;
+  // Thin pigment layers let the painter's paper, depth and existing bubbles show through.
+  float wash = 0.025 + bank * 0.12 + smoothstep(-0.18, 0.23, current) * 0.035;
+  vec3 colour = mix(uDeep, uSurface, 0.18 + current * 0.22) * wash;
+  float body = dome * bubble * (1.0 - smoothstep(0.70, 0.83, life)) * 0.07;
+  float edge = rim * bubble * 0.48;
+  float litSide = smoothstep(-0.8, 0.65, -(at.x + at.y) / max(radius, 0.001));
+  vec3 pigment = mix(uDeep, uGlint, 0.35 + litSide * 0.5);
+  colour = colour * (1.0 - body) + uSurface * body;
+  float alpha = wash * (1.0 - body) + body;
+  colour = colour * (1.0 - edge) + pigment * edge;
+  alpha = alpha * (1.0 - edge) + edge;
   return vec4(colour, alpha);
 }
 `;

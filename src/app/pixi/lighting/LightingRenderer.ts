@@ -14,8 +14,7 @@ import type { MapBounds } from '../../vision/visibility';
 import type { HideableLayer } from '../playerSafeFrame';
 import type { UnlitGrid } from '../../grid/gridLightingMark';
 import { requestRender } from '../RenderScheduler';
-import { LevelsBelow, type BelowLevelsHost, type BelowPicture } from './levels/LevelsBelow';
-import type { TileView } from '../mapImage/levelOfDetail';
+import { LevelsBelow, type BelowLevelsHost, type BelowRender } from './levels/LevelsBelow';
 import type { TokenPerception } from '../../vision/tokenPerception';
 import type { ArtFloors } from '../../levels/levelSurfaces';
 import { contextLost } from './engine/gpu';
@@ -221,24 +220,22 @@ export class LightingRenderer implements SceneLightingView {
       this.engine.flush();
       below = this.belowForFrame(frame);
     });
-    return this.engine.renderFrame(frame, render, below);
+    try {
+      return this.engine.renderFrame(frame, render, below);
+    } finally {
+      // Thumbnails are rare: their look's snapshots go once taken.
+      this.levelsBelow?.releasePicture('thumbnail');
+    }
   }
 
   /** The levels below seen through the openings, drawn for a picture of the scene in the GM's look; none for a frame without a size. */
-  private belowForFrame({ x, y, resolution, width, height }: SceneFrame): BelowShown | undefined {
+  private belowForFrame({ x, y, width, height }: SceneFrame): BelowShown | undefined {
     if (!this.levelsBelow || !width || !height) return undefined;
-    return this.levelsBelow.drawFor({
-      key: 'thumbnail', camera: new Matrix(1, 0, 0, 1, -x, -y), width, height, resolution, mode: 'gm',
-      tiles: { rect: { x, y, width, height }, worldPerScreenPixel: 1 / resolution },
-    });
+    return this.levelsBelow.drawFor({ key: 'thumbnail', mode: 'gm', view: { camera: new Matrix(1, 0, 0, 1, -x, -y), width, height } });
   }
 
-  prepareBelow(picture?: Omit<BelowPicture, 'camera'>): void {
+  prepareBelow(picture?: BelowRender): void {
     this.run(() => this.levelsBelow?.prepare(picture));
-  }
-
-  addBelowDemandRegion(view: TileView): () => void {
-    return this.levelsBelow?.addDemandRegion(view) ?? ((): void => undefined);
   }
 
   releaseBelowPicture(): void {

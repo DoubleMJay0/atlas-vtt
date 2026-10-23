@@ -2,6 +2,8 @@ import { Container, type Matrix, type Renderer, type RenderTexture } from 'pixi.
 import { hasPendingChanges } from '../../RenderScheduler';
 import { destroyTree } from '../../utils/destroyTree';
 
+/** Over the map, beneath the tokens, as on the view's own stage (`MAP_LAYER_Z.liquids`). */
+const LIQUIDS_Z = 1.5;
 /** Below the lighting, as on the view's own stage (`LIGHTING_Z_INDEX` is 90). */
 const TOKENS_Z = 50;
 const LIGHTING_Z = 90;
@@ -10,9 +12,11 @@ const ROOF_Z = 91;
 /** Above the lighting, as the view's own fog (1000). */
 const FOG_Z = 1000;
 
-/** What a level below shows, in world pixels: its map, its tokens, its lighting, its roof and its fog, bottom to top. */
+/** What a level below shows, in world pixels: its map, its liquids, its tokens, its lighting, its roof and its fog, bottom to top. */
 export interface BelowParts {
   map: Container;
+  /** The level's water, lava and acid, held still, where the view's host draws them. */
+  liquids?: Container | undefined;
   tokens: Container;
   lighting: Container;
   roof: Container;
@@ -20,10 +24,10 @@ export interface BelowParts {
 }
 
 /**
- * A level below the view, as a stage of its own that is never part of the view's (`LevelsBelow`
- * renders it into a texture for each picture the view draws): its map image, its tokens, its
+ * A level below the view, as a stage of its own that is never part of the view's (`BelowSnapshots`
+ * renders it into the level's world-space snapshot): its map image, its liquids, its tokens, its
  * lighting layer, whose composite lights them as on the level itself, its roof, and its committed fog,
- * moved into the picture by the picture's camera. A render group of its own, so a change in it
+ * moved into the snapshot by the snapshot's camera. A render group of its own, so a change in it
  * shows as pending (`hasChanges`) though the view's stage holds nothing of it.
  */
 export class BelowStage {
@@ -32,6 +36,10 @@ export class BelowStage {
 
   constructor(parts: BelowParts) {
     parts.map.zIndex = 0;
+    if (parts.liquids) {
+      parts.liquids.zIndex = LIQUIDS_Z;
+      this.world.addChild(parts.liquids);
+    }
     parts.tokens.zIndex = TOKENS_Z;
     parts.lighting.zIndex = LIGHTING_Z;
     parts.roof.zIndex = ROOF_Z;

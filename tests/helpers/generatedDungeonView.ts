@@ -116,6 +116,8 @@ export interface DungeonView {
   counts: RenderCounts;
   /** One display frame at the clock's next step: the lighting's work and the render it asks for. */
   frame: () => void;
+  /** The lighting's quality from now on, as a GM's change of it in the settings. */
+  setQuality: (quality: LightingQuality) => void;
   destroy: () => void;
 }
 
@@ -129,10 +131,13 @@ export interface DungeonViewOptions {
 }
 
 /** The entry floor's view of `built` with its real lighting, levels below and liquids, a vision token `hero` at the hero's place, the camera on the opening at about 70 points a cell. */
-export async function openDungeonView(built: GeneratedDungeon, { quality, openings, pane, paneHeight, resolution }: DungeonViewOptions): Promise<DungeonView> {
+export async function openDungeonView(built: GeneratedDungeon, { quality: initial, openings, pane, paneHeight, resolution }: DungeonViewOptions): Promise<DungeonView> {
+  let quality = initial;
+  const listeners = new Set<() => void>();
   const view = await openLevelsView({
     map: Math.max(built.width, built.height), pane, paneHeight, resolution,
-    levels: built.levels, maps: built.maps, viewedLevel: built.viewed, quality,
+    levels: built.levels, maps: built.maps, viewedLevel: built.viewed,
+    qualitySource: { current: () => quality, onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener); } },
   });
   const { scene } = built;
   const hero = { id: 'hero', kind: 'token', imagePath: '', x: built.hero.x, y: built.hero.y, level: built.viewed, vision: { enabled: true } } as TokenEntity;
@@ -148,7 +153,7 @@ export async function openDungeonView(built: GeneratedDungeon, { quality, openin
     },
   });
   view.store.getState().setSceneLighting({ enabled: true, ambient: 0.05 });
-  const liquids = createViewLiquids(view.app, view.viewport, view.store, { current: () => quality, onChange: () => () => undefined });
+  const liquids = createViewLiquids(view.app, view.viewport, view.store, { current: () => initial, onChange: () => () => undefined });
   liquids.container.zIndex = -1;
   view.viewport.addChild(liquids.container);
   liquids.setMode('play');
@@ -169,6 +174,10 @@ export async function openDungeonView(built: GeneratedDungeon, { quality, openin
   let time = performance.now();
   return {
     view, gl: renderer.gl, counts,
+    setQuality: (next) => {
+      quality = next;
+      for (const listener of listeners) listener();
+    },
     frame: () => { view.app.ticker.update(time = Math.max(time + 16, performance.now())); },
     destroy: () => { liquids.destroy(); view.dispose(); },
   };

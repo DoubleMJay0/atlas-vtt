@@ -19,7 +19,9 @@ import {
   type TutorialId,
   TUTORIAL_IDS,
 } from './atlasSettings';
-import { loadAnimateMaps, loadInitiativeCollapsed, loadInputMode, loadLightingQuality, saveAnimateMaps, saveInitiativeCollapsed, saveInputMode, saveLightingQuality } from './deviceSettings';
+import { loadAnimateMaps, loadInitiativeCollapsed, loadInputMode, loadLightingQuality, loadPickedLightingQuality, saveAnimateMaps, saveInitiativeCollapsed, saveInputMode, saveLightingQuality, savePickedLightingQuality } from './deviceSettings';
+import { readGpuFacts } from './gpuFacts';
+import { pickLightingQuality } from '../lighting/deviceTier';
 import { readDock, type InitiativeLayout } from '../initiative/initiativeLayout';
 import type { InitiativeTurnOptions } from '../initiative/turnOptions';
 import type { LightingQualityLevel } from '../lighting/lightingQuality';
@@ -214,16 +216,37 @@ export class SettingsService {
     this.notify();
   }
 
-  /** How much the lighting may ask of this device's graphics; `high` until chosen. */
+  /** How much the lighting may ask of this device's graphics: the GM's choice, else the level Atlas picked for the device. */
   getLightingQuality(): LightingQualityLevel {
-    return loadLightingQuality(this.app) ?? 'high';
+    return loadLightingQuality(this.app) ?? this.pickedLightingQuality();
+  }
+
+  /** Whether the GM never chose a lighting quality on this device, so it runs at the one Atlas picked. */
+  isLightingQualityPicked(): boolean {
+    return loadLightingQuality(this.app) === null;
   }
 
   /** The lighting quality is this device's: it goes to local storage, not into the synced settings. */
   setLightingQuality(level: LightingQualityLevel): void {
-    if (this.getLightingQuality() === level) return;
+    if (loadLightingQuality(this.app) === level) return;
+    const shown = this.getLightingQuality();
     saveLightingQuality(this.app, level);
-    this.notify();
+    if (shown !== level) this.notify();
+  }
+
+  /**
+   * The level picked for this device's graphics (`pickLightingQuality`) the first time it is
+   * asked, then stored, so it never changes by itself. `high` where the graphics cannot be read,
+   * which is asked again next time.
+   */
+  private pickedLightingQuality(): LightingQualityLevel {
+    const stored = loadPickedLightingQuality(this.app);
+    if (stored) return stored;
+    const facts = readGpuFacts();
+    if (!facts) return 'high';
+    const level = pickLightingQuality(facts);
+    savePickedLightingQuality(this.app, level);
+    return level;
   }
 
   /** Whether animated maps play on this device as chosen, or null when never chosen (`animateMapsOn` decides then). */
