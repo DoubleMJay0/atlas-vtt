@@ -20,7 +20,6 @@ import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import { isLegacyTokenRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { isRecord } from '../utils/guards';
-import { assetImagePaths, ownShadingFile, sceneFileImages, sceneFileShading } from './sceneShadingFiles';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { t } from '../i18n';
 import { trashVaultItem } from '../utils/trashVaultItem';
@@ -128,12 +127,6 @@ export interface SceneAsset extends BaseAsset {
   type: 'scene';
   mapId?: string;
   data?: SceneAssetData;
-  /**
-   * The relief and shade images Atlas wrote for this scene (`levelShading`): files of the scene
-   * alone, which deleting it trashes. A path its file names but this record does not list is
-   * never trashed.
-   */
-  shadingFiles?: string[];
 }
 
 export interface EncounterAsset extends BaseAsset {
@@ -949,13 +942,8 @@ export class AssetService {
     const assetsToDelete = Object.values(this.metadata.assets)
       .filter(asset => asset.collection === collectionId);
     
-    this.sceneImagesKept = new Map();
-    try {
-      for (const asset of assetsToDelete) {
-        await this.deleteAsset(asset.id);
-      }
-    } finally {
-      this.sceneImagesKept = null;
+    for (const asset of assetsToDelete) {
+      await this.deleteAsset(asset.id);
     }
 
     // Delete collection folder
@@ -1119,15 +1107,29 @@ export class AssetService {
 
     // For scene assets, also delete the map file and close any open leaves
     if (asset.type === 'scene') {
-      let shading: string[] = [];
-      const mapPath = await this.sceneMapPath(asset);
+      // Load the scene data from the JSON file if not already loaded
+      let sceneData = asset.data;
+      if (!sceneData) {
+        try {
+          const sceneJsonPath = this.getAssetPath(asset);
+          const sceneJsonFile = this.app.vault.getAbstractFileByPath(sceneJsonPath);
+          if (sceneJsonFile instanceof TFile) {
+            const parsed: unknown = JSON.parse(await this.app.vault.read(sceneJsonFile));
+            if (isRecord(parsed) && typeof parsed.mapPath === 'string') {
+              sceneData = { mapPath: parsed.mapPath };
+            }
+          }
+        } catch (error) {
+          console.error('[AssetService] Error loading scene data:', error);
+        }
+      }
+      
+      const mapPath = sceneData?.mapPath;
       if (mapPath) {
         try {
           // Delete the map file
           const mapFile = this.app.vault.getAbstractFileByPath(mapPath);
           if (mapFile instanceof TFile) {
-            // Its relief and shade belong to it alone, unless another scene names them too (a copy outside Atlas).
-            shading = await sceneFileShading(this.app, mapFile);
             // Close any leaves showing this file
             const leaves = this.app.workspace.getLeavesOfType('atlas-view');
             for (const leaf of leaves) {
@@ -1157,7 +1159,6 @@ export class AssetService {
       } catch (error) {
         console.error('[AssetService] Error deleting scene snapshots:', error);
       }
-      await this.trashUnsharedShading(asset, shading);
     }
 
     const emptiedGroups = asset.type === 'token' ? await this.getGroupsUsingTokens([asset.id]) : [];
@@ -1172,59 +1173,6 @@ export class AssetService {
     await this.saveMetadata();
 
     await this.deleteEmptiedGroups(emptiedGroups);
-  }
-
-  /** A scene's map file: from its loaded data, else from its record's JSON. */
-  private async sceneMapPath(scene: SceneAsset): Promise<string | undefined> {
-    if (scene.data?.mapPath) return scene.data.mapPath;
-    try {
-      const file = this.app.vault.getAbstractFileByPath(this.getAssetPath(scene));
-      if (!(file instanceof TFile)) return undefined;
-      const parsed: unknown = JSON.parse(await this.app.vault.read(file));
-      return isRecord(parsed) && typeof parsed.mapPath === 'string' ? parsed.mapPath : undefined;
-    } catch (error) {
-      console.error('[AssetService] Error loading scene data:', error);
-      return undefined;
-    }
-  }
-
-  /**
-   * The images each scene's file names, by scene id, kept while a collection is deleted so that
-   * deleting its scenes one after another reads every other scene's file once, not once per scene.
-   */
-  private sceneImagesKept: Map<string, readonly string[]> | null = null;
-
-  private async sceneImages(scene: SceneAsset): Promise<readonly string[]> {
-    const kept = this.sceneImagesKept?.get(scene.id);
-    if (kept) return kept;
-    const mapPath = await this.sceneMapPath(scene);
-    const file = mapPath ? this.app.vault.getAbstractFileByPath(mapPath) : null;
-    const images = file instanceof TFile ? await sceneFileImages(this.app, file) : [];
-    this.sceneImagesKept?.set(scene.id, images);
-    return images;
-  }
-
-  /**
-   * Trashes the relief and shade images (`levelShading`) of a deleted scene: only those Atlas wrote
-   * for it (its record's `shadingFiles`) that its file still names, that lie where Atlas writes
-   * them (`ownShadingFile`), and that no other asset uses (a map's image or thumbnail, a token's
-   * art, any image another scene's file names). A scene file is untrusted: a path it names alone
-   * never makes a file go.
-   */
-  private async trashUnsharedShading(scene: SceneAsset, named: readonly string[]): Promise<void> {
-    const owned = new Set(scene.shadingFiles ?? []);
-    const candidates = named.filter((path) => owned.has(path) && ownShadingFile(path, scene.collection));
-    if (candidates.length === 0) return;
-    const used = new Set<string>();
-    for (const other of Object.values(this.metadata!.assets)) {
-      if (other.id === scene.id) continue;
-      for (const path of assetImagePaths(other)) used.add(path);
-      if (other.type !== 'scene') continue;
-      for (const path of other.shadingFiles ?? []) used.add(path);
-      // A scene whose data is not loaded still names its images: a copy made outside Atlas may share them.
-      for (const path of await this.sceneImages(other)) used.add(path);
-    }
-    for (const path of candidates) if (!used.has(path)) await this.trashFileIfPresent(path);
   }
 
   /** An encounter's thumbnail goes with it, unless another encounter (a copy) still shows the same file. */

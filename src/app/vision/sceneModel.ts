@@ -23,6 +23,7 @@ import type { MapBounds } from './visibility';
 import { wallList } from './wallList';
 import type { EngineLight, EngineZone } from '../pixi/lighting/engine/types';
 import { LightReaches } from './lightReaches';
+import { LightMotion, NO_MOVING_LIGHTS } from './lightMotion';
 import { activeLights, engineLight } from './lightSources';
 import { everyLevelObjects, levelObjects } from '../levels/levelObjects';
 import { mapTokens } from '../tokens/offMap';
@@ -85,10 +86,24 @@ export class SceneModelBuilder {
   private readonly sightTokens = new SightTokens();
   private readonly sightCache = new SightCache();
   private readonly lightReaches = new LightReaches();
+  /** Which lights are moving, where the builder is given a clock. */
+  private readonly motion: LightMotion | null;
   private built: Built | null = null;
 
-  /** `reflectedLight: false` builds lights without their reflection (`REFLECTION`), as before it existed. */
-  constructor(private readonly options: { reflectedLight?: boolean } = {}) {}
+  /**
+   * `reflectedLight: false` builds lights without their reflection (`REFLECTION`), as before it
+   * existed. With a `clock` (ms), a light that moves is built as moving (`LightMotion`): without
+   * its reflection and marked `moving`, so the engine draws it cheaply; once it rests, the next
+   * update builds it whole (`restsAt`).
+   */
+  constructor(private readonly options: { reflectedLight?: boolean; clock?: () => number } = {}) {
+    this.motion = options.clock ? new LightMotion() : null;
+  }
+
+  /** When a light built as moving comes to rest: an update from then on builds it whole. Null while none moves. */
+  restsAt(): number | null {
+    return this.motion?.restsAt() ?? null;
+  }
 
   /**
    * The model of `state`, and whether this call built it anew. Sight without a range reaches over
@@ -103,7 +118,9 @@ export class SceneModelBuilder {
     const hasVision = sceneHasVision(everyLevelObjects(state).tokens);
     const last = this.built;
     const sameReach = last?.reach.width === reach.width && last.reach.height === reach.height;
-    if (last && sameReach && last.walls === walls && last.lights === lights && last.zones === zones && last.tokens === tokens && last.grid === grid && last.rules === rules && last.hasVision === hasVision) {
+    const rest = this.restsAt();
+    const rested = rest !== null && this.options.clock!() >= rest;
+    if (last && !rested && sameReach && last.walls === walls && last.lights === lights && last.zones === zones && last.tokens === tokens && last.grid === grid && last.rules === rules && last.hasVision === hasVision) {
       const same = !sightOptionsChanged(last.lighting, lighting) && !awakeLightsChanged(lights, withZones(last.lighting, lightZoneList(zones)), withZones(lighting, lightZoneList(zones)));
       // The lighting is noted either way: the next update compares with it, not with an older one.
       last.lighting = lighting;
@@ -117,6 +134,7 @@ export class SceneModelBuilder {
   /** The next update builds anew, whatever changed: the map's size did, or lighting was off meanwhile. */
   reset(): void {
     this.built = null;
+    this.motion?.clear();
   }
 
   private build(state: SceneState, tokens: Record<string, TokenEntity>, bounds: MapBounds, reach: MapBounds, measurement: MeasurementSettings, rules: SightRules | undefined, hasVision: boolean): SceneModel {
@@ -129,13 +147,14 @@ export class SceneModelBuilder {
     // are traced a quarter cell apart, clear of the capsules the picture puts around walls.
     const sampling = { spacing: scale.cellSize * AREA_SAMPLE_SPACING, clearance: wallRadius(worldTexel(bounds)) };
     const reflection = this.options.reflectedLight === false ? null : { ...sampling, reach: REFLECTION.cells * scale.cellSize };
-    const everyReach = this.lightReaches.sync(shining, walls, sampling, reflection);
+    const moving = this.motion?.note(shining, this.options.clock!()) ?? NO_MOVING_LIGHTS;
+    const everyReach = this.lightReaches.sync(shining, walls, sampling, reflection, moving);
     // A light whose flame stands in magical darkness it does not outshine gives nothing: the picture and the rule both leave it out.
     const out = shining.map((light) => !light.darkness && quenched(light, light.priority ?? 0, everyReach));
     // A darkness is drawn as the polygon the rule counts, and veils the light it swallows where the
     // rule counts that light: the reaches' polygons, handed on rather than traced again.
     const dark = shining.some((light) => light.darkness);
-    const lights = shining.flatMap((light, i) => (out[i] ? [] : [withRule(light, everyReach[i]!, dark)]));
+    const lights = shining.flatMap((light, i) => (out[i] ? [] : [withRule(moving.has(light.key) ? { ...light, moving: true } : light, everyReach[i]!, dark)]));
     const reaches = everyReach.filter((_, i) => !out[i]);
     const sources = sourcesInDarkness(sightSources(tokens, scale, reach, rules, GM_SIGHT_POLICY), ambient, reaches);
     this.sightCache.retain(new Set(sources.map(source => source.tokenId)));

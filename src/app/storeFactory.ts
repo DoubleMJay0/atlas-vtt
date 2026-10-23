@@ -53,7 +53,6 @@ import { createLevelSurfacesActions, type LevelSurfacesSlice } from './stores/le
 import { createMapFeaturesActions, type MapFeaturesSlice } from './stores/mapFeaturesSlice';
 import { createLiquidsActions, type LiquidsSlice } from './stores/liquidsSlice';
 import { levelsForFile, readExploredMasks, readSceneLevels } from './levels/levelFile';
-import { readShadingPath } from './levels/levelShading';
 import { levelAlignmentsOf, movesWithFrame, withoutAlignments } from './levels/levelAlignment';
 import { levelsCarriedWithGrid, type CarriedLevels, type GridCarryScene } from './levels/levelGridCarry';
 
@@ -1389,8 +1388,6 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
             draft.levels = undefined;
             draft.levelAlignments = undefined;
             draft.viewedLevel = null;
-            draft.relief = undefined;
-            draft.shade = undefined;
 
             // Note: We don't clear background here - it will be set by the new map
             // Note: We don't clear mapPath - it must be preserved for storage adapter
@@ -1545,9 +1542,6 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
               version: state.version,
               mapPath: state.mapPath, // Include mapPath to verify data belongs to correct map
               background: state.background,
-              // A scene without levels lights its map by these; one with levels keeps them on each level.
-              relief: state.relief,
-              shade: state.shade,
               levels: levelsForFile(state.levels, state.background, state.levelAlignments),
               grid: state.grid,
               objects: state.objects,
@@ -1577,8 +1571,6 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
               ...saved,
               levels,
               levelAlignments: levelAlignmentsOf(read),
-              relief: readShadingPath(saved.relief),
-              shade: readShadingPath(saved.shade),
               exploredMasks: readExploredMasks(saved.exploredMasks, levels),
               lootRoller: readLootRollerState(saved.lootRoller),
               lighting: readSceneLighting(saved.lighting),

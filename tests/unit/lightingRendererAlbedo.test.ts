@@ -40,6 +40,7 @@ vi.mock('../../src/app/pixi/lighting/ExploredMemory', () => ({
   ExploredMemory: class {
     sync(): void {}
     record(): void {}
+    stampDue(): boolean { return false; }
     reload(): void {}
     reset(): void {}
     edit(): boolean { return false; }

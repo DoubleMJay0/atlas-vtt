@@ -19,6 +19,18 @@ export const MAX_LIGHT_REACH = MAX_TEXELS * BASE_TEXEL;
  */
 export const TILE_RAYS = 32;
 /**
+ * Rays a moving light's tile traces across its flame (`EngineLight.moving`): its shadows are a
+ * little harder while it moves, and the tile is traced in full once it rests.
+ */
+export const MOVING_TILE_RAYS = 4;
+/**
+ * A moving light's tile is traced on texels this many of the field's wide, a sixteenth of the
+ * work for the tile of a torch on a large map. Only texels whose whole square is free of every
+ * wall's capsule are lit, so no light ever reaches past a wall; along walls and at the edges of
+ * shadows the light is a coarse texel shorter or longer until the light rests.
+ */
+export const MOVING_TILE_SCALE = 2;
+/**
  * Most tile texels one draw traces. A light's tile is traced in bands of rows within this, each
  * handed to the driver on its own: Windows resets a graphics device whose draw runs for about two
  * seconds, and a torch's whole tile in one draw came close to that on integrated graphics, losing
@@ -139,26 +151,6 @@ export const REFLECTION = {
   level: 0.4,
   fade: 0.6,
   blur: 0.1,
-} as const;
-
-/**
- * Shadows from heights (a level's relief, `EngineRelief`): heights are shares of a wall's (the
- * relief's 1). A placed or carried light stands `lightHeight` above what it stands on (a torch
- * held, a lamp on a post); an area light glows `areaHeight` above its surface (lava), so whatever
- * stands near it throws a long low shadow. A point of the floor is in an object's shadow where the
- * straight line from its own height to the light passes under something standing higher than both
- * that line and the point itself: what stands never shades its own top, which stays lit, and only
- * what is taller shades a top. Each shadow is soft by `flame` of the light's flame, from `rays`
- * rays across it. `bias` is the height a point must stand above the line to count, against the
- * relief's steps; a ray takes at most `steps` steps (beyond, nothing shades it).
- */
-export const RELIEF = {
-  lightHeight: 0.5,
-  areaHeight: 0.04,
-  flame: 0.55,
-  rays: 8,
-  bias: 0.02,
-  steps: 384,
 } as const;
 
 export const BOUNCE = {

@@ -43,6 +43,14 @@ export interface ExploredMemoryDeps {
    * it neither follows undo and redo of edits nor counts any.
    */
   edits?: boolean;
+  /**
+   * Sight recorded with a time (`record`'s `now`: during a drag) is stamped in at most this often
+   * (ms; unset, every time): what is recorded sooner waits, and only the last of it is stamped
+   * once its turn comes (`stampDue`), or before anything reads or replaces the memory. A stamp
+   * cuts every light's lit area out of the sight on the GPU, too much for every frame of a drag;
+   * an area a dragged token saw for less than this may go unremembered.
+   */
+  stampEveryMs?: number;
 }
 
 /**
@@ -75,6 +83,9 @@ export class ExploredMemory {
   private revision: number;
   /** The level whose memory the texture holds (null: a scene without levels); undefined before the first `sync`. */
   private level: string | null | undefined = undefined;
+  /** Sight recorded since the last stamp, waiting for its turn (`stampEveryMs`). */
+  private waiting: ExploredShapes | null = null;
+  private lastStamp = -Infinity;
   private readonly unsubscribe: () => void;
 
   constructor(private readonly deps: ExploredMemoryDeps) {
@@ -96,7 +107,38 @@ export class ExploredMemory {
     if (mask !== this.loadedMask) void this.load(mask);
   }
 
-  record(shapes: ExploredShapes): void {
+  /**
+   * Records what sight sees now. With `now` (ms, the clock `stampDue` is asked by; a drag gives it)
+   * it waits for its turn (`stampEveryMs`); without, it is stamped at once and what waited goes.
+   */
+  record(shapes: ExploredShapes, now?: number): void {
+    if (!this.texture || !this.bounds) return;
+    if (this.beforeTurn(now)) {
+      this.waiting = shapes;
+      // The save stamps it first, should no turn come before.
+      this.saver.schedule();
+      return;
+    }
+    this.stamp(shapes, now);
+  }
+
+  /** Stamps the sight that waits for its turn (`stampEveryMs`), once that has come at `now`; unset, whatever the time. True when it stamped. */
+  stampDue(now?: number): boolean {
+    const shapes = this.waiting;
+    if (!shapes || this.beforeTurn(now)) return false;
+    this.deps.guard(() => this.stamp(shapes, now));
+    return true;
+  }
+
+  /** Whether sight recorded at `now` comes before its turn (`stampEveryMs`); without a time it never does. */
+  private beforeTurn(now: number | undefined): boolean {
+    return now !== undefined && now - this.lastStamp < (this.deps.stampEveryMs ?? 0);
+  }
+
+  /** Stamps `shapes` in; one stamped out of turn (no `now`: before a save, a switch, an edit) leaves the turns as they were. */
+  private stamp(shapes: ExploredShapes, now?: number): void {
+    this.waiting = null;
+    if (now !== undefined) this.lastStamp = now;
     if (!this.texture || !this.bounds) return;
     this.texture.add(shapes);
     // The decoded mask replaces the texture: what is seen meanwhile must not go with what it replaces.
@@ -112,6 +154,7 @@ export class ExploredMemory {
    * not the memory (its mask still loading, a lost context).
    */
   edit(edit: ExploredEdit): boolean {
+    this.stampDue();
     const texture = this.texture;
     if (!texture || !this.bounds || !this.isMemory() || this.deps.edits === false) return false;
     const shapes: ExploredShapes = { polygons: editPolygons(edit, this.bounds), clip: null };
@@ -149,6 +192,7 @@ export class ExploredMemory {
   /** The WebGL context is lost: nothing the texture holds from now on is the memory. */
   holdSaves(): void {
     this.contextLost = true;
+    this.waiting = null;
     this.saver.cancel();
   }
 
@@ -165,6 +209,7 @@ export class ExploredMemory {
 
   /** Before the map unloads: save the scene's pending memory into it, then start the next scene blank. */
   beforeMapUnload(): void {
+    this.stampDue();
     this.saver.flush();
     this.texture?.clear();
     this.supersede();
@@ -172,7 +217,8 @@ export class ExploredMemory {
   }
 
   private switchLevel(level: string | null): void {
-    // The save is heard by the store, whose listeners may have switched already
+    // What the level left saw goes into its memory; the save is heard by the store, whose listeners may have switched already
+    this.stampDue();
     if (this.level !== undefined) this.saver.flush();
     if (this.level === level) return;
     const first = this.level === undefined;
@@ -185,6 +231,7 @@ export class ExploredMemory {
 
   /** Lighting stopped: what is pending is never saved. */
   cancelSaves(): void {
+    this.waiting = null;
     this.saver.cancel();
     this.loadGeneration++;
   }
@@ -255,6 +302,8 @@ export class ExploredMemory {
   private ensure(bounds: MapBounds): void {
     if (this.texture && this.bounds?.width === bounds.width && this.bounds.height === bounds.height) return;
     const previous = this.texture;
+    // What waits was seen on the map of the old size.
+    this.waiting = null;
     this.texture = new ExploredTexture(this.deps.renderer, bounds);
     this.bounds = bounds;
     this.supersede();
@@ -302,6 +351,7 @@ export class ExploredMemory {
   }
 
   private save(): void {
+    this.stampDue();
     if (!this.texture || !this.ready || this.contextLost) return;
     this.loadedMask = saveExploredMask(this.texture.toCanvas());
     this.deps.store.getState().setExploredMask(this.loadedMask, this.level ?? null);

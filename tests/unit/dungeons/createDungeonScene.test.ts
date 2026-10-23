@@ -33,15 +33,11 @@ interface Bench {
   jobs: DungeonJob[];
 }
 
-/** What the dungeon worker gives back: the model, its layout and a PNG of the layout's size; for a floor's shading, its relief and shade. */
+/** What the dungeon worker gives back: the model, its layout and a bitmap of the layout's size. */
 function drawn(job: DungeonJob): DungeonRendered {
   const model = job.model ?? smallDungeon();
-  if (job.output.kind !== 'map' && job.output.kind !== 'shading') throw new Error('Only maps and their shading are drawn here');
+  if (job.output.kind !== 'map') throw new Error('Only maps are drawn here');
   const map = mapLayout(model, suggestedPxPerCell(model, job.output.pxPerCell, job.view, job.output.maxPixels), job.view);
-  if (job.output.kind === 'shading') {
-    const floor = job.output.floor ?? 0;
-    return { model, map, image: { type: 'shading', relief: new Blob([`RELIEF ${floor}`]), shade: new Blob([`SHADE ${floor}`]) } };
-  }
   return { model, map, image: { type: 'bitmap', bitmap: fakeBitmap(map.widthPx, map.heightPx) } };
 }
 
@@ -88,8 +84,6 @@ interface SceneState {
   objects: { walls: Record<string, WallSegment>; lights: Record<string, unknown>; pins?: Record<string, NotePin>; levelLinks?: Record<string, LevelLink> };
   lighting: unknown;
   levels?: SceneLevel[];
-  relief?: string;
-  shade?: string;
 }
 
 const sceneFile = ({ vault }: Bench, path: string): { version: number; state: SceneState } => JSON.parse(vault.files.get(path)!) as { version: number; state: SceneState };
@@ -111,9 +105,7 @@ describe('creating a dungeon scene', () => {
 
     expect(result).toEqual({ ok: true, name: TITLE, scenePath: `${SCENES}/${TITLE}.atlasmap` });
     expect(b.jobs.map(job => job.output)).toEqual([
-      // The map leaves the cast shadows out: its shade carries them.
-      { kind: 'map', ...SIZE, bitmap: true, castShadows: false },
-      { kind: 'shading', ...SIZE },
+      { kind: 'map', ...SIZE, bitmap: true },
     ]);
     const records = await recordsOf(b);
     expect(records.map(r => r.type).sort()).toEqual(['map', 'scene']);
@@ -127,10 +119,6 @@ describe('creating a dungeon scene', () => {
     expect(state.objects.levelLinks).toBeUndefined();
     expect(result.entryLevel).toBeUndefined();
     expect(state.background).toBe(map.mapFilePath);
-    // Its relief and shade lie beside the map's image, files of the scene, no assets of their own.
-    expect(b.vault.files.get(state.relief!)).toBe('RELIEF 0');
-    expect(b.vault.files.get(state.shade!)).toBe('SHADE 0');
-    expect(state.relief!.startsWith('atlas-vtt/assets/') && state.relief!.endsWith('.png')).toBe(true);
     expect(state.grid).toMatchObject({ size: DEFAULT_PX_PER_CELL, offsetX: 0, offsetY: 0 });
     expect(state.grid.autoDetect).toBeUndefined();
     expect(state.lighting).toEqual({ enabled: true, ambient: 1 });
@@ -149,12 +137,9 @@ describe('creating a dungeon scene', () => {
     const result = created(await createDungeonSceneWith(b.deps, options(model)));
 
     expect(b.jobs.map(job => job.output)).toEqual([
-      { kind: 'map', ...SIZE, bitmap: true, castShadows: false },
-      { kind: 'map', ...SIZE, bitmap: true, castShadows: false, floor: 1 },
-      { kind: 'map', ...SIZE, bitmap: true, castShadows: false, floor: 2 },
-      { kind: 'shading', ...SIZE },
-      { kind: 'shading', ...SIZE, floor: 1 },
-      { kind: 'shading', ...SIZE, floor: 2 },
+      { kind: 'map', ...SIZE, bitmap: true },
+      { kind: 'map', ...SIZE, bitmap: true, floor: 1 },
+      { kind: 'map', ...SIZE, bitmap: true, floor: 2 },
     ]);
     const maps = (await recordsOf(b)).filter(r => r.type === 'map');
     expect(maps.map(map => map.name)).toEqual([`${TITLE}, Floor A`, `${TITLE}, Floor B`, `${TITLE}, Floor C`]);
@@ -169,10 +154,6 @@ describe('creating a dungeon scene', () => {
     };
     expect(levels.map(level => level.background)).toEqual([mapPath(`${TITLE}, Floor C`), mapPath(`${TITLE}, Floor B`), mapPath(`${TITLE}, Floor A`)]);
     expect(background).toBe(levels[0]!.background);
-    // Each level carries its floor's relief and shade; the scene itself none.
-    expect(levels.map(level => b.vault.files.get(level.relief!))).toEqual(['RELIEF 2', 'RELIEF 1', 'RELIEF 0']);
-    expect(levels.map(level => b.vault.files.get(level.shade!))).toEqual(['SHADE 2', 'SHADE 1', 'SHADE 0']);
-    expect(file.state.relief).toBeUndefined();
     expect(result.entryLevel).toBe(levels[2]!.id);
 
     const ids = levels.map(level => level.id);

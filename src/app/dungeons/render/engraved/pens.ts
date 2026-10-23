@@ -25,11 +25,6 @@ export interface Pens {
 
 export const LINE_ANGLE = -Math.PI / 4;
 
-/** Between two lines of a hatch at `pxPerCell`, in cells: never closer than a picture of that size can hold. */
-export function penSpacing(pxPerCell: number): number {
-  return Math.max(0.046, 3.2 / pxPerCell);
-}
-
 export function pensOf(scene: ArtScene): Pens {
   const { palette, view } = scene.env;
   const ppc = scene.frame.pxPerCell;
@@ -37,9 +32,8 @@ export function pensOf(scene: ArtScene): Pens {
     ink: palette.ink,
     shade: palette.ink,
     floor: palette.floor,
-    spacing: penSpacing(ppc),
-    // Lines as fine as the map they stand for would hold: a smaller picture of it (`renderShade`) averages them.
-    minWidth: 0.5 / (scene.frame.detailPxPerCell ?? ppc),
+    spacing: Math.max(0.046, 3.2 / ppc),
+    minWidth: 0.5 / ppc,
     step: Math.min(0.03, 5 / ppc),
     angle: LINE_ANGLE,
     mono: view.monochrome,

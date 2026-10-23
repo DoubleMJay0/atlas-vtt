@@ -2,6 +2,7 @@ import { Texture, type WebGLRenderer } from 'pixi.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BOUNCE, FLICKER_INTERVAL_MS } from '../../../../lighting/lightingConstants';
 import { LightingWorld } from '../LightingWorld';
+import { GpuPacer } from '../GpuPacer';
 import { LIGHTING_QUALITY } from '../../../../lighting/lightingQuality';
 import type { DrawnLight } from '../LightMap';
 import type { EngineLight } from '../types';
@@ -183,4 +184,60 @@ describe('a paced LightingWorld', () => {
       renderer.destroy();
     }
   }, 120_000);
+});
+
+describe('a moving light in a paced world', () => {
+  const cleanup: (() => void)[] = [];
+  afterEach(() => {
+    vi.restoreAllMocks();
+    while (cleanup.length) cleanup.pop()!();
+  });
+
+  type Shown = { x: number; moving?: true } | undefined;
+  const tiles = (world: LightingWorld): { tiles(): ReadonlyMap<string, Shown>; busy(): boolean } => (world as unknown as { tiles: { tiles(): ReadonlyMap<string, Shown>; busy(): boolean } }).tiles;
+  const shown = (world: LightingWorld): Shown => tiles(world).tiles().get('torch');
+
+  it('is drawn where it is in every frame, however far behind the device is, and traced in full once it rests', async () => {
+    const renderer = await createTestRenderer(256);
+    cleanup.push(() => renderer.destroy());
+    const world = new LightingWorld(renderer, { width: 1024, height: 1024 }, LIGHTING_QUALITY.high, true);
+    cleanup.push(() => world.destroy());
+    const steady = { ...torch, animation: 'none' as const };
+    world.update([], [steady], null);
+    world.flush();
+    expect(shown(world)).toMatchObject({ x: 300 });
+    // The device runs as much as it may: nothing paced goes out.
+    vi.spyOn(GpuPacer.prototype, 'allowance').mockReturnValue(0);
+    world.update([], [{ ...steady, x: 340 }], null);
+    expect(shown(world)).toMatchObject({ x: 300 });
+    for (const x of [360, 380, 400]) {
+      world.update([], [{ ...steady, x, moving: true }], null);
+      expect(shown(world)).toMatchObject({ x, moving: true });
+      expect(tiles(world).busy()).toBe(false);
+    }
+    // At rest it is traced in full as the pacer lets it through, the quick tile shown meanwhile.
+    world.update([], [{ ...steady, x: 400 }], null);
+    expect(shown(world)).toMatchObject({ x: 400, moving: true });
+    expect(tiles(world).busy()).toBe(true);
+    vi.restoreAllMocks();
+    world.flush();
+    expect(shown(world)).toEqual(expect.objectContaining({ x: 400 }));
+    expect(shown(world)?.moving).toBeUndefined();
+  });
+
+  it('builds no bounce while it moves', async () => {
+    const renderer = await createTestRenderer(256);
+    cleanup.push(() => renderer.destroy());
+    const world = new LightingWorld(renderer, { width: 1024, height: 1024 });
+    cleanup.push(() => world.destroy());
+    world.update([], [{ ...torch, animation: 'none' }], null);
+    world.flush();
+    const build = vi.spyOn(world.cascades!, 'build');
+    world.update([], [{ ...torch, animation: 'none', x: 360, moving: true }], null);
+    world.animate(START + 10 * BOUNCE.throttleMs);
+    expect(build).not.toHaveBeenCalled();
+    world.update([], [{ ...torch, animation: 'none', x: 360 }], null);
+    world.animate(START + 20 * BOUNCE.throttleMs);
+    expect(build).toHaveBeenCalledTimes(1);
+  });
 });

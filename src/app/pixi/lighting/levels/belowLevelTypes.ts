@@ -7,7 +7,6 @@ import type { LightingMode } from '../engine/compositeFilter';
 import type { LightingStore } from '../LightingRenderer';
 import type { SnapshotView } from './belowSnapshot';
 import type { TokenArt } from './BelowTokens';
-import type { ShadingPixels } from './LevelShading';
 import type { RoofHost } from './Roof';
 
 /** What a level below (`BelowLevel`) is made with, and what its snapshots are drawn at. */
@@ -48,8 +47,6 @@ export interface BelowLevelDeps {
   roofs: RoofHost;
   /** Makes the level's liquids, which ask for the snapshot to be drawn again (`changed`); without it none are drawn. */
   liquids?: (changed: () => void) => BelowLiquids;
-  /** Reads the level's relief and shade (`LevelShading`); without it the level is drawn without them. */
-  readShading?: (path: string) => Promise<ShadingPixels>;
   /** How long a piece of the roof takes to fade. */
   fadeMs: number;
   requestRender: () => void;

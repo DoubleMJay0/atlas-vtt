@@ -4,6 +4,7 @@ import { sameCone } from './visionCone';
 import type { AreaSampling } from './areaReach';
 import { reflectionParts, type ReflectionSampling } from './reflectedLight';
 import type { EngineLight } from '../pixi/lighting/engine/types';
+import { NO_MOVING_LIGHTS } from './lightMotion';
 
 interface Entry {
   x: number;
@@ -12,6 +13,8 @@ interface Entry {
   surface: EngineLight['surface'];
   walls: readonly WallSegment[];
   reach: LightReach;
+  /** It was worked out with its reflection. */
+  reflected: boolean;
 }
 
 /** How the outline of an area light is sampled when no map says more: a quarter of a 70 px cell apart, clear of 3 px capsules. */
@@ -23,7 +26,8 @@ const DEFAULT_SAMPLING: AreaSampling = { spacing: 17.5, clearance: 3 };
  * does not retrace every light, and again when its cone turned or an area light's area changed.
  * A new bright radius, kind or priority keeps the polygon, which they do not shape; the
  * reflection is worked out again from it, since how far and how strongly the lit floor reflects
- * follows the bright radius.
+ * follows the bright radius. A moving light (`LightMotion`) has no reflection until it rests: the
+ * rule then counts a little less light around it, never more.
  */
 export class LightReaches {
   private entries = new Map<string, Entry>();
@@ -32,38 +36,38 @@ export class LightReaches {
 
   /**
    * `sampling` says how area lights' outlines are traced (`areaSamples`), `reflection` how the
-   * lights' reflections are (`reflectionParts`; without it they have none); another one retraces them.
+   * lights' reflections are (`reflectionParts`; without it they have none); another one retraces
+   * them. The lights keyed in `moving` are worked out without their reflection.
    */
-  sync(lights: readonly EngineLight[], walls: readonly WallSegment[], sampling: AreaSampling = DEFAULT_SAMPLING, reflection: ReflectionSampling | null = null): LightReach[] {
+  sync(lights: readonly EngineLight[], walls: readonly WallSegment[], sampling: AreaSampling = DEFAULT_SAMPLING, reflection: ReflectionSampling | null = null, moving: ReadonlySet<string> = NO_MOVING_LIGHTS): LightReach[] {
     const resampled = sampling.spacing !== this.sampling.spacing || sampling.clearance !== this.sampling.clearance;
-    const reflected = !sameReflection(reflection, this.reflection);
+    const reflectionChanged = !sameReflection(reflection, this.reflection);
     this.sampling = sampling;
     this.reflection = reflection;
     const next = new Map<string, Entry>();
     for (const light of lights) {
       const { key, x, y, bright, dim, surface } = light;
       const cached = this.entries.get(key);
+      // A darkness gives nothing back.
+      const reflects = !!this.reflection && !light.darkness && !moving.has(key);
       const traced = cached && cached.walls === walls && cached.x === x && cached.y === y && cached.dim === dim && sameCone(cached.reach.cone, light.cone)
-        && cached.surface === surface && !(surface && resampled) && !reflected
-        // A darkness gives nothing back: one that becomes a light, or a light that becomes one, is traced with its reflection or without.
-        && !(this.reflection && !!cached.reach.darkness !== !!light.darkness);
-      if (!traced) next.set(key, { x, y, dim, surface, walls, reach: this.trace(light, walls) });
-      else if (cached.reach.bright === bright && sameKind(cached.reach, light)) next.set(key, cached);
+        && cached.surface === surface && !(surface && resampled) && !reflectionChanged;
+      if (!traced) next.set(key, { x, y, dim, surface, walls, reach: this.trace(light, walls, reflects), reflected: reflects });
+      else if (cached.reach.bright === bright && sameKind(cached.reach, light) && cached.reflected === reflects) next.set(key, cached);
       else {
         const { origin, polygon, parts } = cached.reach;
         const kept: LightReach = { origin, dim, polygon, ...(parts && { parts }), bright, ...kindOf(light) };
-        next.set(key, { ...cached, reach: this.reflection && !light.darkness ? { ...kept, reflection: reflectionParts(kept, walls, this.reflection) } : kept });
+        next.set(key, { ...cached, reach: reflects ? { ...kept, reflection: reflectionParts(kept, walls, this.reflection!) } : kept, reflected: reflects });
       }
     }
     this.entries = next;
     return [...next.values()].map((entry) => entry.reach);
   }
 
-  private trace(light: EngineLight, walls: readonly WallSegment[]): LightReach {
+  private trace(light: EngineLight, walls: readonly WallSegment[], reflects: boolean): LightReach {
     const { x, y, bright, dim, surface } = light;
     const reach = surface ? areaLightReach({ x, y }, surface, dim, walls, this.sampling, bright, light) : lightReach({ x, y }, dim, walls, bright, light);
-    // A darkness gives nothing back.
-    return this.reflection && !light.darkness ? { ...reach, reflection: reflectionParts(reach, walls, this.reflection) } : reach;
+    return reflects ? { ...reach, reflection: reflectionParts(reach, walls, this.reflection!) } : reach;
   }
 }
 

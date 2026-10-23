@@ -22,7 +22,6 @@ import { ReflectionTiles } from './ReflectionTiles';
 import { TileCache, type TilePacer } from './TileCache';
 import type { EngineLight, EngineZone } from './types';
 import { WallFields } from './WallFields';
-import type { EngineRelief } from './ReliefMap';
 import { ZoneMap, sameZoneLook, type ZoneLook } from './ZoneMap';
 
 /**
@@ -110,13 +109,11 @@ export class LightingWorld {
   /**
    * `pierce` is what the senses that see in magical darkness perceive (`pierceShapes`), the same
    * list while nothing changed; it is drawn into the darkness map, so it costs nothing on a map
-   * without a darkness source. `relief` is what stands on the map (`EngineRelief`): every tile is
-   * built anew when it changes, with the shadows of what stands; null, none (unset keeps the last).
+   * without a darkness source.
    */
-  update(walls: readonly WallSegment[], lights: readonly EngineLight[], albedo: Texture | null, pierce: readonly PierceShape[] = this.pierce, relief?: EngineRelief | null): void {
+  update(walls: readonly WallSegment[], lights: readonly EngineLight[], albedo: Texture | null, pierce: readonly PierceShape[] = this.pierce): void {
     const pierceChanged = pierce !== this.pierce;
     this.pierce = pierce;
-    const reliefChanged = relief !== undefined && this.tiles.setRelief(relief);
     let changed: Rect[] | 'all' = [];
     if (walls !== this.walls) {
       changed = this.walls ? changedWallRects(this.walls, walls, tileWallReach(this.texel)) : 'all';
@@ -129,7 +126,7 @@ export class LightingWorld {
     }
     // A darkness has no tile: its area is the rule's polygon, which changes with any wall.
     const shining = lights.filter((light) => !light.darkness);
-    const tilesChanged = this.tiles.sync(shining, walls, reliefChanged ? 'all' : changed, this.pacer);
+    const tilesChanged = this.tiles.sync(shining, walls, changed, this.pacer);
     // After the fields: a reflection ends at the walls' capsules as a tile does.
     const reflectionsChanged = this.reflections.sync(shining, this.fieldAll());
     const lightsChanged = !sameLights(this.lights, lights);
@@ -152,12 +149,14 @@ export class LightingWorld {
    * Tiles still to build, throttled flicker and bounce, each as the pacer lets it through; true
    * when a world texture changed. A light map drawn steady (a light moved, the bounce was built)
    * takes its flicker back at once, so a dragged light never blinks between the two. Bounce
-   * waits for the last tile: it reads the light map they make. `buildBounce` builds a pending
-   * bounce whatever the pacer says (`flush`).
+   * waits for the last tile: it reads the light map they make, and for every moving light to rest
+   * (`EngineLight.moving`): a light dragged over the map would rebuild it every few frames, a
+   * stall each time. `buildBounce` builds a pending bounce whatever the pacer says or moves (`flush`).
    */
   animate(now: number, buildBounce = false, view?: Box): boolean {
     let drew = this.buildTiles(this.pacer);
-    if (this.bounceDirty && this.cascades && !this.tiles.busy() && now - this.lastBounce >= BOUNCE.throttleMs && (buildBounce || this.pacer.allowance() > 0)) {
+    const waits = !buildBounce && (this.lights.some((light) => light.moving) || this.pacer.allowance() <= 0);
+    if (this.bounceDirty && this.cascades && !this.tiles.busy() && now - this.lastBounce >= BOUNCE.throttleMs && !waits) {
       // Bounce uses steady intensity, so flicker never rebuilds it.
       this.drawSteady();
       this.cascades.build(this.lightMap, this.albedo, this.fieldAll());
@@ -371,7 +370,7 @@ function sameLights(a: readonly EngineLight[], b: readonly EngineLight[]): boole
     const y = b[i]!;
     return x.key === y.key && x.x === y.x && x.y === y.y && x.bright === y.bright && x.dim === y.dim && x.flame === y.flame
       && x.intensity === y.intensity && x.animation === y.animation && x.color.every((c, j) => c === y.color[j])
-      && !!x.darkness === !!y.darkness && (x.priority ?? 0) === (y.priority ?? 0) && sameCone(x.cone, y.cone) && x.edge === y.edge && x.area === y.area && x.surface === y.surface && x.parts === y.parts && x.reflection === y.reflection;
+      && !!x.darkness === !!y.darkness && (x.priority ?? 0) === (y.priority ?? 0) && sameCone(x.cone, y.cone) && x.edge === y.edge && x.area === y.area && x.surface === y.surface && x.parts === y.parts && x.reflection === y.reflection && x.moving === y.moving;
   });
 }
 

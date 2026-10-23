@@ -53,6 +53,8 @@ uniform float uDimLevel;
 uniform float uHaloGain;
 uniform float uHaloSize;
 uniform float uTexel;
+// A moving light's tile has coarser texels than this map (Tile.scale); the reflection's are this map's.
+uniform float uTileTexel;
 uniform vec4 uCone;
 uniform float uEdge;
 uniform float uIsArea;
@@ -81,7 +83,7 @@ float inCone(vec2 v, float d) {
   return max(beam, own);
 }
 void main() {
-  ivec2 texel = ivec2(floor((vWorld - uTileOrigin) / uTexel));
+  ivec2 texel = ivec2(floor((vWorld - uTileOrigin) / uTileTexel));
   bool inTile = all(greaterThanEqual(texel, ivec2(0))) && all(lessThan(texel, textureSize(uTile, 0)));
   float spill = 0.0;
   if (uHasReflection > 0.5) {

@@ -84,6 +84,7 @@ export class LightMap {
       u.uHasReflection = reflection ? 1 : 0;
       if (reflection) slot.reflectOrigin.set([reflection.rect[0], reflection.rect[1]]);
       slot.mesh.shader!.resources.uReflection = (reflection?.texture ?? this.placeholder).source;
+      u.uTileTexel = this.texel * (light.tile.scale ?? 1);
       slot.light[0] = light.tile.x;
       slot.light[1] = light.tile.y;
       u.uBright = light.bright;
@@ -149,6 +150,7 @@ export class LightMap {
       uHaloGain: { value: HALO.gain, type: 'f32' },
       uHaloSize: { value: HALO.size, type: 'f32' },
       uTexel: { value: this.texel, type: 'f32' },
+      uTileTexel: { value: this.texel, type: 'f32' },
       uCone: { value: cone, type: 'vec4<f32>' },
       uEdge: { value: 1, type: 'f32' },
       uIsArea: { value: 0, type: 'f32' },

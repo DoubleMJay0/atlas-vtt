@@ -18,9 +18,6 @@ export interface NewSceneFile {
     lighting?: SceneLighting;
     /** The scene's floors, bottom first, for a scene of several (written with `sceneFileVersion`). */
     levels?: SceneLevel[];
-    /** The relief and shade of a scene of one map (`SceneShading`). */
-    relief?: string;
-    shade?: string;
   };
   version: number;
 }

@@ -1,7 +1,6 @@
 import { TILE_SMOOTH } from '../../../lighting/lightingConstants';
 import { GLSL_VERSION } from './glsl';
 import { TILE_CLEARANCE_GLSL } from './tileShader';
-import { RELIEF_SHADOW_GLSL } from './reliefShader';
 
 /** Texel offsets within `TILE_SMOOTH` of a texel (without itself), with their Gaussian weights (sigma = half the radius). */
 function smoothTaps(): string {
@@ -24,8 +23,6 @@ function smoothTaps(): string {
  * region as this one and light spreads within free space, never across a wall. Near walls the
  * disc shrinks, keeping contact shadows crisp; texels without clearance read no neighbours and
  * stay exactly 0, as the trace left them. The composite lights the capsule's edge (`wallPushGlsl`).
- * Where the scene has a relief, the smoothed tile takes its relief shadow (`reliefShadow`): what
- * stands only ever darkens it, so no light passes a wall it did not pass before.
  */
 export const tileSmoothFragment = `${GLSL_VERSION}
 in vec2 vUv;
@@ -35,7 +32,6 @@ uniform vec2 uTexels;
 uniform sampler2D uRaw;
 out vec4 finalColor;
 ${TILE_CLEARANCE_GLSL}
-${RELIEF_SHADOW_GLSL}
 
 ivec2 here;
 ivec2 last;
@@ -52,12 +48,11 @@ void tap(ivec2 offset, float q, float weight) {
 void main() {
   here = ivec2(gl_FragCoord.xy);
   last = ivec2(uTexels) - 1;
-  vec2 w = uTileRect.xy + (vec2(here) + 0.5) * uTexel;
-  float c = clearance(w);
+  float c = clearance(uTileRect.xy + (vec2(here) + 0.5) * uTexel);
   float reach = c / uTexel;
   reach2 = reach * max(reach, 0.0);
   sum = texelFetch(uRaw, here, 0).r;
   weights = 1.0;
 ${smoothTaps()}
-  finalColor = vec4(sum / weights * reliefShadow(w), 0.0, 0.0, 1.0);
+  finalColor = vec4(sum / weights, 0.0, 0.0, 1.0);
 }`;

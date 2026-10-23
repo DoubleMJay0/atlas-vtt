@@ -14,8 +14,6 @@ import { areaBlurFragment, areaDistanceFragment, areaTileFragment } from './area
 import { zoneFragment } from './zoneShader';
 import { roofFragment } from './roofShader';
 import { reflectionBlurFragment, reflectionFragment, reflectionVertex } from './reflectionShader';
-import { reliefAreaFragment, reliefPointFragment } from './reliefShader';
-import { shadeFragment, shadeVertex } from './shadeShader';
 
 export interface EngineShaderSource {
   readonly name: string;
@@ -35,8 +33,6 @@ export const ENGINE_SHADERS = {
   areaDistance: { name: 'atlas-area-light-distance', vertex: tileVertex, fragment: areaDistanceFragment },
   areaTile: { name: 'atlas-area-light-tile', vertex: tileVertex, fragment: areaTileFragment },
   areaBlur: { name: 'atlas-area-light-blur', vertex: tileVertex, fragment: areaBlurFragment },
-  reliefPoint: { name: 'atlas-relief-shadow', vertex: tileVertex, fragment: reliefPointFragment },
-  reliefArea: { name: 'atlas-relief-shadow-area', vertex: tileVertex, fragment: reliefAreaFragment },
   tileLimited: { name: 'atlas-visibility-tile-limited', vertex: limitedVertex, fragment: limitedFragment },
   reflection: { name: 'atlas-reflected-light', vertex: reflectionVertex, fragment: reflectionFragment },
   reflectionBlur: { name: 'atlas-reflected-light-blur', vertex: FULLSCREEN_VERTEX, fragment: reflectionBlurFragment },
@@ -51,5 +47,4 @@ export const ENGINE_SHADERS = {
   composite: { name: 'atlas-lighting-composite', vertex: defaultFilterVert, fragment: compositeFragment },
   compositeUpscale: { name: 'atlas-lighting-composite-upscale', vertex: defaultFilterVert, fragment: compositeUpscaleFragment },
   roof: { name: 'atlas-roof', vertex: defaultFilterVert, fragment: roofFragment },
-  shade: { name: 'atlas-shade', vertex: shadeVertex, fragment: shadeFragment },
 } as const satisfies Record<string, EngineShaderSource>;

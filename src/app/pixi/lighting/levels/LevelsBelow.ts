@@ -1,4 +1,3 @@
-import type { ShadingPixels } from './LevelShading';
 import { Matrix, type Application, type Container } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';
 import type { MeasurementSettings } from '../../../grid/measurementFormat';
@@ -54,8 +53,6 @@ export interface BelowLevelsHost extends RoofHost {
   viewedRoof(): ((point: Point) => boolean) | null;
   /** Puts the openings' eraser into the view's stage, between its grid and its tokens. */
   placeEraser(eraser: Container): void;
-  /** Reads a level's relief or shade image (`levelShading`); without it the levels below are drawn without them. */
-  readShading?(path: string): Promise<ShadingPixels>;
 }
 
 export interface LevelsBelowDeps {
@@ -308,7 +305,6 @@ export class LevelsBelow {
       art: deps.host.createArt(),
       roofs: deps.host,
       ...(deps.host.createLiquids && { liquids: (changed: () => void) => deps.host.createLiquids!(id, changed) }),
-      ...(deps.host.readShading && { readShading: (path: string) => deps.host.readShading!(path) }),
       fadeMs: deps.fadeMs ?? 0,
       requestRender: deps.requestRender,
       onReady: deps.onReady,

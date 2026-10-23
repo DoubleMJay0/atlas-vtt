@@ -11,7 +11,7 @@ export interface AssetAnswerPorts {
   scaleImage?: ScaleImage | undefined;
 }
 
-/** An image of the picture held in memory: the map and its shade. */
+/** An image of the picture held in memory: the map. */
 export interface PictureImage {
   readonly hash: string;
   readonly bytes: Uint8Array;
@@ -25,8 +25,6 @@ export interface PictureImage {
 export interface PictureAssets {
   /** The shared map's image, while one is shared. */
   map(player: string): PictureImage | null;
-  /** The shadows multiplied over the shared map (`SharedScene.shade`), while the map has them. */
-  shade?(player: string): PictureImage | null;
   /** The explored memory by hash, while it is the one players were sent. */
   explored(hash: string, player: string): Uint8Array | undefined;
   /** The vault path of artwork the picture shows (a token's or an initiative portrait's, an image of a quest's text), by hash. */
@@ -90,12 +88,10 @@ export class AssetAnswers {
     return this.mapImage(hash, player) !== null || this.picture.artPath(hash, player) !== undefined;
   }
 
-  /** The map or its shade by hash, while the player's picture shows it. */
+  /** The map by hash, while the player's picture shows it. */
   private mapImage(hash: string, player: string): PictureImage | null {
     const map = this.picture.map(player);
-    if (map?.hash === hash) return map;
-    const shade = this.picture.shade?.(player) ?? null;
-    return shade?.hash === hash ? shade : null;
+    return map?.hash === hash ? map : null;
   }
 
   private serve(hash: string, bytes: Uint8Array, to: string, first: number): void {

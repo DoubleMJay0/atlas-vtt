@@ -32,15 +32,7 @@ export interface SharedScene {
   readonly lit: boolean;
   /** Which floor of a map with several this scene is; none for a map of one floor (and from an older GM). */
   readonly floor?: SharedFloor;
-  /**
-   * The shadows the map was drawn without, multiplied over it (a PNG or WebP as large as the map,
-   * white where nothing falls); none for a map without. Added later: an older page draws the map without.
-   */
-  readonly shade?: AssetRef;
 }
-
-/** Image types a scene's shade may have: pictures whose pixels read back as written. */
-const SHADE_MIME_TYPES: readonly string[] = ['image/png', 'image/webp'];
 
 /** Parts of one message a client puts together: at most this many, each as large as an asset chunk. */
 export const MAX_PARTS = 64;
@@ -129,11 +121,10 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 const isSceneId = (value: unknown): value is string => typeof value === 'string' && value.length <= MAX_SCENE_ID;
 const isBase64Chunk = (value: unknown): value is string => typeof value === 'string' && value.length <= (ASSET_CHUNK_BYTES / 3) * 4 && BASE64.test(value);
 
-/** A scene's floor and shade where they are given and well formed; a malformed one is left out, so the scene still shows. */
-function sceneExtras(value: Record<string, unknown>): Pick<SharedScene, 'floor' | 'shade'> {
+/** A scene's floor where it is given and well formed; a malformed one is left out, so the scene still shows. */
+function sceneExtras(value: Record<string, unknown>): Pick<SharedScene, 'floor'> {
   const floor = parseFloor(value.floor);
-  const shade = value.shade === undefined ? null : parseAsset(value.shade);
-  return { ...(floor !== undefined && { floor }), ...(shade !== null && SHADE_MIME_TYPES.includes(shade.mime) && { shade }) };
+  return floor !== undefined ? { floor } : {};
 }
 
 function parseScene(value: unknown): SharedScene | null | undefined {

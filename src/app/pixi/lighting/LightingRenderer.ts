@@ -21,8 +21,6 @@ import { contextLost } from './engine/gpu';
 import { AttemptProgress } from './AttemptProgress';
 import { LightingEngine } from './engine/LightingEngine';
 import type { EngineScene, SceneFrame } from './engine/types';
-import type { EngineRelief } from './engine/ReliefMap';
-import type { ShadeSink } from './engine/ShadeLayer';
 import type { BelowShown } from './engine/LightingEngine';
 import { ExploredMemory, type ExploredMemoryState } from './ExploredMemory';
 import type { LightingAttempt } from './lightingAttempts';
@@ -47,6 +45,15 @@ function animationView(viewport: Viewport, screen: { width: number; height: numb
 
 /** Above tokens, below their nameplates and bars (100): the GM keeps readable labels in the dark. */
 export const LIGHTING_Z_INDEX = 90;
+
+/** A drag's sight is stamped into the explored memory at most this often (ms): each stamp is a few ms of GPU work (`ExploredMemory`). */
+const EXPLORED_STAMP_MS = 100;
+
+/** Whether the pointer holds tokens (`heldTokens`, noted for every drag). */
+function dragging(state: Pick<ViewState, 'heldTokens'>): boolean {
+  for (const _ in state.heldTokens) return true;
+  return false;
+}
 const DEFAULT_CELL_SIZE = 70;
 
 /** Why the engine does not light a view: it stopped on this device, or its last attempt never drew a frame. */
@@ -78,13 +85,6 @@ export interface LightingRendererDeps {
   albedo: () => Texture | null;
   /** The grid the composite draws unlit, while there is one (`UnlitGrid`). */
   grid?: () => UnlitGrid | null;
-  /**
-   * How high what stands on the viewed level's map stands (`EngineRelief`), while it has a relief:
-   * every light casts its shadows from it. Call `followShading` when it changes.
-   */
-  relief?: () => EngineRelief | null;
-  /** Who draws the viewed level's shade under the scene's light (`ShadeLayer`). */
-  shade?: ShadeSink;
   /** The senses and conditions of the map's collection; the generic ones without it. */
   rules?: () => SightRules;
   /** The device-local record of attempts to light this map; without one every attempt is made. */
@@ -121,8 +121,11 @@ export class LightingRenderer implements SceneLightingView {
   readonly modeLayer: HideableLayer;
   private readonly engine: LightingEngine;
   private readonly memory: ExploredMemory;
-  /** What the scene is built from, and when it is built anew (`SceneModelBuilder`). */
-  private readonly model = new SceneModelBuilder();
+  /**
+   * What the scene is built from, and when it is built anew (`SceneModelBuilder`); a moving light
+   * is built whole once it rests, on the clock of the display frames (`frameTime`).
+   */
+  private readonly model = new SceneModelBuilder({ clock: () => this.clock() });
   private readonly spots = new SceneSpots();
   private readonly gmSpots = new SceneSpots(GM_SIGHT_POLICY);
   private reaches: LightReach[] = [];
@@ -134,8 +137,6 @@ export class LightingRenderer implements SceneLightingView {
   private lastScene: SceneWithoutLook | null = null;
   /** The albedo the engine was last given. */
   private albedo: Texture | null = null;
-  /** The relief the engine was last given. */
-  private relief: EngineRelief | null = null;
   private readonly attempt: AttemptProgress;
   private stopped = false;
   /** A scene build worked out new sight; reported once the guarded work is over. */
@@ -157,7 +158,6 @@ export class LightingRenderer implements SceneLightingView {
     this.quality = deps.quality?.current() ?? DEFAULT_LIGHTING_QUALITY;
     this.engine = new LightingEngine(renderer, this.quality, { paced: true });
     this.attempt = new AttemptProgress(renderer, deps.attempt);
-    if (deps.shade) this.engine.setShade(deps.shade);
     this.layer = this.engine.layer;
     this.memory = new ExploredMemory({
       renderer,
@@ -169,6 +169,7 @@ export class LightingRenderer implements SceneLightingView {
       onTravel: (undone) => deps.exploredWatcher?.memoryTravelled(undone),
       onChange: () => requestRender(deps.app),
       guard: (work) => this.run(work),
+      stampEveryMs: EXPLORED_STAMP_MS,
     });
     this.levelsBelow = deps.below ? new LevelsBelow({
       app: deps.app,
@@ -261,14 +262,6 @@ export class LightingRenderer implements SceneLightingView {
       this.update(this.deps.store.getState());
     });
     requestRender(this.deps.app);
-  }
-
-  /**
-   * The viewed level's relief changed: the engine takes the new one at once (every light's tile is
-   * built anew), so nothing holds the old one when its owner lets it go.
-   */
-  followShading(): void {
-    if (this.deps.relief?.() !== this.relief) this.run(() => this.update(this.deps.store.getState()));
   }
 
   /** The map image changed size or finished loading. */
@@ -368,13 +361,14 @@ export class LightingRenderer implements SceneLightingView {
     this.engine.setCoverage(reach);
     const { model, rebuilt } = this.model.update(state, bounds, this.deps.measurement, this.deps.rules, reach ?? bounds);
     const base = rebuilt || !this.lastScene ? (this.lastScene = this.takeModel(model, state, bounds)) : this.lastScene;
+    // The drag ended: what its tokens saw last goes into the memory now.
+    if (!dragging(state)) this.memory.stampDue();
     const spots = this.spots.update(model, state, this.deps.measurement, this.deps.rules);
     const gmSight = model.gmSight ?? model.sight;
     // Both pictures always show the same tokens (`GM_SIGHT_POLICY`), so the same sight gives the same footprints.
     const gmSpots = gmSight === model.sight ? spots : this.gmSpots.update(model, state, this.deps.measurement, this.deps.rules, gmSight);
     this.albedo = this.deps.albedo();
-    this.relief = this.deps.relief?.() ?? null;
-    this.engine.update({ ...base, albedo: this.albedo, relief: this.relief, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(state.lighting) });
+    this.engine.update({ ...base, albedo: this.albedo, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(state.lighting) });
     this.levelsBelow?.update(state, bounds, { sight: model.sight, gmSight });
     if (this.levelsBelow?.failed()) this.engine.fail(new Error('The lighting of a level below stopped'));
     requestRender(this.deps.app);
@@ -386,7 +380,8 @@ export class LightingRenderer implements SceneLightingView {
     this.sight = sight;
     this.zones = ambient.zones ?? [];
     this.sightChanged = true;
-    if (explored) this.memory.record(explored);
+    // A drag records what its tokens see at most every `EXPLORED_STAMP_MS`; any other change at once.
+    if (explored) this.memory.record(explored, dragging(state) ? this.clock() : undefined);
     const cellSize = state.grid?.size ?? DEFAULT_CELL_SIZE;
     return { bounds, walls, lights, sight: gmSight, sightRadius: cellSize * 0.5, cellSize, zones };
   }
@@ -405,6 +400,11 @@ export class LightingRenderer implements SceneLightingView {
     // The levels below come back from their saved memories, built anew.
     this.levelsBelow?.reset(false);
     this.update(state);
+  }
+
+  /** The time of the display frame (ms), which the map's animations, its lights' motion and the memory's stamps go by. */
+  private clock(): number {
+    return frameTime(this.deps.app.ticker);
   }
 
   /** The composite maps screen pixels to the world with the camera of the frame being rendered. */
@@ -427,9 +427,13 @@ export class LightingRenderer implements SceneLightingView {
   private animate(): void {
     this.attempt.settle();
     this.followAlbedo();
-    if (!this.layer.visible) return;
     // The display frame's time, which every animation of the map shares, so their frames share renders.
-    const now = frameTime(this.deps.app.ticker);
+    const now = this.clock();
+    // A light that moved has come to rest: its reflection, its full tile and the bounce follow.
+    const rest = this.model.restsAt();
+    if (rest !== null && now >= rest) this.update(this.deps.store.getState());
+    if (this.memory.stampDue(now)) requestRender(this.deps.app);
+    if (!this.layer.visible) return;
     const view = animationView(this.deps.viewport, this.deps.app.renderer.screen);
     this.levelsBelow?.animate(now, view);
     if (!this.engine.busy()) return;
