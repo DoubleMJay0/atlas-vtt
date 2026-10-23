@@ -10,23 +10,26 @@ import type { SightRules } from '../../../vision/sightRules';
 import type { FogCover } from '../../../vision/throughSight';
 import type { TokenPerception } from '../../../vision/tokenPerception';
 import type { MapBounds } from '../../../vision/visibility';
-import type { TileView } from '../../mapImage/levelOfDetail';
 import { addBeforeRender, BEFORE_RENDER_ORDER } from '../../RenderScheduler';
 import { NO_BELOW, type BelowPictures as ShownPictures, type LightingMode } from '../engine/compositeFilter';
 import type { BelowShown, LightingEngine } from '../engine/LightingEngine';
 import type { LightingState, LightingStore } from '../LightingRenderer';
 import { BelowLayout, type LevelArtSource } from './belowLayout';
 import { BelowPerception } from './belowPerception';
-import { BelowRegions } from './belowRegions';
-import { BelowLevel, type BelowMapImage } from './BelowLevel';
-import { BelowPictures, type BelowPicture } from './BelowPictures';
+import { BelowLevel, type BelowLiquids, type BelowMapImage } from './BelowLevel';
+import { BelowSnapshots, type BelowPicture } from './BelowSnapshots';
+import { sameSnapshotGrid, snapshotGrid, type SnapshotGrid, type SnapshotView } from './belowSnapshot';
 import { tokenLook, type TokenArt } from './BelowTokens';
 import { LevelStackTexture } from './LevelStackTexture';
 import type { RoofHost } from './Roof';
 import type { Point } from '../../../types/visionTypes';
 import type { Box } from '../../../vision/polygonBounds';
 
-export type { BelowPicture } from './BelowPictures';
+export type { BelowPicture } from './BelowSnapshots';
+export type { BelowLiquids } from './BelowLevel';
+
+/** A render of the view through the viewport's camera now (the player window's frame): its picture, and its size in points. */
+export type BelowRender = Omit<BelowPicture, 'view'> & { width: number; height: number };
 
 /** How dark the GM sees a level below through an opening, once per level down: never mistaken for the floor the view shows. */
 export const BELOW_GM_DIM = 0.6;
@@ -37,8 +40,10 @@ const RECORD_WHILE_DRAGGING_MS = 100;
 
 /** What a view gives its levels below that the lighting cannot make itself; their roofs are made with it too (`RoofHost`). */
 export interface BelowLevelsHost extends RoofHost {
-  /** A map image for a level below, drawn with the view's camera and never changing the view's world (`belowMapImage`). */
-  createMapImage(): BelowMapImage;
+  /** A map image for a level below, read through its snapshot's camera and never changing the view's world (`belowMapImage`). */
+  createMapImage(camera?: SnapshotView): BelowMapImage;
+  /** The liquids of a level below, held still, asking for its snapshot anew through `changed`; without it none are drawn below. */
+  createLiquids?(level: string, changed: () => void): BelowLiquids;
   /** Token art for the tokens of a level below. */
   createArt(): TokenArt;
   /** A level's map as the level stack reads it: its size and its transparent parts (a video's poster's). */
@@ -55,7 +60,7 @@ export interface BelowLevelsHost extends RoofHost {
 
 export interface LevelsBelowDeps {
   app: Application;
-  /** The view's camera: the canvas's own picture is drawn through it. */
+  /** The view's camera: no snapshot is drawn while no opening lies in the canvas's picture. */
   viewport: Viewport;
   store: LightingStore;
   host: BelowLevelsHost;
@@ -79,19 +84,21 @@ export interface LevelsBelowDeps {
  * The levels below a view seen through its openings (the transparent parts of its map and the
  * openings drawn on it): the level stack the rules and the picture read (`BelowLayout`), the eraser
  * that opens the view's map, and one `BelowLevel` for each level below drawn where the stack shows
- * it, at most two. Before each render of the view, each level's stage is rendered into a texture
- * of that render's size, through that render's camera, and handed to the view's composite, which
- * takes from it texel on pixel where the stack shows that level: for the canvas in a before-render
- * hook that runs after the player window's frame took its own (`BEFORE_RENDER_ORDER`), for the
- * player window's frame through `prepare`, for a picture of the scene through `drawFor`. Nothing is
- * drawn while no opening is in the picture, and a level shows nothing until its picture is ready.
+ * it, at most two. Each level is drawn into a world-space snapshot over the stack's box
+ * (`BelowSnapshots`), in the look the picture shows (the GM's, the players', a thumbnail's), only
+ * when the level changed; the view's composite reads it where the stack shows that level. The
+ * canvas's snapshots are brought up to date in a before-render hook that runs after the player
+ * window's frame took its own (`BEFORE_RENDER_ORDER`), the frame's through `prepare`, a picture of
+ * the scene's through `drawFor`. Nothing is drawn while no opening is in the picture, and a level
+ * shows nothing until its snapshot is drawn.
  */
 export class LevelsBelow {
   private readonly levels = new Map<string, BelowLevel>();
   private readonly stackTexture = new LevelStackTexture();
   private readonly layout: BelowLayout;
-  private readonly pictures: BelowPictures;
-  private readonly regions = new BelowRegions();
+  private readonly snapshots: BelowSnapshots;
+  /** Where the snapshots lie: over the drawn stack's box. */
+  private grid: SnapshotGrid | null = null;
   private readonly perception = new BelowPerception();
   private readonly stopPreparing: () => void;
   /** The stack as the view draws it: only levels whose picture is ready show. */
@@ -104,7 +111,7 @@ export class LevelsBelow {
 
   constructor(private readonly deps: LevelsBelowDeps) {
     this.layout = new BelowLayout(deps.host.levelArt, deps.onReady);
-    this.pictures = new BelowPictures(deps.app.renderer, () => deps.view.setBelow(NO_BELOW, 1));
+    this.snapshots = new BelowSnapshots(deps.app.renderer, () => deps.view.setBelow(NO_BELOW, 1));
     this.stopPreparing = addBeforeRender(deps.app, () => deps.guard(() => this.prepareCanvas()), BEFORE_RENDER_ORDER.levelsBelow);
   }
 
@@ -159,6 +166,7 @@ export class LevelsBelow {
     // Once the levels are lit: a level shows from the update that gave it its world.
     this.stack = this.drawnOf(stack);
     this.bind(this.stack);
+    this.aim(snapshotGrid(this.stack));
     if (this.stack && this.mayRecord(state)) {
       for (const level of this.levels.values()) if (level.ready()) level.recordThrough(viewed.sight, this.stack, state);
     }
@@ -182,16 +190,17 @@ export class LevelsBelow {
   }
 
   /**
-   * Draws the levels below for a render of the view about to be drawn through the camera the
-   * viewport holds now (the player window's frame; without `picture`, the canvas's own), and hands
-   * them to the view's composite; where no opening shows a ready level in it, none, and its texels show nothing.
+   * Hands the view's composite the snapshots of the levels below for a render about to be drawn
+   * through the camera the viewport holds now (the player window's frame; without `picture`, the
+   * canvas's own), drawing those that changed; where no opening shows a ready level in it, none,
+   * and its texels show nothing.
    */
-  prepare(picture?: Omit<BelowPicture, 'camera'>): void {
-    if (picture) this.deps.view.setBelow(...this.shownFor({ ...picture, camera: this.camera() }));
+  prepare(picture?: BelowRender): void {
+    if (picture) this.deps.view.setBelow(...this.shownFor({ key: picture.key, mode: picture.mode, view: this.viewOf(picture) }));
     else this.prepareCanvas();
   }
 
-  /** Draws the levels below for a picture of the scene (a thumbnail) and returns them for its render, without touching the canvas's. */
+  /** The snapshots of the levels below for a picture of the scene (a thumbnail), drawn where they changed, without touching the canvas's. */
   drawFor(picture: BelowPicture): BelowShown {
     const [pictures, dim] = this.shownFor(picture);
     return { pictures, dim };
@@ -207,14 +216,9 @@ export class LevelsBelow {
     if (changed) this.deps.requestRender();
   }
 
-  /** Keeps the tiles of `view` (the player window's frame) of every level below loaded, as the view's own map does. */
-  addDemandRegion(view: TileView): () => void {
-    return this.regions.add(view, this.levels.values());
-  }
-
-  /** The player window's frame is no longer drawn: its textures go. */
+  /** A picture is no longer drawn (the player window closed, a thumbnail taken): the snapshots only it used go. */
   releasePicture(key: BelowPicture['key']): void {
-    this.pictures.release(key);
+    this.snapshots.release(key);
   }
 
   /** The graphics context is lost: what the memories below hold from now on is not their memory. */
@@ -229,6 +233,7 @@ export class LevelsBelow {
   reset(flush: boolean): void {
     this.stack = this.drawnOf(null);
     this.bind(null);
+    this.grid = null;
     for (const [id, level] of [...this.levels]) this.remove(id, level, flush);
     this.layout.reset();
   }
@@ -236,24 +241,34 @@ export class LevelsBelow {
   destroy(): void {
     this.stopPreparing();
     this.reset(false);
-    this.pictures.destroy();
+    this.snapshots.destroy();
     this.stackTexture.destroy();
   }
 
-  /** The canvas's own render: its size, its pixels, and the view it shows now. */
+  /** The canvas's own render, in the view it shows now. */
   private prepareCanvas(): void {
-    const { renderer } = this.deps.app;
-    const camera = this.camera();
-    this.deps.view.setBelow(...this.shownFor({ key: 'canvas', camera, width: renderer.screen.width, height: renderer.screen.height, resolution: renderer.resolution, mode: this.deps.mode() }));
+    this.deps.view.setBelow(...this.shownFor({ key: 'canvas', mode: this.deps.mode(), view: this.viewOf(this.deps.app.renderer.screen) }));
   }
 
-  /** Renders every ready level below that `picture` shows into its texture; the pictures for the view's composite and their dimming. */
+  /** The viewport's camera now, over a render of `size` points. */
+  private viewOf(size: { width: number; height: number }): BelowPicture['view'] {
+    return { camera: this.camera(), width: size.width, height: size.height };
+  }
+
+  /** Draws the snapshots `picture` shows that changed; the snapshots for the view's composite and their dimming. */
   private shownFor(picture: BelowPicture): [ShownPictures, number] {
     const dim = picture.mode === 'player' ? BELOW_PLAYER_DIM : BELOW_GM_DIM;
-    const stack = this.stack;
-    if (!stack || !this.pictures.shows(stack, picture) || !this.pictures.canBlend()) return [NO_BELOW, dim];
+    const { stack, grid } = this;
+    if (!stack || !grid || !BelowSnapshots.shows(stack, picture.view) || !this.snapshots.canBlend()) return [NO_BELOW, dim];
     const look = tokenLook(picture.mode === 'player' ? this.tokenPerception(this.deps.store.getState()) : null);
-    return [this.pictures.draw(this.levels.values(), stack, picture, look), dim];
+    return [this.snapshots.draw(this.levels.values(), stack, grid, picture, look), dim];
+  }
+
+  /** The snapshots lie over `grid` (the drawn stack's box) from now on. */
+  private aim(grid: SnapshotGrid | null): void {
+    if (sameSnapshotGrid(grid, this.grid)) return;
+    this.grid = grid;
+    for (const level of this.levels.values()) level.setSnapshot(this.grid);
   }
 
   /**
@@ -275,7 +290,7 @@ export class LevelsBelow {
     return undefined;
   }
 
-  /** World pixels to the points of the render about to be drawn: the viewport's transform now. */
+  /** World pixels to the points of the render about to be drawn: the viewport's transform now (the player window's frame's, while it is taken). */
   private camera(): Matrix {
     const { viewport } = this.deps;
     return new Matrix(viewport.scale.x, 0, 0, viewport.scale.y, viewport.x, viewport.y);
@@ -289,9 +304,10 @@ export class LevelsBelow {
       renderer: deps.app.renderer,
       store: deps.store,
       quality: belowQuality(deps.quality()),
-      image: deps.host.createMapImage(),
+      image: (camera) => deps.host.createMapImage(camera),
       art: deps.host.createArt(),
       roofs: deps.host,
+      ...(deps.host.createLiquids && { liquids: (changed: () => void) => deps.host.createLiquids!(id, changed) }),
       ...(deps.host.readShading && { readShading: (path: string) => deps.host.readShading!(path) }),
       fadeMs: deps.fadeMs ?? 0,
       requestRender: deps.requestRender,
@@ -299,8 +315,8 @@ export class LevelsBelow {
       guard: deps.guard,
     });
     level.setStack(this.stackTexture.composite);
+    level.setSnapshot(this.grid);
     this.levels.set(id, level);
-    this.regions.join(level);
     return level;
   }
 
@@ -312,9 +328,8 @@ export class LevelsBelow {
     if (this.levels.get(id) !== level) return;
     this.levels.delete(id);
     this.perception.forget(id);
-    this.regions.leave(id);
-    // The view's composite lets go of the level's pictures before they go.
-    this.pictures.releaseLevel(id);
+    // The view's composite lets go of the level's snapshots before they go.
+    this.snapshots.releaseLevel(id);
     level.destroy(flush);
   }
 

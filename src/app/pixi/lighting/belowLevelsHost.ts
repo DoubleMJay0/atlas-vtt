@@ -2,6 +2,7 @@ import { Ticker, type Application, type Container } from 'pixi.js';
 import type { App } from 'obsidian';
 import type { Viewport } from 'pixi-viewport';
 import { mapImageSourceFor } from '../../MapLoader';
+import { everyLevelObjects } from '../../levels/levelObjects';
 import { MISSING_ASSET_SIZE } from '../../services/AssetValidationService';
 import type { LevelArt } from '../../levels/artRaster';
 import { MapImage } from '../mapImage/MapImage';
@@ -14,14 +15,20 @@ import { requestRender } from '../RenderScheduler';
 import { TextureCache } from '../token-renderer/TextureCache';
 import type { FogCover } from '../../vision/throughSight';
 import type { BelowMapImage } from './levels/BelowLevel';
-import type { BelowLevelsHost } from './levels/LevelsBelow';
+import type { BelowLevelsHost, BelowLiquids } from './levels/LevelsBelow';
+import { LiquidLayer, type LiquidLayerDeps } from '../liquids/LiquidLayer';
 import type { RoofHost, RoofImageRead } from './levels/Roof';
 import type { Point } from '../../types/visionTypes';
+
+type LiquidStore = LiquidLayerDeps['store'];
+type LiquidsState = ReturnType<LiquidStore['getState']>;
 
 export interface BelowLevelsHostDeps {
   obsApp: App;
   app: Application;
   viewport: Viewport;
+  /** The view's store, whose liquids the levels below draw on their own level. */
+  store: LiquidStore;
   /** The committed fog of the level the view shows. */
   viewedFog: () => FogCover;
   /** Whether the roof of the level the view shows covers a point in the players' picture. */
@@ -82,15 +89,34 @@ async function readLevelArt(obsApp: App, background: string | null, gridSize: nu
   }
 }
 
-/** A map image drawn through the view's camera, never changing the view's own (a level below's map, a roof). */
-function createViewMapImage(obsApp: App, app: Application, viewport: Viewport): BelowMapImage {
+/**
+ * A map image drawn through the view's camera, never changing the view's own (the view's roof);
+ * through `camera` instead where given (a level below's map or roof, drawn into its snapshot),
+ * whose tiles appear at once: a fade would draw the snapshot anew on every frame of it.
+ */
+function createViewMapImage(obsApp: App, app: Application, viewport: Viewport, camera?: MapImageViewport): BelowMapImage {
   return belowMapImage(obsApp, new MapImage({
     service: MapImageService.forApp(obsApp),
-    viewport: viewCamera(viewport),
+    viewport: camera ?? viewCamera(viewport),
     ticker: Ticker.shared,
     renderer: app.renderer,
     requestRender: () => requestRender(app),
+    ...(camera && { drawAtOnce: () => true }),
   }));
+}
+
+/** The liquids of `level`, held still (a level below shows them in its snapshot, which never moves). */
+function createLevelLiquids(app: Application, store: LiquidStore, level: string, changed: () => void): BelowLiquids {
+  const onLevel = (state: LiquidsState): LiquidsState => ({ objects: everyLevelObjects(state), levels: state.levels, grid: state.grid, viewedLevel: level });
+  const layer = new LiquidLayer({
+    store: { getState: () => onLevel(store.getState()), subscribe: (listener) => store.subscribe((state) => listener(onLevel(state))) },
+    ticker: app.ticker,
+    requestRender: changed,
+    inView: () => false,
+    drawable: app.renderer.name === 'webgl',
+    fps: () => 0,
+  });
+  return { container: layer.container, destroy: () => layer.destroy() };
 }
 
 /** A roof image's size and pieces (`roofPieces`), read in the tile worker; rejects where it is no image of the vault. */
@@ -103,13 +129,13 @@ async function readRoofImage(obsApp: App, path: string): Promise<RoofImageRead> 
 /** What a map view gives its roofs: map images through its camera, and the pieces of a roof image. */
 export function createRoofHost(obsApp: App, app: Application, viewport: Viewport): RoofHost {
   return {
-    createMapImage: () => createViewMapImage(obsApp, app, viewport),
+    createMapImage: (camera) => createViewMapImage(obsApp, app, viewport, camera),
     readRoof: (path) => readRoofImage(obsApp, path),
   };
 }
 
-/** What a map view gives the levels below it: map images through its camera, token art, the levels' maps, its fog and a place for the eraser. */
-export function createBelowLevelsHost({ obsApp, app, viewport, viewedFog, viewedRoof, placeEraser }: BelowLevelsHostDeps): BelowLevelsHost {
+/** What a map view gives the levels below it: map images through their snapshots' cameras, token art, liquids, the levels' maps, its fog and a place for the eraser. */
+export function createBelowLevelsHost({ obsApp, app, viewport, store, viewedFog, viewedRoof, placeEraser }: BelowLevelsHostDeps): BelowLevelsHost {
   return {
     ...createRoofHost(obsApp, app, viewport),
     createArt: () => {
@@ -118,6 +144,7 @@ export function createBelowLevelsHost({ obsApp, app, viewport, viewedFog, viewed
       return art;
     },
     levelArt: (background, gridSize) => readLevelArt(obsApp, background, gridSize),
+    createLiquids: (level, changed) => createLevelLiquids(app, store, level, changed),
     viewedFog,
     viewedRoof,
     placeEraser,

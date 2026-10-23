@@ -142,7 +142,7 @@ describe('the cost of levels below (budgets asserted with VITE_PERF_STRICT)', ()
       // A frame of the player window at its budget, through the same view.
       const frameTarget = RenderTexture.create({ width: 2560, height: 1440 });
       const frame = (): void => {
-        view.controller.renderer.prepareBelow?.({ key: 'frame', width: 2560, height: 1440, resolution: 1, mode: 'player' });
+        view.controller.renderer.prepareBelow?.({ key: 'frame', width: 2560, height: 1440, mode: 'player' });
         renderer.render({ container: view.app.stage, target: frameTarget, clear: true });
       };
       const frameWith = await medianGpu(gl, ext!, frame);
