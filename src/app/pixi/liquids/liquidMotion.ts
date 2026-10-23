@@ -1,0 +1,62 @@
+/**
+ * How liquid surfaces move over time, without the numbers ever growing: every pattern the shader
+ * draws repeats every `PATTERN_TILE` cells, every pulse completes whole cycles in `MOTION_LOOP`
+ * seconds, and the drifts are worked out here in double precision and handed over wrapped. So a map
+ * left playing for days moves as smoothly as in its first minute, and a wrap shows no seam.
+ */
+
+import type { LiquidKind } from '../../types/liquidTypes';
+
+/** Seconds after which the shader's clock starts again; every pulse of a pattern completes whole cycles in it. */
+export const MOTION_LOOP = 4096;
+/** Cells after which every pattern repeats, so a drift may wrap by it unseen. */
+export const PATTERN_TILE = 64;
+/** At most this many frames a second while a surface moves: liquids move slowly and every frame is a render. */
+export const LIQUID_FPS = 30;
+
+/** One pattern's drift: cells per second along the surface's frame (its flow, or the map's axes). */
+interface Drift { across: number; along: number }
+
+/**
+ * The four drifts each kind's shader reads (`uDriftA.xy`, `.zw`, `uDriftB.xy`, `.zw`), as it names
+ * them there. In a flowing surface's frame `along` is downstream; a still one drifts in place.
+ */
+const DRIFTS: Readonly<Record<LiquidKind, { flowing: readonly Drift[]; still: readonly Drift[] }>> = {
+  water: {
+    // Warp, ripples, finer ripples, caustics: the slow warp keeps the faster ripples from reading as a conveyor belt.
+    flowing: [{ across: 0.03, along: 0.16 }, { across: 0, along: 0.42 }, { across: -0.04, along: 0.62 }, { across: 0.05, along: 0.3 }],
+    still: [{ across: 0.04, along: 0.02 }, { across: -0.05, along: 0.035 }, { across: 0.045, along: -0.06 }, { across: -0.03, along: -0.04 }],
+  },
+  lava: {
+    // Churn, plates, heat, fine crust grain: everything molten creeps.
+    flowing: [{ across: 0.01, along: 0.035 }, { across: 0, along: 0.05 }, { across: -0.012, along: 0.03 }, { across: 0, along: 0.05 }],
+    still: [{ across: 0.012, along: 0.008 }, { across: -0.006, along: 0.01 }, { across: 0.01, along: -0.012 }, { across: -0.006, along: 0.01 }],
+  },
+  acid: {
+    // Shimmer, a second shimmer, bubbles, unused.
+    flowing: [{ across: 0.02, along: 0.12 }, { across: -0.02, along: 0.2 }, { across: 0, along: 0.1 }, { across: 0, along: 0 }],
+    still: [{ across: 0.03, along: 0.015 }, { across: -0.025, along: 0.03 }, { across: 0, along: 0 }, { across: 0, along: 0 }],
+  },
+};
+
+const wrap = (value: number, period: number): number => value - Math.floor(value / period) * period;
+
+/** The shader's clock at `seconds` of motion. */
+export function loopTime(seconds: number): number {
+  return wrap(seconds, MOTION_LOOP);
+}
+
+/** The drifts of a surface of `kind` at `seconds` of motion, eight numbers in its frame, each wrapped to `PATTERN_TILE`. */
+export function liquidDrifts(kind: LiquidKind, flowing: boolean, seconds: number, into: Float32Array = new Float32Array(8)): Float32Array {
+  const drifts = DRIFTS[kind][flowing ? 'flowing' : 'still'];
+  drifts.forEach((drift, index) => {
+    into[index * 2] = wrap(drift.across * seconds, PATTERN_TILE);
+    into[index * 2 + 1] = wrap(drift.along * seconds, PATTERN_TILE);
+  });
+  return into;
+}
+
+/** Whether a new frame is due `now` (ms) after the last one shown at `last`: at most `LIQUID_FPS` a second, a little early rather than a whole frame late. */
+export function liquidFrameDue(now: number, last: number | null): boolean {
+  return last === null || now - last >= 1000 / LIQUID_FPS - 4;
+}

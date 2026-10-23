@@ -25,6 +25,8 @@ export interface LiquidSurface extends OnOneLevel {
   liquid: LiquidKind;
   /** The surface's corners in world pixels, at least three. */
   polygon: { x: number; y: number }[];
+  /** What stands dry inside it (a pillar in a pool, an island in a lake): outlines in world pixels, at least three corners each. */
+  holes?: { x: number; y: number }[][] | undefined;
   /** Where it flows, a unit vector in world space; absent, it stands still. */
   flow?: { x: number; y: number } | undefined;
   colors: LiquidColors;

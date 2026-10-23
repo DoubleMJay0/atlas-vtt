@@ -10,8 +10,9 @@ import { isRecord } from '../utils/guards';
 import { hasArea } from '../vision/polygonArea';
 
 /**
- * The corners a surface may have: a generated shoreline is resampled and smoothed, a few hundred
- * corners around a lake; a damaged file must not hand the triangulation and the distance field more.
+ * The corners a surface may have, its holes' included: a generated shoreline is resampled and
+ * smoothed, a few hundred corners around a lake; a damaged file must not hand the triangulation
+ * and the distance field more.
  */
 export const MAX_LIQUID_CORNERS = 2048;
 /** The surfaces one level may have: a flooded dungeon holds a few dozen pools and channels. */
@@ -51,20 +52,41 @@ function readColors(value: unknown, liquid: LiquidKind): LiquidColors {
   return { surface: pick('surface'), deep: pick('deep'), glint: pick('glint') };
 }
 
+function isArea(polygon: unknown): polygon is Point[] {
+  return Array.isArray(polygon) && polygon.length >= 3 && polygon.length <= MAX_LIQUID_CORNERS && polygon.every(isPoint) && hasArea(polygon);
+}
+
+const copy = (polygon: readonly Point[]): Point[] => polygon.map(({ x, y }) => ({ x, y }));
+
+/** The holes that are areas, as long as all corners together stay within the limit. */
+function readHoles(value: unknown, corners: number): Point[][] {
+  if (!Array.isArray(value)) return [];
+  const holes: Point[][] = [];
+  let total = corners;
+  for (const hole of value) {
+    if (!isArea(hole)) continue;
+    total += hole.length;
+    if (total > MAX_LIQUID_CORNERS) break;
+    holes.push(copy(hole));
+  }
+  return holes;
+}
+
 /** A surface as it is read: `id` is its place in the record; one that is no area, or of no kind Atlas knows, is none. */
 function readLiquid(id: string, value: unknown): LiquidSurface | null {
   if (!isRecord(value)) return null;
   const { polygon, level } = value;
   const liquid = LIQUID_KINDS.find((kind) => kind === value.liquid);
-  if (!liquid) return null;
-  if (!Array.isArray(polygon) || polygon.length < 3 || polygon.length > MAX_LIQUID_CORNERS || !polygon.every(isPoint) || !hasArea(polygon)) return null;
+  if (!liquid || !isArea(polygon)) return null;
   const flow = readFlow(value.flow);
+  const holes = readHoles(value.holes, polygon.length);
   return {
     id,
     kind: 'liquid',
     liquid,
-    polygon: polygon.map(({ x, y }) => ({ x, y })),
+    polygon: copy(polygon),
     colors: readColors(value.colors, liquid),
+    ...(holes.length > 0 && { holes }),
     ...(flow && { flow }),
     ...(typeof level === 'string' && { level }),
   };
@@ -103,13 +125,14 @@ export function liquidsFromFile(value: unknown): Record<string, LiquidSurface> |
 export function liquidMovedWithMap<T extends Partial<LiquidSurface>>(surface: T, move: (point: Point) => Point): T {
   if (!Array.isArray(surface.polygon)) return surface;
   const polygon = surface.polygon.map(move);
+  const holes = Array.isArray(surface.holes) ? { holes: surface.holes.map((hole) => (Array.isArray(hole) ? hole.map(move) : hole)) } : {};
   const flow = readFlow(surface.flow);
   const start = surface.polygon.find(isPoint);
-  if (!flow || !start) return { ...surface, polygon };
+  if (!flow || !start) return { ...surface, polygon, ...holes };
   // The map's moves are affine, so one step along the flow anywhere gives its direction everywhere.
   const step = 100;
   const from = move(start);
   const to = move({ x: start.x + flow.x * step, y: start.y + flow.y * step });
   const moved = readFlow({ x: to.x - from.x, y: to.y - from.y });
-  return { ...surface, polygon, flow: moved ?? flow };
+  return { ...surface, polygon, ...holes, flow: moved ?? flow };
 }
