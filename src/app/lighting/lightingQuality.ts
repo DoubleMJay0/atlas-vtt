@@ -44,10 +44,12 @@ export const DEFAULT_LIGHTING_QUALITY: LightingQuality = LIGHTING_QUALITY.high;
 
 /**
  * A level below the view seen through its openings: `balanced` without bounce under `high`, its
- * lights flickering at a quarter of the view's pace (each redraw renders the level's picture and
- * the view's stage anew, and the flicker shows only through the openings, dimmed); else `saver`.
+ * lights flickering 4 times a second (each redraw draws the level's snapshot and the view's stage
+ * anew, and the flicker shows only through the openings, dimmed); else `saver`, steady.
  */
-const BELOW_HIGH: LightingQuality = { ...LIGHTING_QUALITY.balanced, bounceMaxSide: 0, flickerMs: 4 * FLICKER_INTERVAL_MS };
+/** How often flickering lights below are redrawn at `high`: each redraw draws the level's snapshot anew, and 4 a second reads as flicker through an opening. */
+const BELOW_FLICKER_MS = 250;
+const BELOW_HIGH: LightingQuality = { ...LIGHTING_QUALITY.balanced, bounceMaxSide: 0, flickerMs: BELOW_FLICKER_MS };
 
 /**
  * The quality a level below the view is lit at while the view is lit at `quality`: a tier lower,

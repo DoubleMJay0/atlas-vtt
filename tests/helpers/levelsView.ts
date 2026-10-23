@@ -305,7 +305,7 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
       const before = layers.map(({ layer }) => layer.visible);
       for (const { layer, visible } of layers) layer.visible = visible;
       try {
-        controller.renderer.prepareBelow?.({ key: 'frame', width: pane, height: paneHeight, resolution, mode: 'player' });
+        controller.renderer.prepareBelow?.({ key: 'frame', width: pane, height: paneHeight, mode: 'player' });
         renderer.render({ container: app.stage, target, clear: true, clearColor: [0, 0, 0, 1] });
         return renderer.extract.pixels({ target }).pixels;
       } finally {

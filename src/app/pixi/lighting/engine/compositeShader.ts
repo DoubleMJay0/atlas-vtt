@@ -45,8 +45,10 @@ import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
  * the view shows, 1 and 2 the levels below drawn (nearest first), 255 nothing. In the viewed
  * level's composite (uLevelIndex 0) a texel that shows anything else is a hole: the eraser took the
  * map and the grid's backing there, so what is left of the scene beneath is the viewed level's own
- * tokens, lit as everywhere, over uBelow1 or uBelow2 (that level's own composite, rendered for this
- * very picture, texel on pixel, where uBelowShown says it was) dimmed by uBelowDim once per level
+ * tokens, lit as everywhere, over uBelow1 or uBelow2 (that level's snapshot, its own composite
+ * drawn in world space over the stack's box from texel uBelowGrid.xy, uBelowGrid.z of its texels a
+ * side in a stack texel, read at the snapshot texel inside this very stack texel, where
+ * uBelowShown says there is one) dimmed by uBelowDim once per level
  * down, or nothing (black for the GM, the unexplored colour for the players). In a level below's
  * composite (uLevelIndex 1 or 2) nothing is seen outside the texels that show it.
  */
@@ -93,7 +95,6 @@ uniform sampler2D uZonesLifted;
 uniform float uHasZones;
 uniform float uGrid;
 uniform vec3 uGridColor;
-uniform vec4 uInputPixel;
 uniform sampler2D uStack;
 uniform vec4 uStackBox;
 uniform vec2 uStackGrid;
@@ -104,6 +105,7 @@ uniform sampler2D uBelow1;
 uniform sampler2D uBelow2;
 uniform vec2 uBelowShown;
 uniform float uBelowDim;
+uniform vec3 uBelowGrid;
 ${fieldGlsl('uField')}
 ${fieldGlsl('uSightField')}
 float clearance(vec2 w) { return uFieldClearance(w); }
@@ -130,6 +132,15 @@ int stackAt(vec2 w) {
   vec2 local = cell - uStackBox.xy;
   if (any(lessThan(local, vec2(0.0))) || any(greaterThanEqual(local, uStackBox.zw))) return 0;
   return int(texelFetch(uStack, ivec2(local), 0).r * 255.0 + 0.5);
+}
+
+// The snapshot texel of a level below that holds w: worked out from the stack texel holding w, as
+// stackAt reads it, so it always lies in that stack texel and never shows a neighbour's.
+ivec2 snapshotTexel(vec2 w) {
+  vec2 cell = floor(w / uStackTexel);
+  float sub = uBelowGrid.z;
+  vec2 inside = clamp(floor((w - cell * uStackTexel) * sub / uStackTexel), vec2(0.0), vec2(sub - 1.0));
+  return ivec2((cell - uBelowGrid.xy) * sub + inside);
 }
 
 // Explored memory is stamped with hard-edged polygons: blur it over a disc of two memory texels,
@@ -336,13 +347,13 @@ void main() {
     shown = mix(shown, ink, grid * clamp(gridShown, 0.0, 1.0));
   }
   if (hole) {
-    // The level below as its own composite drew this very pixel, or nothing; the viewed level's tokens over it.
+    // The level below as its snapshot holds it in this very stack texel, or nothing; the viewed level's tokens over it.
     vec3 under = uMode > 0.5 ? toSrgb(uUnexplored) : vec3(0.0);
-    ivec2 pixel = ivec2(floor(screen * uInputPixel.x * uInputSize.z));
+    ivec2 snap = snapshotTexel(world);
     if (shownLevel == 1 && uBelowShown.x > 0.5) {
-      under = texelFetch(uBelow1, clamp(pixel, ivec2(0), textureSize(uBelow1, 0) - 1), 0).rgb * uBelowDim;
+      under = texelFetch(uBelow1, clamp(snap, ivec2(0), textureSize(uBelow1, 0) - 1), 0).rgb * uBelowDim;
     } else if (shownLevel == 2 && uBelowShown.y > 0.5) {
-      under = texelFetch(uBelow2, clamp(pixel, ivec2(0), textureSize(uBelow2, 0) - 1), 0).rgb * (uBelowDim * uBelowDim);
+      under = texelFetch(uBelow2, clamp(snap, ivec2(0), textureSize(uBelow2, 0) - 1), 0).rgb * (uBelowDim * uBelowDim);
     }
     shown = mix(under, shown, clamp(back.a, 0.0, 1.0));
   }

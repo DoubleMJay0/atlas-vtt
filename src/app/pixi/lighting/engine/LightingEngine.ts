@@ -28,7 +28,7 @@ export interface LightingEngineOptions {
   paced?: boolean;
 }
 
-/** The pictures of the levels below for a render, and how much each level down is dimmed. */
+/** The snapshots of the levels below for a render, and how much each level down is dimmed. */
 export interface BelowShown {
   pictures: BelowPictures;
   dim: number;
@@ -265,9 +265,9 @@ export class LightingEngine {
   }
 
   /**
-   * The levels below as their own engines drew the render about to be drawn (`LevelsBelow.prepare`),
-   * nearest first, dimmed by `dim` once per level down; a level without a picture shows nothing
-   * where the stack shows it. The caller owns the textures.
+   * The snapshots of the levels below for the render about to be drawn (`LevelsBelow.prepare`),
+   * nearest first, dimmed by `dim` once per level down; a level without one shows nothing where the
+   * stack shows it. The caller owns the textures.
    */
   setBelow(pictures: BelowPictures, dim: number): void {
     this.below = { pictures, dim };

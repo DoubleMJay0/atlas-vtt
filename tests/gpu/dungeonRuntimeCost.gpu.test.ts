@@ -264,7 +264,9 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
       }
       const render = await throughput(ctx);
       const zoom0 = view.viewport.scale.x;
+      const belowBeforeZoom = ctx.counts.below;
       const zoom = await measure(ctx, 30, (i) => { view.viewport.scale.set(zoom0 * (1 + 0.5 * Math.sin(i / 5))); });
+      const belowPerZoom = round((ctx.counts.below - belowBeforeZoom) / 30);
       view.viewport.scale.set(zoom0);
       holdTokens(view.store, ['hero']);
       const cell = built.pxPerCell;
@@ -285,8 +287,9 @@ describe('the cost of a generated dungeon of three floors at runtime (printed)',
       await profile('torch');
       holdTokens(view.store, []);
       const s = view.store.getState();
+      const snapshot = (view.controller.renderer as unknown as { view: { levelsBelow: { grid: { width: number; height: number; texel: number } | null } } }).view.levelsBelow.grid;
       const scene = { mapPx: `${built.width}×${built.height}`, pxPerCell: built.pxPerCell, walls: Object.keys(s.objects.walls).length, lights: Object.keys(s.objects.lights).length, liquids: Object.keys(s.objects.liquids ?? {}).length };
-      console.info(`dungeon runtime cost at ${level}, floors below seen ${openings}: ${JSON.stringify({ ...scene, memoryMb, idle, render, zoom, drag, belowPerStep, torchDrag })}`);
+      console.info(`dungeon runtime cost at ${level}, floors below seen ${openings}: ${JSON.stringify({ ...scene, memoryMb, idle, render, zoom, belowPerZoom, ...(snapshot && { snapshot: `${snapshot.width}×${snapshot.height} at ${round(snapshot.texel)} px` }), drag, belowPerStep, torchDrag })}`);
       expect(drag.cpu).toBeGreaterThan(0);
     } finally {
       ctx.destroy();
