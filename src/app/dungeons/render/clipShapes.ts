@@ -1,9 +1,9 @@
-import { intersectShapes, unionShapes } from '../../lighting/polygonClip';
+import { intersectShapes, subtractShapes, unionShapes } from '../../lighting/polygonClip';
 import type { QShape } from '../../types/shapeTypes';
 import type { Vec } from './geometry';
 
 /**
- * Polygon union and intersection in cells, through the lighting's clipping helpers, which work on
+ * Polygon union, intersection and difference in cells, through the lighting's clipping helpers, which work on
  * integers: cells are scaled to 1/1024 of a cell, far finer than any pixel a map is drawn at.
  */
 const SCALE = 1024;
@@ -31,4 +31,9 @@ export function unionRings(rings: readonly (readonly Vec[])[]): Rings {
 /** What `a` and `b` cover both. */
 export function intersectRings(a: readonly (readonly Vec[])[], b: readonly (readonly Vec[])[]): Rings {
   return fromQ(intersectShapes(toQ(a), toQ(b)));
+}
+
+/** What `a` covers and `b` does not. */
+export function subtractRings(a: readonly (readonly Vec[])[], b: readonly (readonly Vec[])[]): Rings {
+  return fromQ(subtractShapes(toQ(a), toQ(b)));
 }

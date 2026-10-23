@@ -23,12 +23,10 @@ import { dungeonWalls, type DungeonPlacement, type DungeonWalls } from './toWall
 
 /** A dungeon's scene, and what became of its doors, for the log. */
 export interface DungeonSceneParts {
-  /** Grid, walls (object outlines included), stairs, map features and lighting; the levels and pins are added once the maps and the note are written. */
+  /** Grid, walls (object outlines included), stairs, map features, liquids, lights and lighting; the levels and pins are added once the maps and the note are written. */
   scene: MapSceneParts;
   /** The rooms of its note, each with its pin's place. */
   rooms: NoteRoom[];
-  /** Water, lava and acid of every floor, moving while maps are animated. */
-  liquids: Record<string, LiquidSurface>;
   /** The scene's levels by floor (the entry floor first); null for a dungeon of one floor, whose scene has none. */
   levelIds: string[] | null;
   doors: Partial<Record<DoorKind, number>>;
@@ -102,8 +100,8 @@ export function dungeonScene(
       ...(links && { levelLinks: links }),
       ...(Object.keys(surfaces).length > 0 && { levelSurfaces: surfaces }),
       mapFeatures: features,
+      ...(Object.keys(liquids).length > 0 && { liquids }),
     },
-    liquids,
     rooms: noteRooms(model, view, placement, levelIds),
     levelIds,
     doors,

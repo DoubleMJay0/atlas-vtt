@@ -31,7 +31,7 @@ function dungeonWith(tags: string[], kind: LiquidSurface['liquid'], look: Dungeo
   for (let seed = 1; seed < 200; seed++) {
     const model = generateDungeon({ seed, tags, floors });
     const parts = partsOf(model, look);
-    const liquids = Object.values(parts.liquids).filter(l => l.liquid === kind);
+    const liquids = Object.values(parts.scene.liquids ?? {}).filter(l => l.liquid === kind);
     if (liquids.length) return { model, liquids, parts };
   }
   throw new Error(`no ${kind}`);
@@ -69,6 +69,17 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
     expect(parts.levelIds).not.toBeNull();
     for (const liquid of liquids) expect(parts.levelIds).toContain(liquid.level);
     for (const light of Object.values(parts.scene.lights)) expect(parts.levelIds).toContain(light.levels?.[0]);
+  });
+
+  it('cuts the columns standing in a pool out of its surface', () => {
+    for (let seed = 1; seed < 400; seed++) {
+      const model = generateDungeon({ seed, tags: ['flooded', 'colonnades'], floors: 1 });
+      const pools = Object.values(partsOf(model, 'parchment').scene.liquids ?? {}).filter(l => l.holes?.length);
+      if (!pools.length) continue;
+      for (const pool of pools) for (const hole of pool.holes!) expect(inside(pool.polygon, hole[0]!.x, hole[0]!.y)).toBe(true);
+      return;
+    }
+    throw new Error('no column stands in a pool');
   });
 
   it('counts a cell twice in squares with small tiles', () => {

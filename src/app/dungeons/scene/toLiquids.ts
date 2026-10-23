@@ -2,8 +2,8 @@ import { toGameUnits } from '../../grid/statedDistance';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { LightEmission, LightSource } from '../../types/lightingTypes';
 import type { LiquidColors, LiquidKind, LiquidSurface } from '../../types/liquidTypes';
-import type { DungeonTerrain } from '../model';
-import { intersectRings, unionRings } from '../render/clipShapes';
+import type { DungeonColumn, DungeonTerrain } from '../model';
+import { intersectRings, subtractRings, unionRings } from '../render/clipShapes';
 import { shapePolygon, type Vec } from '../render/geometry';
 import { mixColours, paletteOf } from '../render/palette';
 import type { VisibleDungeon } from '../render/visibleDungeon';
@@ -24,6 +24,8 @@ interface Liquid {
   liquid: LiquidKind;
   /** Its outline in cells. */
   ring: Vec[];
+  /** Columns standing in it, in cells. */
+  holes?: Vec[][];
   flow?: Vec;
 }
 
@@ -57,25 +59,54 @@ function terrainLiquids(pieces: readonly DungeonTerrain[]): Liquid[] {
   });
 }
 
-/** The floor's pools, on what of them lies on the floor (the map clips them there too). */
+/** The outline of a standing column, which the water flows round. */
+function columnRing({ x, y, radius, square }: DungeonColumn): Vec[] {
+  if (square) return [{ x: x - radius, y: y - radius }, { x: x + radius, y: y - radius }, { x: x + radius, y: y + radius }, { x: x - radius, y: y + radius }];
+  return Array.from({ length: 16 }, (_, k) => ({ x: x + Math.cos((k / 16) * Math.PI * 2) * radius, y: y + Math.sin((k / 16) * Math.PI * 2) * radius }));
+}
+
+/** Rings as clipping gives them back, outlines with the holes that lie in each. */
+function withHoles(rings: Vec[][]): { ring: Vec[]; holes: Vec[][] }[] {
+  const outlines = rings.filter(ring => signedArea(ring) > 0);
+  const holes = rings.filter(ring => signedArea(ring) < 0);
+  return outlines.map(ring => ({ ring, holes: holes.filter(hole => inside(ring, hole[0]!)) }));
+}
+
+/**
+ * The floor's pools, on what of them lies on the floor (the map clips them there too), the columns
+ * standing in them cut out as holes.
+ */
 function poolLiquids(dungeon: VisibleDungeon, style: DungeonStyle): Liquid[] {
   const floorRings = unionRings(dungeon.floors.map(shape => shapePolygon(shape, 0, 100)));
+  const columns = dungeon.floor.columns.filter(column => !column.shattered).map(columnRing);
   const liquid: LiquidKind = style.liquid === 'lava' ? 'lava' : 'water';
   return dungeon.floor.water.flatMap(pool => {
     const steps = Math.max(1, Math.min(6, Math.floor(MAX_CORNERS / Math.max(3, pool.outline.length))));
-    return intersectRings([smoothRing(pool.outline, steps)], floorRings)
-      .filter(ring => ring.length >= 3 && ring.length <= MAX_CORNERS && signedArea(ring) > 0.05)
-      .map((ring): Liquid => ({ liquid, ring }));
+    const wet = intersectRings([smoothRing(pool.outline, steps)], floorRings);
+    return withHoles(columns.length ? subtractRings(wet, columns) : wet)
+      .filter(({ ring }) => ring.length >= 3 && ring.length <= MAX_CORNERS && signedArea(ring) > 0.05)
+      .map(({ ring, holes }): Liquid => ({ liquid, ring, ...(holes.length && { holes }) }));
   });
 }
 
+/** Positive for an outline, negative for a hole, as clipping orients them. */
 function signedArea(ring: readonly Vec[]): number {
   let sum = 0;
   ring.forEach((p, i) => {
     const q = ring[(i + 1) % ring.length]!;
     sum += p.x * q.y - q.x * p.y;
   });
-  return Math.abs(sum / 2);
+  return sum / 2;
+}
+
+function inside(polygon: readonly Vec[], p: Vec): boolean {
+  let hit = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i]!;
+    const b = polygon[j]!;
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) hit = !hit;
+  }
+  return hit;
 }
 
 /** The middle of an outline, by area. */
@@ -138,10 +169,10 @@ export function floorLiquids(
   const units = (cells: number): number => toGameUnits({ value: cells * squares, unit: 'squares' }, { unitType: unit.unitType, ruleDistance: unit.ruleDistance });
   const liquids: Record<string, LiquidSurface> = {};
   const lights: Record<string, LightSource> = {};
-  found.forEach(({ liquid, ring, flow }, index) => {
+  found.forEach(({ liquid, ring, holes, flow }, index) => {
     const polygon = ring.map(world);
     const liquidId = `liquid_${id}_${index + 1}`;
-    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon, ...(flow && { flow }), colors: colours[liquid], ...(level && { level }) };
+    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon, ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(level && { level }) };
     const glow = GLOWS[liquid];
     if (!glow) return;
     const middle = centroid(polygon);
