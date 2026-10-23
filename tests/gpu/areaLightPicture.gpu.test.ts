@@ -55,10 +55,12 @@ function mapCanvas(): OffscreenCanvas {
     ctx.stroke();
   }
   ctx.fillStyle = '#c2410c';
-  ctx.beginPath();
-  LAVA_FIELD.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-  ctx.closePath();
-  ctx.fill();
+  for (const lava of [LAVA_FIELD, RIVER]) {
+    ctx.beginPath();
+    lava.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.fill();
+  }
   return canvas;
 }
 
@@ -70,6 +72,12 @@ async function savePng(pixels: Uint8ClampedArray, size: number, name: string): P
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   await commands.writeFile(`out/area-lights/${name}.png`, btoa(binary), 'base64');
 }
+
+/** A lava river from the room's west wall to its east wall, below the first lava, its shores lying on both walls. */
+const RIVER: Point[] = [
+  { x: 100, y: 720 }, { x: 250, y: 700 }, { x: 400, y: 740 }, { x: 550, y: 710 }, { x: 700, y: 730 },
+  { x: 700, y: 800 }, { x: 550, y: 780 }, { x: 400, y: 815 }, { x: 250, y: 775 }, { x: 100, y: 790 },
+];
 
 describe('an area light over lava', () => {
   const cleanup: (() => void)[] = [];
@@ -85,23 +93,33 @@ describe('an area light over lava', () => {
     const bounds = { width: MAP, height: MAP };
     const walls = sealWalls(dungeonWalls(), sealTolerance(worldTexel(bounds)));
     const light = engineLight({ key: 'lava', x: 375, y: 500, emission: LAVA, area: LAVA_FIELD }, SCALE);
+    const river = engineLight({ key: 'river', x: 400, y: 760, emission: { ...LAVA, bright: 5, dim: 15 }, area: RIVER }, SCALE);
     const map = Texture.from(new CanvasSource({ resource: mapCanvas() as unknown as HTMLCanvasElement }));
     cleanup.push(() => map.destroy(true));
     engine.setEnabled(true);
     engine.setMode('player');
-    engine.update({ bounds, albedo: map, walls, lights: [light], sight: SEES_ALL, sightRadius: 20, ambient: 0 });
+    engine.update({ bounds, albedo: map, walls, lights: [light, river], sight: SEES_ALL, sightRadius: 20, ambient: 0 });
     engine.flush();
-    const stage = new Container();
-    const floor = new Sprite(map);
-    stage.addChild(floor, engine.layer);
-    engine.setView(new Matrix(), 1);
-    const target = RenderTexture.create({ width: MAP, height: MAP });
-    renderer.render({ container: stage, target, clear: true });
-    const pixels = readRgba(renderer, target);
-    stage.removeChild(engine.layer);
-    stage.destroy({ children: true });
-    target.destroy(true);
+    const shoot = (scale: number, x: number, y: number): Uint8ClampedArray => {
+      const stage = new Container();
+      const world = new Container();
+      world.addChild(new Sprite(map), engine.layer);
+      world.scale.set(scale);
+      world.position.set(x, y);
+      stage.addChild(world);
+      engine.setView(new Matrix(scale, 0, 0, scale, x, y).invert(), scale);
+      const target = RenderTexture.create({ width: MAP, height: MAP });
+      renderer.render({ container: stage, target, clear: true });
+      const shot = readRgba(renderer, target);
+      world.removeChild(engine.layer);
+      stage.destroy({ children: true });
+      target.destroy(true);
+      return shot;
+    };
+    const pixels = shoot(1, 0, 0);
     await savePng(pixels, MAP, 'lava-room');
+    // The shore of the field and the pillar's shadow, four times as large.
+    await savePng(shoot(4, -1700, -1400), MAP, 'lava-shore');
     const at = (x: number, y: number): number => pixels[(y * MAP + x) * 4]! + pixels[(y * MAP + x) * 4 + 1]! + pixels[(y * MAP + x) * 4 + 2]!;
     // The lava itself, the floor beside it and the floor in the room's far corner; the room behind the door.
     expect(at(375, 500)).toBeGreaterThan(200);

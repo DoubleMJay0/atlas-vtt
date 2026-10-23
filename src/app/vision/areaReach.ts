@@ -55,9 +55,10 @@ export function twoWayWalls(walls: readonly WallSegment[]): readonly WallSegment
 }
 
 /**
- * The points of `area`'s outline the rule traces from: evenly along it, `spacing` apart (more
- * thinly where that would make more than `MAX_AREA_SAMPLES`), and none within the clearance of a
- * wall that blocks light.
+ * The points of `area`'s outline the rule traces from: its corners, which reach farthest (a corner
+ * that pokes past a wall lights what lies there), and points evenly along it, `spacing` apart, or
+ * more thinly where that would make more than `MAX_AREA_SAMPLES` in all (an outline of more corners
+ * than that keeps every so many of them); none within the clearance of a wall that blocks light.
  */
 export function areaSamples(area: readonly Point[], walls: readonly WallSegment[], { spacing, clearance }: AreaSampling): Point[] {
   const lengths = area.map((a, i) => {
@@ -66,10 +67,16 @@ export function areaSamples(area: readonly Point[], walls: readonly WallSegment[
   });
   const perimeter = lengths.reduce((sum, length) => sum + length, 0);
   if (perimeter <= 0) return [];
-  const count = Math.min(MAX_AREA_SAMPLES, Math.max(area.length, Math.ceil(perimeter / Math.max(spacing, 1e-3))));
+  const cornerStep = Math.max(1, Math.ceil(area.length / (MAX_AREA_SAMPLES / 2)));
+  const corners = area.filter((_, i) => i % cornerStep === 0);
+  const count = Math.min(MAX_AREA_SAMPLES - corners.length, Math.ceil(perimeter / Math.max(spacing, 1e-3)));
   const step = perimeter / count;
   const near = nearbySegments(area, walls, clearance);
   const samples: Point[] = [];
+  const keep = (point: Point): void => {
+    if (near.every((seg) => distToSeg(point.x, point.y, seg) >= clearance)) samples.push(point);
+  };
+  corners.forEach(keep);
   let edge = 0;
   let start = 0;
   for (let k = 0; k < count; k++) {
@@ -78,8 +85,7 @@ export function areaSamples(area: readonly Point[], walls: readonly WallSegment[
     const a = area[edge]!;
     const b = area[(edge + 1) % area.length]!;
     const t = Math.min(1, (s - start) / (lengths[edge]! || 1));
-    const point = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-    if (near.every((seg) => distToSeg(point.x, point.y, seg) >= clearance)) samples.push(point);
+    keep({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
   }
   return samples;
 }

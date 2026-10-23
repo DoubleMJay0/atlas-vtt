@@ -124,7 +124,8 @@ describe('the rule of an area light', () => {
   it('samples a long shore more thinly, never more than its cap', () => {
     const long = [{ x: 0, y: 0 }, { x: 20_000, y: 0 }, { x: 20_000, y: 50 }, { x: 0, y: 50 }];
     expect(areaSamples(long, [], SAMPLING).length).toBe(MAX_AREA_SAMPLES);
-    expect(areaSamples(POOL, [], SAMPLING).length).toBe(64);
+    // Its four corners and a point every 12.5 px along its 800 px.
+    expect(areaSamples(POOL, [], SAMPLING).length).toBe(68);
   });
 
   it('records the area and its reach as explored where a token sees by light', () => {
