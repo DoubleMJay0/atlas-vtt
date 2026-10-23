@@ -48,13 +48,13 @@ export class ReliefMap {
     const inverse = uvToWorld.clone().invert();
     const [w, h] = [image.width, image.height];
     // The world length of one texel step along either axis of the image.
-    const across = Math.hypot(uvToWorld.a, uvToWorld.b) / image.width;
-    const down = Math.hypot(uvToWorld.c, uvToWorld.d) / image.height;
+    const across = Math.hypot(uvToWorld.a, uvToWorld.b) / w;
+    const down = Math.hypot(uvToWorld.c, uvToWorld.d) / h;
     this.relief = {
       heights: heightTexture(image),
       blocks: new Texture({ source: new BufferImageSource({ resource: blocks.data, width: blocks.columns, height: blocks.rows, format: 'rgba8unorm', alphaMode: 'no-premultiply-alpha', scaleMode: 'nearest', autoGenerateMipmaps: false }) }),
-      width: image.width,
-      height: image.height,
+      width: w,
+      height: h,
       worldToRelief: new Float32Array([w * inverse.a, h * inverse.b, 0, w * inverse.c, h * inverse.d, 0, w * inverse.tx, h * inverse.ty, 1]),
       texelWorld: Math.max(across, down),
     };

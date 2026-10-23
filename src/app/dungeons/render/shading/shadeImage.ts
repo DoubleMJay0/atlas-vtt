@@ -87,7 +87,8 @@ export function renderShade(model: DungeonModel, style: DungeonStyle, view: Dung
       factor[k * 3 + c] = Math.min(1, ratio);
     }
   }
-  const soft = style.direction === 'engraved' ? boxBlur(factor, width, height, HATCH_BLUR) : factor;
+  const engraved = style.direction === 'engraved';
+  const soft = engraved ? boxBlur(factor, width, height, HATCH_BLUR) : factor;
   const data = new Uint8ClampedArray(width * height * 4);
   for (let k = 0; k < width * height; k++) {
     data[k * 4] = Math.round(soft[k * 3]! * 255);
@@ -96,7 +97,6 @@ export function renderShade(model: DungeonModel, style: DungeonStyle, view: Dung
     // Where the map holds no art (a hole cut to the floor below, the paper) the shade adds nothing.
     data[k * 4 + 3] = bare[k * 4 + 3]!;
   }
-  const engraved = style.direction === 'engraved';
   return { image: { width, height, data }, hatch: engraved ? hatchOf(model, style, view, detailAt) : null };
 }
 

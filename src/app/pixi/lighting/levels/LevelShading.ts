@@ -41,6 +41,18 @@ interface Read<T> {
   value: T | null;
 }
 
+/** Which image lies where: its path, its map's size and stretch. */
+interface Placement {
+  path: string;
+  stretch: MapStretch;
+  width: number;
+  height: number;
+}
+
+function samePlacement(placed: Placement | null, path: string, size: ShadedMap['size'], stretch: MapStretch): boolean {
+  return placed?.path === path && placed.width === size.width && placed.height === size.height && sameStretch(placed.stretch, stretch);
+}
+
 /** A canvas holding `pixels`, for a texture: PIXI premultiplies a canvas's pixels as it uploads them. */
 function shadeCanvas({ width, height, data }: ShadingPixels): HTMLCanvasElement {
   const canvas = getDomHost().createCanvas(undefined, { width, height });
@@ -67,8 +79,8 @@ export class LevelShading {
   private shadeRead: Read<ShadingPixels> | null = null;
   private reliefRead: Read<ReliefImage> | null = null;
   private shadeTexture: Texture | null = null;
-  private shadePlaced: { path: string; stretch: MapStretch; width: number; height: number } | null = null;
-  private reliefMap: { map: ReliefMap; path: string; stretch: MapStretch; width: number; height: number } | null = null;
+  private shadePlaced: Placement | null = null;
+  private reliefMap: (Placement & { map: ReliefMap }) | null = null;
   private destroyed = false;
 
   constructor(private readonly deps: LevelShadingDeps) {
@@ -128,7 +140,7 @@ export class LevelShading {
       return;
     }
     const { size, drawn } = map;
-    if (placed?.path === path && placed.width === size.width && placed.height === size.height && sameStretch(placed.stretch, drawn)) return;
+    if (samePlacement(placed, path, size, drawn)) return;
     const previous = placed?.path === path ? null : this.shadeTexture;
     if (previous || !this.shadeTexture) this.shadeTexture = Texture.from(shadeCanvas(pixels));
     // The new image is set before the old texture goes: nothing destroyed stays bound.
@@ -141,9 +153,13 @@ export class LevelShading {
   private placeRelief(path: string | null, map: ShadedMap | null): void {
     const image = path && this.reliefRead?.path === path ? this.reliefRead.value : null;
     const placed = this.reliefMap;
-    if (path && image && map && placed?.path === path && placed.width === map.size.width && placed.height === map.size.height && sameStretch(placed.stretch, map.placed)) return;
-    if (!placed && (!path || !image || !map)) return;
-    this.reliefMap = path && image && map ? { map: new ReliefMap(image, imagePlacement(map.size, map.placed)), path, stretch: map.placed, ...map.size } : null;
+    if (!path || !image || !map) {
+      if (!placed) return;
+      this.reliefMap = null;
+    } else {
+      if (samePlacement(placed, path, map.size, map.placed)) return;
+      this.reliefMap = { map: new ReliefMap(image, imagePlacement(map.size, map.placed)), path, stretch: map.placed, ...map.size };
+    }
     // The lighting takes the new relief at once, and lets go of the old one before it goes.
     this.deps.onReliefChange();
     placed?.map.destroy();

@@ -1,6 +1,7 @@
 import type { App, TFile } from 'obsidian';
 import { sceneImagePaths } from '../levels/levelFile';
 import { sceneShadingPaths } from '../levels/levelShading';
+import { isRecord } from '../utils/guards';
 import { collectionFolderPath, GLOBAL_ASSETS_DIR } from './assetPaths';
 import type { Asset } from './AssetService';
 
@@ -8,7 +9,7 @@ import type { Asset } from './AssetService';
 async function sceneFileState(app: App, file: TFile): Promise<unknown> {
   try {
     const envelope: unknown = JSON.parse(await app.vault.read(file));
-    return typeof envelope === 'object' && envelope !== null && 'state' in envelope ? envelope.state : null;
+    return isRecord(envelope) && 'state' in envelope ? envelope.state : null;
   } catch {
     return null;
   }
@@ -22,7 +23,7 @@ export async function sceneFileShading(app: App, file: TFile): Promise<string[]>
 /** Every image a scene's file shows (`sceneImagePaths`): its maps, roofs, reliefs and shades. */
 export async function sceneFileImages(app: App, file: TFile): Promise<string[]> {
   const state = await sceneFileState(app, file);
-  return typeof state === 'object' && state !== null ? sceneImagePaths(state) : [];
+  return isRecord(state) ? sceneImagePaths(state) : [];
 }
 
 /** Whether `path` lies where Atlas writes a scene's relief and shade: a PNG in its shared assets folder or in the scene's collection. */
