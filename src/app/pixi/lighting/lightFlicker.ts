@@ -25,6 +25,18 @@ const WALKS: Partial<Record<LightAnimation, WalkProfile>> = {
   magic: { step: 120, intensity: { min: 1, max: 1, keep: 1 }, radius: { min: 0.96, max: 1.04, keep: 0.95 } },
 };
 
+/**
+ * How many slots of the map's animation clock (`ANIMATION_FPS`) an animation is redrawn every:
+ * a torch's walk steps every 60 ms and needs every slot; a slow swell (a pulse over 2 s, lava
+ * over 3 to 7 s) changes by about one percent from one slot to the next, so every second will do.
+ */
+const SLOTS: Partial<Record<LightAnimation, number>> = { pulse: 2, smoulder: 2 };
+
+/** The slots of the animation clock `animation` is redrawn every (at least one). */
+export function flickerSlots(animation: LightAnimation): number {
+  return SLOTS[animation] ?? 1;
+}
+
 /** Two random walks in [-1, 1]: intensity and radius. */
 interface WalkState {
   stepIndex: number;

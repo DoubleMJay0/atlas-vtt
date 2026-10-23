@@ -32,6 +32,19 @@ import { SceneModelBuilder, SceneSpots, type SceneModel, type SceneState } from 
 import type { ExploredMemoryWatcher, SceneLightingView } from './sceneLightingView';
 import { levelExploredMask, viewedLevelId } from '../../levels/sceneLevels';
 import { MOTION_SLOW_MS, prefersReducedMotion } from '../../utils/motion';
+import { frameTime } from '../utils/animationFrames';
+import type { Box } from '../../vision/polygonBounds';
+
+/**
+ * Where flicker is looked at: the GM's view grown by half its size on every side, as for liquids
+ * (`boxInView`), since the player window frames at least that.
+ */
+function animationView(viewport: Viewport, screen: { width: number; height: number }): Box {
+  const [scaleX, scaleY] = [viewport.scale.x || 1, viewport.scale.y || 1];
+  const [left, top] = [-viewport.x / scaleX, -viewport.y / scaleY];
+  const [width, height] = [screen.width / scaleX, screen.height / scaleY];
+  return { minX: left - width / 2, minY: top - height / 2, maxX: left + width * 1.5, maxY: top + height * 1.5 };
+}
 
 /** Above tokens, below their nameplates and bars (100): the GM keeps readable labels in the dark. */
 export const LIGHTING_Z_INDEX = 90;
@@ -377,7 +390,8 @@ export class LightingRenderer implements SceneLightingView {
     this.zones = ambient.zones ?? [];
     this.sightChanged = true;
     if (explored) this.memory.record(explored);
-    return { bounds, walls, lights, sight: gmSight, sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, zones };
+    const cellSize = state.grid?.size ?? DEFAULT_CELL_SIZE;
+    return { bounds, walls, lights, sight: gmSight, sightRadius: cellSize * 0.5, cellSize, zones };
   }
 
   /**
@@ -417,10 +431,12 @@ export class LightingRenderer implements SceneLightingView {
     this.attempt.settle();
     this.followAlbedo();
     if (!this.layer.visible) return;
-    this.levelsBelow?.animate(performance.now());
+    // The display frame's time, which every animation of the map shares, so their frames share renders.
+    const now = frameTime(this.deps.app.ticker);
+    const view = animationView(this.deps.viewport, this.deps.app.renderer.screen);
+    this.levelsBelow?.animate(now, view);
     if (!this.engine.busy()) return;
-    // ponytail: animated lights redraw the whole light map even while off-screen; cull to the viewport if that gets slow.
-    if (this.engine.animate(performance.now())) requestRender(this.deps.app);
+    if (this.engine.animate(now, view)) requestRender(this.deps.app);
   }
 
   destroy(): void {

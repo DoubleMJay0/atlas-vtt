@@ -1,13 +1,15 @@
 import type { Renderer, Texture } from 'pixi.js';
 import type { WallSegment } from '../../../types/wallTypes';
-import { BOUNCE, DARKNESS, tileWallReach, worldTexel } from '../../../lighting/lightingConstants';
-import { DEFAULT_LIGHTING_QUALITY, bouncesOn, type LightingQuality } from '../../../lighting/lightingQuality';
+import { BOUNCE, DARKNESS, tileWallReach } from '../../../lighting/lightingConstants';
+import { DEFAULT_LIGHTING_QUALITY, bouncesOn, pictureTexel, type LightingQuality } from '../../../lighting/lightingQuality';
 import { changedWallRects } from '../../../lighting/wallChanges';
 import type { Rect } from '../../../lighting/segments';
 import { lightReach } from '../../../vision/sight';
 import type { MapBounds, Polygon } from '../../../vision/visibility';
 import { sameCone } from '../../../vision/visionCone';
-import { LightFlicker, STEADY, type FlickerSample } from '../lightFlicker';
+import { flickerSlots, LightFlicker, STEADY, type FlickerSample } from '../lightFlicker';
+import { animationFrameDue, slotsOf } from '../../utils/animationFrames';
+import type { Box } from '../../../vision/polygonBounds';
 import type { CapsuleField } from './CapsuleField';
 import { glOf } from './gpu';
 import { GpuPacer } from './GpuPacer';
@@ -65,9 +67,12 @@ export class LightingWorld {
   private lastBounce = -Infinity;
   /** When the light map last took its flicker; -Infinity while it holds the steady lights. */
   private lastFlicker = -Infinity;
+  /** The animated lights and how often the light map is redrawn for them, worked out once per list of lights. */
+  private flickering: { lights: readonly EngineLight[]; animated: readonly EngineLight[]; slots: number } | null = null;
 
-  constructor(private readonly renderer: Renderer, readonly bounds: MapBounds, quality: LightingQuality = DEFAULT_LIGHTING_QUALITY, paced = false) {
-    this.texel = worldTexel(bounds, quality.maxTexels);
+  /** `cell` is the map's grid cell in world px, which the texel follows (`pictureTexel`); unknown, the map's size alone decides. */
+  constructor(private readonly renderer: Renderer, readonly bounds: MapBounds, quality: LightingQuality = DEFAULT_LIGHTING_QUALITY, paced = false, private readonly cell?: number) {
+    this.texel = pictureTexel(bounds, quality, cell);
     this.tileRays = quality.tileRays;
     this.flickerMs = quality.flickerMs;
     this.fields = new WallFields(renderer, bounds, this.texel);
@@ -87,9 +92,9 @@ export class LightingWorld {
     if (ms === null && flickered) this.drawSteady();
   }
 
-  /** Whether this world was made as `quality` makes one for its map (texel, bounce, tile rays): else it is built anew. */
-  fits(quality: LightingQuality): boolean {
-    return this.texel === worldTexel(this.bounds, quality.maxTexels) && !!this.cascades === bouncesOn(quality, this.bounds) && this.tileRays === quality.tileRays;
+  /** Whether this world was made as `quality` makes one for its map and cell (texel, bounce, tile rays): else it is built anew. */
+  fits(quality: LightingQuality, cell: number | undefined = this.cell): boolean {
+    return this.texel === pictureTexel(this.bounds, quality, cell) && !!this.cascades === bouncesOn(quality, this.bounds) && this.tileRays === quality.tileRays;
   }
 
   /** Every wall that blocks light, one-way walls too, which bounce treats as blocking both ways. */
@@ -150,7 +155,7 @@ export class LightingWorld {
    * waits for the last tile: it reads the light map they make. `buildBounce` builds a pending
    * bounce whatever the pacer says (`flush`).
    */
-  animate(now: number, buildBounce = false): boolean {
+  animate(now: number, buildBounce = false, view?: Box): boolean {
     let drew = this.buildTiles(this.pacer);
     if (this.bounceDirty && this.cascades && !this.tiles.busy() && now - this.lastBounce >= BOUNCE.throttleMs && (buildBounce || this.pacer.allowance() > 0)) {
       // Bounce uses steady intensity, so flicker never rebuilds it.
@@ -161,8 +166,7 @@ export class LightingWorld {
       this.lastBounce = now;
       drew = true;
     }
-    const flicker = this.flickerMs;
-    if (flicker !== null && this.animated() && now - this.lastFlicker >= flicker && this.pacer.allowance() > 0) {
+    if (this.flickerDue(now, view) && this.pacer.allowance() > 0) {
       this.drawLightMap((light) => this.flicker.sample(light.key, light.animation, now));
       this.pacer.submitted();
       this.lastFlicker = now;
@@ -247,7 +251,32 @@ export class LightingWorld {
 
   /** Lights that flicker, while the quality lets them. */
   private animated(): boolean {
-    return this.flickerMs !== null && this.lights.some((light) => light.animation !== 'none');
+    return this.flickerMs !== null && this.flickers().animated.length > 0;
+  }
+
+  private flickers(): NonNullable<LightingWorld['flickering']> {
+    if (this.flickering?.lights !== this.lights) {
+      const animated = this.lights.filter((light) => light.animation !== 'none');
+      this.flickering = { lights: this.lights, animated, slots: Math.min(...animated.map((light) => flickerSlots(light.animation))) };
+    }
+    return this.flickering;
+  }
+
+  /**
+   * Whether the flicker is due a redraw at `now`: on the map's animation clock (`animationFrameDue`),
+   * every so many slots as the quality and the quickest of the animations ask, and only while one
+   * of them lights something within `view` (world px; unset, anywhere): a light map redrawn for
+   * lights nobody looks at is a render of the whole stage for nothing. One that comes back into
+   * view takes its flicker on the next slot.
+   */
+  private flickerDue(now: number, view: Box | undefined): boolean {
+    const ms = this.flickerMs;
+    if (ms === null) return false;
+    const { animated, slots } = this.flickers();
+    if (animated.length === 0) return false;
+    const last = this.lastFlicker === -Infinity ? null : this.lastFlicker;
+    if (!animationFrameDue(now, last, Math.max(slotsOf(ms), slots))) return false;
+    return !view || animated.some((light) => lightsWithin(light, view));
   }
 
   private forgetRemoved(lights: readonly EngineLight[]): void {
@@ -325,6 +354,12 @@ export class LightingWorld {
 }
 
 const NO_ZONES: readonly EngineZone[] = [];
+
+/** Whether anything `light` lights may lie within `view` (world px). */
+function lightsWithin(light: EngineLight, view: Box): boolean {
+  const reach = light.dim + (light.surface ? areaRadius(light.surface, light) : 0);
+  return light.x + reach >= view.minX && light.x - reach <= view.maxX && light.y + reach >= view.minY && light.y - reach <= view.maxY;
+}
 
 /** The average of a convex piece's corners, inside it. */
 function middleOf(piece: readonly { x: number; y: number }[]): { x: number; y: number } {

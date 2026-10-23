@@ -7,7 +7,7 @@ import { createViewAtlasStore, type ViewAtlasStore } from '../../src/app/storeFa
 import type { SceneLevel } from '../../src/app/types/sceneLevelTypes';
 import type { TokenRenderer } from '../../src/app/pixi/TokenRenderer';
 import { RenderScheduler } from '../../src/app/pixi/RenderScheduler';
-import { LightingController } from '../../src/app/pixi/lighting/LightingController';
+import { LightingController, type LightingControllerDeps } from '../../src/app/pixi/lighting/LightingController';
 import type { BelowMapImage } from '../../src/app/pixi/lighting/levels/BelowLevel';
 import type { BelowLevelsHost } from '../../src/app/pixi/lighting/levels/LevelsBelow';
 import type { TokenArt } from '../../src/app/pixi/lighting/levels/BelowTokens';
@@ -146,6 +146,10 @@ export interface LevelsViewOptions {
   viewedPlacement?: MapStretch;
   /** The viewed level's roof is drawn (`ViewRoofs`) from its `foreground`, its pieces fading at once. */
   roofs?: boolean;
+  /** The viewed level's relief and shade, as `ViewShading` hands them to the lighting. */
+  shading?: LightingControllerDeps['shading'];
+  /** Reads the relief and shade images the levels below name; without it they are drawn without them. */
+  readShading?: BelowLevelsHost['readShading'];
 }
 
 export interface LevelsView {
@@ -197,7 +201,7 @@ export function belowNoise(map: number): Texture {
  * on a real renderer, as far as its lighting and its levels below go. The map images are
  * sprites, the tokens below take one art: nothing loads from the vault.
  */
-export async function openLevelsView({ map, pane, paneHeight = pane, resolution = 1, viewed, below, tokenArt, viewedFog, quality, belowRect, holdBelowImage = false, levels = LEVELS, maps: extraMaps = {}, viewedLevel = 'upper', viewedPlacement = NO_STRETCH, roofs: withRoofs = false }: LevelsViewOptions): Promise<LevelsView> {
+export async function openLevelsView({ map, pane, paneHeight = pane, resolution = 1, viewed, below, tokenArt, viewedFog, quality, belowRect, holdBelowImage = false, levels = LEVELS, maps: extraMaps = {}, viewedLevel = 'upper', viewedPlacement = NO_STRETCH, roofs: withRoofs = false, shading, readShading }: LevelsViewOptions): Promise<LevelsView> {
   const app = new Application();
   await app.init({ width: pane, height: paneHeight, resolution, preference: 'webgl', antialias: false, autoStart: false, backgroundColor: 0x000000, useBackBuffer: true });
   const scheduler = new RenderScheduler(app);
@@ -245,6 +249,7 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
     },
     viewedFog: viewedFog ?? ((): FogCover => undefined),
     placeEraser: (eraser) => viewport.addChildAt(eraser, viewport.getChildIndex(floor) + 1),
+    ...(readShading && { readShading }),
   };
   const bounds = (): MapBounds => {
     const rect = floorImage.worldRect!;
@@ -258,7 +263,7 @@ export async function openLevelsView({ map, pane, paneHeight = pane, resolution 
   }) : null;
   const controller = new LightingController({
     viewport, app, store, eventBus: new EventEmitter(), obsApp, viewId: 'levels-view',
-    bounds, albedo: () => null, below: host, roofFadeMs: 0, ...(roofs && { roofs }),
+    bounds, albedo: () => null, below: host, roofFadeMs: 0, ...(roofs && { roofs }), ...(shading && { shading }),
     ...(quality && { quality: { current: () => quality, onChange: () => () => undefined } }),
   });
   made.controller = controller;

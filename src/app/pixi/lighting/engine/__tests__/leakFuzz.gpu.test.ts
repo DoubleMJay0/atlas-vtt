@@ -237,7 +237,7 @@ describe('leak fuzz', () => {
   const QUALITIES: [string, LightingQuality, number][] = [
     ['balanced', LIGHTING_QUALITY.balanced, 9],
     ['saver', LIGHTING_QUALITY.saver, 7],
-    ['coarse with bounce', { maxTexels: 1024, bounceMaxSide: Infinity, flickerMs: null, tileRays: 8 }, 7],
+    ['coarse with bounce', { maxTexels: 1024, bounceMaxSide: Infinity, flickerMs: null, tileRays: 8, liquidFps: 10 }, 7],
   ];
   for (const [name, quality, seed] of QUALITIES) {
     it(`holds at the ${name} lighting quality on a map whose texels it coarsens`, { timeout: 600_000 }, async () => {

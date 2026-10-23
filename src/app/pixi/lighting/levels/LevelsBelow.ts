@@ -24,6 +24,7 @@ import { tokenLook, type TokenArt } from './BelowTokens';
 import { LevelStackTexture } from './LevelStackTexture';
 import type { RoofHost } from './Roof';
 import type { Point } from '../../../types/visionTypes';
+import type { Box } from '../../../vision/polygonBounds';
 
 export type { BelowPicture } from './BelowPictures';
 
@@ -197,11 +198,11 @@ export class LevelsBelow {
   }
 
   /** Flicker below and changes on the levels' stages ask for a render while an opening shows them. */
-  animate(now: number): void {
+  animate(now: number, view?: Box): void {
     if (!this.stack?.box) return;
     let changed = false;
     for (const level of this.levels.values()) {
-      if (level.animate(now) || level.stage.hasChanges()) changed = true;
+      if (level.animate(now, view) || level.stage.hasChanges()) changed = true;
     }
     if (changed) this.deps.requestRender();
   }

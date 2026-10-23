@@ -6,6 +6,8 @@ export const FIELD_MAX = 128;
 export const BASE_TEXEL = 2;
 /** Longest side of a world-space texture; larger maps get coarser texels. */
 export const MAX_TEXELS = 4096;
+/** Texels of the lighting's picture a grid cell spans at most (`pictureTexel`): a 70 px cell at `BASE_TEXEL` spans 35. */
+export const CELL_TEXELS = 48;
 /**
  * Farthest a light may reach, in world pixels: the side of the largest map lit at full
  * resolution. A light's tile is cut to the map, so the engine never traces more than this.

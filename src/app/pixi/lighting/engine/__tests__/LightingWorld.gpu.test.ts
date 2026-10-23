@@ -6,6 +6,7 @@ import { LIGHTING_QUALITY } from '../../../../lighting/lightingQuality';
 import type { DrawnLight } from '../LightMap';
 import type { EngineLight } from '../types';
 import { createTestRenderer, readFloats } from './gpuTestUtils';
+import { ANIMATION_SLOT_MS } from '../../../utils/animationFrames';
 
 const torch: EngineLight = { key: 'torch', x: 300, y: 300, bright: 60, dim: 120, flame: 10, color: [1, 0.8, 0.6], intensity: 1, animation: 'torch' };
 const START = 10_000;
@@ -28,18 +29,39 @@ describe('LightingWorld.animate', () => {
     return { renderer, world };
   }
 
-  it('redraws a flickering light only once per flicker interval', async () => {
+  it('redraws a flickering light once per slot of the map\'s animation clock', async () => {
     const { world } = await setup();
     const draw = vi.spyOn(world.lightMap, 'draw');
+    // START opens a slot: the next opens a slot's length later, whatever the frame rate.
+    const next = (Math.floor(START / ANIMATION_SLOT_MS) + 1) * ANIMATION_SLOT_MS;
 
     expect(world.animate(START + 8)).toBe(false);
-    expect(world.animate(START + FLICKER_INTERVAL_MS - 1)).toBe(false);
+    expect(world.animate(next - 1)).toBe(false);
     expect(draw).not.toHaveBeenCalled();
 
-    expect(world.animate(START + FLICKER_INTERVAL_MS)).toBe(true);
+    expect(world.animate(next + 0.5)).toBe(true);
     expect(draw).toHaveBeenCalledTimes(1);
-    expect(world.animate(START + FLICKER_INTERVAL_MS + 8)).toBe(false);
+    expect(world.animate(next + 8)).toBe(false);
     expect(world.busy()).toBe(true);
+  });
+
+  it('redraws a slow swell every second slot, and nothing for lights outside the view', async () => {
+    const renderer = await createTestRenderer(256);
+    cleanup.push(() => renderer.destroy());
+    const world = new LightingWorld(renderer, { width: 1024, height: 1024 });
+    cleanup.push(() => world.destroy());
+    world.update([], [{ ...torch, animation: 'smoulder' }], null);
+    world.animate(START);
+    const draw = vi.spyOn(world.lightMap, 'draw');
+    const slot = (k: number): number => (Math.floor(START / ANIMATION_SLOT_MS) + k) * ANIMATION_SLOT_MS + 0.5;
+    for (let k = 1; k <= 8; k++) world.animate(slot(k));
+    expect(draw).toHaveBeenCalledTimes(4);
+    // A view far from the light: its flicker waits.
+    const away = { minX: 2000, minY: 2000, maxX: 3000, maxY: 3000 };
+    for (let k = 9; k <= 16; k++) world.animate(slot(k), false, away);
+    expect(draw).toHaveBeenCalledTimes(4);
+    world.animate(slot(18), false, { minX: 0, minY: 0, maxX: 500, maxY: 500 });
+    expect(draw).toHaveBeenCalledTimes(5);
   });
 
   it('flickers the brightness and the bright radius of a light, never where it ends', async () => {

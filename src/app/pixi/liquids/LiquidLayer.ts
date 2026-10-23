@@ -5,7 +5,8 @@ import type { LiquidSurface } from '../../types/liquidTypes';
 import type { ViewState } from '../../types/viewState';
 import type { MapVideoMode } from '../mapImage/video/mapVideoPlayback';
 import { destroyTree } from '../utils/destroyTree';
-import { liquidFrameDue } from './liquidMotion';
+import { frameTime } from '../utils/animationFrames';
+import { LIQUID_FPS, liquidFrameDue } from './liquidMotion';
 import { LiquidMesh, type WorldBox } from './LiquidMesh';
 
 /** How long building surfaces may take in one frame; one that takes longer is still built whole. */
@@ -24,6 +25,13 @@ export interface LiquidLayerDeps {
   inView: (box: WorldBox) => boolean;
   /** False on a renderer without WebGL: the still map shows, nothing is built. */
   drawable: boolean;
+  /**
+   * How many frames a second the surfaces may move at now (at most `LIQUID_FPS`; 0 holds the
+   * moment shown): fewer on a device that asks the lighting for less, and zoomed far out, where
+   * their detail is too fine to see move. Unset, `LIQUID_FPS`.
+   */
+  fps?: () => number;
+  /** The time of the display frame (ms); unset, the ticker's, which every animation of the map shares (`frameTime`). */
   now?: () => number;
 }
 
@@ -36,7 +44,7 @@ interface Built {
 /**
  * The water, lava and acid of the level a view shows, moving over its map image (`LiquidMesh`).
  * It stands right above the map, so the lighting lights it as floor, and is played by the map
- * video's rules (`setMode`): `play` moves it at most `LIQUID_FPS` times a second while a surface is
+ * video's rules (`setMode`): `play` moves it at most `LIQUID_FPS` times a second (`fps`) while a surface is
  * in view, `pause` holds the moment shown, `poster` shows the still moment every picture of the
  * scene shows (`stillFor`).
  */
@@ -58,7 +66,7 @@ export class LiquidLayer {
   private destroyed = false;
 
   constructor(private readonly deps: LiquidLayerDeps) {
-    this.now = deps.now ?? ((): number => performance.now());
+    this.now = deps.now ?? ((): number => frameTime(deps.ticker));
     this.unsubscribe = deps.store.subscribe((state) => this.sync(state));
     deps.ticker.add(this.tick);
     this.sync(deps.store.getState());
@@ -165,7 +173,8 @@ export class LiquidLayer {
     // The clock runs only while the surfaces play: a pause holds the moment and resumes from it.
     if (this.lastTick !== null) this.seconds += Math.min(now - this.lastTick, MAX_STEP_MS) / 1000;
     this.lastTick = now;
-    if (!liquidFrameDue(now, this.lastFrame) || !this.inView()) return;
+    const fps = this.deps.fps?.() ?? LIQUID_FPS;
+    if (fps <= 0 || !liquidFrameDue(now, this.lastFrame, fps) || !this.inView()) return;
     this.lastFrame = now;
     this.show(this.seconds);
   };

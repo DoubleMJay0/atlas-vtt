@@ -1,4 +1,5 @@
 import { Matrix, type Container, type Renderer, type RenderTexture } from 'pixi.js';
+import type { Box } from '../../../vision/polygonBounds';
 import type { MeasurementSettings } from '../../../grid/measurementFormat';
 import { levelImagePlacement } from '../../../levels/levelAlignment';
 import { levelBackground } from '../../../levels/levelEdits';
@@ -120,11 +121,23 @@ export class BelowLevel {
   private rule: Omit<BelowSight, 'stack' | 'index'> | null = null;
   private mode: LightingMode = 'gm';
   private destroyed = false;
+  /**
+   * Counts the changes to what the level's picture shows that its stage's display tree does not
+   * hold (its light map, memory and composite, the scene it is built from): a picture drawn at the
+   * same count, through the same camera, with nothing pending in its stage, is the picture it would
+   * draw again (`draw`'s `shown`).
+   */
+  private revision = 0;
+  /** Something the picture shows changed: a part's texture or image, the memory; asks for a render. */
+  private readonly changed = (): void => {
+    this.revision++;
+    this.deps.requestRender();
+  };
 
   constructor(private readonly deps: BelowLevelDeps) {
     this.engine = new LightingEngine(deps.renderer, deps.quality, { levelIndex: deps.index, backBuffer: false });
-    this.tokens = new BelowTokens(deps.art, deps.requestRender);
-    this.fog = new BelowFog(deps.requestRender);
+    this.tokens = new BelowTokens(deps.art, this.changed);
+    this.fog = new BelowFog(this.changed);
     this.memory = new ExploredMemory({
       renderer: deps.renderer,
       store: deps.store,
@@ -132,13 +145,13 @@ export class BelowLevel {
         if (texture) this.engine.setExplored(texture);
       },
       onTravel: () => undefined,
-      onChange: deps.requestRender,
+      onChange: this.changed,
       guard: deps.guard,
       edits: false,
     });
-    this.roof = new Roof({ host: deps.roofs, requestRender: deps.requestRender, onReady: deps.onReady, fadeMs: deps.fadeMs });
+    this.roof = new Roof({ host: deps.roofs, requestRender: this.changed, onReady: deps.onReady, fadeMs: deps.fadeMs });
     const read = deps.readShading;
-    this.shading = read ? new LevelShading({ gpu: true, read, requestRender: deps.requestRender, onRead: deps.onReady, onReliefChange: deps.onReady }) : null;
+    this.shading = read ? new LevelShading({ gpu: true, read, requestRender: this.changed, onRead: deps.onReady, onReliefChange: deps.onReady }) : null;
     if (this.shading) this.engine.setShade(this.shading.layer);
     this.stage = new BelowStage({ map: deps.image.layer, shade: this.shading?.layer.view, tokens: this.tokens.view, lighting: this.engine.layer, roof: this.roof.layer.view, fog: this.fog.view });
   }
@@ -187,6 +200,7 @@ export class BelowLevel {
   update(state: LightingState, viewed: { sight: Sight; gmSight: Sight }, measurement: () => MeasurementSettings, rules?: () => SightRules): void {
     const bounds = this.bounds();
     if (!bounds) return;
+    this.revision++;
     const id = this.deps.id;
     const seen = { ...state, viewedLevel: id };
     this.memory.sync(bounds, exploredMaskOf(state, id), id);
@@ -205,7 +219,7 @@ export class BelowLevel {
     this.engine.update({
       bounds, walls: model.walls, lights: model.lights, albedo: null, zones: model.zones, relief: this.shading?.relief() ?? null,
       sight: gm, spots: gmSpots, ...(gm !== player && { playerSight: player, playerSpots: spots }),
-      sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, ...sceneLook(state.lighting),
+      sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, cellSize: state.grid?.size ?? DEFAULT_CELL_SIZE, ...sceneLook(state.lighting),
     });
     const objects = levelObjectsOn(state, id);
     this.tokens.sync(mapTokens(objects), state.grid?.size ?? DEFAULT_CELL_SIZE);
@@ -233,11 +247,17 @@ export class BelowLevel {
   }
 
   setStack(stack: CompositeStack | null): void {
+    this.revision++;
     this.engine.setStack(stack);
   }
 
-  /** Draws the level's picture for `frame` into `target`: its tokens as `look` says, its fog for the frame's mode. */
-  draw(frame: BelowFrame, target: RenderTexture, look: (token: TokenEntity) => BelowTokenLook): void {
+  /**
+   * Draws the level's picture for `frame` into `target`: its tokens as `look` says, its fog for the
+   * frame's mode. `shown` is the count (`revision`) `target` was last drawn at for a frame like this
+   * one (the same camera, mode and tiles), or null: where nothing changed since, its picture is
+   * left as it is. Returns the count `target` now shows.
+   */
+  draw(frame: BelowFrame, target: RenderTexture, look: (token: TokenEntity) => BelowTokenLook, shown: number | null = null): number {
     if (frame.mode !== this.mode) {
       this.mode = frame.mode;
       this.engine.setMode(frame.mode);
@@ -248,18 +268,24 @@ export class BelowLevel {
     this.roof.setView(inverse);
     this.tokens.show(look);
     this.fog.view.alpha = frame.mode === 'player' ? 1 : GM_FOG_ALPHA;
+    // What the stage holds changed (a token, a tile of the map, a fade), for this picture or another.
+    if (this.stage.hasChanges()) this.revision++;
+    if (shown === this.revision) return this.revision;
     const restore = frame.tiles ? [this.deps.image.drawFor(frame.tiles), this.roof.drawFor(frame.tiles)] : [];
     try {
       this.stage.render(this.deps.renderer, target, frame.camera);
     } finally {
       for (const back of restore) back();
     }
+    return this.revision;
   }
 
   /** Flicker below and the roof's fading: true where the level's light map changed (the roof asks for its renders itself). */
-  animate(now: number): boolean {
+  animate(now: number, view?: Box): boolean {
     this.roof.animate(now);
-    return this.engine.busy() && this.engine.animate(now);
+    const drew = this.engine.busy() && this.engine.animate(now, view);
+    if (drew) this.revision++;
+    return drew;
   }
 
   /** The graphics context is lost: nothing its memory holds from now on is its memory. */
@@ -310,7 +336,10 @@ export class BelowLevel {
     const looking: Sight = { all: false, regions: sight.regions.filter((region) => region.polygon !== null) };
     const shapes = exploredShapes(looking, withZones(state.lighting, model.ambient.zones ?? []), model.reaches);
     const within = shapes && this.clipOf(stack, bounds);
-    if (shapes && within) this.memory.record({ ...shapes, within });
+    if (shapes && within) {
+      this.memory.record({ ...shapes, within });
+      this.revision++;
+    }
   }
 
   /** The memory texels `stack` shows the level in, worked out once for the stack and the map. */

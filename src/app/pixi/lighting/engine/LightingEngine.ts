@@ -13,6 +13,7 @@ import { SceneSightLayers } from './SceneSightLayers';
 import type { BoundFields } from './WallFields';
 import type { ShadeSink } from './ShadeLayer';
 import type { EngineScene, SceneFrame } from './types';
+import type { Box } from '../../../vision/polygonBounds';
 
 /** How an engine draws: on the canvas as the view's own lighting, or off-screen as a level below the view's (`LevelsBelow`). */
 export interface LightingEngineOptions {
@@ -127,13 +128,13 @@ export class LightingEngine {
     this.quality = quality;
     this.world?.setFlicker(quality.flickerMs);
     const { scene } = this;
-    if (scene && this.world && !this.world.fits(quality)) this.attempt(() => this.build(scene));
+    if (scene && this.world && !this.world.fits(quality, scene.cellSize)) this.attempt(() => this.build(scene));
   }
 
   private build(scene: EngineScene): void {
     const { bounds } = scene;
-    if (!this.world || this.world.bounds.width !== bounds.width || this.world.bounds.height !== bounds.height || !this.world.fits(this.quality)) {
-      this.replaceWorld(new LightingWorld(this.renderer, bounds, this.quality, this.paced));
+    if (!this.world || this.world.bounds.width !== bounds.width || this.world.bounds.height !== bounds.height || !this.world.fits(this.quality, scene.cellSize)) {
+      this.replaceWorld(new LightingWorld(this.renderer, bounds, this.quality, this.paced, scene.cellSize));
     }
     const world = this.world!;
     const composite = this.composite!;
@@ -183,8 +184,9 @@ export class LightingEngine {
     this.composite?.setGrid(grid?.markColor() ?? null);
   }
 
-  animate(now: number): boolean {
-    return this.attempt(() => this.currentWorld()?.animate(now)) ?? false;
+  /** Builds what is still to build and redraws the flicker when due; `view` (world px) is where flicker is looked at (`LightingWorld.animate`). */
+  animate(now: number, view?: Box): boolean {
+    return this.attempt(() => this.currentWorld()?.animate(now, false, view)) ?? false;
   }
 
   busy(): boolean {

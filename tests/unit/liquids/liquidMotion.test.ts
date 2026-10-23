@@ -28,10 +28,15 @@ describe('how liquids move over time', () => {
     }
   });
 
-  it('shows at most 30 frames a second', () => {
+  it('shows at most 30 frames a second, on the slots of the map\'s animation clock', () => {
     expect(liquidFrameDue(0, null)).toBe(true);
     expect(liquidFrameDue(16.7, 0)).toBe(false);
-    expect(liquidFrameDue(33.3, 0)).toBe(true);
+    expect(liquidFrameDue(33.4, 0)).toBe(true);
+    // A frame shown late in a slot leaves the next one due at the slot's end, not a whole frame later.
+    expect(liquidFrameDue(34, 30)).toBe(true);
+    // Fewer frames a second take every so many slots.
+    expect(liquidFrameDue(40, 0, 15)).toBe(false);
+    expect(liquidFrameDue(67, 0, 15)).toBe(true);
   });
 
   it('counts a surface in view when it lies within half the view\'s size around it', () => {

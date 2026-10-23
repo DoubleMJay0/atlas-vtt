@@ -25,9 +25,14 @@ export interface BelowPicture {
  * The textures the levels below are drawn into, one for each level and picture of the view
  * (`BelowPicture`): of that picture's size and pixels, so its composite takes from them texel on
  * pixel, kept while those stay. `unbind` lets the view's composite go of one before it is destroyed.
+ * The canvas's picture of a level is drawn again only when the level or the camera changed: a view
+ * at rest whose liquids or lights move renders its stage many times a second, and the levels
+ * below need none of those.
  */
 export class BelowPictures {
   private readonly targets = new Map<string, RenderTexture>();
+  /** What each texture of the canvas's picture was last drawn for: a render of the view at rest takes it again (`BelowLevel.draw`). */
+  private readonly drawn = new WeakMap<RenderTexture, { camera: readonly number[]; mode: LightingMode; revision: number }>();
 
   constructor(private readonly renderer: Renderer, private readonly unbind: () => void) {}
 
@@ -49,7 +54,13 @@ export class BelowPictures {
     for (const level of levels) {
       if (!level.ready() || !showsBelow(stack, level.index)) continue;
       const target = this.targetFor(picture, level.id);
-      level.draw({ camera: picture.camera, mode: picture.mode, tiles: picture.tiles, picture: picture.key === 'thumbnail' }, target, look);
+      const frame = { camera: picture.camera, mode: picture.mode, tiles: picture.tiles, picture: picture.key === 'thumbnail' };
+      // Only the canvas's own picture is kept: a frame for the player window or a thumbnail draws its tiles every time.
+      const camera = [picture.camera.a, picture.camera.b, picture.camera.c, picture.camera.d, picture.camera.tx, picture.camera.ty];
+      const last = picture.key === 'canvas' && !picture.tiles ? this.drawn.get(target) : undefined;
+      const same = !!last && last.mode === picture.mode && last.camera.every((value, i) => value === camera[i]);
+      const revision = level.draw(frame, target, look, same ? last.revision : null);
+      if (picture.key === 'canvas' && !picture.tiles) this.drawn.set(target, { camera, mode: picture.mode, revision });
       shown[level.index - 1] = target;
     }
     return shown;

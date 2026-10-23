@@ -76,6 +76,8 @@ export interface EngineScene extends Pick<SceneLighting, 'ambientColor' | 'explo
   spots?: readonly SeenSpot[];
   /** Footprint radius of a vision token, for the soft edges of its sight. */
   sightRadius: number;
+  /** The grid's cell in world px: the world textures' texel follows it (`pictureTexel`). Unset, the map's size alone decides. */
+  cellSize?: number;
   ambient: number;
   /** The scene's ambient zones in their order, the same list while they stay; none draws exactly as before zones existed. */
   zones?: readonly EngineZone[];

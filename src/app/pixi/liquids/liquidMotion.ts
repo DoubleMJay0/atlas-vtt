@@ -6,6 +6,7 @@
  */
 
 import type { LiquidKind } from '../../types/liquidTypes';
+import { animationFrameDue, slotsOf } from '../utils/animationFrames';
 
 /** Seconds after which the shader's clock starts again; every pulse of a pattern completes whole cycles in it. */
 export const MOTION_LOOP = 4096;
@@ -56,7 +57,11 @@ export function liquidDrifts(kind: LiquidKind, flowing: boolean, seconds: number
   return into;
 }
 
-/** Whether a new frame is due `now` (ms) after the last one shown at `last`: at most `LIQUID_FPS` a second, a little early rather than a whole frame late. */
-export function liquidFrameDue(now: number, last: number | null): boolean {
-  return last === null || now - last >= 1000 / LIQUID_FPS - 4;
+/**
+ * Whether a new frame is due `now` (ms) after the last one shown at `last`: at most `fps`
+ * (`LIQUID_FPS` unless less is asked for) a second, on the map's animation clock
+ * (`animationFrameDue`), so a liquid's frame shares its render with a flickering light's.
+ */
+export function liquidFrameDue(now: number, last: number | null, fps = LIQUID_FPS): boolean {
+  return animationFrameDue(now, last, slotsOf(1000 / fps));
 }

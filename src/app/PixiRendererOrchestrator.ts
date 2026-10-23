@@ -700,7 +700,7 @@ export class PixiRendererOrchestrator { // Renamed class
   private placeLiquids(viewport: Viewport, mapImage: MapImage): void {
     const app = this.pixiAppManager.getApp();
     if (!app?.renderer || !app.ticker) return;
-    this.liquids ??= createViewLiquids(app, viewport, this.store);
+    this.liquids ??= createViewLiquids(app, viewport, this.store, settingsLightingQuality(SettingsService.forApp(this.obsApp)));
     this.liquids.container.zIndex = MAP_LAYER_Z.liquids;
     viewport.addChildAt(this.liquids.container, viewport.getChildIndex(mapImage.layer) + 1);
   }
