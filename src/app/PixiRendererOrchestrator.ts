@@ -19,6 +19,7 @@ import { PinRenderer } from "./pixi/PinRenderer"; // Import PinRenderer
 import { HexLinkRenderer } from "./pixi/hexLinks/HexLinkRenderer";
 import { HexLinkInteraction } from "./pixi/hexLinks/HexLinkInteraction";
 import { LevelLinkEditor } from "./pixi/levelLinks/LevelLinkEditor";
+import { MapFeatureInteraction } from "./pixi/mapFeatures/MapFeatureInteraction";
 import { onLeavingView } from "./pixi/viewLeaving";
 import { linkedSceneLevels } from "./services/linkedSceneLevels";
 import type { SceneLevel } from "./types/sceneLevelTypes";
@@ -92,6 +93,8 @@ export class PixiRendererOrchestrator { // Renamed class
   private hexLinkInteraction?: HexLinkInteraction;
   /** The stairs between levels: shown to the GM, edited with the stairs tool. */
   private levelLinks?: LevelLinkEditor;
+  /** The GM's hover label of map features and doors, and a feature's menu; none in a player view. */
+  private mapFeatures?: MapFeatureInteraction;
   private selectionManager?: SelectionManager; // Add SelectionManager instance
   private fogRenderer?: FogOfWarRenderer; // Add FogRenderer instance
   private measureRenderer?: MeasureRenderer; // Add MeasureRenderer instance
@@ -415,6 +418,9 @@ export class PixiRendererOrchestrator { // Renamed class
       });
       const stairs = this.levelLinks;
       this.eventBusUnsubscribers.push(onLeavingView({ eventBus: this.eventBus, obsApp: this.obsApp, viewId: this.viewId }, () => stairs.stop()));
+      const features = new MapFeatureInteraction(this.store, this.pixiAppManager.getCanvasElement());
+      this.mapFeatures = features;
+      this.eventBusUnsubscribers.push(onLeavingView({ eventBus: this.eventBus, obsApp: this.obsApp, viewId: this.viewId }, () => features.leave()));
     }
 
     this.selectionManager = new SelectionManager(
@@ -1115,6 +1121,7 @@ export class PixiRendererOrchestrator { // Renamed class
       this.tokenRenderer.setHexLinkHandlers(this.hexLinkInteraction);
     }
     if (this.levelLinks) this.tokenRenderer.setStairsTool(this.levelLinks);
+    if (this.mapFeatures) this.tokenRenderer.setMapFeatureHandlers(this.mapFeatures);
     if (this.selectionManager) {
       this.selectionManager.setHitTestTokensProvider(
         (x, y) => this.tokenRenderer!.hitTestTokens(x, y)
@@ -1241,6 +1248,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.hexLinkInteraction?.destroy();
     this.hexLinkRenderer?.destroy();
     this.levelLinks?.destroy();
+    this.mapFeatures?.destroy();
     this.fogRenderer?.destroy(); // Destroy FogRenderer
     this.stopMeasuresFollowingPlayers?.();
     this.measureRenderer?.destroy(); // Destroy MeasureRenderer

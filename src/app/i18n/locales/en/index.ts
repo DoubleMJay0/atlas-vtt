@@ -32,6 +32,7 @@ import { loot } from './loot';
 import { tables } from './tables';
 import { lpv } from './lpv';
 import { map } from './map';
+import { mapFeature } from './mapFeature';
 import { menu } from './menu';
 import { notice } from './notice';
 import { palette } from './palette';
@@ -134,6 +135,7 @@ export const en = {
   ...tables,
   ...lpv,
   ...map,
+  ...mapFeature,
   ...menu,
   ...notice,
   ...palette,
