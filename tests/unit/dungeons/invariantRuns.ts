@@ -175,9 +175,10 @@ export function describeInvariants(floors: number): void {
       expect(share('dwelling', (m) => anyFloor(m, (f) => f.props.some((p) => p.kind === 'throne' || p.kind === 'tapestry' || p.kind === 'well')))).toBeGreaterThan(0.6);
     });
 
-    it('furnish the largest hall with a centrepiece or a dais, and set every dais against a wall', () => {
+    it('furnish the largest hall with a centrepiece, a dais or a set piece of terrain, and set every dais against a wall', () => {
       const halls = runs.flatMap((run) => run.model.floors.map((floor) => ({ floor, hall: [...normals(floor)].sort((a, b) => b.w * b.h - a.w * a.h)[0] }))).filter(({ hall }) => hall && hall.w * hall.h >= 12);
-      const centred = halls.filter(({ floor, hall }) => floor.props.some((p) => p.room === hall!.id && ['dais', 'fountain', 'statue', 'well'].includes(p.kind)));
+      const setPieces = ['platform', 'ledge', 'statue', 'obelisk', 'portal-ring', 'altar', 'pool', 'mosaic', 'pillar', 'wall-fragment', 'pews', 'chasm', 'channel'];
+      const centred = halls.filter(({ floor, hall }) => floor.props.some((p) => p.room === hall!.id && ['dais', 'fountain', 'statue', 'well'].includes(p.kind)) || floor.terrain.some((t) => t.room === hall!.id && setPieces.includes(t.kind)));
       expect(centred.length / halls.length).toBeGreaterThan(0.6);
       expect(
         failures(eachFloor((run, i) => {

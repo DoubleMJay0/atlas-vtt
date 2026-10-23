@@ -7,6 +7,11 @@
  * in that continuous space, so a cell's centre is (x + 0.5, y + 0.5) and columns stand on grid vertices.
  */
 
+import type { DungeonTerrain, FiveRoomStage } from './terrainModel';
+
+export type { CoverLevel, DungeonTerrain, FiveRoomStage, HazardKind, TerrainKind, TerrainOpening, TerrainTraits } from './terrainModel';
+export { FIVE_ROOM_STAGES } from './terrainModel';
+
 /** Bump when the same seed and tags would give another dungeon. */
 export const DUNGEON_GENERATOR_VERSION = 2;
 
@@ -50,6 +55,8 @@ export interface DungeonRoom {
    * rooms around it and reached through one room only. An arena, not a story: nothing is locked.
    */
   boss: boolean;
+  /** In a five-room dungeon, which of the five main rooms this is; unset in every other room. */
+  stage?: FiveRoomStage;
 }
 
 /**
@@ -151,6 +158,8 @@ export interface DungeonFloor {
   /** Floor cells under water, for exports. */
   waterCells: CellPoint[];
   stairs: DungeonStair[];
+  /** Cover, difficult ground, hazards, holes, bridges, height and points of interest (`terrainModel.ts`). */
+  terrain: DungeonTerrain[];
   /**
    * Secret wings the GM hid (Hide room), by the id of each wing's first room; never set by the
    * generator. The view's secret rooms switch hides every secret wing whatever this says.
@@ -175,6 +184,11 @@ export interface DungeonRequest {
   floors: number;
   /** Whether the deepest floor has a boss room (`DungeonRoom.boss`); unset is yes. */
   bossRoom?: boolean;
+  /**
+   * A five-room dungeon (`DungeonRoom.stage`): one floor, five main rooms in a row joined by
+   * passages, the fourth the boss room whatever `bossRoom` says. Unset is no.
+   */
+  fiveRoom?: boolean;
   /** 0..1; unset follows the tags (dry 0, wet 0.3, flooded 0.6, else random). */
   waterLevel?: number;
 }

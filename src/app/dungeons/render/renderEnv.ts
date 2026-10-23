@@ -19,6 +19,12 @@ export interface RenderEnv {
   px: number;
   /** Device pixels per cell, for choosing detail. */
   pxPerCell: number;
+  /**
+   * How holes in the floor are drawn where a floor lies below: `cut` leaves them transparent, so
+   * the scene shows the level below through them; `drawn` paints them as depth, as on the deepest
+   * floor, for pictures that stand alone (the SVG export).
+   */
+  openings: 'cut' | 'drawn';
   /** A seeded stream of the render concern, split by layer. */
   rng(key: string): Rng;
 }
@@ -29,6 +35,7 @@ export function createRenderEnv(
   style: DungeonStyle,
   view: DungeonView,
   pxPerCell: number,
+  openings: RenderEnv['openings'] = 'cut',
 ): RenderEnv {
   return {
     ctx,
@@ -38,6 +45,7 @@ export function createRenderEnv(
     palette: paletteOf(style, view),
     px: 1 / REFERENCE_CELL_PX,
     pxPerCell,
+    openings,
     rng: (key: string): Rng => floorStream(dungeon.model.seed, 'render', dungeon.index, key),
   };
 }

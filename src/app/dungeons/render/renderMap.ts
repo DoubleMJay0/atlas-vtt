@@ -17,6 +17,8 @@ export interface RenderMapOptions {
   plainPaper?: boolean;
   /** The floor to draw, by index; the entry floor where unset. */
   floor?: number;
+  /** Holes over a floor below: transparent (`cut`, where unset) or painted as depth (`drawn`). */
+  openings?: 'cut' | 'drawn';
   /**
    * Keeps hatching and strokes readable where cells are small (`legibleStyle`), for a picture
    * this many times the 1400 × 1000 the legible size is given for: the preview's.
@@ -33,7 +35,7 @@ export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyl
   const { pxPerCell } = options;
   const layout = mapLayout(model, pxPerCell, view);
   const drawn = options.legibleAt ? legibleStyle(style, pxPerCell / options.legibleAt) : style;
-  const env = createRenderEnv(ctx, visibleDungeon(model, view, options.floor ?? 0), drawn, view, pxPerCell);
+  const env = createRenderEnv(ctx, visibleDungeon(model, view, options.floor ?? 0), drawn, view, pxPerCell, options.openings);
   ctx.save();
   if (!options.transparent) drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome || options.plainPaper === true);
   ctx.scale(pxPerCell, pxPerCell);
@@ -48,7 +50,8 @@ export function renderMapSvg(model: DungeonModel, style: DungeonStyle, view: Dun
   const size = mapLayout(model, options.pxPerCell, view);
   const svg = new SvgCanvas(size.widthPx, size.heightPx);
   // The recorder offers every part of the 2D context the renderer uses.
-  const layout = renderMap(svg as unknown as Canvas2D, model, style, view, options);
+  // An SVG has no way to cut holes: they are painted as depth.
+  const layout = renderMap(svg as unknown as Canvas2D, model, style, view, { ...options, openings: 'drawn' });
   return { svg: svg.toSvg(), layout };
 }
 

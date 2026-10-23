@@ -35,6 +35,12 @@ function seat(theme: Theme): PropKind {
   return theme ? SEAT_OF[theme] : 'statue';
 }
 
+/** What stands on the boss arena's platform: the theme's seat, else a throne. */
+export function arenaSeat(rng: Rng, tags: ReadonlySet<DungeonTag>): PropKind {
+  const theme = themeOf(rng, tags);
+  return theme ? SEAT_OF[theme] : 'throne';
+}
+
 function centreKind(rng: Rng, theme: Theme, floor: FloorFurnishing): PropKind {
   const well = floor.wellPlaced ? 0 : theme === 'dwelling' ? 3 : 0.5;
   const fountain = (theme === 'tomb' ? 0.3 : 2) * floor.fountainWeight;

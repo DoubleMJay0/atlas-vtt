@@ -11,6 +11,10 @@ import { drawProps } from './props';
 import type { RenderEnv } from './renderEnv';
 import { drawStairwells } from './stairwells';
 import { drawStonework } from './stonework';
+import { drawTerrainGround } from './terrain/terrainGround';
+import { drawTerrainOpenings } from './terrain/terrainOpenings';
+import { drawTerrainRaised } from './terrain/terrainRaised';
+import { drawTerrainStanding } from './terrain/terrainStanding';
 import { drawWater } from './water';
 
 /** What surrounds the walls, per hatching mode; rock the rooms close in on is shaded whole but in stippling. */
@@ -38,7 +42,8 @@ function drawSurroundings(env: RenderEnv): void {
 
 /**
  * The floor plan, bottom to top: what surrounds the walls, walls and floor, water, grid and
- * cracks, rubble and props, the inner shadow, then doors, stairwells and columns. The context is
+ * cracks, rubble, terrain on the ground and raised terrain, props, the inner shadow, terrain that
+ * stands, holes in the floor and their bridges, then doors, stairwells and columns. The context is
  * in cells; paper and labels are the caller's.
  */
 export function drawDungeon(env: RenderEnv): void {
@@ -48,8 +53,12 @@ export function drawDungeon(env: RenderEnv): void {
   drawGrid(env);
   drawCracks(env);
   drawRubble(env);
+  drawTerrainGround(env);
+  drawTerrainRaised(env);
   drawProps(env);
   drawInnerShadow(env);
+  drawTerrainStanding(env);
+  drawTerrainOpenings(env);
   drawDoors(env);
   drawStairwells(env);
   drawColumns(env);

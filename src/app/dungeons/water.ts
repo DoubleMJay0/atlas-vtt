@@ -9,7 +9,7 @@ import { type Rng, chance, floorStream, int, stream } from './rng';
 import { traceLoops } from './water/contour';
 import { fractalNoise } from './water/noise';
 import { chaikin, jitter, resample, wobble } from './water/smooth';
-import { type CellGrid, WET, floorCells, gridAround, indexOf, wetGrid } from './water/wetGrid';
+import { type CellGrid, DRY, WET, floorCells, gridAround, indexOf, wetGrid } from './water/wetGrid';
 
 export interface WaterResult {
   water: DungeonWater[];
@@ -21,6 +21,8 @@ export interface WaterRequest {
   level: number;
   /** Rooms with a pool (`poolRooms`). */
   pools: ReadonlySet<number>;
+  /** Floor cells that stay dry, as `x,y`: what terrain fills (water never runs over a chasm or a platform). */
+  dry?: ReadonlySet<string>;
 }
 
 /** Water gathers where the floor falls away: in rooms steps lead down into, and in dead ends. */
@@ -81,6 +83,11 @@ export function placeWater(seed: number, floor: number, rooms: readonly DungeonR
   const wetFloor = new Uint8Array(grid.w * grid.h);
   if (request.level > 0) noiseFloor(rng, grid, floors, request.level, wetFloor);
   rooms.filter((room) => request.pools.has(room.id)).forEach((room) => poolIn(room, grid, wetFloor));
+  for (const key of request.dry ?? []) {
+    const [x, y] = key.split(',').map(Number) as [number, number];
+    const i = indexOf(grid, x, y);
+    if (i >= 0) wetFloor[i] = DRY;
+  }
   const wet = wetGrid(grid, rooms, wetFloor);
   const waterCells = floors.filter((c) => wet[indexOf(grid, c.x, c.y)] === WET);
   if (waterCells.length === 0) return { water: [], waterCells: [] };

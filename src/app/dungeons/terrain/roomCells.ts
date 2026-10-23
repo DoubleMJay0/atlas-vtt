@@ -1,0 +1,176 @@
+/**
+ * One room's floor as terrain sees it, cell by cell: which cells may take a piece (inside the
+ * floor, round rooms only where the whole cell lies inside the circle), which must stay clear
+ * (the cell before each door, every stairwell and the row it is reached from, cells a column
+ * stands on), which are taken and whether they can be walked. Placing a piece is allowed only
+ * while every cell that can be walked stays reachable from every other: a room never splits.
+ *
+ * Local coordinates follow the room's axis: `i` from the wall it was entered by (0) to its far
+ * wall (`depth - 1`), `j` across it from 0 to `width - 1`.
+ */
+
+import type { CellDir, CellPoint, DungeonColumn, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
+import { cellKey, cellsOf, dir, floorRect, inRect } from '../geometry';
+import { approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
+import type { Footing } from './catalog';
+
+const STEPS: readonly CellDir[] = [dir(1, 0), dir(-1, 0), dir(0, 1), dir(0, -1)];
+
+export class RoomCells {
+  readonly depth: number;
+  readonly width: number;
+  /** Cells that can take terrain, by key. */
+  private readonly open = new Set<string>();
+  /** Floor cells that can be walked when nothing stands on them, by key. */
+  private readonly floor = new Set<string>();
+  /** Cells that must stay clear, by key. */
+  private readonly clear = new Set<string>();
+  /** Taken cells and whether they can be walked. */
+  private readonly taken = new Map<string, Footing>();
+  /** Cells a placed piece needs kept clear (a bridge's landings, the foot of steps), by key. */
+  private readonly held = new Set<string>();
+  /** The cells every way through the room must reach: before its doors and onto its stairs. */
+  readonly needed: CellPoint[];
+
+  constructor(
+    readonly room: DungeonRoom,
+    doors: readonly DungeonDoor[],
+    stairs: readonly DungeonStair[],
+    floorIndex: number,
+    columns: readonly DungeonColumn[],
+  ) {
+    const horizontal = room.axis.x !== 0;
+    this.depth = horizontal ? room.w : room.h;
+    this.width = horizontal ? room.h : room.w;
+    const rect = floorRect(room);
+    const inside = stairs.filter((s) => cellsOf(spotRect(s)).every((c) => inRect(rect, c.x, c.y)));
+    const stairCells = inside.flatMap((s) => cellsOf(spotRect(s)));
+    const approaches = inside.flatMap((s) => approachCells(s, s.to > floorIndex ? 'upper' : 'lower'));
+    this.needed = [...doorApproaches(room, doors), ...approaches].filter((c) => inRect(rect, c.x, c.y));
+    for (const c of [...stairCells, ...this.needed]) this.clear.add(cellKey(c.x, c.y));
+    for (const c of cellsOf(rect)) {
+      if (!this.inside(c, [0.5], 0)) continue;
+      const key = cellKey(c.x, c.y);
+      this.floor.add(key);
+      if (this.inside(c, [0, 1], 0.05) && !this.clear.has(key) && !columns.some((col) => touches(col, c))) this.open.add(key);
+    }
+  }
+
+  /** The cell at `i` along the room's axis (from its near wall) and `j` across. */
+  cell(i: number, j: number): CellPoint {
+    const { room } = this;
+    if (room.axis.x !== 0) return { x: room.axis.x > 0 ? room.x + i : room.x + room.w - 1 - i, y: room.y + j };
+    return { x: room.x + j, y: room.axis.y > 0 ? room.y + i : room.y + room.h - 1 - i };
+  }
+
+  /** The cells of the local rectangle from (i, j), `di` deep and `dj` wide. */
+  block(i: number, j: number, di: number, dj: number): CellPoint[] {
+    const out: CellPoint[] = [];
+    for (let a = i; a < i + di; a++) for (let b = j; b < j + dj; b++) out.push(this.cell(a, b));
+    return out;
+  }
+
+  /** The room's axis: from its near wall towards its far wall. */
+  get axis(): CellDir {
+    return this.room.axis;
+  }
+
+  /** Across the room, the way `j` grows. */
+  get across(): CellDir {
+    return this.room.axis.x !== 0 ? dir(0, 1) : dir(1, 0);
+  }
+
+  /** Floor cells that can be walked when nothing stands on them. */
+  get floorCount(): number {
+    return this.floor.size;
+  }
+
+  /** Whether every cell can take a piece now. */
+  fits(cells: readonly CellPoint[]): boolean {
+    return cells.length > 0 && cells.every((c) => this.isFree(c));
+  }
+
+  isFree(c: CellPoint): boolean {
+    const key = cellKey(c.x, c.y);
+    return this.open.has(key) && !this.taken.has(key) && !this.held.has(key);
+  }
+
+  /** Whether the cell is floor of this room, taken or not. */
+  isFloor(c: CellPoint): boolean {
+    return this.floor.has(cellKey(c.x, c.y));
+  }
+
+  /** Whether the cell holds a piece that cannot be walked. */
+  isBlocked(c: CellPoint): boolean {
+    return this.taken.get(cellKey(c.x, c.y)) === 'block';
+  }
+
+  /** Whether `cells` could be taken with `footing` and the room stay whole: every walkable cell still reaches every other. */
+  allows(cells: readonly CellPoint[], footing: Footing, over: readonly CellPoint[] = []): boolean {
+    if (!this.fits(cells)) return false;
+    if (footing === 'walk') return true;
+    const extra = new Set(cells.map((c) => cellKey(c.x, c.y)));
+    for (const c of over) extra.delete(cellKey(c.x, c.y));
+    return this.whole(extra);
+  }
+
+  /** Takes `cells`; a bridge passes `walk` over cells of the hole it crosses. */
+  take(cells: readonly CellPoint[], footing: Footing): void {
+    for (const c of cells) this.taken.set(cellKey(c.x, c.y), footing);
+  }
+
+  /** Lays a walkable crossing over taken cells. */
+  bridge(cells: readonly CellPoint[]): void {
+    for (const c of cells) this.taken.set(cellKey(c.x, c.y), 'walk');
+  }
+
+  /** Keeps cells clear of any later piece: where a bridge lands, before a platform's steps. */
+  keepClear(cells: readonly CellPoint[]): void {
+    for (const c of cells) this.held.add(cellKey(c.x, c.y));
+  }
+
+  /** How many floor cells are taken by pieces that cannot be walked. */
+  blockedCount(): number {
+    let n = 0;
+    for (const footing of this.taken.values()) if (footing === 'block') n++;
+    return n;
+  }
+
+  /** Whether every walkable floor cell, with `extra` blocked too, reaches every other. */
+  private whole(extra: ReadonlySet<string>): boolean {
+    const walkable = (key: string): boolean => this.floor.has(key) && this.taken.get(key) !== 'block' && !extra.has(key);
+    const start = [...this.floor].find(walkable);
+    if (start === undefined) return false;
+    const seen = new Set([start]);
+    const queue = [start];
+    for (let head = 0; head < queue.length; head++) {
+      const [x, y] = (queue[head] as string).split(',').map(Number) as [number, number];
+      for (const d of STEPS) {
+        const key = cellKey(x + d.x, y + d.y);
+        if (seen.has(key) || !walkable(key)) continue;
+        seen.add(key);
+        queue.push(key);
+      }
+    }
+    let count = 0;
+    for (const key of this.floor) if (walkable(key)) count++;
+    return seen.size === count && this.needed.every((c) => seen.has(cellKey(c.x, c.y)));
+  }
+
+  /** Whether the points of the cell at `at` (0 a corner, 0.5 its middle) lie `margin` inside the circle of a round room. */
+  private inside(c: CellPoint, at: readonly number[], margin: number): boolean {
+    const { room } = this;
+    if (!room.rotunda) return true;
+    const cx = room.x + room.w / 2;
+    const cy = room.y + room.h / 2;
+    const r = Math.sqrt(room.w * room.w + 1) / 2 - margin;
+    return at.every((dx) => at.every((dy) => Math.hypot(c.x + dx - cx, c.y + dy - cy) <= r));
+  }
+}
+
+/** Whether a column stands on or touches the cell. */
+function touches(column: DungeonColumn, c: CellPoint): boolean {
+  const dx = Math.max(c.x - column.x, 0, column.x - (c.x + 1));
+  const dy = Math.max(c.y - column.y, 0, column.y - (c.y + 1));
+  return Math.hypot(dx, dy) < column.radius + 0.05;
+}

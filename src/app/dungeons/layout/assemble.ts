@@ -11,6 +11,7 @@ import { addBossDoor, placeBossRoom } from './boss';
 import { cleanUp } from './cleanup';
 import { type CompactLayout, compactLayout } from './compact';
 import { placeEntrances } from './entrances';
+import { addRewardRoom, withStages } from './fiveRoom';
 import { floorRulesHold } from './floorRules';
 import { type FloorRoot, growTree, normalCount } from './grow';
 import { growPass } from './growPass';
@@ -35,6 +36,13 @@ export interface FloorRequest {
   blocked: ReadonlySet<string>;
   /** Whether the floor has the boss room. */
   boss: boolean;
+  /**
+   * Where a gallery could look down into the boss room: the floors of the rooms above, less
+   * their walls' ring. A boss room under one of them is preferred, so it can be two floors high.
+   */
+  galleries?: readonly CellRect[];
+  /** A five-room dungeon: no loops or secret wings, a reward room beyond the boss room, stages named. */
+  fiveRoom?: boolean;
   /** What else the finished floor must allow: the stairwells it needs to and from the floors beside it. */
   accept: (layout: CompactLayout) => boolean;
 }
@@ -68,16 +76,19 @@ function attempt(seed: number, request: FloorRequest, index: number): Built | nu
   const work = growTree(rngOf, params, root, { reserved: request.reserved, within: request.within, blocked: request.blocked });
   const normals = normalCount(work);
   growPass(rngOf, work);
-  const boss = !request.boss || placeBossRoom(work);
-  addLoops(rngOf, work, params);
+  const placed = !request.boss || placeBossRoom(work, request.galleries ?? []);
+  if (!request.fiveRoom) addLoops(rngOf, work, params);
   addBossDoor(rngOf, work);
-  placeSecretWings(rngOf, work, params);
-  addSecretLoops(rngOf, work, params);
+  const boss = placed && (!request.fiveRoom || addRewardRoom(rngOf, work));
+  if (!request.fiveRoom) {
+    placeSecretWings(rngOf, work, params);
+    addSecretLoops(rngOf, work, params);
+  }
   cleanUp(work);
   const entrances = floor > 0 || placeEntrances(rngOf, work, params);
   addSteps(rngOf, work, params);
   shapeRooms(rngOf, work, params);
-  const layout = compactLayout(work);
+  const layout = request.fiveRoom ? withStages(compactLayout(work)) : compactLayout(work);
   const kept = [normals >= params.minRooms, entrances, boss, floorRulesHold(layout)].filter(Boolean).length;
   return { layout, normals, linked: request.accept(layout), kept };
 }

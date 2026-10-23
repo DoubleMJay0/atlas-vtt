@@ -93,6 +93,7 @@ function floorBelow(seed: number, params: DungeonParams, above: FloorShape, inde
     reserved: null,
     within: underneath(above),
     boss: boss && last,
+    galleries: above.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda).map((room) => ({ x0: room.x + 1, y0: room.y + 1, x1: room.x + room.w - 2, y1: room.y + room.h - 2 })),
     blocked: landingCells(landing),
     accept: (built) => linkFloor(seed, above, { ...built, stairs: [landing] }, index, last) !== null,
   };
@@ -101,7 +102,8 @@ function floorBelow(seed: number, params: DungeonParams, above: FloorShape, inde
   return (buildFloorLayout(seed, { ...request, within: null }) ?? under)?.layout ?? null;
 }
 
-export function planFloors(seed: number, params: DungeonParams, count: number, boss: boolean): PlannedFloor[] {
+/** Every floor; a five-room dungeon (`fiveRoom`) is one floor of five main rooms. */
+export function planFloors(seed: number, params: DungeonParams, count: number, boss: boolean, fiveRoom = false): PlannedFloor[] {
   const entry = buildFloorLayout(seed, {
     floor: 0,
     params: floorParams(params, 0),
@@ -109,6 +111,7 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
     reserved: ENTRANCE_BLOCK,
     within: null,
     boss: boss && count === 1,
+    fiveRoom: fiveRoom && count === 1,
     blocked: new Set(),
     accept: (layout) => count === 1 || chooseDescent(stairsRng(seed, 0, 'descent'), { ...layout, stairs: [] }, 0) !== null,
   });
