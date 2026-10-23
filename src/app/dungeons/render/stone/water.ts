@@ -9,7 +9,6 @@ import { depthField, poolOutlines, poolsPath } from '../art/pools';
 import { drawGridCanvas, fieldOf, gridOver, rgbaCanvas } from '../art/raster';
 import { paintLayer } from '../art/strips';
 import type { StoneColours } from './colours';
-import { drawLava } from './lava';
 
 /**
  * Still water: clear at its shore, so the floor shows through, deepening and darkening away from
@@ -20,7 +19,6 @@ export function drawPools(scene: ArtScene, c: StoneColours): void {
   const outlines = poolOutlines(scene);
   if (!outlines.length) return;
   const trace = poolsPath(outlines);
-  if (scene.env.style.liquid === 'lava' && !c.mono) return drawLava(scene, c, outlines.map(o => o), trace);
   paintWater(scene, c, trace, outlines, depthField(scene, trace, outlines.flat()), false);
 }
 

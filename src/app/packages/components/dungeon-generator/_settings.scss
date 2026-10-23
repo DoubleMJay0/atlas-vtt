@@ -9,7 +9,8 @@
   @include atlas-flex-col($gap: $spacing-l);
   flex: 1;
   min-height: 0;
-  padding: $spacing-l;
+  // The scrollbar sits inside the end padding, so nothing moves when the settings start to scroll.
+  @include atlas-scroll-padding($spacing-l);
   overflow-y: auto;
   @include atlas-scrollbar;
 }

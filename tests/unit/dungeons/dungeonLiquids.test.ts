@@ -70,15 +70,32 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
     for (const liquid of liquids) {
       expect(areas.some(area => inside(area, liquid.polygon[0]!.x, liquid.polygon[0]!.y))).toBe(false);
       expect(liquid.polygon.length).toBeGreaterThanOrEqual(3);
-      expect(liquid.polygon.length).toBeLessThanOrEqual(128);
+      expect(liquid.polygon.length).toBeLessThanOrEqual(256);
     }
   });
 
-  it('turns the pools of a look whose pools are lava into lava, and keeps each floor\'s on its level', () => {
-    const { liquids, parts } = dungeonWith(['wet'], 'lava', 'volcanic', 2);
-    expect(parts.levelIds).not.toBeNull();
-    for (const liquid of liquids) expect(parts.levelIds).toContain(liquid.level);
-    for (const light of Object.values(parts.scene.lights)) expect(parts.levelIds).toContain(light.levels?.[0]);
+  it('keeps pools water in every look, lava and acid only where the dungeon has them, each floor\'s on its level', () => {
+    for (let seed = 1; seed < 60; seed++) {
+      const model = generateDungeon({ seed, tags: ['flooded'], floors: 2 });
+      const parts = partsOf(model, 'volcanic');
+      const hazards = new Set(model.floors.flatMap(f => f.terrain.filter(p => p.kind === 'channel').map(p => p.traits.hazard)));
+      for (const liquid of Object.values(parts.scene.liquids ?? {})) {
+        expect(parts.levelIds).toContain(liquid.level);
+        if (liquid.liquid !== 'water') expect(hazards.has(liquid.liquid)).toBe(true);
+      }
+      for (const light of Object.values(parts.scene.lights)) expect(parts.levelIds).toContain(light.levels?.[0]);
+    }
+  });
+
+  it('makes one surface of a lake with an island, never a surface per row, and keeps every outline within an area light\'s corners', () => {
+    for (let seed = 1; seed < 80; seed++) {
+      const parts = partsOf(generateDungeon({ seed, tags: ['flooded', 'large'], floors: 1 }), 'parchment');
+      for (const liquid of Object.values(parts.scene.liquids ?? {})) {
+        expect(liquid.polygon.length).toBeLessThanOrEqual(256);
+        for (const hole of liquid.holes ?? []) expect(hole.length).toBeLessThanOrEqual(256);
+      }
+      for (const light of Object.values(parts.scene.lights)) expect(light.area!.length).toBeLessThanOrEqual(256);
+    }
   });
 
   it('cuts the columns standing in a pool out of its surface', () => {

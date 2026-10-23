@@ -1,14 +1,14 @@
 import { toGameUnits } from '../../grid/statedDistance';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
+import { MAX_AREA_CORNERS } from '../../lighting/lightArea';
 import type { LightEmission, LightSource } from '../../types/lightingTypes';
 import type { LiquidColors, LiquidKind, LiquidSurface } from '../../types/liquidTypes';
-import type { DungeonColumn, DungeonTerrain } from '../model';
+import type { CellPoint, DungeonColumn, DungeonTerrain } from '../model';
 import { intersectRings, subtractRings, unionRings } from '../render/clipShapes';
 import { shapePolygon, type Vec } from '../render/geometry';
 import { mixColours, paletteOf } from '../render/palette';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
-import { cellOutlines } from './cellOutline';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
@@ -18,14 +18,16 @@ import type { DungeonPlacement } from './toWalls';
  * that glows from the whole of that surface (`LightSource.area`), so a room with lava is lit by it.
  */
 
-/** The most corners a surface's outline gets; a pool's curve is sampled more coarsely to stay under it. */
-const MAX_CORNERS = 128;
+/** The most corners an outline gets: as many as an area light reads; a larger one is simplified (`fitCorners`). */
+const MAX_CORNERS = MAX_AREA_CORNERS;
+/** How far a simplified outline may stray from the drawn one at first, in cells; doubled until it fits. */
+const FIRST_TOLERANCE = 0.01;
 
 interface Liquid {
   liquid: LiquidKind;
   /** Its outline in cells. */
   ring: Vec[];
-  /** Columns standing in it, in cells. */
+  /** Islands and what stands in it, in cells. */
   holes?: Vec[][];
   flow?: Vec;
 }
@@ -56,8 +58,54 @@ function terrainLiquids(pieces: readonly DungeonTerrain[]): Liquid[] {
     const liquid = piece.traits.hazard && HAZARD_LIQUID[piece.traits.hazard];
     if (!liquid || (piece.kind !== 'channel' && piece.kind !== 'deep-water')) return [];
     const flow = piece.kind === 'channel' && piece.facing ? { x: piece.facing.x, y: piece.facing.y } : undefined;
-    return cellOutlines(piece.cells, MAX_CORNERS).map((ring): Liquid => ({ liquid, ring, ...(flow && { flow }) }));
+    return withHoles(cellRings(piece.cells)).map(({ ring, holes }): Liquid => ({ liquid, ring, ...(holes.length && { holes }), ...(flow && { flow }) }));
   });
+}
+
+/** The outline of cells as clipping makes it: whole rings with their holes, never a ring per row. */
+function cellRings(cells: readonly CellPoint[]): Vec[][] {
+  return unionRings(cells.map(({ x, y }) => [{ x, y }, { x: x + 1, y }, { x: x + 1, y: y + 1 }, { x, y: y + 1 }]));
+}
+
+/** Points of a closed ring kept by Douglas–Peucker within `tolerance`. */
+function simplifyRing(ring: readonly Vec[], tolerance: number): Vec[] {
+  const keep = new Uint8Array(ring.length);
+  const stack: [number, number][] = [[0, Math.floor(ring.length / 2)], [Math.floor(ring.length / 2), ring.length]];
+  keep[0] = 1;
+  keep[Math.floor(ring.length / 2)] = 1;
+  while (stack.length) {
+    const [from, to] = stack.pop()!;
+    const a = ring[from]!;
+    const b = ring[to % ring.length]!;
+    let far = -1;
+    let farthest = tolerance;
+    for (let i = from + 1; i < to; i++) {
+      const d = segmentDistance(ring[i]!, a, b);
+      if (d > farthest) {
+        farthest = d;
+        far = i;
+      }
+    }
+    if (far < 0) continue;
+    keep[far] = 1;
+    stack.push([from, far], [far, to]);
+  }
+  return ring.filter((_, i) => keep[i]);
+}
+
+function segmentDistance(p: Vec, a: Vec, b: Vec): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = dx * dx + dy * dy;
+  const t = length === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length));
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+
+/** A ring within `MAX_CORNERS`: as drawn where it fits, else simplified as little as it takes. */
+function fitCorners(ring: Vec[]): Vec[] {
+  let fitted = ring;
+  for (let tolerance = FIRST_TOLERANCE; fitted.length > MAX_CORNERS; tolerance *= 2) fitted = simplifyRing(ring, tolerance);
+  return fitted;
 }
 
 /** The outline of a standing column, which the water flows round. */
@@ -73,13 +121,11 @@ function withHoles(rings: Vec[][]): { ring: Vec[]; holes: Vec[][] }[] {
   return outlines.map(ring => ({ ring, holes: holes.filter(hole => inside(ring, hole[0]!)) }));
 }
 
-/** The floor's pools, on what of them lies on the floor (the map clips them there too). */
-function poolLiquids(dungeon: VisibleDungeon, style: DungeonStyle): Liquid[] {
+/** The floor's pools of water, on what of them lies on the floor (the map clips them there too). Lava and acid are hazards of their own, never pools. */
+function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
   const floorRings = unionRings(dungeon.floors.map(shape => shapePolygon(shape, 0, 100)));
-  const liquid: LiquidKind = style.liquid === 'lava' ? 'lava' : 'water';
   return dungeon.floor.water.flatMap(pool => {
-    const steps = Math.max(1, Math.min(6, Math.floor(MAX_CORNERS / Math.max(3, pool.outline.length))));
-    return intersectRings([smoothRing(pool.outline, steps)], floorRings).filter(ring => signedArea(ring) > 0).map((ring): Liquid => ({ liquid, ring }));
+    return withHoles(intersectRings([smoothRing(pool.outline, 4)], floorRings)).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }) }));
   });
 }
 
@@ -95,18 +141,17 @@ function drawnOver(dungeon: VisibleDungeon, view: DungeonView): Vec[][] {
   const stairs = floor.stairs.map(({ x, y, w, h }) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }]);
   const terrain = floor.terrain
     .filter(piece => roomShapes.has(piece.room) && !UNDER_WATER.has(piece.kind) && !(piece.traits.hazard && HAZARD_LIQUID[piece.traits.hazard]))
-    .flatMap(piece => cellOutlines(piece.cells, MAX_CORNERS));
+    .flatMap(piece => cellRings(piece.cells));
   const props = view.props ? floor.props.filter(prop => roomShapes.has(prop.room)).map(propPolygon) : [];
   return [...stairs, ...terrain, ...props, ...floor.columns.map(columnRing)];
 }
 
-/** Each liquid with what the map draws over it cut out: islands as holes, a surface cut in two as two. */
+/** Each liquid with what the map draws over it cut out: islands as holes, a surface cut in two as two, every ring within `MAX_CORNERS`. */
 function cutOut(found: readonly Liquid[], over: readonly Vec[][]): Liquid[] {
-  if (!over.length) return [...found];
-  return found.flatMap(({ ring, ...rest }) =>
-    withHoles(subtractRings([ring], over))
-      .filter(cut => cut.ring.length >= 3 && cut.ring.length <= MAX_CORNERS && signedArea(cut.ring) > 0.05)
-      .map((cut): Liquid => ({ ...rest, ring: cut.ring, ...(cut.holes.length && { holes: cut.holes }) })));
+  return found.flatMap(({ ring, holes = [], ...rest }) =>
+    withHoles(over.length ? subtractRings([ring, ...holes], over) : [ring, ...holes])
+      .filter(cut => cut.ring.length >= 3 && signedArea(cut.ring) > 0.05)
+      .map((cut): Liquid => ({ ...rest, ring: fitCorners(cut.ring), ...(cut.holes.length && { holes: cut.holes.map(fitCorners) }) })));
 }
 
 /** Positive for an outline, negative for a hole, as clipping orients them. */
@@ -181,7 +226,7 @@ export function floorLiquids(
   level?: string,
 ): FloorLiquids {
   const shown = dungeon.floor.terrain.filter(piece => dungeon.roomShapes.has(piece.room));
-  const whole = [...(view.water ? poolLiquids(dungeon, style) : []), ...terrainLiquids(shown)];
+  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(shown)];
   const colours = liquidColours(style, view);
   const { originCell, pxPerCell } = placement;
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
@@ -196,8 +241,8 @@ export function floorLiquids(
   const lights: Record<string, LightSource> = {};
   whole.forEach(({ liquid, ring }, index) => {
     const glow = GLOWS[liquid];
-    if (!glow || ring.length > MAX_CORNERS) return;
-    const area = ring.map(world);
+    if (!glow) return;
+    const area = fitCorners(ring).map(world);
     const middle = centroid(area);
     const emission: LightEmission = { bright: units(glow.bright), dim: units(glow.dim), color: glow.color, intensity: glow.intensity, animation: 'smoulder', kind: 'custom' };
     const lightId = `light_${id}_${index + 1}`;
