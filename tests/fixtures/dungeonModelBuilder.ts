@@ -21,7 +21,7 @@ import { rngFrom, type Rng } from '../../src/app/dungeons/rng';
  */
 
 export function emptyFloor(): DungeonFloor {
-  return { rooms: [], doors: [], columns: [], props: [], rubble: [], cracks: [], water: [], waterCells: [], stairs: [], terrain: [] };
+  return { rooms: [], doors: [], columns: [], props: [], rubble: [], cracks: [], water: [], waterCells: [], stairs: [], terrain: [], growth: [] };
 }
 
 /** A dungeon of one empty floor; build it through `entryFloor`. */

@@ -39,7 +39,7 @@ function dungeonWith(tags: string[], kind: LiquidSurface['liquid'], look: Dungeo
 
 describe('a dungeon\'s water, lava and acid in its scene', () => {
   it('glows from every lava channel as a whole, bridges included, and moves around what the map draws over it', () => {
-    const { model, liquids, parts } = dungeonWith(['dry'], 'lava', 'parchment');
+    const { model, liquids, parts } = dungeonWith(['dry', 'lava'], 'lava', 'parchment');
     const floor = model.floors[0]!;
     const layout = mapLayout(model, PX, DEFAULT_VIEW);
     const world = (x: number, y: number) => ({ x: (x - layout.originCell.x) * PX, y: (y - layout.originCell.y) * PX });
@@ -98,6 +98,20 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
     }
   });
 
+  it('has lava and acid only where its tags ask for them', () => {
+    const molten = (tags: string[]): Set<string> => {
+      const found = new Set<string>();
+      for (let seed = 1; seed <= 60; seed++) {
+        for (const floor of generateDungeon({ seed, tags, floors: 2 }).floors) for (const piece of floor.terrain) if (piece.traits.hazard === 'lava' || piece.traits.hazard === 'acid') found.add(piece.traits.hazard);
+      }
+      return found;
+    };
+    expect(molten([])).toEqual(new Set());
+    expect(molten(['dry'])).toEqual(new Set());
+    expect(molten(['lava'])).toEqual(new Set(['lava']));
+    expect(molten(['acid'])).toEqual(new Set(['acid']));
+  });
+
   it('cuts the columns standing in a pool out of its surface', () => {
     for (let seed = 1; seed < 400; seed++) {
       const model = generateDungeon({ seed, tags: ['flooded', 'colonnades'], floors: 1 });
@@ -110,7 +124,7 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
   });
 
   it('counts a cell twice in squares with small tiles', () => {
-    const { model } = dungeonWith(['dry'], 'lava', 'parchment');
+    const { model } = dungeonWith(['dry', 'lava'], 'lava', 'parchment');
     const small = partsOf(model, 'parchment', { ...DEFAULT_VIEW, smallTiles: true });
     const light = Object.values(small.scene.lights)[0]!;
     expect(light.emission.dim).toBe(40);

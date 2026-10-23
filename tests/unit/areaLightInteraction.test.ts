@@ -19,26 +19,20 @@ function withLava(): ReturnType<typeof setup> & { lava: string } {
 }
 
 describe('dragging an area light', () => {
-  it('moves its whole area with its middle, as one undo step', () => {
-    const { store, lava, tool, press, move, up, steps, undo } = withLava();
-    tool.active = true;
-    expect(press(650, 150)).toBe(true);
-    move(680, 170);
-    up();
-    expect(store.getState().objects.lights[lava]).toMatchObject({ x: 680, y: 170, area: AREA.map(({ x, y }) => ({ x: x + 30, y: y + 20 })) });
-    expect(steps()).toBe(1);
-    undo();
-    expect(store.getState().objects.lights[lava]).toMatchObject({ x: 650, y: 150, area: AREA });
-  });
-
-  it('puts the area back when the drag is cancelled, leaving no step', () => {
-    const { store, lava, tool, lights, press, move, steps } = withLava();
-    tool.active = true;
-    press(650, 150);
-    move(700, 250);
-    lights.cancel();
-    expect(store.getState().objects.lights[lava]).toMatchObject({ x: 650, y: 150, area: AREA });
+  it('leaves it where its surface is, with every tool that moves lights, and still opens its popover on a click', () => {
+    const { store, lava, tool, press, move, up, steps } = withLava();
+    for (const [active, moves] of [[true, false], [false, true]] as const) {
+      tool.active = active;
+      tool.moves = moves;
+      press(650, 150);
+      move(680, 170);
+      up();
+      expect(store.getState().objects.lights[lava]).toMatchObject({ x: 650, y: 150, area: AREA });
+    }
     expect(steps()).toBe(0);
+    press(650, 150);
+    up();
+    expect(store.getState().lightPopover).toBe(lava);
   });
 });
 

@@ -13,30 +13,37 @@ import { drawShade } from './shade';
 import { drawWallBand, drawWallEdge } from './walls';
 import { drawPools } from './water';
 import { drawWeathering } from './weathering';
+import { stoneGrowth } from './growth';
 
 /**
  * Stone & shadow, bottom to top: the rock, the wall's course, the floor, water, terrain on the
- * ground and raised floors, light and shade, the grid, the wall's ink, then rubble, whatever
- * stands, passages and stairs, and holes in the floor with their bridges.
+ * ground and raised floors, moss and plants, light and shade, the grid, climbers with the wall's
+ * ink running under their upper leaves, then rubble, whatever stands, columns and what climbs
+ * them, passages and stairs, and holes in the floor with their bridges.
  */
 export function paintStone(scene: ArtScene): void {
   const { env } = scene;
   const c = stoneColours(env.palette, env.view.monochrome);
   const hand = stoneHand(scene, c);
   const colours = { water: c.water, cloth: c.cloth };
+  const growth = stoneGrowth(scene, hand, c);
   drawRock(env);
   drawWallBand(scene, c);
   drawFloor(scene, c);
   drawPools(scene, c);
   drawTerrainGround(hand, colours);
   drawWeathering(scene);
+  growth.ground();
   drawShade(scene, c);
   drawGrid(env);
+  growth.climbers();
   drawWallEdge(scene, c);
+  growth.overWalls();
   drawDebris(hand);
   drawProps(hand, c.water, c.cloth);
   drawTerrainStanding(hand, colours);
   drawColumns(hand);
+  growth.columns();
   drawPassages(hand);
   drawTerrainOpenings(hand);
 }

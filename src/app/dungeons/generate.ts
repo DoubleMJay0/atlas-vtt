@@ -1,15 +1,17 @@
 /**
  * Seed, tags and floors in, a whole dungeon out: the tags it is built with, every floor's rooms,
  * doors and stairwells planned together, every floor's terrain placed together (holes line up
- * between floors), then each floor's water and furniture. Architecture only: no story, no text;
+ * between floors), then each floor's water, undergrowth, furniture and vegetation. Architecture only: no story, no text;
  * a dungeon is named by the GM alone.
  */
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { fiveRoomParams } from './layout/fiveRoom';
-import { approachCells, spotRect } from './floors/stairSpots';
-import { cellKey, cellsOf } from './geometry';
-import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, type DungeonStair, requestedFloors } from './model';
+import { floraOf } from './growth/flora';
+import { placeGrowth } from './growth/placeGrowth';
+import { addUndergrowth } from './growth/undergrowth';
+import { stairsAndAround } from './floors/stairSpots';
+import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, requestedFloors } from './model';
 import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './params';
 import { floorColumns, placeProps } from './props';
 import { roomRoles, type RoomRoles } from './props/roles';
@@ -31,15 +33,12 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const dry = level <= 0 && params.tags.has('dry');
   const pools = dry ? new Set<number>() : poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance);
   const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set([...terrain.takenCells(), ...stairsAndAround(stairs)]) });
-  const pieces = addShallowWater(terrain, waterCells);
+  const flora = floraOf(params.tags);
+  addShallowWater(terrain, waterCells);
+  const pieces = addUndergrowth(seed, terrain, waterCells, flora);
   const { props, rubble, cracks } = placeProps({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, roles, params });
-  return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces };
-}
-
-/** Every stairwell, the rows it is reached from at either end and the cells round them, by key: no pool reaches them. */
-function stairsAndAround(stairs: readonly DungeonStair[]): string[] {
-  const cells = stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, 'upper'), ...approachCells(s, 'lower')]);
-  return cells.flatMap((c) => [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => cellKey(c.x + dx, c.y + dy))));
+  const growth = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
+  return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth };
 }
 
 export function generateDungeon(request: DungeonRequest): DungeonModel {

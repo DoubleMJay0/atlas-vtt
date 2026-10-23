@@ -141,4 +141,19 @@ describe('shadows from heights on a generated dungeon', () => {
       expect(duskSum).toBeLessThan(daySum * 0.35);
     });
   }
+
+  it('barrow: an overgrown room\'s plants cast their small shadows from a torch, as stones do', async () => {
+    const floor = shadedFloor({ seed: 12, tags: ['overgrown', 'wet'], floors: 1 }, 'moss', PX_PER_CELL);
+    floors.set('moss', floor);
+    const { thing, lamp } = standingThing(floor.model);
+    const near = closeUp(floor, thing);
+    const torch = torchAt(floor, 'torch', lamp(-2.4));
+    await save(shoot(renderer, floor, null, near, true), near, 'moss-1-baked-close');
+    await save(shoot(renderer, floor, { ambient: 1, lights: [] }, near), near, 'moss-2-daylight-close');
+    await save(shoot(renderer, floor, { ambient: 0.12, lights: [torch] }, near), near, 'moss-3-dim-torch-close');
+    const whole = { ...near, scale: Math.min(1600 / floor.layout.widthPx, 1200 / floor.layout.heightPx), x: 0, y: 0 };
+    const today = shoot(renderer, floor, null, { ...whole, width: Math.round(floor.layout.widthPx * whole.scale), height: Math.round(floor.layout.heightPx * whole.scale) }, true);
+    const shaded = shoot(renderer, floor, null, { ...whole, width: Math.round(floor.layout.widthPx * whole.scale), height: Math.round(floor.layout.heightPx * whole.scale) });
+    expect(difference(today, shaded).mean).toBeLessThan(0.3);
+  });
 });

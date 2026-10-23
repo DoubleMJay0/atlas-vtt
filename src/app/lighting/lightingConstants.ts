@@ -29,28 +29,42 @@ export const TILE_BAND_TEXELS = 1 << 17;
  */
 export const TILE_SMOOTH = 4;
 /**
- * The picture's tail: past its dim radius, where the rules stop counting it, a light eases out
- * over this share of the dim radius, as real light spills into the dark (a fade of 8 % looked
- * like light that stops; Fabian, 2026-10-23). What lies in the tail looks faintly lit and is not
- * counted: a token standing there is unseen. Walls stop the tail like any light.
+ * Where a light ends in the picture, as a multiple of its dim radius: at it. The picture never
+ * lights what the rules do not count (but for a texel of filtering), so a token on a floor that
+ * looks lit is seen. Its tiles reach this far.
  */
-export const LIGHT_TAIL = 0.5;
-/** Where a light ends in the picture, as a multiple of its dim radius: its tiles reach this far. */
-export const LIGHT_REACH = 1 + LIGHT_TAIL;
+export const LIGHT_REACH = 1;
 /**
- * The tail is shaped in what the eye sees, not in light (`TAIL_GLSL`): the light itself falls as
- * that curve to this power, about the display's (sRGB is near a 2.4 power), so its brightness
- * on screen eases out without a ring at the dim radius and without a visible end.
+ * The fade: from its bright radius a light falls smoothly to nothing exactly at its dim radius,
+ * so it sinks into the dark instead of stopping (Fabian, 2026-10-23: the light must never look
+ * larger than what creatures see, and fade into blackness within it). A light bright to its end,
+ * or nearly, still fades over at least this share of its dim radius.
  */
-export const TAIL_POWER = 2.4;
-/** Rays a light's tile traces across its flame in its tail, at most: the tail is faint, and far texels cost the most. */
-export const TAIL_RAYS = 8;
+export const LIGHT_FADE_MIN = 0.3;
+/**
+ * The fade is shaped in what the eye sees, not in light (`FADE_GLSL`): the light itself falls as
+ * that curve to this power, about the display's (sRGB is near a 2.4 power), so its brightness on
+ * screen falls without a ring where the fade begins and without a step where it ends.
+ */
+export const FADE_POWER = 2.4;
+
+/** The share of a light left at `distance` by its fade (`FADE_GLSL`, which this mirrors): 1 to where the fade begins, 0 from the dim radius on. */
+export function lightFade(bright: number, dim: number, distance: number): number {
+  const from = Math.min(bright, dim * (1 - LIGHT_FADE_MIN));
+  const u = Math.min(1, Math.max(0, (dim - distance) / Math.max(dim - from, 1e-3)));
+  return (u * (2 - u)) ** (1.5 * FADE_POWER);
+}
+/**
+ * A sense with a range that shows the map (darkvision, a token's limited sight) fades in the
+ * players' picture over this last share of its range, as light fades within its dim radius: what
+ * it perceives is unchanged, the picture only darker towards its edge.
+ */
+export const SENSE_FADE = 0.4;
 /**
  * How much light a light gives in its two ranges (HDR, before exposure): `bright` up to the
- * bright radius, `dim` from there to the dim radius, with a soft knee between them. The
- * composite tonemaps a light at its bright level and scales the result back, so every floor
- * shows the dim range at the same share of the bright range, about a third; it must not fall
- * under a quarter (`lightFalloff.gpu.test.ts`).
+ * bright radius, `dim` from there to the dim radius, with a soft knee between them, and the
+ * fade (`LIGHT_FADE_MIN`) over the dim range. The composite tonemaps a light at its bright level
+ * and scales the result back, so a dim floor shows its share of the bright range on any floor.
  */
 export const LIGHT_LEVELS = { bright: 1.25, dim: 0.4 } as const;
 export const EXPOSURE = 0.9;
@@ -61,25 +75,21 @@ export const MIN_SOFTNESS = 0.12;
 /** Strength of the cool grey shift where the light is low and none of it a light's own (ambient, bounce). */
 export const PURKINJE = 0.55;
 
-/**
- * How wide, in world pixels, a beam's sides are soft at most: as long as the tail past its dim
- * radius. What lies there looks lit and is not counted, like the tail.
- */
+/** How wide, in world pixels, a beam's sides fade at most: as wide as its far end fades. */
 export function softEdge(dim: number): number {
-  return LIGHT_TAIL * dim;
+  return LIGHT_FADE_MIN * dim;
 }
 /**
- * A light that shines one way gives its full light inside its cone, where the rules count it,
- * and eases out past the cone's sides as past its dim radius (`TAIL_GLSL`), over its soft edge
- * (`softEdge`, a width, not an angle: an angle grows with the distance). That width is also held
- * to a share (`BEAM_EDGE`) of the beam's half-width at that distance (`beamEdge`), so a beam
- * keeps its shape: a narrow beam has narrow soft sides, which widen with the distance as a real
+ * A light that shines one way gives its light inside its cone, where the rules count it, and
+ * fades towards the cone's sides as towards its dim radius (`FADE_GLSL`), to nothing on them:
+ * over its soft edge inside the cone (`softEdge`, a width, not an angle: an angle grows with the
+ * distance), held to a share (`BEAM_EDGE`) of the beam's half-width at that distance
+ * (`beamEdge`), so a narrow beam has narrow soft sides that widen with the distance, as a real
  * beam's penumbra does. A beam wider than a half turn leaves a dark wedge behind the light, and
- * the edge is held to that wedge's half-width instead, so it never fills the wedge. The beam's
- * far end has the tail every light has, and its own space (the cone's apex), which is lit all
- * around, eases out over the edge it has at that radius.
+ * the edge is held to that wedge's half-width instead. Its far end fades like any light's, and its
+ * own space (the cone's apex), which is lit all around, fades to nothing at its radius.
  */
-export const BEAM_EDGE = 0.4;
+export const BEAM_EDGE = 0.25;
 /** A beam's edge is never narrower than this many texels of the light map, where it is drawn: a narrower one shows the texels as steps. */
 export const BEAM_EDGE_TEXELS = 1;
 
@@ -95,7 +105,7 @@ export function beamEdge(edge: number, distance: number, angle: number, texel: n
 
 /**
  * A source of magical darkness swallows all light up to its radius; over the last `rim` world
- * pixels inside it (and no more than the fade past a light's dim radius) the light comes back,
+ * pixels inside it (and no more than `rimShare` of its radius) the light comes back,
  * so its edge is soft and nothing beyond the radius is darkened. The rule counts the rim as dark:
  * it is kept narrow, since a wide one shows daylight where a token is hidden. `veil` is the faint cool tint (linear light) the players see in place of the map
  * there, to tell magical darkness from the unlit dark; `gmVeil` the stronger one the GM sees
@@ -103,6 +113,7 @@ export function beamEdge(edge: number, distance: number, angle: number, texel: n
  */
 export const DARKNESS = {
   rim: 6,
+  rimShare: 0.08,
   veil: [0.003, 0.0026, 0.011],
   gmVeil: [0.03, 0.022, 0.085],
 } as const;
@@ -116,16 +127,15 @@ export const DARKNESS = {
  * the floor is brightly lit, less where it is less lit) or `cells` grid cells. So a light never
  * reaches past its own range, and the next room gets what of it is left. *Picture*: in the
  * light's colour at `level` (HDR) next to brightly lit floor it comes from (less next to less lit
- * floor), down to `edge` of `level` where the rule stops counting it, then easing out as a light's tail does
- * (`TAIL_GLSL`) by `fade` times its reach, blurred within the free floor over `blur` of its
- * longest reach, so the points it is traced from show as one soft spill.
+ * floor), fading as a light does (`FADE_GLSL`) over the last `fade` of its reach to nothing
+ * where the rule stops counting it, blurred within the free floor over `blur` of its longest
+ * reach, so the points it is traced from show as one soft spill.
  */
 export const REFLECTION = {
   share: 0.4,
   cells: 3,
-  level: 0.32,
-  edge: 0.45,
-  fade: LIGHT_REACH,
+  level: 0.4,
+  fade: 0.6,
   blur: 0.1,
 } as const;
 

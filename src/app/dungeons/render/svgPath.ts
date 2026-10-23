@@ -67,6 +67,25 @@ export abstract class SvgPathBuilder {
     this.moveTo(x, y);
   }
 
+  /** An ellipse as Canvas 2D adds one, as straight pieces fine enough for the small things drawn so (leaves' shadows, caps, petals). */
+  ellipse(x: number, y: number, rx: number, ry: number, rotation: number, from: number, to: number, counterclockwise = false): void {
+    let sweep = counterclockwise ? from - to : to - from;
+    sweep = sweep >= TAU ? TAU : ((sweep % TAU) + TAU) % TAU;
+    const signed = counterclockwise ? -sweep : sweep;
+    const pieces = Math.max(4, Math.ceil((sweep / TAU) * 24));
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    for (let i = 0; i <= pieces; i++) {
+      const a = from + (signed * i) / pieces;
+      const px = Math.cos(a) * rx;
+      const py = Math.sin(a) * ry;
+      const qx = x + px * cos - py * sin;
+      const qy = y + px * sin + py * cos;
+      if (i === 0 && !this.last) this.moveTo(qx, qy);
+      else this.lineTo(qx, qy);
+    }
+  }
+
   quadraticCurveTo(cx: number, cy: number, x: number, y: number): void {
     if (!this.last) this.moveTo(cx, cy);
     this.path.push(`Q${this.point(cx, cy)} ${this.point(x, y)}`);

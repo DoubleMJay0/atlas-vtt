@@ -1,6 +1,6 @@
 import { BufferImageSource, Texture } from 'pixi.js';
 import { afterEach, describe, expect, it } from 'vitest';
-import { LIGHT_REACH } from '../../../../lighting/lightingConstants';
+import { lightFade } from '../../../../lighting/lightingConstants';
 import { srgbToLinear } from '../../../../lighting/srgb';
 import type { UnitScale } from '../../../../lighting/lightingUnits';
 import type { LightEmission } from '../../../../types/lightingTypes';
@@ -8,6 +8,7 @@ import type { Point } from '../../../../types/visionTypes';
 import type { WallSegment } from '../../../../types/wallTypes';
 import { lightLevelAt } from '../../../../vision/lightLevels';
 import { LightReaches } from '../../../../vision/lightReaches';
+import { areaDistance } from '../../../../vision/areaReach';
 import { engineLight } from '../../../../vision/lightSources';
 import { SEES_ALL } from '../../../../vision/sight';
 import { LightingEngine } from '../LightingEngine';
@@ -61,17 +62,18 @@ describe('an area light in the picture', () => {
     return { light, at: (point) => luminance(read(Math.floor((point.x * SIZE) / MAP), Math.floor((point.y * SIZE) / MAP))) };
   }
 
-  it('is brightest on the lava, falls off from its shore as a light from its flame, and ends at its reach', async () => {
+  it('is brightest on the lava, falls off from its shore as a light from its flame, and ends at its dim radius', async () => {
     const { at, light } = await picture();
     const fromShore = (d: number): number => at({ x: 500 + d, y: 510 });
     const level = fromShore(light.bright / 2);
     for (const inside of [{ x: 425, y: 475 }, { x: 360, y: 590 }, { x: 495, y: 430 }]) expect(at(inside)).toBeGreaterThanOrEqual(level);
-    // The dim range keeps at least a quarter of the bright level out to its edge, and nothing is left past the reach.
-    expect(fromShore(light.dim - 6)).toBeGreaterThan(0.25 * level);
-    expect(fromShore(light.dim * LIGHT_REACH + 8)).toBeLessThan(0.02 * level);
+    // The dim range fades from its bright radius, lit halfway and nearly dark at its edge, and nothing is left past it.
+    expect(fromShore((light.bright + light.dim) / 2)).toBeGreaterThan(0.05 * level);
+    expect(fromShore(light.dim - 6)).toBeLessThan(0.1 * level);
+    expect(fromShore(light.dim + 8)).toBeLessThan(0.02 * level);
     // It only falls with distance, and nowhere steeply: no ring.
     let steepest = 0;
-    for (let d = 2; d < light.dim * LIGHT_REACH; d += 2) {
+    for (let d = 2; d < light.dim + 8; d += 2) {
       const drop = fromShore(d) - fromShore(d + 2);
       expect(drop).toBeGreaterThan(-0.01 * level);
       steepest = Math.max(steepest, drop / 2);
@@ -98,6 +100,8 @@ describe('an area light in the picture', () => {
         const rule = lightLevelAt(point, { ambient: 0 }, reaches);
         // Away from the wall (its capsule and the filtering beside it) and from the rule's edges.
         if (Math.abs(x - 560) < 8) continue;
+        // The picture fades to nothing at the dim radius: where it has faded to under a fifth, it is not asked.
+        if (rule !== 'dark' && lightFade(light.bright, light.dim, areaDistance(point, reaches[0]!)) < 0.2) continue;
         if (rule !== 'dark') {
           lit++;
           if (at(point) < 0.02 * level) unlit++;

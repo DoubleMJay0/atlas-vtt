@@ -27,8 +27,6 @@ export interface TileJob {
   readonly rect: Rect;
   readonly oneWay: CapsuleField | null;
   readonly tile: RenderTexture;
-  /** How far from the light its tail starts, where fewer rays are traced (`TAIL_RAYS`); Infinity for none. */
-  readonly tailFrom: number;
   /** An area light's tile: its outline is drawn into a distance field first, then traced towards. */
   readonly area?: AreaJob;
   /** The shadows of what stands (`EngineRelief`), traced after the walls' and taken into the smoothing; none without a relief. */
@@ -46,7 +44,7 @@ export interface AreaJob {
   readonly count: number;
   readonly bright: number;
   readonly dim: number;
-  /** Where its light ends, past the dim range. */
+  /** Where its light ends (`LIGHT_REACH` of its dim range). */
   readonly reach: number;
   /** Sigma, in world pixels, of the blur that rounds the creases of its distance field for the light map (`areaBlurFragment`). */
   readonly blur: number;
@@ -74,7 +72,6 @@ export class TileTracer {
     uTileRect: { value: new Float32Array(4), type: 'vec4<f32>' },
     uLight: { value: new Float32Array(2), type: 'vec2<f32>' },
     uFlame: { value: 1, type: 'f32' },
-    uTailFrom: { value: 1e20, type: 'f32' },
     uRays: { value: TILE_RAYS, type: 'f32' },
     uOffsets: { value: new Float32Array(TILE_RAYS), type: 'f32', size: TILE_RAYS },
     uTexel: { value: 1, type: 'f32' },
@@ -155,17 +152,17 @@ export class TileTracer {
   }
 
   /** The whole tile at once. `rect` must be snapped to the field's texel grid; `oneWay` holds this light's one-way walls. */
-  trace(at: readonly [number, number], flame: number, rect: Rect, oneWay: CapsuleField | null, tailFrom = Infinity): RenderTexture {
-    const job = this.begin(at, flame, rect, oneWay, tailFrom);
+  trace(at: readonly [number, number], flame: number, rect: Rect, oneWay: CapsuleField | null): RenderTexture {
+    const job = this.begin(at, flame, rect, oneWay);
     this.step(job, Infinity);
     return job.tile;
   }
 
-  /** A tile to build with `step`, whose light's tail starts at `tailFrom` from it; draws nothing yet. */
-  begin(at: readonly [number, number], flame: number, rect: Rect, oneWay: CapsuleField | null, tailFrom = Infinity): TileJob {
+  /** A tile to build with `step`; draws nothing yet. */
+  begin(at: readonly [number, number], flame: number, rect: Rect, oneWay: CapsuleField | null): TileJob {
     const { texel } = this.field;
     const tile = createTarget(rect[2] / texel, rect[3] / texel, 'r8unorm', 'nearest');
-    return { at, flame, rect, oneWay, tile, tailFrom, relief: this.relief.job(rect, this.field.texel), raw: null, phase: 'trace', row: 0 };
+    return { at, flame, rect, oneWay, tile, relief: this.relief.job(rect, this.field.texel), raw: null, phase: 'trace', row: 0 };
   }
 
 
@@ -184,7 +181,7 @@ export class TileTracer {
       corners[2 * i + 1] = shape.corners[i]!.y;
     }
     const area: AreaJob = { corners, count, bright: shape.bright, dim: shape.dim, reach: shape.reach, blur: shape.blur, distance };
-    return { at, flame: 0, rect, oneWay, tile, area, tailFrom: Infinity, relief: this.relief.job(rect, this.field.texel), raw: null, phase: 'distance', row: 0 };
+    return { at, flame: 0, rect, oneWay, tile, area, relief: this.relief.job(rect, this.field.texel), raw: null, phase: 'distance', row: 0 };
   }
 
   /**
@@ -210,7 +207,6 @@ export class TileTracer {
     u.uTileRect.set([job.rect[0], job.rect[1], width * texel, height * texel]);
     u.uLight.set(job.at);
     u.uFlame = job.flame;
-    u.uTailFrom = Math.min(job.tailFrom, 1e20);
     u.uTexel = texel;
     u.uHasOneWay = job.oneWay ? 1 : 0;
     u.uTexels.set([width, height]);

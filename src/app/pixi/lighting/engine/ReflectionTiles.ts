@@ -24,7 +24,7 @@ interface Entry {
 /**
  * One reflection tile per light that reflects (`EngineLight.reflection`, the rule's own parts),
  * drawn anew only when its parts are other ones (the light moved or changed, or walls did, which
- * the rule traces again) or the wall field is another. Each tile is one draw of every part's glow
+ * the rule traces again) or the wall field is another. Each tile is one draw of every part's
  * polygon as a fan, max-blended (`reflectionShader.ts`), over the bounds of those polygons alone,
  * so a light whose shadows are few and short keeps a small tile.
  */
@@ -32,8 +32,6 @@ export class ReflectionTiles {
   private readonly entries = new Map<string, Entry>();
   private readonly uniforms = new UniformGroup({
     uReflectRect: { value: new Float32Array(4), type: 'vec4<f32>' },
-    uEdgeShare: { value: REFLECTION.edge, type: 'f32' },
-    uFade: { value: REFLECTION.fade, type: 'f32' },
   });
   // `max` blending applies only to a mesh below the render root, so the mesh is drawn from here.
   private readonly scene = new Container();
@@ -144,11 +142,11 @@ export class ReflectionTiles {
     return this.shader.shader;
   }
 
-  /** The bounds of every glow polygon, grown to the texel grid and clipped to the map; null if empty. */
+  /** The bounds of every part's polygon, grown to the texel grid and clipped to the map; null if empty. */
   private rectOf(parts: readonly ReflectionPart[]): Rect | null {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const { glow } of parts) {
-      for (const { x, y } of glow) {
+    for (const { polygon } of parts) {
+      for (const { x, y } of polygon) {
         x0 = Math.min(x0, x);
         y0 = Math.min(y0, y);
         x1 = Math.max(x1, x);
@@ -163,20 +161,20 @@ export class ReflectionTiles {
   }
 }
 
-/** Every part's glow polygon as a triangle fan from its point, which each corner carries with the part's reach and strength (`aPart`). */
+/** Every part's polygon as a triangle fan from its point, which each corner carries with the part's reach and strength (`aPart`). */
 function fansOf(parts: readonly ReflectionPart[]): Geometry {
-  const corners = parts.reduce((sum, part) => sum + part.glow.length + 1, 0);
+  const corners = parts.reduce((sum, part) => sum + part.polygon.length + 1, 0);
   const positions = new Float32Array(corners * 2);
   const info = new Float32Array(corners * 4);
   const indices: number[] = [];
   let base = 0;
-  for (const { origin, reach, strength, glow } of parts) {
-    const points = [origin, ...glow];
+  for (const { origin, reach, strength, polygon } of parts) {
+    const points = [origin, ...polygon];
     points.forEach((p, i) => {
       positions.set([p.x, p.y], (base + i) * 2);
       info.set([origin.x, origin.y, reach, strength], (base + i) * 4);
     });
-    for (let i = 1; i <= glow.length; i++) indices.push(base, base + i, base + (i % glow.length) + 1);
+    for (let i = 1; i <= polygon.length; i++) indices.push(base, base + i, base + (i % polygon.length) + 1);
     base += points.length;
   }
   return new Geometry({

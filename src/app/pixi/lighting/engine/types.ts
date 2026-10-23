@@ -32,7 +32,7 @@ export interface EngineLight {
    * darkness swallows its light. Without it the engine works the area out the same way.
    */
   area?: Polygon;
-  /** Width in world pixels of the soft edge past a beam's sides at most (`softEdge`); unset, the tail past the dim radius. */
+  /** Width in world pixels of the soft edge inside a beam's sides at most (`softEdge`); unset, `softEdge` of its dim radius. */
   edge?: number;
   /**
    * A light that glows from a whole area (lava): its corners, at most `MAX_AREA_CORNERS`. Inside

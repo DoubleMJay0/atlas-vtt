@@ -1,6 +1,6 @@
 import type { Renderer, Texture } from 'pixi.js';
 import type { WallSegment } from '../../../types/wallTypes';
-import { BOUNCE, DARKNESS, LIGHT_REACH, tileWallReach, worldTexel } from '../../../lighting/lightingConstants';
+import { BOUNCE, DARKNESS, tileWallReach, worldTexel } from '../../../lighting/lightingConstants';
 import { DEFAULT_LIGHTING_QUALITY, bouncesOn, type LightingQuality } from '../../../lighting/lightingQuality';
 import { changedWallRects } from '../../../lighting/wallChanges';
 import type { Rect } from '../../../lighting/segments';
@@ -285,7 +285,7 @@ export class LightingWorld {
       if (!tile) continue;
       const { intensity, radiusScale } = sample(light);
       // Flicker breathes the bright radius only: where a light ends is where the rules end it.
-      drawn.push({ tile, bright: light.bright * radiusScale, dim: light.dim, reach: light.dim * LIGHT_REACH, color: light.color, intensity: light.intensity * intensity, cone: light.cone, edge: light.edge, reflection: this.reflections.get(light.key) });
+      drawn.push({ tile, bright: light.bright * radiusScale, dim: light.dim, color: light.color, intensity: light.intensity * intensity, cone: light.cone, edge: light.edge, reflection: this.reflections.get(light.key) });
     }
     this.lightMap.draw(drawn);
   }
@@ -296,7 +296,7 @@ export class LightingWorld {
    * and rule cannot differ.
    */
   private darknessOf(light: EngineLight): DrawnDarkness {
-    return { origin: { x: light.x, y: light.y }, dim: light.dim, soft: Math.min(DARKNESS.rim, (LIGHT_REACH - 1) * light.dim), polygon: this.areaOf(light) };
+    return { origin: { x: light.x, y: light.y }, dim: light.dim, soft: Math.min(DARKNESS.rim, DARKNESS.rimShare * light.dim), polygon: this.areaOf(light) };
   }
 
   /**

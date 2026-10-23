@@ -7,6 +7,8 @@ import { RELIEF_PX_PER_CELL, renderRelief } from '../../src/app/dungeons/render/
 import { renderShade, SHADE_PX_PER_CELL, shadowsApart } from '../../src/app/dungeons/render/shading/shadeImage';
 import { HEIGHT } from '../../src/app/dungeons/render/terrain/footprints';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
+import { createRenderEnv } from '../../src/app/dungeons/render/renderEnv';
+import { growthPicture } from '../../src/app/dungeons/render/growth/growthForms';
 import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import type { Point } from '../../src/app/types/visionTypes';
@@ -51,6 +53,18 @@ describe('a generated floor\'s shading', () => {
     const low = heightAt(model, relief, { x: stone.points.reduce((sum, p) => sum + p.x, 0) / stone.points.length, y: stone.points.reduce((sum, p) => sum + p.y, 0) / stone.points.length });
     expect(low).toBeGreaterThan(0.02);
     expect(low).toBeLessThan(0.12);
+  });
+
+  it('lets the plants on the floor of an overgrown dungeon stand in its relief, low', () => {
+    const overgrown = generateDungeon({ seed: 12, tags: ['overgrown', 'wet'], floors: 1 });
+    const style = dungeonStyle('moss');
+    const relief = renderRelief(overgrown, style, DEFAULT_VIEW, 0)!;
+    const env = createRenderEnv(new OffscreenCanvas(1, 1).getContext('2d')!, visibleDungeon(overgrown, DEFAULT_VIEW, 0), style, DEFAULT_VIEW, RELIEF_PX_PER_CELL);
+    const forms = growthPicture(env).ground.filter((form) => form.leaves.length > 0);
+    expect(forms.length).toBeGreaterThan(3);
+    const heights = forms.map((form) => heightAt(overgrown, relief, { x: (form.bounds.minX + form.bounds.maxX) / 2, y: (form.bounds.minY + form.bounds.maxY) / 2 }));
+    expect(heights.filter((h) => h > 0.02).length).toBeGreaterThan(forms.length / 3);
+    expect(Math.max(...heights)).toBeLessThanOrEqual(0.41);
   });
 
   it('leaves its map without the shadows the shade holds, and the shade darkens where they fell', () => {

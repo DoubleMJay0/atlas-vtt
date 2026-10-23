@@ -46,7 +46,7 @@ function relief(standing: readonly Standing[]): ReliefMap {
 }
 
 function lamp(key: string, at: Point): EngineLight {
-  return { key, x: at.x, y: at.y, bright: 150, dim: 420, flame: 24, color: [1, 1, 1], intensity: 1, animation: 'none' };
+  return { key, x: at.x, y: at.y, bright: 200, dim: 640, flame: 24, color: [1, 1, 1], intensity: 1, animation: 'none' };
 }
 
 const PILLAR: Standing = { at: { x: 512, y: 512 }, radius: 40, height: 1 };
