@@ -91,3 +91,15 @@ export function silhouette(form: PlantForm): PathFn {
     }
   };
 }
+
+/**
+ * For a picture that records every path (the SVG export): every third leaf, each as one outline
+ * through every sixth point of its halves, so an overgrown map stays a file of a few megabytes.
+ */
+export function plainLeaves(leaves: readonly Leaf[]): { leaf: Leaf; outline: Vec[] }[] {
+  return leaves.filter((_, i) => i % 3 === 0).map(leaf => {
+    const { left, right } = placeLeaf(leaf);
+    const every = (points: readonly Vec[]): Vec[] => points.filter((_, i) => i % 6 === 0 || i === points.length - 1);
+    return { leaf, outline: [...every(left), ...every(right).reverse()] };
+  });
+}

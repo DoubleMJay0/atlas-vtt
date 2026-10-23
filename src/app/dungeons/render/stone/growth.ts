@@ -8,7 +8,7 @@ import { poolOutlines, poolsPath } from '../art/pools';
 import type { Canvas2D, Vec } from '../geometry';
 import { inView, type Leaf, type PlantForm } from '../growth/forms';
 import { growthPicture } from '../growth/growthForms';
-import { placeLeaf, silhouette, stemRibbon } from '../growth/leafGeometry';
+import { placeLeaf, plainLeaves, silhouette, stemRibbon } from '../growth/leafGeometry';
 import { mossField, mossResolution } from '../growth/mossField';
 import type { StoneColours } from './colours';
 import type { Rgb } from '../palette';
@@ -68,10 +68,11 @@ function paintLeaf(ctx: Canvas2D, leaf: Leaf, colours: PlantColours, ramp: Ramp,
   ctx.stroke();
 }
 
-function paintStems(ctx: Canvas2D, form: PlantForm, colours: PlantColours, line: number): void {
+function paintStems(ctx: Canvas2D, form: PlantForm, colours: PlantColours, line: number, plain = false): void {
   const base = colours.stems[form.palette];
   const woody = form.palette === 'root';
   for (const stem of form.stems) {
+    if (plain && stem.from < 0.02) continue;
     ctx.beginPath();
     polygon(ctx, stemRibbon(stem));
     if (woody) {
@@ -81,7 +82,7 @@ function paintStems(ctx: Canvas2D, form: PlantForm, colours: PlantColours, line:
     }
     ctx.fillStyle = css(base);
     ctx.fill();
-    if (stem.from < 0.012) continue;
+    if (stem.from < 0.012 || plain) continue;
     if (woody) {
       // Bark: the root's underside falls into shade along its length.
       ctx.beginPath();
@@ -107,14 +108,21 @@ function paintStems(ctx: Canvas2D, form: PlantForm, colours: PlantColours, line:
 }
 
 /** Where a root breaks the floor: a dark gap, deepest in its middle. */
-function paintHoles(ctx: Canvas2D, form: PlantForm, colours: PlantColours): void {
+function paintHoles(ctx: Canvas2D, form: PlantForm, colours: PlantColours, raster: boolean): void {
   for (const hole of form.holes) {
-    const g = ctx.createRadialGradient(hole.x, hole.y, 0, hole.x, hole.y, hole.radius * 1.4);
-    g.addColorStop(0, css(colours.hole, 0.8));
-    g.addColorStop(0.55, css(colours.hole, 0.55));
+    if (!raster) {
+      ctx.beginPath();
+      ctx.ellipse(hole.x, hole.y, hole.radius * 0.8, hole.radius * 0.55, hole.angle, 0, Math.PI * 2);
+      ctx.fillStyle = css(colours.hole, 0.7);
+      ctx.fill();
+      continue;
+    }
+    const g = ctx.createRadialGradient(hole.x, hole.y, 0, hole.x, hole.y, hole.radius * 1.1);
+    g.addColorStop(0, css(colours.hole, 0.85));
+    g.addColorStop(0.6, css(colours.hole, 0.6));
     g.addColorStop(1, css(colours.hole, 0));
     ctx.beginPath();
-    ctx.ellipse(hole.x, hole.y, hole.radius * 1.4, hole.radius, hole.angle, 0, Math.PI * 2);
+    ctx.ellipse(hole.x, hole.y, hole.radius * 1.1, hole.radius * 0.75, hole.angle, 0, Math.PI * 2);
     ctx.fillStyle = g;
     ctx.fill();
   }
@@ -167,7 +175,7 @@ function paintBlossoms(ctx: Canvas2D, form: PlantForm, colours: PlantColours): v
   }
 }
 
-function paintCaps(ctx: Canvas2D, form: PlantForm, colours: PlantColours): void {
+function paintCaps(ctx: Canvas2D, form: PlantForm, colours: PlantColours, raster: boolean): void {
   const ramp = colours.leaves.fungus;
   for (const cap of [...form.caps].sort((a, b) => a.layer - b.layer)) {
     ctx.save();
@@ -176,14 +184,16 @@ function paintCaps(ctx: Canvas2D, form: PlantForm, colours: PlantColours): void 
     ctx.fillStyle = rampAt(ramp, 0.45 + cap.tone * 0.08);
     ctx.fill();
     ctx.clip();
-    // The dome: light on the side towards it, shade falling away on the other.
     const r = cap.radius;
-    const g = ctx.createRadialGradient(cap.x + TO_LIGHT.x * r * 0.45, cap.y + TO_LIGHT.y * r * 0.45, r * 0.05, cap.x, cap.y, r * 1.3);
-    g.addColorStop(0, rampAt(ramp, 1));
-    g.addColorStop(0.55, rampAt(ramp, 0.55));
-    g.addColorStop(1, rampAt(ramp, 0.05));
-    ctx.fillStyle = g;
-    ctx.fill();
+    if (raster) {
+      // The dome: light on the side towards it, shade falling away on the other.
+      const g = ctx.createRadialGradient(cap.x + TO_LIGHT.x * r * 0.45, cap.y + TO_LIGHT.y * r * 0.45, r * 0.05, cap.x, cap.y, r * 1.3);
+      g.addColorStop(0, rampAt(ramp, 1));
+      g.addColorStop(0.55, rampAt(ramp, 0.55));
+      g.addColorStop(1, rampAt(ramp, 0.05));
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
     // Its rim on the side away from the light, where the cap curls under towards its gills.
     ctx.beginPath();
     ctx.ellipse(cap.x, cap.y, cap.radius * cap.stretch, cap.radius, cap.angle, 0, Math.PI * 2);
@@ -204,14 +214,35 @@ function paintCaps(ctx: Canvas2D, form: PlantForm, colours: PlantColours): void 
   }
 }
 
+/** A plant as a picture that records every path keeps it: its leaves in a few tones, one path each. */
+function paintPlainForm(ctx: Canvas2D, form: PlantForm, colours: PlantColours, onlyAbove: number): void {
+  const ramp = colours.leaves[form.palette];
+  const tones = new Map<number, Vec[][]>();
+  for (const { leaf, outline } of plainLeaves(form.leaves.filter(l => l.layer > onlyAbove))) {
+    const tone = Math.round((0.2 + 0.62 * leaf.layer + leaf.tone * 0.09) * 4) / 4;
+    tones.set(tone, [...(tones.get(tone) ?? []), outline]);
+  }
+  for (const [tone, outlines] of [...tones].sort((a, b) => a[0] - b[0])) {
+    ctx.beginPath();
+    for (const outline of outlines) polygon(ctx, outline);
+    ctx.fillStyle = rampAt(ramp, tone);
+    ctx.fill();
+  }
+}
+
 /** A plant, bottom to top: its stems, its leaves from the deepest, its blossoms and caps. */
 function paintForm(scene: ArtScene, form: PlantForm, colours: PlantColours, onlyAbove = -1): void {
   const { ctx } = scene.env;
+  if (!scene.raster) {
+    if (onlyAbove < 0) paintStems(ctx, form, colours, 0.004, true);
+    paintPlainForm(ctx, form, colours, onlyAbove);
+    return;
+  }
   const line = Math.max(0.0028, 0.75 / scene.frame.pxPerCell);
   ctx.save();
   ctx.lineJoin = 'round';
   if (onlyAbove < 0) {
-    paintHoles(ctx, form, colours);
+    paintHoles(ctx, form, colours, scene.raster);
     paintStems(ctx, form, colours, line);
     paintThorns(ctx, form, colours);
   }
@@ -220,7 +251,7 @@ function paintForm(scene: ArtScene, form: PlantForm, colours: PlantColours, only
   for (const leaf of leaves) paintLeaf(ctx, leaf, colours, ramp, line);
   if (onlyAbove < 0) {
     paintBlossoms(ctx, form, colours);
-    paintCaps(ctx, form, colours);
+    paintCaps(ctx, form, colours, scene.raster);
   }
   ctx.restore();
 }

@@ -5,7 +5,7 @@ import { grownRings, traceRings } from '../art/outline';
 import type { Canvas2D, Vec } from '../geometry';
 import { inView, type Leaf, type PlantForm } from '../growth/forms';
 import { growthPicture } from '../growth/growthForms';
-import { placeLeaf, silhouette, stemRibbon } from '../growth/leafGeometry';
+import { placeLeaf, plainLeaves, silhouette, stemRibbon } from '../growth/leafGeometry';
 import { mossField, mossResolution } from '../growth/mossField';
 import { hash2 } from '../art/noise';
 import { poolOutlines, poolsPath } from '../art/pools';
@@ -52,8 +52,11 @@ interface Hatches {
   cross: CanvasPattern;
 }
 
+/** Below this many pixels a cell, leaves are too small to hatch: their outlines alone give their tone. */
+const LEAST_HATCHED_PX = 80;
+
 function hatchesOf(scene: ArtScene, pens: Pens): Hatches | null {
-  if (!scene.raster) return null;
+  if (!scene.raster || scene.frame.pxPerCell < LEAST_HATCHED_PX) return null;
   const { ctx } = scene.env;
   const ppc = scene.frame.pxPerCell;
   const period = Math.max(3, pens.spacing * 0.5 * ppc);
@@ -203,8 +206,23 @@ function cutBlossoms(ctx: Canvas2D, form: PlantForm, pens: Pens, line: number): 
 
 function cutForm(scene: ArtScene, form: PlantForm, pens: Pens, hatches: Hatches | null, onlyAbove = -1): void {
   const { ctx } = scene.env;
-  // A little finer than the look's own fine line, so leaves read as drawn, not as noise.
-  const line = Math.max(pens.minWidth * 1.6, 0.0062);
+  if (!scene.raster) {
+    // A picture that records every path keeps a plant as its outlines alone, in one path.
+    ctx.save();
+    if (onlyAbove < 0) cutStems(ctx, { ...form, stems: form.stems.filter(stem => stem.from >= 0.02) }, pens, null, 0.006);
+    ctx.beginPath();
+    for (const { outline } of plainLeaves(form.leaves.filter(l => l.layer > onlyAbove))) polygon(ctx, outline);
+    ctx.fillStyle = pens.floor;
+    ctx.fill();
+    ctx.strokeStyle = pens.ink;
+    ctx.lineWidth = 0.006;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  // A little finer than the look's own fine line, so leaves read as drawn, not as noise; drawn small,
+  // a third of a pixel, so a plant reads as a grey of its lines instead of a blot.
+  const line = Math.max(0.35 / scene.frame.pxPerCell, 0.0062);
   ctx.save();
   ctx.lineJoin = 'round';
   if (onlyAbove < 0) cutStems(ctx, form, pens, hatches, line);
@@ -218,12 +236,14 @@ function cutForm(scene: ArtScene, form: PlantForm, pens: Pens, hatches: Hatches 
 
 /** Moss as stipple: a dot where a seeded draw falls under how deep in shade the cushion lies there. */
 function stippleMoss(scene: ArtScene, pens: Pens): void {
+  // Thousands of dots would swell an SVG: the export leaves moss out.
+  if (!scene.raster) return;
   const { env } = scene;
   const { ctx } = env;
   const view = viewBounds(scene.frame, 1);
   const res = Math.min(mossResolution(scene.frame.pxPerCell), 90);
   const seed = env.dungeon.model.seed;
-  const dot = Math.max(pens.minWidth * 1.2, 0.55 / res);
+  const dot = Math.max(0.0045, 0.55 / scene.frame.pxPerCell);
   ctx.save();
   ctx.beginPath();
   traceRings(ctx, grownRings(scene, BAND));
@@ -261,7 +281,10 @@ export function engravedGrowth(scene: ArtScene, hand: Hand, pens: Pens): GrowthP
   const hatches = hatchesOf(scene, pens);
   const view = viewBounds(scene.frame, 1);
   const shown = (forms: readonly PlantForm[]): PlantForm[] => forms.filter(form => inView(form, view));
-  const shadow = (form: PlantForm, strength: number): void => castShadow(hand, silhouette(form), form.lift, form.bounds, strength);
+  // The SVG export keeps no plant's shadow: hatched, each would be hundreds of lines.
+  const shadow = (form: PlantForm, strength: number): void => {
+    if (scene.raster) castShadow(hand, silhouette(form), form.lift, form.bounds, strength);
+  };
   const picture = (): ReturnType<typeof growthPicture> => growthPicture(scene.env);
   return {
     ground: () => {

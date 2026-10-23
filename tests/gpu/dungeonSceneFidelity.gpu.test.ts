@@ -36,6 +36,9 @@ const CASES: readonly { seed: number; tags: string[]; floors: number; look: Dung
   { seed: 282, tags: ['small'], floors: 2, look: 'parchment', view: {} },
   { seed: 375, tags: ['small', 'crumbling', 'dry'], floors: 2, look: 'sepia', view: { smallTiles: true } },
   { seed: 42, tags: [], floors: 1, look: 'masonry', view: {}, fiveRoom: true },
+  // Ivy and moss lie over the walls' foot: the walls must still be found on the ink.
+  { seed: 16, tags: ['dwelling', 'overgrown'], floors: 1, look: 'parchment', view: {} },
+  { seed: 404, tags: ['temple', 'overgrown', 'colonnades', 'wet'], floors: 2, look: 'print', view: {} },
 ];
 
 const TALL_TERRAIN = new Set(['pillar', 'obelisk', 'statue', 'wall-fragment']);
@@ -51,6 +54,11 @@ function withoutTallObjects(model: DungeonModel): DungeonModel {
       terrain: floor.terrain.filter(piece => !TALL_TERRAIN.has(piece.kind)),
     })),
   };
+}
+
+/** The dungeon without what grows on it: climbers lie over the walls' ink on purpose. */
+function withoutGrowth(model: DungeonModel): DungeonModel {
+  return { ...model, floors: model.floors.map(floor => ({ ...floor, growth: [] })) };
 }
 
 /** A floor's outlines of tall objects, each a ring of corners. */
@@ -99,10 +107,20 @@ describe('a dungeon scene and its map image', () => {
 
         // (a) Solid walls lie on drawn ink; the sides of a secret door's passage are not drawn, as the passage is not
         const inSecretCell = (p: { x: number; y: number }): boolean => floor.doors.some(d => d.kind === 'secret' && Math.abs(p.x - toPx(d.x + 0.5, d.y + 0.5).x) <= PX_PER_CELL / 2 + halfInk + 1 && Math.abs(p.y - toPx(d.x + 0.5, d.y + 0.5).y) <= PX_PER_CELL / 2 + halfInk + 1);
-        const onInk = wallsOnInk(walls.filter(w => w.type !== 'door'), mask, picture).filter(s => !inSecretCell(s.at));
+        const solid = walls.filter(w => w.type !== 'door');
+        // Where something grows, the walls are held to the picture drawn without it, and the
+        // picture with it must still show its walls nearly everywhere.
+        const grows = floor.growth.length > 0;
+        const bare = grows ? draw(withoutGrowth(model), look, view, index) : picture;
+        const bareMask = grows ? inkMask(bare, parseHex(palette.ink)) : mask;
+        const onInk = wallsOnInk(solid, bareMask, bare).filter(s => !inSecretCell(s.at));
         const far = onInk.filter(s => s.distance > 6).slice(0, 5).map(s => `${Math.round(s.at.x)},${Math.round(s.at.y)}`);
         expect(far, `${where}: walls beyond 6 px of ink`).toEqual([]);
         expect(share(onInk.map(s => s.distance), 2), `${where}: walls within 2 px of ink`).toBeGreaterThanOrEqual(0.99);
+        if (grows) {
+          const shown = wallsOnInk(solid, mask, picture).filter(s => !inSecretCell(s.at));
+          expect(share(shown.map(s => s.distance), 2), `${where}: walls within 2 px of ink under the growth`).toBeGreaterThanOrEqual(0.97);
+        }
 
         // Doors stand across the middle of the drawn door, at right angles to the way through
         for (const door of floor.doors.filter(d => d.kind === 'door')) {

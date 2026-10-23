@@ -141,7 +141,7 @@ export function root(form: PlantForm, rng: Rng, at: Vec, heading: number, length
     widths = [];
   };
   const hole = (q: Vec, a: number, w: number): void => {
-    form.holes.push({ x: q.x, y: q.y, radius: w * 1.1 + 0.012, angle: a });
+    form.holes.push({ x: q.x, y: q.y, radius: w * 0.85 + 0.008, angle: a });
   };
   // A root that dives breaks out of the floor where it begins, too.
   if (options.dives && depth === 0) hole(at, heading, width);
