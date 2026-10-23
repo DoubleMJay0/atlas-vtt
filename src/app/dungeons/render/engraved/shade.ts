@@ -20,7 +20,8 @@ export function drawShade(scene: ArtScene, pens: Pens): void {
     angle: pens.angle,
     spacing: pens.spacing,
     bounds: viewBounds(scene.frame),
-    step: pens.step,
+    // A shadow's width changes slowly along a line: a coarse step is enough.
+    step: Math.max(pens.step, 0.05),
     minWidth: pens.minWidth,
     active: activeCells(scene.grid, depth),
     width: (x, y) => pens.spacing * 0.32 * strength * sampleField(scene.grid, depth, x, y),

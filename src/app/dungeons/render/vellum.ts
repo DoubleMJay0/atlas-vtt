@@ -94,7 +94,7 @@ function paints(ctx: Canvas2D): boolean {
 }
 
 /**
- * Fills the map's `layout` with the vellum. Monochrome, and a context without gradients (the SVG
+ * Fills the map's `layout` with the vellum, its grain at `grain` (smooth paper below 1). Monochrome, and a context without gradients (the SVG
  * export), get the plain paper; a context outside a browser gets the colours without the grain.
  */
 export function drawVellum(ctx: Canvas2D, paper: string, layout: MapLayout, seed: number, plain: boolean, grain = 1): void {
@@ -116,7 +116,8 @@ export function drawVellum(ctx: Canvas2D, paper: string, layout: MapLayout, seed
   ctx.fillRect(0, 0, w, h);
   if (typeof OffscreenCanvas !== 'undefined') {
     const rng = stream(seed, 'render', 'vellum');
-    for (const spec of TILES) {
+    // Smooth paper (a grain under 1) has no pores.
+    for (const spec of TILES.filter(t => grain >= 1 || t.kind === 'clouds')) {
       const pattern = ctx.createPattern(tileFor(spec, paper), 'repeat');
       if (!pattern) continue;
       const scale = (spec.cells * pxPerCell) / spec.px;

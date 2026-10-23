@@ -37,6 +37,6 @@ export function pensOf(scene: ArtScene): Pens {
     step: Math.min(0.03, 5 / ppc),
     angle: LINE_ANGLE,
     mono: view.monochrome,
-    water: view.monochrome ? palette.floor : mixColours(palette.floor, palette.water, 0.7),
+    water: view.monochrome ? palette.floor : mixColours(palette.floor, palette.water, 0.5),
   };
 }

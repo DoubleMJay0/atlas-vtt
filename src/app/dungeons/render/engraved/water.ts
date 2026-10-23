@@ -49,7 +49,7 @@ export function paintWater(scene: ArtScene, pens: Pens, trace: PathFn, outlines:
       // Here and there a glint breaks a line, never so often that the water turns to a pattern.
       const glint = valueNoise(x * 0.9, y * 6, seed + 22);
       const open = glint > 0.8 ? Math.max(0, 1 - (glint - 0.8) * 12) : 1;
-      const body = deep ? 0.3 + 0.12 * Math.min(1, d / 0.8) : 0.05 + 0.22 * Math.exp(-d / 0.14);
+      const body = deep ? 0.3 + 0.12 * Math.min(1, d / 0.8) : 0.1 + 0.2 * Math.exp(-d / 0.14);
       return spacing * body * open;
     },
   });

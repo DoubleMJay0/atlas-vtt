@@ -14,8 +14,9 @@ const CARD_DUNGEON = 'crumbling';
 
 /**
  * Every look on dungeons of every kind, whole and close up at 200 px per cell with tokens, written
- * to `out/dungeon-render/v2-art/` for judging by eye. `VITE_ART_LOOK`, `VITE_ART_DUNGEON` and
- * `VITE_ART_SHOT` (whole, close, mono) narrow a run while iterating.
+ * to `out/dungeon-render/v2-art/` for judging by eye, when asked for: `VITE_ART=1` draws them all,
+ * `VITE_ART_LOOK`, `VITE_ART_DUNGEON` and `VITE_ART_SHOT` (whole, close, mono, card, specimen,
+ * spots) narrow a run while iterating.
  */
 
 const only = (key: string): string[] | null => {
@@ -25,8 +26,10 @@ const only = (key: string): string[] | null => {
 const looks = only('VITE_ART_LOOK');
 const dungeons = only('VITE_ART_DUNGEON');
 const shots = only('VITE_ART_SHOT') ?? ['whole', 'close'];
+/** The sheets take minutes and are for a person: they are drawn only when asked for. */
+const asked = Boolean(looks ?? dungeons ?? only('VITE_ART_SHOT') ?? only('VITE_ART'));
 
-describe('dungeon looks, for judging by eye', () => {
+describe.skipIf(!asked)('dungeon looks, for judging by eye', () => {
   for (const { id } of DUNGEON_STYLES) {
     if (looks && !looks.includes(id)) continue;
     for (const { name } of ART_DUNGEONS) {

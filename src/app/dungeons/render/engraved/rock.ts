@@ -17,7 +17,6 @@ export function drawRock(scene: ArtScene, pens: Pens): void {
   const { ctx, dungeon, style } = scene.env;
   const seed = dungeon.model.seed;
   const start = CUT.width(style) + CUT.gap + CUT.thin + 0.03;
-  const base = style.surround.reach;
   const cover = rockCoverage(scene, 0.05);
   const mass = fieldOf(scene.grid, (x, y) => 0.85 + 0.3 * fbm(x * 0.9, y * 0.9, seed + 2, 3));
   // Worked out once on the scene's grid; the lines begin crisply where the clip below lets them.

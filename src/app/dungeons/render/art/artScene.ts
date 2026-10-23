@@ -67,7 +67,9 @@ export function buildArtScene(env: RenderEnv, frame: ArtFrame, stands: readonly 
   const res = fieldResolution(frame.pxPerCell);
   const b = viewBounds(frame, 1);
   const grid = gridOver(b.minX, b.minY, b.maxX, b.maxY, res);
-  const sdf = fieldOf(grid, (x, y) => dungeon.field.distance(x, y));
+  // Distance is piecewise smooth: half the samples, read bilinearly, are as good and twice as quick.
+  const sdfGrid = gridOver(b.minX, b.minY, b.maxX, b.maxY, res / 2);
+  const sdf = fieldOf(sdfGrid, (x, y) => dungeon.field.distance(x, y));
   const pockets = narrowPockets(dungeon, env.style.surround.reach / 2).map(p => p.ring);
   const relief = rasterRelief(grid, floors, pockets, stands, (x, y) => dungeon.field.distance(x, y) > 0);
   const shadow = env.view.shadow ? castShadow(grid, relief.heights) : new Float32Array(relief.heights.length);
@@ -84,7 +86,7 @@ export function buildArtScene(env: RenderEnv, frame: ArtFrame, stands: readonly 
     occlusion,
     dark,
     raster: pictures && drawsRaster(env.ctx),
-    sdfAt: (x, y) => sampleField(grid, sdf, x, y),
+    sdfAt: (x, y) => sampleField(sdfGrid, sdf, x, y),
     shadowAt: (x, y) => sampleField(grid, shadow, x, y),
     occlusionAt: (x, y) => sampleField(grid, occlusion, x, y),
     pocketAt: (x, y) => sampleField(grid, relief.pocket, x, y),
