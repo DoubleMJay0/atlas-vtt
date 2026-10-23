@@ -19,5 +19,6 @@ describe('terrain names', () => {
     }
     expect([...names].filter((name) => typeof messages[name] !== 'string')).toEqual([]);
     expect(names.size).toBeGreaterThan(25);
-  });
+    // Three hundred dungeons of up to four floors: seconds alone, longer beside the whole suite
+  }, 60_000);
 });
