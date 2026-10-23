@@ -75,6 +75,8 @@ import { levelImageOnItsOwn, viewedImagePlacement } from './levels/levelAlignmen
 import { viewedLevelId } from './levels/sceneLevels';
 import { levelObjects } from './levels/levelObjects';
 import { watchMapVideoPlayback } from './pixi/mapImage/video/watchMapVideoPlayback';
+import type { LiquidLayer } from './pixi/liquids/LiquidLayer';
+import { createViewLiquids } from './pixi/liquids/viewLiquids';
 import { playerWindowStore } from './stores/playerWindowStore';
 import { PlayerWindowService } from './services/PlayerWindowService';
 import { fitZoomRange } from './pixi/fitMapRect';
@@ -95,6 +97,8 @@ export class PixiRendererOrchestrator { // Renamed class
   private levelLinks?: LevelLinkEditor;
   /** The GM's hover label of map features and doors, and a feature's menu; none in a player view. */
   private mapFeatures?: MapFeatureInteraction;
+  /** Water, lava and acid moving over the map image, right above it. */
+  private liquids?: LiquidLayer;
   private selectionManager?: SelectionManager; // Add SelectionManager instance
   private fogRenderer?: FogOfWarRenderer; // Add FogRenderer instance
   private measureRenderer?: MeasureRenderer; // Add MeasureRenderer instance
@@ -660,6 +664,8 @@ export class PixiRendererOrchestrator { // Renamed class
     this.releaseMapImage();
     this.mapImage = mapImage;
     viewport.addChildAt(mapImage.layer, 0);
+    mapImage.layer.zIndex = MAP_LAYER_Z.mapImage;
+    this.placeLiquids(viewport, mapImage);
     this.gridSystem?.setMapImage(mapImage);
     const stopChanges = mapImage.onChange((change) => this.mapImageChanged(change));
     const stopBackground = MapController.followBackground(this.obsApp, this.store, mapImage);
@@ -674,13 +680,30 @@ export class PixiRendererOrchestrator { // Renamed class
     this.mapImageChanged('image');
   }
 
-  /** Plays the map image's animated map while someone sees it; returns the function that stops. */
+  /**
+   * Puts the liquid surfaces right above the map image, beneath the grid and everything the
+   * lighting lights after the map. By zIndex: the grid inserts itself right above the map image.
+   */
+  private placeLiquids(viewport: Viewport, mapImage: MapImage): void {
+    const app = this.pixiAppManager.getApp();
+    if (!app?.renderer || !app.ticker) return;
+    this.liquids ??= createViewLiquids(app, viewport, this.store);
+    this.liquids.container.zIndex = MAP_LAYER_Z.liquids;
+    viewport.addChildAt(this.liquids.container, viewport.getChildIndex(mapImage.layer) + 1);
+  }
+
+  /** Plays the map image's animated map and the liquids on it while someone sees them; returns the function that stops. */
   private watchMapVideo(mapImage: MapImage): () => void {
     const app = this.pixiAppManager.getApp();
     if (!app?.renderer) return () => undefined;
     const settings = SettingsService.forApp(this.obsApp);
     return watchMapVideoPlayback({
-      map: mapImage,
+      map: {
+        setVideoMode: (mode): void => {
+          mapImage.setVideoMode(mode);
+          this.liquids?.setMode(mode);
+        },
+      },
       canvas: app.canvas,
       renderer: app.renderer,
       scene: {
@@ -950,9 +973,12 @@ export class PixiRendererOrchestrator { // Renamed class
     const restoreRoof = picture ? this.roofs?.drawFor(picture) : undefined;
     // A picture of an animated map shows its poster, as its asset card does, not whatever frame plays now.
     const restoreVideo = this.mapImage?.hideVideoFor();
+    // Liquids take the still moment too, so a picture of the scene is the same however long it played.
+    const restoreLiquids = this.liquids?.stillFor();
     try {
       return captureSceneFrame({ gmViewLayers: this.gmViewLayers(), markerLayers: this.markerLayers(), lighting: this.lighting, roofs: this.roofs }, frame, render);
     } finally {
+      restoreLiquids?.();
       restoreVideo?.();
       restoreRoof?.();
       restoreMapImage?.();
@@ -1249,6 +1275,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.hexLinkRenderer?.destroy();
     this.levelLinks?.destroy();
     this.mapFeatures?.destroy();
+    this.liquids?.destroy();
     this.fogRenderer?.destroy(); // Destroy FogRenderer
     this.stopMeasuresFollowingPlayers?.();
     this.measureRenderer?.destroy(); // Destroy MeasureRenderer
