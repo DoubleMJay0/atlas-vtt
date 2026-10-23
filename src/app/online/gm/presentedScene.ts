@@ -3,7 +3,6 @@ import type { PresentedSceneSource } from '../../services/presentedScene';
 import type { TabMetaState } from '../../stores/tabMetaStore';
 import { field } from './atlasLighting.ts';
 import type { SceneState } from './atlasView.ts';
-import { hasLevels, resolveLevel, viewedLevelId } from '../../levels/sceneLevels';
 
 /** Atlas's command that shows the active map tab's scene on the player view, as the eye on a scene tab does. */
 export const PRESENT_COMMAND = 'atlas-vtt:send-map-to-player-view';
@@ -120,13 +119,12 @@ export function findPresentedTab(leaves: readonly WorkspaceLeaf[], presented: Pr
 }
 
 /**
- * Whether a view's store holds the presented tab's scene now: the tab is active, its scene loaded,
- * and of a scene with several levels the presented one shown, as Atlas's player window holds its
- * frame while the GM looks at another level.
+ * Whether a view's store holds the presented tab's scene now: the tab is active and its scene loaded.
+ * Whichever of its levels the GM looks at, online players go on seeing theirs: each the floor their
+ * token stands on, those without one the presented level (`SceneShare`).
  */
-export function showsPresented(state: Pick<SceneState, 'mapPath' | 'mapLoaded' | 'isMapLoading' | 'levels' | 'viewedLevel'>, presented: PresentedTab): boolean {
-  return presented.tabs.getState().activeTabId === presented.tabId && state.mapPath === presented.filePath && state.mapLoaded && !state.isMapLoading
-    && (!hasLevels(state.levels) || viewedLevelId(state) === resolveLevel(state.levels, presented.levelId));
+export function showsPresented(state: Pick<SceneState, 'mapPath' | 'mapLoaded' | 'isMapLoading'>, presented: PresentedTab): boolean {
+  return presented.tabs.getState().activeTabId === presented.tabId && state.mapPath === presented.filePath && state.mapLoaded && !state.isMapLoading;
 }
 
 interface Commands {

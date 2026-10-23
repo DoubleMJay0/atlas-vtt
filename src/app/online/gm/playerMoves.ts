@@ -3,7 +3,6 @@ import { placeTokens, type PlacedTokensState } from '../../stores/tokenStacking'
 import type { ViewState } from '../../types/viewState';
 import { checkMove, insideMap, landing, MoveRate, type MoveContext } from './moveCheck.ts';
 import { PlayerDrags } from './playerDrags.ts';
-import { stairsTaken, type StairsTaken } from './stairsTaken.ts';
 import { mapTokens } from '../../tokens/offMap';
 
 /** What player moves read and write of an Atlas tab's store. */
@@ -23,8 +22,6 @@ export interface PlayerMovePorts {
   now(): number;
   setTimer(run: () => void, ms: number): number;
   clearTimer(timer: number): void;
-  /** Players' tokens a move or drag put down inside stairs went to another level, which players are not shown. */
-  tookStairs?(taken: readonly StairsTaken[]): void;
 }
 
 /** A move held while the GM drags: who sent it, and where the token stood then. */
@@ -150,11 +147,8 @@ export class PlayerMoves {
     const token = mapTokens(state.objects)[tokenId];
     const at = token === undefined ? move : landing(this.context(state), state, tokenId, token, move);
     const stopped = at.x !== move.x || at.y !== move.y;
-    if (!stopped || at.x !== token?.x || at.y !== token.y) {
-      this.store.setState((draft) => placeTokens(draft, [{ id: tokenId, x: at.x, y: at.y }]));
-      const taken = stairsTaken(state, this.store.getState(), [tokenId]);
-      if (taken.length > 0) this.ports.tookStairs?.(taken);
-    }
+    // A token put down on stairs goes to the level they lead to, and its player's picture follows it there
+    if (!stopped || at.x !== token?.x || at.y !== token.y) this.store.setState((draft) => placeTokens(draft, [{ id: tokenId, x: at.x, y: at.y }]));
     if (stopped) this.refuse(from, move);
   }
 
