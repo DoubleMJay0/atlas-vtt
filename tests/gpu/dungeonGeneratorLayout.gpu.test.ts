@@ -33,7 +33,9 @@ style.textContent = THEME + css;
 /** The overlay over an Atlas view of `width` × `height` px (here the page, as a leaf contains it). */
 async function openTab(width: number, height: number): Promise<void> {
   await page.viewport(width, height);
+  // As the Atlas view's UI layer, which lets presses through to the map
   view = document.body.createDiv({ cls: 'atlas-vtt-plugin' });
+  view.style.pointerEvents = 'none';
   tab = view.createDiv({ cls: 'atlas-dungeon-generator-overlay' });
   root = createRoot(tab);
   const header = createElement('button', { className: 'atlas-close-btn' }, '×');
@@ -65,6 +67,8 @@ describe('the dungeon generator over the Atlas view', () => {
     expect(header.top).toBe(frame.top);
     expect(close.right).toBe(frame.right - 8);
     expect(close.top).toBe(frame.top + 8);
+    // It takes presses although the layer it lies in lets them through
+    expect(document.elementFromPoint(close.x + close.width / 2, close.y + close.height / 2)).toBe(tab.querySelector('.atlas-close-btn'));
     const sidebar = box('.atlas-dungeon-generator__sidebar');
     expect(sidebar.right).toBe(frame.right);
     expect([sidebar.left, sidebar.top, sidebar.bottom]).toEqual([header.left, header.bottom, frame.bottom]);

@@ -7,11 +7,13 @@
 
 // Fills the Atlas view: Obsidian gives every `.workspace-leaf` `contain: strict`, which makes the
 // leaf the box of `position: fixed`, so sidebars and splits shrink it with the map. Above the
-// map's bars and beside its other overlays (the DM screen); its layout asks its own size.
+// map's bars and beside its other overlays (the DM screen); its layout asks its own size. The map's
+// UI layer lets presses through to the canvas (`pointer-events: none`), so the overlay takes them back.
 .atlas-dungeon-generator-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
+  pointer-events: auto;
   background: var(--background-primary);
   container: atlas-dungeon-generator / size;
   outline: none;
