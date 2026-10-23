@@ -23,6 +23,8 @@
 
 ## Improved
 
+- On Balanced and Saver lighting quality, a high-resolution screen draws the lit map at standard resolution, which takes the graphics less work; the edges of what players see never reach further
+- A device without a lighting quality chosen in the settings starts on one picked for its graphics: Balanced on graphics built into the processor, Saver where WebGL draws on the CPU
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 
 ## Important changes
