@@ -102,6 +102,15 @@ export const dungeon = {
   'dungeon.tagName.string': 'string',
   'dungeon.tagName.temple': 'temple',
   'dungeon.tagName.tomb': 'tomb',
+  'dungeon.tagName.lava': 'lava',
+  'dungeon.tagName.acid': 'acid',
+  'dungeon.tagName.overgrown': 'overgrown',
+  'dungeon.tagGroup.theme': 'Theme',
+  'dungeon.tagGroup.liquids': 'Water and fire',
+  'dungeon.tagGroup.nature': 'Age and growth',
+  'dungeon.tagGroup.size': 'Size',
+  'dungeon.tagGroup.layout': 'Layout',
+  'dungeon.tagGroup.secrets': 'Secrets',
 
   'dungeon.tag.chaotic': 'Grown without symmetry',
   'dungeon.tag.ordered': 'Wings that mirror each other',
@@ -127,6 +136,9 @@ export const dungeon = {
   'dungeon.tag.string': 'One room after another, never branching',
   'dungeon.tag.temple': 'Altars here and there',
   'dungeon.tag.tomb': 'Sarcophagi, fewer fountains',
+  'dungeon.tag.lava': 'Channels of molten rock that light their rooms',
+  'dungeon.tag.acid': 'Channels of bubbling acid',
+  'dungeon.tag.overgrown': 'Ivy on the walls, moss and plants on the floor',
 
   // Terrain: what the GM's hover label and the room's note name a piece (`DungeonTerrain.name`).
   'dungeon.terrain.lowWall': 'Low wall',

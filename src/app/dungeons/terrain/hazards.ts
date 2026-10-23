@@ -21,9 +21,10 @@ export type HazardChoice = 'chasm' | 'channel' | 'deep-water' | 'pit';
 /** How likely each hazard is, by the dungeon's tags. */
 export function hazardWeights(tags: ReadonlySet<DungeonTag>): (readonly [HazardChoice, number])[] {
   const wet = tags.has('wet') || tags.has('flooded');
+  const molten = tags.has('lava') || tags.has('acid');
   return [
     ['chasm', tags.has('crumbling') || tags.has('deep') ? 5 : 3],
-    ['channel', 1.5],
+    ['channel', molten ? 4 : substances(tags).length ? 1.5 : 0],
     ['deep-water', tags.has('dry') ? 0 : wet ? 3 : 0.7],
     ['pit', 1.5],
   ];
@@ -31,13 +32,22 @@ export function hazardWeights(tags: ReadonlySet<DungeonTag>): (readonly [HazardC
 
 type Substance = { hazard: 'lava' | 'acid' | 'deep-water'; name: string };
 
-/** What runs in a channel: water in a wet dungeon, else lava or acid. */
-function substance(rng: Rng, tags: ReadonlySet<DungeonTag>): Substance {
-  if ((tags.has('wet') || tags.has('flooded')) && !tags.has('dry')) return { hazard: 'deep-water', name: 'dungeon.terrain.waterChannel' };
-  return weighted<Substance>(rng, [
-    [{ hazard: 'lava', name: 'dungeon.terrain.lavaChannel' }, 2],
-    [{ hazard: 'acid', name: 'dungeon.terrain.acidChannel' }, 1],
-  ]);
+/**
+ * What may run in a channel, by the tags: lava and acid only where asked for, water wherever the
+ * dungeon is not dry. Without any, a dungeon has no channels.
+ */
+function substances(tags: ReadonlySet<DungeonTag>): (readonly [Substance, number])[] {
+  return [
+    [{ hazard: 'lava', name: 'dungeon.terrain.lavaChannel' }, tags.has('lava') ? 3 : 0] as const,
+    [{ hazard: 'acid', name: 'dungeon.terrain.acidChannel' }, tags.has('acid') ? 2 : 0] as const,
+    [{ hazard: 'deep-water', name: 'dungeon.terrain.waterChannel' }, tags.has('dry') ? 0 : tags.has('wet') || tags.has('flooded') ? 2 : 1] as const,
+  ].filter(([, weight]) => weight > 0);
+}
+
+/** What runs in this channel; null where the tags leave nothing to run. */
+function substance(rng: Rng, tags: ReadonlySet<DungeonTag>): Substance | null {
+  const choices = substances(tags);
+  return choices.length ? weighted<Substance>(rng, choices) : null;
 }
 
 /** Bands across the room to try, each with its bridge where the way through the room's middle crosses it. */
@@ -191,7 +201,9 @@ export function placeChasmOver(work: TerrainWork, k: number, rc: RoomCells, rng:
 }
 
 function placeChannel(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
-  const { hazard, name } = substance(rng, work.tags);
+  const flowing = substance(rng, work.tags);
+  if (!flowing) return false;
+  const { hazard, name } = flowing;
   const floor = work.floors[k];
   for (const drawn of bands(rc, rng, 1, false).slice(0, 12)) {
     const band = neededBridge(rc, drawn);

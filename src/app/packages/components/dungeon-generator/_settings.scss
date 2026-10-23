@@ -193,6 +193,15 @@
   @include atlas-flex-col($gap: $spacing-s);
 }
 
+.atlas-dungeon-tags__group {
+  @include atlas-flex-col($gap: $spacing-xs);
+}
+
+.atlas-dungeon-tags__label {
+  color: var(--text-faint);
+  font-size: $font-ui-smaller;
+}
+
 .atlas-dungeon-tags__chips {
   display: flex;
   flex-wrap: wrap;
