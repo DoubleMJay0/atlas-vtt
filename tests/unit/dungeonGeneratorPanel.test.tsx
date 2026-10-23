@@ -360,12 +360,16 @@ describe('the generator state', () => {
   });
 
   it('keeps the hidden wings while only the water changes, and drops them for another seed', () => {
+    // A seed whose first floor has a secret wing: the test must not depend on a random one
+    const seed = Array.from({ length: 60 }, (_, k) => k + 1)
+      .find((candidate) => generateDungeon({ seed: candidate, tags: [] }).floors[0]!.rooms.some((room) => room.wing === 'secret'));
+    expect(seed).toBeDefined();
     const { result } = renderHook(() => useDungeonState(app));
+    act(() => result.current.setSeed(seed!));
     const request = result.current.request;
     act(() => result.current.setGenerated(request, generateDungeon(request)));
-    const secret = result.current.model!.floors[0]!.rooms.find((room) => room.wing === 'secret');
-    if (!secret) return;
-    act(() => result.current.hideWing(secret.id));
+    const secret = result.current.model!.floors[0]!.rooms.find((room) => room.wing === 'secret')!;
+    act(() => result.current.hideWing(0, secret.id));
     expect(result.current.edits.hiddenWings?.length).toBe(1);
     act(() => result.current.newSeed());
     expect(result.current.edits).toEqual({});
