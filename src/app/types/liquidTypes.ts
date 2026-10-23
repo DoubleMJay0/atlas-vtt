@@ -30,6 +30,8 @@ export interface LiquidSurface extends OnOneLevel {
   /** Where it flows, a unit vector in world space; absent, it stands still. */
   flow?: { x: number; y: number } | undefined;
   colors: LiquidColors;
+  /** How water was illustrated; absent in older scenes, which keep the painted treatment. */
+  waterStyle?: 'painted' | 'engraved';
 }
 
 export type LiquidSurfaceInput = Omit<LiquidSurface, 'id' | 'kind'>;

@@ -37,6 +37,8 @@ uniform vec4 uFieldCode;
 uniform float uCell;
 uniform float uKind;
 uniform float uFlowing;
+uniform float uWaterStyle;
+uniform float uWaterDetail;
 uniform vec4 uFrame;
 uniform vec4 uDriftA;
 uniform vec4 uDriftB;
@@ -78,6 +80,8 @@ export interface LiquidUniforms {
   uCell: number;
   uKind: number;
   uFlowing: number;
+  uWaterStyle: number;
+  uWaterDetail: number;
   uFrame: Float32Array;
   uDriftA: Float32Array;
   uDriftB: Float32Array;
@@ -104,6 +108,8 @@ export function createLiquidShader(field: Texture): LiquidShader {
     uCell: { value: 1, type: 'f32' },
     uKind: { value: 0, type: 'f32' },
     uFlowing: { value: 0, type: 'f32' },
+    uWaterStyle: { value: 0, type: 'f32' },
+    uWaterDetail: { value: 2, type: 'f32' },
     uFrame: { value: new Float32Array([1, 0, 0, 1]), type: 'vec4<f32>' },
     uDriftA: { value: new Float32Array(4), type: 'vec4<f32>' },
     uDriftB: { value: new Float32Array(4), type: 'vec4<f32>' },

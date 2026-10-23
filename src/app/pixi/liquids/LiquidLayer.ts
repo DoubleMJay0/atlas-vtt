@@ -31,6 +31,8 @@ export interface LiquidLayerDeps {
    * their detail is too fine to see move. Unset, `LIQUID_FPS`.
    */
   fps?: () => number;
+  /** Water shading detail independently of zoom/frame pacing: saver 0, balanced 1, high 2. */
+  waterDetail?: () => number;
   /** The time of the display frame (ms); unset, the ticker's, which every animation of the map shares (`frameTime`). */
   now?: () => number;
 }
@@ -53,6 +55,7 @@ export class LiquidLayer {
   private readonly built = new Map<string, Built>();
   private pending: LiquidSurface[] = [];
   private cell = 0;
+  private waterDetail = 2;
   private record: unknown = undefined;
   private mode: MapVideoMode = 'pause';
   /** Seconds of motion, which only playing advances. */
@@ -140,6 +143,7 @@ export class LiquidLayer {
     while (this.pending.length > 0) {
       const surface = this.pending.shift()!;
       const mesh = new LiquidMesh(surface, this.cell);
+      mesh.setWaterDetail(this.deps.waterDetail?.() ?? 2);
       mesh.setTime(this.shownSeconds);
       this.built.set(surface.id, { entry: record?.[surface.id], mesh });
       if (this.now() - start >= budget) break;
@@ -167,6 +171,12 @@ export class LiquidLayer {
   }
 
   private readonly tick = (): void => {
+    const detail = this.deps.waterDetail?.() ?? 2;
+    if (detail !== this.waterDetail) {
+      this.waterDetail = detail;
+      for (const { mesh } of this.built.values()) mesh.setWaterDetail(detail);
+      if (this.built.size > 0) this.deps.requestRender();
+    }
     if (this.pending.length > 0) this.build(BUILD_BUDGET_MS);
     if (this.mode !== 'play' || this.built.size === 0) return;
     const now = this.now();

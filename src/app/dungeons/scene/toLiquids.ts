@@ -10,6 +10,7 @@ import { mixColours, paletteOf } from '../render/palette';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { propPolygon } from './toFeatures';
+import { waterColours } from './waterColours';
 import type { DungeonPlacement } from './toWalls';
 
 /**
@@ -192,8 +193,11 @@ function centroid(ring: readonly Vec[]): Vec {
 /** The colours each liquid moves in, from the look's own: water in the look's water, lava and acid in theirs, toned down to the duotone of a monochrome map. */
 function liquidColours(style: DungeonStyle, view: DungeonView): Record<LiquidKind, LiquidColors> {
   const palette = paletteOf(style, view);
-  const water: LiquidColors = { surface: palette.water, deep: mixColours(palette.water, palette.ink, 0.35), glint: mixColours(palette.water, '#ffffff', 0.75) };
-  if (view.monochrome) return { water, lava: water, acid: water };
+  const water = waterColours(style, view);
+  if (view.monochrome) {
+    const mono = { surface: palette.water, deep: mixColours(palette.water, palette.ink, 0.35), glint: mixColours(palette.water, '#ffffff', 0.75) };
+    return { water, lava: mono, acid: mono };
+  }
   return {
     water,
     lava: { surface: '#d6602a', deep: '#5c1a0c', glint: '#ffd27a' },
@@ -235,7 +239,7 @@ export function floorLiquids(
   const liquids: Record<string, LiquidSurface> = {};
   cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow }, index) => {
     const liquidId = `liquid_${id}_${index + 1}`;
-    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(level && { level }) };
+    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(liquid === 'water' && { waterStyle: style.direction === 'engraved' ? 'engraved' : 'painted' }), ...(level && { level }) };
   });
   // The glow comes from the whole of the lava, under its bridges and what stands in it too
   const lights: Record<string, LightSource> = {};

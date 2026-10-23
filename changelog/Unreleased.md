@@ -23,6 +23,8 @@
 
 ## Improved
 
+- Water on generated dungeon maps moves in the drawing’s own style: soft painted reflections or quiet engraved ripples, with gentler banks and cheaper shading at lower graphics quality.
+
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 
 ## Important changes

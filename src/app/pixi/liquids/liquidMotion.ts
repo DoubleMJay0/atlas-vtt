@@ -24,9 +24,9 @@ interface Drift { across: number; along: number }
  */
 const DRIFTS: Readonly<Record<LiquidKind, { flowing: readonly Drift[]; still: readonly Drift[] }>> = {
   water: {
-    // Warp, ripples, finer ripples, caustics: the slow warp keeps the faster ripples from reading as a conveyor belt.
-    flowing: [{ across: 0.03, along: 0.16 }, { across: 0, along: 0.42 }, { across: -0.04, along: 0.62 }, { across: 0.05, along: 0.3 }],
-    still: [{ across: 0.04, along: 0.02 }, { across: -0.05, along: 0.035 }, { across: 0.045, along: -0.06 }, { across: -0.03, along: -0.04 }],
+    // Broad wash, broken reflections, fine brushwork, unused: slow currents, never a racing caustic net.
+    flowing: [{ across: 0.008, along: 0.055 }, { across: 0, along: 0.09 }, { across: -0.01, along: 0.065 }, { across: 0, along: 0 }],
+    still: [{ across: 0.028, along: 0.014 }, { across: -0.04, along: 0.02 }, { across: 0.022, along: -0.028 }, { across: 0, along: 0 }],
   },
   lava: {
     // Churn, plates, heat, fine crust grain: everything molten creeps.

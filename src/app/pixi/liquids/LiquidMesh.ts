@@ -61,6 +61,7 @@ export class LiquidMesh {
     uniforms.uFieldCode.set([field.outside, field.near, field.far, 0]);
     uniforms.uCell = cell;
     uniforms.uKind = KIND_CODE[surface.liquid];
+    uniforms.uWaterStyle = surface.waterStyle === 'engraved' ? 1 : 0;
     const { flow } = surface;
     uniforms.uFlowing = flow ? 1 : 0;
     // Its frame: across the flow, then along it; a still surface keeps the map's axes.
@@ -75,6 +76,11 @@ export class LiquidMesh {
     this.mesh.eventMode = 'none';
     this.bounds = boxOf(surface.polygon);
     this.setTime(0);
+  }
+
+  /** Water octaves: saver 0, balanced 1, high 2. No geometry or texture work. */
+  setWaterDetail(detail: number): void {
+    this.uniforms.uWaterDetail = detail;
   }
 
   /** Shows the surface as it moves `seconds` into its motion. */
