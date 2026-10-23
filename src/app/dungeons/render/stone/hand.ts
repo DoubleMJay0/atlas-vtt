@@ -9,7 +9,7 @@ import type { Vec } from '../geometry';
 import type { StoneColours } from './colours';
 import { drawLava } from './lava';
 import { cellPattern } from './patterns';
-import { grainTile, rockTile, woodTile, ROCK_TILE } from './textures';
+import { grainTile, rockTile, tileTexels, woodTile, ROCK_TILE } from './textures';
 import { paintWater } from './water';
 import { lightInside } from './lightInside';
 import { depthField } from '../art/pools';
@@ -80,8 +80,8 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       path(ctx);
       ctx.clip();
       if (material === 'rock') ctx.fillStyle = cellPattern(ctx, rockTile(), ROCK_TILE.cells);
-      else if (material === 'wood' || material === 'rope') ctx.fillStyle = cellPattern(ctx, woodTile(0.12), 0.9);
-      else ctx.fillStyle = cellPattern(ctx, grainTile(material === 'metal' ? 0.03 : 0.06), 1.4);
+      else if (material === 'wood' || material === 'rope') ctx.fillStyle = cellPattern(ctx, woodTile(0.12, tileTexels(0.9)), 0.9);
+      else ctx.fillStyle = cellPattern(ctx, grainTile(material === 'metal' ? 0.03 : 0.06, tileTexels(1.4)), 1.4);
       ctx.fill();
       ctx.restore();
     },

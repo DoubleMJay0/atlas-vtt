@@ -6,7 +6,7 @@ import { clipOutsideMouths, grownRings, rockSide, traceRings } from '../art/outl
 import { wallInkWidth } from '../wallInk';
 import type { StoneColours } from './colours';
 import { cellPattern } from './patterns';
-import { grainTile } from './textures';
+import { grainTile, tileTexels } from './textures';
 
 /**
  * Every room is lined with a course of dressed blocks: stone with its grain, joints across it at
@@ -30,7 +30,7 @@ export function drawWallBand(scene: ArtScene, c: StoneColours): void {
   ctx.fill('evenodd');
   ctx.clip('evenodd');
   if (scene.raster) {
-    ctx.fillStyle = cellPattern(ctx, grainTile(0.08), 1.6);
+    ctx.fillStyle = cellPattern(ctx, grainTile(0.08, tileTexels(1.6)), 1.6);
     ctx.fill('evenodd');
   }
   joints(scene, c, seed);

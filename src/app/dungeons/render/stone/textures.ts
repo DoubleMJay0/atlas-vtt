@@ -1,3 +1,4 @@
+import { DEFAULT_PX_PER_CELL } from '../layoutSize';
 import { periodicFbm, standardised } from '../art/noise';
 import { plateAt, plateValue } from '../art/plates';
 
@@ -7,7 +8,7 @@ import { plateAt, plateValue } from '../art/plates';
  */
 
 /** Rock tiles: their side in texels, the cells they cover, and their plates across. */
-export const ROCK_TILE = { px: 768, cells: 3, plates: 7, seed: 0x51a7e };
+export const ROCK_TILE = { px: 1024, cells: 3, plates: 7, seed: 0x51a7e };
 
 const LIGHT = (() => {
   const l = [-0.5, -0.5, 0.71];
@@ -16,6 +17,11 @@ const LIGHT = (() => {
 })();
 
 const cache = new Map<string, OffscreenCanvas>();
+
+/** Texels for a tile repeated every `cells` cells: one a pixel of a scene's map, up to 2048. */
+export function tileTexels(cells: number): number {
+  return Math.min(2048, 2 ** Math.ceil(Math.log2(cells * DEFAULT_PX_PER_CELL)));
+}
 
 function canvasOf(size: number, rgba: Uint8ClampedArray<ArrayBuffer>): OffscreenCanvas {
   const canvas = new OffscreenCanvas(size, size);

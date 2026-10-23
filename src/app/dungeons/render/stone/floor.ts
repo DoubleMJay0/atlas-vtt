@@ -8,7 +8,7 @@ import { clipFloors } from '../art/outline';
 import { insetConvex, traceRounded } from '../art/polygons';
 import type { StoneColours } from './colours';
 import { cellPattern } from './patterns';
-import { grainTile } from './textures';
+import { grainTile, tileTexels } from './textures';
 
 /**
  * The floor: stones of the look's pattern, each its own faint shade, joints sunk a little and their
@@ -54,7 +54,7 @@ export function drawFloor(scene: ArtScene, c: StoneColours): void {
     ctx.restore();
   }
   if (scene.raster) {
-    ctx.fillStyle = cellPattern(ctx, grainTile(0.014), 2.2);
+    ctx.fillStyle = cellPattern(ctx, grainTile(0.014, tileTexels(2.2)), 2.2);
     ctx.globalAlpha = c.mono ? 0.5 : 1;
     ctx.fillRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
   }

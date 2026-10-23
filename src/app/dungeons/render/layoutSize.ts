@@ -10,10 +10,15 @@ export const MAX_MAP_PIXELS = 144_000_000;
 /** Whole cells of paper around the floors: room for the hatching, its strokes and the exits. */
 const MAP_MARGIN_CELLS = 2;
 /**
- * A scene's map is drawn at this many pixels per cell (less where the limits above demand it): one
- * image pixel per screen pixel on a Retina display at zoom 1 with a cell 100 points wide.
+ * A scene's map is drawn at this many pixels per cell (less where the limits above demand it): two
+ * image pixels per screen pixel on a Retina display at zoom 1 with a cell 100 points wide, so the
+ * map stays sharp zoomed in twice as far. Stored as WebP (`SCENE_MAP_QUALITY`, encoded by the image
+ * workers while the next floor is drawn), it costs a few megabytes where a PNG of half the
+ * resolution cost tens.
  */
-export const DEFAULT_PX_PER_CELL = 200;
+export const DEFAULT_PX_PER_CELL = 400;
+/** The WebP quality a scene's map is stored at: no difference to see at 4× magnification, about a thirtieth of a PNG. */
+export const SCENE_MAP_QUALITY = 0.92;
 
 /**
  * Where a map image lies on the grid: its pixel (0, 0) is the corner of cell `originCell`. Every

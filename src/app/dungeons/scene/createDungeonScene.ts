@@ -10,7 +10,7 @@ import { AssetThumbnailService, THUMBNAIL_SPEC } from '../../services/AssetThumb
 import { t } from '../../i18n';
 import { INVALID_NAME_CHARACTERS } from '../../services/assetPaths';
 import type { DungeonModel, DungeonRequest } from '../model';
-import { DEFAULT_PX_PER_CELL, type MapLayout } from '../render/layoutSize';
+import { DEFAULT_PX_PER_CELL, SCENE_MAP_QUALITY, type MapLayout } from '../render/layoutSize';
 import type { DungeonStyle, DungeonView } from '../style';
 import { DungeonWorkerClient } from '../worker/DungeonWorkerClient';
 import type { DungeonJob, DungeonRendered } from '../worker/dungeonJob';
@@ -176,7 +176,8 @@ export async function createDungeonScene(app: App, assetService: AssetService, o
       app,
       assetService,
       render: (job) => client.render(job),
-      convertImage: (image) => optimizeImage(image, IMAGE_PRESETS.map, { thumbnail: THUMBNAIL_SPEC }),
+      // A generated map is all fine grain, which a PNG cannot pack: stored as WebP, a thirtieth of the size
+      convertImage: (image) => optimizeImage(image, { ...IMAGE_PRESETS.map, quality: SCENE_MAP_QUALITY }, { thumbnail: THUMBNAIL_SPEC, webpOnly: true }),
       thumbnails: AssetThumbnailService.getInstance(app, assetService),
     },
     options,
