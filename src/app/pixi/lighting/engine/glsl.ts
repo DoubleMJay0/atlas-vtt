@@ -65,6 +65,31 @@ export const SRGB_GLSL = `
 vec3 toLinear(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
 vec3 toSrgb(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }`;
 
+/**
+ * How the lighting turns light into colour, shared by the composite and the roofs, so a roof and the
+ * floor beneath it are lit alike: Khronos PBR Neutral (colours stay as painted up to ~0.8, highlights
+ * roll off to white), and the cool grey low light takes on by `night` (the share it is dim, Purkinje).
+ */
+export const TONEMAP_GLSL = `
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+vec3 neutral(vec3 color) {
+  const float start = 0.8 - 0.04;
+  const float desaturation = 0.15;
+  float x = min(color.r, min(color.g, color.b));
+  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  color -= offset;
+  float peak = max(color.r, max(color.g, color.b));
+  if (peak < start) return color;
+  const float d = 1.0 - start;
+  float newPeak = 1.0 - d * d / (peak + d - start);
+  color *= newPeak / peak;
+  float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
+  return mix(color, vec3(newPeak), g);
+}
+vec3 nightShift(vec3 lit, float night) {
+  return mix(lit, vec3(dot(lit, LUMA)) * vec3(0.86, 0.96, 1.18), night);
+}`;
+
 /** Share of a unit disc left of x (-1..1). */
 export const DISC_SHARE_GLSL = `
 float discShare(float x) {

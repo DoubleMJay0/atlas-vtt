@@ -10,6 +10,8 @@ export const MAP_LAYER_Z = {
   placementCells: 91,
   /** The hover, press and Shift-preview highlight of linked hexes (GM only). */
   hexLinks: 92,
+  /** Stairs between levels: their outlines and badges, and the editor's corners (GM only). */
+  levelLinks: 93,
   /** The marker on the token whose turn it is: above the lighting, below the tokens' bars. */
   turn: 96,
   /** Note pins (GM only). */

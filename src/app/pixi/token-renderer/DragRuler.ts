@@ -14,6 +14,7 @@ import { formatDistance, type MeasurementSettings } from '../../grid/measurement
 import type { ViewAtlasState } from '../../storeFactory';
 import type { LayerVisibility } from '../playerSafeFrame';
 import type { DragRulerView } from './DragRulerView';
+import { levelObjects } from '../../levels/levelObjects';
 import { computeTokenPixelSize } from './tokenSizing';
 import { mapTokens } from '../../tokens/offMap';
 
@@ -76,7 +77,7 @@ export class DragRuler {
 
   /** Players never see the ruler of a token hidden from them, or of one they do not see (`isSeen`, with dynamic lighting). */
   getPlayerViewLayers(isSeen: (tokenId: string) => boolean = () => true): LayerVisibility[] {
-    const token = this.tokenId ? mapTokens(this.store.getState().objects)[this.tokenId] : undefined;
+    const token = this.tokenId ? mapTokens(levelObjects(this.store.getState()))[this.tokenId] : undefined;
     const shown = !token || (!token.isHidden && isSeen(token.id));
     return shown ? [] : this.view.layers.map(layer => ({ layer, visible: false }));
   }
@@ -140,7 +141,7 @@ export class DragRuler {
   }
 
   private tokenSize(): number {
-    const size = this.tokenId ? mapTokens(this.store.getState().objects)[this.tokenId]?.size : undefined;
+    const size = this.tokenId ? mapTokens(levelObjects(this.store.getState()))[this.tokenId]?.size : undefined;
     return size || 1;
   }
 }

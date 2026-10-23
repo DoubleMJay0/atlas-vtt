@@ -25,6 +25,10 @@ export interface UISlice extends ViewUIState {
   closeLightPopover: () => void;
   openLightZonePopover: (zoneId: string) => void;
   closeLightZonePopover: () => void;
+  openLevelLinkPopover: (linkId: string) => void;
+  closeLevelLinkPopover: () => void;
+  openLevelSurfacePopover: (surfaceId: string) => void;
+  closeLevelSurfacePopover: () => void;
   setSceneLightingPanelOpen: (open: boolean) => void;
   setHeldTokens: (held: HeldTokens) => void;
   setExploredBrush: (changes: Partial<ExploredBrushOptions>) => void;
@@ -33,6 +37,7 @@ export interface UISlice extends ViewUIState {
   /** Opens the dungeon generator over the map, in place of one open already. */
   openDungeonGenerator: (request: DungeonGeneratorRequest) => void;
   closeDungeonGenerator: () => void;
+  setRoofsHidden: (hidden: boolean) => void;
 }
 
 /** Default state — all panels closed */
@@ -48,11 +53,14 @@ export function createInitialUIState(): Pick<
   | 'isDiceTrayOpen'
   | 'lightPopover'
   | 'lightZonePopover'
+  | 'levelLinkPopover'
+  | 'levelSurfacePopover'
   | 'isSceneLightingPanelOpen'
   | 'heldTokens'
   | 'exploredBrush'
   | 'isToolbarEditing'
   | 'dungeonGenerator'
+  | 'roofsHidden'
 > {
   return {
     isGridSettingsOpen: false,
@@ -65,11 +73,14 @@ export function createInitialUIState(): Pick<
     isDiceTrayOpen: false,
     lightPopover: null,
     lightZonePopover: null,
+    levelLinkPopover: null,
+    levelSurfacePopover: null,
     isSceneLightingPanelOpen: false,
     heldTokens: {},
     exploredBrush: DEFAULT_EXPLORED_BRUSH,
     isToolbarEditing: false,
     dungeonGenerator: null,
+    roofsHidden: false,
   };
 }
 
@@ -90,12 +101,17 @@ export function createUIActions(
   | 'closeLightPopover'
   | 'openLightZonePopover'
   | 'closeLightZonePopover'
+  | 'openLevelLinkPopover'
+  | 'closeLevelLinkPopover'
+  | 'openLevelSurfacePopover'
+  | 'closeLevelSurfacePopover'
   | 'setSceneLightingPanelOpen'
   | 'setHeldTokens'
   | 'setExploredBrush'
   | 'setToolbarEditing'
   | 'openDungeonGenerator'
   | 'closeDungeonGenerator'
+  | 'setRoofsHidden'
 > {
   return {
     setGridSettingsOpen: (open) => set((draft) => { draft.isGridSettingsOpen = open; }),
@@ -129,6 +145,10 @@ export function createUIActions(
       draft.lightPopover = null;
     }),
     closeLightZonePopover: () => set((draft) => { draft.lightZonePopover = null; }),
+    openLevelLinkPopover: (linkId) => set((draft) => { draft.levelLinkPopover = linkId; }),
+    closeLevelLinkPopover: () => set((draft) => { draft.levelLinkPopover = null; }),
+    openLevelSurfacePopover: (surfaceId) => set((draft) => { draft.levelSurfacePopover = surfaceId; }),
+    closeLevelSurfacePopover: () => set((draft) => { draft.levelSurfacePopover = null; }),
     closeLightPopover: () => set((draft) => { draft.lightPopover = null; }),
     setSceneLightingPanelOpen: (open) => set((draft) => { draft.isSceneLightingPanelOpen = open; }),
     setHeldTokens: (held) => set((draft) => { draft.heldTokens = held; }),
@@ -142,5 +162,6 @@ export function createUIActions(
       draft.isToolbarEditing = false;
     }),
     closeDungeonGenerator: () => set((draft) => { draft.dungeonGenerator = null; }),
+    setRoofsHidden: (hidden) => set((draft) => { draft.roofsHidden = hidden; }),
   };
 }

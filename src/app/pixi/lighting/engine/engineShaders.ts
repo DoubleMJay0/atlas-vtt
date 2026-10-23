@@ -9,6 +9,7 @@ import { sightFragment, sightVertex } from './sightShader';
 import { tileFragment, tileVertex } from './tileShader';
 import { tileSmoothFragment } from './tileSmoothShader';
 import { zoneFragment } from './zoneShader';
+import { roofFragment } from './roofShader';
 
 export interface EngineShaderSource {
   readonly name: string;
@@ -35,4 +36,5 @@ export const ENGINE_SHADERS = {
   bounceResolve: { name: 'atlas-bounce-resolve', vertex: cascadeVertex, fragment: resolveFragment },
   sight: { name: 'atlas-sight', vertex: sightVertex, fragment: sightFragment },
   composite: { name: 'atlas-lighting-composite', vertex: defaultFilterVert, fragment: compositeFragment },
+  roof: { name: 'atlas-roof', vertex: defaultFilterVert, fragment: roofFragment },
 } as const satisfies Record<string, EngineShaderSource>;

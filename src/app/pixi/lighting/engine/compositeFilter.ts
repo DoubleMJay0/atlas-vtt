@@ -1,14 +1,5 @@
-import {
-  Color,
-  Filter,
-  Matrix,
-  Sprite,
-  Texture,
-  UniformGroup,
-  type FilterWithShader,
-  type FilterSystem,
-  type RenderSurface,
-} from 'pixi.js';
+import { Color, Matrix, Texture, UniformGroup, type Filter } from 'pixi.js';
+import { AreaAwareFilter } from './areaAwareFilter';
 import { BOUNCE, DARKNESS, EXPOSURE, PURKINJE, wallBand, wallCore } from '../../../lighting/lightingConstants';
 import { DEFAULT_AMBIENT_COLOR, DEFAULT_EXPLORED_COLOR, DEFAULT_UNEXPLORED_COLOR } from '../../../lighting/sceneLightingOptions';
 import { srgbToLinear } from '../../../lighting/srgb';
@@ -22,6 +13,24 @@ import { DARK_SIGHT_LEVELS, darkLooks, type DarkLooks } from './senseDrawing';
 import { SEES_ALL } from '../../../vision/sight';
 
 export type LightingMode = 'gm' | 'player';
+
+/** The level stack as the composite reads it (`LevelStackTexture`): what each texel of the stack's grid shows. */
+export interface CompositeStack {
+  /** Red is the level each texel shows (0 the viewed one, 1 and 2 the levels below drawn, 255 nothing). */
+  texture: Texture;
+  /** Where the texture's first texel lies in the grid, and how many it has. */
+  box: { x: number; y: number; columns: number; rows: number };
+  /** The grid's texel in world pixels, and its size. */
+  texel: number;
+  columns: number;
+  rows: number;
+}
+
+/** The pictures of the levels below drawn for a render, nearest first: null where a level has none. */
+export type BelowPictures = readonly [Texture | null, Texture | null];
+
+/** No level below is drawn for the render. */
+export const NO_BELOW: BelowPictures = [null, null];
 
 /** The bounce's weight in the composite; 0 in a world without bounce. */
 const BOUNCE_GAIN: number = BOUNCE.gain;
@@ -57,33 +66,16 @@ export interface CompositeFilter {
   setGrid(mark: GridMarkColor | null): void;
   /** Maps screen pixels of the render being drawn to world pixels; `zoom` is screen px per world px. */
   setView(screenToWorld: Matrix, zoom: number): void;
-}
-
-/**
- * PIXI tells a filter where its area starts on screen (`uOutputFrame`) only when it is the last
- * of its chain. `calculateSpriteMatrix` for a sprite at the origin with a 1 px texture maps
- * input coordinates to screen pixels, so its translation is that start for any position.
- */
-class AreaAwareFilter extends Filter {
-  private readonly probe = new Sprite(Texture.WHITE);
-  private readonly probeMatrix = new Matrix();
-
-  constructor(options: FilterWithShader, private readonly origin: Float32Array, private readonly group: UniformGroup) {
-    super(options);
-  }
-
-  override apply(filterManager: FilterSystem, input: Texture, output: RenderSurface, clearMode: boolean): void {
-    const { tx, ty } = filterManager.calculateSpriteMatrix(this.probeMatrix, this.probe);
-    this.origin[0] = tx;
-    this.origin[1] = ty;
-    this.group.update();
-    filterManager.applyFilter(this, input, output, clearMode);
-  }
-
-  override destroy(destroyPrograms = false): void {
-    this.probe.destroy();
-    super.destroy(destroyPrograms);
-  }
+  /** The level stack of the view's openings, or null while the level shows only itself: nothing of it is read then. */
+  setStack(stack: CompositeStack | null): void;
+  /**
+   * The levels below as their own composites drew the render about to be drawn, texel on pixel,
+   * nearest first, dimmed by `dim` once per level down; a level without a picture shows nothing in
+   * its texels.
+   */
+  setBelow(pictures: BelowPictures, dim: number): void;
+  /** Which level of the stack this composite draws: 0 the viewed one, 1 or 2 a level below. */
+  setLevelIndex(index: number): void;
 }
 
 export function createCompositeFilter(world: LightingWorld, explored: Texture): CompositeFilter {
@@ -97,6 +89,9 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
   const greyTint = new Float32Array(3);
   const darkTint = new Float32Array([1, 1, 1]);
   const gridColor = new Float32Array(3);
+  const stackBox = new Float32Array(4);
+  const stackGrid = new Float32Array(2);
+  const belowShown = new Float32Array(2);
   let gridMark: number | undefined;
   const group = new UniformGroup({
     uScreenToWorld: { value: screenToWorld, type: 'mat3x3<f32>' },
@@ -131,6 +126,13 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     uFluSpacing: { value: BOUNCE.probe, type: 'f32' },
     uGrid: { value: 0, type: 'f32' },
     uGridColor: { value: gridColor, type: 'vec3<f32>' },
+    uStackBox: { value: stackBox, type: 'vec4<f32>' },
+    uStackGrid: { value: stackGrid, type: 'vec2<f32>' },
+    uStackTexel: { value: 1, type: 'f32' },
+    uHasBelow: { value: 0, type: 'f32' },
+    uLevelIndex: { value: 0, type: 'f32' },
+    uBelowShown: { value: belowShown, type: 'vec2<f32>' },
+    uBelowDim: { value: 1, type: 'f32' },
   });
   const u = group.uniforms;
   // Bound while the scene has no darkness source, no ambient zone or no bounce, so the filter never holds a destroyed map.
@@ -147,6 +149,9 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
       uDarkness: noDarkness.source,
       uZones: noDarkness.source,
       uZonesLifted: noDarkness.source,
+      uStack: noDarkness.source,
+      uBelow1: noDarkness.source,
+      uBelow2: noDarkness.source,
       ...fieldResources(world),
     },
     blendRequired: true,
@@ -231,6 +236,27 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     setView(matrix, zoom): void {
       screenToWorld.copyFrom(matrix);
       u.uPixelWorld = 1 / zoom;
+      group.update();
+    },
+    setStack(stack): void {
+      filter.resources.uStack = (stack?.texture ?? noDarkness).source;
+      u.uHasBelow = stack ? 1 : 0;
+      if (stack) {
+        stackBox.set([stack.box.x, stack.box.y, stack.box.columns, stack.box.rows]);
+        stackGrid.set([stack.columns, stack.rows]);
+        u.uStackTexel = stack.texel;
+      }
+      group.update();
+    },
+    setBelow([first, second], dim): void {
+      filter.resources.uBelow1 = (first ?? noDarkness).source;
+      filter.resources.uBelow2 = (second ?? noDarkness).source;
+      belowShown.set([first ? 1 : 0, second ? 1 : 0]);
+      u.uBelowDim = dim;
+      group.update();
+    },
+    setLevelIndex(index): void {
+      u.uLevelIndex = index;
       group.update();
     },
   };

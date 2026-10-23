@@ -1,14 +1,13 @@
+import { COLLECTION_GONE, mapSceneFile, writeMapScene, type MapSceneDeps } from '../writeMapScene';
 import { resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
-import type { Size } from '../../imageProcessing/imageLayout';
 import type { ProcessedImage } from '../../imageProcessing/imageProcessing';
 import type { ScaleDown } from '../../imageProcessing/imageJob';
-import { UVTT_TOO_LARGE, parseUvtt } from './parseUvtt';
 import { wallsCrowd } from './uvttCrowding';
 import { uvttSceneName } from './uvttFileNames';
-import { COLLECTION_GONE, writeMapScene, type MapSceneDeps } from '../writeMapScene';
-import { uvttCellSize, uvttToScene, type UvttCounts } from './uvttToScene';
-import { UVTT_LIMITS, type UvttMap, type UvttRefusal } from './uvttTypes';
+import { CROWDED_WALLS, UNREADABLE_IMAGE, cellSizeOn, readUvttSource, refused, type UvttSource } from './uvttSource';
+import { uvttToScene, type UvttCounts } from './uvttToScene';
+import type { UvttRefusal } from './uvttTypes';
 
 export interface UvttImportDeps extends MapSceneDeps {
   /** The file's image as a map stores it, with its thumbnail: the image workers. */
@@ -29,67 +28,51 @@ export interface UvttImported {
 
 export type UvttImportResult = UvttImported | UvttRefusal;
 
-const refused = (problem: string): UvttRefusal => ({ ok: false, problem });
-
-const UNREADABLE_IMAGE = 'The map image in the file could not be read.';
-const CROWDED_WALLS = 'The walls in the file end too close together in too many places for Atlas to join them.';
-
-/**
- * World pixels a cell of the map spans on an image of `image` pixels, or why that image cannot
- * carry the map's grid: its cells would not be square, or too small to be a grid at all.
- */
-function cellSizeOn(map: UvttMap, image: Size): number | UvttRefusal {
-  const pixels = `${image.width} × ${image.height} pixels`;
-  const squares = `${map.size.x} × ${map.size.y} squares`;
-  const cellSize = uvttCellSize(map, image);
-  if (cellSize === null) return refused(`The map image is ${pixels}, which does not fit a map of ${squares}.`);
-  if (cellSize < UVTT_LIMITS.cellPixels) return refused(`The map image is too small for its grid: ${pixels} for ${squares}.`);
-  return cellSize;
+/** Converts a source's image as a map stores it; null when the workers cannot read it. */
+export async function convertSourceImage(deps: Pick<UvttImportDeps, 'convertImage'>, source: UvttSource): Promise<ProcessedImage | null> {
+  try {
+    return await deps.convertImage(source.image);
+  } catch (error) {
+    console.error('[Atlas] The image of a Universal VTT file could not be converted', error);
+    return null;
+  }
 }
 
-async function importFile(deps: UvttImportDeps, file: File, collectionId: string): Promise<UvttImportResult> {
-  if (file.size > UVTT_LIMITS.fileBytes) return refused(UVTT_TOO_LARGE);
-  const parsed = parseUvtt(await file.text());
-  if (!parsed.ok) return parsed;
-  const { map } = parsed;
+/** The size a converted image is shown at: the saved image's own, which a large map's was scaled down to. */
+export async function savedSize(image: ProcessedImage, source: UvttSource): Promise<{ width: number; height: number }> {
+  return (await imageDimensions(image.image)) ?? image.scaledDown?.to ?? source.size;
+}
 
-  const source = new Blob([map.image.bytes], { type: map.image.type });
-  const sourceSize = await imageDimensions(source);
-  if (!sourceSize) return refused(UNREADABLE_IMAGE);
-  if (sourceSize.width * sourceSize.height > UVTT_LIMITS.imagePixels) {
-    return refused(`The map image is too large to open: ${sourceSize.width} × ${sourceSize.height} pixels.`);
-  }
-  const sourceCell = cellSizeOn(map, sourceSize);
-  if (typeof sourceCell !== 'number') return sourceCell;
-
+async function importSource(deps: UvttImportDeps, source: UvttSource, collectionId: string): Promise<UvttImportResult> {
+  const { map } = source;
   const collection = await deps.assetService.getCollection(collectionId);
   if (!collection) return refused(COLLECTION_GONE);
 
   // Where things lie on the map does not depend on the size the image is saved at
-  const unit = resolveMeasurementSettings(deps.assetService.getCollectionSettings(collection.id).gridDefaults, null);
-  const placed = uvttToScene(map, { cellSize: sourceCell, unit });
+  const settings = deps.assetService.getCollectionSettings(collection.id);
+  const unit = resolveMeasurementSettings(settings.gridDefaults, null);
+  const placed = uvttToScene(map, { cellSize: source.cellSize, unit });
   if (placed.onImage === 0 && placed.skipped.outside > 0) {
     return refused('Nothing in the file lies on its map image: its walls, doors and lights are all outside it.');
   }
-  if (wallsCrowd(Object.values(placed.walls), sourceSize)) return refused(CROWDED_WALLS);
+  if (wallsCrowd(Object.values(placed.walls), source.size)) return refused(CROWDED_WALLS);
 
-  let image: ProcessedImage;
-  try {
-    image = await deps.convertImage(source);
-  } catch (error) {
-    console.error('[Atlas] The image of a Universal VTT file could not be converted', error);
-    return refused(UNREADABLE_IMAGE);
-  }
-  // The size the scene shows the image at: the saved image's own, which a large map's was scaled down to
-  const size = (await imageDimensions(image.image)) ?? image.scaledDown?.to ?? sourceSize;
+  const image = await convertSourceImage(deps, source);
+  if (!image) return refused(UNREADABLE_IMAGE);
+  const size = await savedSize(image, source);
   const cellSize = cellSizeOn(map, size);
   if (typeof cellSize !== 'number') return cellSize;
 
-  const scene = cellSize === sourceCell ? placed : uvttToScene(map, { cellSize, unit });
+  const scene = cellSize === source.cellSize ? placed : uvttToScene(map, { cellSize, unit });
   // A map scaled down has its walls closer together
   if (scene !== placed && wallsCrowd(Object.values(scene.walls), size)) return refused(CROWDED_WALLS);
-  if (Object.values(scene.skipped).some((count) => count > 0)) console.debug(`[Atlas] ${file.name}: left out what the map does not take`, scene.skipped);
-  const written = await writeMapScene(deps, { baseName: uvttSceneName(file.name), collection, image, scene });
+  if (Object.values(scene.skipped).some((count) => count > 0)) console.debug(`[Atlas] ${source.fileName}: left out what the map does not take`, scene.skipped);
+  const written = await writeMapScene(deps, {
+    collection,
+    baseName: uvttSceneName(source.fileName),
+    maps: [{ image, name: (sceneName) => sceneName }],
+    content: ([background]) => mapSceneFile(settings, background!, scene),
+  });
   if (!written.ok) return written;
   return {
     ...written,
@@ -97,6 +80,16 @@ async function importFile(deps: UvttImportDeps, file: File, collectionId: string
     lightsOff: map.bakedLighting && scene.counts.lights > 0,
     ...(image.scaledDown && { scaledDown: image.scaledDown }),
   };
+}
+
+/** Imports a file already read (`readUvttSource`) as `importUvttFile` does. Never throws. */
+export async function importUvttSource(deps: UvttImportDeps, source: UvttSource, collectionId: string): Promise<UvttImportResult> {
+  try {
+    return await importSource(deps, source, collectionId);
+  } catch (error) {
+    console.error('[Atlas] Importing a Universal VTT file failed', error);
+    return refused('The file could not be imported.');
+  }
 }
 
 /**
@@ -107,7 +100,8 @@ async function importFile(deps: UvttImportDeps, file: File, collectionId: string
  */
 export async function importUvttFile(deps: UvttImportDeps, file: File, collectionId: string): Promise<UvttImportResult> {
   try {
-    return await importFile(deps, file, collectionId);
+    const source = await readUvttSource(file);
+    return 'ok' in source ? source : await importUvttSource(deps, source, collectionId);
   } catch (error) {
     console.error('[Atlas] Importing a Universal VTT file failed', error);
     return refused('The file could not be imported.');

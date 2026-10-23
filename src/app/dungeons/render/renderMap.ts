@@ -13,6 +13,8 @@ export interface RenderMapOptions {
   pxPerCell: number;
   /** Leave the paper out, for an image laid over something else. */
   transparent?: boolean;
+  /** Plain paper instead of the vellum, as the SVG export draws it (it holds no gradients or grain). */
+  plainPaper?: boolean;
   /**
    * Keeps hatching and strokes readable where cells are small (`legibleStyle`), for a picture
    * this many times the 1400 × 1000 the legible size is given for: the preview's.
@@ -30,7 +32,7 @@ export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyl
   const drawn = options.legibleAt ? legibleStyle(style, pxPerCell / options.legibleAt) : style;
   const env = createRenderEnv(ctx, visibleDungeon(model, view), drawn, view, pxPerCell);
   ctx.save();
-  if (!options.transparent) drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome);
+  if (!options.transparent) drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome || options.plainPaper === true);
   ctx.scale(pxPerCell, pxPerCell);
   ctx.translate(-layout.originCell.x, -layout.originCell.y);
   drawDungeon(env);

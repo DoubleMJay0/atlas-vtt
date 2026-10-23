@@ -1,7 +1,7 @@
 import type { App } from 'obsidian';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import { IMAGE_PRESETS, optimizeImage, type ProcessedImage } from '../../imageProcessing/imageProcessing';
-import { writeMapScene, type MapSceneDeps } from '../../import/writeMapScene';
+import { mapSceneFile, writeMapScene, type MapSceneDeps } from '../../import/writeMapScene';
 import type { AssetService } from '../../services/AssetService';
 import { AssetThumbnailService, THUMBNAIL_SPEC } from '../../services/AssetThumbnailService';
 import { t } from '../../i18n';
@@ -75,11 +75,12 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
   if (!parts) return refused(t('dungeon.problem.crowdedWalls'));
   if (parts.unplaced > 0) console.debug(`[Atlas] ${options.name}: ${parts.unplaced} doors had no walls beside them and were left open`);
 
+  const settings = deps.assetService.getCollectionSettings(collection.id);
   const written = await writeMapScene(deps, {
-    baseName: dungeonSceneName(options.name),
     collection,
-    image,
-    scene: parts.scene,
+    baseName: dungeonSceneName(options.name),
+    maps: [{ image, name: (sceneName) => sceneName }],
+    content: ([background]) => mapSceneFile(settings, background!, parts.scene),
   });
   if (!written.ok) {
     console.error('[Atlas] Saving a dungeon scene failed:', written.problem);

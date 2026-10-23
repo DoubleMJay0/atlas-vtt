@@ -1,6 +1,7 @@
 import { tokenLabel, type WorkScene } from './atlasView.ts';
 import type { KnownPlayer, Ownership } from './ownership.ts';
 import { seeAsPlayers } from './playerTokenVision.ts';
+import { levelObjects } from '../../levels/levelObjects';
 
 /** A player token of a scene, or a token a player was given there, as the GM's panels list it. */
 export interface PlayerTokenRow {
@@ -11,10 +12,10 @@ export interface PlayerTokenRow {
   readonly owner: KnownPlayer | null;
 }
 
-/** The player tokens of a scene, with who has each. */
+/** The player tokens of the level a scene shows, with who has each. */
 export function playerTokenRows(ownership: Ownership, scene: WorkScene | null): PlayerTokenRow[] {
   if (scene === null) return [];
-  const { tokens } = scene.store.getState().objects;
+  const { tokens } = levelObjects(scene.store.getState());
   return ownership.seats(scene.mapPath, tokens).flatMap(({ tokenId, owner }) => {
     const token = tokens[tokenId];
     return token === undefined ? [] : [{ tokenId, label: tokenLabel(token), owner }];

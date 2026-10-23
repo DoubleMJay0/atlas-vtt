@@ -19,7 +19,7 @@ import {
   type TutorialId,
   TUTORIAL_IDS,
 } from './atlasSettings';
-import { loadInitiativeCollapsed, loadInputMode, loadLightingQuality, saveInitiativeCollapsed, saveInputMode, saveLightingQuality } from './deviceSettings';
+import { loadAnimateMaps, loadInitiativeCollapsed, loadInputMode, loadLightingQuality, saveAnimateMaps, saveInitiativeCollapsed, saveInputMode, saveLightingQuality } from './deviceSettings';
 import { readDock, type InitiativeLayout } from '../initiative/initiativeLayout';
 import type { InitiativeTurnOptions } from '../initiative/turnOptions';
 import type { LightingQualityLevel } from '../lighting/lightingQuality';
@@ -35,7 +35,7 @@ type SettingsListener = (settings: AtlasSettings) => void;
 
 /**
  * The GM's Atlas preferences, kept in the plugin's data (`data.json`), except the input mode,
- * the lighting quality and the collapsed initiative tracker, which belong to the device (`deviceSettings.ts`). Without a data store (tests, a view
+ * the lighting quality, whether maps animate and the collapsed initiative tracker, which belong to the device (`deviceSettings.ts`). Without a data store (tests, a view
  * without the plugin) the settings live in memory only.
  */
 export class SettingsService {
@@ -223,6 +223,18 @@ export class SettingsService {
   setLightingQuality(level: LightingQualityLevel): void {
     if (this.getLightingQuality() === level) return;
     saveLightingQuality(this.app, level);
+    this.notify();
+  }
+
+  /** Whether animated maps play on this device as chosen, or null when never chosen (`animateMapsOn` decides then). */
+  getAnimateMaps(): boolean | null {
+    return loadAnimateMaps(this.app);
+  }
+
+  /** Animating maps is this device's choice: it goes to local storage, not into the synced settings. */
+  setAnimateMaps(on: boolean): void {
+    if (this.getAnimateMaps() === on) return;
+    saveAnimateMaps(this.app, on);
     this.notify();
   }
 
