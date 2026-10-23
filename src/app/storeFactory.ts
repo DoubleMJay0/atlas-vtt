@@ -50,6 +50,7 @@ import { isolateListeners } from './stores/isolatedListeners';
 import { elsewhereThanViewedLevel, placedOnViewedLevel, placedOnViewedLevels } from './levels/sceneLevels';
 import { createSceneLevelsActions, writeExploredMask, type SceneLevelsSlice } from './stores/sceneLevelsSlice';
 import { createLevelSurfacesActions, type LevelSurfacesSlice } from './stores/levelSurfacesSlice';
+import { createMapFeaturesActions, type MapFeaturesSlice } from './stores/mapFeaturesSlice';
 import { levelsForFile, readExploredMasks, readSceneLevels } from './levels/levelFile';
 import { levelAlignmentsOf, movesWithFrame, withoutAlignments } from './levels/levelAlignment';
 import { levelsCarriedWithGrid, type CarriedLevels, type GridCarryScene } from './levels/levelGridCarry';
@@ -227,6 +228,11 @@ export interface ViewAtlasState extends ViewState {
   addLevelSurface: LevelSurfacesSlice['addLevelSurface'];
   updateLevelSurface: LevelSurfacesSlice['updateLevelSurface'];
   deleteLevelSurface: LevelSurfacesSlice['deleteLevelSurface'];
+
+  // Named areas of the map for the GM (from mapFeaturesSlice.ts)
+  addMapFeatures: MapFeaturesSlice['addMapFeatures'];
+  updateMapFeature: MapFeaturesSlice['updateMapFeature'];
+  deleteMapFeature: MapFeaturesSlice['deleteMapFeature'];
 
   // Copy, paste and duplicate (from mapObjectsSlice.ts)
   insertMapObjects: MapObjectsSlice['insertMapObjects'];
@@ -1491,6 +1497,7 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
           // --- Levels of the scene (from sceneLevelsSlice.ts) ---
           ...createSceneLevelsActions(set, get),
           ...createLevelSurfacesActions(set),
+          ...createMapFeaturesActions(set),
 
           // --- Per-view UI visibility (from uiSlice.ts) ---
           ...createInitialUIState(),

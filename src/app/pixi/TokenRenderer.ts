@@ -56,6 +56,7 @@ import { usesCanvasRenderer } from './utils/rendererType';
 import { markHandled, resetHandled } from './utils/handledEvents';
 import { watchClick } from './utils/clickRelease';
 import type { HexLinkPointerHandlers } from './hexLinks/HexLinkInteraction';
+import type { MapFeaturePointerHandlers } from './mapFeatures/MapFeatureInteraction';
 import type { LightPointerHandlers } from './lighting/LightInteraction';
 import { runInBackground } from '../utils/backgroundTask';
 import { isModHeld } from '../keyboard/modKey';
@@ -153,6 +154,7 @@ export class TokenRenderer {
   private pinClickHandler?: (pinId: string, e: FederatedPointerEvent) => void;
   private pinHoverHandler?: (type: 'over' | 'out', pinId: string, e?: FederatedPointerEvent) => void;
   private hexLinkHandlers?: HexLinkPointerHandlers;
+  private mapFeatureHandlers?: MapFeaturePointerHandlers;
   /** Ends the watch on a right press that opens a hex or fog menu on release. */
   private stopMenuPress?: () => void;
   /** Whether the GM holds spawned tokens to place (`TokenPlacer`): the pointer is theirs then. */
@@ -813,6 +815,7 @@ export class TokenRenderer {
     }
     this.playerSight.syncOutlines(perception);
     this.uiManager.setPlayersView(this.playerSight.showsPlayers() || this.isInPlayerMode());
+    if (!this.showsGmView()) this.mapFeatureHandlers?.leave();
     this.syncCanvasTurn();
     this.dragRuler.refreshVisibility();
     this.notifyPlayersView();
@@ -1604,7 +1607,11 @@ export class TokenRenderer {
     this.hexLinkHandlers = handlers;
   }
 
-  /** Door badges: the GM opens and closes doors with a click from any tool but the wall tool, which edits them. */
+  /** Map features: the GM's hover label and their menu, with the select and move tools, below tokens, hex links and door badges. */
+  public setMapFeatureHandlers(handlers: MapFeaturePointerHandlers): void {
+    this.mapFeatureHandlers = handlers;
+  }
+
   /** Placed lights: their markers and range rings take the pointer with any tool, after pins and door badges. */
   public setLightHandlers(handlers: LightPointerHandlers): void {
     this.lightHandlers = handlers;
@@ -1788,6 +1795,14 @@ export class TokenRenderer {
           return;
         }
       }
+      // A map feature's menu is the GM's, like the feature itself
+      if (tokenTools && !onToken && this.mapFeatureHandlers && this.showsGmView()) {
+        const featureId = this.mapFeatureHandlers.hitTest(worldPos.x, worldPos.y);
+        if (featureId) {
+          this.openMenuOnRelease(e, (up) => this.mapFeatureHandlers?.openContextMenu(featureId, up.clientX, up.clientY));
+          return;
+        }
+      }
       if (!onToken && this.fogHitTestProvider && this.fogClickHandler) {
         const fogId = this.fogHitTestProvider(worldPos.x, worldPos.y);
         if (fogId) {
@@ -1924,6 +1939,7 @@ export class TokenRenderer {
       this.lastHoveredPinId = null;
     }
     this.hexLinkHandlers?.hover(null);
+    this.mapFeatureHandlers?.leave();
     this.lightHandlers?.leave();
     this.interactionController.handleViewportTokenHover(null);
     this.uiManager.setHoverState(null);
@@ -1937,6 +1953,7 @@ export class TokenRenderer {
     if (this.placementActive()) {
       this.interactionController.handleViewportTokenHover(null);
       this.uiManager.setHoverState(null);
+      this.mapFeatureHandlers?.leave();
       return;
     }
 
@@ -1944,6 +1961,7 @@ export class TokenRenderer {
     const activeTool = this.store.getState().activeTool;
     if (activeTool !== 'select' && activeTool !== 'move') {
       this.hexLinkHandlers?.hover(null, e);
+      this.mapFeatureHandlers?.leave();
     }
 
     // Pin hover: show pointer cursor and emit preview events from any tool
@@ -1962,6 +1980,7 @@ export class TokenRenderer {
         this.interactionController.handleViewportTokenHover(null);
         this.uiManager.setHoverState(null);
         this.hexLinkHandlers?.hover(null, e);
+        this.mapFeatureHandlers?.leave();
         this.applyCursor('pointer');
         return;
       }
@@ -1995,6 +2014,7 @@ export class TokenRenderer {
       this.interactionController.handleViewportTokenHover(null);
       this.uiManager.setHoverState(null);
       this.hexLinkHandlers?.hover(null, e);
+      this.mapFeatureHandlers?.leave();
       this.applyCursor(lightCursor);
       return;
     }
@@ -2020,9 +2040,27 @@ export class TokenRenderer {
     this.interactionController.handleViewportTokenHover(tokenId, e);
     this.uiManager.setHoverState(tokenId, isModHeld(e));
     this.hexLinkHandlers?.hover(hexLinkId, e);
+    this.hoverMapFeatures(worldPos, tokenId !== null || hexLinkId !== null, e);
 
     this.applyCursor(tokenId || hexLinkId ? 'pointer' : 'default');
   };
+
+  /**
+   * The GM's label of what lies under the pointer: a door badge above everything, else a map feature
+   * where no token or linked hex is (`covered`). Only while the canvas shows the GM's view.
+   */
+  private hoverMapFeatures(worldPos: { x: number; y: number }, covered: boolean, e: FederatedPointerEvent): void {
+    const handlers = this.mapFeatureHandlers;
+    if (!handlers) return;
+    const doorId = this.doorMenuHandlers?.hitTest(worldPos.x, worldPos.y) ?? null;
+    if (!this.showsGmView() || (covered && doorId === null)) handlers.leave();
+    else handlers.hover(worldPos, doorId, e);
+  }
+
+  /** Whether the canvas shows the GM's view: not session view, the peek or the palette's player mode. */
+  private showsGmView(): boolean {
+    return !this.playerSight.showsPlayers() && !this.isInPlayerMode();
+  }
 
   /** Sets the viewport cursor and re-applies it after PIXI's own cursor write for this event. */
   private applyCursor(cursor: string): void {

@@ -3,6 +3,9 @@ import type { MeasureRules } from '../marks/index.ts';
 import { type App } from 'obsidian';
 import type { GridGeometry } from '../../grid/gridDistance';
 import { resolveMeasurementSettings } from '../../grid/measurementFormat';
+import { levelObjects } from '../../levels/levelObjects';
+import { difficultCells } from '../../mapFeatures/featureIndex';
+import { mapFeatureList } from '../../mapFeatures/mapFeatures';
 import { diceSourceOf } from './atlasDice.ts';
 import { accentColour, atlasPlayerSettings, lightingSourceOf, measurementOf } from './atlasLighting.ts';
 import { mapLayerSourceOf, rulesLookupOf } from './atlasMapLayers.ts';
@@ -79,7 +82,10 @@ export function bindScene(ports: SceneBindingPorts, tab: AtlasTab, presented: Pr
   const liveRenderer = (): unknown => (live() ? renderer : null);
   const marks = new GmMarks(ports.app, liveRenderer, tab.store, () => {
     const grid = call(liveRenderer(), 'getGridOptions') as GridGeometry | null | undefined;
-    return grid === null || grid === undefined ? null : { grid, measurement: measurement() ?? resolveMeasurementSettings(undefined, tab.store.getState().grid) } satisfies MeasureRules;
+    if (grid === null || grid === undefined) return null;
+    const state = tab.store.getState();
+    const difficult = difficultCells(mapFeatureList(levelObjects(state).mapFeatures));
+    return { grid, measurement: measurement() ?? resolveMeasurementSettings(undefined, state.grid), difficult } satisfies MeasureRules;
   });
   // Players' marks leave the GM's canvas as the hold begins: it is about to show another scene.
   const store = new PresentedStore(tab.store, presented, () => {
