@@ -39,8 +39,11 @@ vec4 lava(vec2 q, float d, float px, float near) {
   vec3 colour = crustColour * alpha;
 
   // Fine cracks across a plate, glowing faintly where the plate is thin.
-  vec3 fine = voronoi(onPlates * 3.25 + 17.0, vec2(TILE * 3.25), 0.05);
-  float crack = (1.0 - smoothstep(0.0, 0.02 + px * 2.0, fine.y / 3.25)) * body * near * smoothstep(0.25, 0.9, heat * 0.6 + rim);
+  float crack = 0.0;
+  if (near * body > 0.0) {
+    float fine = voronoiFast(onPlates * 3.25 + 17.0, vec2(TILE * 3.25), 0.05).y / 3.25;
+    crack = (1.0 - smoothstep(0.0, 0.02 + px * 2.0, fine)) * body * near * smoothstep(0.25, 0.9, heat * 0.6 + rim);
+  }
 
   float seam = (1.0 - smoothstep(seamWidth * 0.3, seamWidth * 1.2, edge)) * crust;
   float hot = smoothstep(0.4, 0.95, heat);

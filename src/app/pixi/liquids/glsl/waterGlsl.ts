@@ -25,12 +25,20 @@ vec4 water(vec2 q, float d, float px, float near) {
   // On a channel the cells are drawn out along the flow.
   vec2 drawnOut = flowing ? vec2(1.0, 0.5) : vec2(1.0);
   vec2 c = p + vec2(r1, r2) * (flowing ? 0.45 : 0.7) - uDriftB.zw;
-  float e1 = voronoi(c * drawnOut * 1.5, TILE * drawnOut * 1.5, 0.18).y;
-  float e2 = voronoi(c * drawnOut * 2.5 + vec2(r2, r1) * 0.6 + 11.0, TILE * drawnOut * 2.5, 0.22).y;
-  float line1 = 1.0 - smoothstep(0.0, 0.09 + px * 3.0, e1);
-  float line2 = 1.0 - smoothstep(0.0, 0.07 + px * 5.0, e2);
-  float caustic = line1 * line1 * 0.5 + line2 * line2 * 0.3 + line1 * line2 * 0.7;
-  caustic *= shown(0.6, px * 1.5) * mix(0.35, 1.0, near);
+  float causticShown = shown(0.6, px * 1.5) * mix(0.35, 1.0, near);
+  float caustic = 0.0;
+  if (causticShown > 0.0) {
+    float e1 = voronoiFast(c * drawnOut * 1.5, TILE * drawnOut * 1.5, 0.18).y;
+    float line1 = 1.0 - smoothstep(0.0, 0.09 + px * 3.0, e1);
+    caustic = line1 * line1 * 0.5;
+    // The finer net only where it can be told apart.
+    if (near > 0.0) {
+      float e2 = voronoiFast(c * drawnOut * 2.5 + vec2(r2, r1) * 0.6 + 11.0, TILE * drawnOut * 2.5, 0.22).y;
+      float line2 = (1.0 - smoothstep(0.0, 0.07 + px * 5.0, e2)) * near;
+      caustic += line2 * line2 * 0.3 + line1 * line2 * 0.7;
+    }
+    caustic *= causticShown;
+  }
 
   // Foam lines carried downstream on a channel.
   float foam = 0.0;

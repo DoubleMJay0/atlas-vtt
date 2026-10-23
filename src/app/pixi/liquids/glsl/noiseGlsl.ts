@@ -49,8 +49,10 @@ float fbm(vec2 p, vec2 period, int octaves, float px) {
   float sum = 0.0;
   float amp = 0.5;
   for (int o = 0; o < 5; o++) {
-    if (o >= octaves) break;
-    sum += amp * shown(1.0, px) * gnoise(p, period);
+    float visible = shown(1.0, px);
+    // Finer octaves would fade out further still.
+    if (o >= octaves || visible <= 0.0) break;
+    sum += amp * visible * gnoise(p, period);
     p = p * 2.0 + vec2(13.0, 7.0);
     period *= 2.0;
     px *= 2.0;
@@ -86,9 +88,10 @@ vec3 voronoi(vec2 p, vec2 period, float churn) {
       if (dist < best) { best = dist; nearest = r; nearestCell = cell; id = h.w; }
     }
   }
+  // The cells around the nearest one hold every edge of its cell: no point strays far enough from its own.
   float edge = 8.0;
-  for (int y = -2; y <= 2; y++) {
-    for (int x = -2; x <= 2; x++) {
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
       vec2 cell = nearestCell + vec2(float(x), float(y));
       vec4 h = hash42(mod(i + cell, period) + uSeed);
       vec2 r = cell + cellPoint(h, churn) - f;
@@ -97,5 +100,26 @@ vec3 voronoi(vec2 p, vec2 period, float churn) {
     }
   }
   return vec3(sqrt(best), edge, id);
+}
+
+/** As \`voronoi\`, in one pass: y is half the gap between the nearest two points, the edge's distance where they face each other, a little less elsewhere. Half the cost; for fine nets. */
+vec3 voronoiFast(vec2 p, vec2 period, float churn) {
+  vec2 i = floor(p);
+  vec2 f = p - i;
+  float f1 = 8.0;
+  float f2 = 8.0;
+  float id = 0.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 cell = vec2(float(x), float(y));
+      vec4 h = hash42(mod(i + cell, period) + uSeed);
+      vec2 r = cell + cellPoint(h, churn) - f;
+      float dist = dot(r, r);
+      if (dist < f1) { f2 = f1; f1 = dist; id = h.w; }
+      else if (dist < f2) { f2 = dist; }
+    }
+  }
+  f1 = sqrt(f1);
+  return vec3(f1, (sqrt(f2) - f1) * 0.5, id);
 }
 `;
