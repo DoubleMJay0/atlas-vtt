@@ -14,6 +14,8 @@
 - A pin that links a scene of several floors can open it on the floor you pick
 - Animated maps: WebM and MP4 videos play as maps, on the map and in the player window; Animate maps in Atlas' settings shows their first frame instead
 - Replace map image: put a video, a gridless version or a larger export of the same map in its place, keeping the grid, walls, lights and tokens
+- Map features: hover rubble, a statue or a door to see its name and traits, shown only to you; right-click a feature to rename it or set its terrain
+- Difficult terrain costs double in a token's movement ruler where the game system has that rule (5e, Pathfinder 2e, Draw Steel), with a switch in the collection's grid settings
 
 ## Improved
 
