@@ -152,6 +152,7 @@ export class LightingController {
       markers: this.lightMarkers,
       rings: this.rangeRings,
       canMove: () => this.editor.shown,
+      movesThings: () => ['select', 'move'].includes(store.getState().activeTool),
       select: (lightId, add) => this.editor.walls.selectLight(lightId, add),
     });
     this.session = new SessionLighting({

@@ -35,8 +35,10 @@ export interface LightInteractionDeps {
   store: ViewAtlasStore;
   markers: LightMarkers;
   rings: LightRangeRings;
-  /** The lighting tool is in use: a press selects the light, and a drag moves it. */
+  /** The lighting tool is in use: a press selects the light (and with the select or move tool too, a drag moves it). */
   canMove: () => boolean;
+  /** A tool that moves things is in use (select or move): a drag moves a light, without selecting it for the lighting tool. */
+  movesThings: () => boolean;
   /** Selects the light for the lighting tool; `add` toggles it in the selection. */
   select: (lightId: string, add: boolean) => void;
 }
@@ -53,7 +55,8 @@ interface Gesture {
 
 /**
  * The pointer on placed lights: a click on a marker opens the light's popover with any tool,
- * a drag moves the light with the lighting tool (an area light with its whole area), and the handles of the open light's range
+ * a drag moves the light with the lighting, select or move tool (a light glowing from an area, which
+ * the generator lays over its lava or acid, stays where its surface is), and the handles of the open light's range
  * rings resize its ranges and turn its beam. A drag is one undo step, opened only once it starts. Only the
  * pointer's release commits a drag: Escape, a pointer cancel, the window losing focus, the
  * popover leaving the light or the canvas showing the players' view cancel it, which puts back
@@ -136,8 +139,9 @@ export class LightInteraction {
     const grabbed = viewport.toWorld(start.x, start.y);
     const origin = { x: light.x, y: light.y };
     const add = event.ctrlKey || event.metaKey;
-    const canMove = this.deps.canMove();
-    if (canMove) this.deps.select(lightId, add);
+    const editing = this.deps.canMove();
+    if (editing) this.deps.select(lightId, add);
+    const canMove = (editing || this.deps.movesThings()) && !light.area;
     let dragging = false;
     let moved = false;
 
