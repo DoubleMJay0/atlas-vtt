@@ -10,6 +10,7 @@ export const BOUNDARIES = {
       "src/app/fog/**/*.tsx",
       "src/app/levels/**/*.ts",
       "src/app/levels/**/*.tsx",
+      "src/app/mapFeatures/**/*.ts",
       "src/app/vision/**/*.ts",
       "src/app/vision/**/*.tsx",
       "src/app/gameSystems/**/*.ts",

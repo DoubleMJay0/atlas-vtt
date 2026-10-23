@@ -11,6 +11,8 @@ import { migrateWidgetsToCollection, needsWidgetMigration } from '../utils/widge
 import { lightZonesFromFile } from '../lighting/lightZones';
 import { levelLinksFromFile } from '../levels/levelLinks';
 import { levelSurfacesFromFile } from '../levels/levelSurfaces';
+import { mapFeaturesFromFile } from '../mapFeatures/mapFeatures';
+import type { MapFeature } from '../types/mapFeatureTypes';
 import { normalizeImagePath } from '../utils/pathUtils';
 import { fixMapTokenPaths } from '../utils/fixMapPaths';
 import { getDataFilePath } from '../utils/dataFileMigration';
@@ -62,6 +64,8 @@ export interface MapFile {
     levelLinks?: Record<string, LevelLink>;
     /** Openings to the levels below and floor over them; absent until a map has some. */
     levelSurfaces?: Record<string, LevelSurface>;
+    /** Named areas of the map for the GM; absent until a map has some. */
+    mapFeatures?: Record<string, MapFeature>;
   };
   camera: CameraState;
 }
@@ -419,6 +423,7 @@ export function migrateMapFile(persisted: unknown): MapFile {
   const zones = lightZonesFromFile(persisted.objects?.lightZones);
   const links = levelLinksFromFile(persisted.objects?.levelLinks);
   const surfaces = levelSurfacesFromFile(persisted.objects?.levelSurfaces);
+  const features = mapFeaturesFromFile(persisted.objects?.mapFeatures);
   const background = persisted.background ?? null;
   const levels = readSceneLevels(persisted.levels, background);
 
@@ -443,6 +448,7 @@ export function migrateMapFile(persisted: unknown): MapFile {
       ...(zones && { lightZones: zones }),
       ...(links && { levelLinks: links }),
       ...(surfaces && { levelSurfaces: surfaces }),
+      ...(features && { mapFeatures: features }),
     },
     grid: persisted.grid ? migrateGrid(persisted.grid) : initial.grid,
     camera: persisted.camera || initial.camera
