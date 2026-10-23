@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
 import type { CollectionMetadata } from '../../../services/AssetService';
 import { CollectionSelect } from '../asset-manager/token-creator/CollectionSelect';
 import { t } from '../../../i18n';
@@ -6,6 +6,7 @@ import { DungeonIdentity } from './DungeonIdentity';
 import { SettingsSection, SwitchRow } from './fields';
 import { StyleSettings } from './StyleSettings';
 import { TagChips } from './TagChips';
+import { useScrollbarGutter } from '../primitives/useScrollbarGutter';
 import type { DungeonState } from './useDungeonState';
 import type { ThumbnailRenderer } from './useStyleThumbnails';
 import { ViewSettings } from './ViewSettings';
@@ -27,8 +28,10 @@ interface GeneratorSettingsProps {
 export function GeneratorSettings({ state, layer, collection, thumbnails }: GeneratorSettingsProps): React.JSX.Element {
   const { request, settings } = state;
   const collectionId = useId();
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  useScrollbarGutter(scroller);
   return (
-    <div className="atlas-dungeon-generator__settings">
+    <div className="atlas-dungeon-generator__settings" ref={setScroller}>
       <div className="atlas-dungeon-fields">
         {collection && collection.options.length > 1 && (
           <div className="atlas-dungeon-field atlas-dungeon-field--stacked" role="group" aria-labelledby={collectionId}>
