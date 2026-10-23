@@ -41,6 +41,14 @@ export interface ViewState extends ViewUIState {
 
   // Map background image path
   background: string | null;
+  /**
+   * What lights the map of a scene without levels besides its image (`SceneShading`): how high
+   * everything on it stands, and the shade of the one light its image was drawn without. Vault
+   * paths; a scene with levels keeps them on each level. Read with `levelShading`. Saved with the
+   * map, never undo-tracked, like `lighting`.
+   */
+  relief?: string | null | undefined;
+  shade?: string | null | undefined;
 
   /**
    * The scene's levels (floors), bottom first; absent for a scene with one level. Objects stay in

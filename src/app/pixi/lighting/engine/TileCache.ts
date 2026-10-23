@@ -10,6 +10,7 @@ import type { GpuPacer } from './GpuPacer';
 import { LimitedTileMask } from './LimitedTileMask';
 import { TileTracer, type TileJob, type TileTracerOptions } from './TileTracer';
 import type { EngineLight } from './types';
+import type { EngineRelief } from './ReliefMap';
 
 /** A light's traced visibility, at the spot it was placed. */
 export interface Tile {
@@ -58,11 +59,23 @@ export class TileCache {
   /** What limited walls stop, which no trace can tell, is taken out of a finished tile. */
   private readonly limited: LimitedTileMask;
   private readonly entries = new Map<string, Entry>();
+  private relief: EngineRelief | null = null;
 
   /** Tiles never reach past the map (rounded up to the texel grid), however far a light shines. */
   constructor(private readonly renderer: Renderer, private readonly field: CapsuleField, private readonly bounds: MapBounds, tracing: TileTracerOptions = {}) {
     this.tracer = new TileTracer(renderer, field, tracing);
     this.limited = new LimitedTileMask(renderer, field.texel);
+  }
+
+  /**
+   * The relief whose shadows every tile takes (`EngineRelief`); null, none. True when it changed:
+   * the caller then syncs every tile anew (`sync` with `'all'`).
+   */
+  setRelief(relief: EngineRelief | null): boolean {
+    if (relief === this.relief) return false;
+    this.relief = relief;
+    this.tracer.setRelief(relief);
+    return true;
   }
 
   tiles(): ReadonlyMap<string, Tile> {

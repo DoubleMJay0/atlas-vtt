@@ -4,6 +4,10 @@ import { mapLayout, mapPixelSize, suggestedPxPerCell, type MapLayout } from '../
 import { fittedPxPerCell, renderMap, renderMapSvg } from '../render/renderMap';
 import { renderThumbnail, THUMBNAIL_CELLS_ACROSS } from '../render/thumbnail';
 import type { DungeonStyle, DungeonView } from '../style';
+import { renderRelief, type RasterImage } from '../render/shading/reliefImage';
+import { renderShade } from '../render/shading/shadeImage';
+import { SHADE_HATCH_KEY, shadeHatchText } from '../../lighting/shadeHatch';
+import { withPngText } from '../../utils/pngText';
 
 /**
  * What the dungeon worker does: generate a dungeon (or take one as it is) and draw its floor plan
@@ -19,11 +23,17 @@ export type DungeonOutput =
    * bitmap, or with `svg` an SVG document. `transparent` leaves the paper out. `floor` is the
    * floor drawn, by index (the entry floor where unset); every floor's image has the same layout.
    */
-  | { kind: 'map'; pxPerCell: number; bitmap?: boolean; svg?: boolean; transparent?: boolean; floor?: number }
+  | { kind: 'map'; pxPerCell: number; bitmap?: boolean; svg?: boolean; transparent?: boolean; floor?: number; castShadows?: boolean }
   /** The floor plan fitted into `width` × `height` pixels, as a bitmap: the preview. */
   | { kind: 'preview'; width: number; height: number; floor?: number }
   /** A window of the dungeon, as a bitmap: a style's card in the gallery (`renderThumbnail`). */
-  | { kind: 'thumbnail'; width: number; height: number; legibleAt: number };
+  | { kind: 'thumbnail'; width: number; height: number; legibleAt: number }
+  /**
+   * What a scene lights a floor's map by, over the layout its map has at `pxPerCell`: its relief
+   * (`renderRelief`) and the shade its map leaves out (`renderShade`, null where the view shows no
+   * shadows), each a PNG.
+   */
+  | { kind: 'shading'; pxPerCell: number; floor?: number };
 
 export interface DungeonJob {
   request: DungeonRequest;
@@ -34,7 +44,11 @@ export interface DungeonJob {
   output: DungeonOutput;
 }
 
-export type RenderedImage = { type: 'png'; blob: Blob } | { type: 'bitmap'; bitmap: ImageBitmap } | { type: 'svg'; svg: string };
+export type RenderedImage =
+  | { type: 'png'; blob: Blob }
+  | { type: 'bitmap'; bitmap: ImageBitmap }
+  | { type: 'svg'; svg: string }
+  | { type: 'shading'; relief: Blob; shade: Blob | null };
 
 export interface DungeonRendered {
   model: DungeonModel;
@@ -73,13 +87,37 @@ function thumbnailOf(model: DungeonModel, job: DungeonJob, output: Extract<Dunge
   return { model, map: mapLayout(model, output.width / THUMBNAIL_CELLS_ACROSS, job.view), image: { type: 'bitmap', bitmap: canvas.transferToImageBitmap() } };
 }
 
+async function pngOf({ width, height, data }: RasterImage, text?: { keyword: string; text: string }): Promise<Blob> {
+  const { canvas, ctx } = canvasOf(width, height);
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
+  const png = await canvas.convertToBlob({ type: 'image/png' });
+  if (!text) return png;
+  return new Blob([withPngText(new Uint8Array(await png.arrayBuffer()), text.keyword, text.text)], { type: 'image/png' });
+}
+
+async function shadingOf(model: DungeonModel, job: DungeonJob, output: Extract<DungeonOutput, { kind: 'shading' }>): Promise<DungeonRendered> {
+  const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, job.view);
+  const floor = output.floor ?? 0;
+  const relief = renderRelief(model, job.style, job.view, floor);
+  if (!relief) throw new Error('Could not draw the relief: no 2D canvas.');
+  const shade = renderShade(model, job.style, job.view, floor, pxPerCell);
+  const hatch = shade?.hatch ? { keyword: SHADE_HATCH_KEY, text: shadeHatchText(shade.hatch) } : undefined;
+  return { model, map: mapLayout(model, pxPerCell, job.view), image: { type: 'shading', relief: await pngOf(relief), shade: shade && await pngOf(shade.image, hatch) } };
+}
+
 export async function runDungeonJob(job: DungeonJob): Promise<DungeonRendered> {
   const { style, view, output } = job;
   const model = job.model ?? generateDungeon(job.request);
   if (output.kind === 'preview') return previewOf(model, job, output);
   if (output.kind === 'thumbnail') return thumbnailOf(model, job, output);
+  if (output.kind === 'shading') return shadingOf(model, job, output);
   const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, view);
-  const options = { pxPerCell, ...(output.transparent ? { transparent: true } : {}), ...(output.floor !== undefined && { floor: output.floor }) };
+  const options = {
+    pxPerCell,
+    ...(output.transparent ? { transparent: true } : {}),
+    ...(output.floor !== undefined && { floor: output.floor }),
+    ...(output.castShadows === false && { castShadows: false }),
+  };
   if (output.svg) {
     const { svg, layout } = renderMapSvg(model, style, view, options);
     return { model, map: layout, image: { type: 'svg', svg } };

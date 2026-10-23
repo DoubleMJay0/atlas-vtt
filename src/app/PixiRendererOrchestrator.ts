@@ -46,6 +46,7 @@ import { LightingController } from './pixi/lighting/LightingController';
 import { settingsLightingQuality } from './pixi/lighting/settingsLightingQuality';
 import { createBelowLevelsHost } from './pixi/lighting/belowLevelsHost';
 import { ViewRoofs } from './pixi/roofs/ViewRoofs';
+import { ViewShading } from './pixi/shading/ViewShading';
 import { ShownPlaces } from './lighting/shownPlaces';
 import type { SceneFrame } from './pixi/lighting/engine/types';
 import { captureSceneFrame } from './pixi/sceneFrameCapture';
@@ -113,6 +114,8 @@ export class PixiRendererOrchestrator { // Renamed class
   private lighting?: LightingController;
   /** The roof of the level shown, above the lighting. */
   private roofs?: ViewRoofs;
+  /** The viewed level's shade and relief (`ViewShading`). */
+  private shading?: ViewShading;
   /** Where gliding tokens are drawn: the token renderer notes them, the lighting reads its tokens there. */
   private readonly shownPlaces = new ShownPlaces();
   /** The players' frame, rendered at the player window's size; made when this view is first presented. */
@@ -457,6 +460,15 @@ export class PixiRendererOrchestrator { // Renamed class
       onChange: () => this.tokenRenderer?.refreshPlayerSight(),
     });
 
+    this.shading = new ViewShading({
+      obsApp: this.obsApp,
+      app: this.pixiAppManager.app,
+      store: this.store,
+      mapImage: () => this.mapImage,
+      onReliefChange: () => this.lighting?.renderer.followShading?.(),
+    });
+    viewport.addChild(this.shading.layer.view);
+
     if (!isPlayerView) {
       const quality = settingsLightingQuality(SettingsService.forApp(this.obsApp));
       this.lighting = new LightingController({
@@ -472,6 +484,7 @@ export class PixiRendererOrchestrator { // Renamed class
         fogCoverage: () => this.fogRenderer!.getCommittedCoverage(),
         shown: this.shownPlaces,
         ...(this.roofs && { roofs: this.roofs }),
+        shading: this.shading,
         below: createBelowLevelsHost({
           obsApp: this.obsApp,
           app: this.pixiAppManager.app,
@@ -736,6 +749,7 @@ export class PixiRendererOrchestrator { // Renamed class
   private mapImageChanged(change: MapImageChange): void {
     // The lighting follows a new albedo by itself, without building its scene anew.
     if (this._isDestroyed || change !== 'image') return;
+    this.shading?.follow();
     // An alignment's preview draws the map another way than the scene has it: only the zoom range
     // follows it, and the fog, the lighting and the explored memory keep the scene's size until the
     // alignment is applied.
@@ -1286,6 +1300,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.textTool?.destroy(); // Destroy TextTool
     this.lighting?.destroy();
     this.roofs?.destroy();
+    this.shading?.destroy();
     this.playerFrames?.destroy();
     delete this.playerFrames;
     this.audioRenderer?.destroy();

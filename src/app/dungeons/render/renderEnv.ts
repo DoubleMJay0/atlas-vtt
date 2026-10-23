@@ -25,6 +25,12 @@ export interface RenderEnv {
    * floor, for pictures that stand alone (the SVG export).
    */
   openings: 'cut' | 'drawn';
+  /**
+   * Whether the one light's cast shadows are painted into the picture (`castShadow`, the scene's
+   * shadow field). A scene's map leaves them out: its shade image carries them (`renderShade`), so
+   * dynamic lights can cast their own; occlusion at every foot, which has no direction, stays.
+   */
+  castShadows: boolean;
   /** A seeded stream of the render concern, split by layer. */
   rng(key: string): Rng;
 }
@@ -36,6 +42,7 @@ export function createRenderEnv(
   view: DungeonView,
   pxPerCell: number,
   openings: RenderEnv['openings'] = 'cut',
+  castShadows = true,
 ): RenderEnv {
   return {
     ctx,
@@ -46,6 +53,7 @@ export function createRenderEnv(
     px: 1 / REFERENCE_CELL_PX,
     pxPerCell,
     openings,
+    castShadows,
     rng: (key: string): Rng => floorStream(dungeon.model.seed, 'render', dungeon.index, key),
   };
 }

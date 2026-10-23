@@ -256,7 +256,7 @@ const cellsOfStair = (s: Parameters<typeof spotRect>[0]): { x: number; y: number
 };
 
 describe('the outlines of tall objects', () => {
-  it('stand on columns, statues and wells, and sealing never bridges one to a wall or another', () => {
+  it('stand on columns, statues and wells, block sight only, and sealing never bridges one to a wall or another', () => {
     let outlines = 0;
     for (let seed = 1; seed <= 40; seed++) {
       const model = generateDungeon({ seed, tags: seed % 2 ? ['colonnades', 'temple'] : ['large'], floors: 1 + (seed % 2) });
@@ -264,7 +264,11 @@ describe('the outlines of tall objects', () => {
       const tolerance = sealTolerance(worldTexel(image));
       for (const level of parts.levelIds ?? [undefined]) {
         const walls = wallsOn(parts, level);
-        outlines += new Set(walls.filter(w => w.id.includes('_shadow_')).map(w => w.chainId)).size;
+        const objects = walls.filter(w => w.id.includes('_shadow_'));
+        outlines += new Set(objects.map(w => w.chainId)).size;
+        // Cover for sight only: the relief casts their shadows, tops lit, from every light.
+        for (const wall of objects) expect(wall.blocks).toBe('sight');
+        for (const wall of walls.filter(w => !w.id.includes('_shadow_'))) expect(wall.blocks).toBeUndefined();
         const owner = (id: string): string => (id.includes('_shadow_') ? id.replace(/_\d+$/, '') : 'walls');
         for (const bridge of sealWalls(walls, tolerance).slice(walls.length)) {
           const named = bridge.id.split(':').filter(part => part.startsWith('wall_'));

@@ -32,6 +32,17 @@ export interface SceneLevel {
   /** A roof or canopy drawn above the tokens. */
   foreground?: string | null;
   /**
+   * How high everything on the level's map stands, as a greyscale image lying on it exactly (black
+   * the floor, white a wall's height): the lighting casts every light's shadows from it. A vault path.
+   */
+  relief?: string | null;
+  /**
+   * The shadows the level's map leaves out of its image (the one light it was drawn by), as an image
+   * to multiply over it: white where nothing falls. Drawn as it is without lighting; with lighting it
+   * darkens the ambient light only. A vault path.
+   */
+  shade?: string | null;
+  /**
    * The levels below this one that are drawn through its openings (the transparent parts of its map,
    * the openings drawn on it), nearest first; unset is every level below it. A level below that it
    * does not see still has its floor, and nothing shows where that floor is.

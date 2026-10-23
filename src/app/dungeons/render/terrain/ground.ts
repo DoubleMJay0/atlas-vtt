@@ -1,4 +1,5 @@
-import type { DungeonTerrain } from '../../model';
+import type { DungeonTerrain, TerrainKind } from '../../model';
+import type { RenderEnv } from '../renderEnv';
 import type { Vec } from '../geometry';
 import { castShadow, type Hand } from '../art/hand';
 import { valueNoise } from '../art/noise';
@@ -29,13 +30,23 @@ export function drawPews(hand: Hand, piece: DungeonTerrain): void {
   }
 }
 
-/** Loose stones over whole cells (difficult ground): a faint tone over the zone and many small stones, none big enough to hide behind. */
-export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, perCell: number): void {
-  const rng = pieceRng(hand.scene.env, piece);
-  const rings = cellRings(piece.cells).map(r => chiselled(r, piece.id * 7 + 3, 0.06));
-  const bounds = pointsBounds(rings.flat());
-  hand.tone((x, y) => 0.06 + 0.08 * valueNoise(x * 3, y * 3, piece.id), grown(bounds, 0.1), polysPath(rings), 'shade');
-  const stones: { poly: Vec[]; c: Vec; r: number }[] = [];
+/** A loose stone of a scatter: its outline, middle and radius, in cells. */
+export interface ScatterStone {
+  poly: Vec[];
+  c: Vec;
+  r: number;
+}
+
+/** How large and how many the stones of each kind of scattered ground are, per cell. */
+export const SCATTER: Readonly<Partial<Record<TerrainKind, { size: number; perCell: number }>>> = {
+  'rubble-field': { size: 0.05, perCell: 15 },
+  'chasm-floor': { size: 0.075, perCell: 9 },
+};
+
+/** The stones of a piece of scattered ground, the same every time it is drawn: the relief reads them too (`groundStones`). */
+export function scatterStones(env: RenderEnv, piece: DungeonTerrain, size: number, perCell: number): ScatterStone[] {
+  const rng = pieceRng(env, piece);
+  const stones: ScatterStone[] = [];
   for (const c of piece.cells) {
     for (let k = 0; k < perCell; k++) {
       const at = { x: c.x + 0.06 + rng() * 0.88, y: c.y + 0.06 + rng() * 0.88 };
@@ -43,6 +54,15 @@ export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, per
       stones.push({ poly: stoneOutline(rng, at, r), c: at, r });
     }
   }
+  return stones;
+}
+
+/** Loose stones over whole cells (difficult ground): a faint tone over the zone and many small stones, none big enough to hide behind. */
+export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, perCell: number): void {
+  const rings = cellRings(piece.cells).map(r => chiselled(r, piece.id * 7 + 3, 0.06));
+  const bounds = pointsBounds(rings.flat());
+  hand.tone((x, y) => 0.06 + 0.08 * valueNoise(x * 3, y * 3, piece.id), grown(bounds, 0.1), polysPath(rings), 'shade');
+  const stones = scatterStones(hand.scene.env, piece, size, perCell);
   const all: PathFn = path => stones.forEach(st => polyPath(st.poly)(path));
   castShadow(hand, all, 0.05, bounds, 0.55);
   hand.surface(all, 'rock');

@@ -20,6 +20,7 @@ import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import { isLegacyTokenRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { isRecord } from '../utils/guards';
+import { assetImagePaths, ownShadingFile, sceneFileImages, sceneFileShading } from './sceneShadingFiles';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { t } from '../i18n';
 import { trashVaultItem } from '../utils/trashVaultItem';
@@ -127,6 +128,12 @@ export interface SceneAsset extends BaseAsset {
   type: 'scene';
   mapId?: string;
   data?: SceneAssetData;
+  /**
+   * The relief and shade images Atlas wrote for this scene (`levelShading`): files of the scene
+   * alone, which deleting it trashes. A path its file names but this record does not list is
+   * never trashed.
+   */
+  shadingFiles?: string[];
 }
 
 export interface EncounterAsset extends BaseAsset {
@@ -1107,6 +1114,7 @@ export class AssetService {
 
     // For scene assets, also delete the map file and close any open leaves
     if (asset.type === 'scene') {
+      let shading: string[] = [];
       // Load the scene data from the JSON file if not already loaded
       let sceneData = asset.data;
       if (!sceneData) {
@@ -1130,6 +1138,8 @@ export class AssetService {
           // Delete the map file
           const mapFile = this.app.vault.getAbstractFileByPath(mapPath);
           if (mapFile instanceof TFile) {
+            // Its relief and shade belong to it alone, unless another scene names them too (a copy outside Atlas).
+            shading = await sceneFileShading(this.app, mapFile);
             // Close any leaves showing this file
             const leaves = this.app.workspace.getLeavesOfType('atlas-view');
             for (const leaf of leaves) {
@@ -1159,6 +1169,7 @@ export class AssetService {
       } catch (error) {
         console.error('[AssetService] Error deleting scene snapshots:', error);
       }
+      await this.trashUnsharedShading(asset, shading);
     }
 
     const emptiedGroups = asset.type === 'token' ? await this.getGroupsUsingTokens([asset.id]) : [];
@@ -1173,6 +1184,28 @@ export class AssetService {
     await this.saveMetadata();
 
     await this.deleteEmptiedGroups(emptiedGroups);
+  }
+
+  /**
+   * Trashes the relief and shade images (`levelShading`) of a deleted scene: only those Atlas wrote
+   * for it (its record's `shadingFiles`) that its file still names, that lie where Atlas writes
+   * them (`ownShadingFile`), and that no other asset uses (a map's image or thumbnail, a token's
+   * art, any image another scene's file names). A scene file is untrusted: a path it names alone
+   * never makes a file go.
+   */
+  private async trashUnsharedShading(scene: SceneAsset, named: readonly string[]): Promise<void> {
+    const owned = new Set(scene.shadingFiles ?? []);
+    const candidates = named.filter((path) => owned.has(path) && ownShadingFile(path, scene.collection));
+    if (candidates.length === 0) return;
+    const used = new Set<string>();
+    for (const other of Object.values(this.metadata!.assets)) {
+      if (other.id === scene.id) continue;
+      for (const path of assetImagePaths(other)) used.add(path);
+      if (other.type !== 'scene' || !other.data?.mapPath) continue;
+      const file = this.app.vault.getAbstractFileByPath(other.data.mapPath);
+      if (file instanceof TFile) for (const path of await sceneFileImages(this.app, file)) used.add(path);
+    }
+    for (const path of candidates) if (!used.has(path)) await this.trashFileIfPresent(path);
   }
 
   /** An encounter's thumbnail goes with it, unless another encounter (a copy) still shows the same file. */

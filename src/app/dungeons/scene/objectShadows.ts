@@ -8,12 +8,13 @@ import type { DungeonView } from '../style';
 import type { DungeonPlacement } from './toWalls';
 
 /**
- * Tall objects as small closed walls in their scene, so they cast shadows in its lighting and
- * block sight without walls drawn by the GM: standing columns, statues, wells, and the terrain
- * that is total cover (pillars, statues, wall fragments, obelisks). Low ones (altars, chests,
- * sarcophagi, crates, barrels, a dais, low walls) cast none. Each outline lies inside what the map
- * draws, and keeps farther than the engine's seal tolerance from every wall and every other
- * outline, so sealing never bridges an object to a wall: light still passes between them.
+ * Tall objects as small closed walls in their scene that block sight (cover) without walls drawn by
+ * the GM: standing columns, statues, wells, and the terrain that is total cover (pillars, statues,
+ * wall fragments, obelisks). Low ones (altars, chests, sarcophagi, crates, barrels, a dais, low
+ * walls) get none. Light passes them (`blocks: 'sight'`): the floor's relief casts every object's
+ * shadow from each light, its top lit, so a wall around it would only black its top out. Each
+ * outline lies inside what the map draws, and keeps farther than the engine's seal tolerance from
+ * every wall and every other outline, so sealing never bridges an object to a wall.
  */
 
 /** Where a tall object stands, in cells: a disc, or a rectangle turned by `rotation`. */
@@ -164,7 +165,7 @@ export function objectShadows(
     placed++;
     ring.forEach((p1, k) => {
       const wallId = `${id}_${placed}_${k + 1}`;
-      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', p1, p2: ring[(k + 1) % ring.length]!, chainId: `${id}_${placed}`, ...(levels && { levels }) };
+      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', blocks: 'sight', p1, p2: ring[(k + 1) % ring.length]!, chainId: `${id}_${placed}`, ...(levels && { levels }) };
       segments.push([p1, ring[(k + 1) % ring.length]!]);
     });
   }

@@ -61,7 +61,7 @@ export function shadowField(scene: ArtScene, path: PathFn, lift: number, bounds:
 
 /** Casts the shadow of `path` from `lift` onto whatever lies under it, within `clip` if given. */
 export function castShadow(hand: Hand, path: PathFn, lift: number, bounds: Bounds, strength = 0.75, clip: PathFn | null = null): void {
-  if (!hand.scene.env.view.shadow) return;
+  if (!hand.scene.env.view.shadow || !hand.scene.env.castShadows) return;
   const { field, bounds: b } = shadowField(hand.scene, path, lift, bounds);
   hand.tone((x, y) => field(x, y) * strength, b, clip, 'shade');
 }

@@ -3,7 +3,7 @@ import type { ProcessedImage } from '../imageProcessing/imageProcessing';
 import { prebuildMapImageAt } from '../pixi/mapImage/prebuildMapImage';
 import { AssetService, type CollectionMetadata, type MapAsset, type SceneAsset } from '../services/AssetService';
 import type { AssetThumbnailService } from '../services/AssetThumbnailService';
-import { discardAssetFiles, writeAssetImage } from '../services/assetImageFiles';
+import { discardAssetFiles, writeAssetFile, writeAssetImage } from '../services/assetImageFiles';
 import { collectionFolderPath } from '../services/assetPaths';
 import { TransferFiles } from '../services/assetTransfer/transferFiles';
 import { newSceneFile, type NewSceneFile } from '../services/newSceneFile';
@@ -37,6 +37,9 @@ export interface MapSceneParts {
   mapFeatures?: Record<string, MapFeature>;
   /** Water, lava and acid that move while maps are animated. */
   liquids?: Record<string, LiquidSurface>;
+  /** The relief and shade of a scene's one map (`SceneShading`); a scene of several floors keeps them on its levels. */
+  relief?: string;
+  shade?: string;
 }
 
 /**
@@ -59,6 +62,8 @@ export function mapSceneFile(settings: CollectionSettings, background: string, p
     ...(parts.liquids && { liquids: parts.liquids }),
   };
   content.state.lighting = parts.lighting;
+  if (parts.relief) content.state.relief = parts.relief;
+  if (parts.shade) content.state.shade = parts.shade;
   if (parts.levels) {
     content.state.levels = parts.levels;
     content.version = content.state.version = sceneFileVersion(parts.levels);
@@ -73,11 +78,25 @@ export interface MapSceneDeps {
   thumbnails: Pick<AssetThumbnailService, 'tryThumbnailForImage'>;
 }
 
+/** What lights a map besides its image (`SceneShading`): its relief, and the shade it leaves out (none where it paints its own), as PNGs. */
+export interface SceneShadingImages {
+  relief: Blob;
+  shade: Blob | null;
+}
+
+/** Where a map's relief and shade were written; null for one it has none of. */
+export interface ShadingPaths {
+  relief: string | null;
+  shade: string | null;
+}
+
 /** One map image of the scene: a map asset of its own. */
 export interface MapToWrite {
   image: ProcessedImage;
   /** The map asset's name, given the name the scene gets. */
   name: (sceneName: string) => string;
+  /** Its relief and shade: files of the scene beside the image, no assets of their own. */
+  shading?: SceneShadingImages;
 }
 
 /** A Markdown note that comes with the scene: in the collection's notes folder, named as the scene is. */
@@ -92,8 +111,11 @@ export interface MapScenePlan {
   baseName: string;
   maps: readonly MapToWrite[];
   note?: NoteToWrite;
-  /** The scene file, given where each map's image was written (in the order of `maps`) and the note's path, where the plan has a note. */
-  content: (mapFilePaths: readonly string[], notePath: string | null) => NewSceneFile;
+  /**
+   * The scene file, given where each map's image was written (in the order of `maps`), the note's
+   * path where the plan has a note, and where each map's relief and shade went (undefined for a map without).
+   */
+  content: (mapFilePaths: readonly string[], notePath: string | null, shading: readonly (ShadingPaths | undefined)[]) => NewSceneFile;
 }
 
 export type MapSceneWritten = { ok: true; name: string; scenePath: string } | { ok: false; problem: string };
@@ -128,6 +150,15 @@ function newIdentity<T extends 'map' | 'scene'>(type: T, collectionId: string): 
   return { id, type, filePath: defaultJsonPath(type, collectionId, id) };
 }
 
+/** Writes a map's relief and shade beside its image (`written` gathers the paths, so a failure takes them back) and returns where they went. */
+async function writeShading(app: App, mapName: string, images: SceneShadingImages, written: string[]): Promise<ShadingPaths> {
+  const relief = await writeAssetFile(app, `${mapName} relief`, await images.relief.arrayBuffer(), 'png');
+  written.push(relief);
+  const shade = images.shade ? await writeAssetFile(app, `${mapName} shade`, await images.shade.arrayBuffer(), 'png') : null;
+  if (shade) written.push(shade);
+  return { relief, shade };
+}
+
 /**
  * Writes a new scene and its maps (an import, a generated dungeon): each map's image and
  * thumbnail, its note where the plan has one, the scene file, and every record in one save of the index. All of it happens under the index lock, so the vault check never sees
@@ -149,6 +180,7 @@ export function writeMapScene({ app, assetService, thumbnails }: MapSceneDeps, p
       const shared = { tags: [], collection: collection.id, createdAt: now, modifiedAt: now };
 
       const maps: MapAsset[] = [];
+      const shading: (ShadingPaths | undefined)[] = [];
       for (const map of plan.maps) {
         const mapName = map.name(name);
         const mapFilePath = await writeAssetImage(app, mapName, await map.image.image.arrayBuffer());
@@ -156,13 +188,16 @@ export function writeMapScene({ app, assetService, thumbnails }: MapSceneDeps, p
         const thumbnailPath = await thumbnails.tryThumbnailForImage(mapFilePath, map.image.thumbnail);
         if (thumbnailPath) images.push(thumbnailPath);
         maps.push({ ...newIdentity('map', collection.id), ...shared, name: mapName, mapFilePath, ...(thumbnailPath && { thumbnailPath }) });
+        shading.push(map.shading && await writeShading(app, mapName, map.shading, images));
       }
 
       const notePath = plan.note ? paths.note : null;
       if (plan.note) await files.write(paths.note, plan.note.text(name));
-      const content = plan.content(maps.map((map) => map.mapFilePath), notePath);
+      const content = plan.content(maps.map((map) => map.mapFilePath), notePath, shading);
       await files.write(scenePath, JSON.stringify(content, null, 2));
-      const sceneRecord: SceneAsset = { ...newIdentity('scene', collection.id), ...shared, name, data: { mapPath: scenePath } };
+      // The relief and shade written here are the scene's alone: its record lists them, so deleting it trashes them.
+      const shadingFiles = shading.flatMap((paths) => (paths ? [paths.relief, paths.shade] : [])).filter((path): path is string => !!path);
+      const sceneRecord: SceneAsset = { ...newIdentity('scene', collection.id), ...shared, name, data: { mapPath: scenePath }, ...(shadingFiles.length > 0 && { shadingFiles }) };
       const records = [...maps, sceneRecord];
       for (const record of records) {
         const recordFile = assetService.pendingRecordFile(record);

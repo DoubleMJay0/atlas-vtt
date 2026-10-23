@@ -47,7 +47,7 @@ export interface DungeonExportDeps {
 async function pngOf(rendered: DungeonRendered): Promise<Blob> {
   const { image } = rendered;
   if (image.type === 'png') return image.blob;
-  if (image.type === 'svg') throw new Error('An SVG map is no PNG.');
+  if (image.type === 'svg' || image.type === 'shading') throw new Error('Only a map drawn as a picture is a PNG.');
   const canvas = new OffscreenCanvas(image.bitmap.width, image.bitmap.height);
   canvas.getContext('2d')?.drawImage(image.bitmap, 0, 0);
   image.bitmap.close();

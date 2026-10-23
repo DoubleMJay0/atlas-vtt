@@ -3,6 +3,7 @@ import { isFiniteNumber, isRecord } from '../utils/guards';
 import { readExploredMask } from '../lighting/exploredMaskCodec';
 import type { SceneLevels } from './sceneLevels';
 import { readLevelAlignment, type LevelAlignments } from './levelAlignment';
+import { readShadingPath, sceneShadingPaths } from './levelShading';
 
 /** The version of a scene file written by every Atlas since files had versions, and of every scene with one level. */
 export const SINGLE_LEVEL_FILE_VERSION = 4;
@@ -31,8 +32,10 @@ function readLevel(value: unknown): SceneLevel | null {
   if (!isRecord(value)) return null;
   const id = text(value.id);
   if (!id) return null;
-  const { name, foreground, sees, offset, alignment, openArt, ...rest } = value;
+  const { name, foreground, relief, shade, sees, offset, alignment, openArt, ...rest } = value;
   const readAlignment = readLevelAlignment(alignment);
+  const readRelief = readShadingPath(relief);
+  const readShade = readShadingPath(shade);
   const readSees = Array.isArray(sees) ? sees.filter((entry): entry is string => typeof entry === 'string') : undefined;
   const readOff = readOffset(offset);
   return {
@@ -43,6 +46,8 @@ function readLevel(value: unknown): SceneLevel | null {
     elevation: readElevation(value.elevation),
     background: text(value.background),
     ...(foreground !== undefined && { foreground: text(foreground) }),
+    ...(readRelief && { relief: readRelief }),
+    ...(readShade && { shade: readShade }),
     ...(readSees && { sees: readSees }),
     ...(openArt === false && { openArt: false as const }),
     ...(readOff && { offset: readOff }),
@@ -121,8 +126,9 @@ export function levelsWithBackground(levels: SceneLevel[] | undefined, backgroun
 
 /**
  * Every map image a scene's file shows, once each: the scene's background, which is the first
- * level's, and each level's background and foreground. Reads the file's shape as it is, so a
- * snapshot or a scene of a newer version is read the same way.
+ * level's, each level's background and foreground, and the reliefs and shades that light them
+ * (`levelShading`). Reads the file's shape as it is, so a snapshot or a scene of a newer version
+ * is read the same way.
  */
 export function sceneImagePaths(state: { background?: unknown; levels?: unknown }): string[] {
   const paths = new Set<string>();
@@ -138,5 +144,6 @@ export function sceneImagePaths(state: { background?: unknown; levels?: unknown 
       add(level.foreground);
     }
   }
+  for (const path of sceneShadingPaths(state)) paths.add(path);
   return [...paths];
 }
