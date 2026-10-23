@@ -6,6 +6,7 @@
  */
 
 import { stream } from '../rng';
+import { boundedCached } from './boundedCache';
 import type { Canvas2D } from './geometry';
 import { DEFAULT_PX_PER_CELL, type MapLayout } from './layoutSize';
 import { luminance, mixColours, parseHex, type Rgb } from './palette';
@@ -70,21 +71,23 @@ export function vellumColours(paper: string): { inner: string; outer: string } {
 
 const deviations = new Map<TileSpec['kind'], Float32Array>();
 const tiles = new Map<string, OffscreenCanvas>();
+/** Grain canvases kept: both tiles of the last few looks (the gallery draws all of them in turn). */
+const TILE_LIMIT = 6;
 
 /** A tile's grain as a canvas for a surface of `paper`, made once per tile and colour. */
 function tileFor(spec: TileSpec, paper: string): OffscreenCanvas {
-  const key = `${spec.kind}:${paper}`;
-  let tile = tiles.get(key);
-  if (tile) return tile;
+  return boundedCached(tiles, `${spec.kind}:${paper}`, TILE_LIMIT, () => grainTile(spec, paper));
+}
+
+function grainTile(spec: TileSpec, paper: string): OffscreenCanvas {
   let deviation = deviations.get(spec.kind);
   if (!deviation) {
     deviation = spec.kind === 'clouds' ? cloudTile(spec.px, SKIN_SEED) : poreTile(spec.px, SKIN_SEED + 1);
     deviations.set(spec.kind, deviation);
   }
   const surface = luminance(parseHex(paper)) / 255;
-  tile = new OffscreenCanvas(spec.px, spec.px);
+  const tile = new OffscreenCanvas(spec.px, spec.px);
   tile.getContext('2d')!.putImageData(new ImageData(deviationPixels(deviation, Math.min(surface, BRIGHTEST), Math.max(surface, GRAIN_FLOOR) * GRAIN), spec.px), 0, 0);
-  tiles.set(key, tile);
   return tile;
 }
 

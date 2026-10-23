@@ -3,6 +3,8 @@
  * per-sample tones) and seamless tiles (for textures drawn as patterns).
  */
 
+import { boundedCached } from '../boundedCache';
+
 /** An integer hash of a lattice point, in [0, 1). */
 export function hash2(ix: number, iy: number, seed: number): number {
   let h = (Math.imul(ix | 0, 0x27d4eb2d) ^ Math.imul(iy | 0, 0x165667b1) ^ Math.imul(seed | 0, 0x9e3779b1)) >>> 0;
@@ -148,19 +150,15 @@ export function periodicWorley(size: number, cells: number, seed: number): { f1:
 }
 
 const samplers = new Map<string, Tile>();
+/** Tiles kept: several per dungeon (rock edge, shade, weathering, water), for the last few dungeons. */
+const SAMPLER_LIMIT = 16;
 
 /**
  * Seamless fbm as a function of a cell-space point, one tile `cells` wide: fast enough for every
  * sample of a soft field.
  */
 export function noiseSampler(seed: number, cells: number, base = 4, octaves = 4, size = 256): (x: number, y: number) => number {
-  const key = `${seed}:${base}:${octaves}:${size}`;
-  let tile = samplers.get(key);
-  if (!tile) {
-    tile = periodicFbm(size, base, seed, octaves);
-    samplers.set(key, tile);
-  }
-  const t = tile;
+  const t = boundedCached(samplers, `${seed}:${base}:${octaves}:${size}`, SAMPLER_LIMIT, () => periodicFbm(size, base, seed, octaves));
   const k = size / cells;
   return (x, y) => sampleTile(t, x * k, y * k);
 }
