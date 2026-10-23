@@ -96,6 +96,7 @@ function LightPopover({ lightId }: { lightId: string }): React.ReactElement | nu
         unit={unitLabelFor(unitType)}
         unitDistance={unitDistance}
         maxRange={maxRange}
+        surface={!!light.area}
         more={<ShinesRow light={light} onChange={(activeBelowAmbient) => store.getState().updateLight(light.id, { activeBelowAmbient })} />}
         onBeamCommit={makeWay}
         direction={{ degrees: light.rotation ?? 0, onChange: (rotation) => store.getState().updateLight(light.id, { rotation }) }}

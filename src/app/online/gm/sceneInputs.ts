@@ -11,6 +11,7 @@ import { heldForSight } from '../../lighting/sightOnDrop';
 import type { TokenEntity } from '../../types';
 import type { FogOperation } from '../../types/fogTypes';
 import type { WallSegment } from '../../types/wallTypes';
+import type { LightEmission } from '../../types/lightingTypes';
 import { tokenEffects, type SightRules } from '../../vision/sightRules';
 import { tokenSenses } from '../../vision/tokenSenses';
 import { wallList } from '../../vision/wallList';
@@ -116,9 +117,19 @@ function sightToken(token: TokenEntity, inputs: SightInputs): SightToken | null 
     size: finite(token.size) && token.size > 0 ? token.size : 1,
     ...(finite(token.rotation) && { rotation: token.rotation }),
     ...(vision && { vision: sharedVision({ ...token, vision }, inputs.rules) }),
-    ...(light && { light: { ...light } }),
+    ...(light && { light: sharedEmission(light) }),
     ...(effects.length > 0 && { effects }),
   };
+}
+
+/**
+ * A light's emission as players get it, a slow smoulder as a pulse, which every player page draws
+ * (one that does not know an animation stops on it). The players' page knows no area lights yet:
+ * a placed area light goes out as a light at its middle, its area left out.
+ */
+// ponytail: share `area` once the players' page draws area lights; until then lava lights its room from its middle there.
+function sharedEmission(emission: LightEmission): JsonRecord {
+  return emission.animation === 'smoulder' ? { ...emission, animation: 'pulse' } : { ...emission };
 }
 
 /** The parts of a lit scene that change while it is played: its lighting, its lights that are switched on, its tokens and the held ones. */
@@ -135,7 +146,7 @@ export function sharedSight(inputs: SightInputs): SharedSight {
   return {
     lighting: { ...state.lighting },
     lights: lightList(levelObjects(state).lights).filter((light) => light.hidden !== true).map((light) => ({
-      id: inputs.lightAlias(light.id), x: light.x, y: light.y, emission: { ...light.emission },
+      id: inputs.lightAlias(light.id), x: light.x, y: light.y, emission: sharedEmission(light.emission),
       ...(finite(light.rotation) && { rotation: light.rotation }), ...(finite(light.activeBelowAmbient) && { activeBelowAmbient: light.activeBelowAmbient }),
     })),
     tokens: tokens.map(({ entry }) => entry),

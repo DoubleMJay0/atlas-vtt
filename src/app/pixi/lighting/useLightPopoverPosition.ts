@@ -2,6 +2,7 @@ import { readLight } from '../../lighting/lightingObjects';
 import { useCallback, useLayoutEffect, useRef } from 'react';
 import type React from 'react';
 import { beamOf } from '../../lighting/lightBeam';
+import { areaRadius } from '../../lighting/lightArea';
 import { gameUnitsToWorld, unitScaleOf } from '../../lighting/lightingUnits';
 import { useViewStoreHook } from '../../react/ViewStoreContext';
 import { useAtlasUI } from '../../react/root/AtlasUIContext';
@@ -53,9 +54,11 @@ export function useLightPopoverPosition(ref: React.RefObject<HTMLElement | null>
     const light = readLight(levelObjects(state).lights[id]);
     if (!light) return null;
     const scale = unitScaleOf({ unitDistance }, state.grid);
+    // An area light's rings are kept clear of as the circles around its middle that hold them.
+    const around = light.area ? areaRadius(light.area, light) : 0;
     return {
       x: light.x, y: light.y, beam: beamOf(light), marker: LIGHT_MARKER_RADIUS * mapMarkerScale(zoom) * zoom,
-      bright: gameUnitsToWorld(light.emission.bright, scale), dim: gameUnitsToWorld(light.emission.dim, scale),
+      bright: around + gameUnitsToWorld(light.emission.bright, scale), dim: around + gameUnitsToWorld(light.emission.dim, scale),
     };
   });
 }

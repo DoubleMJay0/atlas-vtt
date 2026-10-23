@@ -53,7 +53,8 @@ export function objectsMovedWithMap(objects: SceneObjects, move: MapMove, moves?
     tokens: mapRecord(sceneTokens(objects), (token) => (isOffMap(token) ? token : placed<typeof token>(move)(token)), moves),
     pins: mapRecord(objects.pins, placed(move), moves),
     texts: mapRecord(objects.texts, placed(move), moves),
-    lights: mapRecord(objects.lights, placed(move), moves),
+    // An area light's area follows the map with its middle.
+    lights: mapRecord(objects.lights, (light) => ({ ...placed<typeof light>(move)(light), ...(Array.isArray(light.area) && { area: light.area.map(move) }) }), moves),
     audios: mapRecord(objects.audios, placed(move), moves),
     drawings: mapRecord(objects.drawings, (drawing) => ({ ...drawing, points: drawing.points.map(move) }), moves),
     walls: mapRecord(objects.walls, (wall) => ({ ...wall, p1: move(wall.p1), p2: move(wall.p2) }), moves),
