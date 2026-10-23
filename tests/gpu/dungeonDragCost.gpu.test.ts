@@ -206,7 +206,8 @@ describe('the cost of a token drag on a generated dungeon of three floors (print
       }
       holdTokens(view.store, []);
       const s = view.store.getState();
-      const scene = { quality: level, mapPx: `${built.width}×${built.height}`, pxPerCell: built.pxPerCell, outlines, walls: Object.keys(s.objects.walls).length };
+      const engine = (view.controller.renderer as unknown as { view: { engine?: { failed: boolean; hasWorld(): boolean } } }).view.engine;
+      const scene = { lit: !!engine && !engine.failed && engine.hasWorld(), stageRenders: ctx.counts.stage, quality: level, mapPx: `${built.width}×${built.height}`, pxPerCell: built.pxPerCell, outlines, walls: Object.keys(s.objects.walls).length };
       rows.push(`${JSON.stringify(scene)}\n${Object.entries(result).map(([k, v]) => `  ${k.padEnd(13)} ${JSON.stringify(v)}\n  ${''.padEnd(13)} paced ${JSON.stringify(paced[k])}`).join('\n')}`);
       expect(result.column!.cpuMs).toBeGreaterThan(0);
     } finally {
