@@ -20,7 +20,6 @@ export function drawPools(scene: ArtScene, pens: Pens): void {
   if (!outlines.length) return;
   const trace = poolsPath(outlines);
   const depth = depthField(scene, trace, outlines.flat());
-  if (scene.env.style.liquid === 'lava') return paintMolten(scene, pens, trace, outlines, depth, 'lava');
   paintWater(scene, pens, trace, outlines, depth, false);
 }
 

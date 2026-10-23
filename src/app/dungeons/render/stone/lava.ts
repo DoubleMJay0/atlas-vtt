@@ -8,8 +8,12 @@ import { depthField } from '../art/pools';
 import { blurField, cellOf, drawField, drawGridCanvas, fieldOf, gridOver, pixelCanvas } from '../art/raster';
 import { pointsBounds } from '../geometry';
 import type { StoneColours } from './colours';
+import { drawAcidDetail } from './acid';
 
-/** Molten rock within `trace`: its crust and seams, its glow spilling onto the floor round it, its shore inked. */
+/**
+ * Molten rock or acid within `trace`: its surface from shore to middle, its glow spilling onto the
+ * floor round it, its shore inked; acid bubbles and stains the floor (`drawAcidDetail`).
+ */
 export function drawLava(scene: ArtScene, c: StoneColours, outlines: readonly Vec[][], trace: PathFn, kind: Molten = 'lava'): void {
   const { ctx } = scene.env;
   const points = outlines.flat();
@@ -47,6 +51,7 @@ export function drawLava(scene: ArtScene, c: StoneColours, outlines: readonly Ve
     ctx.fill();
     ctx.restore();
   }
+  if (kind === 'acid' && scene.raster) drawAcidDetail(scene, c, outlines, trace, depth);
   ctx.save();
   clipFloors(scene);
   ctx.beginPath();

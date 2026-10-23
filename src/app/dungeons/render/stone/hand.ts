@@ -15,7 +15,6 @@ import { lightInside } from './lightInside';
 import { depthField } from '../art/pools';
 
 /** Acid: a murky, poisonous green. */
-const ACID = '#6f8f2e';
 
 /** Line weights of Stone & shadow, in cells. */
 const WEIGHTS = { heavy: 0.028, outline: 0.013, fine: 0.007 };
@@ -112,7 +111,7 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       ctx.restore();
     },
     water: (pools, depth, deep) => paintWater(scene, c, polysPath(pools), pools, depth, deep),
-    lava: (pools, tint) => (tint === 'acid' ? paintWater(scene, { ...c, water: c.mono ? c.water : ACID }, polysPath(pools), pools, depthField(scene, polysPath(pools), pools.flat()), true) : drawLava(scene, c, pools, polysPath(pools), tint)),
+    lava: (pools, tint) => (c.mono && tint === 'acid' ? paintWater(scene, c, polysPath(pools), pools, depthField(scene, polysPath(pools), pools.flat()), true) : drawLava(scene, c, pools, polysPath(pools), tint)),
   };
   return hand;
 }
