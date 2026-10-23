@@ -2,6 +2,7 @@ import type { WallSegment } from '../../types/wallTypes';
 import type { DoorKind, DungeonDoor, DungeonModel } from '../model';
 import { visibleFloor } from '../render/visibleDungeon';
 import { REFERENCE_CELL_PX, type DungeonStyle, type DungeonView } from '../style';
+import type { Vec } from '../render/geometry';
 import { STEPS, doorEnds, doorLine, splitRings, wallRings, type RingHit } from './wallOutline';
 
 /** Where a dungeon map lies in the world: its pixel (0, 0) is the corner of `originCell`. */
@@ -27,6 +28,21 @@ const DOOR_WALLS: Partial<Record<DoorKind, DoorWall>> = {
   secret: { type: 'secret-door', v: (door, half) => (door.from === null ? 0.5 - half : half - 0.5) },
 };
 
+/**
+ * Whether a point lies on the outer mouth of an entrance: the edge of its cell's wall ring that
+ * faces the outside. An entrance leads out, so no wall closes it there (the map draws none either:
+ * the ground outside the way in is cleared).
+ */
+function entranceMouth(door: DungeonDoor, half: number): (p: Vec) => boolean {
+  const reach = 0.5 + half + 1 / STEPS;
+  const mouth = { x: door.x + 0.5 - door.dir.x * (0.5 + half), y: door.y + 0.5 - door.dir.y * (0.5 + half) };
+  return p => {
+    const dx = p.x - mouth.x;
+    const dy = p.y - mouth.y;
+    return Math.abs(dx * door.dir.x + dy * door.dir.y) < 1 / STEPS && Math.abs(dx * door.dir.y - dy * door.dir.x) <= reach;
+  };
+}
+
 /** The drawn wall's width outside the floor, in cells: Stonework walls use the normal stroke. */
 export function wallInkWidth(style: DungeonStyle): number {
   const px = style.hatching.mode === 'stonework' ? style.strokes.normal : style.strokes.thick;
@@ -45,7 +61,8 @@ export interface DungeonWalls {
  * The walls and doors of one floor of a dungeon in world pixels, along the centre line of its drawn walls:
  * one chain per wall outline, every wall drawn once (rooms side by side have walls of their own,
  * a cell of rock apart), and every door ending exactly on a corner of the wall beside it, so
- * light and sight find no gap. Rooms the view hides (a secret wing) have no walls. Pure.
+ * light and sight find no gap. Entrances stay open to the outside. Rooms the view hides (a secret
+ * wing) have no walls. Pure.
  */
 export function dungeonWalls(model: DungeonModel, style: DungeonStyle, view: Pick<DungeonView, 'secrets'>, placement: DungeonPlacement, floor = 0): DungeonWalls {
   const { doors, floors } = visibleFloor(model, view, floor);
@@ -79,9 +96,14 @@ export function dungeonWalls(model: DungeonModel, style: DungeonStyle, view: Pic
     walls[id] = { id, kind: 'wall', p1: world(from), p2: world(to), ...rest };
   };
 
+  const mouths = doors.filter(door => door.from === null).map(door => entranceMouth(door, half));
+  const onMouth = (a: Vec, b: Vec): boolean => mouths.some(mouth => mouth(a) && mouth(b));
   outlines.forEach((ring, index) => {
     const chainId = `chain_dungeon_${index + 1}`;
-    ring.forEach((corner, i) => add(corner, ring[(i + 1) % ring.length]!, { type: 'solid', chainId }));
+    ring.forEach((corner, i) => {
+      const next = ring[(i + 1) % ring.length]!;
+      if (!onMouth(corner, next)) add(corner, next, { type: 'solid', chainId });
+    });
   });
   const counts: Partial<Record<DoorKind, number>> = {};
   for (const { door, wall, ends } of placed) {

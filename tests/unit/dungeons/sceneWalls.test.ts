@@ -32,11 +32,23 @@ function wayThrough(door: DungeonDoor, placement: DungeonPlacement): [{ x: numbe
   ];
 }
 
+/** Walls across every entrance's open mouth, where the outline of its cell would close it, so a check can find the rest sealed. */
+function mouthsClosed(model: DungeonModel, floor: number, placement: DungeonPlacement): WallSegment[] {
+  const half = wallInkWidth(STYLE) / 2;
+  const snap = (v: number): number => Math.round(v * 1024) / 1024;
+  return model.floors[floor]!.doors.filter(door => door.from === null).map((door, k): WallSegment => {
+    const out = 0.5 + half;
+    const at = (u: number): { x: number; y: number } =>
+      toWorld({ x: snap(door.x + 0.5 - door.dir.x * out - door.dir.y * u), y: snap(door.y + 0.5 - door.dir.y * out + door.dir.x * u) }, placement);
+    return { id: `mouth_${k}`, kind: 'wall', type: 'solid', p1: at(-out), p2: at(out) };
+  });
+}
+
 function checkSealed(model: DungeonModel): void {
   const placement = placementOf(model);
   const far = farReach(model, placement);
   model.floors.forEach((floor, index) => {
-    const walls = wallsOf(model, placement, index);
+    const walls = [...wallsOf(model, placement, index), ...mouthsClosed(model, index, placement)];
     for (const room of floor.rooms) expect(escapingRays(walls, room, placement, far), `room ${room.id} of floor ${index}, seed ${model.seed}`).toEqual([]);
     expect(looseEnds(walls)).toEqual([]);
     expect(duplicateWalls(walls)).toBe(0);
@@ -61,6 +73,19 @@ describe('dungeon walls', () => {
     expect(doors.every(w => w.closed === true)).toBe(true);
     expect(walls.filter(w => w.type === 'secret-door')).toEqual([expect.objectContaining({ closed: true })]);
     expect(walls.filter(w => w.chainId === undefined)).toHaveLength(6);
+  });
+
+  it('leaves every entrance open to the outside', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const model = generateDungeon({ seed, tags: [], floors: 1 });
+      const placement = placementOf(model);
+      const walls = wallsOf(model, placement);
+      for (const door of model.floors[0]!.doors.filter(d => d.from === null && d.kind === 'opening')) {
+        const inside = toWorld({ x: door.x + 0.5 + door.dir.x, y: door.y + 0.5 + door.dir.y }, placement);
+        const outside = toWorld({ x: door.x + 0.5 - door.dir.x * 3, y: door.y + 0.5 - door.dir.y * 3 }, placement);
+        expect(wallsCrossed(walls, inside, outside), `seed ${seed}`).toEqual([]);
+      }
+    }
   });
 
   it('leaves the way through an opening free and puts exactly one door across a closed one', () => {
