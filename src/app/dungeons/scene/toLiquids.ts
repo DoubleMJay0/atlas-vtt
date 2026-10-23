@@ -176,7 +176,7 @@ export function floorLiquids(
     const glow = GLOWS[liquid];
     if (!glow) return;
     const middle = centroid(polygon);
-    const emission: LightEmission = { bright: units(glow.bright), dim: units(glow.dim), color: glow.color, intensity: glow.intensity, animation: 'pulse', kind: 'custom' };
+    const emission: LightEmission = { bright: units(glow.bright), dim: units(glow.dim), color: glow.color, intensity: glow.intensity, animation: 'smoulder', kind: 'custom' };
     const lightId = `light_${id}_${index + 1}`;
     lights[lightId] = { id: lightId, kind: 'light', x: middle.x, y: middle.y, emission, area: polygon, ...(level && { levels: [level] }) };
   });
