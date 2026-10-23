@@ -12,6 +12,7 @@ import { drawRock } from './rock';
 import { drawShade } from './shade';
 import { drawWallBand, drawWallEdge } from './walls';
 import { drawPools } from './water';
+import { drawWeathering } from './weathering';
 
 /**
  * Stone & shadow, bottom to top: the rock, the wall's course, the floor, water, terrain on the
@@ -28,6 +29,7 @@ export function paintStone(scene: ArtScene): void {
   drawFloor(scene, c);
   drawPools(scene, c);
   drawTerrainGround(hand, colours);
+  drawWeathering(scene);
   drawShade(scene, c);
   drawGrid(env);
   drawWallEdge(scene, c);

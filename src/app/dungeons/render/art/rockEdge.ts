@@ -14,18 +14,18 @@ export function rockCoverage(scene: ArtScene, softness = 0.025): Float32Array {
   const { env } = scene;
   const seed = env.dungeon.model.seed;
   const reach = noiseSampler(seed + 1, 12, 3, 3);
-  const bays = noiseSampler(seed + 2, 4, 3, 3);
-  const spurs = noiseSampler(seed + 3, 1.2, 3, 3);
-  const chips = noiseSampler(seed + 4, 0.45, 3, 2);
+  // One wander at every scale: bays a few cells long down to chips a fraction of a cell.
+  const wander = noiseSampler(seed + 2, 6, 2, 6);
   const base = env.style.surround.reach;
   const parted = partedRock(mouthsOf(env.dungeon), seed + 5);
   const reached = fieldOf(scene.grid, (x, y) => {
-    if (scene.pocketAt(x, y) > 0.5) return 1;
     const d = scene.sdfAt(x, y);
-    if (d > base * 1.8 + 0.6) return 0;
+    // Under the floors the rock is whole (the floor lies over it), so the closing never opens a wall.
+    if (d < 0.05) return 1;
+    if (d > base * 1.8 + 0.6) return scene.pocketAt(x, y) > 0.5 ? 1 : 0;
+    if (scene.pocketAt(x, y) > 0.5) return 1;
     const r = base * (0.55 + 0.6 * reach(x, y));
-    const wander = (bays(x, y) - 0.5) * 0.9 + (spurs(x, y) - 0.5) * 0.45 + (chips(x, y) - 0.5) * 0.18;
-    const edge = d + wander * Math.min(1, d / 0.5);
+    const edge = d + (wander(x, y) - 0.5) * 1.5 * Math.min(1, d / 0.5);
     return smoothstep(r + softness, r - softness, edge);
   });
   // Rock between rooms stands whole: gaps and holes narrower than two cells close up.

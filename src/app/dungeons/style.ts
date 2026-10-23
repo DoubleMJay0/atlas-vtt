@@ -31,6 +31,8 @@ export interface DungeonStyle {
   floor: FloorPattern;
   /** What pools hold where it is not water. */
   liquid?: 'lava';
+  /** What grows or settles at the foot of the walls and in the floor's damp hollows: moss, frost, soot, slime. */
+  weathering?: { color: string; amount: number };
   /** The grid's line width as a share of the usual, and how strongly its ink shows over the floor (0..1). */
   grid: { weight: number; strength: number };
 }

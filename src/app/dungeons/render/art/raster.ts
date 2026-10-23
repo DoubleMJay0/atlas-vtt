@@ -198,35 +198,43 @@ export function activeCells(grid: Grid, field: Float32Array): (x: number, y: num
   };
 }
 
-/** The largest (or smallest) value within `radius` samples along rows, then along columns: a square window, in linear time. */
-function slide(grid: Grid, values: Float32Array, radius: number, pick: (a: number, b: number) => number): Float32Array {
-  const { w, h } = grid;
-  const queue = new Int32Array(Math.max(w, h));
-  const run = (read: (i: number) => number, n: number, write: (i: number, v: number) => void): void => {
-    // A monotonic queue of indices: its head is always the pick of the window.
-    let head = 0;
-    let tail = 0;
-    for (let i = 0; i < n + radius; i++) {
-      if (i < n) {
-        const v = read(i);
-        while (tail > head && pick(read(queue[tail - 1]!), v) === v) tail--;
-        queue[tail++] = i;
+/**
+ * The largest (or, `max` false, smallest) value within `radius` samples of each one along a line of
+ * `n` values from `src` (every `stride`, from `offset`) into `dst`, by a monotonic queue: linear time.
+ */
+function slideLine(src: Float32Array, dst: Float32Array, offset: number, stride: number, n: number, radius: number, max: boolean, queue: Int32Array): void {
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < n + radius; i++) {
+    if (i < n) {
+      const v = src[offset + i * stride]!;
+      while (tail > head) {
+        const back = src[offset + queue[tail - 1]! * stride]!;
+        if (max ? back <= v : back >= v) tail--;
+        else break;
       }
-      const at = i - radius;
-      if (at < 0) continue;
-      while (queue[head]! < at - radius) head++;
-      write(at, read(queue[head]!));
+      queue[tail++] = i;
     }
-  };
+    const at = i - radius;
+    if (at < 0) continue;
+    while (queue[head]! < at - radius) head++;
+    dst[offset + at * stride] = src[offset + queue[head]! * stride]!;
+  }
+}
+
+/** The largest (or smallest) value within a square window of `radius` samples. */
+function slide(grid: Grid, values: Float32Array, radius: number, max: boolean): Float32Array {
+  const { w, h } = grid;
+  const queue = new Int32Array(Math.max(w, h) + 1);
   const rows = new Float32Array(values.length);
-  for (let j = 0; j < h; j++) run(i => values[j * w + i]!, w, (i, v) => (rows[j * w + i] = v));
+  for (let j = 0; j < h; j++) slideLine(values, rows, j * w, 1, w, radius, max, queue);
   const out = new Float32Array(values.length);
-  for (let i = 0; i < w; i++) run(j => rows[j * w + i]!, h, (j, v) => (out[j * w + i] = v));
+  for (let i = 0; i < w; i++) slideLine(rows, out, i, w, h, radius, max, queue);
   return out;
 }
 
 /** Fills gaps and holes narrower than twice `radius` samples between what a field covers: a closing. */
 export function closeField(grid: Grid, values: Float32Array, radius: number): Float32Array {
   const r = Math.max(1, Math.round(radius));
-  return slide(grid, slide(grid, values, r, Math.max), r, Math.min);
+  return slide(grid, slide(grid, values, r, true), r, false);
 }

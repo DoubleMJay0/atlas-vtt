@@ -37,7 +37,7 @@ export function drawRock(scene: ArtScene, pens: Pens): void {
     step: Math.max(pens.step, 0.05),
     active: activeCells(scene.grid, tone),
     minWidth: pens.minWidth,
-    wobble: (x, y) => (valueNoise(x * 0.55, y * 0.55, seed + 5) - 0.5) * pens.spacing * 1.2,
+    wobble: (x, y) => (valueNoise(x * 0.4, y * 0.4, seed + 5) - 0.5) * pens.spacing * 0.35,
     width: (x, y) => pens.spacing * 0.8 * sampleField(scene.grid, tone, x, y),
   };
   ctx.save();

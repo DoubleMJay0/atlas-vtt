@@ -32,7 +32,7 @@ export function pensOf(scene: ArtScene): Pens {
     ink: palette.ink,
     shade: palette.ink,
     floor: palette.floor,
-    spacing: Math.max(0.046, 2.8 / ppc),
+    spacing: Math.max(0.046, 3.2 / ppc),
     minWidth: 0.5 / ppc,
     step: Math.min(0.03, 5 / ppc),
     angle: LINE_ANGLE,
