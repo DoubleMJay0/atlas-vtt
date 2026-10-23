@@ -47,13 +47,18 @@ export class DungeonWorkerClient {
   static forApp(app: App): DungeonWorkerClient {
     let client = DungeonWorkerClient.instances.get(app);
     if (!client) {
-      client = new DungeonWorkerClient({
-        createWorker: () => new DungeonWorker({ name: 'Atlas dungeons' }),
-        inThread: (job) => runDungeonJob(job),
-      });
+      client = DungeonWorkerClient.standalone('Atlas dungeons');
       DungeonWorkerClient.instances.set(app, client);
     }
     return client;
+  }
+
+  /** A client with a worker of its own, drawing in the window where no worker starts; whoever makes it disposes it. */
+  static standalone(name: string): DungeonWorkerClient {
+    return new DungeonWorkerClient({
+      createWorker: () => new DungeonWorker({ name }),
+      inThread: (job) => runDungeonJob(job),
+    });
   }
 
   /** Stops the worker; called when the plugin unloads. */

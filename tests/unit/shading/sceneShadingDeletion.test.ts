@@ -7,7 +7,7 @@ import type { DungeonJob, DungeonRendered } from '../../../src/app/dungeons/work
 import { AssetService, type SceneAsset } from '../../../src/app/services/AssetService';
 import { AssetThumbnailService } from '../../../src/app/services/AssetThumbnailService';
 import { smallDungeon } from '../../fixtures/dungeonModels';
-import { pngHeader } from '../../fixtures/uvttFiles';
+import { fakeBitmap, pngOfBitmap } from '../../fixtures/uvttFiles';
 import { createInMemoryApp, type InMemoryApp } from '../../mocks/inMemoryVault';
 
 vi.mock('../../../src/app/pixi/mapImage/prebuildMapImage', () => ({ prebuildMapImageAt: vi.fn() }));
@@ -18,9 +18,9 @@ const NOTE = 'Notes/Campaign secrets.md';
 function drawn(job: DungeonJob): DungeonRendered {
   const model = job.model ?? smallDungeon();
   if (job.output.kind !== 'map' && job.output.kind !== 'shading') throw new Error('Only maps and their shading are drawn here');
-  const map = mapLayout(model, suggestedPxPerCell(model, job.output.pxPerCell, job.view), job.view);
+  const map = mapLayout(model, suggestedPxPerCell(model, job.output.pxPerCell, job.view, job.output.maxPixels), job.view);
   if (job.output.kind === 'shading') return { model, map, image: { type: 'shading', relief: new Blob(['RELIEF']), shade: new Blob(['SHADE']) } };
-  return { model, map, image: { type: 'png', blob: new Blob([pngHeader(map.widthPx, map.heightPx)], { type: 'image/png' }) } };
+  return { model, map, image: { type: 'bitmap', bitmap: fakeBitmap(map.widthPx, map.heightPx) } };
 }
 
 interface Bench { vault: InMemoryApp; assets: AssetService; deps: DungeonSceneDeps }
@@ -35,7 +35,7 @@ async function bench(): Promise<Bench> {
     app: vault.app,
     assetService: assets,
     render: async (job) => drawn(job),
-    convertImage: async (image) => ({ image, thumbnail: new Blob(['THUMB']), preview: null, sourcePreview: null }),
+    convertImage: async (image) => ({ image: pngOfBitmap(image), thumbnail: new Blob(['THUMB']), preview: null, sourcePreview: null }),
     thumbnails: new AssetThumbnailService(vault.app, assets, async () => new ArrayBuffer(0)),
   };
   return { vault, assets, deps };

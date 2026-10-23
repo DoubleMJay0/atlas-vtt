@@ -22,8 +22,9 @@ export type DungeonOutput =
    * The floor plan at `pxPerCell`, or less where the image would pass a map's limits; a PNG, a
    * bitmap, or with `svg` an SVG document. `transparent` leaves the paper out. `floor` is the
    * floor drawn, by index (the entry floor where unset); every floor's image has the same layout.
+   * `maxPixels` holds the image to fewer pixels than a map may have (`SCENE_MAP_PIXELS`).
    */
-  | { kind: 'map'; pxPerCell: number; bitmap?: boolean; svg?: boolean; transparent?: boolean; floor?: number; castShadows?: boolean }
+  | { kind: 'map'; pxPerCell: number; maxPixels?: number; bitmap?: boolean; svg?: boolean; transparent?: boolean; floor?: number; castShadows?: boolean }
   /** The floor plan fitted into `width` × `height` pixels, as a bitmap: the preview. */
   | { kind: 'preview'; width: number; height: number; floor?: number }
   /** A window of the dungeon, as a bitmap: a style's card in the gallery (`renderThumbnail`). */
@@ -31,9 +32,9 @@ export type DungeonOutput =
   /**
    * What a scene lights a floor's map by, over the layout its map has at `pxPerCell`: its relief
    * (`renderRelief`) and the shade its map leaves out (`renderShade`, null where the view shows no
-   * shadows), each a PNG.
+   * shadows), each a PNG. `maxPixels` as for the map.
    */
-  | { kind: 'shading'; pxPerCell: number; floor?: number };
+  | { kind: 'shading'; pxPerCell: number; maxPixels?: number; floor?: number };
 
 export interface DungeonJob {
   request: DungeonRequest;
@@ -96,7 +97,7 @@ async function pngOf({ width, height, data }: RasterImage, text?: { keyword: str
 }
 
 async function shadingOf(model: DungeonModel, job: DungeonJob, output: Extract<DungeonOutput, { kind: 'shading' }>): Promise<DungeonRendered> {
-  const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, job.view);
+  const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, job.view, output.maxPixels);
   const floor = output.floor ?? 0;
   const relief = renderRelief(model, job.style, job.view, floor);
   if (!relief) throw new Error('Could not draw the relief: no 2D canvas.');
@@ -111,7 +112,7 @@ export async function runDungeonJob(job: DungeonJob): Promise<DungeonRendered> {
   if (output.kind === 'preview') return previewOf(model, job, output);
   if (output.kind === 'thumbnail') return thumbnailOf(model, job, output);
   if (output.kind === 'shading') return shadingOf(model, job, output);
-  const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, view);
+  const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, view, output.maxPixels);
   const options = {
     pxPerCell,
     ...(output.transparent ? { transparent: true } : {}),

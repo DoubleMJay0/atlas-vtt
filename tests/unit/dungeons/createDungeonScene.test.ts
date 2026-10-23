@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
-import { DEFAULT_PX_PER_CELL, mapLayout, suggestedPxPerCell } from '../../../src/app/dungeons/render/layoutSize';
+import { DEFAULT_PX_PER_CELL, SCENE_MAP_PIXELS, mapLayout, suggestedPxPerCell } from '../../../src/app/dungeons/render/layoutSize';
 import { createDungeonSceneWith, dungeonSceneName, type DungeonSceneDeps, type DungeonSceneResult } from '../../../src/app/dungeons/scene/createDungeonScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
@@ -14,7 +14,7 @@ import type { NotePin } from '../../../src/app/types';
 import type { LevelLink, SceneLevel } from '../../../src/app/types/sceneLevelTypes';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { smallDungeon } from '../../fixtures/dungeonModels';
-import { pngHeader } from '../../fixtures/uvttFiles';
+import { fakeBitmap, pngHeader, pngOfBitmap } from '../../fixtures/uvttFiles';
 import { createInMemoryApp, interceptWrites, type InMemoryApp } from '../../mocks/inMemoryVault';
 
 vi.mock('../../../src/app/pixi/mapImage/prebuildMapImage', () => ({ prebuildMapImageAt: vi.fn() }));
@@ -23,6 +23,8 @@ const COLLECTION = 'Dungeons';
 const SCENES = `atlas-vtt/collections/${COLLECTION}/scenes`;
 const STYLE = dungeonStyle('parchment');
 const TITLE = 'Sunken Vault of the Grey Abbot';
+/** How large a scene's maps are asked for. */
+const SIZE = { pxPerCell: DEFAULT_PX_PER_CELL, maxPixels: SCENE_MAP_PIXELS };
 
 interface Bench {
   vault: InMemoryApp;
@@ -35,12 +37,12 @@ interface Bench {
 function drawn(job: DungeonJob): DungeonRendered {
   const model = job.model ?? smallDungeon();
   if (job.output.kind !== 'map' && job.output.kind !== 'shading') throw new Error('Only maps and their shading are drawn here');
-  const map = mapLayout(model, suggestedPxPerCell(model, job.output.pxPerCell, job.view), job.view);
+  const map = mapLayout(model, suggestedPxPerCell(model, job.output.pxPerCell, job.view, job.output.maxPixels), job.view);
   if (job.output.kind === 'shading') {
     const floor = job.output.floor ?? 0;
     return { model, map, image: { type: 'shading', relief: new Blob([`RELIEF ${floor}`]), shade: new Blob([`SHADE ${floor}`]) } };
   }
-  return { model, map, image: { type: 'png', blob: new Blob([pngHeader(map.widthPx, map.heightPx)], { type: 'image/png' }) } };
+  return { model, map, image: { type: 'bitmap', bitmap: fakeBitmap(map.widthPx, map.heightPx) } };
 }
 
 const kept = (image: Blob): ProcessedImage => ({ image, thumbnail: new Blob(['THUMB']), preview: null, sourcePreview: null });
@@ -59,7 +61,7 @@ async function bench(): Promise<Bench> {
       jobs.push(job);
       return drawn(job);
     },
-    convertImage: async (image) => kept(image),
+    convertImage: async (image) => kept(pngOfBitmap(image)),
     thumbnails: new AssetThumbnailService(vault.app, assets, async () => new ArrayBuffer(0)),
   };
   return { vault, assets, deps, jobs };
@@ -110,8 +112,8 @@ describe('creating a dungeon scene', () => {
     expect(result).toEqual({ ok: true, name: TITLE, scenePath: `${SCENES}/${TITLE}.atlasmap` });
     expect(b.jobs.map(job => job.output)).toEqual([
       // The map leaves the cast shadows out: its shade carries them.
-      { kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL, castShadows: false },
-      { kind: 'shading', pxPerCell: DEFAULT_PX_PER_CELL },
+      { kind: 'map', ...SIZE, bitmap: true, castShadows: false },
+      { kind: 'shading', ...SIZE },
     ]);
     const records = await recordsOf(b);
     expect(records.map(r => r.type).sort()).toEqual(['map', 'scene']);
@@ -147,12 +149,12 @@ describe('creating a dungeon scene', () => {
     const result = created(await createDungeonSceneWith(b.deps, options(model)));
 
     expect(b.jobs.map(job => job.output)).toEqual([
-      { kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL, castShadows: false },
-      { kind: 'shading', pxPerCell: DEFAULT_PX_PER_CELL },
-      { kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL, castShadows: false, floor: 1 },
-      { kind: 'shading', pxPerCell: DEFAULT_PX_PER_CELL, floor: 1 },
-      { kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL, castShadows: false, floor: 2 },
-      { kind: 'shading', pxPerCell: DEFAULT_PX_PER_CELL, floor: 2 },
+      { kind: 'map', ...SIZE, bitmap: true, castShadows: false },
+      { kind: 'map', ...SIZE, bitmap: true, castShadows: false, floor: 1 },
+      { kind: 'map', ...SIZE, bitmap: true, castShadows: false, floor: 2 },
+      { kind: 'shading', ...SIZE },
+      { kind: 'shading', ...SIZE, floor: 1 },
+      { kind: 'shading', ...SIZE, floor: 2 },
     ]);
     const maps = (await recordsOf(b)).filter(r => r.type === 'map');
     expect(maps.map(map => map.name)).toEqual([`${TITLE}, Floor A`, `${TITLE}, Floor B`, `${TITLE}, Floor C`]);
@@ -229,9 +231,7 @@ describe('creating a dungeon scene', () => {
 
   it('fits grid and walls to an image the workers scaled down', async () => {
     const b = await bench();
-    b.deps.convertImage = async (image) => {
-      const header = new DataView(await image.arrayBuffer());
-      const [width, height] = [header.getUint32(16), header.getUint32(20)];
+    b.deps.convertImage = async ({ width, height }) => {
       const to = { width: width / 2, height: height / 2 };
       return { ...kept(new Blob([pngHeader(to.width, to.height)])), scaledDown: { from: { width, height }, to } };
     };
