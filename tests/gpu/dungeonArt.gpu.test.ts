@@ -1,7 +1,7 @@
 import { describe, it } from 'vitest';
 import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
 import { DUNGEON_STYLES, type DungeonStyleId } from '../../src/app/dungeons/styleCatalog';
-import { ART_DUNGEONS, ART_SPOTS, artModel, drawClose, drawWhole } from './dungeonArtSheets';
+import { ART_DUNGEONS, ART_SPOTS, GROWTH_SPOTS, artModel, drawClose, drawWhole } from './dungeonArtSheets';
 import { savePng } from './dungeonRenderHarness';
 import { specimen } from './dungeonArtSpecimen';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
@@ -16,7 +16,7 @@ const CARD_DUNGEON = 'crumbling';
  * Every look on dungeons of every kind, whole and close up at 200 px per cell with tokens, written
  * to `out/dungeon-render/v2-art/` for judging by eye, when asked for: `VITE_ART=1` draws them all,
  * `VITE_ART_LOOK`, `VITE_ART_DUNGEON` and `VITE_ART_SHOT` (whole, close, mono, card, specimen,
- * spots) narrow a run while iterating.
+ * spots, growth) narrow a run while iterating.
  */
 
 const only = (key: string): string[] | null => {
@@ -63,6 +63,14 @@ describe.skipIf(!asked)('dungeon looks, for judging by eye', () => {
           const canvas = new OffscreenCanvas(layout.widthPx, layout.heightPx);
           renderMap(canvas.getContext('2d')!, model, dungeonStyle(id), DEFAULT_VIEW, { pxPerCell: 120, floor, openings });
           await savePng(canvas, `v2-art/specimen-${id}-f${floor}-${openings}`);
+        }
+      });
+    }
+    if (shots.includes('growth')) {
+      it(`${id} vegetation`, async () => {
+        for (const spot of GROWTH_SPOTS) {
+          const canvas = drawClose(artModel(spot.dungeon), id as DungeonStyleId, DEFAULT_VIEW, 0, 6, 4, false, spot.centre);
+          await savePng(canvas, `v2-art/growth-${id}-${spot.name}`);
         }
       });
     }

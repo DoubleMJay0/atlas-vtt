@@ -49,6 +49,12 @@ export function approachCells(spot: StairSpot, end: StairEnd): CellPoint[] {
   return cellsOf({ x0: r.x0, y0: y, x1: r.x1, y1: y });
 }
 
+/** Every stairwell, the rows it is reached from at either end and the cells round them, by key: what nothing low may crowd. */
+export function stairsAndAround(stairs: readonly StairSpot[]): string[] {
+  const cells = stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, 'upper'), ...approachCells(s, 'lower')]);
+  return cells.flatMap((c) => [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => cellKey(c.x + dx, c.y + dy))));
+}
+
 /** The floor cells just inside a room's doors. */
 export function doorApproaches(room: Pick<DungeonRoom, 'id'>, doors: readonly DungeonDoor[]): CellPoint[] {
   return doors.flatMap((door) => {

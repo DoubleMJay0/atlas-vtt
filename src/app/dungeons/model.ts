@@ -7,10 +7,12 @@
  * in that continuous space, so a cell's centre is (x + 0.5, y + 0.5) and columns stand on grid vertices.
  */
 
+import type { DungeonGrowth } from './growthModel';
 import type { DungeonTerrain, FiveRoomStage } from './terrainModel';
 
 export type { CoverLevel, DungeonTerrain, FiveRoomStage, HazardKind, TerrainKind, TerrainOpening, TerrainTraits } from './terrainModel';
 export { FIVE_ROOM_STAGES } from './terrainModel';
+export type { DungeonGrowth, GrowthKind } from './growthModel';
 
 /** Bump when the same seed and tags would give another dungeon. */
 export const DUNGEON_GENERATOR_VERSION = 2;
@@ -160,6 +162,8 @@ export interface DungeonFloor {
   stairs: DungeonStair[];
   /** Cover, difficult ground, hazards, holes, bridges, height and points of interest (`terrainModel.ts`). */
   terrain: DungeonTerrain[];
+  /** What grows on its walls, columns and floor (`growthModel.ts`); thick undergrowth is terrain. */
+  growth: DungeonGrowth[];
   /**
    * Secret wings the GM hid (Hide room), by the id of each wing's first room; never set by the
    * generator. The view's secret rooms switch hides every secret wing whatever this says.
