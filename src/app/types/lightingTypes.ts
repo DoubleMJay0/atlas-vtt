@@ -107,6 +107,13 @@ export interface LightSource extends OnLevels {
    * `ambientGate` and `isLightOn`.
    */
   activeBelowAmbient?: number;
+  /**
+   * A light that glows from a whole surface, like lava: its corners in world pixels, at least
+   * three. Inside it everything is bright, and `bright` and `dim` are counted from its outline; `x`
+   * and `y` are its middle and the area moves with them. Such a light has no beam (`angle`) and no
+   * flame (`sourceRadius`). Read with `readLight`.
+   */
+  area?: { x: number; y: number }[];
 }
 
 export type LightInput = Omit<LightSource, 'id' | 'kind'>;

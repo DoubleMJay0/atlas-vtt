@@ -10,6 +10,7 @@ import type { CameraState, GridState } from './gridTypes';
 import type { ViewUIState } from './viewUIState';
 import type { PartyValues } from './partyTypes';
 import type { LevelAlignment, LevelLink, LevelSurface, SceneLevel } from './sceneLevelTypes';
+import type { LiquidSurface } from './liquidTypes';
 import type { MapFeature } from './mapFeatureTypes';
 
 /** Data read from a map view, independent of the store and persistence services. */
@@ -75,6 +76,8 @@ export interface ViewState extends ViewUIState {
     levelSurfaces?: Record<string, LevelSurface>;
     /** Named areas the GM reads on hover, some difficult terrain or cover; absent until the first is added. Read with `mapFeatureList`. */
     mapFeatures?: Record<string, MapFeature>;
+    /** Water, lava and acid that move while maps are animated; absent until the first is added. Read with `liquidList`. */
+    liquids?: Record<string, LiquidSurface>;
   };
 
   // Camera state
