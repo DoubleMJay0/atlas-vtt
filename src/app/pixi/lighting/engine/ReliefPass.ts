@@ -1,10 +1,18 @@
 import { Mesh, UniformGroup, type Geometry, type RenderTexture, type Shader } from 'pixi.js';
 import { chordOffsets } from '../../../lighting/chordOffsets';
-import { RELIEF } from '../../../lighting/lightingConstants';
+import { RELIEF, TILE_RAYS } from '../../../lighting/lightingConstants';
 import type { Rect } from '../../../lighting/segments';
 import { ENGINE_SHADERS } from './engineShaders';
 import { createShader, createTarget } from './gpu';
 import type { EngineRelief } from './ReliefMap';
+
+/**
+ * Rays each texel of a relief shadow traces for a light tile of `tileRays` rays: the same share of
+ * `RELIEF.rays` as of `TILE_RAYS`, at least two (8 at `high`, 4 at `balanced`, 2 at `saver`).
+ */
+export function reliefRays(tileRays: number): number {
+  return Math.min(RELIEF.rays, Math.max(2, Math.round((RELIEF.rays * tileRays) / TILE_RAYS)));
+}
 
 /**
  * A tile's relief shadow: traced on a grid of its own over the tile's rect, no finer than a texel of
@@ -42,7 +50,8 @@ export class ReliefPass {
     uReliefTexels: { value: new Float32Array([1, 1, 1, 1]), type: 'vec4<f32>' },
     uWorldToRelief: { value: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]), type: 'mat3x3<f32>' },
     uReliefSize: { value: new Float32Array([1, 1]), type: 'vec2<f32>' },
-    uReliefOffsets: { value: new Float32Array(chordOffsets(RELIEF.rays)), type: 'f32', size: RELIEF.rays },
+    uReliefOffsets: { value: new Float32Array(RELIEF.rays), type: 'f32', size: RELIEF.rays },
+    uReliefRays: { value: Number(RELIEF.rays), type: 'f32' },
   });
   /** What stands on the map, whose shadows each tile begun from now on takes; none, and tiles are as they were without reliefs. */
   relief: EngineRelief | null = null;
@@ -50,7 +59,11 @@ export class ReliefPass {
   private readonly area: Mesh<Geometry, Shader>;
   private readonly raws: (RenderTexture | null)[] = [null, null];
 
-  constructor(private readonly parts: ReliefPassParts) {
+  /** `rays` is how many rays each texel traces, at most `RELIEF.rays` (`reliefRays`). */
+  constructor(private readonly parts: ReliefPassParts, rays: number = RELIEF.rays) {
+    const count = Math.min(RELIEF.rays, Math.max(1, Math.round(rays)));
+    this.uniforms.uniforms.uReliefRays = count;
+    this.uniforms.uniforms.uReliefOffsets.set(chordOffsets(count));
     const reads = { reliefUniforms: this.uniforms, uRelief: parts.placeholder.source, uReliefBlocks: parts.placeholder.source };
     this.point = new Mesh({ geometry: parts.geometry, shader: createShader(ENGINE_SHADERS.reliefPoint, { tileUniforms: parts.tileUniforms, ...reads }) });
     this.area = new Mesh({ geometry: parts.geometry, shader: createShader(ENGINE_SHADERS.reliefArea, { tileUniforms: parts.tileUniforms, areaUniforms: parts.areaUniforms, uDistance: parts.placeholder.source, ...reads }) });

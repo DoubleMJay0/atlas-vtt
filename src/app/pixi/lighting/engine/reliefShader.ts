@@ -82,8 +82,18 @@ const RELIEF_TILE_GLSL = `
 in vec2 vUv;
 uniform vec4 uReliefRect;
 uniform vec4 uReliefTexels;
+// Rays each texel traces (at most RELIEF.rays): fewer at a lower lighting quality.
+uniform float uReliefRays;
 out vec4 finalColor;
-float jitterHere() { return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))); }`;
+float jitterHere() { return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))); }
+// Where ray k starts within the texel (world px from its middle): the rays are spread over the
+// texel (R2 points), so a texel an object's outline or its shadow's edge crosses takes the share
+// of it in shadow instead of all or nothing. Traced from its middle alone, every edge was a
+// staircase of whole texels, which the smoothing only blurred.
+vec2 withinTexel(int k) {
+  vec2 cell = uReliefRect.zw / uReliefTexels.xy;
+  return (fract(vec2(0.5) + float(k) * vec2(0.7548776662, 0.5698402910)) - 0.5) * cell;
+}`;
 
 /**
  * Share of a point light's flame a texel sees past what stands (`reliefClear`): rays across the
@@ -98,21 +108,22 @@ uniform float uFlame;
 uniform float uReliefOffsets[${RELIEF.rays}];
 ${RELIEF_GLSL}
 void main() {
-  vec2 p = uReliefRect.xy + vUv * uReliefRect.zw;
-  vec2 a = toRelief(p);
-  float h0 = reliefAt(a);
+  vec2 middle = uReliefRect.xy + vUv * uReliefRect.zw;
   float hl = reliefAt(toRelief(uLight)) + ${f(RELIEF.lightHeight)};
-  vec2 dir = normalize(uLight - p + vec2(1e-6));
+  vec2 dir = normalize(uLight - middle + vec2(1e-6));
   vec2 across = vec2(-dir.y, dir.x) * uFlame * ${f(RELIEF.flame)};
   float jitter = jitterHere() - 0.5;
   float seen = 0.0;
+  int rays = int(uReliefRays + 0.5);
   for (int k = 0; k < ${RELIEF.rays}; k++) {
+    if (k >= rays) break;
     float lo = k > 0 ? uReliefOffsets[k - 1] : -1.0;
-    float hi = k < ${RELIEF.rays - 1} ? uReliefOffsets[k + 1] : 1.0;
+    float hi = k < rays - 1 ? uReliefOffsets[k + 1] : 1.0;
     float x = uReliefOffsets[k] + jitter * (jitter < 0.0 ? uReliefOffsets[k] - lo : hi - uReliefOffsets[k]);
-    seen += reliefClear(a, h0, toRelief(uLight + across * x), hl);
+    vec2 a = toRelief(middle + withinTexel(k));
+    seen += reliefClear(a, reliefAt(a), toRelief(uLight + across * x), hl);
   }
-  finalColor = vec4(seen / ${f(RELIEF.rays)}, 0.0, 0.0, 1.0);
+  finalColor = vec4(seen / float(rays), 0.0, 0.0, 1.0);
 }`;
 
 /**
@@ -224,8 +235,6 @@ void main() {
   float here = outlineDistance(p, nearest);
   float vis = 1.0;
   if (here > 0.0 && here < uAreaReach) {
-    vec2 a = toRelief(p);
-    float h0 = reliefAt(a);
     vec2 ref;
     vec2 side;
     float lo;
@@ -235,10 +244,13 @@ void main() {
     float total = 0.0;
     float seen = 0.0;
     for (int k = 0; k < ${RELIEF.rays}; k++) {
-      float angle = mix(lo, hi, (float(k) + jitter) / ${f(RELIEF.rays)});
+      if (float(k) >= uReliefRays) break;
+      float angle = mix(lo, hi, (float(k) + jitter) / uReliefRays);
       vec2 dir = ref * cos(angle) + side * sin(angle);
+      vec2 start = p + withinTexel(k);
+      vec2 a = toRelief(start);
       float met;
-      float clear = rayToArea(p, a, h0, dir, met);
+      float clear = rayToArea(start, a, reliefAt(a), dir, met);
       if (met < 0.0) continue;
       float weight = rayWeight(met);
       total += weight;

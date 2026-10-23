@@ -4,7 +4,7 @@ import { LIGHT_LEVELS, TILE_BAND_TEXELS, TILE_RAYS } from '../../../lighting/lig
 import { AREA_CORNER_VECTORS } from './areaTileShader';
 import type { Rect } from '../../../lighting/segments';
 import type { EngineRelief } from './ReliefMap';
-import { ReliefPass, type ReliefJob } from './ReliefPass';
+import { ReliefPass, reliefRays, type ReliefJob } from './ReliefPass';
 import { CapsuleField } from './CapsuleField';
 import { ENGINE_SHADERS } from './engineShaders';
 import { createPlaceholder, createQuad, createShader, createTarget, destroyQuad, glOf, quadGeometry, renderInto, type Quad } from './gpu';
@@ -130,7 +130,7 @@ export class TileTracer {
     this.bandTexels = options.bandTexels ?? TILE_BAND_TEXELS;
     this.noOneWay = new CapsuleField(renderer, [0, 0, 1, 1], 1, 0, 'uOneWay');
     const resources = { tileUniforms: this.uniforms, ...field.resources(), ...this.noOneWay.resources() };
-    this.relief = new ReliefPass({ geometry: this.geometry, tileUniforms: this.uniforms, areaUniforms: this.areaUniforms, placeholder: this.placeholder });
+    this.relief = new ReliefPass({ geometry: this.geometry, tileUniforms: this.uniforms, areaUniforms: this.areaUniforms, placeholder: this.placeholder }, reliefRays(rays));
     this.shader = createShader(ENGINE_SHADERS.tile, resources);
     this.smoothShader = createShader(ENGINE_SHADERS.tileSmooth, { ...resources, uRaw: this.placeholder.source, reliefUniforms: this.relief.uniforms, uReliefShadow: this.placeholder.source });
     this.distanceShader = createShader(ENGINE_SHADERS.areaDistance, { tileUniforms: this.uniforms, areaUniforms: this.areaUniforms });

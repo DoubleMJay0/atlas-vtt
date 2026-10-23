@@ -131,6 +131,50 @@ describe('shadows from heights', () => {
     expect(shaded({ x: 420, y: 512 })).toBeGreaterThan(open({ x: 420, y: 512 }) * 0.85);
   });
 
+  it.each([[undefined], [400]])('draws the edges of a shadow straight and soft, not as a staircase of relief texels, seen close up (cell %s px)', async (cellSize) => {
+    // A lamp with a small flame west of the pillar: the edges of the shadow are straight lines from it past the pillar's sides.
+    const light: EngineLight = { ...lamp('lamp', { x: 300, y: 512 }), bright: 600, dim: 900, flame: 4 };
+    const renderer = await createTestRenderer(SIZE);
+    cleanup.push(() => renderer.destroy());
+    const engine = new LightingEngine(renderer);
+    cleanup.push(() => engine.destroy());
+    const albedo = flatMap(FLOOR);
+    cleanup.push(() => albedo.destroy(true));
+    const map = relief([PILLAR]);
+    cleanup.push(() => map.destroy());
+    engine.setEnabled(true);
+    engine.setMode('player');
+    engine.update({ bounds: { width: MAP, height: MAP }, albedo, walls: [], lights: [light], sight: SEES_ALL, sightRadius: 20, ambient: 0, relief: map.relief, ...(cellSize && { cellSize }) });
+    engine.flush();
+    // Four screen pixels a world pixel, over the shadow's northern edge.
+    const [scale, left, top] = [4, 620, 400];
+    const read = renderThroughEngine(engine, renderer, { size: SIZE, scale, x: -left * scale, y: -top * scale, tint: FLOOR, map: MAP });
+    const at = (x: number, y: number): number => luminance(read(Math.round((x - left) * scale), Math.round((y - top) * scale)));
+    // The edge: where each column of the picture turns from lit to shadow, half way.
+    const tangent = Math.asin(PILLAR.radius / (PILLAR.at.x - light.x));
+    const crossings: Point[] = [];
+    for (let x = left + 4; x < left + SIZE / scale - 4; x += 2) {
+      const ideal = light.y - Math.tan(tangent) * (x - light.x);
+      const [lit, dark] = [at(x, ideal - 24), at(x, ideal + 24)];
+      if (lit - dark < 0.02) continue;
+      for (let y = ideal - 24; y < ideal + 24; y += 1 / scale) {
+        if (at(x, y) < (lit + dark) / 2) {
+          crossings.push({ x, y });
+          break;
+        }
+      }
+    }
+    expect(crossings.length).toBeGreaterThan(20);
+    // A straight line through them, and how far the edge strays from it.
+    const n = crossings.length;
+    const [mx, my] = [crossings.reduce((sum, p) => sum + p.x, 0) / n, crossings.reduce((sum, p) => sum + p.y, 0) / n];
+    const slope = crossings.reduce((sum, p) => sum + (p.x - mx) * (p.y - my), 0) / crossings.reduce((sum, p) => sum + (p.x - mx) ** 2, 0);
+    const stray = Math.max(...crossings.map((p) => Math.abs(p.y - (my + slope * (p.x - mx)))));
+    console.info(`shadow edge strays ${stray.toFixed(2)} world px from a straight line (relief texel ${RELIEF_TEXEL} px, cell ${cellSize ?? 'unknown'})`);
+    // Traced from each texel's middle alone it strayed 1.7 px: a staircase of whole relief texels.
+    expect(stray).toBeLessThan(RELIEF_TEXEL * 0.15);
+  });
+
   it('draws a scene without a relief exactly as before reliefs', async () => {
     const light = lamp('lamp', { x: 512, y: 300 });
     const none = await picture([light], null);
