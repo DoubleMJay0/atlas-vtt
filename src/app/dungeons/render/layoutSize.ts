@@ -11,11 +11,10 @@ export const MAX_MAP_PIXELS = 144_000_000;
 const MAP_MARGIN_CELLS = 2;
 /**
  * A scene's map is drawn at this many pixels per cell (less where `SCENE_MAP_PIXELS` demands it):
- * 1.4 image pixels per screen pixel on a Retina display at zoom 1 with a cell 100 points wide. At
- * play zoom it reads as crisp as 400 did, and it has half the pixels, which the WebP encoder pays
- * for (see `SCENE_MAP_PIXELS`).
+ * the top of the 70–150 px a cell VTTs recommend for map art (Owlbear Rodeo). The map keeps its own
+ * grid lines, so it reads the same when exported; exports choose their own size (`CellSizeDialog`).
  */
-export const DEFAULT_PX_PER_CELL = 280;
+export const DEFAULT_PX_PER_CELL = 150;
 /**
  * Most pixels a scene's map is drawn with, fewer than a map may have (`MAX_MAP_PIXELS`), for the
  * WebP encoder's sake. Chromium's encoder writes the modes of all macroblocks into one partition of
