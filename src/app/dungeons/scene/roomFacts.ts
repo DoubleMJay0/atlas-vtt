@@ -1,10 +1,10 @@
-import { formatList, t, type MessageKey } from '../../i18n';
-import { en } from '../../i18n/locales/en';
+import { formatList, t } from '../../i18n';
 import type { CellDir, CellPoint, DoorKind, DungeonDoor, DungeonRoom, DungeonTerrain, PropKind, TerrainKind } from '../model';
 import { dir } from '../geometry';
 import type { VisibleFloor } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
 import { floorLetter } from './roomKeys';
+import { terrainName } from './terrainName';
 
 /**
  * The one line of physical facts a room's heading in the note carries: what someone standing in
@@ -105,15 +105,12 @@ function waterSentences(visible: VisibleFloor, room: DungeonRoom, view: Pick<Dun
   return [t(under * 2 > room.w * room.h ? 'dungeonScene.poolMost' : 'dungeonScene.poolPart')];
 }
 
-const isMessageKey = (key: string): key is MessageKey => Object.hasOwn(en, key);
-
 /** Feet a step of a piece's elevation stands for (`TerrainTraits.elevation`). */
 const FEET_PER_STEP = 5;
 
 /** A piece of terrain as the note names it: its name, and how high, how deep or where it falls to. */
 function terrainPhrase(piece: DungeonTerrain): string {
-  // The piece names its text by an i18n key (`DungeonTerrain.name`); one this version lacks reads as its kind
-  const name = isMessageKey(piece.name) ? t(piece.name) : piece.kind.replace(/-/g, ' ');
+  const name = terrainName(piece);
   if (piece.opening) return piece.opening.bottom === null ? t('dungeonScene.terrain.bottomless', { name }) : t('dungeonScene.terrain.toFloor', { name, floor: floorLetter(piece.opening.bottom) });
   const elevation = piece.traits.elevation ?? 0;
   if (elevation > 0) return t('dungeonScene.terrain.high', { name, height: elevation * FEET_PER_STEP });

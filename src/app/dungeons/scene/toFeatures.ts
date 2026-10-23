@@ -1,0 +1,125 @@
+import { t } from '../../i18n';
+import { MAX_FEATURE_CORNERS, MAX_MAP_FEATURES } from '../../mapFeatures/mapFeatures';
+import type { FeatureTerrain, MapFeature } from '../../types/mapFeatureTypes';
+import type { CellPoint, DungeonColumn, DungeonProp, DungeonTerrain, PropKind } from '../model';
+import { PROP_REACH } from '../props/space';
+import type { VisibleDungeon } from '../render/visibleDungeon';
+import type { DungeonView } from '../style';
+import { cellOutlines } from './cellOutline';
+import { terrainName } from './terrainName';
+import type { DungeonPlacement } from './toWalls';
+
+/**
+ * What a floor holds as the map features of its level, so the GM reads its name and what it does
+ * to play on hover: every piece of terrain (cover, difficult ground, hazards, bridges, set pieces)
+ * on exactly its cells, every piece of furniture and every column on what the map draws of it.
+ * One builder per kind of thing; terrain first, so furniture standing on it lies over it.
+ */
+
+/** A feature before its id and level: its area in cells, its name and what it does to play. */
+interface Draft {
+  polygon: CellPoint[];
+  name: string;
+  terrain?: FeatureTerrain;
+}
+
+function terrainOf(traits: { difficult?: true; cover?: FeatureTerrain['cover'] }): FeatureTerrain | undefined {
+  const terrain: FeatureTerrain = { ...(traits.difficult && { difficult: true }), ...(traits.cover && { cover: traits.cover }) };
+  return terrain.difficult || terrain.cover ? terrain : undefined;
+}
+
+const withTerrain = (draft: Omit<Draft, 'terrain'>, terrain: FeatureTerrain | undefined): Draft => (terrain ? { ...draft, terrain } : draft);
+
+/** A piece of terrain on its cells: one feature per ring of them (`cellOutlines`), named as the piece names itself. */
+function terrainDrafts(pieces: readonly DungeonTerrain[]): Draft[] {
+  return pieces.flatMap(piece => {
+    const name = terrainName(piece);
+    const terrain = terrainOf(piece.traits);
+    return cellOutlines(piece.cells, MAX_FEATURE_CORNERS).map(polygon => withTerrain({ polygon, name }, terrain));
+  });
+}
+
+/** A box in a prop's own frame, before its turn and scale (y up the prop's facing is negative). */
+interface Box {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+/** Props whose drawing is no disc around their origin (`render/propStone.ts`, `propWood.ts`): a dais reaches in from the wall, a tapestry hangs along it. */
+const PROP_BOXES: Partial<Record<PropKind, Box>> = {
+  dais: { x0: -1.5, x1: 1.5, y0: -1.35, y1: 0 },
+  tapestry: { x0: -0.8, x1: 0.8, y0: -0.15, y1: 0.15 },
+};
+
+/** What each piece of furniture does to play: low furniture is half cover, a statue total; a dais and a tapestry none. */
+const PROP_COVER: Readonly<Record<PropKind, FeatureTerrain['cover']>> = {
+  barrel: 'half',
+  crate: 'half',
+  chest: 'half',
+  fountain: 'half',
+  well: 'half',
+  statue: 'total',
+  sarcophagus: 'half',
+  altar: 'half',
+  throne: 'half',
+  dais: undefined,
+  tapestry: undefined,
+};
+
+/** Corners of a disc's polygon. */
+const DISC_CORNERS = 8;
+
+function discCorners(x: number, y: number, radius: number): CellPoint[] {
+  return Array.from({ length: DISC_CORNERS }, (_, k) => {
+    const angle = Math.PI / DISC_CORNERS + (k * Math.PI * 2) / DISC_CORNERS;
+    return { x: x + Math.cos(angle) * radius, y: y + Math.sin(angle) * radius };
+  });
+}
+
+function propPolygon(prop: DungeonProp): CellPoint[] {
+  const box = PROP_BOXES[prop.kind];
+  if (!box) return discCorners(prop.x, prop.y, PROP_REACH[prop.kind] * prop.scale);
+  const cos = Math.cos(prop.rotation) * prop.scale;
+  const sin = Math.sin(prop.rotation) * prop.scale;
+  const corners: [number, number][] = [[box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1]];
+  return corners.map(([x, y]) => ({ x: prop.x + x * cos - y * sin, y: prop.y + x * sin + y * cos }));
+}
+
+function propDrafts(props: readonly DungeonProp[]): Draft[] {
+  return props.map(prop => withTerrain(
+    { polygon: propPolygon(prop), name: t(`dungeonScene.feature.${prop.kind}`) },
+    terrainOf({ cover: PROP_COVER[prop.kind] }),
+  ));
+}
+
+function columnDrafts(columns: readonly DungeonColumn[]): Draft[] {
+  return columns.map(column => {
+    const { x, y, radius: r } = column;
+    const polygon = column.square ? [{ x: x - r, y: y - r }, { x: x + r, y: y - r }, { x: x + r, y: y + r }, { x: x - r, y: y + r }] : discCorners(x, y, r);
+    return column.shattered
+      ? { polygon, name: t('dungeonScene.feature.brokenColumn'), terrain: { cover: 'half' } }
+      : { polygon, name: t('dungeonScene.feature.column'), terrain: { cover: 'total' } };
+  });
+}
+
+/**
+ * The map features of one floor as shown, in world px on `level` (unset in a scene of one floor),
+ * with ids beginning `id`: the first `MAX_MAP_FEATURES` of its terrain, furniture (where the view
+ * shows props) and columns, in that order. Only rooms the view shows have any.
+ */
+export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, 'props'>, placement: DungeonPlacement, id: string, level?: string): Record<string, MapFeature> {
+  const { floor, roomShapes, field } = dungeon;
+  const drafts = [
+    ...terrainDrafts(floor.terrain.filter(piece => roomShapes.has(piece.room))),
+    ...(view.props ? propDrafts(floor.props.filter(prop => roomShapes.has(prop.room))) : []),
+    ...columnDrafts(floor.columns.filter(column => field.distance(column.x, column.y) < 0)),
+  ].slice(0, MAX_MAP_FEATURES);
+  const { originCell, pxPerCell } = placement;
+  const world = (p: CellPoint): CellPoint => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
+  return Object.fromEntries(drafts.map((draft, index): [string, MapFeature] => {
+    const featureId = `${id}_${index + 1}`;
+    return [featureId, { id: featureId, kind: 'map-feature', ...draft, polygon: draft.polygon.map(world), ...(level && { level }) }];
+  }));
+}

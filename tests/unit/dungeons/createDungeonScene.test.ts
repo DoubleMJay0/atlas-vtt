@@ -10,6 +10,9 @@ import { prebuildMapImageAt } from '../../../src/app/pixi/mapImage/prebuildMapIm
 import { AssetService, type Asset } from '../../../src/app/services/AssetService';
 import { AssetThumbnailService } from '../../../src/app/services/AssetThumbnailService';
 import type { WallSegment } from '../../../src/app/types/wallTypes';
+import type { NotePin } from '../../../src/app/types';
+import type { LevelLink, SceneLevel } from '../../../src/app/types/sceneLevelTypes';
+import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { smallDungeon } from '../../fixtures/dungeonModels';
 import { pngHeader } from '../../fixtures/uvttFiles';
 import { createInMemoryApp, interceptWrites, type InMemoryApp } from '../../mocks/inMemoryVault';
@@ -74,12 +77,15 @@ function created(result: DungeonSceneResult): Extract<DungeonSceneResult, { ok: 
 
 interface SceneState {
   background: string;
+  version: number;
   grid: { size: number; offsetX: number; offsetY: number; autoDetect?: unknown };
-  objects: { walls: Record<string, WallSegment>; lights: Record<string, unknown>; pins?: Record<string, unknown> };
+  objects: { walls: Record<string, WallSegment>; lights: Record<string, unknown>; pins?: Record<string, NotePin>; levelLinks?: Record<string, LevelLink> };
   lighting: unknown;
+  levels?: SceneLevel[];
 }
 
-const sceneState = ({ vault }: Bench, path: string): SceneState => (JSON.parse(vault.files.get(path)!) as { state: SceneState }).state;
+const sceneFile = ({ vault }: Bench, path: string): { version: number; state: SceneState } => JSON.parse(vault.files.get(path)!) as { version: number; state: SceneState };
+const sceneState = (b: Bench, path: string): SceneState => sceneFile(b, path).state;
 const filesOf = ({ vault }: Bench): string[] => [...vault.files.keys()].sort();
 const recordsOf = ({ assets }: Bench): Promise<Asset[]> => assets.getAssets(COLLECTION);
 
@@ -104,6 +110,10 @@ describe('creating a dungeon scene', () => {
     expect(prebuildMapImageAt).toHaveBeenCalledWith(b.vault.app, map.mapFilePath);
 
     const state = sceneState(b, result.scenePath);
+    expect(sceneFile(b, result.scenePath).version).toBe(4);
+    expect(state.levels).toBeUndefined();
+    expect(state.objects.levelLinks).toBeUndefined();
+    expect(result.entryLevel).toBeUndefined();
     expect(state.background).toBe(map.mapFilePath);
     expect(state.grid).toMatchObject({ size: DEFAULT_PX_PER_CELL, offsetX: 0, offsetY: 0 });
     expect(state.grid.autoDetect).toBeUndefined();
@@ -114,6 +124,77 @@ describe('creating a dungeon scene', () => {
     expect(walls.filter(w => w.type === 'secret-door')).toHaveLength(1);
     expect(Object.keys(state.objects.pins ?? {})).toHaveLength(7);
     expect(filesOf(b).filter(path => path.endsWith('.md'))).toEqual([`atlas-vtt/collections/${COLLECTION}/notes/${TITLE}.md`]);
+  });
+
+  it('writes a dungeon of three floors as one scene: a level per floor, deepest first, stairs, and one note', async () => {
+    const b = await bench();
+    const model = generateDungeon({ seed: 7, tags: ['medium'], floors: 3 });
+
+    const result = created(await createDungeonSceneWith(b.deps, options(model)));
+
+    expect(b.jobs.map(job => job.output)).toEqual([
+      { kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL },
+      { kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL, floor: 1 },
+      { kind: 'map', pxPerCell: DEFAULT_PX_PER_CELL, floor: 2 },
+    ]);
+    const maps = (await recordsOf(b)).filter(r => r.type === 'map');
+    expect(maps.map(map => map.name)).toEqual([`${TITLE}, Floor A`, `${TITLE}, Floor B`, `${TITLE}, Floor C`]);
+    const file = sceneFile(b, result.scenePath);
+    expect(file.version).toBe(5);
+    const { levels = [], objects, background } = file.state;
+    expect(levels.map(level => level.name)).toEqual(['Floor C', 'Floor B', 'Floor A']);
+    expect(levels.map(level => level.elevation)).toEqual([{ bottom: -20, top: -10 }, { bottom: -10, top: 0 }, { bottom: 0, top: 10 }]);
+    const mapPath = (name: string): string | undefined => {
+      const map = maps.find(m => m.name === name);
+      return map?.type === 'map' ? map.mapFilePath : undefined;
+    };
+    expect(levels.map(level => level.background)).toEqual([mapPath(`${TITLE}, Floor C`), mapPath(`${TITLE}, Floor B`), mapPath(`${TITLE}, Floor A`)]);
+    expect(background).toBe(levels[0]!.background);
+    expect(result.entryLevel).toBe(levels[2]!.id);
+
+    const ids = levels.map(level => level.id);
+    for (const wall of Object.values(objects.walls)) expect(ids).toContain(wall.levels?.[0]);
+    const links = Object.values(objects.levelLinks ?? {});
+    expect(links.length).toBeGreaterThanOrEqual(2);
+    for (const link of links) expect([[ids[2], ids[1]], [ids[1], ids[0]]]).toContainEqual(link.levels);
+
+    const notePath = `atlas-vtt/collections/${COLLECTION}/notes/${TITLE}.md`;
+    const note = b.vault.files.get(notePath)!;
+    expect(note.startsWith(`# ${TITLE}\n\n## A1\n`)).toBe(true);
+    const pins = Object.values(objects.pins ?? {});
+    expect(pins.length).toBeGreaterThan(5);
+    for (const pin of pins) {
+      expect(pin).toMatchObject({ icon: 'number', gmOnly: true });
+      expect(pin.notePath.startsWith(`${notePath}#${pin.label}`)).toBe(true);
+      expect(note).toContain(`\n## ${pin.notePath.split('#')[1]}\n`);
+      expect(pin.level).toBe(ids[2 - 'ABC'.indexOf(pin.label![0]!)]);
+    }
+  });
+
+  it('takes back every floor\'s map, the thumbnails and the note when the scene cannot be written', async () => {
+    const b = await bench();
+    const before = filesOf(b);
+    const restore = interceptWrites(b.vault.app.vault, 'create', (path) => {
+      if (path.endsWith('.atlasmap')) throw new Error('EIO: i/o error');
+    });
+
+    const result = await createDungeonSceneWith(b.deps, options(generateDungeon({ seed: 7, tags: ['medium'], floors: 3 })));
+    restore();
+
+    expect(result).toEqual({ ok: false, problem: 'The scene could not be created.' });
+    expect(filesOf(b)).toEqual(before);
+    expect(await recordsOf(b)).toEqual([]);
+  });
+
+  it('numbers the scene where its note\'s name is taken', async () => {
+    const b = await bench();
+    await b.vault.app.vault.create(`atlas-vtt/collections/${COLLECTION}/notes/${TITLE}.md`, 'my own');
+
+    const result = created(await createDungeonSceneWith(b.deps, options()));
+
+    expect(result.name).toBe(`${TITLE} 2`);
+    expect(b.vault.files.get(`atlas-vtt/collections/${COLLECTION}/notes/${TITLE}.md`)).toBe('my own');
+    expect(b.vault.files.has(`atlas-vtt/collections/${COLLECTION}/notes/${TITLE} 2.md`)).toBe(true);
   });
 
   it('numbers a second dungeon of the same name', async () => {

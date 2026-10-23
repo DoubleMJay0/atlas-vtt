@@ -13,6 +13,7 @@ import type { GridState } from '../types/gridTypes';
 import type { LightSource, SceneLighting } from '../types/lightingTypes';
 import type { WallSegment } from '../types/wallTypes';
 import type { NotePin } from '../types';
+import type { MapFeature } from '../types/mapFeatureTypes';
 import type { LevelLink, SceneLevel } from '../types/sceneLevelTypes';
 import { sceneFileVersion } from '../levels/levelFile';
 
@@ -29,6 +30,7 @@ export interface MapSceneParts {
   /** Stairs between the floors. */
   levelLinks?: Record<string, LevelLink>;
   pins?: Record<string, NotePin>;
+  mapFeatures?: Record<string, MapFeature>;
 }
 
 /**
@@ -46,6 +48,7 @@ export function mapSceneFile(settings: CollectionSettings, background: string, p
     lights: parts.lights,
     ...(parts.pins && { pins: parts.pins }),
     ...(parts.levelLinks && { levelLinks: parts.levelLinks }),
+    ...(parts.mapFeatures && { mapFeatures: parts.mapFeatures }),
   };
   content.state.lighting = parts.lighting;
   if (parts.levels) {
