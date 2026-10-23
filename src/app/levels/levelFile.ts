@@ -3,7 +3,7 @@ import { isFiniteNumber, isRecord } from '../utils/guards';
 import { readExploredMask } from '../lighting/exploredMaskCodec';
 import type { SceneLevels } from './sceneLevels';
 import { readLevelAlignment, type LevelAlignments } from './levelAlignment';
-import { sceneShadingPaths } from './levelShading';
+import { readShadingPath, sceneShadingPaths } from './levelShading';
 
 /** The version of a scene file written by every Atlas since files had versions, and of every scene with one level. */
 export const SINGLE_LEVEL_FILE_VERSION = 4;
@@ -34,6 +34,8 @@ function readLevel(value: unknown): SceneLevel | null {
   if (!id) return null;
   const { name, foreground, relief, shade, sees, offset, alignment, openArt, ...rest } = value;
   const readAlignment = readLevelAlignment(alignment);
+  const readRelief = readShadingPath(relief);
+  const readShade = readShadingPath(shade);
   const readSees = Array.isArray(sees) ? sees.filter((entry): entry is string => typeof entry === 'string') : undefined;
   const readOff = readOffset(offset);
   return {
@@ -44,8 +46,8 @@ function readLevel(value: unknown): SceneLevel | null {
     elevation: readElevation(value.elevation),
     background: text(value.background),
     ...(foreground !== undefined && { foreground: text(foreground) }),
-    ...(text(relief) && { relief: text(relief) }),
-    ...(text(shade) && { shade: text(shade) }),
+    ...(readRelief && { relief: readRelief }),
+    ...(readShade && { shade: readShade }),
     ...(readSees && { sees: readSees }),
     ...(openArt === false && { openArt: false as const }),
     ...(readOff && { offset: readOff }),

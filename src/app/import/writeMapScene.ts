@@ -195,7 +195,9 @@ export function writeMapScene({ app, assetService, thumbnails }: MapSceneDeps, p
       if (plan.note) await files.write(paths.note, plan.note.text(name));
       const content = plan.content(maps.map((map) => map.mapFilePath), notePath, shading);
       await files.write(scenePath, JSON.stringify(content, null, 2));
-      const sceneRecord: SceneAsset = { ...newIdentity('scene', collection.id), ...shared, name, data: { mapPath: scenePath } };
+      // The relief and shade written here are the scene's alone: its record lists them, so deleting it trashes them.
+      const shadingFiles = shading.flatMap((paths) => (paths ? [paths.relief, paths.shade] : [])).filter((path): path is string => !!path);
+      const sceneRecord: SceneAsset = { ...newIdentity('scene', collection.id), ...shared, name, data: { mapPath: scenePath }, ...(shadingFiles.length > 0 && { shadingFiles }) };
       const records = [...maps, sceneRecord];
       for (const record of records) {
         const recordFile = assetService.pendingRecordFile(record);

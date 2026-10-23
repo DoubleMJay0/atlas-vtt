@@ -21,7 +21,21 @@ export interface ShadedScene {
 
 export const NO_SHADING: LevelShading = { relief: null, shade: null };
 
-const path = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
+/** The longest relief or shade path a scene may name. */
+const MAX_PATH = 1024;
+/** What a relief or shade image may be: a picture whose pixels read back as written. */
+const SHADING_IMAGE = /\.(png|webp)$/i;
+
+/**
+ * A relief or shade path as a scene file may name it, or null: a scene file is untrusted (a bundle,
+ * a hand edit, sync), so only a vault-relative path to a PNG or WebP image counts, never one that
+ * climbs out of where it is (`..`), starts at the root, or lies in a hidden folder (`.obsidian`).
+ */
+function path(value: unknown): string | null {
+  if (typeof value !== 'string' || value === '' || value.length > MAX_PATH || !SHADING_IMAGE.test(value)) return null;
+  if (value.startsWith('/') || value.includes('\\') || /^[a-z]+:/i.test(value)) return null;
+  return value.split('/').every((segment) => segment !== '' && !segment.startsWith('.')) ? value : null;
+}
 
 /**
  * The shading of level `id` (null: the scene's only one, or its first): a scene without levels holds

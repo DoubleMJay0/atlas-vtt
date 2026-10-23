@@ -113,6 +113,24 @@ describe('shadows from heights', () => {
     expect(shaded({ x: 512, y: 560 })).toBeGreaterThan(open({ x: 512, y: 560 }) * 0.9);
   });
 
+  it('lets lava, glowing at its surface, throw long low shadows of what stands near it', async () => {
+    // A field of lava along the west of the map, its shore at x 300.
+    const lava: EngineLight = {
+      key: 'lava', x: 200, y: 512, bright: 120, dim: 480, flame: 0, color: [1, 0.5, 0.2], intensity: 1, animation: 'none',
+      surface: [{ x: 100, y: 312 }, { x: 300, y: 312 }, { x: 300, y: 712 }, { x: 100, y: 712 }],
+    };
+    const stone: Standing = { at: { x: 420, y: 512 }, radius: 20, height: 0.08 };
+    const shaded = await picture([lava], [stone]);
+    const open = await picture([lava], null);
+    // Behind the low stone, well beyond it, its shadow still lies (the lava is wide: it fills in part of it); before it and clear of its fan the floor is lit.
+    expect(shaded({ x: 520, y: 512 })).toBeLessThan(open({ x: 520, y: 512 }) * 0.8);
+    expect(shaded({ x: 380, y: 512 })).toBeGreaterThan(open({ x: 380, y: 512 }) * 0.9);
+    expect(shaded({ x: 520, y: 250 })).toBeGreaterThan(open({ x: 520, y: 250 }) * 0.9);
+    // The lava itself and the stone's top stay as lit.
+    expect(shaded({ x: 200, y: 512 })).toBeGreaterThan(open({ x: 200, y: 512 }) * 0.98);
+    expect(shaded({ x: 420, y: 512 })).toBeGreaterThan(open({ x: 420, y: 512 }) * 0.85);
+  });
+
   it('draws a scene without a relief exactly as before reliefs', async () => {
     const light = lamp('lamp', { x: 512, y: 300 });
     const none = await picture([light], null);
