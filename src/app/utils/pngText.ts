@@ -46,7 +46,10 @@ export function withPngText(png: Uint8Array, keyword: string, text: string): Uin
   return out;
 }
 
-/** The text of `png`'s text chunk `keyword`, before its image data; null where it has none, or is no PNG. */
+/** The longest text chunk read, in bytes. */
+const MAX_TEXT_CHUNK = 64 * 1024;
+
+/** The text of `png`'s text chunk `keyword`, before its image data; null where it has none, is longer than `MAX_TEXT_CHUNK`, or is no PNG. */
 export function readPngText(png: Uint8Array, keyword: string): string | null {
   if (!isPng(png)) return null;
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
@@ -55,7 +58,8 @@ export function readPngText(png: Uint8Array, keyword: string): string | null {
     const length = view.getUint32(at);
     const type = String.fromCharCode(...png.subarray(at + 4, at + 8));
     if (type === 'IDAT' || type === 'IEND' || at + 12 + length > png.length) return null;
-    if (type === TEXT) {
+    // A text chunk Atlas writes is a few hundred bytes; a longer one is no note of ours.
+    if (type === TEXT && length <= MAX_TEXT_CHUNK) {
       const body = png.subarray(at + 8, at + 8 + length);
       const zero = body.indexOf(0);
       if (zero >= 0 && String.fromCharCode(...body.subarray(0, zero)) === keyword) return String.fromCharCode(...body.subarray(zero + 1));

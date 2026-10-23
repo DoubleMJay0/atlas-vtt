@@ -97,6 +97,32 @@ describe('deleting a scene with a relief and a shade', () => {
     expect(b.vault.files.has(first.state.shade)).toBe(false);
   });
 
+  it('keeps a relief a copy names whose data is not loaded, as a copy made outside Atlas may be', async () => {
+    const b = await bench();
+    const first = await scene(b, 'Crypt');
+    const second = await scene(b, 'Vault');
+    renames(b, second.path, { relief: first.state.relief });
+    // The copy's record without its loaded data: its map is found through its record's JSON.
+    delete (b.assets as unknown as { metadata: { assets: Record<string, { data?: unknown }> } }).metadata.assets[second.record.id]!.data;
+
+    await b.assets.deleteAsset(first.record.id);
+
+    expect(b.vault.files.has(first.state.relief)).toBe(true);
+  });
+
+  it('deletes a collection of dungeon scenes with every image they own', async () => {
+    const b = await bench();
+    const scenes = [await scene(b, 'Crypt'), await scene(b, 'Vault'), await scene(b, 'Barrow')];
+    await b.assets.createCollection('Spare');
+
+    await b.assets.deleteCollection(COLLECTION);
+
+    for (const { state } of scenes) {
+      expect(b.vault.files.has(state.relief)).toBe(false);
+      expect(b.vault.files.has(state.shade)).toBe(false);
+    }
+  });
+
   it('keeps an image another asset uses, though the scene\'s record lists it', async () => {
     const b = await bench();
     const { record, path, state } = await scene(b, 'Crypt');

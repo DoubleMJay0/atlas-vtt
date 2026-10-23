@@ -120,12 +120,15 @@ describe('reflected light', () => {
     expect(reach!.reflection).toBeUndefined();
   });
 
-  it('is traced again with its light, and kept when only the bright range changes', () => {
+  it('is traced again with its light, and worked out anew from the kept polygon when only the bright range changes', () => {
     const cache = new LightReaches();
     const walls = rooms();
     const [first] = cache.sync([torch(300, 250)], walls, AREA, SAMPLING);
     const [brighter] = cache.sync([torch(300, 250, { bright: 250 })], walls, AREA, SAMPLING);
-    expect(brighter!.reflection).toBe(first!.reflection);
+    // How far and how strongly the lit floor reflects follows the bright range: as a fresh trace has it.
+    expect(brighter!.polygon).toBe(first!.polygon);
+    expect(brighter!.reflection).toEqual(reachesOf([torch(300, 250, { bright: 250 })])[0]!.reflection);
+    expect(brighter!.reflection).not.toEqual(first!.reflection);
     const [moved] = cache.sync([torch(310, 250)], walls, AREA, SAMPLING);
     expect(moved!.reflection).not.toBe(first!.reflection);
     expect(cache.sync([torch(310, 250)], walls, AREA)[0]!.reflection).toBeUndefined();

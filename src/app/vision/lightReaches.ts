@@ -21,8 +21,9 @@ const DEFAULT_SAMPLING: AreaSampling = { spacing: 17.5, clearance: 3 };
  * Where each light reaches, for deciding on the CPU how well a point is lit. A light's polygon
  * is recomputed only when it moved, its reach changed or the walls changed, so dragging a token
  * does not retrace every light, and again when its cone turned or an area light's area changed.
- * A new bright radius, kind or priority keeps the polygon, which they do not shape, and the
- * reflection with it.
+ * A new bright radius, kind or priority keeps the polygon, which they do not shape; the
+ * reflection is worked out again from it, since how far and how strongly the lit floor reflects
+ * follows the bright radius.
  */
 export class LightReaches {
   private entries = new Map<string, Entry>();
@@ -49,8 +50,9 @@ export class LightReaches {
       if (!traced) next.set(key, { x, y, dim, surface, walls, reach: this.trace(light, walls) });
       else if (cached.reach.bright === bright && sameKind(cached.reach, light)) next.set(key, cached);
       else {
-        const { origin, polygon, parts, reflection: given } = cached.reach;
-        next.set(key, { ...cached, reach: { origin, dim, polygon, ...(parts && { parts }), ...(given && { reflection: given }), bright, ...kindOf(light) } });
+        const { origin, polygon, parts } = cached.reach;
+        const kept: LightReach = { origin, dim, polygon, ...(parts && { parts }), bright, ...kindOf(light) };
+        next.set(key, { ...cached, reach: this.reflection && !light.darkness ? { ...kept, reflection: reflectionParts(kept, walls, this.reflection) } : kept });
       }
     }
     this.entries = next;

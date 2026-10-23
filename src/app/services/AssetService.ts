@@ -949,8 +949,13 @@ export class AssetService {
     const assetsToDelete = Object.values(this.metadata.assets)
       .filter(asset => asset.collection === collectionId);
     
-    for (const asset of assetsToDelete) {
-      await this.deleteAsset(asset.id);
+    this.sceneImagesKept = new Map();
+    try {
+      for (const asset of assetsToDelete) {
+        await this.deleteAsset(asset.id);
+      }
+    } finally {
+      this.sceneImagesKept = null;
     }
 
     // Delete collection folder
@@ -1115,24 +1120,7 @@ export class AssetService {
     // For scene assets, also delete the map file and close any open leaves
     if (asset.type === 'scene') {
       let shading: string[] = [];
-      // Load the scene data from the JSON file if not already loaded
-      let sceneData = asset.data;
-      if (!sceneData) {
-        try {
-          const sceneJsonPath = this.getAssetPath(asset);
-          const sceneJsonFile = this.app.vault.getAbstractFileByPath(sceneJsonPath);
-          if (sceneJsonFile instanceof TFile) {
-            const parsed: unknown = JSON.parse(await this.app.vault.read(sceneJsonFile));
-            if (isRecord(parsed) && typeof parsed.mapPath === 'string') {
-              sceneData = { mapPath: parsed.mapPath };
-            }
-          }
-        } catch (error) {
-          console.error('[AssetService] Error loading scene data:', error);
-        }
-      }
-      
-      const mapPath = sceneData?.mapPath;
+      const mapPath = await this.sceneMapPath(asset);
       if (mapPath) {
         try {
           // Delete the map file
@@ -1186,6 +1174,36 @@ export class AssetService {
     await this.deleteEmptiedGroups(emptiedGroups);
   }
 
+  /** A scene's map file: from its loaded data, else from its record's JSON. */
+  private async sceneMapPath(scene: SceneAsset): Promise<string | undefined> {
+    if (scene.data?.mapPath) return scene.data.mapPath;
+    try {
+      const file = this.app.vault.getAbstractFileByPath(this.getAssetPath(scene));
+      if (!(file instanceof TFile)) return undefined;
+      const parsed: unknown = JSON.parse(await this.app.vault.read(file));
+      return isRecord(parsed) && typeof parsed.mapPath === 'string' ? parsed.mapPath : undefined;
+    } catch (error) {
+      console.error('[AssetService] Error loading scene data:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * The images each scene's file names, by scene id, kept while a collection is deleted so that
+   * deleting its scenes one after another reads every other scene's file once, not once per scene.
+   */
+  private sceneImagesKept: Map<string, readonly string[]> | null = null;
+
+  private async sceneImages(scene: SceneAsset): Promise<readonly string[]> {
+    const kept = this.sceneImagesKept?.get(scene.id);
+    if (kept) return kept;
+    const mapPath = await this.sceneMapPath(scene);
+    const file = mapPath ? this.app.vault.getAbstractFileByPath(mapPath) : null;
+    const images = file instanceof TFile ? await sceneFileImages(this.app, file) : [];
+    this.sceneImagesKept?.set(scene.id, images);
+    return images;
+  }
+
   /**
    * Trashes the relief and shade images (`levelShading`) of a deleted scene: only those Atlas wrote
    * for it (its record's `shadingFiles`) that its file still names, that lie where Atlas writes
@@ -1201,9 +1219,10 @@ export class AssetService {
     for (const other of Object.values(this.metadata!.assets)) {
       if (other.id === scene.id) continue;
       for (const path of assetImagePaths(other)) used.add(path);
-      if (other.type !== 'scene' || !other.data?.mapPath) continue;
-      const file = this.app.vault.getAbstractFileByPath(other.data.mapPath);
-      if (file instanceof TFile) for (const path of await sceneFileImages(this.app, file)) used.add(path);
+      if (other.type !== 'scene') continue;
+      for (const path of other.shadingFiles ?? []) used.add(path);
+      // A scene whose data is not loaded still names its images: a copy made outside Atlas may share them.
+      for (const path of await this.sceneImages(other)) used.add(path);
     }
     for (const path of candidates) if (!used.has(path)) await this.trashFileIfPresent(path);
   }
