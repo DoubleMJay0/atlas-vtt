@@ -4,7 +4,7 @@
  * lie the same way from where it lands: stairs to the floor above lead to the floor above that one.
  */
 
-import type { LevelLink, LevelLinkDirection, LevelLinkInput } from '../types/sceneLevelTypes';
+import type { LevelLink, LevelLinkDirection, LevelLinkFlight, LevelLinkInput } from '../types/sceneLevelTypes';
 import type { Point } from '../types/visionTypes';
 import { firstLinkTarget, linkDirection, linkLevels, linkTargets } from './levelLinks';
 import { hasLevels, type SceneLevels } from './sceneLevels';
@@ -13,6 +13,8 @@ import { hasLevels, type SceneLevels } from './sceneLevels';
 export interface CopiedLevelLink {
   polygon: Point[];
   direction?: LevelLinkDirection;
+  /** Walked stairs keep their foot and rows: the same edge of the same corners. */
+  flight?: LevelLinkFlight;
   /** The levels joined as steps from the level shown when copied (0 that level, 1 the one above, −1 the one below), or every level. */
   steps: number[] | 'all';
 }
@@ -28,6 +30,7 @@ export function copiedLevelLink(link: LevelLink, from: string | null, levels: Sc
   return {
     polygon: link.polygon.map(({ x, y }) => ({ x, y })),
     ...(direction !== 'both' && { direction }),
+    ...(link.flight && { flight: { ...link.flight } }),
     steps: link.levels === 'all' ? 'all' : linkLevels(link, levels).map((id) => indexOf(levels, id) - at),
   };
 }
@@ -49,7 +52,7 @@ export function placedLevelLink(copy: CopiedLevelLink, at: string | null, levels
     joined = ids.length >= 2 && ids.includes(at) ? ids : fallback === null ? [] : [at, fallback];
   }
   if (joined !== 'all' && joined.length < 2) return null;
-  const placed: LevelLinkInput = { polygon: copy.polygon.map(({ x, y }) => ({ x, y })), levels: joined };
+  const placed: LevelLinkInput = { polygon: copy.polygon.map(({ x, y }) => ({ x, y })), levels: joined, ...(copy.flight && { flight: { ...copy.flight } }) };
   const { direction } = copy;
   const leads = direction !== undefined && linkTargets({ id: '', kind: 'level-link', ...placed, direction }, at, levels).length > 0;
   return leads ? { ...placed, direction } : placed;

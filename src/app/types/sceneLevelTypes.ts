@@ -68,6 +68,20 @@ export interface OnLevels {
 export type LevelLinkDirection = 'up' | 'down' | 'both';
 
 /**
+ * Stairs that are walked (`LevelLink.flight`), on a link of four corners joining two levels: edge
+ * `foot` (from corner `foot` to the next) is the end at ground level on the lower level, the
+ * opposite edge the end at ground level on the upper one. On each level a token steps on and off
+ * only across the end at its ground level, and changes level only in the last of the flight's
+ * `rows` at the other end, arriving at the same place, which on the other level is its ground end.
+ */
+export interface LevelLinkFlight {
+  /** The index of the polygon's edge at the foot of the stairs. */
+  foot: number;
+  /** How many rows of cells the stairs are long, from foot to head; at least 2. */
+  rows: number;
+}
+
+/**
  * Stairs, a ladder, a trapdoor or an elevator (Foundry's Change Level region): an area of the map
  * that joins the levels it stands on (`levels`, like a wall's). A token put down inside it on one of
  * them goes to another of them at the same place, if `direction` lets it go that way; where several
@@ -81,6 +95,8 @@ export interface LevelLink extends OnLevels {
   polygon: { x: number; y: number }[];
   /** Unset is `both`. */
   direction?: LevelLinkDirection | undefined;
+  /** Stairs that are walked, foot to head; unset: a token put down anywhere inside changes level. */
+  flight?: LevelLinkFlight | undefined;
 }
 
 export type LevelLinkInput = Omit<LevelLink, 'id' | 'kind'>;

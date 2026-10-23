@@ -6,7 +6,7 @@ import { LevelLinkEditor } from '../../src/app/pixi/levelLinks/LevelLinkEditor';
 import { captureWithLayerVisibility } from '../../src/app/pixi/playerSafeFrame';
 import { createTestRenderer, readRgba } from '../../src/app/pixi/lighting/engine/__tests__/gpuTestUtils';
 import { createViewAtlasStore, type ViewAtlasStore } from '../../src/app/storeFactory';
-import type { SceneLevel } from '../../src/app/types/sceneLevelTypes';
+import type { LevelLinkFlight, SceneLevel } from '../../src/app/types/sceneLevelTypes';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 const SIZE = 256;
@@ -34,12 +34,12 @@ describe('stairs on the GM\'s canvas', () => {
     while (cleanup.length) cleanup.pop()!();
   });
 
-  async function bench(): Promise<Bench> {
+  async function bench(flight?: LevelLinkFlight): Promise<Bench> {
     const renderer: WebGLRenderer = await createTestRenderer(SIZE);
     const store = createViewAtlasStore(createInMemoryApp().app, `stairs-overlay-${Math.random()}`);
     store.setState({
       persistenceEnabled: false, mapLoaded: true, isMapLoading: false, isGMView: true, levels: LEVELS, viewedLevel: 'ground',
-      objects: { ...store.getState().objects, levelLinks: { stairs: { id: 'stairs', kind: 'level-link', polygon: AREA, levels: ['ground', 'upper'] } } },
+      objects: { ...store.getState().objects, levelLinks: { stairs: { id: 'stairs', kind: 'level-link', polygon: AREA, levels: ['ground', 'upper'], ...(flight && { flight }) } } },
     });
     const viewport = new Viewport({ screenWidth: SIZE, screenHeight: SIZE, worldWidth: SIZE, worldHeight: SIZE, events: renderer.events, noTicker: true });
     viewport.sortableChildren = true;
@@ -93,6 +93,28 @@ describe('stairs on the GM\'s canvas', () => {
     expect(apart(canvas()(40, 120), plain)).toBeGreaterThan(20);
     store.getState().setGMView(false);
     expect(apart(canvas()(40, 120), plain)).toBe(0);
+  });
+
+  it('shows walked stairs\' far row faintly and a chevron on the end they are stepped on, from each level, never to players', async () => {
+    // The foot is the bottom edge (y 200), two rows: downstairs the far row is y 40 to 120, upstairs y 120 to 200.
+    const { store, canvas } = await bench({ foot: 2, rows: 2 });
+    const plain = canvas()(200, 128);
+    const ground = canvas();
+    const band = apart(ground(55, 60), plain);
+    expect(band).toBeGreaterThan(4);
+    expect(band).toBeLessThan(60);
+    expect(apart(ground(55, 160), plain)).toBe(0);
+    const chevron = (at: (x: number, y: number) => Pixel, y: number): number => Math.max(...[-2, -1, 0, 1, 2].flatMap((dy) => [-1, 0, 1].map((dx) => apart(at(80 + dx, y + dy), plain))));
+    expect(chevron(ground, 190)).toBeGreaterThan(20);
+    expect(chevron(ground, 50)).toBeLessThan(band + 3);
+    expect(apart(canvas(true)(55, 60), plain)).toBe(0);
+
+    store.getState().setViewedLevel('upper');
+    const upper = canvas();
+    expect(apart(upper(55, 160), plain)).toBeGreaterThan(4);
+    expect(apart(upper(55, 60), plain)).toBe(0);
+    expect(chevron(upper, 50)).toBeGreaterThan(20);
+    expect(chevron(upper, 190)).toBeLessThan(band + 3);
   });
 
   it('shows the corners with the stairs tool, and the area drawn so far', async () => {

@@ -103,6 +103,27 @@ describe('the stairs tool', () => {
   });
 });
 
+describe('walked stairs in the stairs tool', () => {
+  it('keep their foot when a corner is dragged, and count their rows again from the grid, in the drag\'s one undo step', () => {
+    const flight = { foot: 2, rows: 2 };
+    const store = sceneStore({ stairs: { id: 'stairs', kind: 'level-link', polygon: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 200 }, { x: 0, y: 200 }], levels: ['ground', 'upper'], flight } });
+    store.setState({ grid: { ...store.getState().grid!, size: 100 } });
+    getHistoryStore(store)!.getState().clear();
+    const editor = editorFor(store);
+    store.getState().setActiveTool('stairs');
+    editor.pointerDown({ x: 100, y: 200 }, { altKey: true });
+    editor.pointerMove({ x: 100, y: 300 }, { altKey: true });
+    editor.pointerMove({ x: 100, y: 400 }, { altKey: true });
+    editor.pointerUp();
+    const [stairs] = levelLinkList(store.getState().objects.levelLinks);
+    // The middle of the foot moved from y 200 to y 300: three rows from the head's middle at y 0.
+    expect(stairs!.flight).toEqual({ foot: 2, rows: 3 });
+    expect(getHistoryStore(store)!.getState().pastStates).toHaveLength(1);
+    getHistoryStore(store)!.getState().undo();
+    expect(levelLinkList(store.getState().objects.levelLinks)[0]!.flight).toEqual(flight);
+  });
+});
+
 describe('the stairs popover', () => {
   function openStairs(destroyedByTest = false): { store: ViewAtlasStore; editor: LevelLinkEditor } {
     const store = sceneStore({ stairs: { id: 'stairs', kind: 'level-link', polygon: SQUARE, levels: ['ground', 'upper'] } });
