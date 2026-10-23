@@ -12,12 +12,12 @@ const RIPPLES: readonly { inset: number; on: [number, number]; off: [number, num
 /** Pools filled with water colour, inked at their shore, with two dashed ripples, cut to the floors. */
 export function drawWater(env: RenderEnv): void {
   const { ctx, palette, dungeon, style } = env;
-  if (!env.view.water || dungeon.model.water.length === 0) return;
+  if (!env.view.water || dungeon.floor.water.length === 0) return;
   const rng = env.rng('water');
   ctx.save();
   clipToFloors(env);
   ctx.beginPath();
-  for (const pool of dungeon.model.water) traceSmoothClosed(ctx, pool.outline);
+  for (const pool of dungeon.floor.water) traceSmoothClosed(ctx, pool.outline);
   ctx.fillStyle = palette.water;
   ctx.fill();
   ctx.strokeStyle = palette.ink;
@@ -27,7 +27,7 @@ export function drawWater(env: RenderEnv): void {
   ctx.stroke();
   ctx.lineWidth = strokeWidth(env, (style.strokes.normal + style.strokes.thin) / 2);
   ctx.beginPath();
-  for (const pool of dungeon.model.water) {
+  for (const pool of dungeon.floor.water) {
     for (const ripple of RIPPLES) {
       for (const run of insetRuns(pool.outline, ripple.inset)) traceDashes(ctx, run, ripple.on, ripple.off, rng);
     }

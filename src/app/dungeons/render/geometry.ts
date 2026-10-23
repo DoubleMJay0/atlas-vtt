@@ -40,16 +40,16 @@ export function doorShape(door: Pick<DungeonDoor, 'x' | 'y'>): FloorShape {
   return { kind: 'rect', x: door.x, y: door.y, w: 1, h: 1 };
 }
 
-/** A doorway's opening across the passage, and how deep its jambs reach along it, in cells. */
+/** A narrow opening's width across the passage, and how deep its jambs reach along it, in cells. */
 const DOORWAY_OPENING = 0.6;
 const DOORWAY_DEPTH = 0.5;
 
 /**
- * The floor of a door cell. A doorway's is narrowed by two wall jambs in its middle, so the walls
- * drawn around the floor step in and out of the opening; any other door cell is floor whole.
+ * The floor of a door cell. A narrow opening's is narrowed by two wall jambs in its middle, so the
+ * walls drawn around the floor step in and out of it; any other door cell is floor whole.
  */
-export function doorShapes(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'kind'>): FloorShape[] {
-  if (door.kind !== 'doorway') return [doorShape(door)];
+export function doorShapes(door: Pick<DungeonDoor, 'x' | 'y' | 'dir'>, narrow: boolean): FloorShape[] {
+  if (!narrow) return [doorShape(door)];
   const end = (1 - DOORWAY_DEPTH) / 2;
   const side = (1 - DOORWAY_OPENING) / 2;
   const { x, y } = door;

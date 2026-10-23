@@ -1,24 +1,32 @@
 /**
- * Grows the room tree breadth first from the entrance. Every queued room draws from a stream of
- * its own seed, so two rooms queued with one seed grow the same subtree. A layout with too few
- * rooms is thrown away and grown again from another root.
+ * Grows a floor's room tree breadth first from its first room: the room behind the entrance, or
+ * on a floor further down the room around the landing of the stairs from above. Every queued room
+ * draws from a stream of its own seed, so two rooms queued with one seed grow the same subtree.
  */
 
 import type { CellDir, CellPoint } from '../model';
 import type { DungeonParams } from '../params';
-import { type CellRect, dir, rectsClash, rectsTouch } from '../geometry';
-import { MAX_SEED, int, pick, stream } from '../rng';
+import { type CellRect, rectsClash, rectsTouch } from '../geometry';
+
+function contains(outer: CellRect, inner: CellRect): boolean {
+  return inner.x0 >= outer.x0 && inner.y0 >= outer.y0 && inner.x1 <= outer.x1 && inner.y1 <= outer.y1;
+}
+import type { KeyedRng } from '../rng';
 import { type Branch, branchesOf } from './branches';
-import { drawDoorKind, drawSize } from './sizes';
-import { REGULAR_ZONE, type WorkLayout, type WorkRoom, isNormal, roomAt, roomRect } from './workLayout';
+import { type RoomSize, drawDoorKind, drawSize } from './sizes';
+import { REGULAR_ZONE, type WorkLayout, type WorkRoom, doorMayOpen, isNormal, roomAt, roomRect } from './workLayout';
 
-/** Nothing but the first room may cover the way in. */
-export const ENTRANCE_BLOCK: CellRect = { x0: -1, y0: -1, x1: 1, y1: 1 };
-
-const AXES: readonly CellDir[] = [dir(0, 1), dir(1, 0), dir(0, -1), dir(-1, 0)];
-const MAX_ATTEMPTS = 120;
 /** Corridors do not count towards size; this keeps a corridor maze from growing forever. */
 const MAX_TOTAL_ROOMS = 400;
+
+/** Where a floor's first room stands, and on a floor below the entry its size, fixed by the landing. */
+export interface FloorRoot {
+  origin: CellPoint;
+  axis: CellDir;
+  seed: number;
+  /** The room holds the landing of the stairs from above: no door leads in, and it keeps this size. */
+  landing?: RoomSize;
+}
 
 interface QueuedRoom {
   parent: number | null;
@@ -30,50 +38,64 @@ interface QueuedRoom {
   fallbacks: Branch[];
 }
 
-/** Whether a room of this shape may stand here: walls may be shared, floors never. */
+/** Whether a room of this shape may stand here: walls may be shared, floors never, and the reserved ground stays clear. */
 export function roomFits(layout: WorkLayout, rect: CellRect, ignore: ReadonlySet<number>, first: boolean): boolean {
-  if (!first && rectsTouch(rect, ENTRANCE_BLOCK)) return false;
+  if (!first && layout.reserved && rectsTouch(rect, layout.reserved)) return false;
+  if (layout.within && !contains(layout.within, rect)) return false;
   return layout.rooms.every((room) => room.removed || ignore.has(room.id) || !rectsClash(rect, roomRect(room)));
 }
 
-function normalCount(layout: WorkLayout): number {
+export function normalCount(layout: WorkLayout): number {
   return layout.rooms.filter((room) => !room.removed && isNormal(room)).length;
 }
 
-function growTree(seed: number, params: DungeonParams, root: QueuedRoom): WorkLayout {
-  const layout: WorkLayout = { rooms: [], doors: [] };
-  const queue: QueuedRoom[] = [root];
+function newRoom(layout: WorkLayout, item: QueuedRoom, size: RoomSize, fixed: boolean): WorkRoom {
+  return {
+    id: layout.rooms.length,
+    origin: item.origin,
+    axis: item.axis,
+    width: size.width,
+    depth: size.depth,
+    group: item.group,
+    parent: item.parent,
+    removed: false,
+    wing: 'regular',
+    zone: REGULAR_ZONE,
+    rotunda: false,
+    colonnade: false,
+    fixed,
+  };
+}
+
+/**
+ * The tree grown from `root` until the params' most rooms. On the entry floor (`reserved` set) the
+ * first room is entered by an opening from the outside at its origin; a landing has no way in.
+ */
+export function growTree(rngOf: KeyedRng, params: DungeonParams, root: FloorRoot, base: Pick<WorkLayout, 'reserved' | 'within' | 'blocked'>): WorkLayout {
+  const layout: WorkLayout = { rooms: [], doors: [], ...base };
+  const queue: QueuedRoom[] = [{ parent: null, origin: root.origin, axis: root.axis, flip: false, seed: root.seed, group: 0, fallbacks: [] }];
   let groups = 1;
   let normals = 0;
   for (let head = 0; head < queue.length; head++) {
     if (normals >= params.maxRooms || layout.rooms.length >= MAX_TOTAL_ROOMS) break;
     const item = queue[head] as QueuedRoom;
-    const rng = stream(seed, 'layout', item.seed);
-    const size = drawSize(rng, params);
-    const room: WorkRoom = {
-      id: layout.rooms.length,
-      origin: item.origin,
-      axis: item.axis,
-      width: size.width,
-      depth: size.depth,
-      group: item.group,
-      parent: item.parent,
-      removed: false,
-      wing: 'regular',
-      zone: REGULAR_ZONE,
-      ending: false,
-      rotunda: false,
-      colonnade: false,
-    };
-    if (!roomFits(layout, roomRect(room), new Set(), item.parent === null)) {
+    const first = item.parent === null;
+    const rng = rngOf(item.seed);
+    const size = first && root.landing ? root.landing : drawSize(rng, params);
+    const room = newRoom(layout, item, size, first && root.landing !== undefined);
+    const fits = first || (roomFits(layout, roomRect(room), new Set(), false) && doorMayOpen(layout, item.origin, item.axis));
+    if (!fits) {
       const [next, ...rest] = item.fallbacks;
       if (next) queue.push({ ...next, fallbacks: rest, parent: item.parent, group: item.group });
       continue;
     }
     layout.rooms.push(room);
-    const parent = item.parent === null ? null : roomAt(layout, item.parent);
-    const kind = parent === null ? 'entrance' : drawDoorKind(rng, !isNormal(parent) && !isNormal(room));
-    layout.doors.push({ x: item.origin.x, y: item.origin.y, dir: item.axis, kind, from: item.parent, to: room.id, loop: false });
+    if (item.parent !== null) {
+      const parent = roomAt(layout, item.parent);
+      layout.doors.push({ x: item.origin.x, y: item.origin.y, dir: item.axis, kind: drawDoorKind(rng, !isNormal(parent) && !isNormal(room)), from: item.parent, to: room.id, loop: false });
+    } else if (!root.landing) {
+      layout.doors.push({ x: item.origin.x, y: item.origin.y, dir: item.axis, kind: 'opening', from: null, to: room.id, loop: false });
+    }
     if (isNormal(room)) normals++;
     for (const group of branchesOf(rng, room, item.flip, params)) {
       const id = groups++;
@@ -81,24 +103,4 @@ function growTree(seed: number, params: DungeonParams, root: QueuedRoom): WorkLa
     }
   }
   return layout;
-}
-
-/** The grown tree, with at least the tags' fewest rooms where any attempt reached them. */
-export function growLayout(seed: number, params: DungeonParams): WorkLayout {
-  let best: WorkLayout | null = null;
-  let bestCount = -1;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const rng = stream(seed, 'layout', `attempt:${attempt}`);
-    const axis = pick(rng, AXES);
-    const root: QueuedRoom = { parent: null, origin: { x: 0, y: 0 }, axis, flip: false, seed: int(rng, 1, MAX_SEED), group: 0, fallbacks: [] };
-    const layout = growTree(seed, params, root);
-    const count = normalCount(layout);
-    if (count >= params.minRooms) return layout;
-    if (count > bestCount) {
-      best = layout;
-      bestCount = count;
-    }
-  }
-  if (!best) throw new Error('no dungeon layout');
-  return best;
 }

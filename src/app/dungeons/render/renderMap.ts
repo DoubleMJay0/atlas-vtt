@@ -15,6 +15,8 @@ export interface RenderMapOptions {
   transparent?: boolean;
   /** Plain paper instead of the vellum, as the SVG export draws it (it holds no gradients or grain). */
   plainPaper?: boolean;
+  /** The floor to draw, by index; the entry floor where unset. */
+  floor?: number;
   /**
    * Keeps hatching and strokes readable where cells are small (`legibleStyle`), for a picture
    * this many times the 1400 × 1000 the legible size is given for: the preview's.
@@ -23,14 +25,15 @@ export interface RenderMapOptions {
 }
 
 /**
- * The floor plan, which is all a dungeon is drawn as: nothing written on it. The canvas must be
- * the layout's size (`mapLayout`); pixel (0, 0) is the corner of the returned origin cell.
+ * The floor plan of one floor, which is all a dungeon is drawn as: nothing written on it. The
+ * canvas must be the layout's size (`mapLayout`, the same for every floor); pixel (0, 0) is the
+ * corner of the returned origin cell.
  */
 export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyle, view: DungeonView, options: RenderMapOptions): MapLayout {
   const { pxPerCell } = options;
   const layout = mapLayout(model, pxPerCell, view);
   const drawn = options.legibleAt ? legibleStyle(style, pxPerCell / options.legibleAt) : style;
-  const env = createRenderEnv(ctx, visibleDungeon(model, view), drawn, view, pxPerCell);
+  const env = createRenderEnv(ctx, visibleDungeon(model, view, options.floor ?? 0), drawn, view, pxPerCell);
   ctx.save();
   if (!options.transparent) drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome || options.plainPaper === true);
   ctx.scale(pxPerCell, pxPerCell);

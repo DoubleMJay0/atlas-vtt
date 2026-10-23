@@ -1,13 +1,14 @@
-import type { CellDir, DungeonDoor, DungeonRoom } from '../model';
+import type { CellDir, DungeonDoor } from '../model';
 import { unionRings } from '../render/clipShapes';
-import { doorShape, roomCentre, roomShape, rotundaRadius, shapePolygon, type Vec } from '../render/geometry';
+import { doorShape, shapePolygon, type FloorShape, type Vec } from '../render/geometry';
 
 /**
  * The centre line of a dungeon's drawn walls, in cells. The renderer strokes every floor shape at
  * twice the wall width and fills the floors over it, so the ink lies outside the union of the
  * floors, one wall width wide; its centre line is that union grown by half the wall width. Growing
  * each shape before the union gives the same outline, with square corners where the ink has round
- * ones (the corner still lies inside the ink).
+ * ones (the corner still lies inside the ink). The shapes are the renderer's own (`visibleFloor`),
+ * jambs of narrow openings included, so the walls follow exactly what is drawn.
  *
  * The union runs on the clipping helpers' grid of 1/1024 cell, so every corner is a whole number
  * of grid steps and lines along the grid meet the outline exactly.
@@ -16,33 +17,29 @@ import { doorShape, roomCentre, roomShape, rotundaRadius, shapePolygon, type Vec
 /** Grid steps per cell, as `unionRings` rounds them. */
 export const STEPS = 1024;
 /** A rotunda's wall is a polygon of this many sides. */
-const ROTUNDA_SIDES = 32;
+const ROTUNDA_SIDES = 64;
 
 const snap = (cells: number): number => Math.round(cells * STEPS) / STEPS;
 
-function rotundaRing(room: DungeonRoom, grow: number): Vec[] {
-  const c = roomCentre(room);
-  const r = rotundaRadius(room) + grow;
+function ringOf(shape: FloorShape, grow: number): Vec[] {
+  if (shape.kind === 'rect') return shapePolygon(shape, grow).map(p => ({ x: snap(p.x), y: snap(p.y) }));
+  const r = shape.r + grow;
   const ring: Vec[] = [];
   for (let i = 0; i < ROTUNDA_SIDES; i++) {
     const a = (i / ROTUNDA_SIDES) * Math.PI * 2;
-    ring.push({ x: snap(c.x + Math.cos(a) * r), y: snap(c.y + Math.sin(a) * r) });
+    ring.push({ x: snap(shape.cx + Math.cos(a) * r), y: snap(shape.cy + Math.sin(a) * r) });
   }
   return ring;
 }
 
 /**
- * The wall rings around the floors: every room and every door cell (a secret door's too, which
- * the map draws as wall: it becomes a short passage closed by the secret door), each grown by
- * `grow` cells. Outer outlines and the outlines of rock enclosed by rooms alike.
+ * The wall rings around the drawn floors, each grown by `grow` cells, and around every secret
+ * door's cell, which the map draws as wall: it becomes a short passage closed by the secret door.
+ * Outer outlines and the outlines of rock enclosed by rooms alike.
  */
-export function wallRings(rooms: readonly DungeonRoom[], doors: readonly DungeonDoor[], grow: number): Vec[][] {
+export function wallRings(floors: readonly FloorShape[], secretDoors: readonly DungeonDoor[], grow: number): Vec[][] {
   const g = snap(grow);
-  const shapes = [
-    ...rooms.map(room => (room.rotunda ? rotundaRing(room, g) : shapePolygon(roomShape(room), g))),
-    ...doors.map(door => shapePolygon(doorShape(door), g)),
-  ];
-  return unionRings(shapes);
+  return unionRings([...floors.map(shape => ringOf(shape, g)), ...secretDoors.map(door => ringOf(doorShape(door), g))]);
 }
 
 /** A line across a door cell: through `at`, along the door's width (perpendicular to its direction). */

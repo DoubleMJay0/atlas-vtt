@@ -13,7 +13,7 @@ import { pointInPolygon } from '../../../src/app/dungeons/render/geometry';
 
 describe('dungeon render geometry', () => {
   it('draws a rotunda through the inner corners of its cardinal door cells', () => {
-    const room = smallDungeon().rooms.find(r => r.rotunda)!;
+    const room = smallDungeon().floors[0]!.rooms.find(r => r.rotunda)!;
     const circle = roomShape(room);
     expect(circle.kind).toBe('circle');
     expect(rotundaRadius(room)).toBeCloseTo(Math.sqrt(26) / 2);
@@ -28,10 +28,10 @@ describe('dungeon render geometry', () => {
     expect(shapeDistance(cell, 4, 5)).toBeCloseTo(Math.SQRT2);
   });
 
-  it('narrows a doorway with wall jambs and leaves any other door cell whole', () => {
+  it('narrows a narrow opening with wall jambs and leaves any other door cell whole', () => {
     const across = { x: 2, y: 3, dir: { x: 1, y: 0 } as const };
-    expect(doorShapes({ ...across, kind: 'door' })).toEqual([doorShape(across)]);
-    const pieces = doorShapes({ ...across, kind: 'doorway' });
+    expect(doorShapes(across, false)).toEqual([doorShape(across)]);
+    const pieces = doorShapes(across, true);
     const floor = (x: number, y: number): boolean => pieces.some(shape => shapeDistance(shape, x, y) < 0);
     // Full width where it meets the rooms, 0.6 of a cell between the jambs.
     expect(floor(2.1, 3.05)).toBe(true);
@@ -50,12 +50,18 @@ describe('dungeon render geometry', () => {
   it('turns a secret door into wall and hides the secret wing with its doors when asked', () => {
     const model = smallDungeon();
     const shown = visibleDungeon(model, DEFAULT_VIEW);
-    const secretDoor = model.doors.find(d => d.kind === 'secret')!;
+    const secretDoor = model.floors[0]!.doors.find(d => d.kind === 'secret')!;
     expect(shown.doors).toContain(secretDoor);
     expect(shown.field.distance(secretDoor.x + 0.5, secretDoor.y + 0.5)).toBeGreaterThan(0);
     const hidden = visibleDungeon(model, { secrets: false });
     expect(hidden.rooms.some(r => r.wing === 'secret')).toBe(false);
     expect(hidden.doors).not.toContain(secretDoor);
+  });
+
+  it('narrows an opening into a room or from outside, and lets corridors run on through one', () => {
+    const dungeon = visibleDungeon(smallDungeon(), DEFAULT_VIEW);
+    const openings = dungeon.doors.filter(d => d.kind === 'opening');
+    expect(openings.filter(d => dungeon.wide.has(d)).map(d => [d.x, d.y])).toEqual([[8, -3]]);
   });
 
   it('answers the floor field as the union of the floors', () => {

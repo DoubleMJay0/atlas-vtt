@@ -1,13 +1,14 @@
 /**
- * A generated dungeon, in grid cells (x right, y down). The first entrance door sits at (0, 0).
- * Everything a renderer and the scene writer need, and nothing they derive. It holds no text:
- * a dungeon is named only by the GM, and only its scene carries that name.
+ * A generated dungeon, in grid cells (x right, y down): one or more floors in one cell grid, so a
+ * stairwell covers the same cells on both floors it joins. The first entrance door of the entry
+ * floor sits at (0, 0). Everything a renderer and the scene writer need, and nothing they derive.
+ * It holds no text and no story: a dungeon is named only by the GM, and only its scene carries that name.
  * Cell (x, y) covers [x, x + 1) × [y, y + 1); points (columns, props, water, rubble, cracks) are
  * in that continuous space, so a cell's centre is (x + 0.5, y + 0.5) and columns stand on grid vertices.
  */
 
 /** Bump when the same seed and tags would give another dungeon. */
-export const DUNGEON_GENERATOR_VERSION = 1;
+export const DUNGEON_GENERATOR_VERSION = 2;
 
 export interface CellPoint {
   x: number;
@@ -22,8 +23,8 @@ export interface CellDir {
 /** Normal rooms count towards size and get numbers; corridors are one cell wide; a junction is 1 × 1. */
 export type RoomKind = 'room' | 'corridor' | 'junction';
 
-/** Which part of the dungeon's plan a room belongs to. */
-export type Wing = 'regular' | 'approach' | 'culmination' | 'secret';
+/** Secret rooms lie behind a secret door, off every way a party must take. */
+export type Wing = 'regular' | 'secret';
 
 export interface DungeonRoom {
   id: number;
@@ -35,8 +36,6 @@ export interface DungeonRoom {
   kind: RoomKind;
   /** Drawn as a circle through the four cardinal door cells (radius √(w² + 1) / 2). */
   rotunda: boolean;
-  /** The culmination room: farthest from the entrance, holds the boss. */
-  ending: boolean;
   wing: Wing;
   /** Rooms of one mirror group share it; equal seeds grew identical subtrees. */
   group: number;
@@ -49,20 +48,10 @@ export interface DungeonRoom {
 }
 
 /**
- * 0 open passage · 1 door · 2 doorway · 3 entrance stairs · 4 portcullis · 5 locked gate ·
- * 6 secret door · 7 barricade · 8 stairs down · 9 steps.
+ * What stands in a door cell, as a character in the room would see it: an opening (a gap in the
+ * wall), a door, a secret door (drawn as wall), or steps where the floor changes height.
  */
-export type DoorKind =
-  | 'open'
-  | 'door'
-  | 'doorway'
-  | 'entrance'
-  | 'portcullis'
-  | 'gate'
-  | 'secret'
-  | 'barricade'
-  | 'stairs-down'
-  | 'steps';
+export type DoorKind = 'opening' | 'door' | 'secret' | 'steps';
 
 export interface DungeonDoor {
   /** The door cell in the shared wall. */
@@ -71,9 +60,28 @@ export interface DungeonDoor {
   /** From the parent room (or the outside) into the child room. */
   dir: CellDir;
   kind: DoorKind;
-  /** Room on each side; null for the outside of an entrance or stairs down. */
+  /** Room on each side; `from` is null for the outside of an entrance. */
   from: number | null;
   to: number | null;
+  /** Steps that lead down from `from` to `to`; unset, they lead up. */
+  descends?: true;
+}
+
+/**
+ * One end of a stairwell between two floors: the same rectangle of cells inside a room on both,
+ * against a wall, the room still passable around it. The treads descend towards `down`.
+ */
+export interface DungeonStair {
+  /** In cells. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  down: CellDir;
+  /** The index of the floor the stairs lead to. */
+  to: number;
+  /** Shared by the two ends of one stairwell. */
+  link: number;
 }
 
 export type PropKind =
@@ -126,11 +134,8 @@ export interface DungeonWater {
   outline: CellPoint[];
 }
 
-export interface DungeonModel {
-  version: number;
-  seed: number;
-  /** The tags the dungeon was built with: the GM's and those added by chance (`dungeonTags`). */
-  tags: string[];
+/** One floor of a dungeon. Room ids count from 0 on every floor; an entrance is a door with `from === null`. */
+export interface DungeonFloor {
   rooms: DungeonRoom[];
   doors: DungeonDoor[];
   columns: DungeonColumn[];
@@ -140,6 +145,7 @@ export interface DungeonModel {
   water: DungeonWater[];
   /** Floor cells under water, for exports. */
   waterCells: CellPoint[];
+  stairs: DungeonStair[];
   /**
    * Secret wings the GM hid (Hide room), by the id of each wing's first room; never set by the
    * generator. The view's secret rooms switch hides every secret wing whatever this says.
@@ -147,10 +153,28 @@ export interface DungeonModel {
   hiddenWings?: number[];
 }
 
+export interface DungeonModel {
+  version: number;
+  seed: number;
+  /** The tags the dungeon was built with: the GM's and those added by chance (`dungeonTags`). */
+  tags: string[];
+  /** Index 0 is the entry floor (A), each next one below the last. */
+  floors: DungeonFloor[];
+}
+
 /** What a GM asks for: everything else follows from it. */
 export interface DungeonRequest {
   seed: number;
   tags: string[];
+  /** How many floors, 1 to `MAX_FLOORS`. */
+  floors: number;
   /** 0..1; unset follows the tags (dry 0, wet 0.3, flooded 0.6, else random). */
   waterLevel?: number;
+}
+
+export const MAX_FLOORS = 4;
+
+/** A floor count as a request may hold it: a whole number from 1 to `MAX_FLOORS`. */
+export function floorCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(MAX_FLOORS, Math.max(1, Math.round(value))) : 1;
 }

@@ -9,7 +9,7 @@ import type { Canvas2D } from '../../../src/app/dungeons/render/geometry';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import { largeDungeon, smallDungeon } from '../../fixtures/dungeonModels';
-import { addRoom, emptyModel } from '../../fixtures/dungeonModelBuilder';
+import { addRoom, emptyModel, entryFloor } from '../../fixtures/dungeonModelBuilder';
 
 /** Hatching only computes; no layer draws in these tests. */
 const NO_CANVAS = {} as Canvas2D;
@@ -23,6 +23,19 @@ function crosses(s: readonly number[], i: number, j: number): boolean {
   const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d;
   return t > 1e-6 && t < 1 - 1e-6 && u > 1e-6 && u < 1 - 1e-6;
 }
+
+describe('the map layout of a dungeon of several floors', () => {
+  it('lies around every floor, so every floor\'s image has the same size and origin', () => {
+    const model = emptyModel(1);
+    addRoom(entryFloor(model), { x: 0, y: 0, w: 4, h: 4 });
+    const below = emptyModel(1);
+    addRoom(entryFloor(below), { x: 10, y: -6, w: 3, h: 3 });
+    const both = { ...model, floors: [entryFloor(model), entryFloor(below)] };
+    const layout = mapLayout(both, 10);
+    expect(layout.originCell).toEqual({ x: -2, y: -8 });
+    expect([layout.cellsWide, layout.cellsHigh]).toEqual([17, 14]);
+  });
+});
 
 describe('dungeon hatching', () => {
   it('weaves clusters whose strokes never cross one another, the same for the same seed', () => {
@@ -60,7 +73,7 @@ describe('dungeon map size', () => {
 
   it('keeps a huge dungeon within the image limits', () => {
     const model = emptyModel(1);
-    addRoom(model, { x: 0, y: 0, w: 400, h: 250 });
+    addRoom(entryFloor(model), { x: 0, y: 0, w: 400, h: 250 });
     const px = maxPxPerCell(model);
     const layout = mapLayout(model, px);
     expect(Math.max(layout.widthPx, layout.heightPx)).toBeLessThanOrEqual(MAX_MAP_SIDE);
@@ -73,7 +86,7 @@ describe('dungeon map size', () => {
 describe('dungeon preview', () => {
   it('fits the whole map into the preview, on its tighter side', () => {
     const model = emptyModel(1);
-    addRoom(model, { x: 0, y: 0, w: 3, h: 30 });
+    addRoom(entryFloor(model), { x: 0, y: 0, w: 3, h: 30 });
     const px = fittedPxPerCell(model, DEFAULT_VIEW, 1300, 400);
     const layout = mapLayout(model, px, DEFAULT_VIEW);
     expect(layout.widthPx).toBeLessThanOrEqual(1300);

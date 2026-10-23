@@ -1,7 +1,10 @@
-/** Checks every generated dungeon must pass; each returns a list of problems, empty when sound. */
+/**
+ * Checks every floor of a generated dungeon must pass; each returns a list of problems, empty when
+ * sound. Written apart from the generator's own rule checks, so a rule is held by a second reading.
+ */
 
 import { floorRect, inRect, rectsTouch, wallRect } from '../../../src/app/dungeons/geometry';
-import type { DungeonDoor, DungeonModel, DungeonRoom } from '../../../src/app/dungeons/model';
+import type { DungeonDoor, DungeonFloor, DungeonRoom } from '../../../src/app/dungeons/model';
 import { roomShape, rotundaRadius, roomCentre, shapeDistance } from '../../../src/app/dungeons/render/geometry';
 import { REFERENCE_CELL_PX } from '../../../src/app/dungeons/style';
 import { DUNGEON_STYLES } from '../../../src/app/dungeons/styleCatalog';
@@ -9,16 +12,56 @@ import { DUNGEON_STYLES } from '../../../src/app/dungeons/styleCatalog';
 /** The widest wall any preset draws outside a floor, in cells. */
 const WALL = Math.max(...DUNGEON_STYLES.map(({ style }) => style.strokes.thick)) / REFERENCE_CELL_PX;
 
-const IMPASSABLE = new Set(['portcullis', 'barricade']);
+export type Door = Pick<DungeonDoor, 'from' | 'to' | 'kind'>;
 
-function roomOf(model: DungeonModel, id: number | null): DungeonRoom | undefined {
-  return id === null ? undefined : model.rooms[id];
+function roomOf(floor: DungeonFloor, id: number | null): DungeonRoom | undefined {
+  return id === null ? undefined : floor.rooms[id];
 }
 
-export function floorProblems(model: DungeonModel): string[] {
+export function normals(floor: DungeonFloor): DungeonRoom[] {
+  return floor.rooms.filter((room) => room.kind === 'room');
+}
+
+/** Rooms reached from `start` through the doors `use` lets through. */
+export function reached(floor: DungeonFloor, start: number, doors: readonly Door[] = floor.doors): Set<number> {
+  const seen = new Set([start]);
+  const queue = [start];
+  while (queue.length > 0) {
+    const at = queue.shift() as number;
+    for (const door of doors) {
+      if (door.from === null || door.to === null) continue;
+      const next = door.from === at ? door.to : door.to === at ? door.from : null;
+      if (next !== null && !seen.has(next)) {
+        seen.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return seen;
+}
+
+/** Doors walked from `start` to every room reached. */
+export function distances(floor: DungeonFloor, start: number, doors: readonly Door[] = floor.doors): Map<number, number> {
+  const out = new Map([[start, 0]]);
+  const queue = [start];
+  while (queue.length > 0) {
+    const at = queue.shift() as number;
+    for (const door of doors) {
+      if (door.from === null || door.to === null) continue;
+      const next = door.from === at ? door.to : door.to === at ? door.from : null;
+      if (next !== null && !out.has(next)) {
+        out.set(next, (out.get(at) ?? 0) + 1);
+        queue.push(next);
+      }
+    }
+  }
+  return out;
+}
+
+export function floorProblems(floor: DungeonFloor): string[] {
   const out: string[] = [];
-  model.rooms.forEach((a) => {
-    model.rooms.forEach((b) => {
+  floor.rooms.forEach((a) => {
+    floor.rooms.forEach((b) => {
       if (a.id !== b.id && rectsTouch(floorRect(a), wallRect(b))) out.push(`floor ${a.id} runs into the walls of ${b.id}`);
     });
   });
@@ -29,13 +72,13 @@ export function floorProblems(model: DungeonModel): string[] {
  * A rotunda's circle and its wall ring stay clear of every other room's floor and wall ring; only
  * in a door cell may they meet, where the door joins them.
  */
-export function rotundaProblems(model: DungeonModel): string[] {
+export function rotundaProblems(floor: DungeonFloor): string[] {
   const out: string[] = [];
-  const inDoorCell = (x: number, y: number): boolean => model.doors.some((door) => x >= door.x && x <= door.x + 1 && y >= door.y && y <= door.y + 1);
-  for (const rotunda of model.rooms.filter((room) => room.rotunda)) {
+  const inDoorCell = (x: number, y: number): boolean => floor.doors.some((door) => x >= door.x && x <= door.x + 1 && y >= door.y && y <= door.y + 1);
+  for (const rotunda of floor.rooms.filter((room) => room.rotunda)) {
     const c = roomCentre(rotunda);
     const reach = rotundaRadius(rotunda) + WALL;
-    for (const other of model.rooms) {
+    for (const other of floor.rooms) {
       if (other.id === rotunda.id) continue;
       const shape = roomShape(other);
       for (let i = 0; i < 360; i++) {
@@ -52,83 +95,116 @@ export function rotundaProblems(model: DungeonModel): string[] {
   return out;
 }
 
-function onAnyFloor(model: DungeonModel, x: number, y: number): boolean {
-  return model.rooms.some((room) => inRect(floorRect(room), x, y));
+function onAnyFloor(floor: DungeonFloor, x: number, y: number): boolean {
+  return floor.rooms.some((room) => inRect(floorRect(room), x, y));
 }
 
-function inAnyRoom(model: DungeonModel, x: number, y: number): boolean {
-  return model.rooms.some((room) => inRect(wallRect(room), x, y));
+function inAnyRoom(floor: DungeonFloor, x: number, y: number): boolean {
+  return floor.rooms.some((room) => inRect(wallRect(room), x, y));
 }
 
-function doorProblem(model: DungeonModel, door: DungeonDoor): string | null {
-  const from = roomOf(model, door.from);
-  const to = roomOf(model, door.to);
+function doorProblem(floor: DungeonFloor, door: DungeonDoor, entry: boolean): string | null {
+  const from = roomOf(floor, door.from);
+  const to = roomOf(floor, door.to);
   const before = { x: door.x - door.dir.x, y: door.y - door.dir.y };
   const after = { x: door.x + door.dir.x, y: door.y + door.dir.y };
   const where = `${door.kind} door at ${door.x},${door.y}`;
-  if (onAnyFloor(model, door.x, door.y)) return `${where} lies on a floor`;
-  if (!from && !to) return `${where} joins nothing`;
-  if (from ? !inRect(floorRect(from), before.x, before.y) : inAnyRoom(model, before.x, before.y)) return `${where}: wrong side behind`;
-  if (to ? !inRect(floorRect(to), after.x, after.y) : inAnyRoom(model, after.x, after.y)) return `${where}: wrong side ahead`;
+  if (onAnyFloor(floor, door.x, door.y)) return `${where} lies on a floor`;
+  if (!to) return `${where} leads nowhere`;
+  if (!from && !entry) return `${where}: an entrance below the entry floor`;
+  if (from ? !inRect(floorRect(from), before.x, before.y) : inAnyRoom(floor, before.x, before.y)) return `${where}: wrong side behind`;
+  if (!inRect(floorRect(to), after.x, after.y)) return `${where}: wrong side ahead`;
   if (from && !inRect(wallRect(from), door.x, door.y)) return `${where} not in the wall of ${from.id}`;
-  if (to && !inRect(wallRect(to), door.x, door.y)) return `${where} not in the wall of ${to.id}`;
-  const outer = door.from === null || door.to === null;
-  if (outer !== (door.kind === 'entrance' || door.kind === 'stairs-down')) return `${where} has the wrong kind for its sides`;
+  if (!inRect(wallRect(to), door.x, door.y)) return `${where} not in the wall of ${to.id}`;
+  if (door.kind === 'steps' && !from) return `${where}: steps from the outside`;
   return null;
 }
 
-export function doorProblems(model: DungeonModel): string[] {
+export function doorProblems(floor: DungeonFloor, entry: boolean): string[] {
   const cells = new Set<string>();
   const out: string[] = [];
-  for (const door of model.doors) {
+  for (const door of floor.doors) {
     const key = `${door.x},${door.y}`;
     if (cells.has(key)) out.push(`two doors at ${key}`);
     cells.add(key);
-    const problem = doorProblem(model, door);
+    const problem = doorProblem(floor, door, entry);
     if (problem) out.push(problem);
   }
   return out;
 }
 
-/** Every room can be walked to from the first through doors a party can pass. */
-export function unreachableRooms(model: DungeonModel): number[] {
-  const seen = new Set([0]);
-  const queue = [0];
-  while (queue.length > 0) {
-    const at = queue.shift() as number;
-    for (const door of model.doors) {
-      if (door.from === null || door.to === null || IMPASSABLE.has(door.kind)) continue;
-      const next = door.from === at ? door.to : door.to === at ? door.from : null;
-      if (next !== null && !seen.has(next)) {
-        seen.add(next);
-        queue.push(next);
-      }
+/** Every room can be walked to from the first, through any door. */
+export function unreachableRooms(floor: DungeonFloor): number[] {
+  const seen = reached(floor, 0);
+  return floor.rooms.filter((room) => !seen.has(room.id)).map((room) => room.id);
+}
+
+const openDoors = (floor: DungeonFloor): DungeonDoor[] => floor.doors.filter((door) => door.kind !== 'secret');
+
+/** Rooms on a loop of doors a party finds: those with a door whose loss leaves its two rooms joined. */
+export function roomsOnLoops(floor: DungeonFloor): Set<number> {
+  const doors = openDoors(floor).filter((door) => door.from !== null && door.to !== null);
+  const out = new Set<number>();
+  doors.forEach((door, k) => {
+    const others = doors.filter((_, j) => j !== k);
+    if (reached(floor, door.from as number, others).has(door.to as number)) {
+      out.add(door.from as number);
+      out.add(door.to as number);
     }
+  });
+  return out;
+}
+
+/** E − V + C over the rooms and the doors a party finds. */
+export function independentLoops(floor: DungeonFloor): number {
+  const doors = openDoors(floor).filter((door) => door.from !== null && door.to !== null);
+  const seen = new Set<number>();
+  let parts = 0;
+  for (const room of floor.rooms) {
+    if (seen.has(room.id)) continue;
+    parts++;
+    for (const id of reached(floor, room.id, doors)) seen.add(id);
   }
-  return model.rooms.filter((room) => !seen.has(room.id)).map((room) => room.id);
+  return doors.length - floor.rooms.length + parts;
 }
 
-/** Which side of the gate or which secret wing a room is in. */
-function zoneOf(model: DungeonModel, room: DungeonRoom): string {
-  if (room.wing === 'approach' || room.wing === 'culmination') return 'gated';
-  if (room.wing !== 'secret') return 'regular';
-  let head = room;
-  for (let parent = roomOf(model, head.parent); parent && parent.wing === 'secret'; parent = roomOf(model, parent.parent)) head = parent;
-  return `secret:${head.id}`;
+/**
+ * Past five normal rooms, a loop holds a room of a shortest way from the first room to the room
+ * farthest from it (through doors a party finds; the lowest id among the farthest).
+ */
+export function loopProblems(floor: DungeonFloor): string[] {
+  if (normals(floor).length <= 5) return [];
+  const doors = openDoors(floor);
+  const fromStart = distances(floor, 0, doors);
+  const far = Math.max(...fromStart.values());
+  const end = [...fromStart].filter(([, d]) => d === far).map(([id]) => id).sort((a, b) => a - b)[0] as number;
+  const toEnd = distances(floor, end, doors);
+  // Every room on some shortest way lies at start-distance + end-distance = the way's length
+  const onWay = floor.rooms.filter((room) => (fromStart.get(room.id) ?? Infinity) + (toEnd.get(room.id) ?? Infinity) === far);
+  const looped = roomsOnLoops(floor);
+  return onWay.some((room) => looped.has(room.id)) ? [] : [`no loop on the way from room 0 to room ${end}`];
 }
 
-/** Doors that let a party past the gate or into a secret wing without the gate or secret door. */
-export function bypasses(model: DungeonModel): string[] {
+/**
+ * Secret doors add, never block: without them every room outside a secret wing is reached, and
+ * each secret door either closes a loop or is the one way into rooms that are all secret.
+ */
+export function secretProblems(floor: DungeonFloor): string[] {
   const out: string[] = [];
-  for (const door of model.doors) {
-    const from = roomOf(model, door.from);
-    const to = roomOf(model, door.to);
-    if (!from || !to || IMPASSABLE.has(door.kind)) continue;
-    const a = zoneOf(model, from);
-    const b = zoneOf(model, to);
-    if (a === b) continue;
-    const allowed = (a === 'regular' && b === 'gated' && door.kind === 'gate') || (b.startsWith('secret') && door.kind === 'secret');
-    if (!allowed) out.push(`${door.kind} door from ${a} into ${b}`);
+  const open = reached(floor, 0, openDoors(floor));
+  floor.rooms.filter((room) => room.wing !== 'secret' && !open.has(room.id)).forEach((room) => out.push(`room ${room.id} needs a secret door`));
+  for (const door of floor.doors.filter((d) => d.kind === 'secret' && d.from !== null && d.to !== null)) {
+    const without = floor.doors.filter((d) => d !== door);
+    if (reached(floor, door.from as number, without).has(door.to as number)) continue;
+    const beyond = reached(floor, 0, without).has(door.from as number) ? (door.to as number) : (door.from as number);
+    const wing = reached(floor, beyond, without);
+    if ([...wing].some((id) => floor.rooms[id]?.wing !== 'secret')) out.push(`secret door at ${door.x},${door.y} is the only way to rooms that are not secret`);
   }
   return out;
+}
+
+/** About a third of normal rooms hold no props: the share on this floor. */
+export function emptyRooms(floor: DungeonFloor): { empty: number; rooms: number } {
+  const rooms = normals(floor);
+  return { empty: rooms.filter((room) => !floor.props.some((p) => p.room === room.id)).length, rooms: rooms.length };
 }

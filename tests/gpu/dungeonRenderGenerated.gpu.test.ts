@@ -31,7 +31,7 @@ const CASES: readonly { name: string; seed: number; tags: string[] }[] = [
   { name: 'round', seed: 404, tags: ['round', 'colonnades', 'temple'] },
   { name: 'colonnades', seed: 405, tags: ['colonnades', 'large'] },
   { name: 'flooded', seed: 2024, tags: ['flooded', 'tomb', 'winding'] },
-  { name: 'crumbling', seed: 202, tags: ['crumbling', 'dangerous'] },
+  { name: 'crumbling', seed: 202, tags: ['crumbling'] },
   { name: 'temple', seed: 777, tags: ['temple'] },
   { name: 'tomb', seed: 909, tags: ['tomb'] },
   { name: 'dwelling', seed: 303, tags: ['dwelling', 'deep'] },
@@ -39,10 +39,9 @@ const CASES: readonly { name: string; seed: number; tags: string[] }[] = [
   { name: 'string', seed: 616, tags: ['string'] },
   { name: 'compact', seed: 717, tags: ['compact'] },
   { name: 'winding', seed: 818, tags: ['winding', 'wet'] },
-  { name: 'multilevel', seed: 919, tags: ['multi-level'] },
-  { name: 'backdoor', seed: 1020, tags: ['backdoor', 'medium'] },
+  { name: 'medium', seed: 1020, tags: ['medium'] },
   { name: 'large-flooded', seed: 1121, tags: ['large', 'flooded', 'round'] },
-  { name: 'small-ordered', seed: 1222, tags: ['small', 'ordered', 'treasure'] },
+  { name: 'small-ordered', seed: 1222, tags: ['small', 'ordered'] },
 ];
 
 const models = new Map<string, DungeonModel>();
@@ -50,7 +49,7 @@ function modelOf(name: string): DungeonModel {
   let model = models.get(name);
   if (!model) {
     const spec = CASES.find(c => c.name === name)!;
-    model = generateDungeon({ seed: spec.seed, tags: spec.tags });
+    model = generateDungeon({ seed: spec.seed, tags: spec.tags, floors: 1 });
     models.set(name, model);
   }
   return model;
@@ -100,8 +99,11 @@ function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, styleId: D
     for (let y = bounds.minY; y < bounds.maxY; y += 0.1) {
       for (let x = bounds.minX; x < bounds.maxX; x += 0.1) {
         if (!inPocket(pockets, x, y) || dungeon.field.distance(x, y) < 0.2) continue;
-        const [r, g, b] = ctx.getImageData(Math.floor((x - originCell.x) * pxPerCell), Math.floor((y - originCell.y) * pxPerCell), 1, 1).data;
-        if (Math.abs(r! - pr) + Math.abs(g! - pg) + Math.abs(b! - pb) < 6) out.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+        // A patch of paper, not one pixel: an inked edge blended over the shading can match the paper's colour
+        const patch = ctx.getImageData(Math.floor((x - originCell.x) * pxPerCell) - 1, Math.floor((y - originCell.y) * pxPerCell) - 1, 3, 3).data;
+        let paper = true;
+        for (let i = 0; i < patch.length; i += 4) paper &&= Math.abs(patch[i]! - pr) + Math.abs(patch[i + 1]! - pg) + Math.abs(patch[i + 2]! - pb) < 6;
+        if (paper) out.push(`${x.toFixed(1)},${y.toFixed(1)}`);
       }
     }
   }

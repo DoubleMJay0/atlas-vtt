@@ -91,7 +91,8 @@ export function overlappingWalls(walls: readonly WallSegment[]): number {
 
 /** The far end of the dungeon from any point of it, in world pixels: rays this long leave the map. */
 export function farReach(model: DungeonModel, placement: DungeonPlacement): number {
-  const xs = model.rooms.flatMap(r => [r.x - 2, r.x + r.w + 2]);
-  const ys = model.rooms.flatMap(r => [r.y - 2, r.y + r.h + 2]);
+  const rooms = model.floors.flatMap(f => f.rooms);
+  const xs = rooms.flatMap(r => [r.x - 2, r.x + r.w + 2]);
+  const ys = rooms.flatMap(r => [r.y - 2, r.y + r.h + 2]);
   return Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * placement.pxPerCell * 2;
 }

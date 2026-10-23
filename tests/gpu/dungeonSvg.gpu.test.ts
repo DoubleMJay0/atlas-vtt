@@ -54,13 +54,13 @@ const CASES: readonly { name: string; seed: number; tags: string[]; styleId: Dun
   { name: 'round', seed: 404, tags: ['round', 'colonnades', 'temple'], styleId: 'masonry' },
   { name: 'flooded', seed: 2024, tags: ['flooded', 'tomb', 'winding'], styleId: 'slate' },
   { name: 'secret', seed: 515, tags: ['secret'], styleId: 'drafting' },
-  { name: 'crumbling', seed: 202, tags: ['crumbling', 'dangerous'], styleId: 'stipple' },
+  { name: 'crumbling', seed: 202, tags: ['crumbling'], styleId: 'stipple' },
 ];
 
 describe('the map as SVG', () => {
   for (const { name, seed, tags, styleId } of CASES) {
     it(`draws the ${name} map in ${styleId} as the canvas does`, async () => {
-      const model = generateDungeon({ seed, tags });
+      const model = generateDungeon({ seed, tags, floors: 1 });
       const style = dungeonStyle(styleId);
       const size = mapLayout(model, PX_PER_CELL, DEFAULT_VIEW);
       const canvas = new OffscreenCanvas(size.widthPx, size.heightPx);

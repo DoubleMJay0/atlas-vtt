@@ -30,15 +30,19 @@ export function drawSize(rng: Rng, params: DungeonParams): RoomSize {
   return size;
 }
 
-/** Ordinary doors: a door about three times in five, else a doorway or an open arch. */
+/** A normal room's size, small or large but never a corridor: the room around a landing. */
+export function drawRoomSize(rng: Rng): RoomSize {
+  return sizeOfStyle(rng, pick<SizeStyle>(rng, [0, 0, 1]));
+}
+
+/** Ordinary doors: a door about three times in five, else an opening. */
 const DOOR_WEIGHTS: readonly (readonly [DoorKind, number])[] = [
-  ['door', 0.58],
-  ['doorway', 0.24],
-  ['open', 0.18],
+  ['door', 0.6],
+  ['opening', 0.4],
 ];
 
 /** The kind of a door between two rooms; corridors open into each other. */
 export function drawDoorKind(rng: Rng, betweenCorridors: boolean): DoorKind {
   const kind = weighted(rng, DOOR_WEIGHTS);
-  return betweenCorridors ? 'open' : kind;
+  return betweenCorridors ? 'opening' : kind;
 }

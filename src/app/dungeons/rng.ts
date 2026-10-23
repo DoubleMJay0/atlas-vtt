@@ -7,7 +7,7 @@ export type Rng = () => number;
  * The concerns that draw numbers. Each has a stream of its own, so restyling never changes the
  * layout, and a change in one never shifts the others.
  */
-export type RngStream = 'layout' | 'plan' | 'props' | 'water' | 'render';
+export type RngStream = 'layout' | 'stairs' | 'props' | 'water' | 'render';
 
 /** Largest seed a GM can type (as Watabou's: 1 to 2³¹ − 2). */
 export const MAX_SEED = 2_147_483_646;
@@ -27,6 +27,14 @@ export function rngFrom(seed: number): Rng {
 /** The stream of one concern of one dungeon; `key` splits it further (a room's own subtree). */
 export function stream(seed: number, name: RngStream, key: string | number = ''): Rng {
   return rngFrom(fnv1a32(`${seed}#${name}#${key}`));
+}
+
+/** The streams of one concern on one floor, by key. */
+export type KeyedRng = (key: string | number) => Rng;
+
+/** The stream of one concern on one floor of a dungeon. */
+export function floorStream(seed: number, name: RngStream, floor: number, key: string | number = ''): Rng {
+  return stream(seed, name, `${floor}:${key}`);
 }
 
 /** A new seed for New dungeon. */

@@ -7,7 +7,7 @@ import type { RenderEnv } from './renderEnv';
 export function drawProps(env: RenderEnv): void {
   if (!env.view.props) return;
   const { dungeon } = env;
-  drawPropList(env, dungeon.model.props.filter(prop => dungeon.roomShapes.has(prop.room)));
+  drawPropList(env, dungeon.floor.props.filter(prop => dungeon.roomShapes.has(prop.room)));
 }
 
 /** The props given: first the shadows they cast, then the props over them. */

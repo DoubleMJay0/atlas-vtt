@@ -4,8 +4,6 @@
  */
 
 export const DUNGEON_TAGS = [
-  'backdoor',
-  'no-backdoor',
   'chaotic',
   'ordered',
   'colonnades',
@@ -14,7 +12,6 @@ export const DUNGEON_TAGS = [
   'cramped',
   'spacious',
   'crumbling',
-  'dangerous',
   'deep',
   'flat',
   'dry',
@@ -24,8 +21,6 @@ export const DUNGEON_TAGS = [
   'small',
   'medium',
   'large',
-  'multi-level',
-  'single-level',
   'secret',
   'no-secrets',
   'round',
@@ -33,21 +28,18 @@ export const DUNGEON_TAGS = [
   'string',
   'temple',
   'tomb',
-  'treasure',
 ] as const;
 
 export type DungeonTag = (typeof DUNGEON_TAGS)[number];
 
 /** Tags that rule each other out: picking one drops the others of every group it is in. */
 const EXCLUSIVE: readonly (readonly DungeonTag[])[] = [
-  ['backdoor', 'no-backdoor'],
   ['chaotic', 'ordered'],
   ['compact', 'winding'],
   ['cramped', 'spacious'],
   ['deep', 'flat'],
   ['dry', 'wet', 'flooded'],
   ['small', 'medium', 'large'],
-  ['multi-level', 'single-level'],
   ['secret', 'no-secrets'],
   ['secret', 'string'],
   ['round', 'square'],
@@ -73,7 +65,7 @@ export function readTags(values: readonly string[]): DungeonTag[] {
   return values.filter(isDungeonTag).reduce<DungeonTag[]>((tags, tag) => withTag(tags, tag), []);
 }
 
-/** The i18n key segment of a tag (`multi-level` → `multiLevel`). */
+/** The i18n key segment of a tag (`no-secrets` → `noSecrets`). */
 export function tagKey(tag: DungeonTag): string {
   return tag.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
 }

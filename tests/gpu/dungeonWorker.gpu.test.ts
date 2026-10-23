@@ -17,14 +17,14 @@ const client = new DungeonWorkerClient({
 
 afterAll(() => client.dispose());
 
-const job = (output: DungeonJob['output'], seed = 7): DungeonJob => ({ request: { seed, tags: ['medium'] }, style: STYLE, view: DEFAULT_VIEW, output });
+const job = (output: DungeonJob['output'], seed = 7): DungeonJob => ({ request: { seed, tags: ['medium'], floors: 1 }, style: STYLE, view: DEFAULT_VIEW, output });
 
 describe('the dungeon worker', () => {
   it('generates a dungeon and draws its floor plan as a PNG of the map layout\'s size', async () => {
     const result = await client.render(job({ kind: 'map', pxPerCell: 60 }));
 
     expect(result.model.seed).toBe(7);
-    expect(result.model.rooms.length).toBeGreaterThan(3);
+    expect(result.model.floors[0]!.rooms.length).toBeGreaterThan(3);
     expect(result.image.type).toBe('png');
     if (result.image.type !== 'png') throw new Error('No map');
     expect(await imageDimensions(result.image.blob)).toEqual({ width: result.map.widthPx, height: result.map.heightPx });

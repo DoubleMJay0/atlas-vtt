@@ -1,7 +1,7 @@
 import type { DungeonModel } from '../model';
 import type { DungeonView } from '../style';
 import { DEFAULT_VIEW } from '../style';
-import { visibleDungeon } from './visibleDungeon';
+import { dungeonBounds } from './visibleDungeon';
 
 /** Largest side a map image may have (WebP's limit, as for imported maps). */
 export const MAX_MAP_SIDE = 16_383;
@@ -15,7 +15,10 @@ const MAP_MARGIN_CELLS = 2;
  */
 export const DEFAULT_PX_PER_CELL = 200;
 
-/** Where a map image lies on the grid: its pixel (0, 0) is the corner of cell `originCell`. */
+/**
+ * Where a map image lies on the grid: its pixel (0, 0) is the corner of cell `originCell`. Every
+ * floor's image has the same layout, around all floors, so they lie over each other exactly.
+ */
 export interface MapLayout {
   originCell: { x: number; y: number };
   /** In cells. */
@@ -27,7 +30,7 @@ export interface MapLayout {
 }
 
 export function mapLayout(model: DungeonModel, pxPerCell: number, view: Pick<DungeonView, 'secrets'> = DEFAULT_VIEW): MapLayout {
-  const { bounds } = visibleDungeon(model, view);
+  const bounds = dungeonBounds(model, view);
   const minX = Math.floor(bounds.minX) - MAP_MARGIN_CELLS;
   const minY = Math.floor(bounds.minY) - MAP_MARGIN_CELLS;
   const cellsWide = Math.ceil(bounds.maxX) + MAP_MARGIN_CELLS - minX;

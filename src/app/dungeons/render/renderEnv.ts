@@ -1,4 +1,4 @@
-import { stream, type Rng } from '../rng';
+import { floorStream, type Rng } from '../rng';
 import type { DungeonStyle, DungeonView } from '../style';
 import { REFERENCE_CELL_PX } from '../style';
 import type { Canvas2D } from './geometry';
@@ -38,7 +38,7 @@ export function createRenderEnv(
     palette: paletteOf(style, view),
     px: 1 / REFERENCE_CELL_PX,
     pxPerCell,
-    rng: (key: string): Rng => stream(dungeon.model.seed, 'render', key),
+    rng: (key: string): Rng => floorStream(dungeon.model.seed, 'render', dungeon.index, key),
   };
 }
 

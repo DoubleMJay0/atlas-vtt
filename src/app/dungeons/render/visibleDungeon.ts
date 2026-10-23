@@ -1,38 +1,65 @@
-import type { DungeonDoor, DungeonModel, DungeonRoom } from '../model';
+import type { DungeonDoor, DungeonFloor, DungeonModel, DungeonRoom } from '../model';
 import { secretWingOf } from '../secretWings';
 import type { DungeonView } from '../style';
 import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
 
 /**
- * What a view shows of a dungeon: secret wings leave with their doors when secrets are hidden,
- * and so does every wing the GM hid (`DungeonModel.hiddenWings`); a secret door is wall, so its
- * cell is no floor.
+ * What a view shows of one floor of a dungeon: secret wings leave with their doors when secrets
+ * are hidden, and so does every wing the GM hid (`DungeonFloor.hiddenWings`); a secret door is
+ * wall, so its cell is no floor.
  */
-export interface VisibleDungeon {
+export interface VisibleFloor {
   model: DungeonModel;
+  /** The floor's index in `model.floors`. */
+  index: number;
+  floor: DungeonFloor;
   rooms: DungeonRoom[];
   doors: DungeonDoor[];
-  /** Room floors, then door cells (a doorway's narrowed by its jambs). */
+  /** Openings as wide as their cell: between two corridors, so the passage runs on unbroken. */
+  wide: ReadonlySet<DungeonDoor>;
+  /** Room floors, then door cells (a narrow opening's narrowed by its jambs). */
   floors: FloorShape[];
   /** The floors with every door cell whole: what courses of brick and stone are laid around. */
   outlines: FloorShape[];
   roomShapes: Map<number, FloorShape>;
-  field: FloorField;
   /** Of the floors. */
   bounds: Bounds;
 }
 
-export function visibleDungeon(model: DungeonModel, view: Pick<DungeonView, 'secrets'>): VisibleDungeon {
-  const hidden = new Set(model.hiddenWings ?? []);
-  const rooms = model.rooms.filter(room => room.wing !== 'secret' || (view.secrets && !hidden.has(secretWingOf(model.rooms, room.id) ?? room.id)));
-  const shown = new Set(rooms.map(room => room.id));
-  const doors = model.doors.filter(door => (door.from === null || shown.has(door.from)) && (door.to === null || shown.has(door.to)));
+export interface VisibleDungeon extends VisibleFloor {
+  field: FloorField;
+}
+
+function isWideOpening(door: DungeonDoor, byId: ReadonlyMap<number, DungeonRoom>): boolean {
+  if (door.kind !== 'opening' || door.from === null || door.to === null) return false;
+  return byId.get(door.from)?.kind !== 'room' && byId.get(door.to)?.kind !== 'room';
+}
+
+export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secrets'>, index = 0): VisibleFloor {
+  const floor = model.floors[index] ?? model.floors[0];
+  if (!floor) throw new Error('a dungeon without floors');
+  const hidden = new Set(floor.hiddenWings ?? []);
+  const rooms = floor.rooms.filter(room => room.wing !== 'secret' || (view.secrets && !hidden.has(secretWingOf(floor.rooms, room.id) ?? room.id)));
+  const shown = new Map(rooms.map(room => [room.id, room] as const));
+  const doors = floor.doors.filter(door => (door.from === null || shown.has(door.from)) && (door.to === null || shown.has(door.to)));
+  const wide = new Set(doors.filter(door => isWideOpening(door, shown)));
   const roomShapes = new Map(rooms.map(room => [room.id, roomShape(room)] as const));
   const open = doors.filter(door => door.kind !== 'secret');
-  const floors = [...roomShapes.values(), ...open.flatMap(doorShapes)];
+  const floors = [...roomShapes.values(), ...open.flatMap(door => doorShapes(door, !wide.has(door) && door.kind === 'opening'))];
   const outlines = [...roomShapes.values(), ...open.map(doorShape)];
   const bounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
-  return { model, rooms, doors, floors, outlines, roomShapes, field: new FloorField(floors), bounds };
+  return { model, index, floor, rooms, doors, wide, floors, outlines, roomShapes, bounds };
+}
+
+/** One floor as drawn (`visibleFloor`), with the distance field its surroundings are drawn from. */
+export function visibleDungeon(model: DungeonModel, view: Pick<DungeonView, 'secrets'>, index = 0): VisibleDungeon {
+  const visible = visibleFloor(model, view, index);
+  return { ...visible, field: new FloorField(visible.floors) };
+}
+
+/** Of every floor as the view shows it: all floors' images share it, so they lie over each other exactly. */
+export function dungeonBounds(model: DungeonModel, view: Pick<DungeonView, 'secrets'>): Bounds {
+  return unionBounds(model.floors.map((_, index) => visibleFloor(model, view, index).bounds));
 }
 
 /** How far from the floors the field answers exactly; farther points read as this far. */

@@ -1,11 +1,11 @@
 /**
- * Water: a noise field over the dungeon, cut at the water level, plus a pool in every room the
- * plan marks for one. The wet cells are traced into closed outlines, then roughened and smoothed
+ * Water: a noise field over a floor, cut at the water level, plus a pool in the rooms where water
+ * gathers (`poolRooms`). The wet cells are traced into closed outlines, then roughened and smoothed
  * into shorelines. The renderer clips them to the floors.
  */
 
-import type { CellPoint, DungeonRoom, DungeonWater } from './model';
-import { type Rng, int, stream } from './rng';
+import type { CellPoint, DungeonDoor, DungeonRoom, DungeonWater } from './model';
+import { type Rng, chance, floorStream, int, stream } from './rng';
 import { traceLoops } from './water/contour';
 import { fractalNoise } from './water/noise';
 import { chaikin, jitter, resample, wobble } from './water/smooth';
@@ -19,8 +19,22 @@ export interface WaterResult {
 export interface WaterRequest {
   /** 0..1: the share of the noise range under water. */
   level: number;
-  /** Rooms the plan puts a pool in (`RoomMarks.water`). */
+  /** Rooms with a pool (`poolRooms`). */
   pools: ReadonlySet<number>;
+}
+
+/** Water gathers where the floor falls away: in rooms steps lead down into, and in dead ends. */
+export function poolRooms(rng: Rng, rooms: readonly DungeonRoom[], doors: readonly DungeonDoor[], poolChance: number): Set<number> {
+  const out = new Set<number>();
+  if (poolChance <= 0) return out;
+  for (const room of rooms) {
+    if (room.kind !== 'room') continue;
+    const own = doors.filter((door) => door.from === room.id || door.to === room.id);
+    const below = own.some((door) => door.kind === 'steps' && (door.descends ? door.to : door.from) === room.id);
+    const p = poolChance * (below ? 2 : 1) * (own.length <= 1 ? 1.5 : 1);
+    if (chance(rng, Math.min(0.9, p))) out.add(room.id);
+  }
+  return out;
 }
 
 /** The GM's level, else the tags', else a roll of 0 to 0.4 in steps of 0.1. */
@@ -59,9 +73,9 @@ function shoreline(rng: Rng, loop: readonly CellPoint[]): CellPoint[] {
   return wobble(rng, resample(chaikin(rough, 2), 0.5), 0.3);
 }
 
-export function placeWater(seed: number, rooms: readonly DungeonRoom[], request: WaterRequest): WaterResult {
+export function placeWater(seed: number, floor: number, rooms: readonly DungeonRoom[], request: WaterRequest): WaterResult {
   if (rooms.length === 0 || (request.level <= 0 && request.pools.size === 0)) return { water: [], waterCells: [] };
-  const rng = stream(seed, 'water');
+  const rng = floorStream(seed, 'water', floor);
   const grid = gridAround(rooms);
   const floors = floorCells(rooms);
   const wetFloor = new Uint8Array(grid.w * grid.h);

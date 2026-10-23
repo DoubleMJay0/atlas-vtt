@@ -8,7 +8,8 @@ import { visibleDungeon } from './visibleDungeon';
 
 /**
  * A style's card in the gallery: a window of the dungeon at a size where its walls, surroundings,
- * water and props all show, rather than the whole map shrunk until its hatching is a smudge.
+ * water and props all show, rather than the whole map shrunk until its hatching is a smudge. It
+ * shows the entry floor.
  */
 
 /** Cells across a thumbnail. */
@@ -36,8 +37,8 @@ function inside(box: Bounds, p: Vec): boolean {
 export function thumbnailWindow(model: DungeonModel, view: DungeonView, cellsWide: number, cellsHigh: number): Vec {
   const dungeon = visibleDungeon(model, view);
   const rooms = dungeon.rooms.map(room => ({ minX: room.x, minY: room.y, maxX: room.x + room.w, maxY: room.y + room.h }));
-  const pools = view.water ? model.water.map(pool => pointsBounds(pool.outline)) : [];
-  const props = view.props ? model.props.filter(prop => dungeon.roomShapes.has(prop.room)) : [];
+  const pools = view.water ? dungeon.floor.water.map(pool => pointsBounds(pool.outline)) : [];
+  const props = view.props ? dungeon.floor.props.filter(prop => dungeon.roomShapes.has(prop.room)) : [];
   const centres = [...dungeon.rooms.map(roomCentre), ...pools.map(b => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }))];
   let best: Vec = { x: dungeon.bounds.minX, y: dungeon.bounds.minY };
   let bestScore = -1;
@@ -48,7 +49,7 @@ export function thumbnailWindow(model: DungeonModel, view: DungeonView, cellsWid
     for (const room of rooms) score += overlap(room, box);
     for (const pool of pools) score += overlap(pool, box) * WATER_WEIGHT;
     for (const prop of props) if (inside(box, prop)) score += PROP_WEIGHT;
-    for (const column of model.columns) if (inside(box, column)) score += COLUMN_WEIGHT;
+    for (const column of dungeon.floor.columns) if (inside(box, column)) score += COLUMN_WEIGHT;
     if (score > bestScore) {
       bestScore = score;
       best = corner;

@@ -33,7 +33,7 @@ export function MapPreview({ preview, view, onFrame, onHideWing, onShowHiddenWin
     const point = mapPointOf({ x: event.clientX, y: event.clientY }, canvas, picture.bitmap.width);
     const room = roomAt(picture.model, view, picture.map, point);
     const entries: ContextMenuEntry[] = [];
-    if (room !== null && picture.model.rooms.find((entry) => entry.id === room)?.wing === 'secret') {
+    if (room !== null && picture.model.floors[0]?.rooms.find((entry) => entry.id === room)?.wing === 'secret') {
       entries.push({ type: 'item', label: t('dungeon.room.hide'), icon: 'eye-off', onClick: () => onHideWing(room) });
     }
     if (onShowHiddenWings) entries.push({ type: 'item', label: t('dungeon.room.showHidden'), icon: 'eye', onClick: onShowHiddenWings });

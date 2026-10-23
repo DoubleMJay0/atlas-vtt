@@ -1,10 +1,10 @@
 /**
  * Deepens rooms after the tree is grown, a mirror group at a time so twins stay alike. A group
  * stops at random (the deeper and narrower, the sooner), at the deepest size, or when a member
- * would run into another room.
+ * would run into another room. The room around a landing keeps its size.
  */
 
-import { type Rng, chance, stream } from '../rng';
+import { type KeyedRng, type Rng, chance } from '../rng';
 import { roomFits } from './grow';
 import { type WorkLayout, type WorkRoom, isNormal, liveRooms, roomRect } from './workLayout';
 
@@ -13,7 +13,7 @@ const MAX_DEPTH = 10;
 function groupsOf(layout: WorkLayout): WorkRoom[][] {
   const groups = new Map<number, WorkRoom[]>();
   liveRooms(layout)
-    .filter(isNormal)
+    .filter((room) => isNormal(room) && !room.fixed)
     .forEach((room) => {
       const members = groups.get(room.group) ?? [];
       members.push(room);
@@ -35,8 +35,8 @@ function keepsGrowing(rng: Rng, members: WorkRoom[]): boolean {
   return !chance(rng, first.depth / first.width);
 }
 
-export function growPass(seed: number, layout: WorkLayout): void {
-  const rng = stream(seed, 'layout', 'grow');
+export function growPass(rngOf: KeyedRng, layout: WorkLayout): void {
+  const rng = rngOf('grow');
   let active = groupsOf(layout);
   while (active.length > 0) {
     active = active.filter((members) => keepsGrowing(rng, members) && tryDeepen(layout, members));

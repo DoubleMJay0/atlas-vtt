@@ -1,6 +1,6 @@
 /**
  * Walking costs through the dungeon. Each door costs 1 plus 1 for every normal room it joins, so
- * a way through halls weighs more than one along corridors. Barred loop doors are no way through.
+ * a way through halls weighs more than one along corridors.
  */
 
 import type { DoorKind } from '../model';
@@ -11,9 +11,6 @@ export interface GraphDoor {
   to: number | null;
 }
 
-/** Doors a loop may not open: barred or barricaded. */
-export const IMPASSABLE: ReadonlySet<DoorKind> = new Set<DoorKind>(['portcullis', 'barricade']);
-
 export interface Edge {
   to: number;
   cost: number;
@@ -22,7 +19,7 @@ export interface Edge {
 export function adjacency(roomCount: number, doors: readonly GraphDoor[], isNormal: (id: number) => boolean): Edge[][] {
   const edges: Edge[][] = Array.from({ length: roomCount }, () => []);
   for (const door of doors) {
-    if (door.from === null || door.to === null || IMPASSABLE.has(door.kind)) continue;
+    if (door.from === null || door.to === null) continue;
     const cost = 1 + (isNormal(door.from) ? 1 : 0) + (isNormal(door.to) ? 1 : 0);
     edges[door.from]?.push({ to: door.to, cost });
     edges[door.to]?.push({ to: door.from, cost });

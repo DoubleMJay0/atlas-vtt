@@ -7,6 +7,6 @@ export function layoutEdges(layout: WorkLayout): Edge[][] {
 }
 
 /** Walking cost from the first room to every room. */
-export function costsFromEntrance(layout: WorkLayout): number[] {
+export function costsFromStart(layout: WorkLayout): number[] {
   return pathCosts(layoutEdges(layout), 0);
 }

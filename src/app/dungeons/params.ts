@@ -1,6 +1,6 @@
 /**
- * What the tags do to layout, plan, water and props. Every number a tag changes lives here, so the
- * effect of a tag can be read in one place.
+ * What the tags do to layout, water and props, and how floors further down differ from the one
+ * above. Every number a tag or a floor changes lives here, so their effect can be read in one place.
  */
 
 import { chance, stream } from './rng';
@@ -29,13 +29,14 @@ export interface DungeonParams {
   colonnadeFactor: number;
   /** Secret wings: how many to aim for. */
   secretWings: { chance: number; extra: number };
-  /** Chance of a rear entrance. */
-  backdoorChance: number;
-  multiLevel: boolean;
+  /** Chance that a loop door is a secret door, a shortcut only the observant find. */
+  secretLoopChance: number;
+  /** Weight of a secret door for the second entrance, against an opening's 2 and a door's 1. */
+  secretEntranceWeight: number;
   /** 0..1, or null to roll one. */
   waterLevel: number | null;
-  fountainChance: number;
-  wellChance: number;
+  /** Chance of a pool in a room the architecture suits for one (wet and flooded dungeons). */
+  poolChance: number;
   tapestryChance: number;
   crackChance: number;
   shatteredChance: number;
@@ -45,7 +46,6 @@ export interface DungeonParams {
 
 /** Tags a dungeon gets by chance, each unless a tag it holds rules it out. */
 const CHANCE_TAGS: readonly { tag: DungeonTag; chance: number; unless: readonly DungeonTag[] }[] = [
-  { tag: 'multi-level', chance: 0.5, unless: [] },
   { tag: 'string', chance: 0.05, unless: ['winding'] },
   { tag: 'deep', chance: 0.05, unless: [] },
 ];
@@ -80,10 +80,11 @@ function roomRange(has: (tag: DungeonTag) => boolean): [number, number] {
   return [6, 15];
 }
 
-function symmetry(has: (tag: DungeonTag) => boolean): readonly boolean[] {
-  if (has('chaotic')) return [false];
-  if (has('ordered')) return [true, true, true, true, true, true, false];
-  return [true, true, true, true, false];
+/** The share of rooms whose side branches mirror each other. */
+function symmetryShare(has: (tag: DungeonTag) => boolean): number {
+  if (has('string') || has('chaotic')) return 0;
+  if (has('ordered')) return 6 / 7;
+  return 4 / 5;
 }
 
 function waterLevel(has: (tag: DungeonTag) => boolean): number | null {
@@ -99,6 +100,17 @@ function secretWings(has: (tag: DungeonTag) => boolean): DungeonParams['secretWi
   return { chance: 0.5, extra: 0.15 };
 }
 
+function secretLoopChance(has: (tag: DungeonTag) => boolean): number {
+  if (has('no-secrets') || has('string')) return 0;
+  return has('secret') ? 0.4 : 0.15;
+}
+
+/** Ten draws of which `share` mirror. */
+function symmetryDraws(share: number): boolean[] {
+  const mirrored = Math.round(share * 10);
+  return Array.from({ length: 10 }, (_, k) => k < mirrored);
+}
+
 export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
   const set = new Set(tags);
   const has = (tag: DungeonTag): boolean => set.has(tag);
@@ -110,7 +122,7 @@ export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
     tags: set,
     minRooms,
     maxRooms,
-    symmetry: has('string') ? [false] : symmetry(has),
+    symmetry: symmetryDraws(symmetryShare(has)),
     sizeStyles: sizeStyles(has),
     string: has('string'),
     squareRooms: has('round'),
@@ -118,14 +130,42 @@ export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
     rotundaFactor: has('square') ? 0 : has('round') ? 5 : 1,
     colonnadeFactor: has('colonnades') ? 2 : 1,
     secretWings: secretWings(has),
-    backdoorChance: has('backdoor') ? 1 : has('no-backdoor') ? 0 : 0.3,
-    multiLevel: has('multi-level') && !has('single-level'),
+    secretLoopChance: secretLoopChance(has),
+    secretEntranceWeight: has('no-secrets') || has('string') ? 0 : has('secret') ? 2 : 1,
     waterLevel: waterLevel(has),
-    fountainChance: has('tomb') ? 0.02 : 0.1,
-    wellChance: has('dwelling') ? 0.2 : 0.02,
+    poolChance: has('flooded') ? 0.35 : has('wet') ? 0.25 : 0,
     tapestryChance,
     crackChance: crumbling ? 1 / 3 : 0.125,
     shatteredChance: crumbling ? 0.1 : 0.0125,
     rubbleArea: crumbling ? 2 : 4,
+  };
+}
+
+/** The fewest normal rooms any floor has. */
+export const MIN_FLOOR_ROOMS = 3;
+/** How much smaller each floor is than the one above, as a share of the entry floor. */
+const SHRINK_PER_FLOOR = 0.18;
+/** How much of the symmetry, round rooms and colonnades each floor further down loses. */
+const ROUGHEN_PER_FLOOR = 0.35;
+
+/**
+ * The params of floor `floor` (0 the entry floor): digging gets harder further down, so deeper
+ * floors have fewer rooms (never fewer than three), mirror less and are less often round or
+ * colonnaded. Steps grow likelier, as the ground falls away.
+ */
+export function floorParams(params: DungeonParams, floor: number): DungeonParams {
+  if (floor === 0) return params;
+  const size = 1 - SHRINK_PER_FLOOR * floor;
+  const rough = Math.max(0, 1 - ROUGHEN_PER_FLOOR * floor);
+  const minRooms = Math.max(MIN_FLOOR_ROOMS, Math.round(params.minRooms * size));
+  const mirrored = params.symmetry.filter(Boolean).length / params.symmetry.length;
+  return {
+    ...params,
+    minRooms,
+    maxRooms: Math.max(minRooms, Math.round(params.maxRooms * size)),
+    symmetry: symmetryDraws(mirrored * rough),
+    rotundaFactor: params.rotundaFactor * rough,
+    colonnadeFactor: params.colonnadeFactor * rough,
+    stepsChance: params.stepsChance > 0 ? Math.min(0.6, params.stepsChance * 1.5) : 0,
   };
 }

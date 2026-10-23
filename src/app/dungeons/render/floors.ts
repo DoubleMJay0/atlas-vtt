@@ -81,7 +81,7 @@ export function drawInnerShadow(env: RenderEnv): void {
   for (const ring of solid) tracePolygon(ctx, ring);
   ctx.fill('evenodd');
   ctx.beginPath();
-  for (const column of dungeon.model.columns) {
+  for (const column of dungeon.floor.columns) {
     if (column.shattered || dungeon.field.distance(column.x, column.y) >= 0) continue;
     const r = column.radius;
     if (column.square) {

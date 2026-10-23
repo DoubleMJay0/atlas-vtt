@@ -17,41 +17,15 @@ export function drawDoors(env: RenderEnv): void {
   }
 }
 
-/** A doorway needs nothing here: its jambs are wall, cut out of the door cell's floor. */
+/** An opening needs nothing here (a narrow one's jambs are wall, cut out of the door cell's floor), nor a secret door, which is wall. */
 function drawDoor(env: RenderEnv, door: DungeonDoor): void {
-  const { ctx } = env;
+  if (door.from === null && door.kind !== 'secret') exit(env, -1);
   switch (door.kind) {
     case 'door':
       leaf(env, 0);
       return;
-    case 'gate':
-      leaf(env, 0);
-      line(env, 0, -0.42, 0, 0.42);
-      return;
-    case 'barricade':
-      leaf(env, 0.2);
-      line(env, -0.42, -0.22, 0.42, -0.22);
-      return;
-    case 'portcullis': {
-      ctx.fillStyle = env.palette.ink;
-      ctx.beginPath();
-      for (const u of [-0.3, 0, 0.3]) {
-        ctx.moveTo(u + wallWidth(env), 0);
-        ctx.arc(u, 0, wallWidth(env), 0, Math.PI * 2);
-      }
-      ctx.fill();
-      return;
-    }
-    case 'entrance':
-      exit(env, -1);
-      stairs(env, 1, 1);
-      return;
-    case 'stairs-down':
-      exit(env, 1);
-      stairs(env, -1, 1);
-      return;
     case 'steps':
-      stairs(env, -1, 0.8);
+      stairs(env, door.descends ? -1 : 1, 0.8);
       return;
     default:
       return;
@@ -73,20 +47,9 @@ function leaf(env: RenderEnv, v: number): void {
   ctx.stroke();
 }
 
-function line(env: RenderEnv, u0: number, v0: number, u1: number, v1: number): void {
-  const { ctx } = env;
-  ctx.beginPath();
-  ctx.moveTo(u0, v0);
-  ctx.lineTo(u1, v1);
-  ctx.strokeStyle = env.palette.ink;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = strokeWidth(env, env.style.strokes.normal);
-  ctx.stroke();
-}
-
 /**
- * Five treads 6 px apart, narrowing away from the room they serve: `wide` is the side (−1 or
- * 1 along v) of the widest tread.
+ * Five treads 6 px apart, narrowing towards the low end: `wide` is the side (−1 or 1 along v) of
+ * the widest, highest tread.
  */
 function stairs(env: RenderEnv, wide: -1 | 1, scale: number): void {
   const { ctx } = env;
@@ -103,7 +66,7 @@ function stairs(env: RenderEnv, wide: -1 | 1, scale: number): void {
   ctx.stroke();
 }
 
-/** With Exits on, clear ground outside a way in or out: a square of paper over the hatching. */
+/** With Exits on, clear ground outside a way in: a square of paper over the hatching. */
 function exit(env: RenderEnv, side: -1 | 1): void {
   if (!env.view.exits) return;
   env.ctx.fillStyle = env.palette.paper;

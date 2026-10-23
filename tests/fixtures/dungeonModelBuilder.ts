@@ -5,6 +5,7 @@ import type {
   DungeonColumn,
   DungeonCrack,
   DungeonDoor,
+  DungeonFloor,
   DungeonModel,
   DungeonRoom,
   DungeonRubble,
@@ -19,30 +20,28 @@ import { rngFrom, type Rng } from '../../src/app/dungeons/rng';
  * [i, i + 1] × [j, j + 1], so the middle of cell (3, 4) is (3.5, 4.5).
  */
 
+export function emptyFloor(): DungeonFloor {
+  return { rooms: [], doors: [], columns: [], props: [], rubble: [], cracks: [], water: [], waterCells: [], stairs: [] };
+}
+
+/** A dungeon of one empty floor; build it through `entryFloor`. */
 export function emptyModel(seed: number): DungeonModel {
-  return {
-    version: DUNGEON_GENERATOR_VERSION,
-    seed,
-    tags: [],
-    rooms: [],
-    doors: [],
-    columns: [],
-    props: [],
-    rubble: [],
-    cracks: [],
-    water: [],
-    waterCells: [],
-  };
+  return { version: DUNGEON_GENERATOR_VERSION, seed, tags: [], floors: [emptyFloor()] };
+}
+
+export function entryFloor(model: DungeonModel): DungeonFloor {
+  const floor = model.floors[0];
+  if (!floor) throw new Error('a dungeon without floors');
+  return floor;
 }
 
 type RoomInput = Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'> & Partial<DungeonRoom>;
 
-export function addRoom(model: DungeonModel, input: RoomInput): DungeonRoom {
+export function addRoom(model: DungeonFloor, input: RoomInput): DungeonRoom {
   const room: DungeonRoom = {
     id: model.rooms.length,
     kind: input.w === 1 && input.h === 1 ? 'junction' : input.w === 1 || input.h === 1 ? 'corridor' : 'room',
     rotunda: false,
-    ending: false,
     wing: 'regular',
     group: model.rooms.length,
     parent: null,
@@ -54,7 +53,7 @@ export function addRoom(model: DungeonModel, input: RoomInput): DungeonRoom {
   return room;
 }
 
-export function addDoor(model: DungeonModel, x: number, y: number, dir: CellDir, kind: DoorKind, from: number | null, to: number | null): DungeonDoor {
+export function addDoor(model: DungeonFloor, x: number, y: number, dir: CellDir, kind: DoorKind, from: number | null, to: number | null): DungeonDoor {
   const door: DungeonDoor = { x, y, dir, kind, from, to };
   model.doors.push(door);
   return door;
@@ -139,7 +138,7 @@ export function crack(rng: Rng, start: CellPoint, dir: CellPoint): DungeonCrack 
 }
 
 /** Rubble and cracks scattered over a room's floor. */
-export function scatter(model: DungeonModel, room: DungeonRoom, seed: number, stones: number, cracks: number): void {
+export function scatter(model: DungeonFloor, room: DungeonRoom, seed: number, stones: number, cracks: number): void {
   const rng = rngFrom(seed);
   for (let i = 0; i < stones; i++) {
     model.rubble.push(stone(rng, room.x + 0.3 + rng() * (room.w - 0.6), room.y + 0.3 + rng() * (room.h - 0.6)));

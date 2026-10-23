@@ -31,7 +31,7 @@ function modelOf(name: string): DungeonModel {
   let model = models.get(name);
   if (!model) {
     const spec = DUNGEONS.find(d => d.name === name)!;
-    model = generateDungeon({ seed: spec.seed, tags: spec.tags });
+    model = generateDungeon({ seed: spec.seed, tags: spec.tags, floors: 1 });
     models.set(name, model);
   }
   return model;

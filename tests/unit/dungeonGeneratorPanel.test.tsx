@@ -123,7 +123,7 @@ describe('the dungeon generator panel', () => {
     const [, service, options] = vi.mocked(createDungeonScene).mock.calls[0]!;
     expect(service).toBe(assets);
     expect(options).toMatchObject({ collectionId: 'Dungeons', name: 'Sunken Vault' });
-    expect(options.model?.rooms.length).toBeGreaterThan(0);
+    expect(options.model?.floors[0]?.rooms.length).toBeGreaterThan(0);
     expect(options.style).toBe(dungeonStyle(settings.getDungeonGenerator().style));
   });
 
@@ -257,7 +257,7 @@ describe('the generator state', () => {
     const { result } = renderHook(() => useDungeonState(app));
     const request = result.current.request;
     act(() => result.current.setGenerated(request, generateDungeon(request)));
-    const secret = result.current.model!.rooms.find((room) => room.wing === 'secret');
+    const secret = result.current.model!.floors[0]!.rooms.find((room) => room.wing === 'secret');
     if (!secret) return;
     act(() => result.current.hideWing(secret.id));
     expect(result.current.edits.hiddenWings?.length).toBe(1);

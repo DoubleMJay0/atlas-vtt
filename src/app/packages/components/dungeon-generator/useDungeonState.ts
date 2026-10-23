@@ -58,7 +58,7 @@ const sameTags = (a: readonly DungeonTag[], b: readonly DungeonTag[]): boolean =
  */
 export function useDungeonState(app: App, initialName = ''): DungeonState {
   const [settings, setSettings] = useState<DungeonGeneratorSettings>(() => readSettings(app));
-  const [request, setRequest] = useState<DungeonRequest>(() => ({ seed: randomSeed(), tags: settings.tags }));
+  const [request, setRequest] = useState<DungeonRequest>(() => ({ seed: randomSeed(), tags: settings.tags, floors: 1 }));
   const [name, setNameState] = useState(initialName.trim());
   const requestRef = useRef(request);
   requestRef.current = request;
@@ -127,8 +127,9 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     setView: useCallback((changes) => persist({ view: { ...settingsRef.current.view, ...changes } }), [persist]),
     setStyle: useCallback((style) => persist({ style }), [persist]),
     hideWing: useCallback((room) => {
-      const wing = generated ? secretWingOf(generated.model.rooms, room) : null;
-      if (wing !== null) setEdits((current) => withWingHidden(current, wing));
+      const floor = generated?.model.floors[0];
+      const wing = floor ? secretWingOf(floor.rooms, room) : null;
+      if (wing !== null) setEdits((current) => withWingHidden(current, 0, wing));
     }, [generated]),
     showHiddenWings: useCallback(() => setEdits(NO_EDITS), []),
   };

@@ -17,21 +17,22 @@ export interface DungeonSceneParts {
 const DAYLIGHT = 1;
 
 /**
- * What a dungeon brings to its scene on an image of `image` pixels drawn at `placement`: a grid
- * whose cells are the dungeon's (the image's pixel 0 lies on a cell corner), its walls and doors,
+ * What a dungeon brings to its scene on an image of `image` pixels drawn at `placement`: the grid
+ * drawn on the map (half cells with small tiles; the image's pixel 0 lies on a line of both), the
+ * entry floor's walls and doors,
  * no lights, and dynamic lighting in daylight, so nothing changes until the GM dims it. Null when
  * the walls would crowd too much to be joined (`wallsCrowd`); a generated dungeon never does.
  */
 export function dungeonScene(
   model: DungeonModel,
   style: DungeonStyle,
-  view: Pick<DungeonView, 'secrets'>,
+  view: Pick<DungeonView, 'secrets' | 'smallTiles'>,
   placement: DungeonPlacement,
   image: { width: number; height: number },
 ): DungeonSceneParts | null {
   const { walls, doors, unplaced } = dungeonWalls(model, style, view, placement);
   if (wallsCrowd(Object.values(walls), image)) return null;
-  const size = placement.pxPerCell;
+  const size = view.smallTiles ? placement.pxPerCell / 2 : placement.pxPerCell;
   return {
     scene: {
       grid: { size, ...normaliseGridOffset('square', size, 0, 0) },

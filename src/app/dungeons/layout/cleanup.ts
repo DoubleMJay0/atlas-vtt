@@ -3,14 +3,13 @@
  * empty stretch beyond their last door.
  */
 
-import type { FeatureMap } from '../plan/features';
 import { type WorkLayout, type WorkRoom, doorsOf, isNormal, liveRooms, toLocal } from './workLayout';
 
-function removeDeadEnds(layout: WorkLayout, features: FeatureMap): void {
+function removeDeadEnds(layout: WorkLayout): void {
   for (let changed = true; changed; ) {
     changed = false;
     for (const room of liveRooms(layout)) {
-      if (room.id === 0 || isNormal(room) || features.has(room.id)) continue;
+      if (room.id === 0 || isNormal(room)) continue;
       const doors = doorsOf(layout, room.id);
       if (doors.length > 1) continue;
       room.removed = true;
@@ -28,8 +27,8 @@ function trimCorridor(layout: WorkLayout, room: WorkRoom): void {
   room.depth = Math.max(3, last + 2);
 }
 
-export function cleanUp(layout: WorkLayout, features: FeatureMap): void {
-  removeDeadEnds(layout, features);
+export function cleanUp(layout: WorkLayout): void {
+  removeDeadEnds(layout);
   liveRooms(layout)
     .filter((room) => room.width === 3)
     .forEach((room) => trimCorridor(layout, room));

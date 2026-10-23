@@ -7,7 +7,7 @@ import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import type { DungeonJob, DungeonRendered } from '../../src/app/dungeons/worker/dungeonJob';
 import { saveDungeonExport, type DungeonExportKind } from '../../src/app/packages/components/dungeon-generator/dungeonExports';
 
-const request = { seed: 7, tags: [] };
+const request = { seed: 7, tags: [], floors: 1 };
 const model = generateDungeon(request);
 
 /** A vault that holds one folder and records what is written. */

@@ -7,7 +7,7 @@ import { strokeWidth, type RenderEnv } from './renderEnv';
  */
 export function drawColumns(env: RenderEnv): void {
   const { ctx, palette, style, dungeon } = env;
-  const columns = dungeon.model.columns.filter(c => dungeon.field.distance(c.x, c.y) < 0);
+  const columns = dungeon.floor.columns.filter(c => dungeon.field.distance(c.x, c.y) < 0);
   if (!columns.length) return;
   const outline = strokeWidth(env, style.strokes.normal);
   const hatched = style.hatching.mode === 'hatching';

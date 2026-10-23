@@ -60,7 +60,7 @@ async function bench(): Promise<Bench> {
 
 const options = (model: DungeonModel = smallDungeon()): Parameters<typeof createDungeonSceneWith>[1] => ({
   name: TITLE,
-  request: { seed: model.seed, tags: model.tags },
+  request: { seed: model.seed, tags: model.tags, floors: model.floors.length },
   model,
   style: STYLE,
   view: DEFAULT_VIEW,
@@ -110,7 +110,7 @@ describe('creating a dungeon scene', () => {
     expect(state.lighting).toEqual({ enabled: true, ambient: 1 });
     expect(state.objects.lights).toEqual({});
     const walls = Object.values(state.objects.walls);
-    expect(walls.filter(w => w.type === 'door')).toHaveLength(4);
+    expect(walls.filter(w => w.type === 'door')).toHaveLength(5);
     expect(walls.filter(w => w.type === 'secret-door')).toHaveLength(1);
     expect(Object.keys(state.objects.pins ?? {})).toEqual([]);
     expect(filesOf(b).filter(path => path.endsWith('.md'))).toEqual([]);

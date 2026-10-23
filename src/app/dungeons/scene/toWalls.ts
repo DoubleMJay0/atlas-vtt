@@ -1,6 +1,6 @@
 import type { WallSegment } from '../../types/wallTypes';
 import type { DoorKind, DungeonDoor, DungeonModel } from '../model';
-import { visibleDungeon } from '../render/visibleDungeon';
+import { visibleFloor } from '../render/visibleDungeon';
 import { REFERENCE_CELL_PX, type DungeonStyle, type DungeonView } from '../style';
 import { STEPS, doorEnds, doorLine, splitRings, wallRings, type RingHit } from './wallOutline';
 
@@ -10,26 +10,21 @@ export interface DungeonPlacement {
   pxPerCell: number;
 }
 
-/** What stands in a door cell: a door of a kind, or nothing (the passage is open). */
+/** What stands in a door cell: a door of a kind, or nothing (an opening or steps). */
 interface DoorWall {
   type: 'door' | 'secret-door';
-  locked: boolean;
   /** Where the door lies along the passage, from the cell's middle towards the child room, in cells. */
   v: (door: DungeonDoor, half: number) => number;
 }
 
-const middle = (): number => 0;
-
 /**
- * Door kinds as walls. A portcullis is an opening: Atlas has no wall that stops movement alone,
- * and its bars stay drawn. A secret door closes the passage at its parent's wall, where the map
- * shows that wall unbroken; a barricade lies where its leaf is drawn.
+ * Door kinds as walls: a door closed in its cell's middle, where its leaf is drawn; a secret door
+ * closing the passage at its parent's wall, where the map shows that wall unbroken. Openings and
+ * steps leave the passage open.
  */
 const DOOR_WALLS: Partial<Record<DoorKind, DoorWall>> = {
-  door: { type: 'door', locked: false, v: middle },
-  gate: { type: 'door', locked: true, v: middle },
-  barricade: { type: 'door', locked: true, v: () => 0.2 },
-  secret: { type: 'secret-door', locked: false, v: (door, half) => (door.from === null ? 0.5 - half : half - 0.5) },
+  door: { type: 'door', v: () => 0 },
+  secret: { type: 'secret-door', v: (door, half) => (door.from === null ? 0.5 - half : half - 0.5) },
 };
 
 /** The drawn wall's width outside the floor, in cells: Stonework walls use the normal stroke. */
@@ -47,15 +42,15 @@ export interface DungeonWalls {
 }
 
 /**
- * The walls and doors of a dungeon in world pixels, along the centre line of its drawn walls:
+ * The walls and doors of one floor of a dungeon in world pixels, along the centre line of its drawn walls:
  * one chain per wall outline, every wall drawn once (rooms side by side have walls of their own,
  * a cell of rock apart), and every door ending exactly on a corner of the wall beside it, so
  * light and sight find no gap. Rooms the view hides (a secret wing) have no walls. Pure.
  */
-export function dungeonWalls(model: DungeonModel, style: DungeonStyle, view: Pick<DungeonView, 'secrets'>, placement: DungeonPlacement): DungeonWalls {
-  const { rooms, doors } = visibleDungeon(model, view);
+export function dungeonWalls(model: DungeonModel, style: DungeonStyle, view: Pick<DungeonView, 'secrets'>, placement: DungeonPlacement, floor = 0): DungeonWalls {
+  const { doors, floors } = visibleFloor(model, view, floor);
   const half = wallInkWidth(style) / 2;
-  const rings = wallRings(rooms, doors, half);
+  const rings = wallRings(floors, doors.filter(door => door.kind === 'secret'), half);
 
   const placed: { door: DungeonDoor; wall: DoorWall; ends: [RingHit, RingHit] }[] = [];
   let unplaced = 0;
@@ -90,7 +85,7 @@ export function dungeonWalls(model: DungeonModel, style: DungeonStyle, view: Pic
   });
   const counts: Partial<Record<DoorKind, number>> = {};
   for (const { door, wall, ends } of placed) {
-    add(ends[0].point, ends[1].point, { type: wall.type, closed: true, ...(wall.locked && { locked: true }) });
+    add(ends[0].point, ends[1].point, { type: wall.type, closed: true });
     counts[door.kind] = (counts[door.kind] ?? 0) + 1;
   }
   return { walls, doors: counts, unplaced };

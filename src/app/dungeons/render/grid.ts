@@ -16,7 +16,7 @@ export function drawGrid(env: RenderEnv): void {
   const step = view.smallTiles ? 0.5 : 1;
   const lines: Line[] = [];
   for (const room of env.dungeon.rooms) lines.push(...roomLines(room, step));
-  for (const door of env.dungeon.doors) lines.push(...doorLines(door));
+  for (const door of env.dungeon.doors) lines.push(...doorLines(door, env.dungeon.wide));
   const rng = env.rng('grid');
   ctx.save();
   clipToFloors(env);
@@ -55,9 +55,9 @@ function roomLines(room: DungeonRoom, step: number): Line[] {
   return lines;
 }
 
-/** An open passage is floor: the lines where it meets its rooms are drawn as grid. */
-function doorLines(door: DungeonDoor): Line[] {
-  if (door.kind !== 'open') return [];
+/** A wide opening is floor: the lines where it meets its rooms are drawn as grid. */
+function doorLines(door: DungeonDoor, wide: ReadonlySet<DungeonDoor>): Line[] {
+  if (!wide.has(door)) return [];
   if (door.dir.x !== 0) {
     return [door.x, door.x + 1].map(x => [{ x, y: door.y }, { x, y: door.y + 1 }] as Line);
   }

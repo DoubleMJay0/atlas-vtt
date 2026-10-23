@@ -54,12 +54,12 @@ export function intersection(a: CellRect, b: CellRect): CellRect | null {
   return r.x0 <= r.x1 && r.y0 <= r.y1 ? r : null;
 }
 
-export function floorRect(room: DungeonRoom): CellRect {
+export function floorRect(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>): CellRect {
   return { x0: room.x, y0: room.y, x1: room.x + room.w - 1, y1: room.y + room.h - 1 };
 }
 
 /** The floor with its ring of walls. */
-export function wallRect(room: DungeonRoom): CellRect {
+export function wallRect(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>): CellRect {
   return { x0: room.x - 1, y0: room.y - 1, x1: room.x + room.w, y1: room.y + room.h };
 }
 

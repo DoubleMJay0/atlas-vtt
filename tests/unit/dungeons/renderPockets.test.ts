@@ -3,17 +3,22 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { inPocket, narrowPockets } from '../../../src/app/dungeons/render/pockets';
 import { visibleDungeon } from '../../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
-import { addDoor, addRoom, emptyModel } from '../../fixtures/dungeonModelBuilder';
+import { addDoor, addRoom, emptyModel, entryFloor } from '../../fixtures/dungeonModelBuilder';
 
 describe('rock the rooms close in on', () => {
-  // A dungeon with rock walled in between a rotunda and the rooms around it.
-  const dungeon = visibleDungeon(generateDungeon({ seed: 16, tags: [] }), DEFAULT_VIEW);
+  // A dungeon with rock walled in between its rooms.
+  const dungeon = visibleDungeon(generateDungeon({ seed: 16, tags: [], floors: 1 }), DEFAULT_VIEW);
   const pockets = narrowPockets(dungeon, 0.5);
 
-  it('finds the pocket beside the rotunda, where the band did not reach', () => {
-    // Farther than the hatching distance from every floor, yet walled in on all sides.
-    expect(dungeon.field.distance(-2.2, 15.8)).toBeGreaterThan(0.5);
-    expect(inPocket(pockets, -2.2, 15.8)).toBe(true);
+  it('finds rock walled in on all sides, where the band did not reach', () => {
+    expect(pockets.length).toBeGreaterThan(0);
+    // Farther than the hatching distance from every floor somewhere inside, yet walled in on all sides.
+    const deep = pockets.flatMap(({ bounds }) => {
+      const out: { x: number; y: number }[] = [];
+      for (let y = bounds.minY; y < bounds.maxY; y += 0.1) for (let x = bounds.minX; x < bounds.maxX; x += 0.1) out.push({ x, y });
+      return out;
+    }).find(({ x, y }) => inPocket(pockets, x, y) && dungeon.field.distance(x, y) > 0.5);
+    expect(deep).toBeDefined();
   });
 
   it('never counts a floor or the open ground outside as a pocket', () => {
@@ -28,12 +33,13 @@ describe('rock the rooms close in on', () => {
 
   it('leaves a courtyard wider than the band open ground', () => {
     const model = emptyModel(1);
+    const floor = entryFloor(model);
     // Four halls around a 4 × 4 yard, joined at the corners by single cells.
-    addRoom(model, { x: 0, y: 0, w: 6, h: 1 });
-    addRoom(model, { x: 0, y: 5, w: 6, h: 1 });
-    addRoom(model, { x: 0, y: 1, w: 1, h: 4 });
-    addRoom(model, { x: 5, y: 1, w: 1, h: 4 });
-    addDoor(model, -1, 0, { x: 1, y: 0 }, 'entrance', null, 0);
+    addRoom(floor, { x: 0, y: 0, w: 6, h: 1 });
+    addRoom(floor, { x: 0, y: 5, w: 6, h: 1 });
+    addRoom(floor, { x: 0, y: 1, w: 1, h: 4 });
+    addRoom(floor, { x: 5, y: 1, w: 1, h: 4 });
+    addDoor(floor, -1, 0, { x: 1, y: 0 }, 'opening', null, 0);
     const ring = visibleDungeon(model, DEFAULT_VIEW);
     expect(narrowPockets(ring, 0.5)).toEqual([]);
     expect(narrowPockets(ring, 1.5)).toHaveLength(1);

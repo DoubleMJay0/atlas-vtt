@@ -10,15 +10,15 @@ import { smallDungeon } from '../../fixtures/dungeonModels';
 import { duplicateWalls, escapingRays, farReach, looseEnds, overlappingWalls, toWorld, wallsCrossed } from './wallChecks';
 
 const STYLE = dungeonStyle('parchment');
-const OPENINGS: readonly DoorKind[] = ['open', 'doorway', 'entrance', 'stairs-down', 'steps', 'portcullis'];
+const OPENINGS: readonly DoorKind[] = ['opening', 'steps'];
 
 const placementOf = (model: DungeonModel, pxPerCell = 100): DungeonPlacement => {
   const { originCell } = mapLayout(model, pxPerCell, DEFAULT_VIEW);
   return { originCell, pxPerCell };
 };
 
-function wallsOf(model: DungeonModel, placement = placementOf(model)): WallSegment[] {
-  return Object.values(dungeonWalls(model, STYLE, DEFAULT_VIEW, placement).walls);
+function wallsOf(model: DungeonModel, placement = placementOf(model), floor = 0): WallSegment[] {
+  return Object.values(dungeonWalls(model, STYLE, DEFAULT_VIEW, placement, floor).walls);
 }
 
 /** A way along the door's direction through its cell: from inside the room before it to inside the one after it. */
@@ -34,11 +34,13 @@ function wayThrough(door: DungeonDoor, placement: DungeonPlacement): [{ x: numbe
 
 function checkSealed(model: DungeonModel): void {
   const placement = placementOf(model);
-  const walls = wallsOf(model, placement);
   const far = farReach(model, placement);
-  for (const room of model.rooms) expect(escapingRays(walls, room, placement, far), `room ${room.id} of seed ${model.seed}`).toEqual([]);
-  expect(looseEnds(walls)).toEqual([]);
-  expect(duplicateWalls(walls)).toBe(0);
+  model.floors.forEach((floor, index) => {
+    const walls = wallsOf(model, placement, index);
+    for (const room of floor.rooms) expect(escapingRays(walls, room, placement, far), `room ${room.id} of floor ${index}, seed ${model.seed}`).toEqual([]);
+    expect(looseEnds(walls)).toEqual([]);
+    expect(duplicateWalls(walls)).toBe(0);
+  });
 }
 
 describe('dungeon walls', () => {
@@ -48,24 +50,24 @@ describe('dungeon walls', () => {
     expect(overlappingWalls(wallsOf(model))).toBe(0);
   });
 
-  it('turns each door kind into a door, a locked door, a secret door or an opening', () => {
+  it('turns each door kind into a door, a secret door or an opening', () => {
     const model = smallDungeon();
     const result = dungeonWalls(model, STYLE, DEFAULT_VIEW, placementOf(model));
     const walls = Object.values(result.walls);
     const doors = walls.filter(w => w.type === 'door');
     expect(result.unplaced).toBe(0);
-    expect(result.doors).toEqual({ door: 2, gate: 1, barricade: 1, secret: 1 });
-    expect(doors.filter(w => w.locked)).toHaveLength(2);
+    expect(result.doors).toEqual({ door: 5, secret: 1 });
+    expect(doors.some(w => w.locked)).toBe(false);
     expect(doors.every(w => w.closed === true)).toBe(true);
     expect(walls.filter(w => w.type === 'secret-door')).toEqual([expect.objectContaining({ closed: true })]);
-    expect(walls.filter(w => w.chainId === undefined)).toHaveLength(5);
+    expect(walls.filter(w => w.chainId === undefined)).toHaveLength(6);
   });
 
   it('leaves the way through an opening free and puts exactly one door across a closed one', () => {
     const model = smallDungeon();
     const placement = placementOf(model);
     const walls = wallsOf(model, placement);
-    for (const door of model.doors) {
+    for (const door of model.floors[0]!.doors) {
       const [a, b] = wayThrough(door, placement);
       const crossed = wallsCrossed(walls, a, b);
       if (OPENINGS.includes(door.kind)) expect(crossed, door.kind).toEqual([]);
@@ -77,7 +79,7 @@ describe('dungeon walls', () => {
     const model = smallDungeon();
     const placement = placementOf(model);
     const half = (wallInkWidth(STYLE) / 2) * placement.pxPerCell;
-    const door = Object.values(dungeonWalls(model, STYLE, DEFAULT_VIEW, placement).walls).find(w => w.type === 'door' && !w.locked)!;
+    const door = Object.values(dungeonWalls(model, STYLE, DEFAULT_VIEW, placement).walls).find(w => w.type === 'door')!;
     const length = Math.hypot(door.p2.x - door.p1.x, door.p2.y - door.p1.y);
     expect(length).toBeCloseTo(placement.pxPerCell + 2 * half, 0);
   });
@@ -96,14 +98,16 @@ describe('dungeon walls', () => {
   });
 
   it('seals generated dungeons of every shape', () => {
-    const combos: string[][] = [[], ['round', 'secret', 'multi-level'], ['chaotic', 'winding', 'large'], ['ordered', 'temple', 'colonnades', 'backdoor']];
+    const combos: string[][] = [[], ['round', 'secret'], ['chaotic', 'winding', 'large'], ['ordered', 'temple', 'colonnades']];
     for (let seed = 1; seed <= 24; seed++) {
-      const model = generateDungeon({ seed, tags: combos[seed % combos.length]! });
+      const model = generateDungeon({ seed, tags: combos[seed % combos.length]!, floors: 1 + (seed % 3) });
       checkSealed(model);
-      const { doors, unplaced } = dungeonWalls(model, STYLE, DEFAULT_VIEW, placementOf(model));
-      const closing = model.doors.filter(d => !OPENINGS.includes(d.kind)).length;
-      expect(unplaced, `seed ${seed}`).toBe(0);
-      expect(Object.values(doors).reduce((sum, n) => sum + n, 0)).toBe(closing);
+      model.floors.forEach((floor, index) => {
+        const { doors, unplaced } = dungeonWalls(model, STYLE, DEFAULT_VIEW, placementOf(model), index);
+        const closing = floor.doors.filter(d => !OPENINGS.includes(d.kind)).length;
+        expect(unplaced, `seed ${seed}`).toBe(0);
+        expect(Object.values(doors).reduce((sum, n) => sum + n, 0)).toBe(closing);
+      });
     }
   });
 });

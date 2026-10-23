@@ -16,11 +16,12 @@ const LEGIBLE_PICTURE = { width: 1400, height: 1000 };
 export type DungeonOutput =
   /**
    * The floor plan at `pxPerCell`, or less where the image would pass a map's limits; a PNG, a
-   * bitmap, or with `svg` an SVG document. `transparent` leaves the paper out.
+   * bitmap, or with `svg` an SVG document. `transparent` leaves the paper out. `floor` is the
+   * floor drawn, by index (the entry floor where unset); every floor's image has the same layout.
    */
-  | { kind: 'map'; pxPerCell: number; bitmap?: boolean; svg?: boolean; transparent?: boolean }
+  | { kind: 'map'; pxPerCell: number; bitmap?: boolean; svg?: boolean; transparent?: boolean; floor?: number }
   /** The floor plan fitted into `width` × `height` pixels, as a bitmap: the preview. */
-  | { kind: 'preview'; width: number; height: number }
+  | { kind: 'preview'; width: number; height: number; floor?: number }
   /** A window of the dungeon, as a bitmap: a style's card in the gallery (`renderThumbnail`). */
   | { kind: 'thumbnail'; width: number; height: number; legibleAt: number };
 
@@ -56,12 +57,12 @@ function canvasOf(width: number, height: number): { canvas: OffscreenCanvas; ctx
   return { canvas, ctx };
 }
 
-function previewOf(model: DungeonModel, job: DungeonJob, width: number, height: number): DungeonRendered {
+function previewOf(model: DungeonModel, job: DungeonJob, { width, height, floor }: Extract<DungeonOutput, { kind: 'preview' }>): DungeonRendered {
   const pxPerCell = fittedPxPerCell(model, job.view, Math.max(1, width), Math.max(1, height));
   const size = mapPixelSize(model, pxPerCell, job.view);
   const { canvas, ctx } = canvasOf(size.width, size.height);
   const legibleAt = Math.min(width / LEGIBLE_PICTURE.width, height / LEGIBLE_PICTURE.height);
-  const map = renderMap(ctx, model, job.style, job.view, { pxPerCell, legibleAt });
+  const map = renderMap(ctx, model, job.style, job.view, { pxPerCell, legibleAt, ...(floor !== undefined && { floor }) });
   return { model, map, image: { type: 'bitmap', bitmap: canvas.transferToImageBitmap() } };
 }
 
@@ -75,10 +76,10 @@ function thumbnailOf(model: DungeonModel, job: DungeonJob, output: Extract<Dunge
 export async function runDungeonJob(job: DungeonJob): Promise<DungeonRendered> {
   const { style, view, output } = job;
   const model = job.model ?? generateDungeon(job.request);
-  if (output.kind === 'preview') return previewOf(model, job, output.width, output.height);
+  if (output.kind === 'preview') return previewOf(model, job, output);
   if (output.kind === 'thumbnail') return thumbnailOf(model, job, output);
   const pxPerCell = suggestedPxPerCell(model, output.pxPerCell, view);
-  const options = { pxPerCell, ...(output.transparent ? { transparent: true } : {}) };
+  const options = { pxPerCell, ...(output.transparent ? { transparent: true } : {}), ...(output.floor !== undefined && { floor: output.floor }) };
   if (output.svg) {
     const { svg, layout } = renderMapSvg(model, style, view, options);
     return { model, map: layout, image: { type: 'svg', svg } };

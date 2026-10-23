@@ -6,12 +6,12 @@ import { strokeWidth, type RenderEnv } from './renderEnv';
 /** Cracks: tapered ink wedges from the walls into the rooms, cut to the floors. */
 export function drawCracks(env: RenderEnv): void {
   const { ctx, palette, dungeon } = env;
-  if (!env.view.props || dungeon.model.cracks.length === 0) return;
+  if (!env.view.props || dungeon.floor.cracks.length === 0) return;
   ctx.save();
   clipToFloors(env);
   ctx.fillStyle = palette.ink;
   ctx.beginPath();
-  for (const crack of dungeon.model.cracks) {
+  for (const crack of dungeon.floor.cracks) {
     const outline = taperedOutline(crack);
     if (outline.length < 3) continue;
     ctx.moveTo(outline[0]!.x, outline[0]!.y);
@@ -60,11 +60,11 @@ function miterNormal(pts: readonly CellPoint[], i: number): Vec {
 /** Rubble: small rounded stones in the palette's fill, outlined in ink. */
 export function drawRubble(env: RenderEnv): void {
   const { ctx, palette, dungeon, style } = env;
-  if (!env.view.props || dungeon.model.rubble.length === 0) return;
+  if (!env.view.props || dungeon.floor.rubble.length === 0) return;
   ctx.save();
   clipToFloors(env);
   ctx.beginPath();
-  for (const stone of dungeon.model.rubble) traceSmoothClosed(ctx, stone.points);
+  for (const stone of dungeon.floor.rubble) traceSmoothClosed(ctx, stone.points);
   ctx.fillStyle = palette.fill;
   ctx.fill();
   ctx.strokeStyle = palette.ink;

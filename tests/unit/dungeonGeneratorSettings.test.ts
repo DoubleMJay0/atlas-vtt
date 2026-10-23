@@ -69,39 +69,50 @@ describe('the style catalog', () => {
 
 describe('the GM’s edits on a dungeon', () => {
   it('leave the dungeon as it is when there are none', () => {
-    const model = generateDungeon({ seed: 4242, tags: ['medium'] });
+    const model = generateDungeon({ seed: 4242, tags: ['medium'], floors: 1 });
     expect(applyDungeonEdits(model, NO_EDITS)).toBe(model);
   });
 });
 
 describe('hiding one secret wing', () => {
-  const wingsOf = (m: ReturnType<typeof generateDungeon>): number[] => [...new Set(m.rooms.flatMap((room) => secretWingOf(m.rooms, room.id) ?? []))];
-  const seed = Array.from({ length: 400 }, (_, i) => i + 1).find((s) => wingsOf(generateDungeon({ seed: s, tags: ['secret'] })).length >= 2)!;
-  const model = generateDungeon({ seed, tags: ['secret'] });
-  const [hiddenWing, keptWing] = wingsOf(model);
+  type Model = ReturnType<typeof generateDungeon>;
+  /** The secret wings of floor `index`, by their first rooms. */
+  const wingsOf = (m: Model, index: number): number[] => {
+    const rooms = m.floors[index]?.rooms ?? [];
+    return [...new Set(rooms.flatMap((room) => secretWingOf(rooms, room.id) ?? []))];
+  };
+  const request = (seed: number): Parameters<typeof generateDungeon>[0] => ({ seed, tags: ['secret'], floors: 2 });
+  const seed = Array.from({ length: 400 }, (_, i) => i + 1).find((s) => {
+    const m = generateDungeon(request(s));
+    return wingsOf(m, 1).length >= 2 && wingsOf(m, 0).length >= 1;
+  })!;
+  const model = generateDungeon(request(seed));
+  const floor = model.floors[1]!;
+  const [hiddenWing, keptWing] = wingsOf(model, 1);
 
   it('names each wing by its first room, behind the secret door', () => {
-    for (const wing of wingsOf(model)) {
-      expect(model.doors.some((door) => door.to === wing && door.kind === 'secret')).toBe(true);
+    for (const wing of wingsOf(model, 1)) {
+      expect(floor.doors.some((door) => door.to === wing && door.kind === 'secret')).toBe(true);
     }
-    expect(secretWingOf(model.rooms, model.rooms[0]!.id)).toBeNull();
+    expect(secretWingOf(floor.rooms, floor.rooms[0]!.id)).toBeNull();
   });
 
-  it('takes that wing out of the view and the walls, and leaves the other', () => {
-    const edited = applyDungeonEdits(model, withWingHidden(NO_EDITS, hiddenWing!));
-    expect(edited.hiddenWings).toEqual([hiddenWing]);
-    const shown = visibleDungeon(edited, DEFAULT_VIEW).rooms;
-    const inWing = (room: { id: number }, wing: number): boolean => secretWingOf(model.rooms, room.id) === wing;
+  it('takes that wing out of its floor\'s view and walls, and leaves the other and every other floor', () => {
+    const edited = applyDungeonEdits(model, withWingHidden(NO_EDITS, 1, hiddenWing!));
+    expect(edited.floors[1]!.hiddenWings).toEqual([hiddenWing]);
+    expect(edited.floors[0]).toBe(model.floors[0]);
+    const shown = visibleDungeon(edited, DEFAULT_VIEW, 1).rooms;
+    const inWing = (room: { id: number }, wing: number): boolean => secretWingOf(floor.rooms, room.id) === wing;
     expect(shown.some((room) => inWing(room, hiddenWing!))).toBe(false);
     expect(shown.some((room) => inWing(room, keptWing!))).toBe(true);
-    expect(visibleDungeon(edited, DEFAULT_VIEW).doors.some((door) => door.to === hiddenWing)).toBe(false);
+    expect(visibleDungeon(edited, DEFAULT_VIEW, 1).doors.some((door) => door.to === hiddenWing)).toBe(false);
     const placement = { originCell: { x: 0, y: 0 }, pxPerCell: 100 };
-    const walls = (m: typeof model): number => Object.keys(dungeonWalls(m, dungeonStyle('parchment'), DEFAULT_VIEW, placement).walls).length;
+    const walls = (m: Model): number => Object.keys(dungeonWalls(m, dungeonStyle('parchment'), DEFAULT_VIEW, placement, 1).walls).length;
     expect(walls(edited)).toBeLessThan(walls(model));
   });
 
   it('hides every wing when the view hides secret rooms, whatever was hidden by hand', () => {
-    const edited = applyDungeonEdits(model, withWingHidden(NO_EDITS, hiddenWing!));
-    expect(visibleDungeon(edited, { secrets: false }).rooms.some((room) => room.wing === 'secret')).toBe(false);
+    const edited = applyDungeonEdits(model, withWingHidden(NO_EDITS, 1, hiddenWing!));
+    for (const index of [0, 1]) expect(visibleDungeon(edited, { secrets: false }, index).rooms.some((room) => room.wing === 'secret')).toBe(false);
   });
 });

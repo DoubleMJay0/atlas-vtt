@@ -1,37 +1,31 @@
 /**
- * Seed and tags in, a whole dungeon out: the tags it is built with, layout and plan, what each
- * room's plan puts in it, then water and props. No text: a dungeon is named by the GM alone.
+ * Seed, tags and floors in, a whole dungeon out: the tags it is built with, every floor's rooms,
+ * doors and stairwells planned together, then each floor's water and furniture. Architecture
+ * only: no story, no text; a dungeon is named by the GM alone.
  */
 
-import { buildDungeonLayout } from './layout/assemble';
-import { DUNGEON_GENERATOR_VERSION, type DungeonModel, type DungeonRequest } from './model';
-import { dungeonParams, dungeonTags } from './params';
+import { planFloors, type PlannedFloor } from './floors/planFloors';
+import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, floorCount } from './model';
+import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './params';
 import { placeProps } from './props';
-import { roomMarks } from './props/roomMarks';
-import { chooseWaterLevel, placeWater } from './water';
+import { floorStream } from './rng';
+import { chooseWaterLevel, placeWater, poolRooms } from './water';
+
+function finishFloor(seed: number, index: number, planned: PlannedFloor, params: DungeonParams, level: number): DungeonFloor {
+  const { rooms, doors, stairs } = planned;
+  const dry = level <= 0 && params.tags.has('dry');
+  const pools = dry ? new Set<number>() : poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance);
+  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools });
+  const { columns, props, rubble, cracks } = placeProps({ seed, floor: index, rooms, doors, stairs, params });
+  return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs };
+}
 
 export function generateDungeon(request: DungeonRequest): DungeonModel {
   const { seed } = request;
   const tags = dungeonTags(seed, request.tags);
   const params = dungeonParams(tags);
-  const { rooms, doors, features } = buildDungeonLayout(seed, params);
-  const marks = roomMarks(seed, rooms, features, params.tags);
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
-  const dry = level <= 0 && params.tags.has('dry');
-  const pools = new Set(dry ? [] : [...marks].filter(([, marked]) => marked.water).map(([room]) => room));
-  const { water, waterCells } = placeWater(seed, rooms, { level, pools });
-  const { columns, props, rubble, cracks } = placeProps({ seed, rooms, doors, marks, features, params });
-  return {
-    version: DUNGEON_GENERATOR_VERSION,
-    seed,
-    tags,
-    rooms,
-    doors,
-    columns,
-    props,
-    rubble,
-    cracks,
-    water,
-    waterCells,
-  };
+  const planned = planFloors(seed, params, floorCount(request.floors));
+  const floors = planned.map((floor, index) => finishFloor(seed, index, floor, floorParams(params, index), level));
+  return { version: DUNGEON_GENERATOR_VERSION, seed, tags, floors };
 }

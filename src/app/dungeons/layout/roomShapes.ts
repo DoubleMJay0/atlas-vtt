@@ -1,10 +1,10 @@
 /**
  * Round rooms and colonnades, decided per mirror group so twins stay alike. A room can be round
- * only when it is square and every door sits in the middle of a wall.
+ * only when it is square and every door sits in the middle of a wall, and never around a landing.
  */
 
 import type { DungeonParams } from '../params';
-import { type Rng, chance, stream } from '../rng';
+import { type KeyedRng, type Rng, chance } from '../rng';
 import { type WorkLayout, type WorkRoom, doorsOf, isNormal, liveRooms, toLocal } from './workLayout';
 
 function mirrorGroups(layout: WorkLayout): WorkRoom[][] {
@@ -23,7 +23,7 @@ function doorsInMiddles(layout: WorkLayout, room: WorkRoom): boolean {
 }
 
 function mayBeRound(layout: WorkLayout, room: WorkRoom): boolean {
-  return room.width === room.depth && room.width >= 5 && doorsInMiddles(layout, room);
+  return !room.fixed && room.width === room.depth && room.width >= 5 && doorsInMiddles(layout, room);
 }
 
 function roundChance(layout: WorkLayout, members: WorkRoom[], params: DungeonParams): number {
@@ -48,7 +48,6 @@ function colonnadeChance(members: WorkRoom[], params: DungeonParams): number {
 }
 
 function canHoldColumns(room: WorkRoom): boolean {
-  if (room.ending && room.width === 5) return false;
   return room.rotunda ? room.width >= 7 : room.width >= 5;
 }
 
@@ -59,7 +58,7 @@ function shapeGroup(rng: Rng, layout: WorkLayout, members: WorkRoom[], params: D
   members.forEach((room) => (room.colonnade = columns && canHoldColumns(room)));
 }
 
-export function shapeRooms(seed: number, layout: WorkLayout, params: DungeonParams): void {
-  const rng = stream(seed, 'layout', 'shapes');
+export function shapeRooms(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams): void {
+  const rng = rngOf('shapes');
   mirrorGroups(layout).forEach((members) => shapeGroup(rng, layout, members, params));
 }

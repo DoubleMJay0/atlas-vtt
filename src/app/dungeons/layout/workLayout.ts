@@ -5,7 +5,7 @@
  */
 
 import type { CellDir, CellPoint, DoorKind, RoomKind, Wing } from '../model';
-import { type CellRect, perpendicular } from '../geometry';
+import { type CellRect, cellKey, perpendicular } from '../geometry';
 
 export interface WorkRoom {
   id: number;
@@ -20,11 +20,12 @@ export interface WorkRoom {
   parent: number | null;
   removed: boolean;
   wing: Wing;
-  /** Rooms of one zone may be joined by ordinary doors: the regular wing, the far side of the gate, each secret wing. */
+  /** Rooms of one zone may be joined by ordinary doors: the regular rooms, each secret wing. */
   zone: number;
-  ending: boolean;
   rotunda: boolean;
   colonnade: boolean;
+  /** Holds the landing of the stairs a floor grows from: it keeps its size and corners. */
+  fixed: boolean;
 }
 
 export interface WorkDoor {
@@ -34,6 +35,7 @@ export interface WorkDoor {
   kind: DoorKind;
   from: number | null;
   to: number | null;
+  descends?: true;
   /** Added by the loop pass, not part of the grown tree. */
   loop: boolean;
 }
@@ -41,10 +43,20 @@ export interface WorkDoor {
 export interface WorkLayout {
   rooms: WorkRoom[];
   doors: WorkDoor[];
+  /** Cells no room but the first may cover: the ground before the entrance. */
+  reserved: CellRect | null;
+  /** Where every room must lie, walls included: under the floor above, for a floor further down. */
+  within: CellRect | null;
+  /** Floor cells no door may open onto: a stairwell's, and the cells it is reached from. */
+  blocked: ReadonlySet<string>;
 }
 
 export const REGULAR_ZONE = 0;
-export const GATED_ZONE = 1;
+
+/** Whether a door may stand here: neither of the floor cells it joins is blocked. */
+export function doorMayOpen(layout: WorkLayout, cell: CellPoint, dir: CellDir): boolean {
+  return !layout.blocked.has(cellKey(cell.x - dir.x, cell.y - dir.y)) && !layout.blocked.has(cellKey(cell.x + dir.x, cell.y + dir.y));
+}
 
 /** Cell at `i` along the axis and `j` across it, from the origin. */
 export function localCell(room: Pick<WorkRoom, 'origin' | 'axis'>, i: number, j: number): CellPoint {
