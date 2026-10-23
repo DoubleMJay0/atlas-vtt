@@ -6,6 +6,7 @@ import { mapLayout, type MapLayout } from './layoutSize';
 import { legibleStyle } from './legibleStyle';
 import { createRenderEnv } from './renderEnv';
 import { SvgCanvas } from './svgCanvas';
+import { drawVellum } from './vellum';
 import { visibleDungeon } from './visibleDungeon';
 
 export interface RenderMapOptions {
@@ -29,10 +30,7 @@ export function renderMap(ctx: Canvas2D, model: DungeonModel, style: DungeonStyl
   const drawn = options.legibleAt ? legibleStyle(style, pxPerCell / options.legibleAt) : style;
   const env = createRenderEnv(ctx, visibleDungeon(model, view), drawn, view, pxPerCell);
   ctx.save();
-  if (!options.transparent) {
-    ctx.fillStyle = env.palette.paper;
-    ctx.fillRect(0, 0, layout.widthPx, layout.heightPx);
-  }
+  if (!options.transparent) drawVellum(ctx, env.palette.paper, layout, model.seed, view.monochrome);
   ctx.scale(pxPerCell, pxPerCell);
   ctx.translate(-layout.originCell.x, -layout.originCell.y);
   drawDungeon(env);

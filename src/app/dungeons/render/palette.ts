@@ -15,7 +15,7 @@ export interface Palette {
   shadow: string | null;
 }
 
-type Rgb = [number, number, number];
+export type Rgb = [number, number, number];
 
 export function parseHex(colour: string): Rgb {
   const m = /^#?([0-9a-f]{6})$/i.exec(colour.trim());
@@ -24,7 +24,7 @@ export function parseHex(colour: string): Rgb {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-function luminance([r, g, b]: Rgb): number {
+export function luminance([r, g, b]: Rgb): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
