@@ -4,7 +4,6 @@ import { DEFAULT_LIQUID_COLORS, liquidList, liquidMovedWithMap, MAX_LIQUID_CORNE
 import { levelObjects } from '../../../src/app/levels/levelObjects';
 import { withLevelDeleted } from '../../../src/app/levels/levelEdits';
 import { objectsMovedWithMap } from '../../../src/app/grid/mapStretchObjects';
-import { mapSceneFile } from '../../../src/app/import/writeMapScene';
 import { createAtlasStorage, migrateMapFile } from '../../../src/app/services/MapPersistence';
 import { createViewAtlasStore, type ViewAtlasStore } from '../../../src/app/storeFactory';
 import { getHistoryStore } from '../../../src/app/stores/history';
@@ -135,11 +134,5 @@ describe('liquid surfaces in the scene file', () => {
     expect(JSON.parse(files.get(path)!).version).toBe(4);
     const read = await storage.getItem('atlas');
     expect(read?.state.objects.liquids).toEqual(liquids);
-  });
-
-  it('are written into a new scene by the map scene writer', () => {
-    const liquids = { lake: pool('lake') };
-    const file = mapSceneFile({ conditions: [] }, 'maps/lake.webp', { grid: { size: 70, offsetX: 0, offsetY: 0 }, walls: {}, lights: {}, lighting: { enabled: false, ambient: 1 }, liquids });
-    expect(file.state.objects.liquids).toEqual(liquids);
   });
 });

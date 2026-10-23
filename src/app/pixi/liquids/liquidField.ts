@@ -1,8 +1,8 @@
 /**
  * How far each point of a liquid surface lies from its shore, as a small texture the shader reads:
  * the surface's edge fades out there (so no pixel of it is drawn hard against the map), water grows
- * deeper and lava hotter away from it. Worked out once per surface on the CPU, exactly (the distance
- * to the nearest edge), at a few texels per grid cell.
+ * deeper and lava hotter away from it. Worked out once per surface on the CPU at a few texels per
+ * grid cell: exact round the shore, within a small part of a texel inside.
  */
 
 import type { Point } from '../../types/visionTypes';
@@ -39,12 +39,80 @@ export interface LiquidField {
 
 interface Edge { ax: number; ay: number; bx: number; by: number }
 
-function distanceToEdge(px: number, py: number, edge: Edge): number {
-  const dx = edge.bx - edge.ax;
-  const dy = edge.by - edge.ay;
-  const lengthSquared = dx * dx + dy * dy;
-  const t = lengthSquared > 0 ? Math.min(1, Math.max(0, ((px - edge.ax) * dx + (py - edge.ay) * dy) / lengthSquared)) : 0;
-  return Math.hypot(px - (edge.ax + dx * t), py - (edge.ay + dy * t));
+/** Texels round the shore whose distance is measured exactly; the rest is carried on from them. */
+const SEED_TEXELS = 2;
+
+/** Where the nearest point of the shore lies for each texel, and how far it is (Infinity where none is known yet). */
+interface Nearest { x: Float64Array; y: Float64Array; distance: Float64Array }
+
+/** Measures the texels within `SEED_TEXELS` of each edge exactly, keeping the nearest point of any edge. */
+function seedShore(edges: readonly Edge[], width: number, height: number, origin: Point, texel: number): Nearest {
+  const count = width * height;
+  const nearest: Nearest = { x: new Float64Array(count), y: new Float64Array(count), distance: new Float64Array(count).fill(Infinity) };
+  const band = SEED_TEXELS * texel;
+  for (const edge of edges) {
+    const dx = edge.bx - edge.ax;
+    const dy = edge.by - edge.ay;
+    const lengthSquared = dx * dx + dy * dy;
+    const i0 = Math.max(0, Math.floor((Math.min(edge.ax, edge.bx) - band - origin.x) / texel));
+    const i1 = Math.min(width - 1, Math.ceil((Math.max(edge.ax, edge.bx) + band - origin.x) / texel));
+    const j0 = Math.max(0, Math.floor((Math.min(edge.ay, edge.by) - band - origin.y) / texel));
+    const j1 = Math.min(height - 1, Math.ceil((Math.max(edge.ay, edge.by) + band - origin.y) / texel));
+    for (let j = j0; j <= j1; j++) {
+      const py = origin.y + (j + 0.5) * texel;
+      for (let i = i0; i <= i1; i++) {
+        const px = origin.x + (i + 0.5) * texel;
+        const t = lengthSquared > 0 ? Math.min(1, Math.max(0, ((px - edge.ax) * dx + (py - edge.ay) * dy) / lengthSquared)) : 0;
+        const cx = edge.ax + dx * t;
+        const cy = edge.ay + dy * t;
+        const distance = Math.hypot(px - cx, py - cy);
+        const index = j * width + i;
+        if (distance <= band && distance < nearest.distance[index]!) {
+          nearest.distance[index] = distance;
+          nearest.x[index] = cx;
+          nearest.y[index] = cy;
+        }
+      }
+    }
+  }
+  return nearest;
+}
+
+/**
+ * Carries the nearest shore points on from texel to texel, forwards and back (dead reckoning,
+ * Grevera 2004): each texel takes a neighbour's nearest point where that lies nearer to it. Exact
+ * along straight shores and within a small part of a texel elsewhere, in time linear in the texels.
+ */
+function carryOn(nearest: Nearest, width: number, height: number, origin: Point, texel: number): void {
+  const { x, y, distance } = nearest;
+  const visit = (i: number, j: number, ni: number, nj: number): void => {
+    if (ni < 0 || nj < 0 || ni >= width || nj >= height) return;
+    const from = nj * width + ni;
+    if (distance[from] === Infinity) return;
+    const index = j * width + i;
+    const d = Math.hypot(origin.x + (i + 0.5) * texel - x[from]!, origin.y + (j + 0.5) * texel - y[from]!);
+    if (d < distance[index]!) {
+      distance[index] = d;
+      x[index] = x[from]!;
+      y[index] = y[from]!;
+    }
+  };
+  for (let j = 0; j < height; j++) {
+    for (let i = 0; i < width; i++) {
+      visit(i, j, i - 1, j - 1);
+      visit(i, j, i, j - 1);
+      visit(i, j, i + 1, j - 1);
+      visit(i, j, i - 1, j);
+    }
+  }
+  for (let j = height - 1; j >= 0; j--) {
+    for (let i = width - 1; i >= 0; i--) {
+      visit(i, j, i + 1, j);
+      visit(i, j, i - 1, j + 1);
+      visit(i, j, i, j + 1);
+      visit(i, j, i + 1, j + 1);
+    }
+  }
 }
 
 /** Per row of texel centres, which texels lie inside the polygon (even-odd, as a shoreline that crosses itself is drawn). */
@@ -69,9 +137,9 @@ function insideRows(edges: readonly Edge[], width: number, height: number, origi
 }
 
 /**
- * The distance field of `polygon` (world pixels) with `holes` cut from it, on a grid of `cell` world pixels. Each texel looks
- * only at the edges in the buckets around it, which are as wide as the farthest distance it tells
- * apart, so the work grows with the surface's area and its shore, never with their product.
+ * The distance field of `polygon` (world pixels) with `holes` cut from it, on a grid of `cell`
+ * world pixels: measured exactly round the shore and carried on from there, so the work grows with
+ * the surface's area and its shore, never with their product.
  */
 export function liquidField(polygon: readonly Point[], cell: number, holes: readonly (readonly Point[])[] = []): LiquidField {
   let minX = Infinity;
@@ -97,38 +165,16 @@ export function liquidField(polygon: readonly Point[], cell: number, holes: read
   }));
   const inside = insideRows(edges, width, height, origin, texel);
 
-  // Buckets as wide as the farthest distance told apart: an edge nearer than that to a texel lies
-  // in the texel's bucket or one beside it.
-  const reach = Math.max(FAR_RANGE_CELLS * cell, outside * cell);
-  const bucket = Math.max(reach, texel);
-  const columns = Math.max(1, Math.ceil((width * texel) / bucket));
-  const rows = Math.max(1, Math.ceil((height * texel) / bucket));
-  const buckets: Edge[][] = Array.from({ length: columns * rows }, () => []);
-  const bucketOf = (value: number, start: number, count: number): number => Math.min(count - 1, Math.max(0, Math.floor((value - start) / bucket)));
-  for (const edge of edges) {
-    const x0 = bucketOf(Math.min(edge.ax, edge.bx), origin.x, columns);
-    const x1 = bucketOf(Math.max(edge.ax, edge.bx), origin.x, columns);
-    const y0 = bucketOf(Math.min(edge.ay, edge.by), origin.y, rows);
-    const y1 = bucketOf(Math.max(edge.ay, edge.by), origin.y, rows);
-    for (let by = y0; by <= y1; by++) for (let bx = x0; bx <= x1; bx++) buckets[by * columns + bx]!.push(edge);
-  }
+  const nearest = seedShore(edges, width, height, origin, texel);
+  carryOn(nearest, width, height, origin, texel);
 
   const texels = new Uint8Array(width * height * 4);
   const nearSpan = outside + NEAR_RANGE_CELLS;
   for (let j = 0; j < height; j++) {
-    const y = origin.y + (j + 0.5) * texel;
-    const by = bucketOf(y, origin.y, rows);
     for (let i = 0; i < width; i++) {
-      const x = origin.x + (i + 0.5) * texel;
-      const bx = bucketOf(x, origin.x, columns);
-      let nearest = reach;
-      for (let ny = Math.max(0, by - 1); ny <= Math.min(rows - 1, by + 1); ny++) {
-        for (let nx = Math.max(0, bx - 1); nx <= Math.min(columns - 1, bx + 1); nx++) {
-          for (const edge of buckets[ny * columns + nx]!) nearest = Math.min(nearest, distanceToEdge(x, y, edge));
-        }
-      }
       const index = j * width + i;
-      const cells = (inside[index] ? nearest : -nearest) / cell;
+      const away = Math.min(nearest.distance[index]!, FAR_RANGE_CELLS * cell);
+      const cells = (inside[index] ? away : -away) / cell;
       const at = index * 4;
       texels[at] = Math.round(Math.min(1, Math.max(0, (cells + outside) / nearSpan)) * 255);
       texels[at + 1] = Math.round(Math.min(1, Math.max(0, cells / FAR_RANGE_CELLS)) * 255);
