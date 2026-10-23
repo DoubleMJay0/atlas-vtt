@@ -5,7 +5,7 @@ import { createDungeonSceneWith, type DungeonSceneDeps } from '../../src/app/dun
 import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { runDungeonJob } from '../../src/app/dungeons/worker/dungeonJob';
-import { IMAGE_PRESETS, disposeImageProcessing, optimizeImage } from '../../src/app/imageProcessing/imageProcessing';
+import { IMAGE_PRESETS, disposeImageProcessing, optimizeBitmap } from '../../src/app/imageProcessing/imageProcessing';
 import { linkTargets } from '../../src/app/levels/levelLinks';
 import { AssetService } from '../../src/app/services/AssetService';
 import { AssetThumbnailService, THUMBNAIL_SPEC } from '../../src/app/services/AssetThumbnailService';
@@ -64,7 +64,7 @@ describe('a generated dungeon of three floors in its scene', () => {
       app: vault.app,
       assetService: assets,
       render: runDungeonJob,
-      convertImage: (image) => optimizeImage(image, IMAGE_PRESETS.map, { thumbnail: THUMBNAIL_SPEC }),
+      convertImage: (image) => optimizeBitmap(image, IMAGE_PRESETS.map, { thumbnail: THUMBNAIL_SPEC }),
       thumbnails: new AssetThumbnailService(vault.app, assets),
     };
     const model = generateDungeon({ seed: 404, tags: ['small'], floors: 3 });
