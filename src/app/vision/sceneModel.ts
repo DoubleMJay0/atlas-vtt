@@ -3,7 +3,7 @@ import { selectSight } from './selectSight';
 import type { MeasurementSettings } from '../grid/measurementFormat';
 import { sleeps } from '../lighting/lightActivity';
 import { lightZoneList, withZones } from '../lighting/lightZones';
-import { wallRadius, worldTexel } from '../lighting/lightingConstants';
+import { REFLECTION, wallRadius, worldTexel } from '../lighting/lightingConstants';
 import { AREA_SAMPLE_SPACING } from './areaReach';
 import { unitScaleOf } from '../lighting/lightingUnits';
 import { sealedWalls } from '../lighting/sealWalls';
@@ -87,6 +87,9 @@ export class SceneModelBuilder {
   private readonly lightReaches = new LightReaches();
   private built: Built | null = null;
 
+  /** `reflectedLight: false` builds lights without their reflection (`REFLECTION`), as before it existed. */
+  constructor(private readonly options: { reflectedLight?: boolean } = {}) {}
+
   /**
    * The model of `state`, and whether this call built it anew. Sight without a range reaches over
    * `reach` (the map, unless the level's openings look over larger maps below it).
@@ -122,14 +125,17 @@ export class SceneModelBuilder {
     const zoneList = lightZoneList(levelObjects(state).lightZones);
     const ambient = withZones(state.lighting, zoneList);
     const shining = activeLights(levelObjects(state).lights, tokens, ambient).map((light) => engineLight(light, scale));
-    // An area light's outline is traced a quarter cell apart, clear of the capsules the picture puts around walls.
-    const everyReach = this.lightReaches.sync(shining, walls, { spacing: scale.cellSize * AREA_SAMPLE_SPACING, clearance: wallRadius(worldTexel(bounds)) });
+    // An area light's outline, and the edges of every light's shadows its reflection comes from,
+    // are traced a quarter cell apart, clear of the capsules the picture puts around walls.
+    const sampling = { spacing: scale.cellSize * AREA_SAMPLE_SPACING, clearance: wallRadius(worldTexel(bounds)) };
+    const reflection = this.options.reflectedLight === false ? null : { ...sampling, reach: REFLECTION.cells * scale.cellSize };
+    const everyReach = this.lightReaches.sync(shining, walls, sampling, reflection);
     // A light whose flame stands in magical darkness it does not outshine gives nothing: the picture and the rule both leave it out.
     const out = shining.map((light) => !light.darkness && quenched(light, light.priority ?? 0, everyReach));
     // A darkness is drawn as the polygon the rule counts, and veils the light it swallows where the
     // rule counts that light: the reaches' polygons, handed on rather than traced again.
     const dark = shining.some((light) => light.darkness);
-    const lights = shining.flatMap((light, i) => (out[i] ? [] : [dark ? withRuleArea(light, everyReach[i]!) : light]));
+    const lights = shining.flatMap((light, i) => (out[i] ? [] : [withRule(light, everyReach[i]!, dark)]));
     const reaches = everyReach.filter((_, i) => !out[i]);
     const sources = sourcesInDarkness(sightSources(tokens, scale, reach, rules, GM_SIGHT_POLICY), ambient, reaches);
     this.sightCache.retain(new Set(sources.map(source => source.tokenId)));
@@ -143,9 +149,15 @@ export class SceneModelBuilder {
 
 const NO_ZONES: readonly EngineZone[] = [];
 
-/** A light with the area the rule counts for it, for the darkness map: its reach's polygon, and an area light's parts beyond its area. */
-function withRuleArea(light: EngineLight, reach: LightReach): EngineLight {
-  return { ...light, area: reach.polygon, ...(reach.parts && { parts: reach.parts }) };
+/**
+ * A light with what the rule counts for it that the picture draws as the rule has it: its
+ * reflection, and in a scene with a darkness, for the darkness map, its reach's polygon and an
+ * area light's parts beyond its area.
+ */
+function withRule(light: EngineLight, reach: LightReach, dark: boolean): EngineLight {
+  const reflected = reach.reflection?.length ? { reflection: reach.reflection } : null;
+  if (dark) return { ...light, area: reach.polygon, ...(reach.parts && { parts: reach.parts }), ...reflected };
+  return reflected ? { ...light, ...reflected } : light;
 }
 
 /** Whether a light that follows the ambient light wakes or falls asleep between two ambient lights. */

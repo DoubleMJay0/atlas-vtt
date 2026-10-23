@@ -5,6 +5,7 @@ import type { SeenSpot } from '../../../vision/perception';
 import type { Sight } from '../../../vision/sight';
 import type { MapBounds, Polygon } from '../../../vision/visibility';
 import type { VisionCone } from '../../../vision/visionCone';
+import type { ReflectionPart } from '../../../vision/reflectedLight';
 
 /** A light in world pixels with its steady settings; colour is linear and already tinted. */
 export interface EngineLight {
@@ -30,7 +31,7 @@ export interface EngineLight {
    * darkness swallows its light. Without it the engine works the area out the same way.
    */
   area?: Polygon;
-  /** Width in world pixels of the soft edge past a beam's sides and far end (`softEdge`); unset, the fade past the dim radius. */
+  /** Width in world pixels of the soft edge past a beam's sides at most (`softEdge`); unset, the tail past the dim radius. */
   edge?: number;
   /**
    * A light that glows from a whole area (lava): its corners, at most `MAX_AREA_CORNERS`. Inside
@@ -40,6 +41,8 @@ export interface EngineLight {
   surface?: readonly { x: number; y: number }[];
   /** Where the rule counts an area light's light beyond its area (`LightReach.parts`), handed on with `area` where one builder made both. */
   parts?: readonly { origin: { x: number; y: number }; polygon: Polygon }[];
+  /** Where its lit floor gives light back (`LightReach.reflection`), as the rule counts it; the same list while it stays. */
+  reflection?: readonly ReflectionPart[];
 }
 
 /** An area with ambient light of its own (`LightZone`), in world pixels; inside `polygon` the rule counts its level. */

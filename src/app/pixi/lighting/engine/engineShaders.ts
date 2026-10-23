@@ -1,4 +1,5 @@
 import { defaultFilterVert } from 'pixi.js';
+import { FULLSCREEN_VERTEX } from './glsl';
 import { capsuleFieldFragment, capsuleFieldVertex } from './capsuleFieldShader';
 import { cascadeFragment, cascadeVertex, emissionFragment, resolveFragment } from './cascadeShaders';
 import { compositeFragment } from './compositeShader';
@@ -11,6 +12,7 @@ import { tileSmoothFragment } from './tileSmoothShader';
 import { areaBlurFragment, areaDistanceFragment, areaTileFragment } from './areaTileShader';
 import { zoneFragment } from './zoneShader';
 import { roofFragment } from './roofShader';
+import { reflectionBlurFragment, reflectionFragment, reflectionVertex } from './reflectionShader';
 
 export interface EngineShaderSource {
   readonly name: string;
@@ -31,6 +33,8 @@ export const ENGINE_SHADERS = {
   areaTile: { name: 'atlas-area-light-tile', vertex: tileVertex, fragment: areaTileFragment },
   areaBlur: { name: 'atlas-area-light-blur', vertex: tileVertex, fragment: areaBlurFragment },
   tileLimited: { name: 'atlas-visibility-tile-limited', vertex: limitedVertex, fragment: limitedFragment },
+  reflection: { name: 'atlas-reflected-light', vertex: reflectionVertex, fragment: reflectionFragment },
+  reflectionBlur: { name: 'atlas-reflected-light-blur', vertex: FULLSCREEN_VERTEX, fragment: reflectionBlurFragment },
   lightMap: { name: 'atlas-light-map', vertex: lightMapVertex, fragment: lightMapFragment },
   darkness: { name: 'atlas-darkness', vertex: darknessVertex, fragment: darknessFragment },
   pierce: { name: 'atlas-darkness-pierce', vertex: pierceVertex, fragment: pierceFragment },

@@ -1,3 +1,4 @@
+import { TAIL_POWER } from '../../../lighting/lightingConstants';
 /**
  * PIXI compiles a shader as GLSL ES 1.00 unless its source starts with this line; `textureLod()`,
  * `flat` and the other WebGL2 features the engine uses need ES 3.00, so every engine shader starts with it.
@@ -88,6 +89,18 @@ vec3 neutral(vec3 color) {
 }
 vec3 nightShift(vec3 lit, float night) {
   return mix(lit, vec3(dot(lit, LUMA)) * vec3(0.86, 0.96, 1.18), night);
+}`;
+
+/**
+ * A light's tail (`LIGHT_TAIL`): the share of its light left at u, 1 where the tail starts and 0
+ * where the light ends. What the eye sees falls as u³(4 − 3u), level at both ends and falling
+ * early, so it eases out without a ring and leaves a long, faint end, as light spilling into the
+ * dark does; the light falls as that to the power `TAIL_POWER`, about the display's own.
+ */
+export const TAIL_GLSL = `
+float tail(float u) {
+  u = clamp(u, 0.0, 1.0);
+  return pow(u * u * u * (4.0 - 3.0 * u), ${TAIL_POWER.toFixed(2)});
 }`;
 
 /** Share of a unit disc left of x (-1..1). */

@@ -11,6 +11,9 @@ import type { WallSegment } from '../../src/app/types/wallTypes';
 import type { MeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { LightingRenderer } from '../../src/app/pixi/lighting/LightingRenderer';
 import { readRgba } from '../../src/app/pixi/lighting/engine/__tests__/gpuTestUtils';
+import { lightLevelAt } from '../../src/app/vision/lightLevels';
+import { tokenPerception } from '../../src/app/vision/tokenPerception';
+import type { Point } from '../../src/app/types/visionTypes';
 
 vi.mock('events', async () => import('eventemitter3'));
 
@@ -32,9 +35,30 @@ function rooms(): WallSegment[] {
   ];
 }
 
-function token(x: number, y: number, vision: TokenEntity['vision']): TokenEntity {
-  return { id: 'hero', kind: 'token', imagePath: '', x, y, size: 1, layer: 0, rotation: 0, isHidden: false, vision };
+function token(x: number, y: number, vision: TokenEntity['vision'], id = 'hero'): TokenEntity {
+  return { id, kind: 'token', imagePath: '', x, y, size: 1, layer: 0, rotation: 0, isHidden: false, ...(vision && { vision }) };
 }
+
+/**
+ * Room A (100..500 square) with a corridor leaving its east wall at the south (500..680 ×
+ * 420..500), which turns north at its end (600..680) into room B (520..980 × 100..340): a light in
+ * room A lights the corridor and the turn's floor, and room B lies round the turn's corner. From
+ * room B's south-east a passage (900..980) leads down into room C (700..980 × 520..900), round a
+ * second corner.
+ */
+function cornerRooms(): WallSegment[] {
+  return [
+    wall(100, 100, 500, 100), wall(100, 100, 100, 500), wall(100, 500, 680, 500), wall(500, 100, 500, 420),
+    wall(500, 420, 600, 420), wall(600, 420, 600, 340), wall(680, 500, 680, 340), wall(520, 340, 600, 340),
+    wall(680, 340, 900, 340), wall(520, 100, 520, 340), wall(520, 100, 980, 100), wall(980, 100, 980, 900),
+    wall(900, 340, 900, 520), wall(700, 520, 900, 520), wall(700, 520, 700, 900), wall(700, 900, 980, 900),
+  ];
+}
+
+/** Room B next to the turn, where the light round the corner falls. */
+const NEAR_TURN = { x0: 560, x1: 760, y0: 230, y1: 335 };
+/** Room C, round the second corner. */
+const ROOM_C = { x0: 710, x1: 890, y0: 530, y1: 890 };
 
 function light(x: number, y: number, extra: Partial<LightSource> = {}): LightSource {
   return { id: 'light', kind: 'light', x, y, emission: TORCH, ...extra };
@@ -70,6 +94,11 @@ describe('light that reaches a room a party token stands in', () => {
 
   /** The players' picture of the scene through the view's own lighting, as the canvas shows it in session view. */
   async function picture(objects: Partial<ViewAtlasState['objects']>, lighting: Partial<ViewAtlasState['lighting']>): Promise<Shot> {
+    return (await scene(objects, lighting)).shot;
+  }
+
+  /** `picture`, with the rule as the view has it. */
+  async function scene(objects: Partial<ViewAtlasState['objects']>, lighting: Partial<ViewAtlasState['lighting']>): Promise<{ shot: Shot; view: LightingRenderer; tokens: Record<string, TokenEntity> }> {
     const renderer = new WebGLRenderer();
     await renderer.init({ width: MAP, height: MAP, backgroundAlpha: 1, useBackBuffer: true });
     const app = new Application();
@@ -108,7 +137,8 @@ describe('light that reaches a room a party token stands in', () => {
     }
     renderer.render({ container: app.stage, target, clear: true });
     const pixels = readRgba(renderer, target);
-    return { pixels, at: (x, y) => [pixels[(y * MAP + x) * 4]!, pixels[(y * MAP + x) * 4 + 1]!, pixels[(y * MAP + x) * 4 + 2]!] };
+    const shot: Shot = { pixels, at: (x, y) => [pixels[(y * MAP + x) * 4]!, pixels[(y * MAP + x) * 4 + 1]!, pixels[(y * MAP + x) * 4 + 2]!] };
+    return { shot, view, tokens: store.getState().objects.tokens };
   }
 
   const sum = (pixel: readonly number[]): number => pixel[0]! + pixel[1]! + pixel[2]!;
@@ -138,5 +168,54 @@ describe('light that reaches a room a party token stands in', () => {
     }
     // The light reaches into room B through the opening.
     expect(lit).toBeGreaterThan(1000);
+  });
+
+  /**
+   * Reflected light: what a light's lit floor gives back reaches round a corner, as far as what
+   * is left of its range; the rule counts it dim, a token standing in it is seen, and a room
+   * round a second corner stays dark. The floor there (#8a857c) shows a mean of 96 (torch) and
+   * 83 (lava) in the sum of its channels, where it was black before reflected light; it must
+   * show at least 70.
+   */
+  it.each([
+    ['torch', light(420, 460), 70],
+    ['lava', light(555, 465, { emission: { bright: 5, dim: 20, color: '#ff8a3d', intensity: 1, animation: 'none', kind: 'custom' }, area: [{ x: 520, y: 440 }, { x: 590, y: 440 }, { x: 590, y: 490 }, { x: 520, y: 490 }] }), 70],
+  ])('lights the room round the corner from a %s, and not the room round two', async (name, source, threshold) => {
+    const walls = Object.fromEntries(cornerRooms().map((w) => [w.id, w]));
+    const objects = { walls, lights: { light: source }, tokens: { hero: token(820, 200, { enabled: true }) } };
+    const { shot: seeing, view, tokens } = await scene(objects, {});
+    const all = await picture(objects, { tokenVision: false });
+    await savePng(seeing.pixels, `corner-${name}-vision`);
+    await savePng(all.pixels, `corner-${name}-no-vision`);
+    const reaches = view.lightReaches();
+    const ambient = view.ambientLight();
+    const direct = reaches.map(({ reflection: _reflection, ...reach }) => reach);
+    const level = (p: Point, lights = reaches): string => lightLevelAt(p, ambient, lights);
+    // Next to the turn: lit by the reflection alone, as the rule counts it, and as the picture shows it.
+    const reflected: Point[] = [];
+    let brightness = 0;
+    for (let y = NEAR_TURN.y0; y < NEAR_TURN.y1; y += 3) {
+      for (let x = NEAR_TURN.x0; x < NEAR_TURN.x1; x += 3) {
+        if (level({ x, y }, direct) !== 'dark' || level({ x, y }) !== 'dim') continue;
+        reflected.push({ x, y });
+        brightness += sum(all.at(x, y));
+        // The party's own picture shows it as the scene has it, or the memory of it where that is brighter.
+        expect([x, y, sum(seeing.at(x, y)) >= sum(all.at(x, y)) - 3]).toEqual([x, y, true]);
+      }
+    }
+    expect(reflected.length).toBeGreaterThan(100);
+    expect(brightness / reflected.length).toBeGreaterThan(threshold);
+    // A goblin standing in it, without vision of its own, is seen by the party in room B, and only by that light.
+    const at = reflected[Math.floor(reflected.length / 2)]!;
+    const withGoblin = { ...tokens, goblin: token(at.x, at.y, undefined, 'goblin') };
+    expect(tokenPerception(view.currentSight(), ambient, reaches, withGoblin)('goblin')).toBe('seen');
+    expect(tokenPerception(view.currentSight(), ambient, direct, withGoblin)('goblin')).toBe('unseen');
+    // Round the second corner: nothing, by the rule and in the picture.
+    for (let y = ROOM_C.y0; y < ROOM_C.y1; y += 5) {
+      for (let x = ROOM_C.x0; x < ROOM_C.x1; x += 5) {
+        expect([x, y, level({ x, y })]).toEqual([x, y, 'dark']);
+        expect([x, y, sum(all.at(x, y)) <= 6]).toEqual([x, y, true]);
+      }
+    }
   });
 });

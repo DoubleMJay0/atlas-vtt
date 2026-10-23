@@ -1,6 +1,6 @@
 import { BufferImageSource, Texture } from 'pixi.js';
 import { afterEach, describe, expect, it } from 'vitest';
-import { LIGHT_REACH } from '../../../../lighting/lightingConstants';
+import { LIGHT_REACH, TAIL_POWER } from '../../../../lighting/lightingConstants';
 import { LIGHT_PRESETS, LIGHT_PRESET_IDS } from '../../../../lighting/lightPresets';
 
 /** The presets that give light: a darkness has no falloff. */
@@ -189,13 +189,14 @@ describe('light falloff as the players see it', () => {
     expect(measured).toBeGreaterThan(3);
   });
 
-  it('fades out past the dim radius and shows nothing from the reach on', async () => {
+  it('eases out past the dim radius and shows nothing from the reach on', async () => {
     const profile = await profileOf(LIGHT_PRESETS.torch.emission);
     const level = brightLevel(profile);
     const edge = profile.at(profile.dim - 2);
-    const halfway = profile.at((profile.dim + profile.reach) / 2);
-    expect(halfway).toBeLessThan(0.75 * edge);
-    expect(halfway).toBeGreaterThan(0.1 * edge);
+    // Halfway along the tail the eye sees about a third of the edge (`TAIL_GLSL`, u³(4 − 3u) at a half is 0.31).
+    const seen = (profile.at((profile.dim + profile.reach) / 2) / edge) ** (1 / TAIL_POWER);
+    expect(seen).toBeLessThan(0.5);
+    expect(seen).toBeGreaterThan(0.2);
     // Past the reach only bounced light is left: under a fiftieth of the bright level.
     for (const d of [profile.reach + 2, profile.reach + 20, profile.reach + 60]) expect(profile.at(d)).toBeLessThan(0.02 * level);
   });

@@ -29,11 +29,22 @@ export const TILE_BAND_TEXELS = 1 << 17;
  */
 export const TILE_SMOOTH = 4;
 /**
- * A light fades out from its dim radius to this multiple of it, where it ends. The rules count
- * nothing past the dim radius as lit, so the fade is as short as a soft edge allows: at 1.06 a
- * candle looked cut out.
+ * The picture's tail: past its dim radius, where the rules stop counting it, a light eases out
+ * over this share of the dim radius, as real light spills into the dark (a fade of 8 % looked
+ * like light that stops; Fabian, 2026-10-23). What lies in the tail looks faintly lit and is not
+ * counted: a token standing there is unseen. Walls stop the tail like any light.
  */
-export const LIGHT_REACH = 1.08;
+export const LIGHT_TAIL = 0.5;
+/** Where a light ends in the picture, as a multiple of its dim radius: its tiles reach this far. */
+export const LIGHT_REACH = 1 + LIGHT_TAIL;
+/**
+ * The tail is shaped in what the eye sees, not in light (`TAIL_GLSL`): the light itself falls as
+ * that curve to this power, about the display's (sRGB is near a 2.4 power), so its brightness
+ * on screen eases out without a ring at the dim radius and without a visible end.
+ */
+export const TAIL_POWER = 2.4;
+/** Rays a light's tile traces across its flame in its tail, at most: the tail is faint, and far texels cost the most. */
+export const TAIL_RAYS = 8;
 /**
  * How much light a light gives in its two ranges (HDR, before exposure): `bright` up to the
  * bright radius, `dim` from there to the dim radius, with a soft knee between them. The
@@ -51,26 +62,24 @@ export const MIN_SOFTNESS = 0.12;
 export const PURKINJE = 0.55;
 
 /**
- * How wide, in world pixels, a light's edge is soft where the rules give it a hard one: past the
- * sides of a beam, and past its far end. No wider than the fade past a dim radius, and never
- * more than half a cell: what lies there looks lit and is not counted, so a token standing in
- * it is hidden on a floor that seems lit.
+ * How wide, in world pixels, a beam's sides are soft at most: as long as the tail past its dim
+ * radius. What lies there looks lit and is not counted, like the tail.
  */
-export function softEdge(dim: number, cellSize: number): number {
-  return Math.min((LIGHT_REACH - 1) * dim, cellSize / 2);
+export function softEdge(dim: number): number {
+  return LIGHT_TAIL * dim;
 }
 /**
  * A light that shines one way gives its full light inside its cone, where the rules count it,
- * and falls off past the cone's sides over its soft edge (`softEdge`, a width, not an angle: an
- * angle grows with the distance), steeply at first. That width is also held to a share
- * (`BEAM_EDGE`) of the beam's half-width at that distance (`beamEdge`), so a narrow or short
- * beam has a narrow edge: a fixed width lit more floor beside such a beam than the beam itself
- * (`beamSpill.gpu.test.ts`). A beam wider than a half turn leaves a dark wedge behind the
- * light, and the edge is held to that wedge's half-width instead, so it never fills the wedge.
- * The beam's far end fades over the edge it has there (`beamEnd`), and its own space (the
- * cone's apex), which is lit all around, over the edge it has at that radius.
+ * and eases out past the cone's sides as past its dim radius (`TAIL_GLSL`), over its soft edge
+ * (`softEdge`, a width, not an angle: an angle grows with the distance). That width is also held
+ * to a share (`BEAM_EDGE`) of the beam's half-width at that distance (`beamEdge`), so a beam
+ * keeps its shape: a narrow beam has narrow soft sides, which widen with the distance as a real
+ * beam's penumbra does. A beam wider than a half turn leaves a dark wedge behind the light, and
+ * the edge is held to that wedge's half-width instead, so it never fills the wedge. The beam's
+ * far end has the tail every light has, and its own space (the cone's apex), which is lit all
+ * around, eases out over the edge it has at that radius.
  */
-export const BEAM_EDGE = 0.06;
+export const BEAM_EDGE = 0.4;
 /** A beam's edge is never narrower than this many texels of the light map, where it is drawn: a narrower one shows the texels as steps. */
 export const BEAM_EDGE_TEXELS = 1;
 
@@ -83,10 +92,6 @@ export function beamEdge(edge: number, distance: number, angle: number, texel: n
   return Math.min(edge, Math.max(BEAM_EDGE_TEXELS * texel, BEAM_EDGE * distance * Math.sin(Math.min(angle / 2, Math.PI - angle / 2))));
 }
 
-/** How far past its dim radius a beam of `angle` (radians) fades out: as `beamEdge`, by the beam's own half-width at that radius. */
-export function beamEnd(edge: number, dim: number, angle: number, texel: number): number {
-  return Math.min(edge, Math.max(BEAM_EDGE_TEXELS * texel, BEAM_EDGE * dim * Math.sin(Math.min(angle / 2, Math.PI / 2))));
-}
 
 /**
  * A source of magical darkness swallows all light up to its radius; over the last `rim` world
@@ -100,6 +105,28 @@ export const DARKNESS = {
   rim: 6,
   veil: [0.003, 0.0026, 0.011],
   gmVeil: [0.03, 0.022, 0.085],
+} as const;
+
+/**
+ * Reflected light: what a light's lit floor gives back into the shadows next to it, one bounce,
+ * so a room round a corner from a torch is dimly lit and a token standing there is seen.
+ * *Rule*: the floor along the edges of the light's shadows reflects; a point with a clear line to
+ * such a point of the floor is in dim light while the whole way, light to floor to point, is no
+ * longer than the light's dim range, and the second part no longer than `share` of it (where
+ * the floor is brightly lit, less where it is less lit) or `cells` grid cells. So a light never
+ * reaches past its own range, and the next room gets what of it is left. *Picture*: in the
+ * light's colour at `level` (HDR) next to brightly lit floor it comes from (less next to less lit
+ * floor), down to `edge` of `level` where the rule stops counting it, then easing out as a light's tail does
+ * (`TAIL_GLSL`) by `fade` times its reach, blurred within the free floor over `blur` of its
+ * longest reach, so the points it is traced from show as one soft spill.
+ */
+export const REFLECTION = {
+  share: 0.4,
+  cells: 3,
+  level: 0.32,
+  edge: 0.45,
+  fade: LIGHT_REACH,
+  blur: 0.1,
 } as const;
 
 export const BOUNCE = {

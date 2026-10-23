@@ -1,6 +1,6 @@
 import type { Renderer, Texture } from 'pixi.js';
 import type { WallSegment } from '../../../types/wallTypes';
-import { BOUNCE, DARKNESS, LIGHT_REACH, beamEnd, tileWallReach, worldTexel } from '../../../lighting/lightingConstants';
+import { BOUNCE, DARKNESS, LIGHT_REACH, tileWallReach, worldTexel } from '../../../lighting/lightingConstants';
 import { DEFAULT_LIGHTING_QUALITY, bouncesOn, type LightingQuality } from '../../../lighting/lightingQuality';
 import { changedWallRects } from '../../../lighting/wallChanges';
 import type { Rect } from '../../../lighting/segments';
@@ -16,6 +16,7 @@ import { areaRadius } from '../../../lighting/lightArea';
 import { filledPieces } from '../../../lighting/polygonFill';
 import { LightMap, type DrawnLight } from './LightMap';
 import { RadianceCascades } from './RadianceCascades';
+import { ReflectionTiles } from './ReflectionTiles';
 import { TileCache, type TilePacer } from './TileCache';
 import type { EngineLight, EngineZone } from './types';
 import { WallFields } from './WallFields';
@@ -53,6 +54,7 @@ export class LightingWorld {
   /** The walls changed since the zones were drawn: their soft edges end at walls. */
   private zonesStale = false;
   private readonly tiles: TileCache;
+  private readonly reflections: ReflectionTiles;
   private readonly pacer: GpuPacer;
   private readonly flicker = new LightFlicker();
   private walls: readonly WallSegment[] | null = null;
@@ -71,6 +73,7 @@ export class LightingWorld {
     this.lightMap = new LightMap(renderer, bounds, this.texel);
     this.cascades = bouncesOn(quality, bounds) ? new RadianceCascades(renderer, bounds, this.fields.tiles) : null;
     this.tiles = new TileCache(renderer, this.fields.tiles, bounds, { rays: quality.tileRays });
+    this.reflections = new ReflectionTiles(renderer, bounds, this.texel);
     const gl = paced ? glOf(renderer) : null;
     this.pacer = new GpuPacer(gl && 'fenceSync' in gl ? gl : null);
   }
@@ -117,12 +120,15 @@ export class LightingWorld {
       }
     }
     // A darkness has no tile: its area is the rule's polygon, which changes with any wall.
-    const tilesChanged = this.tiles.sync(lights.filter((light) => !light.darkness), walls, changed, this.pacer);
+    const shining = lights.filter((light) => !light.darkness);
+    const tilesChanged = this.tiles.sync(shining, walls, changed, this.pacer);
+    // After the fields: a reflection ends at the walls' capsules as a tile does.
+    const reflectionsChanged = this.reflections.sync(shining, this.fieldAll());
     const lightsChanged = !sameLights(this.lights, lights);
     const areasChanged = changed !== 'all' && changed.length === 0 ? false : lights.some((light) => light.darkness);
     if (lightsChanged) this.forgetRemoved(lights);
     this.lights = lights;
-    if (tilesChanged || lightsChanged || areasChanged) {
+    if (tilesChanged || reflectionsChanged || lightsChanged || areasChanged) {
       this.drawSteady();
       this.bounceDirty = true;
     } else if (pierceChanged && this.darknessMap()) {
@@ -220,6 +226,7 @@ export class LightingWorld {
   destroy(): void {
     this.pacer.destroy();
     this.tiles.destroy();
+    this.reflections.destroy();
     this.cascades?.destroy();
     this.lightMap.destroy();
     this.darkness?.destroy();
@@ -275,7 +282,7 @@ export class LightingWorld {
       if (!tile) continue;
       const { intensity, radiusScale } = sample(light);
       // Flicker breathes the bright radius only: where a light ends is where the rules end it.
-      drawn.push({ tile, bright: light.bright * radiusScale, dim: light.dim, reach: light.edge === undefined || !light.cone ? light.dim * LIGHT_REACH : light.dim + beamEnd(light.edge, light.dim, light.cone.angle, this.texel), color: light.color, intensity: light.intensity * intensity, cone: light.cone, edge: light.edge });
+      drawn.push({ tile, bright: light.bright * radiusScale, dim: light.dim, reach: light.dim * LIGHT_REACH, color: light.color, intensity: light.intensity * intensity, cone: light.cone, edge: light.edge, reflection: this.reflections.get(light.key) });
     }
     this.lightMap.draw(drawn);
   }
@@ -292,12 +299,13 @@ export class LightingWorld {
   /**
    * Where a light would shine, as shapes drawn as fans from their origins: a light's area, or an
    * area light's area in convex pieces and the reaches of its outline the rule counts (`parts`,
-   * where the builder handed them on).
+   * where the builder handed them on), and where its reflection reaches.
    */
   private litShapes(light: EngineLight): LitShape[] {
-    if (!light.surface) return [{ origin: { x: light.x, y: light.y }, polygon: this.areaOf(light) }];
+    const reflected = light.reflection ?? [];
+    if (!light.surface) return [{ origin: { x: light.x, y: light.y }, polygon: this.areaOf(light) }, ...reflected];
     const pieces = filledPieces(light.surface).map((piece) => ({ origin: middleOf(piece), polygon: piece }));
-    return [...pieces, ...(light.parts ?? [])];
+    return [...pieces, ...(light.parts ?? []), ...reflected];
   }
 
   /** The area the rule counts for a light: the one it came with, else traced here and kept while the light and the walls stay. */
@@ -325,7 +333,7 @@ function sameLights(a: readonly EngineLight[], b: readonly EngineLight[]): boole
     const y = b[i]!;
     return x.key === y.key && x.x === y.x && x.y === y.y && x.bright === y.bright && x.dim === y.dim && x.flame === y.flame
       && x.intensity === y.intensity && x.animation === y.animation && x.color.every((c, j) => c === y.color[j])
-      && !!x.darkness === !!y.darkness && (x.priority ?? 0) === (y.priority ?? 0) && sameCone(x.cone, y.cone) && x.edge === y.edge && x.area === y.area && x.surface === y.surface && x.parts === y.parts;
+      && !!x.darkness === !!y.darkness && (x.priority ?? 0) === (y.priority ?? 0) && sameCone(x.cone, y.cone) && x.edge === y.edge && x.area === y.area && x.surface === y.surface && x.parts === y.parts && x.reflection === y.reflection;
   });
 }
 

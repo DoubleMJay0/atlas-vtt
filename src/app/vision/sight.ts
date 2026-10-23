@@ -12,6 +12,7 @@ import { GENERIC_SIGHT_RULES, tokenEffects, type SightRules } from './sightRules
 import { resolveSenses, tokenSenses } from './tokenSenses';
 import { computeVisibility, type MapBounds, type Polygon } from './visibility';
 import { areaParts, type AreaSampling, type LightReachPart } from './areaReach';
+import { reflectedArea, type ReflectionPart } from './reflectedLight';
 import { tokenFacing, visionCone, type VisionCone } from './visionCone';
 import { computeTokenPixelSize } from '../pixi/token-renderer/tokenSizing';
 
@@ -110,6 +111,11 @@ export interface LightReach {
    * outline (`areaParts`); `bright` and `dim` count from that point. `origin` is the area's middle.
    */
   parts?: readonly LightReachPart[];
+  /**
+   * Where the light its lit floor gives back reaches (`reflectionParts`): dim light in the shadows
+   * beside it, as far as what is left of the light's dim range. None for a darkness.
+   */
+  reflection?: readonly ReflectionPart[];
 }
 
 /** What a reach is besides its radii. */
@@ -278,9 +284,10 @@ export function areaLightReach(origin: Point, area: readonly Point[], dim: numbe
   return { origin, bright, dim, polygon: area as Polygon, parts: areaParts(area, dim, walls, sampling), ...kindOf(kind) };
 }
 
-/** Every polygon a light lights: its reach, or an area light's area and the reaches of its outline. */
+/** Every polygon a light lights: its reach, or an area light's area and the reaches of its outline, and where its reflection reaches. */
 export function litPolygons(reach: LightReach): Polygon[] {
-  return reach.parts ? [reach.polygon, ...reach.parts.map((part) => part.polygon)] : [reach.polygon];
+  const direct = reach.parts ? [reach.polygon, ...reach.parts.map((part) => part.polygon)] : [reach.polygon];
+  return reach.reflection?.length ? [...direct, ...reflectedArea(reach.reflection)] : direct;
 }
 
 /** The fields of `kind` that say something: a light without them is stored as it always was. */
