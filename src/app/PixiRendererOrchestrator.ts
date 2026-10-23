@@ -664,6 +664,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.releaseMapImage();
     this.mapImage = mapImage;
     viewport.addChildAt(mapImage.layer, 0);
+    mapImage.layer.zIndex = MAP_LAYER_Z.mapImage;
     this.placeLiquids(viewport, mapImage);
     this.gridSystem?.setMapImage(mapImage);
     const stopChanges = mapImage.onChange((change) => this.mapImageChanged(change));
@@ -679,11 +680,15 @@ export class PixiRendererOrchestrator { // Renamed class
     this.mapImageChanged('image');
   }
 
-  /** Puts the liquid surfaces right above the map image, beneath the grid and everything the lighting lights after the map. */
+  /**
+   * Puts the liquid surfaces right above the map image, beneath the grid and everything the
+   * lighting lights after the map. By zIndex: the grid inserts itself right above the map image.
+   */
   private placeLiquids(viewport: Viewport, mapImage: MapImage): void {
     const app = this.pixiAppManager.getApp();
-    if (!app?.renderer) return;
+    if (!app?.renderer || !app.ticker) return;
     this.liquids ??= createViewLiquids(app, viewport, this.store);
+    this.liquids.container.zIndex = MAP_LAYER_Z.liquids;
     viewport.addChildAt(this.liquids.container, viewport.getChildIndex(mapImage.layer) + 1);
   }
 
