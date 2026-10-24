@@ -183,11 +183,13 @@ export function onWall(fs: FurnishSpace, kind: PropKind, count: number): Dungeon
     return across ? [across] : [];
   }
   const sides = spec.wall === 'outer' && fs.outer ? WALL_SIDES.filter((side) => fs.outer?.has(side)) : WALL_SIDES;
-  const runs = sides.flatMap((side) => wallRuns(fs, side, spec.footprint.along, false).map((run) => ({ side, run })));
+  // A hanging is drawn wider than its cells: a cell of whole wall either side keeps it off a corner and a door.
+  const runs = sides.flatMap((side) => wallRuns(fs, side, spec.footprint.along + 2, false).map((padded) => ({ side, padded })));
   const out: DungeonProp[] = [];
-  for (const { side, run } of shuffled(fs.rng, runs)) {
+  for (const { side, padded } of shuffled(fs.rng, runs)) {
     if (out.length >= count) break;
-    const placed = hangPiece(fs, kind, run, side);
+    if (padded.some((c) => fs.hung.has(`${cellKey(c.x, c.y)},${side}`))) continue;
+    const placed = hangPiece(fs, kind, padded.slice(1, -1), side);
     if (placed) out.push(placed);
   }
   return out;

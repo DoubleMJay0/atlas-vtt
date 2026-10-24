@@ -80,6 +80,21 @@ describe('cell furniture', () => {
     }
   });
 
+  it('hangs no wall piece in a corner or beside a door, where its drawing would cover the next wall', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const fs = furnished(5, 4, { seed, north: true });
+      onWall(fs, 'portrait', 8);
+      expect(fs.placed.length).toBeGreaterThan(0);
+      for (const { prop } of fs.placed) {
+        // Never in the corner cells of the 5 × 4 room, never beside the middle of the north or south wall's door.
+        const x = Math.floor(prop.x);
+        const y = Math.floor(prop.y);
+        expect(x === 0 || x === 4 ? y >= 1 && y <= 2 : true, `seed ${seed} at ${prop.x},${prop.y}`).toBe(true);
+        expect((y <= 0 || y >= 3) && Math.abs(x - 2) <= 1, `seed ${seed} at ${prop.x},${prop.y}`).toBe(false);
+      }
+    }
+  });
+
   it('never splits a room', () => {
     const kinds: PropKind[] = ['bed', 'table', 'shelves', 'bookshelf', 'wardrobe', 'barrel', 'crate', 'desk', 'bunk', 'chest', 'planter', 'armour-stand'];
     for (let seed = 1; seed <= 200; seed++) {
