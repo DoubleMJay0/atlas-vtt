@@ -4,12 +4,18 @@ import type { GlyphFit } from '../../propShapes';
 import { rngFrom } from '../../../rng';
 import { stoneOutline } from '../../terrain/stones';
 import { hash2, valueNoise } from '../../art/noise';
+import type { Face } from './finish';
 
 /**
  * What nature built in a cave, seen from straight above, in cells round the piece's centre (the
  * room towards −y; a wall piece's wall runs along y = +0.1). Every outline is worked out once here
  * and shared by both painters, so the Stone and the Engraved drawing and the shadow agree.
  */
+
+/** A ring with its first point repeated at its end, to draw it as an open run that closes. */
+export function closed(ring: readonly Vec[]): Vec[] {
+  return [...ring, ring[0]!];
+}
 
 /** A lobed ring round `c`: `lobes` swellings of `amp` (a share of `r`), a second, finer rhythm over them. */
 export function lobed(c: Vec, r: number, lobes: number, amp: number, phase: number, n = 28): Vec[] {
@@ -24,8 +30,6 @@ export function lobed(c: Vec, r: number, lobes: number, amp: number, phase: numb
 export interface Mound {
   c: Vec;
   r: number;
-  /** Where its tip stands off its foot's centre, as a share of its radius. */
-  lean: Vec;
   foot: Vec[];
   rings: Vec[][];
   tip: Vec;
@@ -38,7 +42,7 @@ function mound(x: number, y: number, r: number, lean: Vec, phase: number): Mound
   const lobes = r < 0.1 ? 3 : 5;
   const points = (radius: number): number => Math.max(lobes * 4, Math.round(radius * 85));
   const rings = [0.72, 0.48, 0.27].map((s, i) => lobed({ x: x + lean.x * r * (1 - s), y: y + lean.y * r * (1 - s) }, r * s, lobes, 0.06 - i * 0.012, phase + i * 0.9, points(r * s)));
-  return { c, r, lean, foot: lobed(c, r, lobes, 0.07, phase, points(r)), rings, tip: { x: x + lean.x * r * 0.86, y: y + lean.y * r * 0.86 } };
+  return { c, r, foot: lobed(c, r, lobes, 0.07, phase, points(r)), rings, tip: { x: x + lean.x * r * 0.86, y: y + lean.y * r * 0.86 } };
 }
 
 /** A clump of stalagmites, the tallest in its middle, the smallest at its edges, each leaning a little its own way; no two feet overlap, so the clump is drawn as one. */
@@ -92,8 +96,6 @@ export const COLUMN = {
 /** How far the column's fluted shaft certainly reaches: its outline lighting takes as a wall. */
 export const COLUMN_SOLID = 0.24;
 
-/** The wall's line, a wall piece's back; what lies on the wall stops short of its ink. */
-export const WALL = 0.1;
 /** How far a wall piece's sheet reaches up to its wall. */
 export const SHEET_TOP = 0.072;
 
@@ -137,7 +139,6 @@ export function curtainLine(fit: GlyphFit): Vec[] {
   return Array.from({ length: steps + 1 }, (_, k) => {
     const t = k / steps;
     const end = Math.min(1, Math.min(t, 1 - t) * folds);
-    // Folds of slightly different depth, as a drapery grows.
     // Folds of different depth, as a drapery grows, its line drifting a little off the wall and back.
     const fold = Math.floor(t * folds * 2);
     const deep = 0.022 + 0.013 * hash2(fold, 1, 53);
@@ -179,7 +180,7 @@ export interface Crystal {
   /** Its body from the rock to the termination: the hull of both ends. */
   body: Vec[];
   /** The body's two long sides either side of its ridge, each with the way it faces. */
-  sides: { poly: Vec[]; out: Vec }[];
+  sides: Face[];
   ridge: Vec[];
   r: number;
 }
@@ -238,14 +239,13 @@ export interface Block {
   outline: Vec[];
   top: Vec[];
   c: Vec;
-  r: number;
 }
 
 function block(seed: number, c: Vec, r: number, topShift: Vec): Block {
   const outline = stoneOutline(rngFrom(seed), c, r);
   // The top: the outline drawn in towards a point a little up the slope, as a block's flat face lies.
   const t = { x: c.x + topShift.x, y: c.y + topShift.y };
-  return { outline, top: outline.map(p => ({ x: t.x + (p.x - t.x) * 0.56, y: t.y + (p.y - t.y) * 0.56 })), c, r };
+  return { outline, top: outline.map(p => ({ x: t.x + (p.x - t.x) * 0.56, y: t.y + (p.y - t.y) * 0.56 })), c };
 }
 
 /** One large block and a smaller one broken from it, with chips at their foot. */

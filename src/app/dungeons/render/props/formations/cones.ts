@@ -3,7 +3,7 @@ import { pathBounds, polyPath, polysPath, type PathFn } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
 import { calcite, fineRuns, type Finish } from './finish';
-import type { Mound } from './shapes';
+import { closed, type Mound } from './shapes';
 
 /**
  * Cones of calcite seen from straight above: the flank turned from the light falls into shade from
@@ -36,15 +36,15 @@ function flank(cone: Cone, dir: Vec, threshold: number): Vec[] {
 }
 
 /**
- * Models every cone in `cones`: Stone shades its far flank in `steps` nested wedges and, where
- * `lit`, lightens the flank towards the light; Engraved hatches a field deepening away from it.
+ * Models every cone in `cones`: Stone lightens the flank towards the light and shades the far one
+ * as wedges from the apex; Engraved hatches a field deepening away from the light.
  */
-export function shadeCones(pen: GlyphPen, cones: readonly Cone[], strength: number, finish: Finish, steps = 2, lit = false): void {
+function shadeCones(pen: GlyphPen, cones: readonly Cone[], finish: Finish): void {
   const light = lightInGlyph(pen);
   if (finish.painter === 'stone') {
     const wedges = (dir: Vec, threshold: number): PathFn => polysPath(cones.map(c => flank(c, dir, threshold)).filter(w => w.length > 2));
-    if (lit) finish.lit(pen, wedges(light, 0.3), 0.7);
-    for (const threshold of [0.15, 0.6].slice(0, steps)) finish.shaded(pen, wedges({ x: -light.x, y: -light.y }, threshold), strength * 0.55);
+    finish.lit(pen, wedges(light, 0.3), 0.7);
+    finish.shaded(pen, wedges({ x: -light.x, y: -light.y }, 0.15), 0.55);
     return;
   }
   for (const { foot, apex, reach } of cones) {
@@ -57,7 +57,7 @@ export function shadeCones(pen: GlyphPen, cones: readonly Cone[], strength: numb
       const d = Math.hypot(dx, dy);
       if (d < 1e-6) return 0;
       const away = -(dx * light.x + dy * light.y) / d;
-      return strength * Math.max(0, away + 0.15) ** 0.9 * Math.min(1, d / (reach * 0.45));
+      return 0.5 * Math.max(0, away + 0.15) ** 0.9 * Math.min(1, d / (reach * 0.45));
     }, bounds, path, 'shade');
   }
 }
@@ -72,15 +72,12 @@ export function glint(pen: GlyphPen, c: Vec, r: number, spread: number): Vec[] {
   });
 }
 
-/** One rounded part of a clump: its cone, the fine lines on it, where it glints, and whether its outline gets the painter's lips. */
+/** One rounded part of a clump: its cone, the fine lines on it and where it glints. */
 export interface ClumpPart {
   cone: Cone;
   lines: Vec[][];
   glints: Vec[][];
-  lips?: boolean;
 }
-
-const closed = (ring: readonly Vec[]): Vec[] => [...ring, ring[0]!];
 
 /** A stalagmite as a part of its clump: rings of growth climbing to its tip; a great one's splash cup in its tip, and where it glints. */
 export function moundPart(pen: GlyphPen, m: Mound): ClumpPart {
@@ -94,8 +91,8 @@ export function moundPart(pen: GlyphPen, m: Mound): ClumpPart {
 
 /**
  * Rounded calcite parts that do not overlap, drawn together: every foot, every lit and shaded flank,
- * every fine line, glint and outline is one path for the whole clump. Parts with `lips` take the
- * painter's lit lip and shade; Engraved also gives its shade line to any part large enough to carry it.
+ * every fine line, glint and outline is one path for the whole clump. Engraved gives its shade
+ * line to any part large enough to carry it; on a smaller one it would swallow the part.
  */
 export function drawClump(pen: GlyphPen, parts: readonly ClumpPart[], finish: Finish): void {
   const { ctx } = pen;
@@ -103,10 +100,10 @@ export function drawClump(pen: GlyphPen, parts: readonly ClumpPart[], finish: Fi
   polysPath(parts.map(p => p.cone.foot))(ctx);
   ctx.fillStyle = calcite(pen);
   ctx.fill();
-  shadeCones(pen, parts.map(p => p.cone), finish.painter === 'stone' ? 1 : 0.5, finish, 1, true);
-  fineRuns(pen, parts.flatMap(p => p.lines), false, 0.7);
+  shadeCones(pen, parts.map(p => p.cone), finish);
+  fineRuns(pen, parts.flatMap(p => p.lines), 0.7);
   finish.sheen(pen, parts.flatMap(p => p.glints));
-  const edged = (p: ClumpPart): boolean => p.lips === true || (finish.painter === 'engraved' && p.cone.reach >= 0.1);
+  const edged = (p: ClumpPart): boolean => finish.painter === 'engraved' && p.cone.reach >= 0.1;
   pen.hand.line(parts.filter(p => !edged(p)).map(p => [...p.cone.foot]), 'outline', true);
   for (const p of parts.filter(edged)) glyphEdges(pen, p.cone.foot, true);
 }

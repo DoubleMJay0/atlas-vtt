@@ -1,4 +1,4 @@
-import type { CellPoint, DungeonModel, DungeonProp, PropKind, TerrainKind } from '../../../src/app/dungeons/model';
+import type { CellPoint, DungeonModel, PropKind, TerrainKind } from '../../../src/app/dungeons/model';
 import { draft } from '../../../src/app/dungeons/terrain/catalog';
 import { addRoom, emptyModel } from '../../fixtures/dungeonModelBuilder';
 import type { GlyphSpecimen, SpecimenPiece } from './types';
@@ -23,8 +23,7 @@ function cave(): DungeonModel {
     addRoom(floor, { x, y, w, h, cells });
   }
   const prop = (kind: PropKind, room: number, x: number, y: number, rotation = 0, along?: number): void => {
-    const piece: DungeonProp = { kind, x, y, room, rotation, scale: 1, ...(along && { size: { along, out: 0 } }) };
-    floor.props.push(piece);
+    floor.props.push({ kind, x, y, room, rotation, scale: 1, ...(along && { size: { along, out: 0 } }) });
   };
   const terrain = (kind: TerrainKind, room: number, cells: CellPoint[]): void => {
     floor.terrain.push({ id: floor.terrain.length, ...draft(kind, room, cells) });

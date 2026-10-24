@@ -1,5 +1,5 @@
 import { glyphTone, lightInGlyph } from '../../art/glyphLight';
-import { pathBounds, polyPath, runsPath, type PathFn } from '../../art/paths';
+import { pathBounds, polyPath, polysPath, runsPath, type PathFn } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
 import { mixColours, withAlpha } from '../../palette';
@@ -17,7 +17,7 @@ export interface Finish {
   shaded(pen: GlyphPen, path: PathFn, strength: number): void;
   /** Wet calcite's highlight: short strokes where the light glints. */
   sheen(pen: GlyphPen, runs: readonly (readonly Vec[])[]): void;
-  /** Whether the painter cuts a heavy shade line on a raised part's far edges (Engraved does, through `glyphEdges`). */
+  /** Which painter finishes, for the few places a drawing differs beyond light and shade. */
   painter: 'stone' | 'engraved';
   /** A band of mineral stain in calcite: Stone washes it with the warm tone iron leaves; Engraved leaves it to its lines. */
   stain(pen: GlyphPen, path: PathFn): void;
@@ -85,8 +85,14 @@ export function facing(pen: GlyphPen, out: Vec): number {
   return (out.x * light.x + out.y * light.y) / len;
 }
 
+/** A plane of a formation and the direction it faces outward, in the glyph's frame. */
+export interface Face {
+  poly: Vec[];
+  out: Vec;
+}
+
 /** Faces split by the light: those turned to it and those turned away, each as one path, with how strongly. */
-export function splitByLight(pen: GlyphPen, faces: readonly { poly: Vec[]; out: Vec }[], finish: Finish, threshold = 0.15): void {
+export function splitByLight(pen: GlyphPen, faces: readonly Face[], finish: Finish, threshold = 0.15): void {
   const lit: Vec[][] = [];
   const shaded: Vec[][] = [];
   let litBy = 0;
@@ -105,26 +111,27 @@ export function splitByLight(pen: GlyphPen, faces: readonly { poly: Vec[]; out: 
   if (shaded.length) finish.shaded(pen, path => shaded.forEach(p => polyPath(p)(path)), 0.35 + 0.45 * shadedBy);
 }
 
-/** Fills a closed outline in `fill` and inks it at the outline weight, or the fine weight. */
-export function fillOutline(pen: GlyphPen, poly: readonly Vec[], fill: string, weight: 'outline' | 'fine' | 'none' = 'outline'): void {
+/** Fills closed outlines in `fill` as one path. */
+export function fillPolys(pen: GlyphPen, polys: readonly (readonly Vec[])[], fill: string): void {
   const { ctx } = pen;
   ctx.beginPath();
-  polyPath(poly)(ctx);
+  polysPath(polys)(ctx);
   ctx.fillStyle = fill;
   ctx.fill();
-  if (weight === 'none') return;
-  ctx.save();
-  if (weight === 'fine') ctx.lineWidth = pen.fine;
-  ctx.stroke();
-  ctx.restore();
+}
+
+/** Fills a closed outline in `fill` and inks it at the outline weight. */
+export function fillOutline(pen: GlyphPen, poly: readonly Vec[], fill: string): void {
+  fillPolys(pen, [poly], fill);
+  pen.ctx.stroke();
 }
 
 /** Open runs at the fine weight, `alpha` of the ink. */
-export function fineRuns(pen: GlyphPen, runs: readonly (readonly Vec[])[], closed = false, alpha = 1): void {
+export function fineRuns(pen: GlyphPen, runs: readonly (readonly Vec[])[], alpha = 1): void {
   const { ctx } = pen;
   ctx.save();
   ctx.beginPath();
-  runsPath(runs, closed)(ctx);
+  runsPath(runs)(ctx);
   ctx.lineWidth = pen.fine;
   if (alpha < 1) ctx.globalAlpha = alpha;
   ctx.stroke();

@@ -4,8 +4,8 @@ import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
 import type { GlyphFit } from '../../propShapes';
 import { drawClump, glint, moundPart } from './cones';
-import { calcite, calciteGrain, facing, fillOutline, fineRuns, outlineRuns, splitByLight, type Finish } from './finish';
-import { COLUMN, MOUND_PAD, MOUNDS, SHEET_TOP, curtainFoot, curtainLine, flowLobes, flowSheet, ribbon } from './shapes';
+import { calcite, calciteGrain, facing, fillOutline, fillPolys, fineRuns, outlineRuns, splitByLight, type Face, type Finish } from './finish';
+import { COLUMN, MOUND_PAD, MOUNDS, SHEET_TOP, closed, curtainFoot, curtainLine, flowLobes, flowSheet, ribbon } from './shapes';
 
 /**
  * Calcite that dripping water built: stalagmites as cones seen from straight above (rings of growth
@@ -31,10 +31,10 @@ export function columnFormation(pen: GlyphPen, _fit: GlyphFit, finish: Finish): 
   });
   const column = {
     cone: { foot: shaft, apex: centre, reach: 0.25 },
-    lines: [...flutes, [...core, core[0]!]],
+    lines: [...flutes, closed(core)],
     glints: [glint(pen, centre, 0.19, 0.9), glint(pen, centre, 0.1, 1.1)],
   };
-  fineRuns(pen, drips.map(d => [...d, d[0]!]), false, 0.7);
+  fineRuns(pen, drips.map(closed), 0.7);
   drawClump(pen, [...foot.map(m => moundPart(pen, m)), column], finish);
 }
 
@@ -42,14 +42,14 @@ export function columnFormation(pen: GlyphPen, _fit: GlyphFit, finish: Finish): 
  * The faces of a strip between two runs, each facing the way its outer run's segment does; faces
  * in a row that the light falls on alike are joined into one, so a long strip is a few faces.
  */
-function strip(pen: GlyphPen, outer: readonly Vec[], inner: readonly Vec[], threshold: number): { poly: Vec[]; out: Vec }[] {
+function strip(pen: GlyphPen, outer: readonly Vec[], inner: readonly Vec[], threshold: number): Face[] {
   const kind = (i: number): number => {
     const a = outer[i]!;
     const b = outer[i + 1]!;
     const f = facing(pen, { x: b.y - a.y, y: -(b.x - a.x) });
     return f > threshold ? 1 : f < -threshold ? -1 : 0;
   };
-  const faces: { poly: Vec[]; out: Vec }[] = [];
+  const faces: Face[] = [];
   for (let i = 0; i < outer.length - 1;) {
     const k = kind(i);
     let j = i + 1;
@@ -68,11 +68,11 @@ function strip(pen: GlyphPen, outer: readonly Vec[], inner: readonly Vec[], thre
 export function flowstone(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
   const sheet = flowSheet(fit);
   const { edge, tips } = flowLobes(fit);
-  fillOutline(pen, sheet, calcite(pen), 'none');
+  fillPolys(pen, [sheet], calcite(pen));
   calciteGrain(pen, polyPath(sheet), finish);
   // Bands of stain follow the lip, as each flood laid its film.
   const towardWall = (f: number): Vec[] => edge.map(p => ({ x: p.x, y: p.y + (SHEET_TOP - p.y) * f }));
-  finish.stain(pen, polysPath([[0.18, 0.34], [0.55, 0.72]].map(([from, to]) => [...towardWall(from!), ...towardWall(to!).reverse()])));
+  finish.stain(pen, polysPath(([[0.18, 0.34], [0.55, 0.72]] as const).map(([from, to]) => [...towardWall(from), ...towardWall(to).reverse()])));
   // Each tongue's lip rolls over: lit where it turns to the light, shaded where it turns away.
   const lip = edge.map(p => ({ x: p.x, y: Math.min(SHEET_TOP, p.y + 0.03) }));
   splitByLight(pen, strip(pen, edge, lip, 0.2), finish, 0.2);
@@ -83,7 +83,7 @@ export function flowstone(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
       lines.push([{ x: tip.x + spread * 0.4, y: SHEET_TOP - 0.008 }, { x: tip.x + spread, y: (SHEET_TOP + tip.y) / 2 }, { x: tip.x + spread * 0.55, y: tip.y + 0.035 }]);
     }
   }
-  fineRuns(pen, [...lines, lip], false, 0.6);
+  fineRuns(pen, [...lines, lip], 0.6);
   finish.sheen(pen, tips.map(t => [{ x: t.x - 0.03, y: t.y + 0.012 }, { x: t.x + 0.015, y: t.y + 0.016 }]));
   pen.hand.line([edge], 'outline');
 }
@@ -91,12 +91,12 @@ export function flowstone(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
 /** A curtain: calcite folded to and fro along the wall, every other fold catching the light, over the flowstone at its foot. */
 export function curtain(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
   const foot = curtainFoot(fit);
-  fillOutline(pen, foot, calcite(pen), 'none');
+  fillPolys(pen, [foot], calcite(pen));
   finish.stain(pen, polyPath(foot));
   outlineRuns(pen, [foot.slice(0, -2)]);
   const line = curtainLine(fit);
   const rib = ribbon(line, 0.072);
-  fillOutline(pen, rib, calcite(pen), 'none');
+  fillPolys(pen, [rib], calcite(pen));
   // Each half fold faces its own way: those towards the light are lit, the others shaded.
   const n = line.length;
   const outer = rib.slice(0, n);
@@ -109,7 +109,7 @@ export function curtain(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
   // Bands of growth along it, and a crease at each fold.
   const creases: Vec[][] = [];
   for (let i = 4; i < n - 1; i += 4) creases.push([outer[i]!, inner[i]!]);
-  fineRuns(pen, [line, ...creases], false, 0.65);
+  fineRuns(pen, [line, ...creases], 0.65);
   if (finish.painter === 'stone') glyphEdges(pen, rib, true);
   else pen.hand.line([rib], 'outline', true);
 }
