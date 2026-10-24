@@ -1,4 +1,4 @@
-import { afterAll, describe, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { commands } from 'vitest/browser';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonRequest } from '../../src/app/dungeons/model';
@@ -24,6 +24,9 @@ vi.mock('../../src/app/pixi/mapImage/prebuildMapImage', () => ({ prebuildMapImag
 
 const run = import.meta.env.VITE_PERF_GEN === '1';
 const req = (seed: number, tags: string[], floors = 1): DungeonRequest => ({ seed, tags: tags as DungeonTag[], floors });
+/** The most a cave's scene may take, from the click to the files written, in ms. */
+const LIMITS: Readonly<Record<string, number>> = { 'cavern medium': 3000, 'cavern large 3 floors lava overgrown': 7000, 'cavern underdark 3 floors flooded': 7000 };
+
 const CASES: [string, DungeonRequest, DungeonStyleId][] = [
   ['small', req(11, ['small']), 'parchment'],
   ['medium', req(7, ['medium']), 'parchment'],
@@ -32,6 +35,9 @@ const CASES: [string, DungeonRequest, DungeonStyleId][] = [
   ['medium overgrown wet', req(7, ['medium', 'overgrown', 'wet']), 'parchment'],
   ['medium 3 floors flooded', req(5, ['medium', 'flooded'], 3), 'masonry'],
   ['large 3 floors lava overgrown', req(3, ['large', 'lava', 'overgrown'], 3), 'volcanic'],
+  ['cavern medium', { ...req(7, ['medium']), theme: 'cavern' }, 'parchment'],
+  ['cavern large 3 floors lava overgrown', { ...req(3, ['large', 'lava', 'overgrown'], 3), theme: 'cavern' }, 'volcanic'],
+  ['cavern underdark 3 floors flooded', { ...req(5, ['deep', 'spacious', 'flooded'], 3), theme: 'cavern' }, 'masonry'],
 ];
 
 const client = new DungeonWorkerClient({ createWorker: () => new DungeonWorker({ name: 'Atlas dungeons (cost)' }) });
@@ -79,6 +85,8 @@ describe.skipIf(!run)('what creating a dungeon scene costs', () => {
       if (!result.ok) throw new Error(result.problem);
       rows.push(`${name}: total ${total} ms, longest main-thread task ${Math.round(longest)} ms, maps ${sizes.map((s) => (s / 1e6).toFixed(1)).join(' / ')} MB\n  ${events.join('\n  ')}`);
       await commands.writeFile('out/perf-gen/scene.txt', rows.join('\n'));
+      const limit = LIMITS[name];
+      if (limit !== undefined) expect(total, `${name}: ${total} ms`).toBeLessThan(limit);
     });
   }
 });
