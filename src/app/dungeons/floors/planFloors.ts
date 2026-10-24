@@ -37,6 +37,12 @@ interface Link {
   extra: StairSpot[];
 }
 
+/** The floors planned so far and the next stairwell's link. */
+interface Progress {
+  floors: PlannedFloor[];
+  link: number;
+}
+
 /** Places tried for the stairs up to a storey, until one lets it keep every rule. */
 const STOREY_STAIR_TRIES = 4;
 /** How often a dungeon's floors may be grown anew so that the storey above can stand on them. */
@@ -179,7 +185,7 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
   let floors: PlannedFloor[] = [entryFloor(0)];
   let link = 0;
   // The floors and links as they stood before each floor was added, and how many sound layouts each floor passes over.
-  const before: { floors: PlannedFloor[]; link: number }[] = [];
+  const before: Progress[] = [];
   const passOver = new Map<number, number>();
   let regrown = 0;
   const failsAt = new Map<number, number>();
@@ -197,7 +203,7 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
       const below = Math.max(0, index - 1 - Math.floor((fails - 1) / REGROWN_PER_FLOOR));
       passOver.set(below, (passOver.get(below) ?? 0) + 1);
       for (const later of [...passOver.keys()]) if (later > below) passOver.delete(later);
-      ({ floors, link } = below === 0 ? { floors: [entryFloor(passOver.get(0) ?? 0)], link: 0 } : (before[below] as { floors: PlannedFloor[]; link: number }));
+      ({ floors, link } = below === 0 ? { floors: [entryFloor(passOver.get(0) ?? 0)], link: 0 } : (before[below] as Progress));
       index = Math.max(below, 1) - 1;
       continue;
     }

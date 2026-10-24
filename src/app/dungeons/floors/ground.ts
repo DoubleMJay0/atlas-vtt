@@ -4,7 +4,7 @@
  * from; a dug floor lies under the floor above, a little past it either way.
  */
 
-import { type CellRect, floorRect, inRect, wallRect } from '../geometry';
+import { type CellRect, contains, floorRect, wallRect } from '../geometry';
 import type { DungeonRoom } from '../model';
 import { type FloorStack, isAbove } from './floorStack';
 import { type StairSpot, spotRect } from './stairSpots';
@@ -37,7 +37,6 @@ export function footprintOf(earlier: Rooms, index: number, stack: FloorStack): C
 
 /** The floor of the room on `floor` that holds the stairwell `spot`, if one does. */
 export function stairRoomFloor(floor: Rooms, spot: StairSpot): CellRect | null {
-  const r = spotRect(spot);
-  const room = floor.rooms.find((candidate) => candidate.kind === 'room' && inRect(floorRect(candidate), r.x0, r.y0) && inRect(floorRect(candidate), r.x1, r.y1));
+  const room = floor.rooms.find((candidate) => candidate.kind === 'room' && contains(floorRect(candidate), spotRect(spot)));
   return room ? floorRect(room) : null;
 }

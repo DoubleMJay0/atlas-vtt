@@ -14,7 +14,7 @@ import type { FeatureSpec } from '../themes/features';
 import { draft } from './catalog';
 import type { FloorTerrain } from './floorTerrain';
 import type { RoomCells } from './roomCells';
-import { reasonsOf } from './typeReasons';
+import { mayCutIn, reasonsOf } from './typeReasons';
 import type { TerrainWork } from './work';
 
 /** An opening in a room's floor leaves at least this share of it to stand on. */
@@ -53,8 +53,7 @@ export function cutStairWell(work: TerrainWork, above: FloorTerrain, k: number, 
   const stairs = (work.floors[k]?.plan.stairs ?? []).filter((s) => s.to === above.index && cellsOf(spotRect(s)).every((c) => inRect(floor, c.x, c.y)));
   for (const stair of stairs) {
     const rc = above.roomHolding(cellsOf(spotRect(stair)));
-    const type = rc && work.typed(above.index, rc.room.id)?.spec.id;
-    if (!rc || !mayOpen(rc.room) || (reason.cutIn && type !== undefined && !reason.cutIn.includes(type))) continue;
+    if (!rc || !mayOpen(rc.room) || !mayCutIn(work, above.index, rc.room.id, reason)) continue;
     for (const rect of besideStairs(stair)) {
       const cells = cellsOf(rect);
       if (!cells.every((c) => inRect(floor, c.x, c.y)) || !cuttable(rc, cells)) continue;
@@ -96,7 +95,7 @@ export function lightWells(work: TerrainWork): void {
       for (const rect of lightWellSpots(floorRect(room))) {
         const cells = cellsOf(rect);
         const lit = below.roomHolding(cells);
-        if (!lit || cells.some((c) => lit.nearStairs(c)) || cells.some((c) => rc.nearStairs(c)) || !cuttable(rc, cells)) continue;
+        if (!lit || cells.some((c) => lit.nearStairs(c) || rc.nearStairs(c)) || !cuttable(rc, cells)) continue;
         if (floor.place({ ...draft('gallery', rc.room.id, cells, { name: reason.name }), opening: { bottom: under, link: work.nextLink() } }) !== null) break;
       }
     }

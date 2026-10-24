@@ -6,7 +6,7 @@
  */
 
 import type { CellDir, CellPoint } from '../model';
-import { type CellRect, cellKey, cellsOf } from '../geometry';
+import { type CellRect, cellKey, cellsOf, contains, wallRect } from '../geometry';
 import { MAX_SEED, type Rng, int, pick, shuffled } from '../rng';
 import type { FloorRoot } from '../layout/grow';
 import { type RoomSize, drawRoomSize, drawSmallRoomSize } from '../layout/sizes';
@@ -50,22 +50,29 @@ function overlap(f: CellRect, below: CellRect): number {
   return w > 0 && h > 0 ? w * h : 0;
 }
 
-/** Whether `inner` lies within `outer`. */
-function within(outer: CellRect, inner: CellRect): boolean {
-  return inner.x0 >= outer.x0 && inner.y0 >= outer.y0 && inner.x1 <= outer.x1 && inner.y1 <= outer.y1;
+/** A landing room's floor and the axis it grows along. */
+interface LandingPlace {
+  f: CellRect;
+  axis: CellDir;
 }
 
 /** Every place a landing room of this size may stand along `axes`, its walls within `ground` where given. */
-function landingPlaces(spot: StairSpot, end: StairEnd, size: RoomSize, axes: readonly CellDir[], ground: CellRect | null): { f: CellRect; axis: CellDir }[] {
+function landingPlaces(spot: StairSpot, end: StairEnd, size: RoomSize, axes: readonly CellDir[], ground: CellRect | null): LandingPlace[] {
   const options = axes.flatMap((axis) => {
     const { w, h } = floorDims(axis, size.width, size.depth);
     return placements(spot, end, w, h).map((f) => ({ f, axis }));
   });
   return options.filter(({ f }) => {
-    if (ground && !within(ground, { x0: f.x0 - 1, y0: f.y0 - 1, x1: f.x1 + 1, y1: f.y1 + 1 })) return false;
     const room = { id: 0, x: f.x0, y: f.y0, w: f.x1 - f.x0 + 1, h: f.y1 - f.y0 + 1, kind: 'room' as const, rotunda: false };
+    if (ground && !contains(ground, wallRect(room))) return false;
     return spotFits(room, { doors: [], stairs: [], ends: [] }, spot, end);
   });
+}
+
+/** Of `places`, those whose floor lies over the most of `over`. */
+function coveringMost(places: readonly LandingPlace[], over: CellRect): LandingPlace[] {
+  const most = Math.max(...places.map(({ f }) => overlap(f, over)));
+  return places.filter(({ f }) => overlap(f, over) === most);
 }
 
 /** The small rooms a landing is drawn as most often: where none of them stands on `ground`, no landing does. */
@@ -93,9 +100,7 @@ export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd, storey: St
     const size = storey?.small ? drawSmallRoomSize(rng) : drawRoomSize(rng);
     const fitting = landingPlaces(spot, end, size, shuffled(rng, STAIR_DIRS), storey?.ground ?? null);
     if (fitting.length === 0) continue;
-    const over = storey?.over;
-    const most = over ? Math.max(...fitting.map(({ f }) => overlap(f, over))) : 0;
-    const { f, axis } = pick(rng, over ? fitting.filter(({ f }) => overlap(f, over) === most) : fitting);
+    const { f, axis } = pick(rng, storey?.over ? coveringMost(fitting, storey.over) : fitting);
     return { origin: originOf(f, axis), axis, seed: int(rng, 1, MAX_SEED), landing: size };
   }
   return null;

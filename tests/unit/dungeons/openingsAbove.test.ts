@@ -55,7 +55,6 @@ function sidesOnWalls(cells: readonly CellPoint[], room: DungeonRoom): number {
   return [Math.min(...xs) === room.x, Math.max(...xs) === room.x + room.w - 1, Math.min(...ys) === room.y, Math.max(...ys) === room.y + room.h - 1].filter(Boolean).length;
 }
 
-const inRect = (r: { x: number; y: number; w: number; h: number }, c: CellPoint): boolean => c.x >= r.x && c.x < r.x + r.w && c.y >= r.y && c.y < r.y + r.h;
 const stairCells = (s: DungeonStair): CellPoint[] => Array.from({ length: s.w * s.h }, (_, i) => ({ x: s.x + (i % s.w), y: s.y + Math.floor(i / s.w) }));
 
 /** Whether two rooms' floors overlap by two cells or more both ways. */
@@ -202,16 +201,16 @@ describe("a Haunted Mansion's stair well and light wells", () => {
       const [entry, upper] = [m.floors[0]!, m.floors[1]!];
       const hall = entry.rooms.find((r) => r.type === 'entrance-hall');
       if (!hall) return [];
-      const up = entry.stairs.filter((s) => s.to === 1 && stairCells(s).every((c) => inRect(hall, c)));
+      const up = entry.stairs.filter((s) => s.to === 1 && stairCells(s).every((c) => inFloor(hall, c)));
       if (hall.id === 0) halls += 1;
       if (hall.id === 0 && up.length > 0) holding += 1;
       return upper.terrain.filter((p) => p.name === 'dungeon.terrain.stairWell').flatMap((piece) => {
         wells += 1;
         const own = upper.rooms[piece.room]!;
-        const stair = up.find((s) => stairCells(s).every((c) => inRect(own, c)));
+        const stair = up.find((s) => stairCells(s).every((c) => inFloor(own, c)));
         const where = `seed ${m.seed} stair well ${piece.id}`;
         if (!stair) return [`${where} in a room no stairs from the entrance hall arrive in`];
-        if (!piece.cells.every((c) => inRect(hall, c))) return [`${where} not over the entrance hall`];
+        if (!piece.cells.every((c) => inFloor(hall, c))) return [`${where} not over the entrance hall`];
         return besideStairs(piece.cells, stair) ? [] : [`${where} not beside the stairs`];
       });
     });
@@ -236,7 +235,7 @@ describe("a Haunted Mansion's stair well and light wells", () => {
           if (own.type !== 'landing' || piece.kind !== 'gallery') return [`${where} is a ${piece.kind} in a ${own.type}`];
           if (!isRectangle(piece.cells) || piece.cells.length < 2) return [`${where} is not a straight opening`];
           if (piece.cells.some((c) => c.x === own.x || c.y === own.y || c.x === own.x + own.w - 1 || c.y === own.y + own.h - 1)) return [`${where} against the landing's wall`];
-          if (piece.opening?.bottom !== under || !below?.rooms.some((r) => r.kind === 'room' && piece.cells.every((c) => inRect(r, c)))) return [`${where} not over a room below`];
+          if (piece.opening?.bottom !== under || !below?.rooms.some((r) => r.kind === 'room' && piece.cells.every((c) => inFloor(r, c)))) return [`${where} not over a room below`];
           return [];
         });
       }),

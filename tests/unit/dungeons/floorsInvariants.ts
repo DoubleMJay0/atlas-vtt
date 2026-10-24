@@ -1,7 +1,7 @@
 /** Checks of what joins a dungeon's floors and what only the entry floor has: stairwells and entrances. */
 
 import { type FloorStack, stackOf, stairEnd } from '../../../src/app/dungeons/floors/floorStack';
-import { floorRect, inRect, wallRect } from '../../../src/app/dungeons/geometry';
+import { type CellRect, floorRect, inRect, wallRect } from '../../../src/app/dungeons/geometry';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonStair } from '../../../src/app/dungeons/model';
 import { distances, normals } from './dungeonInvariants';
 
@@ -113,7 +113,7 @@ export function riseProblems(model: DungeonModel): string[] {
 }
 
 /** The outer walls of a floor: the box round every room's walls. */
-function extentOf(floor: DungeonFloor): { x0: number; y0: number; x1: number; y1: number } {
+function extentOf(floor: DungeonFloor): CellRect {
   const walls = floor.rooms.map(wallRect);
   return { x0: Math.min(...walls.map((r) => r.x0)), y0: Math.min(...walls.map((r) => r.y0)), x1: Math.max(...walls.map((r) => r.x1)), y1: Math.max(...walls.map((r) => r.y1)) };
 }

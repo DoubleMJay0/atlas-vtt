@@ -6,11 +6,7 @@
 
 import type { CellDir, CellPoint } from '../model';
 import type { DungeonParams } from '../params';
-import { type CellRect, rectsClash, rectsTouch } from '../geometry';
-
-function contains(outer: CellRect, inner: CellRect): boolean {
-  return inner.x0 >= outer.x0 && inner.y0 >= outer.y0 && inner.x1 <= outer.x1 && inner.y1 <= outer.y1;
-}
+import { type CellRect, contains, rectsClash, rectsTouch } from '../geometry';
 import type { KeyedRng } from '../rng';
 import { type Branch, branchesOf } from './branches';
 import { type RoomSize, drawDoorKind, drawSize } from './sizes';

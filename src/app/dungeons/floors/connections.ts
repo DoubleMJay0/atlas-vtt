@@ -7,7 +7,7 @@
  */
 
 import type { CellPoint, DungeonDoor, DungeonRoom } from '../model';
-import { cellKey, cellsOf, floorRect, inRect, intersection } from '../geometry';
+import { cellKey, cellsOf, contains, floorRect, intersection, stepsWithin } from '../geometry';
 import { type Rng, pick, weighted } from '../rng';
 import { hops, neighbours } from '../roomGraph';
 import { type FloorStack, stairEnd } from './floorStack';
@@ -44,9 +44,7 @@ function anchors(floor: FloorShape): number[] {
 }
 
 function rectHolds(room: DungeonRoom, spot: StairSpot): boolean {
-  const f = floorRect(room);
-  const r = spotRect(spot);
-  return r.x0 >= f.x0 && r.x1 <= f.x1 && r.y0 >= f.y0 && r.y1 <= f.y1;
+  return contains(floorRect(room), spotRect(spot));
 }
 
 /** Doors walked from the nearest of `from` to every room. */
@@ -63,11 +61,7 @@ function holdsStairs(room: DungeonRoom): boolean {
 /** The cells of the way straight in from the room's door from outside, across the room; none without one. */
 function wayIn(room: DungeonRoom, doors: readonly DungeonDoor[]): CellPoint[] {
   const door = doors.find((d) => d.from === null && d.to === room.id);
-  const out: CellPoint[] = [];
-  if (!door) return out;
-  const f = floorRect(room);
-  for (let at = { x: door.x + door.dir.x, y: door.y + door.dir.y }; inRect(f, at.x, at.y); at = { x: at.x + door.dir.x, y: at.y + door.dir.y }) out.push(at);
-  return out;
+  return door ? stepsWithin(floorRect(room), door, door.dir) : [];
 }
 
 /** The room a floor is entered by: room 0 where it is a normal room, else the normal room fewest doors from it. */

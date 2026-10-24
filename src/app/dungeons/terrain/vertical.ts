@@ -14,7 +14,7 @@ import { draft } from './catalog';
 import type { FloorTerrain } from './floorTerrain';
 import { cutHole, dropBelow } from './holes';
 import type { RoomCells } from './roomCells';
-import { holeAllowed, openingAbove, reasonsOf } from './typeReasons';
+import { holeAllowed, mayCutIn, openingAbove, reasonsOf } from './typeReasons';
 import type { FeatureSpec } from '../themes/features';
 import { GALLERY_FLOOR, cutStairWell, mayOpen } from './wells';
 import type { TerrainWork } from './work';
@@ -90,12 +90,8 @@ export function galleriesOverHalls(work: TerrainWork): void {
 /** The gallery cut in `above` over the hall with floor `hall` on floor `k`, which lies right below it, in a room built to overlook it. */
 function cutGalleryOver(work: TerrainWork, above: FloorTerrain, k: number, hall: CellRect, reason: FeatureSpec): void {
   const area = (r: CellRect): number => cellsOf(r).length;
-  const overlooks = (id: number): boolean => {
-    const type = work.typed(above.index, id)?.spec.id;
-    return !reason.cutIn || type === undefined || reason.cutIn.includes(type);
-  };
   const places = above.plan.rooms
-    .filter((room) => mayOpen(room) && overlooks(room.id))
+    .filter((room) => mayOpen(room) && mayCutIn(work, above.index, room.id, reason))
     .flatMap((room) => {
       const rc = above.room(room.id);
       const over = intersection(floorRect(room), hall);

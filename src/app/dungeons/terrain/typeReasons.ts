@@ -41,6 +41,12 @@ export function openingAbove(work: TerrainWork, k: number, room: number, kind: T
   return !typed || reasonsOf(typed.spec, work.theme.ruined).some((reason) => reason.at === 'above' && reason.kinds.includes(kind));
 }
 
+/** Whether the opening `reason` brings may be cut in room `room` of floor `k`: a type the reason names, an untyped room, or any where it names none. */
+export function mayCutIn(work: TerrainWork, k: number, room: number, reason: FeatureSpec): boolean {
+  const type = work.typed(k, room)?.spec.id;
+  return !reason.cutIn || type === undefined || reason.cutIn.includes(type);
+}
+
 /** Whether a fall from a hole above may open through or end in room `room` of floor `k`: an untyped or empty room, a hazard type or a collapsed room. */
 export function takesFall(work: TerrainWork, k: number, room: number): boolean {
   const typed = work.typed(k, room);

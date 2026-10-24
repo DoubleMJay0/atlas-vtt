@@ -7,24 +7,26 @@
  */
 
 import type { PlannedFloor } from '../../floors/planFloors';
-import { type CellRect, cellsOf, floorRect, inRect, intersection } from '../../geometry';
+import { cellsOf, floorRect, inRect, intersection } from '../../geometry';
 import type { DungeonRoom } from '../../model';
 import { everyOther, gatePassage } from '../../terrain/murderHoles';
-import { FEATURES, type FeatureSpec } from '../features';
+import { reasonsOf } from '../../terrain/typeReasons';
+import { mayOpen } from '../../terrain/wells';
+import type { FeatureSpec } from '../features';
 import type { RoomTypeId } from '../roomTypes';
 import { type Assignment, heldCount, specOf } from './score';
 import { keepsRules, touched } from './swaps';
 
 /** How much of what `reason` overlooks in `hall` the room `over` covers: the cells of a gallery's 2 × 2, or of a row of murder holes; 0 where it could not hold the opening. */
 function coverage(reason: FeatureSpec, hall: DungeonRoom, doors: PlannedFloor['doors'], over: DungeonRoom): number {
-  if (over.kind !== 'room' || over.wing !== 'regular' || over.rotunda || over.boss || over.stage !== undefined) return 0;
+  if (!mayOpen(over)) return 0;
   const f = floorRect(over);
   if (reason.kinds.includes('murder-hole')) {
     const way = gatePassage(hall, doors);
     const row = Math.max(...([0, 1] as const).map((first) => everyOther(way, first).filter((c) => inRect(f, c.x, c.y)).length));
     return row >= 2 ? row : 0;
   }
-  const shared: CellRect | null = intersection(f, floorRect(hall));
+  const shared = intersection(f, floorRect(hall));
   return shared && shared.x1 > shared.x0 && shared.y1 > shared.y0 ? cellsOf(shared).length : 0;
 }
 
@@ -59,7 +61,8 @@ export function placeOverlooks(a: Assignment, floors: readonly PlannedFloor[], a
     const plan = floors[t.floor];
     const hall = plan?.rooms[t.room];
     if (!type || t.boss || up === null || !plan || !hall) continue;
-    const reasons = (specOf(a.programme, type)?.terrain.features ?? []).map((r) => FEATURES[r]).filter((r) => r.at === 'above' && r.cutIn && (a.ruined || !r.ruinedOnly));
+    const spec = specOf(a.programme, type);
+    const reasons = spec ? reasonsOf(spec, a.ruined).filter((r) => r.at === 'above' && r.cutIn) : [];
     for (const reason of reasons) {
       const wanted = reason.cutIn ?? [];
       const covering = a.traits

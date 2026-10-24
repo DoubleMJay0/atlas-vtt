@@ -48,6 +48,11 @@ export function rectsClash(a: CellRect, b: CellRect): boolean {
   return overlap(a.x0, a.x1, b.x0, b.x1) > 1 && overlap(a.y0, a.y1, b.y0, b.y1) > 1;
 }
 
+/** Whether `inner` lies within `outer`. */
+export function contains(outer: CellRect, inner: CellRect): boolean {
+  return inner.x0 >= outer.x0 && inner.y0 >= outer.y0 && inner.x1 <= outer.x1 && inner.y1 <= outer.y1;
+}
+
 /** The overlap of two rectangles, or null. */
 export function intersection(a: CellRect, b: CellRect): CellRect | null {
   const r = { x0: Math.max(a.x0, b.x0), y0: Math.max(a.y0, b.y0), x1: Math.min(a.x1, b.x1), y1: Math.min(a.y1, b.y1) };
@@ -71,4 +76,11 @@ export function cellsOf(rect: CellRect): CellPoint[] {
   const cells: CellPoint[] = [];
   for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) cells.push({ x, y });
   return cells;
+}
+
+/** The cells after `from`, one `step` at a time, for as long as they lie within `rect`: the way straight in from a door. */
+export function stepsWithin(rect: CellRect, from: CellPoint, step: CellDir): CellPoint[] {
+  const out: CellPoint[] = [];
+  for (let at = { x: from.x + step.x, y: from.y + step.y }; inRect(rect, at.x, at.y); at = { x: at.x + step.x, y: at.y + step.y }) out.push(at);
+  return out;
 }
