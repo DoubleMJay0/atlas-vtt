@@ -130,6 +130,16 @@ describe('dungeon vegetation', () => {
     expect(growthOf(lava)).toBeGreaterThan(10);
   }, 120_000);
 
+  it('picks what grows by the theme', () => {
+    expect(kinds(fortress).has('ivy')).toBe(true);
+    const ofMansion = kinds(mansion);
+    for (const k of ['ivy', 'creeper', 'roots']) expect(ofMansion.has(k), k).toBe(true);
+    const ofCavern = kinds(cavern);
+    for (const k of ['moss', 'fungi']) expect(ofCavern.has(k), k).toBe(true);
+    expect(ofCavern.has('ivy')).toBe(false);
+    for (const models of [fortress, mansion, cavern]) expect(kinds(models).has('vine')).toBe(false);
+  }, 120_000);
+
   it('grows green where the light comes in: the entry floor more than the floor below it', () => {
     const green = (f: DungeonFloor): number => f.growth.filter(g => GROWTH_KINDS[g.kind].needsLight).length / Math.max(1, f.rooms.length);
     const above = overgrown.reduce((s, m) => s + green(m.floors[0]!), 0);

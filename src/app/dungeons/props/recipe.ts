@@ -15,6 +15,7 @@ import { aroundParent, flanking, inGrid, onShore } from './arrangeGroups';
 import { PROP_SPECS, isCellPiece } from './catalogue';
 import { againstWall, atBackWall, atCentre, inCorner, inRows, onWall } from './cellVerbs';
 import type { FurnishSpace, PlacedPiece } from './furnishSpace';
+import { keptPieces, ruinedKeep } from './ruined';
 import { occupyCells } from './space';
 
 export interface RecipeContext {
@@ -121,7 +122,9 @@ export function furnishByRecipe(fs: FurnishSpace, recipe: FurnishRecipe, context
     if (belonging && defining.kind !== 'dais') out.push(...placeByVerb(fs, belonging, belonging.kind, countOf(fs, belonging), definingPiece));
   }
   const sheet: PropKind = context.ruined ? 'broken-furniture' : 'dust-sheet';
-  for (const piece of recipe.pieces) {
+  // A ruin keeps its defining piece and part of the rest.
+  const pieces = context.ruined ? keptPieces(fs.rng, recipe.pieces, ruinedKeep(fs.rng)) : recipe.pieces;
+  for (const piece of pieces) {
     const odds = Math.min(1, (piece.chance ?? 1) * (0.7 + 0.6 * context.depthRank)) * context.richness;
     if (!chance(fs.rng, odds)) continue;
     const count = countOf(fs, piece);

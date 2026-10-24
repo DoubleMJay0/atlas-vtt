@@ -17,7 +17,7 @@ import type { FurnishRecipe, Piece, RoomTypeSpec } from '../themes/themeTypes';
 import { PROP_SPECS } from '../props/catalogue';
 import { type Rng, chance } from '../rng';
 import { CRAMPED_AREA, FIGHT_AREA, ensureCover, hasCover, pillars } from './cover';
-import { pews } from './difficult';
+import { pews, ruinedGround } from './difficult';
 import { platformAtFarWall } from './elevation';
 import { placeInterest } from './interest';
 import { againstWall, inCorner } from '../props/cellVerbs';
@@ -26,6 +26,9 @@ import type { FloorTerrain } from './floorTerrain';
 import { type RoomCells, WALL_SIDES, type WallSide } from './roomCells';
 import { reserveLanes } from './roomLanes';
 import type { TerrainWork } from './work';
+
+/** How often a room of a ruin lies under rubble or broken floor. */
+const RUINED_GROUND_CHANCE = 0.6;
 
 /** A room's type and how its recipe is read there. */
 export interface TypedRoom {
@@ -109,6 +112,7 @@ export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, sp
   const rng = work.rng(k, `type:${rc.room.id}`);
   reserveLanes(rc);
   if (!hazarded) allowedTerrain(work, k, rc, spec, rng);
+  if (!hazarded && work.theme.ruined && chance(rng, RUINED_GROUND_CHANCE)) ruinedGround(floor, rc, rng);
   const fs = typedSpace(work, k, rc, floor);
   furnishByRecipe(fs, hazarded ? naturalOnly(spec.furnish) : spec.furnish, context);
   if (!hazarded) ensureTypeCover(fs, spec, work.tags);

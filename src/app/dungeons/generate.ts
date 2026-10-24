@@ -20,6 +20,7 @@ import { readTags } from './tags';
 import type { FloorTerrain } from './terrain/floorTerrain';
 import { addShallowWater, planTerrain } from './terrain/placeTerrain';
 import { pickTheme, themedTags } from './themes/themes';
+import type { ThemeId } from './themes/themeTypes';
 import { typeDungeon } from './themes/typeDungeon';
 import { themeWater, type ThemeWater } from './themes/themeWater';
 import { chooseWaterLevel, drainCells, placeWater, poolRooms } from './water';
@@ -31,6 +32,7 @@ interface FloorParts {
   columns: DungeonFloor['columns'];
   /** Where a built theme lets water stand; null where the layout's low points decide. */
   water: ThemeWater | null;
+  theme: ThemeId;
 }
 
 function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, level: number): DungeonFloor {
@@ -41,7 +43,7 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const pools = dry ? new Set<number>() : poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool);
   const kept = [...terrain.takenCells(), ...terrain.propCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
   const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept) });
-  const flora = floraOf(params.tags);
+  const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
   const pieces = addUndergrowth(seed, terrain, waterCells, flora, params.tags.has('ruined'));
   const typedRooms = new Set(rooms.filter((room) => room.type).map((room) => room.id));
@@ -75,6 +77,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
       params: floorPar,
       roles: typed ? { ...roles, empty: new Set(typed.empty[index]) } : roles,
       columns: floorColumns(seed, index, floor.rooms, floor.stairs, floorPar),
+      theme,
       water: typed ? themeWater(floor.rooms, themed.rooms[index] ?? new Map(), params.tags.has('ruined')) : null,
     };
   });
