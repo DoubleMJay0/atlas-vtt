@@ -18,7 +18,7 @@ import { LightMap, type DrawnLight } from './LightMap';
 import { RadianceCascades } from './RadianceCascades';
 import { ReflectionTiles } from './ReflectionTiles';
 import { TileCache, type TilePacer } from './TileCache';
-import { SceneMaps, byPriority, sameLights } from './SceneMaps';
+import { NO_ZONES, SceneMaps, byPriority, sameLights } from './SceneMaps';
 import type { EngineLight, EngineZone } from './types';
 import { WallFields } from './WallFields';
 import type { ZoneLook, ZoneMap } from './ZoneMap';
@@ -287,8 +287,6 @@ export class LightingWorld {
     this.lightMap.draw(drawn);
   }
 }
-
-const NO_ZONES: readonly EngineZone[] = [];
 
 /** Whether anything `light` lights may lie within `view` (world px). */
 function lightsWithin(light: EngineLight, view: Box): boolean {

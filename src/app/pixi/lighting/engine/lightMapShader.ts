@@ -11,35 +11,6 @@ void main() {
   gl_Position = vec4(vWorld / uMapWorld * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-// A light shows its two ranges: the bright level up to the bright radius, the dim level beyond,
-// joined by a soft knee, 1 / (1 + (d / bright)^4): half way down at the bright radius, without
-// an edge a flicker could move. From the bright radius (or, for a light bright nearly to its end,
-// `LIGHT_FADE_MIN` of its dim radius before it) the light fades (`FADE_GLSL`) to exactly zero at
-// its dim radius, where the rules stop counting it, so it sinks into the dark within what the
-// rules count lit and never beyond. A Gaussian halo around the flame adds to the levels before
-// the fade and the tile, so it cannot pass a wall; a light without a bright radius sizes it by a
-// quarter of its dim radius. Radii are floored at 1 px so an empty light stays finite in the float target.
-// The tile is read with texelFetch: its rect sits on this map's texel grid, so a texel here is a
-// texel there.
-// Alpha holds the luminance the light would have here at its bright level (never less than it
-// has): the composite tonemaps a light at that level and scales the result back, so a floor
-// shows the dim range at the same share of the bright range whatever its colour.
-// A light that shines one way (`uCone`: its facing as a unit vector, half its angle, the radius
-// of its own space; half an angle of π or more is no cone) keeps all of this inside its cone and
-// within its own space, and fades towards the cone's sides as towards its dim radius, to
-// nothing on them: over its edge inside the cone, `uEdge` world pixels, or `BEAM_EDGE` of the
-// beam's half-width at that distance where that is less, though never under a texel (`beamEdge`).
-// Its own space fades to nothing at its radius over the edge it has there. The tile knows nothing
-// of the cone, so turning a light traces nothing.
-// An area light (`uIsArea`) counts every distance from its outline instead of from its middle:
-// `uDistance` holds the signed distance to it on the tile's texel grid (`areaDistanceFragment`),
-// and inside the area, where it is negative, the light is at its brightest, halo and all.
-// A light that reflects (`uHasReflection`) adds the light its lit floor gives back
-// (`ReflectionTiles`, on this map's texel grid from `uReflectOrigin`): `uReflectLevel` times its
-// share there, where it is brighter than the light itself, which is in the shadows. Its alpha is
-// taken as a dim range's is (`uReflectLift`, bright over dim), so the tonemap's toe spares it too.
-// The quad (`uRect`) covers the tile and the reflection; the tile starts at `uTileOrigin`.
-// The colour is `uLightColor`: PIXI sets `uColor` itself, as a vec4, on every mesh shader that declares it.
 /**
  * A light's falloff, as both pictures draw it: what `lightMapFragment` describes, for a point at
  * `d` world pixels from the flame (an area light: from its outline). `lightAt` gives the light
@@ -87,6 +58,35 @@ vec2 lightAt(float d) {
   return vec2(uIntensity * e * fade, atBright);
 }`;
 
+// A light shows its two ranges: the bright level up to the bright radius, the dim level beyond,
+// joined by a soft knee, 1 / (1 + (d / bright)^4): half way down at the bright radius, without
+// an edge a flicker could move. From the bright radius (or, for a light bright nearly to its end,
+// `LIGHT_FADE_MIN` of its dim radius before it) the light fades (`FADE_GLSL`) to exactly zero at
+// its dim radius, where the rules stop counting it, so it sinks into the dark within what the
+// rules count lit and never beyond. A Gaussian halo around the flame adds to the levels before
+// the fade and the tile, so it cannot pass a wall; a light without a bright radius sizes it by a
+// quarter of its dim radius. Radii are floored at 1 px so an empty light stays finite in the float target.
+// The tile is read with texelFetch: its rect sits on this map's texel grid, so a texel here is a
+// texel there.
+// Alpha holds the luminance the light would have here at its bright level (never less than it
+// has): the composite tonemaps a light at that level and scales the result back, so a floor
+// shows the dim range at the same share of the bright range whatever its colour.
+// A light that shines one way (`uCone`: its facing as a unit vector, half its angle, the radius
+// of its own space; half an angle of π or more is no cone) keeps all of this inside its cone and
+// within its own space, and fades towards the cone's sides as towards its dim radius, to
+// nothing on them: over its edge inside the cone, `uEdge` world pixels, or `BEAM_EDGE` of the
+// beam's half-width at that distance where that is less, though never under a texel (`beamEdge`).
+// Its own space fades to nothing at its radius over the edge it has there. The tile knows nothing
+// of the cone, so turning a light traces nothing.
+// An area light (`uIsArea`) counts every distance from its outline instead of from its middle:
+// `uDistance` holds the signed distance to it on the tile's texel grid (`areaDistanceFragment`),
+// and inside the area, where it is negative, the light is at its brightest, halo and all.
+// A light that reflects (`uHasReflection`) adds the light its lit floor gives back
+// (`ReflectionTiles`, on this map's texel grid from `uReflectOrigin`): `uReflectLevel` times its
+// share there, where it is brighter than the light itself, which is in the shadows. Its alpha is
+// taken as a dim range's is (`uReflectLift`, bright over dim), so the tonemap's toe spares it too.
+// The quad (`uRect`) covers the tile and the reflection; the tile starts at `uTileOrigin`.
+// The colour is `uLightColor`: PIXI sets `uColor` itself, as a vec4, on every mesh shader that declares it.
 export const lightMapFragment = `${GLSL_VERSION}
 in vec2 vWorld;
 uniform vec4 uRect;

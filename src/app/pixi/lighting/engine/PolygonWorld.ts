@@ -8,12 +8,11 @@ import { AreaLightPictures } from './AreaLightPictures';
 import type { DarknessMap, PierceShape } from './DarknessMap';
 import { ENGINE_SHADERS } from './engineShaders';
 import { PolygonLightMap, type PolygonDrawn } from './PolygonLightMap';
-import { SceneMaps, byPriority, sameLights } from './SceneMaps';
+import { NO_ZONES, SceneMaps, byPriority, sameLights } from './SceneMaps';
 import type { EngineLight, EngineZone } from './types';
 import { WallBand } from './WallBand';
 import type { ZoneLook, ZoneMap } from './ZoneMap';
 
-const NO_ZONES: readonly EngineZone[] = [];
 const NO_PARTS: NonNullable<EngineLight['parts']> = [];
 
 /**
@@ -74,12 +73,8 @@ export class PolygonWorld {
     const lightsChanged = !sameLights(this.lights, lights);
     this.lights = lights;
     this.maps.setScene(walls, lights, wallsChanged);
-    if (wallsChanged || lightsChanged) {
-      this.drawLightMap(walls);
-      this.maps.drawDarkness();
-    } else if (pierceChanged) {
-      this.maps.drawDarkness();
-    }
+    if (wallsChanged || lightsChanged) this.drawLightMap(walls);
+    if (wallsChanged || lightsChanged || pierceChanged) this.maps.drawDarkness();
   }
 
   /** Nothing is built over several frames and nothing flickers. */

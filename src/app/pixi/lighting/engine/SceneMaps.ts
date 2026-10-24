@@ -12,7 +12,8 @@ import { middleOf } from './polygonFans';
 import type { EngineLight, EngineZone } from './types';
 import { ZoneMap, sameZoneLook, type ZoneLook, type ZoneWalls } from './ZoneMap';
 
-const NO_ZONES: readonly EngineZone[] = [];
+/** A scene without ambient zones, the same list each time. */
+export const NO_ZONES: readonly EngineZone[] = [];
 
 /** How a world's zones are drawn: the program, and how far past its outline a darker zone lies on the walls (`ZoneMap`). */
 export interface ZoneDrawing {
@@ -71,9 +72,9 @@ export class SceneMaps {
 
   /** The darkness map drawn anew, where the scene has a darkness source. */
   drawDarkness(): void {
-    if (!this.lights.some((light) => light.darkness)) return;
-    this.darkness ??= new DarknessMap(this.renderer, this.bounds, this.texel);
     const sources = this.lights.filter((light) => light.darkness);
+    if (sources.length === 0) return;
+    this.darkness ??= new DarknessMap(this.renderer, this.bounds, this.texel);
     // Where a light near a darkness would shine: the darkness veils what it swallows there.
     const lit = this.lights.filter((light) => !light.darkness && sources.some((source) => Math.hypot(source.x - light.x, source.y - light.y) < source.dim + light.dim + (light.surface ? areaRadius(light.surface, light) : 0)));
     this.darkness.draw(sources.map((light) => this.darknessOf(light)), this.pierce, lit.flatMap((light) => this.litShapes(light)));

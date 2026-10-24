@@ -368,14 +368,18 @@ export class LightingEngine {
   /** The composite goes with the world, so it never holds the world's destroyed textures. */
   private dropWorld(): void {
     this.grid?.setMarking(false);
-    this.layer.filters = null;
-    this.composite?.filter.destroy();
-    this.composite = null;
+    this.dropComposite();
     this.bound = null;
     this.world?.destroy();
     this.world = null;
     this.scene = null;
     this.sightLayers.clear();
+  }
+
+  private dropComposite(): void {
+    this.layer.filters = null;
+    this.composite?.filter.destroy();
+    this.composite = null;
   }
 
   /**
@@ -386,11 +390,7 @@ export class LightingEngine {
     const previous = this.world;
     this.world = world;
     this.bound = world.binding();
-    if (this.composite && this.composite.picture !== world.picture) {
-      this.layer.filters = null;
-      this.composite.filter.destroy();
-      this.composite = null;
-    }
+    if (this.composite && this.composite.picture !== world.picture) this.dropComposite();
     if (this.composite) {
       // The darkness map and the zone map are the old world's: nothing of them may stay bound when that world goes.
       this.composite.setMaps(null, null);

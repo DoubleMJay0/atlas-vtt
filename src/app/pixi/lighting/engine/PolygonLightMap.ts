@@ -28,6 +28,18 @@ export interface DrawnArea {
 
 export type PolygonDrawn = DrawnReach | DrawnArea | DrawnDarkness;
 
+function isReach(item: PolygonDrawn): item is DrawnReach {
+  return 'light' in item && 'polygon' in item;
+}
+
+function isArea(item: PolygonDrawn): item is DrawnArea {
+  return 'picture' in item;
+}
+
+function isDarkness(item: PolygonDrawn): item is DrawnDarkness {
+  return 'origin' in item;
+}
+
 interface ReachSlot {
   mesh: Mesh<Geometry, Shader>;
   falloff: Falloff;
@@ -70,22 +82,19 @@ class LightLayer {
 
   /** `drawn` into `target` in their order of priority (onto what it holds, unless `clear`): a darkness takes the light drawn before it out of its area. */
   draw(drawn: readonly PolygonDrawn[], target: RenderTexture, clear: boolean): void {
-    const reaches = drawn.filter((item): item is DrawnReach => 'polygon' in item && 'light' in item);
-    const areas = drawn.filter((item): item is DrawnArea => 'picture' in item);
-    const dark = drawn.filter((item): item is DrawnDarkness => 'origin' in item);
+    const reaches = drawn.filter(isReach);
+    const areas = drawn.filter(isArea);
+    const dark = drawn.filter(isDarkness);
     while (this.reaches.length < reaches.length) this.reaches.push(this.createReach());
     while (this.areas.length < areas.length) this.areas.push(this.createArea());
     while (this.darkSlots.length < dark.length) this.darkSlots.push(this.createDark());
     this.reaches.forEach((slot, i) => this.setReach(slot, reaches[i]));
     this.areas.forEach((slot, i) => this.setArea(slot, areas[i]));
-    this.darkSlots.forEach((slot, i) => {
-      const darkness = dark[i];
-      slot.mesh.visible = !!darkness;
-      if (darkness) setDarknessMesh(slot, darkness);
-    });
+    this.darkSlots.forEach((slot, i) => this.setDarkness(slot, dark[i]));
     drawn.forEach((item, z) => {
-      const slot = 'picture' in item ? this.areas[areas.indexOf(item)] : 'origin' in item ? this.darkSlots[dark.indexOf(item)] : this.reaches[reaches.indexOf(item)];
-      slot!.mesh.zIndex = z;
+      if (isArea(item)) this.areas[areas.indexOf(item)]!.mesh.zIndex = z;
+      else if (isDarkness(item)) this.darkSlots[dark.indexOf(item)]!.mesh.zIndex = z;
+      else this.reaches[reaches.indexOf(item)]!.mesh.zIndex = z;
     });
     this.scene.sortChildren();
     renderInto(this.renderer, this.scene, target, clear ? [0, 0, 0, 0] : undefined);
@@ -141,6 +150,11 @@ class LightLayer {
     slot.color.set(item.light.color);
     slot.uniforms.update();
     slot.mesh.shader!.resources.uPicture = item.picture.texture.source;
+  }
+
+  private setDarkness(slot: DarknessMesh, darkness: DrawnDarkness | undefined): void {
+    slot.mesh.visible = !!darkness;
+    if (darkness) setDarknessMesh(slot, darkness);
   }
 
   private createReach(): ReachSlot {
@@ -201,8 +215,8 @@ export class PolygonLightMap {
 
   /** `drawn` in their order of priority: a darkness takes the light drawn before it out of its area. */
   draw(drawn: readonly PolygonDrawn[]): void {
-    const moves = (item: PolygonDrawn): boolean => 'light' in item && !!item.light.moving;
-    if (drawn.some((item) => 'origin' in item) || !drawn.some(moves)) {
+    const moves = (item: PolygonDrawn): boolean => !isDarkness(item) && !!item.light.moving;
+    if (drawn.some(isDarkness) || !drawn.some(moves)) {
       this.dropStill();
       this.resting.draw(drawn, this.texture, true);
       return;
@@ -235,7 +249,7 @@ export class PolygonLightMap {
 function sameDrawn(a: readonly PolygonDrawn[], b: readonly PolygonDrawn[]): boolean {
   return a.length === b.length && a.every((x, i) => {
     const y = b[i]!;
-    if (!('light' in x) || !('light' in y) || !sameLights([x.light], [y.light])) return false;
-    return 'picture' in x ? 'picture' in y && x.picture === y.picture : 'polygon' in y && x.polygon === y.polygon && x.shadows === y.shadows;
+    if (isDarkness(x) || isDarkness(y) || !sameLights([x.light], [y.light])) return false;
+    return isArea(x) ? isArea(y) && x.picture === y.picture : isReach(y) && x.polygon === y.polygon && x.shadows === y.shadows;
   });
 }
