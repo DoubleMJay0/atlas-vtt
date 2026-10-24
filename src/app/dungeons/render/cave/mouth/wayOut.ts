@@ -21,6 +21,9 @@ export interface WayOut {
   seed: number;
 }
 
+/** Below the floor field's reach (`FloorField`, 3 cells), so a point farther out than it reads as clear of other floors. */
+const FIELD_REACH = 2.5;
+
 /** The ground's strength above which it reads as floor: the grid is drawn there. */
 export const FLOOR_STRENGTH = 0.5;
 
@@ -94,10 +97,10 @@ export function wayStrength(way: WayOut, p: Vec, distance?: (p: Vec) => number):
   const soft = 0.05 + 0.32 * Math.min(1, Math.max(0, u) / way.length);
   const sides = smoothstep(0, soft, wayHalf(way, u, side) - Math.abs(across));
   if (sides <= 0) return 0;
-  const ragged = (valueNoise(across * 2.6 + 5.1, u * 0.8, way.seed + 1) - 0.5) * 0.9 * Math.min(1, Math.max(0, u) / way.length);
+  const ragged = valueNoise(across * 2.6 + 5.1, u * 0.4, way.seed + 1) * 0.9 * Math.min(1, Math.max(0, u) / way.length);
   const along = 1 - smoothstep(way.length * 0.18, way.length, Math.max(0, u) + ragged);
   if (along <= 0) return 0;
-  const clear = distance ? smoothstep(-0.55, -0.15, distance(p) - Math.max(0, u)) : 1;
+  const clear = distance ? smoothstep(-0.55, -0.15, distance(p) - Math.min(Math.max(0, u), FIELD_REACH)) : 1;
   return sides * along * clear;
 }
 
