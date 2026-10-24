@@ -51,6 +51,11 @@ export const DRAWN_PROP_KINDS: ReadonlySet<PropKind> = new Set<PropKind>([
 ]);
 
 export const DRAWN_TERRAIN_KINDS: ReadonlySet<TerrainKind> = new Set<TerrainKind>([
+  'guano',
+  'bone-litter',
+  'sulphur-crust',
+  'rimstone',
+  'boulder-choke',
   'low-wall',
   'crates',
   'table',

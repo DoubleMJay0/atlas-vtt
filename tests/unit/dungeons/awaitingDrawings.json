@@ -68,13 +68,7 @@
     "crude-table",
     "pen"
   ],
-  "terrain": [
-    "bone-litter",
-    "boulder-choke",
-    "guano",
-    "rimstone",
-    "sulphur-crust"
-  ],
+  "terrain": [],
   "cave": [
     "floor",
     "edge",
