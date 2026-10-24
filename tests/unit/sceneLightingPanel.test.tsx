@@ -7,6 +7,11 @@ import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
 import { SceneLightingPanelHost } from '../../src/app/pixi/lighting/SceneLightingPanel';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
+// The vault picker is Obsidian's own modal: here it picks this image at once.
+vi.mock('../../src/app/pixi/lighting/UnexploredImageModal', () => ({
+  pickUnexploredImage: (_app: unknown, onChoose: (path: string) => void): void => onChoose('Maps/Fog/village-fog.png'),
+}));
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -20,7 +25,7 @@ function renderPanel(): { store: ViewAtlasStore; setSceneLighting: ReturnType<ty
   store.getState().setSceneLightingPanelOpen(true);
   const setSceneLighting = vi.spyOn(store.getState(), 'setSceneLighting');
   // As `UIRoot` mounts it: outside every tooltip provider.
-  render(<ViewStoreProvider store={store}><SceneLightingPanelHost /></ViewStoreProvider>);
+  render(<ViewStoreProvider store={store}><SceneLightingPanelHost app={app} /></ViewStoreProvider>);
   return { store, setSceneLighting };
 }
 
@@ -79,6 +84,17 @@ describe('SceneLightingPanel', () => {
     fireEvent.change(screen.getByLabelText('Explored colour'), { target: { value: '#aa7744' } });
     fireEvent.change(screen.getByLabelText('Unexplored colour'), { target: { value: '#102030' } });
     expect(store.getState().lighting).toMatchObject({ exploredColor: '#aa7744', unexploredColor: '#102030' });
+  });
+
+  it('picks a fog map for never-seen areas and takes it back as no choice at all', () => {
+    const { store } = renderPanel();
+    const clear = screen.getByRole('button', { name: 'No image' });
+    expect(clear.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Unexplored image Choose image…' }));
+    expect(store.getState().lighting.unexploredImage).toBe('Maps/Fog/village-fog.png');
+    expect(screen.getByRole('button', { name: 'Unexplored image village-fog.png' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'No image' }));
+    expect(store.getState().lighting).not.toHaveProperty('unexploredImage');
   });
 
   it('sets from how much ambient light the scene counts as lit', () => {

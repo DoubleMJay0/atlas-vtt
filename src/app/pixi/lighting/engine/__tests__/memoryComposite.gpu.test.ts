@@ -61,6 +61,18 @@ function hashOf(at: PixelReader): string {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
+/** The largest difference of a channel between two renders. */
+function largestDifference(a: PixelReader, b: PixelReader): number {
+  let largest = 0;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const other = b(x, y);
+      a(x, y).forEach((channel, i) => { largest = Math.max(largest, Math.abs(channel - other[i]!)); });
+    }
+  }
+  return largest;
+}
+
 function expectColour(pixel: readonly [number, number, number], hex: number): void {
   const expected = [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff];
   // The composite's dither moves a channel by at most one level.
@@ -137,6 +149,43 @@ describe('explored memory in the composite', () => {
     const at = await render('player', { exploredMemory: false, unexploredColor: '#336699' });
     expectColour(at(...REMEMBERED), 0x336699);
     expectColour((await render('player', { exploredMemory: false }))(...REMEMBERED), 0x000000);
+  });
+
+  /** A fog map over the whole map: `color` where it is drawn, transparent elsewhere. */
+  async function renderWithFogMap(mode: LightingMode, draw: (g: Graphics) => Graphics, options: MemoryOptions & Partial<EngineScene> = {}): Promise<PixelReader> {
+    const renderer = await createTestRenderer(SIZE);
+    cleanup.push(() => renderer.destroy());
+    const fog = RenderTexture.create({ width: MAP / 4, height: MAP / 4 });
+    const g = draw(new Graphics());
+    renderer.render({ container: g, target: fog, clear: true, clearColor: [0, 0, 0, 0] });
+    g.destroy();
+    cleanup.push(() => fog.destroy(true));
+    const explored = exploredLeftHalf(renderer);
+    cleanup.push(() => explored.destroy(true));
+    const engine = new LightingEngine(renderer);
+    cleanup.push(() => engine.destroy());
+    engine.setEnabled(true);
+    engine.setMode(mode);
+    engine.setExplored(explored);
+    engine.update(scene({ ...options, unexploredTexture: fog }));
+    engine.flush();
+    return renderThroughEngine(engine, renderer, camera);
+  }
+
+  it('shows the fog map over never-seen areas, and the unexplored colour where it is transparent', async () => {
+    // The fog map's right half is drawn, its left half is transparent.
+    const rightHalf = (g: Graphics): Graphics => g.rect(MAP / 8, 0, MAP / 8, MAP / 4).fill({ color: 0xcc6633 });
+    const at = await renderWithFogMap('player', rightHalf, { exploredMemory: false, unexploredColor: '#336699' });
+    expectColour(at(...UNEXPLORED), 0xcc6633);
+    expectColour(at(...REMEMBERED), 0x336699);
+  });
+
+  it('draws a fog map of one colour exactly as that unexplored colour, in both views', async () => {
+    // Memory, what tokens see and how the light's rim fades into the never-seen dark all stay as they are.
+    const whole = (g: Graphics): Graphics => g.rect(0, 0, MAP / 4, MAP / 4).fill({ color: 0xcc6633 });
+    // The image reaches the shader as 8-bit sRGB, the colour as a float: a channel may round one level apart.
+    expect(largestDifference(await renderWithFogMap('player', whole), await render('player', { unexploredColor: '#cc6633' }))).toBeLessThanOrEqual(1);
+    expect(hashOf(await renderWithFogMap('gm', whole))).toBe(hashOf(await render('gm')));
   });
 
   it('leaves what tokens see and the GM view as they were', async () => {

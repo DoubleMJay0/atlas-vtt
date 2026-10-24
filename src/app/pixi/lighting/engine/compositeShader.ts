@@ -19,7 +19,9 @@ import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
  * for the last filter of a chain; `AreaAwareFilter` computes it for any position in one).
  * In the player view, what the party does not perceive now shows its memory (uMemory 1): the
  * dim grey map tinted by uExploredTint where explored, uUnexplored elsewhere; both colours are
- * linear. That is what lies out of sight and what lies in sight in the dark, without a sense
+ * linear. With a fog map (uHasUnexploredImage, uUnexploredImage: an sRGB image over the whole map)
+ * never-seen areas show it instead of uUnexplored, which shows through where the image is transparent.
+ * That is what lies out of sight and what lies in sight in the dark, without a sense
  * that shows it: stepping behind a wall must not reveal a remembered room that standing in it hides.
  * uDarkness (read only while uHasDarkness is set) is the darkness map: red is how much of the
  * light magical darkness swallows (the lights it swallows are gone from the light map already;
@@ -67,6 +69,8 @@ uniform float uAllSeen;
 uniform float uMemory;
 uniform vec3 uExploredTint;
 uniform vec3 uUnexplored;
+uniform sampler2D uUnexploredImage;
+uniform float uHasUnexploredImage;
 uniform float uGreyKeep;
 uniform vec3 uGreyTint;
 uniform vec3 uDarkTint;
@@ -187,6 +191,18 @@ vec3 litAsBright(vec3 albedo, vec4 lamps, vec3 bounce, vec3 ambient) {
   return mix(lit, vec3(dot(lit, LUMA)) * vec3(0.86, 0.96, 1.18), night);
 }
 
+// What the players see where they perceive and remember nothing: the fog map where the scene has
+// one (over the unexplored colour where it is transparent), the unexplored colour otherwise. Linear.
+vec3 unexploredAt(vec2 w) {
+  if (uHasUnexploredImage < 0.5) return uUnexplored;
+  // Its mip level from the size of a screen pixel on the image: sharp up close, unaliased zoomed out.
+  vec2 size = vec2(textureSize(uUnexploredImage, 0));
+  float lod = max(log2(max(uPixelWorld * max(size.x / uMapSize.x, size.y / uMapSize.y), 1e-6)), 0.0);
+  vec4 fog = textureLod(uUnexploredImage, clamp(w / uMapSize, 0.0, 1.0), lod);
+  vec3 straight = fog.a > 0.0 ? fog.rgb / fog.a : vec3(0.0);
+  return mix(uUnexplored, toLinear(straight), fog.a);
+}
+
 void main() {
   vec2 screen = vTextureCoord * uInputSize.xy + uAreaOrigin;
   vec2 world = (uScreenToWorld * vec3(screen, 1.0)).xy;
@@ -279,9 +295,10 @@ void main() {
   // live picture is no brighter than the brightest the memory can be.
   vec3 remembered = vec3(grey) * 0.07 * uExploredTint;
   float recalls = uMode > 0.5 && uMemory > 0.5 && uAllSeen < 0.5 ? 1.0 : 0.0;
-  float dimmest = dot(visible, LUMA) - max(dot(uUnexplored, LUMA), dot(remembered, LUMA));
+  vec3 unexplored = uMode > 0.5 ? unexploredAt(world) : uUnexplored;
+  float dimmest = dot(visible, LUMA) - max(dot(unexplored, LUMA), dot(remembered, LUMA));
   float explored = uMode > 0.5 && uMemory > 0.5 && (seen < 1.0 || (recalls > 0.5 && dimmest < 0.0)) ? exploredAt(world) : 0.0;
-  vec3 memory = mix(uUnexplored, remembered, explored);
+  vec3 memory = mix(unexplored, remembered, explored);
   // In sight the memory makes up what the live picture lacks of the memory's own brightness:
   // nothing where the picture is as bright (lit and sensed places are exactly as the light
   // shows them), all of it in the dark, and at a light's rim the two add up to the memory's

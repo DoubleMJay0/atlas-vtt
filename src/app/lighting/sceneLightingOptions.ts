@@ -63,6 +63,12 @@ export function gmPictureDiffers(a: SceneLighting, b: SceneLighting): boolean {
     || darkSightLookOf(a) !== darkSightLookOf(b) || darkSightTintOf(a) !== darkSightTintOf(b);
 }
 
+/** The vault path of the scene's fog map for never-seen areas, or null when it sets none it could read. */
+export function unexploredImageOf(lighting: Pick<SceneLighting, 'unexploredImage'>): string | null {
+  const path: unknown = lighting.unexploredImage;
+  return typeof path === 'string' && path.trim() !== '' ? path : null;
+}
+
 /** A threshold within 0..1; anything that is not a number falls back to the default. */
 export function clampLitThreshold(value: number): number {
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : DEFAULT_LIT_THRESHOLD;
@@ -111,5 +117,6 @@ export function readSceneLighting(saved: unknown): SceneLighting {
     if (field in lighting && !isHexColor(lighting[field])) delete lighting[field];
   }
   if ('darkSightLook' in lighting && !isDarkSightLook(lighting.darkSightLook)) delete lighting.darkSightLook;
+  if ('unexploredImage' in lighting && !unexploredImageOf(lighting)) delete lighting.unexploredImage;
   return lighting;
 }
