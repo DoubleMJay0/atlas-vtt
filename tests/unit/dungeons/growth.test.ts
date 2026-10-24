@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonRequest } from '../../../src/app/dungeons/model';
 import { GROWTH_KINDS } from '../../../src/app/dungeons/growthModel';
+import { roomLight } from '../../../src/app/dungeons/growth/placeGrowth';
 import { en } from '../../../src/app/i18n/locales/en';
 
 /**
@@ -142,9 +143,18 @@ describe('dungeon vegetation', () => {
 
   it('grows green where the light comes in: the entry floor more than the floor below it', () => {
     const green = (f: DungeonFloor): number => f.growth.filter(g => GROWTH_KINDS[g.kind].needsLight).length / Math.max(1, f.rooms.length);
-    const above = overgrown.reduce((s, m) => s + green(m.floors[0]!), 0);
-    const below = overgrown.reduce((s, m) => s + green(m.floors[1]!), 0);
+    // In a Cavern the second floor lies below the first; a building's lies above, in its dusk.
+    const caves = overgrown.filter((m) => m.theme === 'cavern');
+    const above = caves.reduce((s, m) => s + green(m.floors[0]!), 0);
+    const below = caves.reduce((s, m) => s + green(m.floors[1]!), 0);
     expect(above).toBeGreaterThan(below * 1.5);
+  });
+
+  it('lights the upper floors of a Fortress as dusk, and a Cavern\'s deeper floors darker', () => {
+    const model = generateDungeon({ seed: 41, theme: 'fortress', tags: [], floors: 3 });
+    const upper = model.floors[1]!;
+    expect(roomLight({ rooms: upper.rooms, doors: upper.doors, floor: 1, aboveGround: true })).toEqual(upper.rooms.map(() => 0.35));
+    expect(new Set(roomLight({ rooms: upper.rooms, doors: upper.doors, floor: 1, aboveGround: false }))).toEqual(new Set([0.12]));
   });
 
   it('is the same for the same request', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bottomUp, floorAbove, floorBelow, floorStack, isAbove, levelElevation, stackOf, stairEnd, topDown } from '../../../src/app/dungeons/floors/floorStack';
+import { bottomUp, floorAbove, floorBelow, floorStack, floorWaterLevel, isAbove, levelElevation, stackOf, stairEnd, topDown } from '../../../src/app/dungeons/floors/floorStack';
 import { THEMES } from '../../../src/app/dungeons/themes/themes';
 
 const down3 = floorStack('down', 3);
@@ -39,6 +39,11 @@ describe('the floor stack', () => {
     expect(levelElevation(up3, 2, 10)).toEqual({ bottom: 20, top: 30 });
     expect(levelElevation(down3, 0, 10)).toEqual({ bottom: 0, top: 10 });
     expect(levelElevation(down3, 2, 10)).toEqual({ bottom: -20, top: -10 });
+  });
+
+  it('lets water stand on every floor of a Cavern and on the lowest floor of a building only', () => {
+    expect([0, 1, 2].map((f) => floorWaterLevel(down3, f, 0.6))).toEqual([0.6, 0.6, 0.6]);
+    expect([0, 1, 2].map((f) => floorWaterLevel(up3, f, 0.6))).toEqual([0.6, 0, 0]);
   });
 
   it('reads a model without a theme as going down', () => {

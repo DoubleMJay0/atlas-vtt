@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
+import { FEATURES } from '../../../src/app/dungeons/themes/features';
+import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { dungeonScene } from '../../../src/app/dungeons/scene/toScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
@@ -96,6 +98,22 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
       }
       for (const light of Object.values(parts.scene.lights)) expect(light.area!.length).toBeLessThanOrEqual(256);
     }
+  });
+
+  it('keeps standing water to the entrance floor of a rising dungeon', () => {
+    const pools = (model: DungeonModel, f: number): DungeonModel['floors'][number]['rooms'] => model.floors[f]!.rooms.filter((r) => r.type && (FORTRESS.rooms.find((s) => s.id === r.type)?.terrain.features ?? []).some((reason) => FEATURES[reason].water === 'pool'));
+    let wetEntrance = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      for (const tags of [['wet'], ['flooded'], ['flooded', 'ruined']]) {
+        const model = generateDungeon({ seed: seed * 613, theme: 'fortress', tags, floors: 3, waterLevel: 0.6 });
+        if (model.floors[0]!.waterCells.length > 0) wetEntrance++;
+        for (const f of [1, 2]) {
+          const inPool = (c: { x: number; y: number }): boolean => pools(model, f).some((r) => c.x >= r.x && c.x < r.x + r.w && c.y >= r.y && c.y < r.y + r.h);
+          expect(model.floors[f]!.waterCells.filter((c) => !inPool(c)), `seed ${seed * 613} [${tags.join(',')}] floor ${f}`).toEqual([]);
+        }
+      }
+    }
+    expect(wetEntrance).toBeGreaterThan(0);
   });
 
   it('has lava and acid only where its tags ask for them', () => {

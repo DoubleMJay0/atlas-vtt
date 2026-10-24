@@ -5,7 +5,7 @@
  * and vegetation. Architecture only: no story, no text; a dungeon is named by the GM alone.
  */
 
-import { type FloorStack, floorStack } from './floors/floorStack';
+import { type FloorStack, floorStack, floorWaterLevel, isAbove } from './floors/floorStack';
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { fiveRoomParams } from './layout/fiveRoom';
 import { floraOf } from './growth/flora';
@@ -37,8 +37,10 @@ interface FloorParts {
   stack: FloorStack;
 }
 
-function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, level: number): DungeonFloor {
-  const { planned, params, roles, columns } = parts;
+function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, dungeonLevel: number): DungeonFloor {
+  const { planned, params, roles, columns, stack } = parts;
+  const level = floorWaterLevel(stack, index, dungeonLevel);
+  const aboveGround = isAbove(stack, index, 0);
   const { rooms, doors, stairs } = planned;
   const dry = level <= 0 && params.tags.has('dry');
   const mayPool = (id: number): boolean => parts.water?.pools.has(id) ?? true;
@@ -47,12 +49,12 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept) });
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
-  const pieces = addUndergrowth(seed, terrain, waterCells, flora, params.tags.has('ruined'));
+  const pieces = addUndergrowth(seed, terrain, waterCells, flora, params.tags.has('ruined'), aboveGround);
   const typedRooms = new Set(rooms.filter((room) => room.type).map((room) => room.id));
   const placed = placeProps({ seed, floor: index, stack: parts.stack, rooms, doors, stairs, columns, terrain: pieces, roles, params, typed: typedRooms, furnished: terrain.propCells() });
   const props = [...terrain.props, ...placed.props];
   const { rubble, cracks } = placed;
-  const growth = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
+  const growth = placeGrowth({ seed, floor: index, aboveGround, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
   return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth };
 }
 

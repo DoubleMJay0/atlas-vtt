@@ -68,3 +68,8 @@ export function levelElevation(stack: FloorStack, floor: number, height: number)
   const bottom = (stack.rise === 'down' ? -1 : 1) * floor * height + 0;
   return { bottom, top: bottom + height };
 }
+
+/** The water level a floor floods to: a cave's every floor, a building's lowest alone (water does not stand upstairs). */
+export function floorWaterLevel(stack: FloorStack, floor: number, level: number): number {
+  return stack.rise === 'down' || floorBelow(stack, floor) === null ? level : 0;
+}

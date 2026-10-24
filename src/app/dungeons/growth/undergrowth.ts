@@ -33,11 +33,11 @@ function clump(rng: Rng, rc: RoomCells, start: CellPoint, size: number, fits: (c
 }
 
 /** Adds the floor's undergrowth to its terrain; returns every piece. */
-export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: readonly CellPoint[], flora: Flora | null, ruined = false): DungeonTerrain[] {
+export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: readonly CellPoint[], flora: Flora | null, ruined: boolean, aboveGround: boolean): DungeonTerrain[] {
   if (!flora?.rich) return floor.pieces;
   const { plan } = floor;
   const space = new GrowthSpace({ ...plan, props: [], terrain: floor.pieces, waterCells });
-  const light = roomLight({ rooms: plan.rooms, doors: plan.doors, floor: floor.index });
+  const light = roomLight({ rooms: plan.rooms, doors: plan.doors, floor: floor.index, aboveGround });
   for (const room of plan.rooms) {
     const rc = floor.room(room.id);
     if (!rc || rc.floorCount < FIGHT_AREA || room.stage !== undefined) continue;

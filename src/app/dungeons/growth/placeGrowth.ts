@@ -2,7 +2,7 @@
  * A floor's vegetation, after its water and furniture: climbers along stretches of its walls and
  * round temple columns, plants in patches on its floor and by its water, weeds in its cracks.
  * Green growth follows the light: on the entry floor it is richest in the rooms by the entrances
- * and thins with every door further in; below it is scarce, while moss, fungi, roots and dead
+ * and thins with every door further in; upstairs it has the entry floor's dusk; below it is scarce, while moss, fungi, roots and dead
  * creepers grow anywhere. Every room draws from a stream of its own.
  */
 
@@ -20,18 +20,21 @@ export interface GrowthInput extends GrowthFloor {
   seed: number;
   /** The floor's index: 0 is the entry floor, open to the daylight at its entrances. */
   floor: number;
+  /** A storey above the entrance floor, lit by windows the map does not draw. */
+  aboveGround: boolean;
   cracks: readonly DungeonCrack[];
 }
 
 /** How light falls off from an entrance, per door walked. */
 const LIGHT_FALL = 2.5;
-/** The least light of a room on the entry floor and below it: cracks, shafts, a lamp left burning. */
+/** The least light of a room on the entry floor and below it (cracks, shafts, a lamp left burning), and the light of every room upstairs. */
 const ENTRY_DUSK = 0.35;
 const DEEP_DUSK = 0.12;
 
 /** How much light reaches each room, 0..1. */
-export function roomLight(input: Pick<GrowthInput, 'rooms' | 'doors' | 'floor'>): number[] {
+export function roomLight(input: Pick<GrowthInput, 'rooms' | 'doors' | 'floor' | 'aboveGround'>): number[] {
   const { rooms, doors, floor } = input;
+  if (input.aboveGround) return rooms.map(() => ENTRY_DUSK);
   if (floor > 0) return rooms.map(() => DEEP_DUSK);
   const graph = neighbours(rooms.length, doors);
   const fromEach = doors.flatMap((d) => (d.from === null && d.to !== null ? [hops(graph, d.to)] : []));
