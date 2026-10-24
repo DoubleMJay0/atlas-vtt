@@ -1,6 +1,7 @@
 /**
- * The first room of a floor further down: a room around the landing of the stairs from above, the
- * stairwell against one of its walls and its arrival row on the floor. Its size is drawn, and of
+ * The first room of a floor further from the entrance: a room around the stairs' end from the
+ * floor before, the stairwell against one of its walls and its arrival row on the floor (past the
+ * low end where the floor lies below, before the high end where it lies above). Its size is drawn, and of
  * every place it may stand one is picked.
  */
 
@@ -9,7 +10,7 @@ import { type CellRect, cellKey, cellsOf } from '../geometry';
 import { MAX_SEED, type Rng, int, pick, shuffled } from '../rng';
 import type { FloorRoot } from '../layout/grow';
 import { drawRoomSize } from '../layout/sizes';
-import { STAIR_DIRS, type StairSpot, approachCells, spotFits, spotRect } from './stairSpots';
+import { STAIR_DIRS, type StairEnd, type StairSpot, approachCells, spotFits, spotRect } from './stairSpots';
 
 /** Sizes tried before an attempt gives up on its landing. */
 const SIZE_TRIES = 4;
@@ -30,8 +31,8 @@ function originOf(f: CellRect, axis: CellDir): CellPoint {
 }
 
 /** The floor rectangles of size `w` × `h` that hold the stairwell and its arrival row, against one wall. */
-function placements(spot: StairSpot, w: number, h: number): CellRect[] {
-  const need = [...cellsOf(spotRect(spot)), ...approachCells(spot, 'lower')];
+function placements(spot: StairSpot, end: StairEnd, w: number, h: number): CellRect[] {
+  const need = [...cellsOf(spotRect(spot)), ...approachCells(spot, end)];
   const xs = need.map((c) => c.x);
   const ys = need.map((c) => c.y);
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -43,16 +44,16 @@ function placements(spot: StairSpot, w: number, h: number): CellRect[] {
 }
 
 /** The landing's first room for an attempt, or null where no room drawn fits it. */
-export function landingRoot(rng: Rng, spot: StairSpot): FloorRoot | null {
+export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd): FloorRoot | null {
   for (let tries = 0; tries < SIZE_TRIES; tries++) {
     const size = drawRoomSize(rng);
     const options = shuffled(rng, STAIR_DIRS).flatMap((axis) => {
       const { w, h } = floorDims(axis, size.width, size.depth);
-      return placements(spot, w, h).map((f) => ({ f, axis }));
+      return placements(spot, end, w, h).map((f) => ({ f, axis }));
     });
     const fitting = options.filter(({ f }) => {
       const room = { id: 0, x: f.x0, y: f.y0, w: f.x1 - f.x0 + 1, h: f.y1 - f.y0 + 1, kind: 'room' as const, rotunda: false };
-      return spotFits(room, { doors: [], stairs: [], ends: [] }, spot, 'lower');
+      return spotFits(room, { doors: [], stairs: [], ends: [] }, spot, end);
     });
     if (fitting.length === 0) continue;
     const { f, axis } = pick(rng, fitting);
@@ -61,7 +62,7 @@ export function landingRoot(rng: Rng, spot: StairSpot): FloorRoot | null {
   return null;
 }
 
-/** The cells no door of the floor below may open onto: the stairwell and its arrival row. */
-export function landingCells(spot: StairSpot): Set<string> {
-  return new Set([...cellsOf(spotRect(spot)), ...approachCells(spot, 'lower')].map((c) => cellKey(c.x, c.y)));
+/** The cells no door of the landing's floor may open onto: the stairwell and its arrival row. */
+export function landingCells(spot: StairSpot, end: StairEnd): Set<string> {
+  return new Set([...cellsOf(spotRect(spot)), ...approachCells(spot, end)].map((c) => cellKey(c.x, c.y)));
 }

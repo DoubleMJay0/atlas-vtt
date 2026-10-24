@@ -19,7 +19,7 @@ import { floorStream } from './rng';
 import { readTags } from './tags';
 import type { FloorTerrain } from './terrain/floorTerrain';
 import { addShallowWater, planTerrain } from './terrain/placeTerrain';
-import { pickTheme, themedTags } from './themes/themes';
+import { pickTheme, themeOf, themedTags } from './themes/themes';
 import type { ThemeId } from './themes/themeTypes';
 import { typeDungeon } from './themes/typeDungeon';
 import { themeWater, type ThemeWater } from './themes/themeWater';
@@ -64,7 +64,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const params = fiveRoom ? fiveRoomParams(base) : base;
   const rolled = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   const count = requestedFloors(request);
-  const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom);
+  const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom, themeOf(theme).rise);
   const themed = typeDungeon(seed, theme, params.tags, planned);
   const { typed } = themed;
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.

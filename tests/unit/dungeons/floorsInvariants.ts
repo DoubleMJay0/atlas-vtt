@@ -1,5 +1,6 @@
 /** Checks of what joins a dungeon's floors and what only the entry floor has: stairwells and entrances. */
 
+import { type FloorStack, stackOf, stairEnd } from '../../../src/app/dungeons/floors/floorStack';
 import { floorRect, inRect, wallRect } from '../../../src/app/dungeons/geometry';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonStair } from '../../../src/app/dungeons/model';
 import { distances, normals } from './dungeonInvariants';
@@ -38,7 +39,7 @@ function againstWall(stair: DungeonStair, room: DungeonRoom): boolean {
 }
 
 /** A stair end inside a normal room's floor, against its wall, reached from free floor, the room passable around every stair in it. */
-function endProblems(floor: DungeonFloor, index: number, stair: DungeonStair): string[] {
+function endProblems(floor: DungeonFloor, index: number, stair: DungeonStair, stack: FloorStack): string[] {
   const where = `floor ${index} stair ${stair.link}`;
   const room = roomHolding(floor, stair);
   if (!room || room.kind !== 'room' || room.rotunda) return [`${where} not inside a normal room`];
@@ -46,7 +47,7 @@ function endProblems(floor: DungeonFloor, index: number, stair: DungeonStair): s
   const f = floorRect(room);
   const inside = floor.stairs.filter((s) => roomHolding(floor, s) === room);
   const taken = new Set(inside.flatMap(cellsOf).map(key));
-  const needed = [...doorApproaches(floor, room), ...inside.flatMap((s) => approach(s, s.to > index))];
+  const needed = [...doorApproaches(floor, room), ...inside.flatMap((s) => approach(s, stairEnd(stack, index, s.to) === 'upper'))];
   if (needed.some((c) => !inRect(f, c.x, c.y) || taken.has(key(c)))) return [`${where} blocks a door or the way onto stairs`];
   const free = new Set<string>();
   for (let y = f.y0; y <= f.y1; y++) for (let x = f.x0; x <= f.x1; x++) if (!taken.has(`${x},${y}`)) free.add(`${x},${y}`);
@@ -87,12 +88,42 @@ export function stairProblems(model: DungeonModel): string[] {
     const short = Math.min(a.stair.w, a.stair.h);
     if (long < 2 || long > 3 || short < 1 || short > 2) out.push(`stair ${link} is ${a.stair.w} × ${a.stair.h}`);
   }
+  const stack = stackOf(model);
   model.floors.forEach((floor, index) => {
-    for (const stair of floor.stairs) out.push(...endProblems(floor, index, stair));
+    for (const stair of floor.stairs) out.push(...endProblems(floor, index, stair, stack));
     const cells = new Set(floor.stairs.flatMap(cellsOf).map(key));
     for (const prop of floor.props) if (cells.has(`${Math.floor(prop.x)},${Math.floor(prop.y)}`)) out.push(`floor ${index}: a ${prop.kind} on the stairs`);
   });
   return out;
+}
+
+/**
+ * A Fortress's or Haunted Mansion's floors rise: every stairwell from floor `k` to `k + 1` is
+ * entered on floor `k` past its low end (the side of `down`), on floor `k + 1` before its high end.
+ */
+export function riseProblems(model: DungeonModel): string[] {
+  if (model.theme === 'cavern') return [];
+  return model.floors.flatMap((floor, index) =>
+    floor.stairs.flatMap((stair) => {
+      const room = roomHolding(floor, stair);
+      const row = approach(stair, stair.to < index);
+      return room && row.every((c) => inRect(floorRect(room), c.x, c.y)) ? [] : [`floor ${index} stair ${stair.link} is not entered from the ${stair.to > index ? 'low' : 'high'} end`];
+    }),
+  );
+}
+
+/** Of the floors past the entrance floor, the share that lies within the walls of the floor before it, plus two cells either way. */
+export function withinShare(models: readonly DungeonModel[]): number {
+  const later = models.flatMap((model) => model.floors.slice(1).map((floor, k) => ({ floor, earlier: model.floors[k] as DungeonFloor })));
+  const box = (floor: DungeonFloor): { x0: number; y0: number; x1: number; y1: number } => {
+    const walls = floor.rooms.map(wallRect);
+    return { x0: Math.min(...walls.map((r) => r.x0)), y0: Math.min(...walls.map((r) => r.y0)), x1: Math.max(...walls.map((r) => r.x1)), y1: Math.max(...walls.map((r) => r.y1)) };
+  };
+  const inside = later.filter(({ floor, earlier }) => {
+    const [a, b] = [box(floor), box(earlier)];
+    return a.x0 >= b.x0 - 2 && a.y0 >= b.y0 - 2 && a.x1 <= b.x1 + 2 && a.y1 <= b.y1 + 2;
+  });
+  return inside.length / Math.max(1, later.length);
 }
 
 /** The rooms holding the stairs between floor `upper` and the one below, on each of the two. */

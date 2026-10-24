@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
+import { bottomUp, stackOf, stairEnd } from '../../../src/app/dungeons/floors/floorStack';
 import { approachCells, spotRect, type StairEnd } from '../../../src/app/dungeons/floors/stairSpots';
-import { cellsOf } from '../../../src/app/dungeons/geometry';
+import { cellsOf, floorRect, inRect } from '../../../src/app/dungeons/geometry';
 import type { DungeonStair } from '../../../src/app/dungeons/model';
+import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
 import { stairLinks } from '../../../src/app/dungeons/scene/toStairs';
 import { flightSides, levelLinkList, linkAt } from '../../../src/app/levels/levelLinks';
 import { moveWallsOf, reaches } from '../../../src/app/online/movement/index.ts';
@@ -17,14 +19,15 @@ const SEEDS = 100;
  * end; the sides closed on both floors. Held by moving across cells, as a player's token moves.
  */
 describe('a generated dungeon\'s stairwells are walked', () => {
-  for (const floors of [2, 3, 4]) {
-    it(`from the end at each floor's ground to the far row, over ${SEEDS} dungeons of ${floors} floors`, () => {
+  for (const theme of ['fortress', 'mansion', 'cavern'] as const satisfies readonly ThemeId[]) for (const floors of [2, 3, 4]) {
+    it(`from the end at each floor's ground to the far row, over ${SEEDS} ${theme} dungeons of ${floors} floors`, () => {
       let stairwells = 0;
       for (let seed = 1; seed <= SEEDS; seed++) {
-        const model = generateDungeon({ seed: seed * 7919 + floors, tags: ['medium'], floors });
+        const model = generateDungeon({ seed: seed * 7919 + floors, tags: ['medium'], floors, theme });
         const ids = model.floors.map((_, index) => `floor-${index}`);
-        // The scene lists its levels bottom first; floor 0 is the top.
-        const levels: SceneLevel[] = [...ids].reverse().map((id) => ({ id, elevation: { bottom: 0, top: 10 }, background: null }));
+        const stack = stackOf(model);
+        // The scene lists its levels bottom first.
+        const levels: SceneLevel[] = bottomUp(stack).map((index) => ({ id: ids[index]!, elevation: { bottom: 0, top: 10 }, background: null }));
         const placement = { originCell: { x: 0, y: 0 }, pxPerCell: PX };
         const links = levelLinkList(stairLinks(model, ids, placement));
         const centre = (cell: { x: number; y: number }): { x: number; y: number } => ({ x: (cell.x + 0.5) * PX, y: (cell.y + 0.5) * PX });
@@ -34,7 +37,11 @@ describe('a generated dungeon\'s stairwells are walked', () => {
             const where = `seed ${seed}, floor ${index}, stair ${stair.link}`;
             const link = links.find((entry) => entry.id === `levellink_dungeon_${stair.link}`);
             expect(link?.flight, where).toBeDefined();
-            const end: StairEnd = stair.to > index ? 'upper' : 'lower';
+            const end: StairEnd = stairEnd(stack, index, stair.to);
+            // The row it is entered from is the floor of the room that holds it.
+            const room = floor.rooms.find((r) => cellsOf(spotRect(stair)).every((c) => inRect(floorRect(r), c.x, c.y)));
+            expect(room, `${where}: in no room`).toBeDefined();
+            for (const c of approachCells(stair, end)) expect(inRect(floorRect(room!), c.x, c.y), `${where}: entered from ${c.x},${c.y}, off the room's floor`).toBe(true);
             walk(stair, end, ids[index]!, levels, links, centre, where);
           }
         });

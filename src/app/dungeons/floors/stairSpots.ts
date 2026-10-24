@@ -8,7 +8,10 @@
 import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
 import { type CellRect, cellKey, cellsOf, dir, floorRect, inRect } from '../geometry';
 
-/** The upper end is where the treads start down; the lower end is where they arrive. */
+/**
+ * The upper end is where the treads start down; the lower end is where they arrive. Ends are
+ * physical: which floor holds which follows the stack (`floorStack.stairEnd`), not planning order.
+ */
 export type StairEnd = 'upper' | 'lower';
 
 export type StairSpot = Pick<DungeonStair, 'x' | 'y' | 'w' | 'h' | 'down'>;

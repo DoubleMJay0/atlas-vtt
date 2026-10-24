@@ -1,15 +1,17 @@
 /**
- * The stairwells between two floors. The first leads down from a room of the upper floor far from
- * where that floor is entered, and the floor below grows around its landing. Where both floors
- * have six rooms or more, a second joins rooms that lie over each other, as far from the first as
- * both floors' rooms allow, so a party has two ways between them.
+ * The stairwells between two floors. The first leads on (down in a Cavern, up in a building) from
+ * a room of the earlier floor far from where that floor is entered, and the next floor grows
+ * around its other end. Where both floors have six rooms or more, a second joins rooms that lie
+ * over each other, as far from the first as both floors' rooms allow, so a party has two ways
+ * between them.
  */
 
 import type { DungeonDoor, DungeonRoom } from '../model';
 import { floorRect, intersection } from '../geometry';
 import { type Rng, pick, weighted } from '../rng';
 import { hops, neighbours } from '../roomGraph';
-import { type FloorSpace, type StairEnd, type StairSpot, spotFits, spotRect, spotsWithin } from './stairSpots';
+import { type FloorStack, stairEnd } from './floorStack';
+import { type FloorSpace, type StairSpot, spotFits, spotRect, spotsWithin } from './stairSpots';
 
 /** Two ways between floors from this many normal rooms on each. */
 export const TWO_CONNECTIONS_FROM = 6;
@@ -27,12 +29,8 @@ export interface PlacedStair {
   spot: StairSpot;
 }
 
-function endOf(stair: { to: number }, index: number): StairEnd {
-  return stair.to > index ? 'upper' : 'lower';
-}
-
-export function spaceOf(floor: FloorShape, index: number): FloorSpace {
-  return { doors: floor.doors, stairs: floor.stairs, ends: floor.stairs.map((stair) => endOf(stair, index)) };
+export function spaceOf(floor: FloorShape, index: number, stack: FloorStack): FloorSpace {
+  return { doors: floor.doors, stairs: floor.stairs, ends: floor.stairs.map((stair) => stairEnd(stack, index, stair.to)) };
 }
 
 export function normalRooms(floor: Pick<FloorShape, 'rooms'>): number {
@@ -62,28 +60,29 @@ function holdsStairs(room: DungeonRoom): boolean {
   return room.kind === 'room' && !room.rotunda && !room.boss && room.wing === 'regular';
 }
 
-/** Where the first stairwell down from floor `index` stands: a room the farther from its entry and other stairs, the likelier. */
-export function chooseDescent(rng: Rng, floor: FloorShape, index: number): PlacedStair | null {
-  const space = spaceOf(floor, index);
+/** Where the first stairwell on from floor `index` to the next stands: a room the farther from its entry and other stairs, the likelier. */
+export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: FloorStack): PlacedStair | null {
+  const space = spaceOf(floor, index, stack);
+  const end = stairEnd(stack, index, index + 1);
   const distance = distanceFrom(floor, anchors(floor));
   let options = floor.rooms.filter(holdsStairs).map((room) => [room, ((distance[room.id] ?? 0) + 1) ** 2] as const);
   while (options.length > 0) {
     const room = weighted(rng, options);
-    const spots = spotsWithin(floorRect(room)).filter((spot) => spotFits(room, space, spot, 'upper'));
+    const spots = spotsWithin(floorRect(room)).filter((spot) => spotFits(room, space, spot, end));
     if (spots.length > 0) return { room: room.id, spot: pick(rng, spots) };
     options = options.filter(([other]) => other !== room);
   }
   return null;
 }
 
-/** Rooms of the upper and lower floor that lie over each other, the pairs farthest from the stairs already there first. */
-function overlappingPairs(upper: FloorShape, lower: FloorShape): { a: DungeonRoom; b: DungeonRoom; spread: number }[] {
-  const upperFar = distanceFrom(upper, anchors(upper));
-  const lowerFar = distanceFrom(lower, anchors(lower));
+/** Rooms of the earlier and later floor that lie over each other, the pairs farthest from the stairs already there first. */
+function overlappingPairs(earlier: FloorShape, later: FloorShape): { a: DungeonRoom; b: DungeonRoom; spread: number }[] {
+  const earlierFar = distanceFrom(earlier, anchors(earlier));
+  const laterFar = distanceFrom(later, anchors(later));
   const pairs: { a: DungeonRoom; b: DungeonRoom; spread: number }[] = [];
-  for (const a of upper.rooms.filter(holdsStairs)) {
-    for (const b of lower.rooms.filter(holdsStairs)) {
-      const spread = Math.min(upperFar[a.id] ?? 0, lowerFar[b.id] ?? 0);
+  for (const a of earlier.rooms.filter(holdsStairs)) {
+    for (const b of later.rooms.filter(holdsStairs)) {
+      const spread = Math.min(earlierFar[a.id] ?? 0, laterFar[b.id] ?? 0);
       if (spread >= MIN_CONNECTION_SPREAD && intersection(floorRect(a), floorRect(b))) pairs.push({ a, b, spread });
     }
   }
@@ -91,19 +90,20 @@ function overlappingPairs(upper: FloorShape, lower: FloorShape): { a: DungeonRoo
 }
 
 /**
- * A further stairwell between `upper` (floor `index`) and `lower` (floor `index + 1`): rooms that
+ * A further stairwell between `earlier` (floor `index`) and `later` (floor `index + 1`): rooms that
  * lie over each other and hold the same rectangle on both, as far from the stairs between them
  * already as both floors allow (at least `MIN_CONNECTION_SPREAD` doors); null where none can stand.
  */
-export function extraConnection(rng: Rng, upper: FloorShape, lower: FloorShape, index: number): StairSpot | null {
-  const upperSpace = spaceOf(upper, index);
-  const lowerSpace = spaceOf(lower, index + 1);
+export function extraConnection(rng: Rng, earlier: FloorShape, later: FloorShape, index: number, stack: FloorStack): StairSpot | null {
+  const earlierSpace = spaceOf(earlier, index, stack);
+  const laterSpace = spaceOf(later, index + 1, stack);
+  const [earlierEnd, laterEnd] = [stairEnd(stack, index, index + 1), stairEnd(stack, index + 1, index)];
   const spots: StairSpot[] = [];
   let widest = 0;
-  for (const { a, b, spread } of overlappingPairs(upper, lower)) {
+  for (const { a, b, spread } of overlappingPairs(earlier, later)) {
     if (spots.length > 0 && spread < widest * 0.75) break;
     const shared = intersection(floorRect(a), floorRect(b));
-    const fitting = shared ? spotsWithin(shared).filter((spot) => spotFits(a, upperSpace, spot, 'upper') && spotFits(b, lowerSpace, spot, 'lower')) : [];
+    const fitting = shared ? spotsWithin(shared).filter((spot) => spotFits(a, earlierSpace, spot, earlierEnd) && spotFits(b, laterSpace, spot, laterEnd)) : [];
     if (fitting.length === 0) continue;
     if (spots.length === 0) widest = spread;
     spots.push(...fitting);
