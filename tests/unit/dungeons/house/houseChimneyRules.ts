@@ -1,4 +1,4 @@
-import { cellKey } from '../../../../src/app/dungeons/geometry';
+import { cellKey, floorCellsOf } from '../../../../src/app/dungeons/geometry';
 import { levelOf, stackOf } from '../../../../src/app/dungeons/floors/floorStack';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonProp } from '../../../../src/app/dungeons/model';
 import { SIDES, houseKeys, owners, stackCells } from './houseCells';
@@ -9,34 +9,34 @@ import { SIDES, houseKeys, owners, stackCells } from './houseCells';
  */
 
 /** The rooms a manor heats: reception rooms, family bedrooms, the kitchen's range and the servants' hall. */
-export const WARMED = new Set(['entrance-hall', 'drawing-room', 'dining-room', 'library', 'saloon', 'parlour', 'study', 'ballroom', 'master-bedroom', 'bedroom', 'nursery', 'kitchen', 'servants-hall']);
+const WARMED = new Set(['entrance-hall', 'drawing-room', 'dining-room', 'library', 'saloon', 'parlour', 'study', 'ballroom', 'master-bedroom', 'bedroom', 'nursery', 'kitchen', 'servants-hall']);
 /** The rooms a stack is planned for: each borders one. */
 const MAIN = new Set(['drawing-room', 'dining-room', 'kitchen', 'master-bedroom']);
 
-/** Ground cells per stack a house may have at most, and the most stacks of any house. */
-export const CELLS_PER_STACK = 80;
-export const MOST_STACKS = 7;
+/** The fewest ground cells per stack a house may have, and the most stacks of any house: looser than the planner's plan, which its main rooms may exceed. */
+const FEWEST_CELLS_PER_STACK = 80;
+const MOST_STACKS = 7;
 /** The most fireplaces on one floor, and the fewest on the entrance floor. */
-export const MOST_FIREPLACES = 10;
-export const FEWEST_FIREPLACES = 2;
+const MOST_FIREPLACES = 10;
+const FEWEST_FIREPLACES = 2;
 /** Of the fireplaces whose stack has a heated room on its far face, the share with a fireplace there too, at least. */
 export const BACK_TO_BACK = 0.7;
 
 const hearthsOf = (floor: DungeonFloor): DungeonProp[] => floor.props.filter((p) => p.kind === 'hearth');
 
 /** A fireplace's two cells and the cell behind each, against the wall it stands on. */
-export function hearthCells(hearth: DungeonProp): { cells: CellPoint[]; behind: CellPoint[] } {
+function hearthCells(hearth: DungeonProp): { cells: CellPoint[]; behind: CellPoint[] } {
   const front = { x: Math.round(Math.sin(hearth.rotation)), y: Math.round(-Math.cos(hearth.rotation)) };
   const along = { x: -front.y, y: front.x };
   const cells = [-0.5, 0.5].map((t) => ({ x: Math.floor(hearth.x + along.x * t), y: Math.floor(hearth.y + along.y * t) }));
   return { cells, behind: cells.map((c) => ({ x: c.x - front.x, y: c.y - front.y })) };
 }
 
-/** C1. A house has a stack for every `CELLS_PER_STACK` ground cells at most (four may stand in any house), `MOST_STACKS` in all, and one at least. */
+/** C1. A house has a stack for every `FEWEST_CELLS_PER_STACK` ground cells at most (four may stand in any house), `MOST_STACKS` in all, and one at least. */
 export function stacksPerHouse(model: DungeonModel): string[] {
   const ground = model.floors[0]!;
   const n = ground.stacks?.length ?? 0;
-  const most = Math.min(MOST_STACKS, Math.max(4, Math.ceil(houseKeys(ground).size / CELLS_PER_STACK)));
+  const most = Math.min(MOST_STACKS, Math.max(4, Math.ceil(houseKeys(ground).size / FEWEST_CELLS_PER_STACK)));
   return n < 1 || n > most ? [`${n} stacks on ${houseKeys(ground).size} ground cells (1–${most})`] : [];
 }
 
@@ -89,15 +89,14 @@ export function mainRoomsWarm(model: DungeonModel): string[] {
 }
 
 function roomBorders(room: DungeonFloor['rooms'][number], stacks: ReadonlySet<string>): boolean {
-  const cells = room.cells ?? Array.from({ length: room.w * room.h }, (_, k) => ({ x: room.x + (k % room.w), y: room.y + Math.floor(k / room.w) }));
-  return cells.some((c) => SIDES.some((s) => stacks.has(cellKey(c.x + s.x, c.y + s.y))));
+  return floorCellsOf(room).some((c) => SIDES.some((s) => stacks.has(cellKey(c.x + s.x, c.y + s.y))));
 }
 
 /** C6. At most `MOST_FIREPLACES` fireplaces on a floor, and `FEWEST_FIREPLACES` at least on the entrance floor of a house that is no ruin (which loses pieces) and no five-room dungeon. */
 export function fireplacesPerFloor(model: DungeonModel): string[] {
-  const out = model.floors.flatMap((floor, i) => (hearthsOf(floor).length > MOST_FIREPLACES ? [`floor ${i}: ${hearthsOf(floor).length} fireplaces`] : []));
-  const ground = model.floors[0]!;
-  if (!model.tags.includes('ruined') && !ground.rooms.some((r) => r.stage) && hearthsOf(ground).length < FEWEST_FIREPLACES) out.push(`the entrance floor has ${hearthsOf(ground).length} fireplaces`);
+  const counts = model.floors.map((floor) => hearthsOf(floor).length);
+  const out = counts.flatMap((n, i) => (n > MOST_FIREPLACES ? [`floor ${i}: ${n} fireplaces`] : []));
+  if (!model.tags.includes('ruined') && !model.floors[0]!.rooms.some((r) => r.stage) && counts[0]! < FEWEST_FIREPLACES) out.push(`the entrance floor has ${counts[0]} fireplaces`);
   return out;
 }
 

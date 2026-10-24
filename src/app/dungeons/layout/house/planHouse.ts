@@ -134,7 +134,7 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
     });
     return { level, storey, typed };
   });
-  // The places no stack is built on stay the rooms' floor.
+  // The places no stack is built on stay the rooms' floor; rooms keep the types they were given with every place cut.
   const built = chooseStacks(frame, cut, planned.map((p) => p.typed));
   for (const { storey, typed } of planned) {
     storey.stacks = storey.stacks.filter((s) => built.has(s));
