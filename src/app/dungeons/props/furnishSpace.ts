@@ -62,10 +62,10 @@ export function record(fs: FurnishSpace, piece: PlacedPiece): DungeonProp {
 }
 
 /**
- * A cell piece on `cells`, its front towards `facing`, `along` cells long where it is drawn
- * stretched: only where it is offered, allowed, the room stays whole and its clear side is free floor.
+ * A cell piece on `cells`, its front towards `facing`: only where it is offered, allowed, the room
+ * stays whole and its clear side is free floor.
  */
-export function placePiece(fs: FurnishSpace, kind: PropKind, cells: readonly CellPoint[], towards: CellDir, along?: number): DungeonProp | null {
+export function placePiece(fs: FurnishSpace, kind: PropKind, cells: readonly CellPoint[], towards: CellDir): DungeonProp | null {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
   if (!isCellPiece(spec) || spec.wallPiece || !allowedOn(fs, kind, cells)) return null;
@@ -78,8 +78,7 @@ export function placePiece(fs: FurnishSpace, kind: PropKind, cells: readonly Cel
   rc.keepClear(clear);
   occupyCells(fs.space, cells);
   const centre = centreOf(cells);
-  const stretched = along !== undefined && along > spec.footprint.along ? { size: { along, out: spec.footprint.out } } : {};
-  const prop: DungeonProp = { kind, x: centre.x, y: centre.y, rotation: facing(towards), scale: 1, room: rc.room.id, ...stretched };
+  const prop: DungeonProp = { kind, x: centre.x, y: centre.y, rotation: facing(towards), scale: 1, room: rc.room.id };
   return record(fs, { prop, cells, clear, facing: towards });
 }
 

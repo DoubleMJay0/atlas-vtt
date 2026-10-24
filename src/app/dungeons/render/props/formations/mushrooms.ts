@@ -2,10 +2,10 @@ import { cutPlantForm } from '../../engraved/growth';
 import { emptyForm, type Cap, type PlantForm } from '../../growth/forms';
 import { fungi } from '../../growth/floorPlants';
 import type { GlyphPen } from '../../glyphPen';
-import { mixColours } from '../../palette';
 import type { GlyphFit } from '../../propShapes';
 import { isDarkColour } from '../../stone/colours';
 import { paintPlantForm } from '../../stone/growth';
+import { darkFloorLine } from '../livedIn/parts';
 import { rngFrom } from '../../../rng';
 
 /**
@@ -62,7 +62,7 @@ function inkRims(pen: GlyphPen): void {
   ctx.save();
   ctx.beginPath();
   mushroomsSilhouette(ctx);
-  if (isDarkColour(palette.floor)) ctx.strokeStyle = mixColours(palette.ink, palette.floor, 0.3);
+  if (isDarkColour(palette.floor)) ctx.strokeStyle = darkFloorLine(pen);
   ctx.lineWidth = pen.fine * 1.4;
   ctx.stroke();
   ctx.restore();

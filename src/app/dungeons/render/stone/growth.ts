@@ -305,7 +305,7 @@ function paintMoss(scene: ArtScene, colours: PlantColours): void {
   }
 }
 
-/** Each scene's plant colours, worked out once from its look. */
+/** Each scene's plant colours, worked out once from its look (by the vegetation's painter, where it ran first). */
 const sceneColours = new WeakMap<ArtScene, PlantColours>();
 
 /**
@@ -337,6 +337,7 @@ export interface GrowthPainter {
 
 export function stoneGrowth(scene: ArtScene, hand: Hand, c: StoneColours): GrowthPainter {
   const colours = plantColours(c, scene.env.dungeon.model.seed);
+  sceneColours.set(scene, colours);
   const picture = (): ReturnType<typeof growthPicture> => growthPicture(scene.env);
   return {
     ground: () => {

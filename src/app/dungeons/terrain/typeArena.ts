@@ -11,6 +11,7 @@ import type { Rng } from '../rng';
 import { programmeOf } from '../themes/themes';
 import type { ArenaSpec } from '../themes/themeTypes';
 import { furnishArena } from './arena';
+import type { FloorTerrain } from './floorTerrain';
 import type { RoomCells } from './roomCells';
 import { type TypedRoom, typedSpace } from './typeTerrain';
 import type { TerrainWork } from './work';
@@ -31,13 +32,11 @@ export function furnishTypedArena(work: TerrainWork, k: number, rc: RoomCells, r
   const floor = work.floors[k];
   if (!floor) return;
   furnishArena(work, k, rc, rng, work.tags, arenaOf(work, typed));
-  floor.deferPieces(() => arenaPieces(work, k, rc, typed));
+  floor.deferPieces(() => arenaPieces(work, k, floor, rc, typed));
 }
 
 /** The climax type's pieces in its arena, keeping it open. */
-function arenaPieces(work: TerrainWork, k: number, rc: RoomCells, typed: TypedRoom): void {
-  const floor = work.floors[k];
-  if (!floor) return;
+function arenaPieces(work: TerrainWork, k: number, floor: FloorTerrain, rc: RoomCells, typed: TypedRoom): void {
   const base = typedSpace(work, k, rc, floor);
   // The arena stays open: what cannot be walked never takes more than this share of it.
   const open = (kind: PropKind): boolean => {

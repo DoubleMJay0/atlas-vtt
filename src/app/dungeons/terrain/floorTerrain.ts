@@ -7,9 +7,9 @@
 
 import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
 import type { CaveFloor, CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
-import { cellKey } from '../geometry';
+import { cellKey, cellsOf } from '../geometry';
 import { type FloorStack, stairEnd } from '../floors/floorStack';
-import type { StairEnd } from '../floors/stairSpots';
+import { type StairEnd, spotRect } from '../floors/stairSpots';
 import { type TerrainDraft, footingOf } from './catalog';
 import { RoomCells } from './roomCells';
 
@@ -102,6 +102,11 @@ export class FloorTerrain {
   /** Places every room's pieces, in the order their rooms were laid out: once, after the floor's water and undergrowth. */
   placePieces(): void {
     for (const place of this.pieceJobs.splice(0)) place();
+  }
+
+  /** The stairwell cells that lie on a room's floor. */
+  stairCellsIn(rc: RoomCells): CellPoint[] {
+    return this.plan.stairs.flatMap((s) => cellsOf(spotRect(s))).filter((c) => rc.isFloor(c));
   }
 
   /** Every cell any piece fills, by key. */

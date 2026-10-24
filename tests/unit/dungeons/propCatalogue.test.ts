@@ -31,11 +31,11 @@ describe('the catalogue of pieces', () => {
   });
 
   it('matches the catalogue table', () => {
-    expect(PROP_SPECS.hearth).toMatchObject({ footprint: { along: 2, out: 1 }, wall: 'back', clear: 'front', footing: 'block' });
+    expect(PROP_SPECS.hearth).toMatchObject({ footprint: { along: 2, out: 1 }, clear: 'front', footing: 'block' });
     expect(PROP_SPECS.hearth.cover).toBeUndefined();
-    expect(PROP_SPECS.flowstone.stretch).toBe(3);
+    expect(PROP_SPECS.flowstone.wallPiece).toBe(true);
     expect(PROP_SPECS.statue.cover).toBe('total');
-    expect(PROP_SPECS.bust).toMatchObject({ footprint: { reach: 0.2 }, wall: 'back', cover: 'half' });
+    expect(PROP_SPECS.bust).toMatchObject({ footprint: { reach: 0.2 }, clear: 'front', cover: 'half' });
     expect(PROP_SPECS.curtain.wallPiece).toBe(true);
     expect(isCellPiece(PROP_SPECS.campfire)).toBe(true);
     expect(isCellPiece(PROP_SPECS.well)).toBe(false);

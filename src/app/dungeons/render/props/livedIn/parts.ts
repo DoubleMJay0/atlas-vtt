@@ -1,6 +1,6 @@
 import { lightInGlyph } from '../../art/glyphLight';
 import type { Hand, Material } from '../../art/hand';
-import { polysPath, runsPath, type PathFn } from '../../art/paths';
+import { runsPath, type PathFn } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import { strokeFine, type GlyphPen } from '../../glyphPen';
 import { mixColours, withAlpha } from '../../palette';
@@ -114,17 +114,16 @@ function facingRuns(poly: readonly Vec[], light: Vec, lit: boolean): Vec[][] {
  * The painter's lips round many small raised parts at once, as `glyphEdges` gives one: in Stone a
  * lit lip on the sides that face the light and a shaded one on the others; in Engraved the heavy
  * shade line on the far sides. Outlines are the parts' own. Drawn in two passes whatever the count.
- * The `sunken` rims (a hollow's) are lit on their far sides and shaded on their near ones.
  */
-export function lips(pen: GlyphPen, polys: readonly (readonly Vec[])[], sunken: readonly (readonly Vec[])[] = []): void {
+export function lips(pen: GlyphPen, polys: readonly (readonly Vec[])[]): void {
   const light = lightInGlyph(pen);
   const { ctx } = pen;
   const ink = ctx.strokeStyle;
   const width = ctx.lineWidth;
-  const far = [...polys.flatMap(p => facingRuns(p, light, false)), ...sunken.flatMap(p => facingRuns(p, light, true))];
+  const far = polys.flatMap(p => facingRuns(p, light, false));
   if (isPainted(pen)) {
     const dark = onDarkFloor(pen);
-    const near = [...polys.flatMap(p => facingRuns(p, light, true)), ...sunken.flatMap(p => facingRuns(p, light, false))];
+    const near = polys.flatMap(p => facingRuns(p, light, true));
     const shift = (runs: Vec[][], d: number): Vec[][] => runs.map(r => r.map(p => ({ x: p.x + light.x * d, y: p.y + light.y * d })));
     ctx.beginPath();
     runsPath(shift(near, -0.01))(ctx);
@@ -144,21 +143,6 @@ export function lips(pen: GlyphPen, polys: readonly (readonly Vec[])[], sunken: 
   }
   ctx.strokeStyle = ink;
   ctx.lineWidth = width;
-}
-
-/** Many polygons as one path. */
-export const polys = (list: readonly (readonly Vec[])[]): PathFn => polysPath(list);
-
-/** A small seeded generator (mulberry32), so every piece is drawn the same on every device. */
-export function seeded(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /** A closed ring of `n` points round (cx, cy) whose radius wanders by `r(angle)`. */

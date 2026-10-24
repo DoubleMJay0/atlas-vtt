@@ -1,11 +1,12 @@
 import { glyphTone } from '../../art/glyphLight';
-import { polyPath, type PathFn } from '../../art/paths';
+import { polyPath, polysPath, type PathFn } from '../../art/paths';
 import { valueNoise } from '../../art/noise';
 import type { Vec } from '../../geometry';
 import { circlePath, type GlyphPen } from '../../glyphPen';
 import { mixColours } from '../../palette';
 import { stoneOutline } from '../../terrain/stones';
-import { colours, darkFloorLine, fine, isPainted, lips, onDarkFloor, polys, ring, seeded, stick, surface } from './parts';
+import { rngFrom } from '../../../rng';
+import { colours, darkFloorLine, fine, isPainted, lips, onDarkFloor, ring, stick, surface } from './parts';
 
 /**
  * A cold campfire: a ring of fieldstones round a bed of ash, the charred ends of the last sticks
@@ -15,7 +16,7 @@ import { colours, darkFloorLine, fine, isPainted, lips, onDarkFloor, polys, ring
 /** Where flames will burn: the clear middle of the ash bed, in the piece's own cells. */
 export const FIRE_AREA = { x: 0, y: 0, r: 0.11 } as const;
 
-const random = seeded(0x6a11);
+const random = rngFrom(0x6a11);
 /**
  * Eight fieldstones laid round the ash, each longer along the ring than across it: a split stone's
  * few flat faces (`stoneOutline`), its sharpest corners worn round, as stones carried from a stream are.
@@ -85,7 +86,7 @@ const ashCracks: PathFn = path => {
   }
 };
 
-export const campfireSilhouette: PathFn = polys(RING_STONES);
+export const campfireSilhouette: PathFn = polysPath(RING_STONES);
 
 export function campfire(pen: GlyphPen): void {
   const painted = isPainted(pen);
@@ -105,9 +106,9 @@ export function campfire(pen: GlyphPen): void {
     glyphTone(pen, (x, y) => Math.max(0, 0.75 - Math.hypot(x, y) / 0.3), { minX: -0.28, minY: -0.28, maxX: 0.28, maxY: 0.28 }, ashPath, 'depth');
   }
   // The sticks: unburnt wood outside, charcoal where the fire reached them, crumbs fallen from them.
-  surface(pen, polys(STICK_POLYS), 'wood', !painted);
+  surface(pen, polysPath(STICK_POLYS), 'wood', !painted);
   // Charcoal: the wood's own ink taken almost to black.
-  surface(pen, path => { polys(CHAR_POLYS)(path); crumbsPath(path); }, 'wood', false, false, mixColours(colours(pen, 'wood').ink, '#000000', 0.55));
+  surface(pen, path => { polysPath(CHAR_POLYS)(path); crumbsPath(path); }, 'wood', false, false, mixColours(colours(pen, 'wood').ink, '#000000', 0.55));
   // The ash's cracks lie between the sticks, so they share the sticks' grain pass.
   fine(pen, path => { ashCracks(path); grainPath(path); }, 'wood');
   // The ring of stones over the ash's edge, each lit on the side towards the light; on a dark floor outlined in the look's light line.

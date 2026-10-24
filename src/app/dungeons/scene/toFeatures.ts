@@ -5,6 +5,7 @@ import type { CellPoint, DungeonColumn, DungeonGrowth, DungeonProp, DungeonTerra
 import { GROWTH_KINDS } from '../growthModel';
 import { PROP_SPECS, isCellPiece, propReach } from '../props/catalogue';
 import { propKey } from '../props/propKinds';
+import { propsAsDrawn } from '../render/propsAsDrawn';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
 import { cellOutlines } from './cellOutline';
@@ -146,7 +147,7 @@ export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, '
   const solid = [
     ...terrainDrafts(shown),
     ...parapetDrafts(shown, cell => field.distance(cell.x + 0.5, cell.y + 0.5) < 0),
-    ...(view.props ? propDrafts(floor.props.filter(prop => roomShapes.has(prop.room))) : []),
+    ...(view.props ? propDrafts(propsAsDrawn(dungeon).filter(prop => roomShapes.has(prop.room))) : []),
     ...columnDrafts(floor.columns.filter(column => field.distance(column.x, column.y) < 0)),
   ].slice(0, MAX_MAP_FEATURES);
   // Vegetation lies under everything and takes what room the rest leaves.

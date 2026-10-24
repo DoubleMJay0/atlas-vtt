@@ -277,7 +277,7 @@ function stippleMoss(scene: ArtScene, pens: Pens): void {
   ctx.restore();
 }
 
-/** Each scene's pens and hatches, worked out once from its look. */
+/** Each scene's pens and hatches, worked out once from its look (by the vegetation's painter, where it ran first). */
 const sceneCuts = new WeakMap<ArtScene, { pens: Pens; hatches: Hatches | null }>();
 
 /**
@@ -298,6 +298,7 @@ export function cutPlantForm(scene: ArtScene, form: PlantForm): void {
 
 export function engravedGrowth(scene: ArtScene, hand: Hand, pens: Pens): GrowthPainter {
   const hatches = hatchesOf(scene, pens);
+  sceneCuts.set(scene, { pens, hatches });
   const view = viewBounds(scene.frame, 1);
   const shown = (forms: readonly PlantForm[]): PlantForm[] => forms.filter(form => inView(form, view));
   // The SVG export keeps no plant's shadow: hatched, each would be hundreds of lines.

@@ -1,4 +1,4 @@
-import type { PathFn } from '../../art/paths';
+import { rectPoly, type PathFn } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import { roundedRect } from '../../glyphPen';
 
@@ -11,12 +11,7 @@ export function panelPath(b: Panel): PathFn {
 }
 
 export function panelPoly(b: Panel): Vec[] {
-  return [
-    { x: b.x - b.w / 2, y: b.y - b.h / 2 },
-    { x: b.x + b.w / 2, y: b.y - b.h / 2 },
-    { x: b.x + b.w / 2, y: b.y + b.h / 2 },
-    { x: b.x - b.w / 2, y: b.y + b.h / 2 },
-  ];
+  return rectPoly({ x: b.x - b.w / 2, y: b.y - b.h / 2, w: b.w, h: b.h });
 }
 
 /** Draped shoulders viewed from above: the crown overlaps the neck, never a face. */

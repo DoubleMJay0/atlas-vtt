@@ -125,7 +125,7 @@ export interface DungeonProp {
   /** Scale, 1 = the prop's natural size. */
   scale: number;
   room: number;
-  /** A piece stretched past its footprint (a long table, a rug runner), in cells along and out from its front. */
+  /** A piece stretched past its footprint (flowstone along its wall), in cells along and out from its front. */
   size?: { along: number; out: number };
 }
 

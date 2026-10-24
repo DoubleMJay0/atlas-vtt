@@ -5,8 +5,7 @@
  */
 
 import { DRAWN_PROP_KINDS } from '../drawnKinds';
-import { spotRect } from '../floors/stairSpots';
-import { cellKey, cellsOf } from '../geometry';
+import { cellKey } from '../geometry';
 import type { TerrainKind } from '../model';
 import { PROP_SPECS } from '../props/catalogue';
 import { type FurnishSpace, furnishSpace } from '../props/furnishSpace';
@@ -36,8 +35,7 @@ export interface TypedRoom {
 
 /** The cells pieces keep off in a room: its stairwells, the cells it must keep reachable, and every cell terrain fills. */
 function keptClear(floor: FloorTerrain, rc: RoomCells): Set<string> {
-  const stairs = floor.plan.stairs.flatMap((s) => cellsOf(spotRect(s))).filter((c) => rc.isFloor(c));
-  return new Set([...floor.takenCells(), ...floor.lane, ...[...stairs, ...rc.needed].map((c) => cellKey(c.x, c.y))]);
+  return new Set([...floor.takenCells(), ...floor.lane, ...[...floor.stairCellsIn(rc), ...rc.needed].map((c) => cellKey(c.x, c.y))]);
 }
 
 /** The pieces of a typed room, with what is drawn and the theme's facts, from the furnishing's own stream. */
@@ -88,10 +86,11 @@ export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, ty
   reserveLanes(rc);
   // A room whose hazard (or the collapse of its floor) is the fight takes no cover.
   const covered = !hazarded && holdsFight(floor, rc);
-  if (!hazarded && !empty) allowedTerrain(work, k, rc, spec, rng);
+  const own = !hazarded && !empty;
+  if (own) allowedTerrain(work, k, rc, spec, rng);
   // Cover before a ruin's decay, which would take its place.
   if (covered) structureCover(floor, rc, rng, work.tags, work.cave !== undefined);
-  if (!hazarded && !empty && work.theme.ruined && chance(rng, RUINED_GROUND_CHANCE)) ruinedGround(floor, rc, rng);
+  if (own && work.theme.ruined && chance(rng, RUINED_GROUND_CHANCE)) ruinedGround(floor, rc, rng);
   if (!empty) floor.deferPieces(() => furnishByRecipe(typedSpace(work, k, rc, floor), hazarded ? naturalOnly(spec.furnish) : spec.furnish, context));
 }
 

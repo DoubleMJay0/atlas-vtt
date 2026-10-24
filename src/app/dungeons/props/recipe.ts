@@ -14,7 +14,7 @@ import { dais } from './arrange';
 import { besideParent, flanking, inGrid, onShore } from './arrangeGroups';
 import { PROP_SPECS } from './catalogue';
 import { againstWall, atBackWall, atCentre, inCorner, inRows, onWall } from './cellVerbs';
-import type { FurnishSpace, PlacedPiece } from './furnishSpace';
+import { type FurnishSpace, type PlacedPiece, record } from './furnishSpace';
 import { keptPieces, ruinedKeep } from './ruined';
 import { occupyCells } from './space';
 
@@ -51,9 +51,7 @@ function onDais(fs: FurnishSpace): DungeonProp[] {
   const cells = cellsUnder(fs, platform, 1.5 * platform.scale, 0, 1.35 * platform.scale);
   fs.cells.take(cells, 'walk');
   occupyCells(fs.space, cells);
-  fs.floor.addProp(platform, cells);
-  fs.placed.push({ prop: platform, cells, clear: [], facing: dir(Math.round(Math.sin(platform.rotation)), Math.round(-Math.cos(platform.rotation))) });
-  return [platform];
+  return [record(fs, { prop: platform, cells, clear: [], facing: dir(Math.round(Math.sin(platform.rotation)), Math.round(-Math.cos(platform.rotation))) })];
 }
 
 const lastOf = (fs: FurnishSpace, kind: PropKind | undefined): PlacedPiece | undefined => (kind ? fs.placed.findLast((p) => p.prop.kind === kind) : undefined);

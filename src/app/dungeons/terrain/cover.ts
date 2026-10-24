@@ -8,8 +8,7 @@
  */
 
 import type { CellDir, TerrainKind } from '../model';
-import { cellsOf, dir, floorCellsOf } from '../geometry';
-import { spotRect } from '../floors/stairSpots';
+import { dir, floorCellsOf } from '../geometry';
 import { type Rng, chance, int, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
@@ -95,8 +94,7 @@ export function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
  * stairs. A room all of whose floor is such a way is a crossing, not a place to make a stand.
  */
 export function holdsFight(floor: FloorTerrain, rc: RoomCells): boolean {
-  const stairs = floor.plan.stairs.flatMap((s) => cellsOf(spotRect(s))).filter((c) => rc.isFloor(c)).length;
-  if (rc.floorCount - stairs < FIGHT_AREA) return false;
+  if (rc.floorCount - floor.stairCellsIn(rc).length < FIGHT_AREA) return false;
   return floorCellsOf(rc.room).some((c) => rc.offWays(c));
 }
 
