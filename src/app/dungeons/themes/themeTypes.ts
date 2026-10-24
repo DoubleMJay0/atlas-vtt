@@ -29,6 +29,8 @@ export interface Piece {
   verb: Verb;
   /** For `withParent`: the kind it is placed around (the last such piece placed). */
   parent?: PropKind;
+  /** For `flank`: a pair either side of the room's inner door; unset, either side of the defining piece. */
+  of?: 'door';
   /** How many, drawn from the range; unset, one. */
   count?: readonly [number, number];
   /** The chance it is there at all; unset, 1. */
@@ -86,6 +88,8 @@ export interface RoomTypeSpec {
   furnish: FurnishRecipe;
   mayStandEmpty?: true;
   ruinedOnly?: true;
+  /** Only ever the boss room's type (a throne room, a ritual room). */
+  climaxOnly?: true;
   /** Taken by rooms holding a stairwell that no other anchor took. */
   holdsStairs?: true;
   /** `count` holds per floor, not per dungeon. */
