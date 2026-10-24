@@ -142,12 +142,14 @@ const ROTUNDA_CORNERS = 16;
 
 /** What each typed room shown was built for, on its floor's outline, for the GM to read on hover; it changes nothing in play. */
 export function roomDrafts(rooms: readonly DungeonRoom[], shown: { has(id: number): boolean }): Draft[] {
-  return rooms.filter((room) => room.kind === 'room' && room.type && shown.has(room.id)).map((room): Draft => {
+  return rooms.filter((room) => room.kind === 'room' && room.type && shown.has(room.id)).flatMap((room): Draft[] => {
     const name = roomTypeName(room) ?? '';
-    if (!room.rotunda) return { polygon: [{ x: room.x, y: room.y }, { x: room.x + room.w, y: room.y }, { x: room.x + room.w, y: room.y + room.h }, { x: room.x, y: room.y + room.h }], name };
+    // A cave's chamber is its own cells, which may reach past its rectangle.
+    if (room.cells) return cellOutlines(room.cells, MAX_FEATURE_CORNERS).map((polygon) => ({ polygon, name }));
+    if (!room.rotunda) return [{ polygon: [{ x: room.x, y: room.y }, { x: room.x + room.w, y: room.y }, { x: room.x + room.w, y: room.y + room.h }, { x: room.x, y: room.y + room.h }], name }];
     const c = { x: room.x + room.w / 2, y: room.y + room.h / 2 };
     const r = rotundaRadius(room);
-    return { polygon: Array.from({ length: ROTUNDA_CORNERS }, (_, k) => ({ x: c.x + Math.cos((k * Math.PI * 2) / ROTUNDA_CORNERS) * r, y: c.y + Math.sin((k * Math.PI * 2) / ROTUNDA_CORNERS) * r })), name };
+    return [{ polygon: Array.from({ length: ROTUNDA_CORNERS }, (_, k) => ({ x: c.x + Math.cos((k * Math.PI * 2) / ROTUNDA_CORNERS) * r, y: c.y + Math.sin((k * Math.PI * 2) / ROTUNDA_CORNERS) * r })), name }];
   });
 }
 

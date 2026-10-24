@@ -2,7 +2,7 @@ import { formatList, type MessageKey, t } from '../../i18n';
 import { isAbove, stackOf } from '../floors/floorStack';
 import type { CellDir, CellPoint, DoorKind, DungeonDoor, DungeonRoom, DungeonStair, DungeonTerrain, GrowthKind, TerrainKind } from '../model';
 import { PROP_KINDS, propKey } from '../props/propKinds';
-import { dir } from '../geometry';
+import { dir, floorCellsOf, holdsCell } from '../geometry';
 import type { VisibleFloor } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
 import { floorLetter } from './roomKeys';
@@ -109,9 +109,9 @@ const WATER_TERRAIN: ReadonlySet<TerrainKind> = new Set(['shallow-water', 'deep-
 
 function waterSentences(visible: VisibleFloor, room: DungeonRoom, view: Pick<DungeonView, 'water'>): string[] {
   if (!view.water || visible.floor.terrain.some(piece => piece.room === room.id && WATER_TERRAIN.has(piece.kind))) return [];
-  const under = visible.floor.waterCells.filter(cell => cell.x >= room.x && cell.x < room.x + room.w && cell.y >= room.y && cell.y < room.y + room.h).length;
+  const under = visible.floor.waterCells.filter(cell => holdsCell(room, cell.x, cell.y)).length;
   if (!under) return [];
-  return [t(under * 2 > room.w * room.h ? 'dungeonScene.poolMost' : 'dungeonScene.poolPart')];
+  return [t(under * 2 > floorCellsOf(room).length ? 'dungeonScene.poolMost' : 'dungeonScene.poolPart')];
 }
 
 /** Feet a step of a piece's elevation stands for (`TerrainTraits.elevation`). */
