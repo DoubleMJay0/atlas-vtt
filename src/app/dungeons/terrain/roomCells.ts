@@ -206,6 +206,11 @@ export class RoomCells {
     return this.doorCells.has(cellKey(c.x + d.x, c.y + d.y));
   }
 
+  /** Whether the cell is one every way through the room keeps: a stairwell, the row it is reached from, the cell before a door. */
+  isKeptClear(c: CellPoint): boolean {
+    return this.clear.has(cellKey(c.x, c.y));
+  }
+
   /** Whether a piece already stands on the cell, walkable or not. */
   isTaken(c: CellPoint): boolean {
     return this.taken.has(cellKey(c.x, c.y));

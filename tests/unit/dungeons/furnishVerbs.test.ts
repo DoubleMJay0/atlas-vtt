@@ -1,38 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { cellKey } from '../../../src/app/dungeons/geometry';
-import type { CellPoint, DungeonDoor, DungeonRoom } from '../../../src/app/dungeons/model';
+import type { CellPoint } from '../../../src/app/dungeons/model';
 import { tapestry } from '../../../src/app/dungeons/props/arrange';
 import { aroundParent, onShore } from '../../../src/app/dungeons/props/arrangeGroups';
 import { atBackWall, againstWall, atCentre, inCorner, inRows, onWall } from '../../../src/app/dungeons/props/cellVerbs';
-import { type FurnishSpace, furnishSpace, placePiece } from '../../../src/app/dungeons/props/furnishSpace';
-import { ALL_PROP_KINDS, type PropKind } from '../../../src/app/dungeons/props/propKinds';
+import { type FurnishSpace, placePiece } from '../../../src/app/dungeons/props/furnishSpace';
+import type { PropKind } from '../../../src/app/dungeons/props/propKinds';
 import { frameOf } from '../../../src/app/dungeons/props/roomFrame';
 import { edgeSpots, roomSpace } from '../../../src/app/dungeons/props/space';
-import { rngFrom } from '../../../src/app/dungeons/rng';
 import { draft } from '../../../src/app/dungeons/terrain/catalog';
-import { FloorTerrain } from '../../../src/app/dungeons/terrain/floorTerrain';
 import { reserveLanes } from '../../../src/app/dungeons/terrain/roomLanes';
 import { room } from './plannedFloorFixtures';
-
-/** A room of `w` × `h` cells entered from the south (axis up), with a door in the middle of its south wall and, if asked, one in its north wall. */
-function furnished(w: number, h: number, options: { seed?: number; rotunda?: boolean; north?: boolean; offered?: ReadonlySet<PropKind>; placeAllowed?: (kind: PropKind, at: CellPoint) => boolean } = {}): FurnishSpace {
-  const r: DungeonRoom = room(0, { x: 0, y: 0, w, h, axis: { x: 0, y: -1 }, rotunda: options.rotunda ?? false });
-  const mid = Math.floor(w / 2);
-  const doors: DungeonDoor[] = [{ x: mid, y: h, dir: { x: 0, y: -1 }, kind: 'door', from: null, to: 0 }];
-  if (options.north) doors.push({ x: mid, y: -1, dir: { x: 0, y: -1 }, kind: 'door', from: 0, to: 1 });
-  const floor = new FloorTerrain(0, { rooms: [r], doors, stairs: [], columns: [] });
-  const rc = floor.room(0)!;
-  const clear = new Set(rc.needed.map((c) => cellKey(c.x, c.y)));
-  return furnishSpace({
-    floor,
-    cells: rc,
-    space: roomSpace(frameOf(r), clear, []),
-    rng: rngFrom(options.seed ?? 1),
-    offered: options.offered ?? ALL_PROP_KINDS,
-    doors,
-    ...(options.placeAllowed && { placeAllowed: options.placeAllowed }),
-  });
-}
+import { furnished } from './furnishFixtures';
 
 const placedCells = (fs: FurnishSpace): CellPoint[] => fs.placed.flatMap((p) => [...p.cells]);
 

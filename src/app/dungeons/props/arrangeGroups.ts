@@ -73,7 +73,9 @@ export function aroundParent(fs: FurnishSpace, kind: PropKind, parent: PlacedPie
     if (out.length >= count) break;
     const towards = STEPS.find((d) => own.has(cellKey(cell.x + d.x, cell.y + d.y))) ?? parent.facing;
     fs.cells.release([cell]);
-    const centre = { x: cell.x + 0.5 + towards.x * 0.15, y: cell.y + 0.5 + towards.y * 0.15 };
+    // A disc leans towards its parent as far as it can without touching the parent's cells.
+    const lean = isCellPiece(PROP_SPECS[kind]) ? 0 : Math.max(0, Math.min(0.15, 0.45 - propReach(kind)));
+    const centre = { x: cell.x + 0.5 + towards.x * lean, y: cell.y + 0.5 + towards.y * lean };
     const placed = single(fs, kind, centre, dir(-towards.x, -towards.y));
     if (placed) out.push(placed);
     else fs.cells.keepClear([cell]);

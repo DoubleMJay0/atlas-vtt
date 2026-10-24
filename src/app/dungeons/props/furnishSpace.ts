@@ -57,7 +57,7 @@ function allowedOn(fs: FurnishSpace, kind: PropKind, cells: readonly CellPoint[]
 
 function record(fs: FurnishSpace, piece: PlacedPiece): DungeonProp {
   fs.placed.push(piece);
-  fs.floor.addProp(piece.prop);
+  fs.floor.addProp(piece.prop, piece.cells);
   return piece.prop;
 }
 
@@ -108,7 +108,7 @@ export function hangPiece(fs: FurnishSpace, kind: PropKind, run: readonly CellPo
   const { cells: rc } = fs;
   if (!spec.wallPiece || run.length === 0 || !allowedOn(fs, kind, run)) return null;
   const keys = run.map((c) => `${cellKey(c.x, c.y)},${side}`);
-  if (keys.some((key) => fs.hung.has(key)) || (side !== 'across' && run.some((c) => rc.doorOn(side, c)))) return null;
+  if (keys.some((key) => fs.hung.has(key)) || run.some((c) => rc.isKeptClear(c)) || (side !== 'across' && run.some((c) => rc.doorOn(side, c)))) return null;
   for (const key of keys) fs.hung.add(key);
   const out = side === 'across' ? dir(0, 0) : rc.beyond(side);
   const into = side === 'across' ? dir(-rc.axis.x, -rc.axis.y) : dir(-out.x, -out.y);

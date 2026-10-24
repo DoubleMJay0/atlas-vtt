@@ -35,6 +35,10 @@ export interface PropsInput {
   terrain: readonly DungeonTerrain[];
   roles: RoomRoles;
   params: DungeonParams;
+  /** Rooms the theme typed: their recipes furnished them with the terrain, so they take no role furniture here. */
+  typed: ReadonlySet<number>;
+  /** The cells that furniture already stands on, by key. */
+  furnished: ReadonlySet<string>;
 }
 
 /** Rooms that get a few more stones in a crumbling dungeon. */
@@ -49,7 +53,7 @@ function clearCells(input: PropsInput): Set<string> {
     ...rooms.flatMap((room) => doorApproaches(room, doors)),
     ...terrain.flatMap((piece) => piece.cells),
   ];
-  return new Set(cells.map((c) => cellKey(c.x, c.y)));
+  return new Set([...cells.map((c) => cellKey(c.x, c.y)), ...input.furnished]);
 }
 
 /** Whether a column stands on or against a stairwell. */
@@ -82,7 +86,8 @@ export function placeProps(input: PropsInput): PropsResult {
   const { roles, empty } = input.roles;
   const furnishing: FloorFurnishing = { tags: params.tags, tapestryChance: params.tapestryChance, fountainWeight: 1, wellPlaced: false };
   const clear = clearCells(input);
-  const keepOff = [...stairs.flatMap((s) => cellsOf(spotRect(s))), ...terrain.flatMap((p) => p.cells)].map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, radius: 0.75 }));
+  const furnished = [...input.furnished].map((k) => k.split(',').map(Number) as [number, number]).map(([x, y]) => ({ x, y }));
+  const keepOff = [...stairs.flatMap((s) => cellsOf(spotRect(s))), ...terrain.flatMap((p) => p.cells), ...furnished].map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, radius: 0.75 }));
   const result: PropsResult = { props: [], rubble: [], cracks: [] };
   for (const room of rooms) {
     const rng = floorStream(seed, 'props', floor, room.id);
@@ -90,7 +95,8 @@ export function placeProps(input: PropsInput): PropsResult {
     const space = roomSpace(frame, clear, columns);
     const role = roles.get(room.id);
     const platform = platformOf(input, room);
-    const props = platform ? seatOnPlatform(platform, room) : role && !empty.has(room.id) ? furnishRoom(rng, space, role, doors, furnishing) : [];
+    const furnishes = role && !empty.has(room.id) && !input.typed.has(room.id);
+    const props = platform ? seatOnPlatform(platform, room) : furnishes ? furnishRoom(rng, space, role, doors, furnishing) : [];
     const extra = params.tags.has('crumbling') && chance(rng, CRUMBLED_SHARE) ? CRUMBLED_RUBBLE : 0;
     result.props.push(...props);
     result.rubble.push(...rubbleIn(rng, frame, params.rubbleArea, extra, [...space.taken, ...keepOff]));

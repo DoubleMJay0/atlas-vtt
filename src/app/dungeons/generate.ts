@@ -16,12 +16,11 @@ import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './p
 import { floorColumns, placeProps } from './props';
 import { roomRoles, type RoomRoles } from './props/roles';
 import { floorStream } from './rng';
-import { type DungeonTag, readTags } from './tags';
-import { assignRoomTypes, type RoomTypes } from './themes/assign/assignRoomTypes';
+import { readTags } from './tags';
 import type { FloorTerrain } from './terrain/floorTerrain';
 import { addShallowWater, planTerrain } from './terrain/placeTerrain';
-import { NO_FACTS, pickTheme, programmeOf, themedTags, themeOf } from './themes/themes';
-import type { ThemeId } from './themes/themeTypes';
+import { pickTheme, themedTags } from './themes/themes';
+import { typeDungeon } from './themes/typeDungeon';
 import { chooseWaterLevel, placeWater, poolRooms } from './water';
 
 interface FloorParts {
@@ -36,32 +35,16 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const { rooms, doors, stairs } = planned;
   const dry = level <= 0 && params.tags.has('dry');
   const pools = dry ? new Set<number>() : poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance);
-  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set([...terrain.takenCells(), ...stairsAndAround(stairs)]) });
+  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set([...terrain.takenCells(), ...terrain.propCells(), ...stairsAndAround(stairs)]) });
   const flora = floraOf(params.tags);
   addShallowWater(terrain, waterCells);
   const pieces = addUndergrowth(seed, terrain, waterCells, flora);
-  const { props, rubble, cracks } = placeProps({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, roles, params });
+  const typedRooms = new Set(rooms.filter((room) => room.type).map((room) => room.id));
+  const placed = placeProps({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, roles, params, typed: typedRooms, furnished: terrain.propCells() });
+  const props = [...terrain.props, ...placed.props];
+  const { rubble, cracks } = placed;
   const growth = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
   return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth };
-}
-
-/**
- * Types every normal room of a theme with a room programme (`DungeonRoom.type`) and returns the
- * assignment; null for a theme that furnishes by roles.
- */
-function typeRooms(seed: number, theme: ThemeId, tags: ReadonlySet<DungeonTag>, floors: readonly PlannedFloor[]): RoomTypes | null {
-  const definition = themeOf(theme);
-  const programme = programmeOf(definition, tags);
-  if (!programme) return null;
-  const facts = definition.facts?.({ seed, tags, floors }) ?? NO_FACTS;
-  const typed = assignRoomTypes({ seed, programme, floors, ruined: tags.has('ruined'), facts });
-  floors.forEach((floor, index) => {
-    for (const room of floor.rooms) {
-      const type = typed.byFloor[index]?.get(room.id);
-      if (type) room.type = type;
-    }
-  });
-  return typed;
 }
 
 export function generateDungeon(request: DungeonRequest): DungeonModel {
@@ -75,7 +58,8 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   const count = requestedFloors(request);
   const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom);
-  const typed = typeRooms(seed, theme, params.tags, planned);
+  const themed = typeDungeon(seed, theme, params.tags, planned);
+  const { typed } = themed;
   const parts = planned.map((floor, index): FloorParts => {
     const floorPar = floorParams(params, index);
     const roles = roomRoles(floorStream(seed, 'props', index, 'roles'), floor);
@@ -88,8 +72,9 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   });
   const terrain = planTerrain(
     seed,
-    parts.map(({ planned: floor, roles, columns }) => ({ ...floor, columns, roles: roles.roles, empty: roles.empty })),
+    parts.map(({ planned: floor, roles, columns }, index) => ({ ...floor, columns, roles: roles.roles, empty: roles.empty, types: themed.rooms[index] ?? new Map() })),
     params.tags,
+    themed.theme,
   );
   const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, level));
   return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors };

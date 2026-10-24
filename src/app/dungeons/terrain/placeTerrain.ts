@@ -12,6 +12,7 @@ import { cellKey } from '../geometry';
 import type { RoomRole } from '../props/roles';
 import { type Rng, chance, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
+import type { ThemeContext } from '../themes/themes';
 import { furnishArena } from './arena';
 import { draft } from './catalog';
 import { CRAMPED_AREA, crampedCover, ensureCover, openRoomCover } from './cover';
@@ -21,6 +22,7 @@ import { type FloorPlan, FloorTerrain } from './floorTerrain';
 import { hazardWeights, placeChasmOver, placeHazard } from './hazards';
 import { anyInterest } from './interest';
 import { furnishStage } from './stages';
+import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import { galleryOverArena, shaftDown } from './vertical';
 import { type TerrainWork, terrainWork } from './work';
 
@@ -37,6 +39,8 @@ export interface TerrainFloorInput extends FloorPlan {
   roles: ReadonlyMap<number, RoomRole>;
   /** Normal rooms left without furniture. */
   empty: ReadonlySet<number>;
+  /** The rooms the theme typed, furnished by their recipes; the rest by their roles. */
+  types?: ReadonlyMap<number, TypedRoom>;
 }
 
 function hazardCount(floor: FloorTerrain): number {
@@ -103,14 +107,17 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
   hazards(work, k, rooms, work.rng(k, 'hazards'));
   for (const room of rooms) {
     if (room.boss || room.stage || input.empty.has(room.id)) continue;
-    furnishRoom(work, k, room, input.roles.get(room.id) ?? 'plain');
+    const typed = input.types?.get(room.id);
+    const rc = work.floors[k]?.room(room.id);
+    if (typed && rc) furnishTypedRoom(work, k, rc, typed.spec, typed.context);
+    else furnishRoom(work, k, room, input.roles.get(room.id) ?? 'plain');
   }
 }
 
 /** The terrain of every floor, as builders that still take the shallow water once it is known (`addShallowWater`). */
-export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>): FloorTerrain[] {
+export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext): FloorTerrain[] {
   const builders = floors.map((floor, index) => new FloorTerrain(index, floor));
-  const work = terrainWork(seed, builders, tags);
+  const work = terrainWork(seed, builders, tags, theme);
   galleryOverArena(work, work.rng(builders.length - 1, 'gallery'));
   floors.forEach((floor, k) => furnishFloor(work, k, floor));
   return builders;

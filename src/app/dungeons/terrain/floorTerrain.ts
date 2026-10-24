@@ -23,6 +23,8 @@ export class FloorTerrain {
   readonly pieces: DungeonTerrain[] = [];
   /** Furniture placed on whole cells with the terrain (the recipes of typed rooms). */
   readonly props: DungeonProp[] = [];
+  /** The cells that furniture stands on, by key. */
+  private readonly furnished = new Set<string>();
   private readonly cells = new Map<number, RoomCells>();
 
   constructor(
@@ -69,9 +71,15 @@ export class FloorTerrain {
     return this.push(piece);
   }
 
-  /** Adds furniture whose cells its room has taken. */
-  addProp(prop: DungeonProp): void {
+  /** Adds furniture whose cells (`cells`) its room has taken. */
+  addProp(prop: DungeonProp, cells: readonly CellPoint[] = []): void {
     this.props.push(prop);
+    for (const c of cells) this.furnished.add(cellKey(c.x, c.y));
+  }
+
+  /** Every cell furniture stands on, by key: water keeps dry under it. */
+  propCells(): Set<string> {
+    return new Set(this.furnished);
   }
 
   /** Every cell any piece fills, by key. */
