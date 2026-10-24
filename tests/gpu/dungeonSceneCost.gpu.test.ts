@@ -32,6 +32,7 @@ const CASES: [string, DungeonRequest, DungeonStyleId][] = [
   ['medium overgrown wet', req(7, ['medium', 'overgrown', 'wet']), 'parchment'],
   ['medium 3 floors flooded', req(5, ['medium', 'flooded'], 3), 'masonry'],
   ['large 3 floors lava overgrown', req(3, ['large', 'lava', 'overgrown'], 3), 'volcanic'],
+  ['large 3 floors rising fortress', { ...req(3, ['large', 'ruined', 'overgrown'], 3), theme: 'fortress' }, 'masonry'],
 ];
 
 const client = new DungeonWorkerClient({ createWorker: () => new DungeonWorker({ name: 'Atlas dungeons (cost)' }) });
