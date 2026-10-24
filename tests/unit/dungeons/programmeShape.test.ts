@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
 import { ALL_PROP_KINDS, type PropKind } from '../../../src/app/dungeons/props/propKinds';
 import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
+import { MANSION } from '../../../src/app/dungeons/themes/mansion';
 import type { Piece, RoomProgramme, RoomTypeSpec } from '../../../src/app/dungeons/themes/themeTypes';
 
 /** Rooms that are furnished as what they are, so they never take a hazard. */
@@ -11,6 +12,7 @@ const FURNISHED_WITHOUT_HAZARD = ['cistern', 'gaol'];
 
 const PROGRAMMES: [string, RoomProgramme, readonly (readonly [string, string])[]][] = [
   ['fortress', FORTRESS, [['kitchen', 'chapel'], ['kitchen', 'solar'], ['gaol', 'solar'], ['garderobe', 'kitchen']]],
+  ['mansion', MANSION, [['kitchen', 'drawing-room'], ['kitchen', 'master-bedroom']]],
 ];
 
 function piecesOf(spec: RoomTypeSpec): Piece[] {
@@ -79,5 +81,15 @@ describe('thrones', () => {
   it('puts the throne in the Fortress alone', () => {
     for (const [name, programme] of PROGRAMMES) if (name !== 'fortress') expect(kindsOf(programme)).not.toContain('throne');
     expect(kindsOf(FORTRESS)).toContain('throne');
+  });
+});
+
+describe('the Haunted Mansion programme', () => {
+  it('refuses every hazard', () => {
+    expect(MANSION.rooms.filter((spec) => spec.terrain.hazards?.length).map((spec) => spec.id)).toEqual([]);
+  });
+
+  it('offers the ballroom as climax only on the entrance floor', () => {
+    expect(MANSION.climax.find((c) => c.type === 'ballroom')?.onlyOnEntranceFloor).toBe(true);
   });
 });
