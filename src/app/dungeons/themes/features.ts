@@ -7,6 +7,7 @@
 
 import type { MessageKey } from '../../i18n';
 import type { TerrainKind } from '../model';
+import type { RoomTypeId } from './roomTypes';
 
 export type FeatureReason =
   | 'minstrels-gallery'
@@ -35,11 +36,13 @@ export interface FeatureSpec {
   upperFloor?: true;
   /** What the feature is called where its kind's own name would not say it. */
   name?: MessageKey;
+  /** For an opening cut in the floor above: the types of room up there that may hold it (one built to overlook the room below). Unset: any. */
+  cutIn?: readonly RoomTypeId[];
 }
 
 export const FEATURES: Readonly<Record<FeatureReason, FeatureSpec>> = {
   // An upper floor's opening overlooking the great hall, behind a balustrade.
-  'minstrels-gallery': { kinds: ['gallery'], shape: 'built', at: 'above', name: 'dungeon.terrain.minstrelsGallery' },
+  'minstrels-gallery': { kinds: ['gallery'], shape: 'built', at: 'above', name: 'dungeon.terrain.minstrelsGallery', cutIn: ['gallery', 'stair-hall', 'solar'] },
   // Small holes in a row over the gate passage, cut in the floor above it.
   'murder-holes': { kinds: ['murder-hole'], shape: 'built', at: 'above' },
   // One shaft in the gaol, under a grate.
@@ -47,8 +50,8 @@ export const FEATURES: Readonly<Record<FeatureReason, FeatureSpec>> = {
   cistern: { kinds: ['deep-water'], water: 'pool', shape: 'built', at: 'here' },
   collapse: { kinds: ['chasm', 'rubble-heap', 'rubble-field', 'broken-floor'], shape: 'natural', at: 'here', ruinedOnly: true },
   // The entrance hall's open stair well.
-  'stair-well': { kinds: ['gallery'], shape: 'built', at: 'above', name: 'dungeon.terrain.stairWell' },
-  'ballroom-gallery': { kinds: ['gallery'], shape: 'built', at: 'above' },
+  'stair-well': { kinds: ['gallery'], shape: 'built', at: 'above', name: 'dungeon.terrain.stairWell', cutIn: ['landing', 'portrait-gallery'] },
+  'ballroom-gallery': { kinds: ['gallery'], shape: 'built', at: 'above', cutIn: ['landing', 'portrait-gallery'] },
   'light-well': { kinds: ['gallery'], shape: 'built', at: 'here', upperFloor: true },
   'rotted-floor': { kinds: ['broken-floor', 'chasm'], shape: 'natural', at: 'here', ruinedOnly: true },
   'conservatory-pool': { kinds: ['pool'], water: 'pool', shape: 'built', at: 'here' },

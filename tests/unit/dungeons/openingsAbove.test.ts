@@ -3,6 +3,8 @@ import { floorBelow, stackOf } from '../../../src/app/dungeons/floors/floorStack
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonTerrain } from '../../../src/app/dungeons/model';
 import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
+import { FEATURES, type FeatureSpec } from '../../../src/app/dungeons/themes/features';
+import { THEMES } from '../../../src/app/dungeons/themes/themes';
 import { opensAbove } from './holeInvariants';
 import { inFloor, walkable } from './terrainInvariants';
 
@@ -34,6 +36,12 @@ function openings(model: DungeonModel, kind: DungeonTerrain['kind']): { k: numbe
   });
 }
 
+/** The reason a hall has for a gallery in the floor above it. */
+function galleryReason(model: DungeonModel, hall: DungeonRoom): FeatureSpec | undefined {
+  const spec = THEMES[model.theme].programme?.rooms.find((s) => s.id === hall.type);
+  return (spec?.terrain.features ?? []).map((r) => FEATURES[r]).find((r) => r.at === 'above' && r.kinds.includes('gallery'));
+}
+
 function isRectangle(cells: readonly CellPoint[]): boolean {
   const xs = cells.map((c) => c.x);
   const ys = cells.map((c) => c.y);
@@ -58,12 +66,15 @@ describe('openings above a room, for its reason', () => {
         const own = m.floors[k]!.rooms[piece.room]!;
         const where = `seed ${m.seed} floor ${k} gallery ${piece.id}`;
         if (!opensAbove(m, hall, 'gallery')) return [`${where} over a ${hall.type}, which has no reason for it`];
+        const reason = galleryReason(m, hall);
+        if (!(reason?.cutIn ?? []).includes(own.type!)) return [`${where} cut in a ${own.type}, which does not overlook a hall`];
         if (!isRectangle(piece.cells)) return [`${where} is not straight-edged`];
         return sidesOnWalls(piece.cells, hall) + sidesOnWalls(piece.cells, own) > 0 ? [] : [`${where} follows no wall`];
       }),
     );
     expect(problems.slice(0, 10)).toEqual([]);
-    expect(all.filter((m) => openings(m, 'gallery').length > 0).length).toBeGreaterThan(20);
+    // Measured 19 of 800, where the room above is one built to overlook the hall.
+    expect(all.filter((m) => openings(m, 'gallery').length > 0).length).toBeGreaterThan(8);
   });
 
   it('stand a balustrade on floor round every gallery and well, where the room above can be walked', () => {

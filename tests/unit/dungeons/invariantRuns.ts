@@ -254,10 +254,11 @@ export function describeInvariants(floors: number): void {
 
     it('look down from a gallery into the great hall or entrance hall below', () => {
       if (floors === 1) return;
-      // Measured 0.07 of Fortresses and 0.12–0.14 of Mansions over 400 seeds; pinned at half.
+      // Only a room built to overlook the hall holds one (a gallery, stair hall or solar; a landing or portrait
+      // gallery): measured 0.020–0.037 over 400 seeds of each theme and floor count; pinned at half.
       const rising = runs.filter((run) => run.model.theme !== 'cavern');
       const share = rising.filter((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'gallery'))).length / rising.length;
-      expect(share).toBeGreaterThan(0.05);
+      expect(share).toBeGreaterThan(0.01);
     });
 
     it('give every furnished room of a Cavern that can hold a fight some cover', () => {
