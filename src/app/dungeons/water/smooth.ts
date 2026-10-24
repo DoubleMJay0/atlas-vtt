@@ -15,11 +15,11 @@ function perimeter(loop: readonly CellPoint[]): number {
   }, 0);
 }
 
-/** Points about `spacing` apart along the loop, at least three. */
-export function resample(loop: readonly CellPoint[], spacing: number): CellPoint[] {
+/** Points about `spacing` apart along the loop, at least `least`. */
+export function resample(loop: readonly CellPoint[], spacing: number, least = 3): CellPoint[] {
   const length = perimeter(loop);
   if (loop.length < 2 || length === 0) return [...loop];
-  const count = Math.max(3, Math.round(length / spacing));
+  const count = Math.max(least, Math.round(length / spacing));
   const step = length / count;
   const out: CellPoint[] = [];
   let travelled = 0;

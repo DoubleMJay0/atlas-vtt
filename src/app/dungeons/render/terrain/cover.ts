@@ -3,7 +3,7 @@ import type { Vec } from '../geometry';
 import type { Hand } from '../art/hand';
 import { polyPath, rectPoly } from '../art/paths';
 import { lengthX, lowWallBox, type Box } from './footprints';
-import { pieceRng } from './pieces';
+import { clearOfCaveWall, pieceRng } from './pieces';
 import { stoneOutline } from './stones';
 
 /** Half cover a party can shoot over: a heap of rubble, a low wall; and the stone block taller pieces stand on. */
@@ -35,7 +35,7 @@ export function drawRubbleHeap(hand: Hand, piece: DungeonTerrain): void {
     }
   }
   stones.sort((p, q) => p.r - q.r);
-  for (const s of stones) {
+  for (const s of stones.filter((st) => clearOfCaveWall(hand.scene.env, st.c, st.r))) {
     const path = polyPath(s.poly);
     hand.surface(path, 'rock');
     hand.solid(path, s.c, s.r, 1.3);

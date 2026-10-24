@@ -21,9 +21,9 @@ export interface CaveShaping {
 }
 
 const SHAPING: Readonly<Record<CaveVariant, Omit<CaveShaping, 'variant' | 'sideWide'>>> = {
-  limestone: { gamma: [2, 3], stretch: 1.6, fill: [0.55, 0.8] },
-  'lava-tube': { gamma: [4, 4], stretch: 3, fill: [0.65, 0.85] },
-  underdark: { gamma: [4, 6], stretch: 1.3, fill: [0.7, 0.85] },
+  limestone: { gamma: [2, 3], stretch: 1.6, fill: [0.5, 0.75] },
+  'lava-tube': { gamma: [4, 4], stretch: 3, fill: [0.6, 0.8] },
+  underdark: { gamma: [4, 6], stretch: 1.3, fill: [0.62, 0.8] },
 };
 const SIDE_WIDE = 0.4;
 /** The narrowest floor a cave's normal room has either way, and a stairwell across. */

@@ -35,7 +35,7 @@ export class RoomCells {
   private readonly held = new Set<string>();
   /** The cells every way through the room must reach: before its doors and onto its stairs. */
   readonly needed: CellPoint[];
-  /** Stairwells, the rows they are reached from and every cell beside them, by key: no hazard lies there and no bridge lands there. */
+  /** The floor's stairwells, the rows they are reached from and every cell beside them, by key: no hazard lies there and no bridge lands there. */
   private readonly byStairs = new Set<string>();
   /** The cells of the room's doors other than secret ones, which keep the wall whole, by key. */
   private readonly doorCells: Set<string>;
@@ -61,7 +61,8 @@ export class RoomCells {
     this.needed = [...doorApproaches(room, doors), ...approaches].filter(own);
     this.doorCells = new Set(doors.filter((d) => d.kind !== 'secret' && (d.from === room.id || d.to === room.id)).map((d) => cellKey(d.x, d.y)));
     for (const c of [...stairCells, ...this.needed]) this.clear.add(cellKey(c.x, c.y));
-    const stairway = [...stairCells, ...approaches];
+    // Every stairwell of the floor counts, not only this room's: a cave chamber may reach beside another's.
+    const stairway = stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, endOf(s))]);
     for (const c of stairway) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) this.byStairs.add(cellKey(c.x + dx, c.y + dy));
     for (const c of floorCellsOf(room)) {
       if (!this.inside(c, [0.5], 0)) continue;

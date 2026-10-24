@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cellKey } from '../../../../src/app/dungeons/geometry';
 import type { CellPoint } from '../../../../src/app/dungeons/model';
 import { type Rng, rngFrom } from '../../../../src/app/dungeons/rng';
-import { CELL_CORE, caveOutline, type PinnedEdge } from '../../../../src/app/dungeons/render/cave/caveOutline';
+import { caveOutline, type PinnedEdge } from '../../../../src/app/dungeons/render/cave/caveOutline';
 import { type FloorShape, type Vec, pointInPolygon } from '../../../../src/app/dungeons/render/geometry';
 import type { CellGrid } from '../../../../src/app/dungeons/water/wetGrid';
 
@@ -77,68 +77,78 @@ function insideAll(rings: readonly Vec[][], x: number, y: number): boolean {
   return inside;
 }
 
-/** Whether the segment enters the open square [x0, x1] × [y0, y1]. */
-function crossesSquare(a: Vec, b: Vec, x0: number, y0: number, x1: number, y1: number): boolean {
-  let t0 = 0;
-  let t1 = 1;
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  for (const [p, q] of [
-    [-dx, a.x - x0],
-    [dx, x1 - a.x],
-    [-dy, a.y - y0],
-    [dy, y1 - a.y],
-  ] as const) {
-    if (p === 0) {
-      if (q <= 1e-9) return false;
-      continue;
-    }
-    const r = q / p;
-    if (p < 0) t0 = Math.max(t0, r);
-    else t1 = Math.min(t1, r);
-  }
-  return t1 - t0 > 1e-9 && (() => {
-    const m = (t0 + t1) / 2;
-    const px = a.x + dx * m;
-    const py = a.y + dy * m;
-    return px > x0 + 1e-9 && px < x1 - 1e-9 && py > y0 + 1e-9 && py < y1 - 1e-9;
-  })();
+/** Whether two segments cross at a point inside both. */
+function segmentsCross(a: Vec, b: Vec, c: Vec, d: Vec): boolean {
+  const side = (o: Vec, p: Vec, q: Vec): number => (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const [d1, d2, d3, d4] = [side(c, d, a), side(c, d, b), side(a, b, c), side(a, b, d)];
+  return d1 * d2 < -1e-18 && d3 * d4 < -1e-18;
 }
 
 const outline = (mask: Mask, pinned: readonly PinnedEdge[] = [], seed = 5): FloorShape[] => caveOutline(seed, 0, (x, y) => has(mask, x, y), BOX, pinned);
-const margin = (1 - CELL_CORE) / 2;
 
 describe('a cave outline', () => {
   const all = masks();
 
-  it('keeps every floor cell’s inner square inside and every rock cell’s outside', () => {
-    for (const mask of all) {
+  it('crosses neither itself nor another ring', () => {
+    let crossings = 0;
+    for (const mask of all.slice(0, 100)) {
       const rings = ringsOf(outline(mask));
-      const segments = rings.flatMap((ring) => ring.map((a, i) => [a, ring[(i + 1) % ring.length]!] as const));
-      for (let y = BOX.y0; y < BOX.y0 + BOX.h; y++) {
-        for (let x = BOX.x0; x < BOX.x0 + BOX.w; x++) {
-          const floor = has(mask, x, y);
-          const [x0, y0, x1, y1] = [x + margin, y + margin, x + 1 - margin, y + 1 - margin];
-          for (const [cx, cy] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] as const) expect(insideAll(rings, cx, cy), `${x},${y}`).toBe(floor);
-          const near = segments.filter(([a, b]) => Math.min(a.x, b.x) < x1 && Math.max(a.x, b.x) > x0 && Math.min(a.y, b.y) < y1 && Math.max(a.y, b.y) > y0);
-          for (const [a, b] of near) expect(crossesSquare(a, b, x0, y0, x1, y1), `${x},${y}`).toBe(false);
+      const segments = rings.flatMap((ring, r) => ring.map((a, i) => ({ r, i, n: ring.length, a, b: ring[(i + 1) % ring.length]! })));
+      for (const p of segments) {
+        for (const q of segments) {
+          if (q.r < p.r || (q.r === p.r && (q.i <= p.i + 1 || p.i + p.n - q.i <= 1))) continue;
+          if (segmentsCross(p.a, p.b, q.a, q.b)) crossings++;
         }
       }
     }
+    expect(crossings).toBe(0);
   });
 
-  it('draws floor over at least 60 % of every floor cell and at most 40 % of every rock cell', () => {
-    for (const mask of all.slice(0, 120)) {
+  it('wanders off the cell grid: little of it runs along a cell edge', () => {
+    let along = 0;
+    let total = 0;
+    for (const mask of all.slice(0, 60)) {
+      for (const ring of ringsOf(outline(mask))) {
+        ring.forEach((a, i) => {
+          const b = ring[(i + 1) % ring.length]!;
+          const length = Math.hypot(b.x - a.x, b.y - a.y);
+          total += length;
+          if ((a.x === b.x && Number.isInteger(a.x)) || (a.y === b.y && Number.isInteger(a.y))) along += length;
+        });
+      }
+    }
+    expect(along / total).toBeLessThan(0.05);
+  });
+
+  it('agrees with its cells: a floor cell has its middle and 60 % or more drawn floor, a rock cell its middle and 60 % or more rock', () => {
+    const wrong: string[] = [];
+    for (const mask of all) {
       const rings = ringsOf(outline(mask));
       for (let y = BOX.y0; y < BOX.y0 + BOX.h; y++) {
         for (let x = BOX.x0; x < BOX.x0 + BOX.w; x++) {
           let inside = 0;
           for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) if (insideAll(rings, x + (i + 0.5) / 10, y + (j + 0.5) / 10)) inside++;
-          if (has(mask, x, y)) expect(inside).toBeGreaterThanOrEqual(60);
-          else expect(inside).toBeLessThanOrEqual(40);
+          const middle = insideAll(rings, x + 0.5, y + 0.5);
+          if (has(mask, x, y) ? inside < 60 || !middle : inside > 40 || middle) wrong.push(`${has(mask, x, y) ? 'floor' : 'rock'} ${x},${y}: ${inside}`);
         }
       }
     }
+    expect(wrong.slice(0, 10)).toEqual([]);
+  }, 60_000);
+
+  it('keeps the middle of every kept cell (a narrows, the main path, where something stands) drawn floor', () => {
+    const wrong: string[] = [];
+    for (const mask of all.slice(0, 120)) {
+      const kept = (x: number, y: number): boolean => has(mask, x, y) && (x + 2 * y) % 3 === 0;
+      const rings = ringsOf(caveOutline(5, 0, (x, y) => has(mask, x, y), BOX, [], kept));
+      for (let y = BOX.y0; y < BOX.y0 + BOX.h; y++) {
+        for (let x = BOX.x0; x < BOX.x0 + BOX.w; x++) {
+          if (!kept(x, y)) continue;
+          for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) if (!insideAll(rings, x + 0.21 + (0.58 * i) / 8, y + 0.21 + (0.58 * j) / 8)) wrong.push(`${x},${y}`);
+        }
+      }
+    }
+    expect([...new Set(wrong)].slice(0, 10)).toEqual([]);
   });
 
   it('keeps a pinned edge a straight segment on its cell edge', () => {

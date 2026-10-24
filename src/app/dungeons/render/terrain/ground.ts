@@ -4,7 +4,7 @@ import { castShadow, type Hand } from '../art/hand';
 import { valueNoise } from '../art/noise';
 import { grown, polyPath, polysPath, rectPoly, type PathFn } from '../art/paths';
 import { cellBox, cellRings } from './cellRings';
-import { pieceRng } from './pieces';
+import { clearOfCaveWall, pieceRng } from './pieces';
 import { chiselled, stoneOutline } from './stones';
 import { pointsBounds } from '../geometry';
 
@@ -24,7 +24,8 @@ export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, per
     for (let k = 0; k < perCell; k++) {
       const at = { x: c.x + 0.06 + rng() * 0.88, y: c.y + 0.06 + rng() * 0.88 };
       const r = size * (0.45 + rng() ** 2 * 1.4);
-      stones.push({ poly: stoneOutline(rng, at, r), c: at, r });
+      const st = { poly: stoneOutline(rng, at, r), c: at, r };
+      if (clearOfCaveWall(hand.scene.env, at, r)) stones.push(st);
     }
   }
   const all: PathFn = path => stones.forEach(st => polyPath(st.poly)(path));

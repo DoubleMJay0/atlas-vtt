@@ -50,15 +50,19 @@ const LIVED_IN_WATER = 0.1;
 /** The share of a cave's water level the floor nearest the surface keeps; the deepest keeps it whole. */
 const CAVE_UPPER_WATER = 0.3;
 
+/** Enough corners for a cave's pool of one cell, between two narrows, to be drawn round. */
+const ROUND_SHORE = 8;
+
 /**
  * Where a cave's water lies: standing in its basins (and behind the dam of a lake at its end),
- * running through its stream rooms, never where lava or acid runs.
+ * running through its stream rooms, never where lava or acid runs; its shores drawn round however
+ * small a pool.
  */
-function caveWater(cave: CaveFloor, rooms: readonly DungeonRoom[], pieces: readonly DungeonTerrain[]): { pools: Set<number>; rooms: Set<number> } {
+function caveWater(cave: CaveFloor, rooms: readonly DungeonRoom[], pieces: readonly DungeonTerrain[]): { pools: Set<number>; rooms: Set<number>; shoreCorners: number } {
   const molten = new Set(pieces.filter((p) => p.traits.hazard === 'lava' || p.traits.hazard === 'acid').map((p) => p.room));
   const dry = (id: number): boolean => !molten.has(id);
   const pools = [...cave.basins, ...cave.dams.filter((id) => rooms[id]?.type === 'lake-cavern')].filter(dry);
-  return { pools: new Set(pools), rooms: new Set([...pools, ...cave.streams.flat().filter(dry)]) };
+  return { pools: new Set(pools), rooms: new Set([...pools, ...cave.streams.flat().filter(dry)]), shoreCorners: ROUND_SHORE };
 }
 
 function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, dungeonLevel: number, site: CaveSites | undefined): DungeonFloor {
@@ -71,7 +75,7 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const wet = cave && caveWater(cave, rooms, terrain.pieces);
   const pools = dry ? new Set<number>() : (wet?.pools ?? poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool));
   const kept = [...terrain.takenCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
-  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms }) });
+  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms, shoreCorners: wet.shoreCorners }) });
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
   // A cave's life keeps to its zones: daylight by the mouth, fungi by water and roosts, nothing where lava runs.

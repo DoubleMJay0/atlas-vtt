@@ -8,7 +8,7 @@
  */
 
 import type { CellDir, TerrainKind } from '../model';
-import { cellsOf, dir } from '../geometry';
+import { cellsOf, dir, floorCellsOf } from '../geometry';
 import { spotRect } from '../floors/stairSpots';
 import { type Rng, chance, int, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
@@ -97,8 +97,7 @@ export function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
 export function holdsFight(floor: FloorTerrain, rc: RoomCells): boolean {
   const stairs = floor.plan.stairs.flatMap((s) => cellsOf(spotRect(s))).filter((c) => rc.isFloor(c)).length;
   if (rc.floorCount - stairs < FIGHT_AREA) return false;
-  for (let i = 0; i < rc.depth; i++) for (let j = 0; j < rc.width; j++) if (rc.offWays(rc.cell(i, j))) return true;
-  return false;
+  return floorCellsOf(rc.room).some((c) => rc.offWays(c));
 }
 
 /** Whether the room holds cover: a piece that gives it, or columns standing in it. */
@@ -133,12 +132,10 @@ export function structureCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, tag
   ensureCover(floor, rc, tags);
 }
 
-/** A last piece of cover where the room has none yet (`kind`, else a heap of rubble where the dungeon crumbles and a statue where it stands whole): tried at every free cell. */
+/** A last piece of cover where the room has none yet (`kind`, else a heap of rubble where the dungeon crumbles and a statue where it stands whole): tried at every cell of its floor, a cave's chamber past its rectangle too. */
 export function ensureCover(floor: FloorTerrain, rc: RoomCells, tags: ReadonlySet<DungeonTag>, kind: TerrainKind = tags.has('crumbling') || tags.has('ruined') ? 'rubble-heap' : 'statue'): void {
   if (hasCover(floor, rc)) return;
-  for (let i = 0; i < rc.depth; i++) {
-    for (let j = 0; j < rc.width; j++) {
-      if (floor.place(draft(kind, rc.room.id, rc.block(i, j, 1, 1), { facing: negate(rc.axis) })) !== null) return;
-    }
+  for (const c of floorCellsOf(rc.room)) {
+    if (floor.place(draft(kind, rc.room.id, [c], { facing: negate(rc.axis) })) !== null) return;
   }
 }

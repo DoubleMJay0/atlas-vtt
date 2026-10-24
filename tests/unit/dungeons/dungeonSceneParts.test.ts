@@ -304,7 +304,8 @@ describe('a room\'s pin', () => {
           const p = pinCell(visible, room);
           const where = `seed ${seed} floor ${index} room ${room.id} at ${p.x},${p.y}`;
           rooms++;
-          expect(p.x > room.x && p.x < room.x + room.w && p.y > room.y && p.y < room.y + room.h, where).toBe(true);
+          // A cave's chamber may reach past its rectangle; its own cells hold its pin.
+          if (!room.cells) expect(p.x > room.x && p.x < room.x + room.w && p.y > room.y && p.y < room.y + room.h, where).toBe(true);
           expect(holdsCell(room, Math.floor(p.x), Math.floor(p.y)), `${where}: on the room's own cells`).toBe(true);
           const roomCells = floorCellsOf(room);
           const anyIdeal = roomCells.some(c => !room.rotunda && clearOfThings(c.x + 0.5, c.y + 0.5) && !preferNot.has(cellKey(c.x, c.y)));

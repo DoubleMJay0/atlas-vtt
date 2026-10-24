@@ -3,6 +3,7 @@ import { floorBelow, stackOf } from '../../floors/floorStack';
 import { HOLE_KINDS } from '../../terrain/catalog';
 import type { Rng } from '../../rng';
 import type { RenderEnv } from '../renderEnv';
+import type { Vec } from '../geometry';
 
 /** The pieces of the floor in rooms the view shows, of `kinds` where given. */
 export function shownPieces(env: RenderEnv, kinds?: ReadonlySet<TerrainKind>): DungeonTerrain[] {
@@ -32,6 +33,17 @@ export function cellSet(cells: readonly CellPoint[]): Set<string> {
 /** Whether a cell is open floor of the room the view shows (not wall, not past the map). */
 export function onFloor(env: RenderEnv, c: CellPoint): boolean {
   return env.dungeon.field.distance(c.x + 0.5, c.y + 0.5) < 0;
+}
+
+/** How far past its radius a stone's outline may reach. */
+const STONE_REACH = 1.3;
+
+/**
+ * Whether a loose stone of radius `r` at `c` lies clear of a cave's drawn wall. A cave's wall
+ * wanders into the cells beside it, and a stone drawn over it would hide the wall's ink.
+ */
+export function clearOfCaveWall(env: RenderEnv, c: Vec, r: number): boolean {
+  return env.dungeon.floor.cave === undefined || env.dungeon.field.distance(c.x, c.y) < -STONE_REACH * r;
 }
 
 /** Whether holes on this floor are cut out of the picture: a floor lies below and the picture is not to stand alone. */

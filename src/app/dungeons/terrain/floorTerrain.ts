@@ -114,6 +114,16 @@ export class FloorTerrain {
     return this.pieces.filter((p) => p.room === id);
   }
 
+  /** Whether a piece of `kind` on `cells` would be the mirror image of one in the room across its middle: what nature never makes. */
+  mirrorsAnother(room: Pick<DungeonRoom, 'id' | 'x' | 'y' | 'w' | 'h'>, kind: TerrainKind, cells: readonly CellPoint[]): boolean {
+    const { x, y, w, h } = room;
+    const flips = [(c: CellPoint): string => cellKey(2 * x + w - 1 - c.x, c.y), (c: CellPoint): string => cellKey(c.x, 2 * y + h - 1 - c.y)];
+    return this.inRoom(room.id).some((p) => p.kind === kind && p.cells.length === cells.length && flips.some((flip) => {
+      const own = new Set(p.cells.map((c) => cellKey(c.x, c.y)));
+      return cells.every((c) => own.has(flip(c)));
+    }));
+  }
+
   private push(piece: TerrainDraft): number {
     const id = this.pieces.length;
     this.pieces.push({ ...piece, id });

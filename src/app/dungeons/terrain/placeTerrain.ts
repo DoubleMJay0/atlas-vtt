@@ -14,7 +14,7 @@ import { cellKey } from '../geometry';
 import type { DungeonTag } from '../tags';
 import type { ThemeContext } from '../themes/themes';
 import { furnishArena } from './arena';
-import { placeBreakdown } from './cavern/breakdown';
+import { placeBreakdown, rubbleAtFeet } from './cavern/breakdown';
 import { withoutItsHazard } from './cavern/unnamedRoom';
 import { floorTextures } from './cavern/caveTextures';
 import { draft } from './catalog';
@@ -49,6 +49,7 @@ function placeTypeHazards(work: TerrainWork, k: number, rooms: readonly DungeonR
 
 function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): void {
   const rooms = input.rooms.filter((room) => room.kind === 'room');
+  if (work.cave) for (const room of rooms) caveGround(work, k, room.id, 'rubble');
   for (const room of rooms) {
     const rc = work.floors[k]?.room(room.id);
     const rng = work.rng(k, `main:${room.id}`);
@@ -76,11 +77,12 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
   if (work.cave) for (const room of rooms) caveGround(work, k, room.id, 'textures');
 }
 
-/** A cave room's breakdown (before its cover) or its floor's textures (after it); both before its pieces, which keep off them. */
-function caveGround(work: TerrainWork, k: number, room: number, what: 'breakdown' | 'textures'): void {
+/** A cave room's rubble at the feet of pitches and shafts (before anything else), its breakdown (before its cover) or its floor's textures (after it); all before its pieces, which keep off them. */
+function caveGround(work: TerrainWork, k: number, room: number, what: 'rubble' | 'breakdown' | 'textures'): void {
   const rc = work.floors[k]?.room(room);
   if (!rc) return;
-  if (what === 'breakdown') placeBreakdown(work, k, rc, work.rng(k, `breakdown:${room}`));
+  if (what === 'rubble') rubbleAtFeet(work, k, rc, work.rng(k, `rubble:${room}`));
+  else if (what === 'breakdown') placeBreakdown(work, k, rc, work.rng(k, `breakdown:${room}`));
   else floorTextures(work, k, rc, work.rng(k, `textures:${room}`));
 }
 

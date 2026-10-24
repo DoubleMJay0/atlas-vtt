@@ -7,9 +7,14 @@ import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
 import { liquidList, liquidsFromFile } from '../../../src/app/liquids/liquids';
 
 it('keeps engraved acid in the map ink palette through a scene round trip', () => {
-  const model = generateDungeon({ seed: 43, tags: ['acid', 'large'], floors: 1 });
   const style = dungeonStyle('blueprint');
-  const { liquids } = floorLiquids(visibleDungeon(model, DEFAULT_VIEW), style, DEFAULT_VIEW, { originCell: { x: 0, y: 0 }, pxPerCell: 100 }, { unitType: 'ft', ruleDistance: 5 }, 'acid');
+  const liquidsOf = (seed: number): ReturnType<typeof floorLiquids>['liquids'] => {
+    const model = generateDungeon({ seed, tags: ['acid', 'large'], floors: 1 });
+    return floorLiquids(visibleDungeon(model, DEFAULT_VIEW), style, DEFAULT_VIEW, { originCell: { x: 0, y: 0 }, pxPerCell: 100 }, { unitType: 'ft', ruleDistance: 5 }, 'acid').liquids;
+  };
+  // The first dungeon from seed 43 on that holds acid.
+  let liquids = liquidsOf(43);
+  for (let seed = 44; seed < 80 && !Object.values(liquids).some((surface) => surface.liquid === 'acid'); seed++) liquids = liquidsOf(seed);
   const read = liquidList(liquidsFromFile(JSON.parse(JSON.stringify(liquids))));
   const acid = read.filter(surface => surface.liquid === 'acid');
   expect(acid.length).toBeGreaterThan(0);

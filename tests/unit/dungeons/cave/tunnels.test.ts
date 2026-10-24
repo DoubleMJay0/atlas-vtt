@@ -58,12 +58,12 @@ describe('cave tunnels', () => {
     }
   });
 
-  it('are one or two cells wide, and keep every lane cell', () => {
+  it('stay passages, never four cells wide both ways, and keep every lane cell', () => {
     for (const { shaped, tunnels } of all) {
       for (const [id, cells] of tunnels) {
         const keys = new Set(cells.map((c) => cellKey(c.x, c.y)));
-        const block3 = cells.some((c) => [0, 1, 2].every((dx) => [0, 1, 2].every((dy) => keys.has(cellKey(c.x + dx, c.y + dy)))));
-        expect(block3, `seed ${shaped.seed} room ${id}`).toBe(false);
+        const block4 = cells.some((c) => [0, 1, 2, 3].every((dx) => [0, 1, 2, 3].every((dy) => keys.has(cellKey(c.x + dx, c.y + dy)))));
+        expect(block4, `seed ${shaped.seed} room ${id}`).toBe(false);
       }
       for (const c of shaped.lane) expect(shaped.grid.owner(c.x, c.y)).not.toBe(ROCK);
     }

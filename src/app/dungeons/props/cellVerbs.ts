@@ -5,7 +5,7 @@
  * the wall verbs place nothing there.
  */
 
-import { cellKey, dir } from '../geometry';
+import { cellKey, dir, floorCellsOf } from '../geometry';
 import type { CellDir, CellPoint, DungeonProp, PropKind } from '../model';
 import { shuffled } from '../rng';
 import { WALL_SIDES, type WallSide } from '../terrain/roomCells';
@@ -68,11 +68,9 @@ export function atBackWall(fs: FurnishSpace, kind: PropKind): DungeonProp | null
   return onSides(fs, kind, ['back'], true);
 }
 
-/** Cells by their distance from the room's middle, nearest first. */
+/** The room's floor cells (a cave's chamber past its rectangle too) by their distance from the room's middle, nearest first. */
 function byCentre(fs: FurnishSpace): CellPoint[] {
-  const { cells: rc } = fs;
-  const out: CellPoint[] = [];
-  for (let i = 0; i < rc.depth; i++) for (let j = 0; j < rc.width; j++) out.push(rc.cell(i, j));
+  const out = [...floorCellsOf(fs.cells.room)];
   const { centre } = fs.space.frame;
   return out.sort((a, b) => Math.hypot(a.x + 0.5 - centre.x, a.y + 0.5 - centre.y) - Math.hypot(b.x + 0.5 - centre.x, b.y + 0.5 - centre.y));
 }

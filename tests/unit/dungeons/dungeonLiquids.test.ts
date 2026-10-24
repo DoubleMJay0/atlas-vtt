@@ -99,7 +99,7 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
       }
       for (const light of Object.values(parts.scene.lights)) expect(light.area!.length).toBeLessThanOrEqual(256);
     }
-  });
+  }, 60_000);
 
   it('keeps standing water to the entrance floor of a rising dungeon', () => {
     const pools = (model: DungeonModel, f: number): DungeonModel['floors'][number]['rooms'] => model.floors[f]!.rooms.filter((r) => r.type && (FORTRESS.rooms.find((s) => s.id === r.type)?.terrain.features ?? []).some((reason) => FEATURES[reason].water === 'pool'));

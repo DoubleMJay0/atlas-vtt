@@ -88,7 +88,7 @@ export function describeCaveInvariants(floors: number): void {
       expect(failures(eachFloor((run, i) => laneNarrowsProblems(run.model.floors[i]!)))).toEqual([]);
     });
 
-    it('keep chambers inside their rectangle, tunnels at most one cell past it, nothing on another room’s', () => {
+    it('keep chambers within two cells of their rectangle, tunnels within their reach, nothing on another room’s', () => {
       expect(failures(eachFloor((run, i) => maskProblems(run.model.floors[i]!)))).toEqual([]);
     });
 

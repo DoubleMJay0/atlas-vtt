@@ -32,19 +32,9 @@ const STEPS = [
   { x: 0, y: 1 },
 ] as const;
 
-/** Whether a piece of `kind` on `cells` would be the mirror image of one in the room across its middle: what nature never makes. */
-function mirrorsAnother(floor: FloorTerrain, rc: RoomCells, kind: TerrainKind, cells: readonly CellPoint[]): boolean {
-  const { x, y, w, h } = rc.room;
-  const flips = [(c: CellPoint): string => cellKey(2 * x + w - 1 - c.x, c.y), (c: CellPoint): string => cellKey(c.x, 2 * y + h - 1 - c.y)];
-  return floor.inRoom(rc.room.id).some((p) => p.kind === kind && p.cells.length === cells.length && flips.some((flip) => {
-    const own = new Set(p.cells.map((c) => cellKey(c.x, c.y)));
-    return cells.every((c) => own.has(flip(c)));
-  }));
-}
-
 /** Lays `kind` on `cells` unless it mirrors a piece already there; whether it did. */
 function layLoose(floor: FloorTerrain, rc: RoomCells, kind: TerrainKind, cells: CellPoint[]): boolean {
-  return !mirrorsAnother(floor, rc, kind, cells) && floor.place(draft(kind, rc.room.id, cells)) !== null;
+  return !floor.mirrorsAnother(rc.room, kind, cells) && floor.place(draft(kind, rc.room.id, cells)) !== null;
 }
 
 /** A heap of fallen blocks on a cell or two of `spots`, else loose rubble; whether either was laid. */
@@ -106,8 +96,17 @@ export function placeBreakdown(work: TerrainWork, k: number, rc: RoomCells, rng:
     const has = floor.inRoom(room.id).some((p) => BREAKDOWN.has(p.kind) && p.cells.some((c) => keys.has(cellKey(c.x, c.y))));
     if (!has) fallen(floor, rc, rng, middle);
   }
-  const avens = floor.plan.stairs.filter((s) => s.way === 'pitch' && s.to < k).map((s) => cellsOf(spotRect(s))).filter((cells) => cells.every((c) => rc.isFloor(c)));
-  const shaftFeet = floor.inRoom(room.id).filter((p) => p.kind === 'chasm-floor' && p.name === 'dungeon.terrain.shaftFloor').map((p) => p.cells);
-  if (avens.length + shaftFeet.length > 0) rubbleRound(floor, rc, rng, [...avens, ...shaftFeet]);
   if (work.typed(k, room.id)?.spec.id === 'collapse-chamber') choke(work, k, rc, rng);
+}
+
+/**
+ * Rubble round the feet of the room's pitches and of the shafts dropped onto it from above, laid
+ * before anything else stands in the room, so no piece takes the ground round a foot first.
+ */
+export function rubbleAtFeet(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
+  const floor = work.floors[k];
+  if (!floor) return;
+  const avens = floor.plan.stairs.filter((s) => s.way === 'pitch' && s.to < k).map((s) => cellsOf(spotRect(s))).filter((cells) => cells.every((c) => rc.isFloor(c)));
+  const shaftFeet = floor.inRoom(rc.room.id).filter((p) => p.kind === 'chasm-floor' && p.name === 'dungeon.terrain.shaftFloor').map((p) => p.cells);
+  if (avens.length + shaftFeet.length > 0) rubbleRound(floor, rc, rng, [...avens, ...shaftFeet]);
 }
