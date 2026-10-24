@@ -38,24 +38,33 @@ const REQUESTS: readonly DungeonRequest[] = [
   ...Array.from({ length: 24 }, (_, k): DungeonRequest => ({ seed: 3000 + k * 53, theme: 'cavern', tags: [['winding'], [], ['wet'], ['spacious'], ['large'], ['inhabited']][k % 6]!, floors: 1 + (k % 2) })),
 ];
 
-/** Of the probe's points, those the open paper round the map reaches without coming nearer the floors than `beyond`. */
-function openPaper(dungeon: VisibleDungeon, beyond: number): (i: number, j: number) => boolean {
-  const { x0, y0, w, h } = probe(dungeon);
-  const far = new Uint8Array(w * h);
+/** The probe's grid over the floors with two cells round them: each point's distance from the floors, the open ground before a mouth as far as can be. */
+function probe(dungeon: VisibleDungeon): { x0: number; y0: number; w: number; h: number; distance: Float32Array } {
+  const b = dungeon.bounds;
+  const x0 = b.minX - 2;
+  const y0 = b.minY - 2;
+  const w = Math.ceil((b.maxX - b.minX + 4) / STEP);
+  const h = Math.ceil((b.maxY - b.minY + 4) / STEP);
+  const distance = new Float32Array(w * h);
   for (let j = 0; j < h; j++) {
     for (let i = 0; i < w; i++) {
       const x = x0 + (i + 0.5) * STEP;
       const y = y0 + (j + 0.5) * STEP;
       // The open ground before a mouth is the paper's: it leads out.
-      far[j * w + i] = dungeon.field.distance(x, y) > beyond || dungeon.open.some((ring) => pointInPolygon(ring, x, y)) ? 1 : 0;
+      distance[j * w + i] = dungeon.open.some((ring) => pointInPolygon(ring, x, y)) ? Infinity : dungeon.field.distance(x, y);
     }
   }
+  return { x0, y0, w, h, distance };
+}
+
+/** The probe's points the open paper round the map reaches without coming nearer the floors than `beyond`. */
+function openPaper({ w, h, distance }: ReturnType<typeof probe>, beyond: number): Uint8Array {
   const outside = new Uint8Array(w * h);
   const stack: number[] = [];
   for (let k = 0; k < w * h; k++) {
     const i = k % w;
     const j = (k - i) / w;
-    if ((i === 0 || j === 0 || i === w - 1 || j === h - 1) && far[k]) {
+    if ((i === 0 || j === 0 || i === w - 1 || j === h - 1) && distance[k]! > beyond) {
       outside[k] = 1;
       stack.push(k);
     }
@@ -64,19 +73,13 @@ function openPaper(dungeon: VisibleDungeon, beyond: number): (i: number, j: numb
     const k = stack.pop()!;
     const i = k % w;
     for (const n of [k - w, k + w, i > 0 ? k - 1 : -1, i < w - 1 ? k + 1 : -1]) {
-      if (n >= 0 && n < w * h && far[n] && !outside[n]) {
+      if (n >= 0 && n < w * h && distance[n]! > beyond && !outside[n]) {
         outside[n] = 1;
         stack.push(n);
       }
     }
   }
-  return (i, j) => outside[j * w + i] === 1;
-}
-
-/** The probe's grid: the map's floors with two cells round them. */
-function probe(dungeon: VisibleDungeon): { x0: number; y0: number; w: number; h: number } {
-  const b = dungeon.bounds;
-  return { x0: b.minX - 2, y0: b.minY - 2, w: Math.ceil((b.maxX - b.minX + 4) / STEP), h: Math.ceil((b.maxY - b.minY + 4) / STEP) };
+  return outside;
 }
 
 /**
@@ -84,11 +87,11 @@ function probe(dungeon: VisibleDungeon): { x0: number; y0: number; w: number; h:
  * cannot reach without crossing the band: what the floors and the band close in on; and, to hold
  * the reading of the picture to account, points of that open paper.
  */
-function rockBeyondBand(dungeon: VisibleDungeon, reach: number): { enclosed: Vec[]; paper: Vec[] } {
-  const { x0, y0, w, h } = probe(dungeon);
+function rockBeyondBand(dungeon: VisibleDungeon, grid: ReturnType<typeof probe>, reach: number): { enclosed: Vec[]; paper: Vec[] } {
+  const { x0, y0, w, h, distance } = grid;
   const b = dungeon.bounds;
-  const closed = openPaper(dungeon, reach + CLOSED_NECK);
-  const open = openPaper(dungeon, reach + OPEN_NECK);
+  const closed = openPaper(grid, reach + CLOSED_NECK);
+  const open = openPaper(grid, reach + OPEN_NECK);
   // A way out's stipple and scree lie on the paper beside it.
   const ways = dungeon.ways.map((way) => wayExtent(way, way.length + 1));
   const byAWay = (p: Vec): boolean => ways.some((e) => p.x > e.minX - 1 && p.x < e.maxX + 1 && p.y > e.minY - 1 && p.y < e.maxY + 1);
@@ -96,12 +99,13 @@ function rockBeyondBand(dungeon: VisibleDungeon, reach: number): { enclosed: Vec
   const paper: Vec[] = [];
   for (let j = 0; j < h; j += 3) {
     for (let i = 0; i < w; i += 3) {
+      const k = j * w + i;
+      const d = distance[k]!;
+      if (d <= reach + INSET || d === Infinity) continue;
       const p = { x: x0 + (i + 0.5) * STEP, y: y0 + (j + 0.5) * STEP };
-      const distance = dungeon.field.distance(p.x, p.y);
-      if (distance <= reach + INSET || dungeon.open.some((ring) => pointInPolygon(ring, p.x, p.y))) continue;
-      if (!closed(i, j)) enclosed.push(p);
+      if (!closed[k]) enclosed.push(p);
       // Within the picture drawn, away from its edge.
-      else if (open(i, j) && distance > reach + 1 && p.x > b.minX && p.x < b.maxX && p.y > b.minY && p.y < b.maxY && (i + j) % 9 === 0 && !byAWay(p)) paper.push(p);
+      else if (open[k] && d > reach + 1 && p.x > b.minX && p.x < b.maxX && p.y > b.minY && p.y < b.maxY && (i + j) % 9 === 0 && !byAWay(p)) paper.push(p);
     }
   }
   return { enclosed, paper };
@@ -126,10 +130,11 @@ describe('rock a cave closes in on', () => {
     it(`is drawn as rock, never paper: seed ${request.seed} [${request.tags.join(',')}]`, () => {
       const model = generateDungeon(request);
       for (let floor = 0; floor < model.floors.length; floor++) {
+        const dungeon = visibleDungeon(model, DEFAULT_VIEW, floor);
+        const grid = probe(dungeon);
         for (const look of LOOKS) {
           const style = dungeonStyle(look);
-          const dungeon = visibleDungeon(model, DEFAULT_VIEW, floor);
-          const { enclosed: samples, paper: open } = rockBeyondBand(dungeon, style.surround.reach);
+          const { enclosed: samples, paper: open } = rockBeyondBand(dungeon, grid, style.surround.reach);
           if (!samples.length) continue;
           const b = dungeon.bounds;
           const origin = { x: Math.floor(b.minX - 1), y: Math.floor(b.minY - 1) };

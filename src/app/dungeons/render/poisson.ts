@@ -1,5 +1,6 @@
 import type { Rng } from '../rng';
 import type { Bounds, Vec } from './geometry';
+import { edgePlaces } from './shapeEdges';
 import type { VisibleFloor } from './visibleDungeon';
 
 /** Candidates tried around an active sample before it retires (Bridson's k). */
@@ -81,21 +82,8 @@ export function poissonDisc(bounds: Bounds, radius: number, inside: (x: number, 
 export function bandSeeds(visible: Pick<VisibleFloor, 'floor' | 'floors'>, boxes: readonly Bounds[], outward: number): Vec[] {
   const seeds = edgeSeeds(boxes, outward);
   if (!visible.floor.cave) return seeds;
-  for (const shape of visible.floors) {
-    if (shape.kind !== 'poly') continue;
-    for (const ring of shape.rings) {
-      let since = OUTLINE_SEED_STEP;
-      ring.forEach((p, i) => {
-        const next = ring[(i + 1) % ring.length]!;
-        if (since >= OUTLINE_SEED_STEP) {
-          seeds.push(p);
-          since = 0;
-        }
-        since += Math.hypot(next.x - p.x, next.y - p.y);
-      });
-    }
-  }
-  return seeds;
+  const outlines = visible.floors.filter((shape) => shape.kind === 'poly');
+  return [...seeds, ...outlines.flatMap((shape) => edgePlaces(shape, 0, OUTLINE_SEED_STEP, 0).map((place) => place.point))];
 }
 
 /** Points just outside every floor shape's edge, so growth reaches each part of a band. */

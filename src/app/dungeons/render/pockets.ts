@@ -29,13 +29,15 @@ const UNDER_BAND = 0.1;
 const NECK_SLACK = 0.1;
 
 const enclosed = new WeakMap<VisibleDungeon, Pocket[]>();
-const closedOff = new WeakMap<VisibleDungeon, Map<number, Pocket[]>>();
+const caves = new WeakMap<VisibleDungeon, { distance: number; pockets: Pocket[] }>();
+
+const floorRings = (dungeon: VisibleDungeon): Vec[][] => dungeon.floors.flatMap(shape => shapeRings(shape, 0, OUTLINE_PX_PER_CELL));
 
 /** Rock the floors close in on all sides: the holes in the union of the floors. */
 function enclosedRock(dungeon: VisibleDungeon): Pocket[] {
   const known = enclosed.get(dungeon);
   if (known) return known;
-  const found = holesOf(unionRings(dungeon.floors.flatMap(shape => shapeRings(shape, 0, OUTLINE_PX_PER_CELL)))).map(asPocket);
+  const found = holesOf(unionRings(floorRings(dungeon))).map(asPocket);
   enclosed.set(dungeon, found);
   return found;
 }
@@ -58,18 +60,8 @@ const asPocket = (ring: Vec[]): Pocket => ({ ring, bounds: pointsBounds(ring) })
  * rock round a loop of passages, has no way out. Each reaches a little under the band.
  */
 function bandClosedRock(dungeon: VisibleDungeon, distance: number): Pocket[] {
-  let byDistance = closedOff.get(dungeon);
-  if (!byDistance) {
-    byDistance = new Map();
-    closedOff.set(dungeon, byDistance);
-  }
-  let found = byDistance.get(distance);
-  if (!found) {
-    const band = grownRings(dungeon.floors.flatMap(shape => shapeRings(shape, 0, OUTLINE_PX_PER_CELL)), distance + NECK_SLACK);
-    found = holesOf(unionRings(band)).map(hole => asPocket(grownRings([[...hole].reverse()], NECK_SLACK + UNDER_BAND)[0] ?? hole));
-    byDistance.set(distance, found);
-  }
-  return found;
+  // Growing unites the rings it grows; a hole turned round is an outline, which grows outward: under the band.
+  return holesOf(grownRings(floorRings(dungeon), distance + NECK_SLACK)).map(hole => asPocket(grownRings([[...hole].reverse()], NECK_SLACK + UNDER_BAND)[0]!));
 }
 
 /**
@@ -84,9 +76,13 @@ export function filledPockets(dungeon: VisibleDungeon, distance: number): Pocket
 
 /** A cave's enclosed rock: every hole of its floors, and the rock its band closes off beyond them. */
 function caveRock(dungeon: VisibleDungeon, distance: number): Pocket[] {
+  const known = caves.get(dungeon);
+  if (known?.distance === distance) return known.pockets;
   const holes = enclosedRock(dungeon);
-  const closed = bandClosedRock(dungeon, distance).filter(({ ring: [first] }) => !first || !inPocket(holes, first.x, first.y));
-  return [...holes, ...closed];
+  const closed = bandClosedRock(dungeon, distance).filter(({ ring }) => !inPocket(holes, ring[0]!.x, ring[0]!.y));
+  const pockets = [...holes, ...closed];
+  caves.set(dungeon, { distance, pockets });
+  return pockets;
 }
 
 /** Whether a point lies in one of `pockets`. */
