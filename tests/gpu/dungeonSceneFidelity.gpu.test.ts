@@ -4,6 +4,7 @@ import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { paletteOf, parseHex } from '../../src/app/dungeons/render/palette';
+import { propTall } from '../../src/app/dungeons/render/propShapes';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { dungeonScene } from '../../src/app/dungeons/scene/toScene';
@@ -49,14 +50,14 @@ const CASES: readonly { seed: number; theme?: ThemeChoice; tags: string[]; floor
 
 const TALL_TERRAIN = new Set(['pillar', 'obelisk', 'statue', 'wall-fragment']);
 
-/** The dungeon without its tall objects: the columns that stand, statues and wells, and terrain that is total cover. */
+/** The dungeon without its tall objects: the columns that stand, every prop with a lighting outline (`propTall`), and terrain that is total cover. */
 function withoutTallObjects(model: DungeonModel): DungeonModel {
   return {
     ...model,
     floors: model.floors.map(floor => ({
       ...floor,
       columns: floor.columns.filter(column => column.shattered),
-      props: floor.props.filter(prop => prop.kind !== 'statue' && prop.kind !== 'well'),
+      props: floor.props.filter(prop => !propTall(prop.kind)),
       terrain: floor.terrain.filter(piece => !TALL_TERRAIN.has(piece.kind)),
     })),
   };

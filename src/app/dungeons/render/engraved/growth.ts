@@ -12,7 +12,7 @@ import { poolOutlines, poolsPath } from '../art/pools';
 import type { GrowthPainter } from '../stone/growth';
 import { BAND } from '../stone/walls';
 import { cellPattern } from '../stone/patterns';
-import type { Pens } from './pens';
+import { pensOf, type Pens } from './pens';
 
 /**
  * Engraved's plants, cut in line: every leaf outlined in ink over the paper, its rib cut, and the
@@ -275,6 +275,25 @@ function stippleMoss(scene: ArtScene, pens: Pens): void {
     ctx.fill();
   }
   ctx.restore();
+}
+
+/** Each scene's pens and hatches, worked out once from its look. */
+const sceneCuts = new WeakMap<ArtScene, { pens: Pens; hatches: Hatches | null }>();
+
+/**
+ * Cuts one plant form as Engraved cuts the vegetation, in the scene's pens: for a piece drawn from
+ * the vegetation's forms (a cave's mushrooms), on a context already set to where the form's cells lie.
+ */
+export function cutPlantForm(scene: ArtScene, form: PlantForm): void {
+  let cuts = sceneCuts.get(scene);
+  if (!cuts) {
+    const pens = pensOf(scene);
+    cuts = { pens, hatches: hatchesOf(scene, pens) };
+    sceneCuts.set(scene, cuts);
+  }
+  cutForm(scene, form, cuts.pens, cuts.hatches);
+  // A picture that records every path keeps the vegetation's leaves alone; a piece keeps its caps.
+  if (!scene.raster) cutCaps(scene.env.ctx, form, cuts.pens, null, 0.006);
 }
 
 export function engravedGrowth(scene: ArtScene, hand: Hand, pens: Pens): GrowthPainter {

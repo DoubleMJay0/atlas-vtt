@@ -85,6 +85,7 @@ function blockPiece(pen: GlyphPen, b: Block, finish: Finish, great: boolean): vo
 /** One or two blocks fallen from the roof, with the chips they broke off at their foot. */
 export function boulder(pen: GlyphPen, _fit: GlyphFit, finish: Finish): void {
   fillPolys(pen, CHIPS, pen.palette.fill);
-  pen.hand.line(CHIPS, 'fine', true);
+  // The chips take the blocks' own outline, so the fallen rock reads whole on a dark floor too.
+  pen.hand.line(CHIPS, 'outline', true);
   for (const [i, b] of BOULDERS.entries()) blockPiece(pen, b, finish, i === BOULDERS.length - 1);
 }

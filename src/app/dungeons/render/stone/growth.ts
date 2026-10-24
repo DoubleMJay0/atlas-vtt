@@ -10,7 +10,7 @@ import { inView, type Leaf, type PlantForm } from '../growth/forms';
 import { growthPicture } from '../growth/growthForms';
 import { placeLeaf, plainLeaves, silhouette, stemRibbon } from '../growth/leafGeometry';
 import { mossField, mossResolution } from '../growth/mossField';
-import type { StoneColours } from './colours';
+import { stoneColours, type StoneColours } from './colours';
 import type { Rgb } from '../palette';
 import { css, plantColours, rampAt, type PlantColours, type Ramp } from './plantColours';
 import { BAND } from './walls';
@@ -303,6 +303,25 @@ function paintMoss(scene: ArtScene, colours: PlantColours): void {
       drawGridCanvas(layer, grid, canvas);
     }, { minX: grid.x0, minY: grid.y0, maxX: grid.x0 + grid.w / grid.res, maxY: grid.y0 + grid.h / grid.res });
   }
+}
+
+/** Each scene's plant colours, worked out once from its look. */
+const sceneColours = new WeakMap<ArtScene, PlantColours>();
+
+/**
+ * Paints one plant form as Stone & shadow paints the vegetation, in the scene's colours: for a
+ * piece drawn from the vegetation's forms (a cave's mushrooms), on a context already set to where
+ * the form's cells lie.
+ */
+export function paintPlantForm(scene: ArtScene, form: PlantForm): void {
+  let colours = sceneColours.get(scene);
+  if (!colours) {
+    colours = plantColours(stoneColours(scene.env.palette, scene.env.view.monochrome), scene.env.dungeon.model.seed);
+    sceneColours.set(scene, colours);
+  }
+  paintForm(scene, form, colours);
+  // A picture that records every path keeps the vegetation's leaves alone; a piece keeps its caps.
+  if (!scene.raster) paintCaps(scene.env.ctx, form, colours, false);
 }
 
 export interface GrowthPainter {

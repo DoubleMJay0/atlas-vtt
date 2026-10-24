@@ -1,7 +1,5 @@
 {
-  "props": [
-    "mushrooms"
-  ],
+  "props": [],
   "terrain": [],
   "cave": []
 }

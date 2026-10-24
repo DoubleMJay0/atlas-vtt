@@ -4,14 +4,14 @@ import { addRoom, emptyModel } from '../../fixtures/dungeonModelBuilder';
 import type { GlyphSpecimen, SpecimenPiece } from './types';
 
 const QUARTER = Math.PI / 2;
-const CELL_KINDS = ['stalagmites', 'column-formation', 'crystals', 'boulder'] as const;
+const CELL_KINDS = ['stalagmites', 'column-formation', 'crystals', 'boulder', 'mushrooms'] as const;
 
 const box = (x: number, y: number, w: number, h: number): CellPoint[] => Array.from({ length: w * h }, (_, i) => ({ x: x + (i % w), y: y + Math.floor(i / w) }));
 
 /**
  * Two cave chambers on natural rock, the formations among what they stand beside in a cavern: a
  * stalagmite clump round a column, flowstone and a curtain on one wall, crystals on a pool's shore,
- * boulders by a rubble heap, tangled roots near the wall.
+ * boulders by a rubble heap, tangled roots near the wall, and a grove's mushrooms.
  */
 function cave(): DungeonModel {
   const model = emptyModel(37);
@@ -45,6 +45,8 @@ function cave(): DungeonModel {
   prop('crystals', 1, 13.5, 0.5, Math.PI);
   prop('crystals', 1, 16.5, 0.5, Math.PI);
   prop('stalagmites', 1, 11.5, 5.5);
+  prop('mushrooms', 1, 16.5, 5.5);
+  prop('mushrooms', 1, 15.5, 5.5, QUARTER);
   return model;
 }
 
@@ -70,6 +72,10 @@ export const SPECIMEN: GlyphSpecimen = {
     { kind: 'crystals', rotation: 0, against: 'wall', at: { x: 7.5, y: 1 } },
     { kind: 'boulder', rotation: 0, at: { x: 9, y: 0 } },
     { kind: 'boulder', rotation: QUARTER, at: { x: 10, y: 1 } },
+    // A grove's mushrooms, patch beside patch.
+    { kind: 'mushrooms', rotation: 0, at: { x: 12, y: 0 } },
+    { kind: 'mushrooms', rotation: QUARTER, at: { x: 13, y: 0 } },
+    { kind: 'mushrooms', rotation: QUARTER * 2, at: { x: 12, y: 1 } },
   ],
   scenes: [{ name: 'cave', model: cave, floor: 0, window: { x: -1, y: -1, cells: 20, rows: 9 } }],
 };
