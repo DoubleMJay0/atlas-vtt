@@ -3,8 +3,8 @@ import { HOLE_KINDS } from '../../terrain/catalog';
 import type { Hand } from '../art/hand';
 import { UNDERGROWTH } from '../growth/growthForms';
 import { drawBridges } from './bridges';
-import { drawAltar, drawCrates, drawLowWall, drawRubbleHeap, drawSarcophagus, drawTable } from './cover';
-import { drawBrokenFloor, drawMosaic, drawPews, drawScatter } from './ground';
+import { drawLowWall, drawRubbleHeap } from './cover';
+import { drawBrokenFloor, drawMosaic, drawScatter } from './ground';
 import { drawChannel, drawDeepWater, drawPit } from './hazards';
 import { drawHoles } from './holes';
 import { drawPool, drawPortalRing } from './interest';
@@ -27,7 +27,6 @@ export interface TerrainColours {
 }
 
 const GROUND: Partial<Record<TerrainKind, Draw>> = {
-  pews: drawPews,
   'rubble-field': (hand, piece) => drawScatter(hand, piece, 0.05, 15),
   'chasm-floor': (hand, piece) => drawScatter(hand, piece, 0.075, 9),
   'broken-floor': drawBrokenFloor,
@@ -41,10 +40,6 @@ const RAISED: Partial<Record<TerrainKind, Draw>> = { platform: drawRaised, ledge
 
 const STANDING: Partial<Record<TerrainKind, Draw>> = {
   'low-wall': drawLowWall,
-  crates: drawCrates,
-  table: drawTable,
-  altar: drawAltar,
-  sarcophagus: drawSarcophagus,
   'rubble-heap': drawRubbleHeap,
   pillar: drawPillar,
   statue: (hand, piece, colours) => drawStatue(hand, piece, colours.water, colours.cloth),

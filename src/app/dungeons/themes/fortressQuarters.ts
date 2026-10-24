@@ -13,11 +13,8 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     nearRule: true,
     strict: true,
     apart: ['kitchen'],
-    terrain: { allows: ['pews', 'platform'], columns: true },
-    furnish: {
-      defining: { kind: 'altar', verb: 'backWall' },
-      pieces: [{ kind: 'candle-stand', verb: 'flank', chance: 0.8 }],
-    },
+    terrain: { allows: ['platform'], columns: true },
+    furnish: { pieces: [] },
   },
   {
     id: 'solar',
@@ -28,17 +25,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'beyond',
     apart: ['kitchen', 'gaol'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'bed', verb: 'wall' },
-      with: { kind: 'chest', verb: 'withParent', parent: 'bed' },
-      pieces: [
-        { kind: 'hearth', verb: 'wall', chance: 0.8 },
-        { kind: 'desk', verb: 'wall', chance: 0.6 },
-        { kind: 'chair', verb: 'withParent', parent: 'desk' },
-        { kind: 'wardrobe', verb: 'wall', chance: 0.6 },
-        { kind: 'rug', verb: 'centre', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.8 }] },
   },
   {
     id: 'chamber',
@@ -49,13 +36,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     near: ['solar'],
     mayStandEmpty: true,
     terrain: {},
-    furnish: {
-      defining: { kind: 'bed', verb: 'wall' },
-      pieces: [
-        { kind: 'wardrobe', verb: 'wall', chance: 0.6 },
-        { kind: 'dressing-table', verb: 'wall', chance: 0.4 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'garderobe',
@@ -68,7 +49,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     nextRule: 'any',
     apart: ['kitchen'],
     terrain: {},
-    furnish: { defining: { kind: 'latrine', verb: 'wall' }, pieces: [] },
+    furnish: { pieces: [] },
   },
   {
     id: 'gaol',
@@ -78,14 +59,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     apart: ['solar'],
     terrain: { features: ['oubliette'], hazards: ['pit'] },
-    furnish: {
-      defining: { kind: 'cell-bars', verb: 'backWall' },
-      with: { kind: 'cot', verb: 'withParent', parent: 'cell-bars' },
-      pieces: [
-        { kind: 'desk', verb: 'wall', chance: 0.6 },
-        { kind: 'stool', verb: 'withParent', parent: 'desk' },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'cistern',
@@ -105,13 +79,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     near: ['gatehouse'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'stall', verb: 'rows', count: [2, 4] },
-      pieces: [
-        { kind: 'trough', verb: 'wall', chance: 0.7 },
-        { kind: 'hay', verb: 'corner', chance: 0.7 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'library',
@@ -119,13 +87,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     size: 'medium',
     depth: ['middle', 'deep'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'bookshelf', verb: 'wall', count: [2, 4] },
-      pieces: [
-        { kind: 'table', verb: 'centre', chance: 0.7 },
-        { kind: 'desk', verb: 'wall', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'gallery',
@@ -134,14 +96,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     depth: 'middle',
     degree: 'through',
     terrain: {},
-    furnish: {
-      defining: { kind: 'portrait', verb: 'wall', count: [2, 6] },
-      pieces: [
-        { kind: 'bust', verb: 'wall', count: [2, 4], chance: 0.6 },
-        { kind: 'bench', verb: 'wall', chance: 0.5 },
-        { kind: 'tapestry', verb: 'wall', chance: 0.4 },
-      ],
-    },
+    furnish: { pieces: [{ kind: 'bust', verb: 'wall', count: [2, 4] }] },
   },
   {
     // The room over the gate passage, where the portcullis is worked and the murder holes are opened.
@@ -150,13 +105,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'beyond',
     over: true,
     terrain: {},
-    furnish: {
-      defining: { kind: 'weapon-rack', verb: 'wall' },
-      pieces: [
-        { kind: 'bench', verb: 'wall', chance: 0.6 },
-        { kind: 'crate', verb: 'corner', chance: 0.4 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'stair-hall',
@@ -164,12 +113,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     holdsStairs: true,
     mayStandEmpty: true,
     terrain: {},
-    furnish: {
-      pieces: [
-        { kind: 'bench', verb: 'wall', chance: 0.3 },
-        { kind: 'tapestry', verb: 'wall', chance: 0.3 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'collapsed-room',

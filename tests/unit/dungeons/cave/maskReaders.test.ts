@@ -6,7 +6,7 @@ import { GrowthSpace } from '../../../../src/app/dungeons/growth/growthSpace';
 import { RUN_STEP, wallRuns } from '../../../../src/app/dungeons/growth/wallRuns';
 import type { CellPoint, DungeonDoor, DungeonFloor, DungeonModel, DungeonRoom } from '../../../../src/app/dungeons/model';
 import { frameOf } from '../../../../src/app/dungeons/props/roomFrame';
-import { edgeSpots, isFree, roomSpace } from '../../../../src/app/dungeons/props/space';
+import { isFree, roomSpace } from '../../../../src/app/dungeons/props/space';
 import { RoomCells } from '../../../../src/app/dungeons/terrain/roomCells';
 import { floorMarks, gridAround, wallMarks } from '../../../../src/app/dungeons/water/wetGrid';
 import { roomAt } from '../../../../src/app/packages/components/dungeon-generator/mapHits';
@@ -53,16 +53,8 @@ describe('a chamber shaped by its cells', () => {
     expect(isFree(space, { x: 2.8, y: 3.5 }, 0.4)).toBe(false);
   });
 
-  it('has its edge places half a cell inside its cells, facing into them, and its back wall round the cut corner', () => {
+  it('has its back wall round the cut corner', () => {
     const shaped = lRoom();
-    const mask = keys(shaped.cells ?? []);
-    const spots = edgeSpots(roomSpace(frameOf(shaped), new Set(), [], mask), 1);
-    expect(spots).toHaveLength(22);
-    for (const { point, inward } of spots) {
-      expect(mask.has(cellKey(Math.floor(point.x), Math.floor(point.y)))).toBe(true);
-      const out = { x: point.x - inward.x * 0.75, y: point.y - inward.y * 0.75 };
-      expect(mask.has(cellKey(Math.floor(out.x), Math.floor(out.y)))).toBe(false);
-    }
     const back = new RoomCells(shaped, [], [], () => 'lower', []).wallCells('back');
     expect(keys(back)).toEqual(keys([0, 1, 2].map((x) => ({ x, y: 4 })).concat([3, 4, 5].map((x) => ({ x, y: 2 })))));
   });

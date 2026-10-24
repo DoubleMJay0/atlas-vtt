@@ -2,15 +2,15 @@
  * The Haunted Mansion programme: the entrance hall is the pivot, the reception rooms lie in front,
  * the service wing on its own branch of the entrance floor, the private rooms deep and upstairs.
  * The haunting is made of rooms (a sealed nursery, a portrait gallery, a ritual room upstairs as a
- * climax, dust-sheeted furniture), never of story objects. No hazards.
+ * climax), never of story objects. No hazards.
  */
 
 import { MANSION_ROOMS } from './mansionRooms';
 import type { ArenaSpec, RoomProgramme } from './themeTypes';
 
-export const BALLROOM_ARENA: ArenaSpec = { seat: 'piano', setPieces: [['statues', 1]], mirrored: ['pillar', 'statue'], hazards: [] };
-export const BEDCHAMBER_ARENA: ArenaSpec = { seat: 'four-poster-bed', setPieces: [], mirrored: ['statue'], hazards: [] };
-export const RITUAL_ARENA: ArenaSpec = { seat: null, setPieces: [['mosaic', 1]], mirrored: ['statue'], hazards: [] };
+export const BALLROOM_ARENA: ArenaSpec = { setPieces: [['statues', 1]], mirrored: ['pillar', 'statue'], hazards: [] };
+export const BEDCHAMBER_ARENA: ArenaSpec = { setPieces: [], mirrored: ['statue'], hazards: [] };
+export const RITUAL_ARENA: ArenaSpec = { setPieces: [['mosaic', 1]], mirrored: ['statue'], hazards: [] };
 
 export const MANSION: RoomProgramme = {
   entrance: [['entrance-hall', 1]],
@@ -40,5 +40,4 @@ export const MANSION: RoomProgramme = {
     ['attic-room', 1],
   ],
   rooms: MANSION_ROOMS,
-  sheeted: 0.15,
 };

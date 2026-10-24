@@ -25,7 +25,7 @@ const SPECIMENS = Object.entries(import.meta.glob<{ SPECIMEN: GlyphSpecimen }>('
   .filter(specimen => !import.meta.env.VITE_GLYPH_FAMILY || specimen.family === import.meta.env.VITE_GLYPH_FAMILY);
 
 const LOOKS: readonly DungeonStyleId[] = DUNGEON_STYLES.map(entry => entry.id);
-/** The first props, drawn before the families: the bar the families are held to, measured but not held to the families' rules (their tapestry is wider than its cell). */
+/** The first props, drawn before the families: the bar the families are held to, measured but not held to the families' rules. */
 const FIRST_PROPS = new Set<string>(FIRST_PROP_KINDS);
 const SHEET: DungeonView = { ...DEFAULT_VIEW };
 /** A piece drawn alone shows its own ink only: no shadow, occlusion or grid. */

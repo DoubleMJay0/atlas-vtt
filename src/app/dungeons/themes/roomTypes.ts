@@ -1,10 +1,9 @@
 /**
- * Every room type a theme's programme may give a room: what it was built for. Ids are stored in
- * models and exports and never translated or renamed; names are `t('dungeonRoom.<roomTypeKey>')`.
- * Types two themes share (a kitchen, a library, a collapsed room) appear once.
+ * Every room type a theme's programme may give a room: what it was built for. Room types stay
+ * internal: they shape the dungeon and are never shown (no label, heading or name). Ids are stored
+ * in models and exports and never renamed. Types two themes share (a kitchen, a library, a
+ * collapsed room) appear once.
  */
-
-import { idKey } from '../idKey';
 
 export const ROOM_TYPE_IDS = [
   'gatehouse',
@@ -75,8 +74,3 @@ export const ROOM_TYPE_IDS = [
 ] as const;
 
 export type RoomTypeId = (typeof ROOM_TYPE_IDS)[number];
-
-/** The i18n key segment of a room type (`great-hall` → `greatHall`). */
-export function roomTypeKey(id: RoomTypeId): string {
-  return idKey(id);
-}

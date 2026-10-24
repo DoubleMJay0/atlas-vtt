@@ -143,7 +143,7 @@ export const CAVERN_ROOMS: readonly RoomTypeSpec[] = [
     depth: 'deepest',
     degree: 'dead-end',
     terrain: { allows: ['platform', 'ledge', 'pool'] },
-    furnish: { defining: { kind: 'nest', verb: 'centre' }, pieces: [] },
+    furnish: { pieces: [] },
   },
   // A lived-in cave's (`inhabited.ts`): its hollows near the mouth and near water.
   {
@@ -159,32 +159,25 @@ export const CAVERN_ROOMS: readonly RoomTypeSpec[] = [
     count: [0, 3],
     terrain: {},
     // Sleepers round their fire: the fire first, so every hollow has one.
-    furnish: { defining: { kind: 'campfire', verb: 'centre' }, with: { kind: 'bedroll', verb: 'wall', count: [2, 4] }, pieces: [] },
+    furnish: { defining: { kind: 'campfire', verb: 'centre' }, pieces: [] },
   },
   {
     id: 'fire-hollow',
     count: [0, 1],
     terrain: {},
-    furnish: {
-      defining: { kind: 'campfire', verb: 'centre' },
-      pieces: [
-        { kind: 'crude-table', verb: 'centre', chance: 0.8 },
-        { kind: 'stool', verb: 'withParent', parent: 'crude-table', count: [2, 3] },
-        { kind: 'crate', verb: 'corner', count: [1, 3] },
-      ],
-    },
+    furnish: { defining: { kind: 'campfire', verb: 'centre' }, pieces: [] },
   },
   {
     id: 'pen',
     count: [0, 1],
     terrain: {},
-    furnish: { defining: { kind: 'pen', verb: 'wall', count: [1, 2] }, pieces: [] },
+    furnish: { pieces: [] },
   },
   {
     id: 'store-hollow',
     count: [0, 1],
     terrain: {},
-    furnish: { defining: { kind: 'crate', verb: 'corner', count: [2, 4] }, pieces: [{ kind: 'sacks', verb: 'corner', count: [1, 2], chance: 0.6 }] },
+    furnish: { pieces: [] },
   },
   {
     id: 'chief-den',
@@ -193,6 +186,6 @@ export const CAVERN_ROOMS: readonly RoomTypeSpec[] = [
     depth: 'deepest',
     degree: 'dead-end',
     terrain: { allows: ['platform', 'ledge'] },
-    furnish: { pieces: [{ kind: 'campfire', verb: 'centre' }, { kind: 'crate', verb: 'corner', count: [1, 2] }] },
+    furnish: { pieces: [{ kind: 'campfire', verb: 'centre' }] },
   },
 ];

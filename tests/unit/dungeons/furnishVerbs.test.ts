@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { cellKey } from '../../../src/app/dungeons/geometry';
 import type { CellPoint } from '../../../src/app/dungeons/model';
-import { tapestry } from '../../../src/app/dungeons/props/arrange';
-import { aroundParent, onShore } from '../../../src/app/dungeons/props/arrangeGroups';
+import { onShore } from '../../../src/app/dungeons/props/arrangeGroups';
 import { atBackWall, againstWall, atCentre, inCorner, inRows, onWall } from '../../../src/app/dungeons/props/cellVerbs';
 import { type FurnishSpace, placePiece } from '../../../src/app/dungeons/props/furnishSpace';
 import type { PropKind } from '../../../src/app/dungeons/props/propKinds';
-import { frameOf } from '../../../src/app/dungeons/props/roomFrame';
-import { edgeSpots, roomSpace } from '../../../src/app/dungeons/props/space';
 import { draft } from '../../../src/app/dungeons/terrain/catalog';
 import { reserveLanes } from '../../../src/app/dungeons/terrain/roomLanes';
-import { room } from './plannedFloorFixtures';
 import { furnished } from './furnishFixtures';
 
 const placedCells = (fs: FurnishSpace): CellPoint[] => fs.placed.flatMap((p) => [...p.cells]);
@@ -35,47 +31,54 @@ function splits(fs: FurnishSpace, w: number, h: number): boolean {
   return seen.size !== cells.length || fs.cells.needed.some((c) => !seen.has(cellKey(c.x, c.y)));
 }
 
-describe('cell furniture', () => {
-  it('stands a bed head to the wall with both long sides free', () => {
+describe('cell pieces', () => {
+  it('builds a fireplace into a wall with the row before it free', () => {
     const fs = furnished(5, 5);
-    const bed = againstWall(fs, 'bed', ['left', 'right', 'back']);
-    expect(bed).not.toBeNull();
+    expect(againstWall(fs, 'hearth', ['left', 'right', 'back'])).not.toBeNull();
     const piece = fs.placed[0]!;
     expect(piece.cells).toHaveLength(2);
-    // Its head lies on a wall cell, its foot one cell into the room.
-    const onWall = (c: CellPoint): boolean => c.x === 0 || c.x === 4 || c.y === 0 || c.y === 4;
-    expect(piece.cells.some(onWall)).toBe(true);
-    expect(piece.clear.length).toBeGreaterThanOrEqual(2);
+    const onWallCell = (c: CellPoint): boolean => c.x === 0 || c.x === 4 || c.y === 0 || c.y === 4;
+    expect(piece.cells.every(onWallCell)).toBe(true);
+    expect(piece.clear).toHaveLength(2);
     for (const c of piece.clear) expect(fs.cells.isBlocked(c)).toBe(false);
   });
 
-  it('rings a table with free cells and seats chairs in them', () => {
+  it('rings a fire pit with free cells', () => {
     const fs = furnished(6, 6);
-    expect(atCentre(fs, 'table')).not.toBeNull();
-    const table = fs.placed[0]!;
-    const chairs = aroundParent(fs, 'chair', table, 4);
-    expect(chairs.length).toBeGreaterThanOrEqual(2);
-    for (const c of table.clear) expect(fs.cells.isBlocked(c)).toBe(false);
+    expect(atCentre(fs, 'campfire')).not.toBeNull();
+    const fire = fs.placed[0]!;
+    expect(fire.clear).toHaveLength(4);
+    for (const c of fire.clear) expect(fs.cells.isBlocked(c)).toBe(false);
   });
 
   it('keeps lanes between doors and stairs straight and clear', () => {
     const fs = furnished(7, 7, { north: true });
     reserveLanes(fs.cells);
-    inRows(fs, 'bunk', 6);
+    inRows(fs, 'boulder', 3);
+    inCorner(fs, 'stalagmites');
     const taken = new Set(placedCells(fs).map((c) => cellKey(c.x, c.y)));
     // The lane from the south door to the north one runs straight up the middle column.
     for (let y = 0; y < 7; y++) expect(taken.has(cellKey(3, y)), `cell 3,${y}`).toBe(false);
   });
 
+  it('lays stones in a row across the middle, a ring\'s width apart', () => {
+    const fs = furnished(9, 7);
+    const stones = inRows(fs, 'boulder', 3);
+    expect(stones).toHaveLength(3);
+    expect(new Set(stones.map((p) => p.y)).size).toBe(1);
+    const xs = stones.map((p) => p.x).sort((a, b) => a - b);
+    expect(xs[1]! - xs[0]!).toBe(3);
+  });
+
   it('places no wall or back-wall piece in a round room or across a door', () => {
     const round = furnished(7, 7, { rotunda: true });
-    expect(atBackWall(round, 'shelves')).toBeNull();
-    expect(againstWall(round, 'bed', ['left', 'right', 'back', 'near'])).toBeNull();
-    expect(onWall(round, 'portrait', 3)).toEqual([]);
+    expect(atBackWall(round, 'hearth')).toBeNull();
+    expect(againstWall(round, 'crystals', ['left', 'right', 'back', 'near'])).toBeNull();
+    expect(onWall(round, 'flowstone', 3)).toEqual([]);
     const doors = furnished(3, 3, { north: true });
-    for (let k = 0; k < 6; k++) onWall(doors, 'portrait', 1);
+    for (let k = 0; k < 6; k++) onWall(doors, 'curtain', 1);
     for (const p of doors.placed) {
-      // No portrait hangs on the cell before a door.
+      // No curtain hangs on the cell before a door.
       expect(p.prop.x === 1.5 && (p.prop.y < 0.5 || p.prop.y > 2.5)).toBe(false);
     }
   });
@@ -83,7 +86,7 @@ describe('cell furniture', () => {
   it('hangs no wall piece in a corner or beside a door, where its drawing would cover the next wall', () => {
     for (let seed = 1; seed <= 30; seed++) {
       const fs = furnished(5, 4, { seed, north: true });
-      onWall(fs, 'portrait', 8);
+      onWall(fs, 'curtain', 8);
       expect(fs.placed.length).toBeGreaterThan(0);
       for (const { prop } of fs.placed) {
         // Never in the corner cells of the 5 × 4 room, never beside the middle of the north or south wall's door.
@@ -96,7 +99,7 @@ describe('cell furniture', () => {
   });
 
   it('never splits a room', () => {
-    const kinds: PropKind[] = ['bed', 'table', 'shelves', 'bookshelf', 'wardrobe', 'barrel', 'crate', 'desk', 'bunk', 'chest', 'planter', 'armour-stand'];
+    const kinds: PropKind[] = ['hearth', 'campfire', 'boulder', 'stalagmites', 'crystals', 'column-formation', 'statue', 'well', 'fountain', 'bust', 'boulder', 'stalagmites'];
     for (let seed = 1; seed <= 200; seed++) {
       const w = 4 + (seed % 5);
       const h = 4 + (seed % 3);
@@ -112,24 +115,17 @@ describe('cell furniture', () => {
 
   it('offers nothing it was not offered', () => {
     const fs = furnished(5, 5, { offered: new Set() });
-    expect(placePiece(fs, 'bed', [{ x: 1, y: 1 }, { x: 1, y: 2 }], { x: 0, y: 1 })).toBeNull();
-    expect(atCentre(fs, 'barrel')).toBeNull();
-    expect(onWall(fs, 'portrait', 2)).toEqual([]);
-  });
-
-  it('stretches a long table along the room', () => {
-    const fs = furnished(5, 9);
-    const [table] = inRows(fs, 'long-table', 1);
-    expect(table?.size?.along).toBeGreaterThanOrEqual(3);
-    expect(table?.size?.along).toBeLessThanOrEqual(6);
+    expect(placePiece(fs, 'hearth', [{ x: 1, y: 0 }, { x: 2, y: 0 }], { x: 0, y: 1 })).toBeNull();
+    expect(atCentre(fs, 'boulder')).toBeNull();
+    expect(onWall(fs, 'flowstone', 2)).toEqual([]);
   });
 
   it('asks the room\'s placeAllowed', () => {
     const veto = { x: 2, y: 2 };
     const fs = furnished(5, 5, { placeAllowed: (_, at) => at.x !== veto.x || at.y !== veto.y });
-    atCentre(fs, 'table');
-    atCentre(fs, 'crate');
-    inCorner(fs, 'hay');
+    atCentre(fs, 'campfire');
+    atCentre(fs, 'boulder');
+    inCorner(fs, 'stalagmites');
     expect(placedCells(fs).some((c) => c.x === veto.x && c.y === veto.y)).toBe(false);
   });
 
@@ -144,31 +140,6 @@ describe('cell furniture', () => {
 });
 
 describe('room walls', () => {
-  it('finds the walls of an L-shaped mask', () => {
-    // A 6 × 5 room without its 3 × 2 north-east corner, as a cave's chamber would name its cells.
-    const r = room(0, { x: 0, y: 0, w: 6, h: 5 });
-    const cells = new Set<string>();
-    for (let y = 0; y < 5; y++) for (let x = 0; x < 6; x++) if (!(x >= 3 && y < 2)) cells.add(cellKey(x, y));
-    const space = roomSpace(frameOf(r), new Set(), [], cells);
-    for (const spot of edgeSpots(space, 1)) {
-      const inner = { x: Math.floor(spot.point.x + spot.inward.x * 0.4), y: Math.floor(spot.point.y + spot.inward.y * 0.4) };
-      const outer = { x: Math.floor(spot.point.x - spot.inward.x * 0.6), y: Math.floor(spot.point.y - spot.inward.y * 0.6) };
-      expect(cells.has(cellKey(inner.x, inner.y))).toBe(true);
-      expect(cells.has(cellKey(outer.x, outer.y))).toBe(false);
-    }
-    expect(edgeSpots(space, 1)).toHaveLength(22);
-  });
-
-  it('hangs a tapestry on the back wall of a mask where its rectangle has none', () => {
-    // Axis up: the back wall is the north edge; the mask lacks the north middle cells.
-    const r = room(0, { x: 0, y: 0, w: 6, h: 5, axis: { x: 0, y: -1 } });
-    const cells = new Set<string>();
-    for (let y = 0; y < 5; y++) for (let x = 0; x < 6; x++) if (!(x >= 2 && x <= 3 && y === 0)) cells.add(cellKey(x, y));
-    const [hung] = tapestry(roomSpace(frameOf(r), new Set(), [], cells), []);
-    expect(hung).toBeDefined();
-    expect(cells.has(cellKey(Math.floor(hung!.x), Math.floor(hung!.y)))).toBe(true);
-  });
-
   it('lists the wall cells of each side of a room', () => {
     const fs = furnished(4, 3);
     expect(fs.cells.wallCells('back').map((c) => c.y)).toEqual([0, 0, 0, 0]);

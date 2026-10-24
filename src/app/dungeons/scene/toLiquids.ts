@@ -141,7 +141,7 @@ const UNDER_WATER: ReadonlySet<string> = new Set(['shallow-water']);
 
 /**
  * What the map draws over its water: stairwells, every piece of terrain that is no liquid (bridges
- * among them), furniture and columns. Cut out of the surfaces, so the motion never runs over them.
+ * among them), props and columns. Cut out of the surfaces, so the motion never runs over them.
  */
 function drawnOver(dungeon: VisibleDungeon, view: DungeonView): Vec[][] {
   const { floor, roomShapes } = dungeon;

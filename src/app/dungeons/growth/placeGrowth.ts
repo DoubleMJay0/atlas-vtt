@@ -1,5 +1,5 @@
 /**
- * A floor's vegetation, after its water and furniture: climbers along stretches of its walls and
+ * A floor's vegetation, after its water and pieces: climbers along stretches of its walls and
  * round temple columns, plants in patches on its floor and by its water, weeds in its cracks.
  * Green growth follows the light: on the entry floor it is richest in the rooms by the entrances
  * and thins with every door further in; upstairs it has the entry floor's dusk; below ground it is

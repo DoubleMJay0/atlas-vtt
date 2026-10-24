@@ -1,7 +1,7 @@
 /**
  * A floor's terrain: what changes how a room plays, cell by cell (Map-Fu: a cell is plainly open
  * floor, difficult terrain, cover or a hazard). Every piece fills whole cells of one room's floor;
- * props (`DungeonProp`) may be smaller and only furnish. Architecture only, never story: a
+ * props (`DungeonProp`) may be smaller. Architecture only, never story: a
  * platform is where something could stand, not who stands there.
  */
 
@@ -10,10 +10,6 @@ import type { CellDir, CellPoint } from './model';
 export type TerrainKind =
   // Half cover: low enough to shoot over.
   | 'low-wall'
-  | 'crates'
-  | 'table'
-  | 'altar'
-  | 'sarcophagus'
   | 'rubble-heap'
   // Total cover: too tall and wide to see past.
   | 'pillar'
@@ -21,7 +17,6 @@ export type TerrainKind =
   | 'wall-fragment'
   | 'obelisk'
   // Difficult terrain.
-  | 'pews'
   | 'rubble-field'
   | 'broken-floor'
   | 'shallow-water'

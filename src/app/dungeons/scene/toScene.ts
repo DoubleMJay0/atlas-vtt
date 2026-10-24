@@ -52,7 +52,7 @@ function floorWalls(dungeon: VisibleDungeon, style: DungeonStyle, view: DungeonV
  * drawn on the map (half cells with small tiles; the image's pixel 0 lies on a line of both),
  * every floor's walls and doors and its tall objects' outlines, the stairs between floors and the
  * openings into them (holes, and bridges laid over them), the
- * map features of every floor's terrain and furniture, its water, lava and acid with the light lava
+ * map features of every floor's terrain and props, its water, lava and acid with the light lava
  * and acid give off over their whole surface, the rooms of its note, and dynamic lighting in
  * daylight, so nothing changes until the GM dims it. Light ranges are in `unit`. A dungeon of several floors gets a level per floor; one of one floor none. Null when
  * the walls of a floor would crowd too much to be joined (`wallsCrowd`); a generated dungeon never does.

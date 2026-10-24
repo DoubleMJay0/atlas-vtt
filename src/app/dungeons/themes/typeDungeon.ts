@@ -1,8 +1,7 @@
 /**
  * A dungeon's theme put to work on its planned floors: for a theme with a room programme every
  * normal room gets its type (`DungeonRoom.type`), and each typed room what its recipe reads there
- * (its rank by depth among rooms of its type, dust sheets past the front third, the theme's
- * richness).
+ * (its rank by depth among rooms of its type, the theme's richness).
  */
 
 import { floorAbove, floorStack } from '../floors/floorStack';
@@ -42,8 +41,7 @@ export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<Dungeon
       room.type = type;
       // Only a type that keeps columns keeps the colonnade the layout gave its room.
       if (!spec.terrain.columns) room.colonnade = false;
-      const sheeted = programme.sheeted !== undefined && traitOf(index, room.id)?.band !== 'front' ? programme.sheeted : 0;
-      out.set(room.id, { spec, context: { depthRank: ranks[index]?.get(room.id) ?? 0.5, ruined, sheeted, richness: facts.richness({ floor: index, room: room.id }) } });
+      out.set(room.id, { spec, context: { depthRank: ranks[index]?.get(room.id) ?? 0.5, ruined, richness: facts.richness({ floor: index, room: room.id }) } });
     }
     return out;
   });

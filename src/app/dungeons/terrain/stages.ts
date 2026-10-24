@@ -3,7 +3,7 @@
  * loot or mechanisms that would ask the GM for a story. Each stage has several ways to be built,
  * chosen by weight and the dungeon's tags, so no two dungeons repeat one another: the entrance a
  * guard post, scattered cover, a dais to hold or an empty hall; the second room a set piece of
- * statues, a basin, an obelisk, pews or tombs; the setback a hazard, rough ground or a ledge; the
+ * statues, a basin or an obelisk; the setback a hazard, rough ground or a ledge; the
  * climax the boss arena; the reward room a point of interest or nothing at all.
  */
 
@@ -14,7 +14,7 @@ import type { DungeonTag } from '../tags';
 import { furnishArena } from './arena';
 import { draft } from './catalog';
 import { scatterCover, tryShape } from './cover';
-import { pews, roughGround } from './difficult';
+import { roughGround } from './difficult';
 import { ledgeAlongWall, platformAtFarWall } from './elevation';
 import { hazardWeights, placeHazard } from './hazards';
 import { anyInterest, placeInterest } from './interest';
@@ -85,7 +85,7 @@ function entrance(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: 
   });
 }
 
-type SetPiece = 'statues' | 'basin' | 'obelisk' | 'pews' | 'tombs' | 'plain';
+type SetPiece = 'statues' | 'basin' | 'obelisk' | 'plain';
 
 /** The second room's set piece, something to look at that does nothing by itself. */
 function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: StageRules): void {
@@ -98,8 +98,6 @@ function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: 
     ['statues', allows('mosaic') && allows('statue') ? 2 : 0],
     ['basin', !allows('pool') || !allows('statue') || tags.has('dry') ? 0 : tags.has('wet') || tags.has('flooded') ? 3 : 1.5],
     ['obelisk', allows('obelisk') ? 1.5 : 0],
-    ['pews', allows('pews') ? 0.5 : 0],
-    ['tombs', allows('sarcophagus') ? 0.5 : 0],
     ['plain', 1],
   ];
   firstThatFits(rng, ways, (way) => {
@@ -118,10 +116,6 @@ function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: 
       }
       case 'obelisk':
         return placeInterest(floor, rc, rng, 'obelisk');
-      case 'pews':
-        return pews(floor, rc);
-      case 'tombs':
-        return [1, rc.width - 2].filter((j) => tryShape(floor, rc, { kind: 'sarcophagus', di: 2, dj: 1 }, Math.max(1, Math.floor(rc.depth / 2) - 1), j)).length > 0;
       case 'plain':
         return anyInterest(floor, rc, rng, tags, allows);
     }
@@ -161,7 +155,7 @@ function setback(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: S
 function reward(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>, rules: StageRules): void {
   const floor = work.floors[k];
   if (!floor || chance(rng, 0.2)) return;
-  const kind = pick(rng, ['altar', 'obelisk', 'mosaic', 'statue'] as const);
+  const kind = pick(rng, ['obelisk', 'mosaic', 'statue'] as const);
   if (!rules.allows(kind) || !placeInterest(floor, rc, rng, kind)) anyInterest(floor, rc, rng, tags, rules.allows);
 }
 
@@ -175,7 +169,7 @@ export function furnishStage(work: TerrainWork, k: number, rc: RoomCells, rng: R
   // A cave's stage is its room: a chasm hall keeps its chasm, a lake cavern its lake.
   const hazarded = named !== undefined && work.cave !== undefined && placeTypeHazard(work, k, rc, named.spec, work.rng(k, `hazard:${rc.room.id}`));
   if (hazarded) {
-    furnishTypedRoom(work, k, rc, named.spec, named.context, true);
+    furnishTypedRoom(work, k, rc, named, { hazarded: true });
     return;
   }
   const typed = named && withoutItsHazard(work, rc.room, named);
@@ -197,5 +191,5 @@ export function furnishStage(work: TerrainWork, k: number, rc: RoomCells, rng: R
       reward(work, k, rc, rng, tags, rules);
       break;
   }
-  if (typed) furnishTypedRoom(work, k, rc, typed.spec, typed.context);
+  if (typed) furnishTypedRoom(work, k, rc, typed);
 }

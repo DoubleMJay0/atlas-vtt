@@ -21,10 +21,6 @@ const STEPS = [
 /** What a party cannot walk across: every hazard and hole, cover, and the standing points of interest. */
 const BLOCKING: ReadonlySet<TerrainKind> = new Set<TerrainKind>([
   'low-wall',
-  'crates',
-  'table',
-  'altar',
-  'sarcophagus',
   'rubble-heap',
   'pillar',
   'statue',
@@ -126,7 +122,7 @@ export function clearanceProblems(floor: DungeonFloor, index: number, stack: Flo
   return floor.terrain.flatMap((piece) => piece.cells.filter((c) => keep.has(key(c))).map((c) => `${piece.kind} ${piece.id} on ${key(c)}, which stays clear`));
 }
 
-/** The cells a piece of furniture on whole cells stands on: those whose middles lie inside its box. */
+/** The cells a piece on whole cells stands on: those whose middles lie inside its box. */
 export function propCells(floor: DungeonFloor, prop: DungeonProp): CellPoint[] {
   const spec = PROP_SPECS[prop.kind];
   if (!isCellPiece(spec) || spec.wallPiece) return [];
@@ -144,7 +140,7 @@ export function propCells(floor: DungeonFloor, prop: DungeonProp): CellPoint[] {
   return cells;
 }
 
-/** The cells furniture blocks: those of every cell piece that cannot be walked. */
+/** The cells pieces block: those of every cell piece that cannot be walked. */
 export function blockingPropCells(floor: DungeonFloor): CellPoint[] {
   return floor.props.filter((p) => PROP_SPECS[p.kind].footing === 'block').flatMap((p) => propCells(floor, p));
 }
@@ -251,14 +247,14 @@ function linked(from: CellPoint, to: CellPoint, may: (c: CellPoint) => boolean):
 export function blockedCells(floor: DungeonFloor, room: number): number {
   const bridged = new Set(floor.terrain.filter((p) => p.kind === 'bridge').flatMap((p) => p.cells.map(key)));
   const r = floor.rooms[room];
-  const furniture = r ? blockingPropCells(floor).filter((c) => inFloor(r, c)).length : 0;
-  return floor.terrain.filter((p) => p.room === room && BLOCKING.has(p.kind)).flatMap((p) => p.cells).filter((c) => !bridged.has(key(c))).length + furniture;
+  const pieces = r ? blockingPropCells(floor).filter((c) => inFloor(r, c)).length : 0;
+  return floor.terrain.filter((p) => p.room === room && BLOCKING.has(p.kind)).flatMap((p) => p.cells).filter((c) => !bridged.has(key(c))).length + pieces;
 }
 
-/** Whether the room holds cover: a piece of terrain or furniture that gives it, columns standing in it, or a gallery's parapet. */
+/** Whether the room holds cover: a piece of terrain or a prop that gives it, columns standing in it, or a gallery's parapet. */
 export function hasCover(floor: DungeonFloor, room: number): boolean {
   const r = floor.rooms[room];
   const columns = r !== undefined && floor.columns.some((c) => c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h);
-  const furniture = floor.props.some((p) => p.room === room && PROP_SPECS[p.kind].cover !== undefined);
-  return columns || furniture || floor.terrain.some((p) => p.room === room && (p.traits.cover !== undefined || p.kind === 'gallery'));
+  const piece = floor.props.some((p) => p.room === room && PROP_SPECS[p.kind].cover !== undefined && !PROP_SPECS[p.kind].wallPiece);
+  return columns || piece || floor.terrain.some((p) => p.room === room && (p.traits.cover !== undefined || p.kind === 'gallery'));
 }

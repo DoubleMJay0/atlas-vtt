@@ -2,15 +2,15 @@
  * The Fortress programme: a gatehouse at the entrance, a great hall as the pivot, the service
  * cluster at the hall's low end, the private cluster on another branch, the chapel a dead end off
  * the hall, barracks and armoury near the gate, stores, cistern and gaol on the entrance floor's
- * back branches, and the throne room as one of its climaxes. The only theme with a throne.
+ * back branches, and the throne room as one of its climaxes.
  */
 
 import { FORTRESS_ROOMS } from './fortressRooms';
 import type { ArenaSpec, RoomProgramme } from './themeTypes';
 
-export const THRONE_ARENA: ArenaSpec = { seat: 'throne', setPieces: [['statues', 3], ['pillars', 2]], mirrored: ['pillar', 'statue'], hazards: [] };
-export const HALL_ARENA: ArenaSpec = { seat: 'high-table', setPieces: [['pillars', 1]], mirrored: ['pillar'], hazards: [] };
-export const CHAPEL_ARENA: ArenaSpec = { seat: 'altar', setPieces: [['statues', 1]], mirrored: ['pillar'], hazards: [] };
+export const THRONE_ARENA: ArenaSpec = { setPieces: [['statues', 3], ['pillars', 2]], mirrored: ['pillar', 'statue'], hazards: [] };
+export const HALL_ARENA: ArenaSpec = { setPieces: [['pillars', 1]], mirrored: ['pillar'], hazards: [] };
+export const CHAPEL_ARENA: ArenaSpec = { setPieces: [['statues', 1]], mirrored: ['pillar'], hazards: [] };
 
 export const FORTRESS: RoomProgramme = {
   entrance: [['gatehouse', 1]],

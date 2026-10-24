@@ -1,9 +1,8 @@
 import { expect, it } from 'vitest';
-import type { DungeonModel } from '../../../src/app/dungeons/model';
-import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
 import type { RoomProgramme } from '../../../src/app/dungeons/themes/themeTypes';
 import { normals } from './dungeonInvariants';
-import { hasCover, isHazard } from './terrainInvariants';
+import { uncoveredFightRooms } from './coverInvariants';
+import { isHazard } from './terrainInvariants';
 import { type ThemeRun, failuresOf } from './themeRuns';
 import { hazardFurnitureProblems, mirrorProblems, physicsProblems, reasonProblems, shapeProblems } from './themeTerrainInvariants';
 
@@ -15,12 +14,8 @@ export function describeThemeTerrain(runs: readonly ThemeRun[], programme: RoomP
     expect(failuresOf(runs, hazardFurnitureProblems)).toEqual([]);
   });
 
-  it('gives every furnished room that can hold a fight some cover', () => {
-    // Furniture on the floor furnishes a room for a fight; pictures on its walls do not.
-    const standing = (floor: DungeonModel['floors'][number], room: number): boolean => floor.props.some((p) => p.room === room && !PROP_SPECS[p.kind].wallPiece);
-    expect(failuresOf(runs, (m) => m.floors.flatMap((floor, f) => normals(floor)
-      .filter((room) => room.w * room.h >= 12 && !room.boss && standing(floor, room.id) && !hasCover(floor, room.id))
-      .map((room) => `floor ${f}: ${room.type} ${room.id} (${room.w}×${room.h}) has no cover`)))).toEqual([]);
+  it('gives every room that can hold a fight some cover', () => {
+    expect(failuresOf(runs, uncoveredFightRooms)).toEqual([]);
   });
 
   it('places hazards within the theme\'s band', () => {
@@ -33,10 +28,6 @@ export function describeThemeTerrain(runs: readonly ThemeRun[], programme: RoomP
 
   it('keeps columns to the types that take them', () => {
     expect(failuresOf(runs, (m) => m.floors.flatMap((floor) => floor.rooms.filter((room) => room.colonnade && room.type && !columns.has(room.type)).map((room) => `a colonnade in a ${room.type}`)))).toEqual([]);
-  });
-
-  it('keeps pews to chapels', () => {
-    expect(failuresOf(runs, (m: DungeonModel) => m.floors.flatMap((floor) => floor.terrain.filter((p) => p.kind === 'pews' && floor.rooms[p.room]?.type !== 'chapel').map((p) => `pews in a ${floor.rooms[p.room]?.type}`)))).toEqual([]);
   });
 
   it('gives every feature and every pool a reason of its room type', () => {

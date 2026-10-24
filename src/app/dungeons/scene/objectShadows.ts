@@ -13,8 +13,8 @@ import type { DungeonPlacement } from './toWalls';
  * shadows a lamp casts) without walls drawn by the GM: standing columns, statues, wells, and the
  * terrain that is total cover (pillars, statues, wall fragments, obelisks). Each face blocks only
  * from inside (`insideOf`): the object's top is seen and lit with its faces, never a black hole in
- * the players' picture, and what stands behind it is hidden and in its shadow. Low ones (altars,
- * chests, sarcophagi, crates, barrels, a dais, low walls) get none. Each outline is one convex
+ * the players' picture, and what stands behind it is hidden and in its shadow. Low ones (a dais,
+ * a fountain, a fire pit, low walls) get none. Each outline is one convex
  * polygon of at most eight corners, lies inside what the map draws, and keeps farther than the
  * engine's seal tolerance from every wall and every other outline, so sealing never bridges an
  * object to a wall.

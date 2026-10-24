@@ -20,14 +20,14 @@ import { modelOf } from './glyphSheetModel';
 /**
  * What one piece costs to draw, per painter: each kind drawn 200 times at play zoom (150 px a
  * cell), the middle of five runs. A kind of a family may cost at most twice the slowest of the
- * reference props (fountain, well, statue, throne) in the same painter (style guide §10). The table
+ * reference props (fountain, well, statue) in the same painter (style guide §10). The table
  * goes to `out/perf-glyph/cost.txt`.
  */
 
 const PX = 150;
 const DRAWS = 200;
 const RUNS = 5;
-const REFERENCE: readonly PropKind[] = ['fountain', 'well', 'statue', 'throne'];
+const REFERENCE: readonly PropKind[] = ['fountain', 'well', 'statue'];
 const FIRST_PROPS = new Set(FIRST_PROP_KINDS);
 const LOOK: Record<ArtDirection, string> = { stone: 'parchment', engraved: 'print' };
 

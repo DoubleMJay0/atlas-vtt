@@ -27,11 +27,6 @@ export function middleThird(cells: readonly CellPoint[]): CellPoint[] {
   return cells.filter((c) => inThird(c.x, x0, w) && inThird(c.y, y0, h));
 }
 
-/** Whether furniture already stands within a cell of the cell's middle. */
-function underFurniture(floor: FloorTerrain, c: CellPoint): boolean {
-  return floor.props.some((p) => p.room !== undefined && Math.hypot(p.x - c.x - 0.5, p.y - c.y - 0.5) < 1);
-}
-
 const STEPS = [
   { x: 1, y: 0 },
   { x: 0, y: 1 },
@@ -54,11 +49,11 @@ function layLoose(floor: FloorTerrain, rc: RoomCells, kind: TerrainKind, cells: 
 
 /** A heap of fallen blocks on a cell or two of `spots`, else loose rubble; whether either was laid. */
 function fallen(floor: FloorTerrain, rc: RoomCells, rng: Rng, spots: readonly CellPoint[]): boolean {
-  const free = shuffled(rng, spots.filter((c) => rc.fits([c]) && !underFurniture(floor, c)));
+  const free = shuffled(rng, spots.filter((c) => rc.fits([c])));
   for (const c of free) {
     for (const d of STEPS) {
       const two = [c, { x: c.x + d.x, y: c.y + d.y }];
-      if (rc.fits(two) && !underFurniture(floor, two[1]!) && layLoose(floor, rc, 'rubble-heap', two)) return true;
+      if (rc.fits(two) && layLoose(floor, rc, 'rubble-heap', two)) return true;
     }
     if (layLoose(floor, rc, 'rubble-heap', [c])) return true;
   }

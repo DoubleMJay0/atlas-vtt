@@ -27,8 +27,8 @@ export interface SheetRoom {
 }
 
 /** What every family's sheet shows beside its pieces (style guide §10). */
-const REFERENCE_PROPS: readonly SpecimenPiece[] = (['barrel', 'crate', 'chest', 'throne', 'statue', 'altar'] as const).map(kind => ({ kind, rotation: 0 }));
-const REFERENCE_TERRAIN: readonly { kind: TerrainKind; w: number }[] = [{ kind: 'crates', w: 1 }, { kind: 'table', w: 2 }];
+const REFERENCE_PROPS: readonly SpecimenPiece[] = (['statue', 'fountain', 'well'] as const).map(kind => ({ kind, rotation: 0 }));
+const REFERENCE_TERRAIN: readonly { kind: TerrainKind; w: number }[] = [{ kind: 'rubble-heap', w: 1 }, { kind: 'low-wall', w: 2 }];
 /** Discs whose centre lies on their wall (`arrange.ts` seats a dais there). */
 const ON_THE_WALL = new Set(['dais']);
 /** The widest a row of free pieces runs, in cells. */

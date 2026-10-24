@@ -13,6 +13,7 @@ import { doorProblems, floorProblems, loopProblems, secretProblems, unreachableR
 import { connectionProblems, entranceProblems, stairProblems } from './floorsInvariants';
 import { bridgeProblems, cellProblems, routeProblems, stairClearanceProblems } from './terrainInvariants';
 import { holeProblems } from './holeInvariants';
+import { uncoveredFightRooms } from './coverInvariants';
 import { stackOf } from '../../../src/app/dungeons/floors/floorStack';
 
 /**
@@ -128,9 +129,13 @@ export function describeCaveInvariants(floors: number): void {
       expect(failures((run) => lifeProblems(run.model))).toEqual([]);
     });
 
-    it('rule 8: guard a lived-in cave at its mouth, keep its hollows near the mouth and water, a fire by every sleeping hollow, its chief deepest; no story objects', () => {
+    it('rule 8: guard a lived-in cave at its mouth, keep its hollows near the mouth and water, a fire by every sleeping hollow, its chief deepest; fire pits and stones only', () => {
       expect(failures((run) => livedInProblems(run.model))).toEqual([]);
       expect(runs.filter((run) => run.tags.includes('inhabited')).some((run) => run.model.floors[0]!.rooms.some((r) => r.type === 'guard-post'))).toBe(true);
+    });
+
+    it('give every room that can hold a fight some cover: boulders, stalagmites or fallen rock', () => {
+      expect(failures((run) => uncoveredFightRooms(run.model))).toEqual([]);
     });
 
     it('make a room a hazard room or a furnished room, never both, nature\'s formations aside, and hold one liquid at most in a room', () => {

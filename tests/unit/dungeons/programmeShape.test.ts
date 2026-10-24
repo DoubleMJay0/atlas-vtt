@@ -7,10 +7,10 @@ import { CAVERN_PROGRAMME } from '../../../src/app/dungeons/themes/cavern';
 import { MANSION } from '../../../src/app/dungeons/themes/mansion';
 import type { Piece, RoomProgramme, RoomTypeSpec } from '../../../src/app/dungeons/themes/themeTypes';
 
-/** Rooms that are furnished as what they are, so they never take a hazard. */
+/** Rooms built for what they are, so they never take a hazard. */
 const FORMAL = ['throne-room', 'chapel', 'solar', 'chamber', 'library', 'kitchen', 'great-hall', 'dining-room', 'bedroom', 'master-bedroom', 'drawing-room'];
-/** Hazard types whose furniture stands only where the hazard was not placed. */
-const FURNISHED_WITHOUT_HAZARD = ['cistern', 'gaol'];
+/** Hazard types whose built piece stands only where the hazard was not placed. */
+const BUILT_WITHOUT_HAZARD = ['cistern'];
 
 /** Climax types of which the facts allow one at most: their weights stand in for each other. */
 const EITHER: Readonly<Record<string, readonly string[]>> = { cavern: ['den', 'chief-den'] };
@@ -22,13 +22,12 @@ const PROGRAMMES: [string, RoomProgramme, readonly (readonly [string, string])[]
 ];
 
 function piecesOf(spec: RoomTypeSpec): Piece[] {
-  const { defining, with: belonging, pieces } = spec.furnish;
-  return [...(defining ? [defining] : []), ...(belonging ? [belonging] : []), ...pieces];
+  const { defining, pieces } = spec.furnish;
+  return [...(defining ? [defining] : []), ...pieces];
 }
 
 function kindsOf(programme: RoomProgramme): PropKind[] {
-  const seats = programme.climax.flatMap((c) => (c.arena.seat ? [c.arena.seat] : []));
-  return [...programme.rooms.flatMap((spec) => piecesOf(spec).flatMap((p) => [p.kind, ...(p.parent ? [p.parent] : [])])), ...seats];
+  return programme.rooms.flatMap((spec) => piecesOf(spec).flatMap((p) => [p.kind, ...(p.parent ? [p.parent] : [])]));
 }
 
 describe.each(PROGRAMMES)('the %s programme', (name, programme, apartPairs) => {
@@ -67,10 +66,10 @@ describe.each(PROGRAMMES)('the %s programme', (name, programme, apartPairs) => {
     expect(Math.abs(sum - 1)).toBeLessThan(1e-9);
   });
 
-  it('keeps hazards and furniture apart', () => {
+  it('keeps hazards and built pieces apart', () => {
     for (const s of programme.rooms) {
       const defining = s.furnish.defining;
-      if (s.terrain.hazards?.length && defining && !FURNISHED_WITHOUT_HAZARD.includes(s.id)) expect(PROP_SPECS[defining.kind].natural, s.id).toBe(true);
+      if (s.terrain.hazards?.length && defining && !BUILT_WITHOUT_HAZARD.includes(s.id)) expect(PROP_SPECS[defining.kind].natural, s.id).toBe(true);
     }
     for (const id of FORMAL) expect(spec(id)?.terrain.hazards ?? [], id).toEqual([]);
   });
@@ -96,10 +95,13 @@ describe.each(PROGRAMMES)('the %s programme', (name, programme, apartPairs) => {
   });
 });
 
-describe('thrones', () => {
-  it('puts the throne in the Fortress alone', () => {
-    for (const [name, programme] of PROGRAMMES) if (name !== 'fortress') expect(kindsOf(programme)).not.toContain('throne');
-    expect(kindsOf(FORTRESS)).toContain('throne');
+describe('structure only', () => {
+  it('builds statues, busts, fountains, wells, daises and fireplaces, and in a cave what nature made and a fire pit', () => {
+    const built = new Set(['dais', 'statue', 'bust', 'fountain', 'well', 'hearth']);
+    for (const [name, programme] of PROGRAMMES) {
+      const allowed = (kind: PropKind): boolean => (name === 'cavern' ? PROP_SPECS[kind].natural === true || kind === 'campfire' : built.has(kind));
+      expect(kindsOf(programme).filter((kind) => !allowed(kind)), name).toEqual([]);
+    }
   });
 });
 

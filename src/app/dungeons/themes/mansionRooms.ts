@@ -1,6 +1,6 @@
 /**
  * The rooms of a Haunted Mansion: what each is for, where it stands, its terrain and its
- * furniture. From the report's §2.2 and §3.2 Manor; the plan's Mansion table. The entrance hall,
+ * pieces. From the report's §2.2 and §3.2 Manor; the plan's Mansion table. The entrance hall,
  * reception rooms and service wing are here, the private rooms, attics and the rest in
  * `mansionQuarters.ts`. No room takes a hazard.
  */
@@ -17,14 +17,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'hub',
     floor: 'entrance',
     terrain: { features: ['stair-well'], columns: true },
-    furnish: {
-      defining: { kind: 'rug', verb: 'centre' },
-      pieces: [
-        { kind: 'side-table', verb: 'flank', of: 'door', chance: 0.7 },
-        { kind: 'coat-stand', verb: 'corner', chance: 0.5 },
-        { kind: 'portrait', verb: 'wall', chance: 0.6 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'drawing-room',
@@ -36,17 +29,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     near: ['entrance-hall'],
     apart: ['kitchen'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'low-table', verb: 'centre' },
-      with: { kind: 'sofa', verb: 'withParent', parent: 'low-table' },
-      pieces: [
-        { kind: 'armchair', verb: 'withParent', parent: 'low-table', count: [2, 2] },
-        { kind: 'hearth', verb: 'wall', chance: 0.8 },
-        { kind: 'piano', verb: 'corner', chance: 0.4 },
-        { kind: 'cabinet', verb: 'wall', chance: 0.5 },
-        { kind: 'portrait', verb: 'wall', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.8 }] },
   },
   {
     id: 'dining-room',
@@ -59,15 +42,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     next: ['servery'],
     near: ['kitchen'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'long-table', verb: 'rows' },
-      with: { kind: 'chair', verb: 'withParent', parent: 'long-table', count: [4, 10] },
-      pieces: [
-        { kind: 'sideboard', verb: 'wall', chance: 0.7 },
-        { kind: 'hearth', verb: 'wall', chance: 0.5 },
-        { kind: 'portrait', verb: 'wall', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.5 }] },
   },
   {
     id: 'servery',
@@ -78,13 +53,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     next: ['kitchen', 'dining-room'],
     nextRule: 'all',
     terrain: {},
-    furnish: {
-      defining: { kind: 'shelves', verb: 'wall' },
-      pieces: [
-        { kind: 'cabinet', verb: 'wall', chance: 0.6 },
-        { kind: 'table', verb: 'centre', chance: 0.4 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'kitchen',
@@ -93,14 +62,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     apart: ['drawing-room', 'master-bedroom'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'range', verb: 'wall' },
-      pieces: [
-        { kind: 'work-table', verb: 'centre' },
-        { kind: 'dresser', verb: 'wall', chance: 0.7 },
-        { kind: 'sink', verb: 'wall', chance: 0.6 },
-      ],
-    },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall' }] },
   },
   {
     id: 'scullery',
@@ -110,14 +72,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     next: ['kitchen'],
     terrain: { features: ['flooded-cellar'], water: 'shallow' },
-    furnish: {
-      defining: { kind: 'sink', verb: 'wall' },
-      pieces: [
-        { kind: 'shelves', verb: 'wall', chance: 0.6 },
-        { kind: 'barrel', verb: 'corner', chance: 0.5 },
-        { kind: 'crate', verb: 'corner', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'servants-hall',
@@ -126,11 +81,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     near: ['kitchen'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'long-table', verb: 'rows' },
-      with: { kind: 'bench', verb: 'withParent', parent: 'long-table', count: [2, 2] },
-      pieces: [],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'wine-cellar',
@@ -139,10 +90,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'entrance',
     terrain: { features: ['flooded-cellar'], water: 'shallow' },
-    furnish: {
-      defining: { kind: 'barrel-rack', verb: 'rows' },
-      pieces: [{ kind: 'bottle-rack', verb: 'wall', chance: 0.7 }],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'laundry',
@@ -151,13 +99,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'entrance',
     terrain: { features: ['flooded-cellar'], water: 'shallow' },
-    furnish: {
-      defining: { kind: 'wash-tub', verb: 'centre', count: [1, 2] },
-      pieces: [
-        { kind: 'drying-line', verb: 'wall', chance: 0.7 },
-        { kind: 'table', verb: 'wall', chance: 0.4 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'library',
@@ -165,13 +107,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     size: 'medium',
     depth: 'middle',
     terrain: {},
-    furnish: {
-      defining: { kind: 'bookshelf', verb: 'wall', count: [2, 6] },
-      pieces: [
-        { kind: 'table', verb: 'centre', chance: 0.7 },
-        { kind: 'armchair', verb: 'corner', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'ballroom',
@@ -182,10 +118,9 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     terrain: { features: ['ballroom-gallery'], columns: true, allows: ['platform'] },
     furnish: {
-      defining: { kind: 'bust', verb: 'wall', count: [2, 6] },
       pieces: [
+        { kind: 'bust', verb: 'wall', count: [2, 6] },
         { kind: 'hearth', verb: 'wall', chance: 0.6 },
-        { kind: 'piano', verb: 'corner', chance: 0.5 },
       ],
     },
   },
@@ -196,10 +131,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     outerWall: true,
     terrain: { features: ['conservatory-pool'], water: 'pool', allows: ['pool', 'thicket'] },
-    furnish: {
-      defining: { kind: 'planter', verb: 'grid', count: [2, 6] },
-      pieces: [{ kind: 'fountain', verb: 'centre', chance: 0.5 }],
-    },
+    furnish: { pieces: [{ kind: 'fountain', verb: 'centre', chance: 0.5 }] },
   },
   ...MANSION_QUARTERS,
 ];

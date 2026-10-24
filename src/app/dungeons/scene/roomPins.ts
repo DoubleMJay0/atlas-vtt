@@ -37,7 +37,7 @@ function clearancesOf(visible: VisibleFloor, room: DungeonRoom): Clearances {
  * Where a room's pin stands: the middle of the free cell nearest the room's middle (in reading
  * order among equals). Free is off the stairwells and the rows they are reached from, the cells
  * before doors, every prop, column and piece of terrain, and dry. Where a small room has no such
- * cell, the nearest off stairs, furniture, columns and terrain no one walks on; then the nearest
+ * cell, the nearest off stairs, props, columns and terrain no one walks on; then the nearest
  * off stairs and that terrain; then its middle.
  */
 export function pinCell(visible: VisibleFloor, room: DungeonRoom): CellPoint {

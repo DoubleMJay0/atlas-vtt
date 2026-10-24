@@ -2,7 +2,7 @@
  * Undergrowth too thick to walk through freely, as terrain (difficult, never blocking): brambles,
  * thick ferns or tangled roots in some rooms of an overgrown dungeon, a clump of two to six whole
  * cells grown out from a wall, the more often the more light the room gets. Placed after the
- * water and before the furniture, which keeps off it. Never by a stairwell, a doorway or lava. In
+ * water and before the pieces, which keep off it. Never by a stairwell, a doorway or lava. In
  * a built theme's rooms (only in a ruin) it grows only where light or water comes in: by an outer
  * wall, under an opening in the floor above, by water.
  */

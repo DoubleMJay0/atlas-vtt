@@ -17,7 +17,7 @@ export interface GlyphPen {
   palette: Palette;
   /** The width of inner detail; the outline is the context's current line width. */
   fine: number;
-  /** What cloth is filled with (an altar's runner, a throne's cushion); the fill where unset. */
+  /** What cloth is filled with (a statue's drapery); the fill where unset. */
   cloth?: string;
   /** The painter's hand, for a part's texture (`hand.grain`); light it only through `art/glyphLight.ts`. */
   hand: Hand;

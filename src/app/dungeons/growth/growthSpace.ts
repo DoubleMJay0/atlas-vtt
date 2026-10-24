@@ -2,7 +2,7 @@
  * Where on a floor something may grow, cell by cell. Nothing grows in a doorway, on the cell
  * before a door (a climber may hide a secret one, which is wall as drawn), on a stairwell, the row it is reached from or beside them, in a hole or on a
  * bridge, or within two cells of lava or acid. Floor plants also keep off every piece of terrain,
- * furniture, columns and water; a climber only hangs over a wall's foot, so it may hang over low
+ * pieces, columns and water; a climber only hangs over a wall's foot, so it may hang over low
  * terrain there.
  */
 
@@ -22,7 +22,7 @@ export interface GrowthFloor {
 }
 
 /** Terrain a climber may hang over at a wall's foot: what lies on the floor, low and walked. */
-const UNDER_CLIMBERS: ReadonlySet<TerrainKind> = new Set(['shallow-water', 'rubble-field', 'broken-floor', 'brambles', 'thicket', 'tangled-roots', 'crates', 'rubble-heap', 'pews']);
+const UNDER_CLIMBERS: ReadonlySet<TerrainKind> = new Set(['shallow-water', 'rubble-field', 'broken-floor', 'brambles', 'thicket', 'tangled-roots', 'rubble-heap']);
 /** How far from lava or acid nothing grows, in cells. */
 const SCORCHED = 2;
 

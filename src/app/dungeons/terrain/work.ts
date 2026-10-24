@@ -23,6 +23,8 @@ export interface TerrainWork {
   nextLink: () => number;
   /** The terrain stream of a floor, split by `key`. */
   rng: (floor: number, key: string) => Rng;
+  /** The stream a floor's pieces (statues, fireplaces, formations) are placed from, split by `key`: its own, so the pieces drawn never move terrain. */
+  furnishRng: (floor: number, key: string) => Rng;
   /** A Cavern's geology: what each floor knows of its rooms, and its variant. */
   cave?: TerrainCave;
 }
@@ -50,5 +52,6 @@ export function terrainWork(seed: number, floors: readonly FloorTerrain[], stack
     empty: (floor, room) => typed.empty[floor]?.has(room) === true,
     nextLink: () => link++,
     rng: (floor, key) => floorStream(seed, 'terrain', floor, key),
+    furnishRng: (floor, key) => floorStream(seed, 'furnish', floor, key),
   };
 }

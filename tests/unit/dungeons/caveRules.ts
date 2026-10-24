@@ -4,6 +4,7 @@ import type { CellPoint, DungeonFloor, DungeonModel } from '../../../src/app/dun
 import { doorApproaches } from '../../../src/app/dungeons/floors/stairSpots';
 import { isAbove, stackOf } from '../../../src/app/dungeons/floors/floorStack';
 import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
+import { roomCellsOf, standsOffWays } from './coverInvariants';
 import { neighbours } from '../../../src/app/dungeons/roomGraph';
 import { stairApproaches, stairCells } from './terrainInvariants';
 
@@ -218,13 +219,13 @@ export function waterShare(floor: DungeonFloor): number {
 }
 
 const HOLLOWS = new Set(['lived-in-hollow', 'fire-hollow', 'pen', 'store-hollow']);
-const STORY_OBJECTS = new Set(['chest', 'lever', 'key', 'corpse']);
 
 /** Rule 8 of a lived-in cave: a guard post at its mouth, its chief's den at the end, hollows near the mouth and near water, a fire by every sleeping hollow; no story objects in any cave. */
 export function livedInProblems(model: DungeonModel): string[] {
   const sites = caveSites(model.floors);
   const all = model.floors.flatMap((f) => f.rooms);
-  const out: string[] = model.floors.flatMap((floor) => floor.props.filter((p) => STORY_OBJECTS.has(p.kind)).map((p) => `a ${p.kind} in a cave`));
+  // Fire pits and stones only: nothing that tells what a hollow is for.
+  const out: string[] = model.floors.flatMap((floor) => floor.props.filter((p) => !PROP_SPECS[p.kind].natural && p.kind !== 'campfire').map((p) => `a ${p.kind} in a cave`));
   const guarded = all.some((r) => r.type === 'guard-post');
   if (all.some((r) => r.type === 'cave-mouth') && (guarded || all.some((r) => r.type === 'chief-den' || HOLLOWS.has(r.type ?? '')))) out.push('a wild cave mouth in a lived-in cave');
   const boss = model.floors.at(-1)!.rooms.find((r) => r.boss);
@@ -236,8 +237,8 @@ export function livedInProblems(model: DungeonModel): string[] {
       if (!HOLLOWS.has(room.type ?? '')) continue;
       if ((site.hopsFromMouth[room.id] ?? Infinity) > 2 || !site.nearWater(room.id, 1)) out.push(`floor ${f}: a ${room.type} far from the mouth or from water`);
       const fireIn = (id: number): boolean => floor.props.some((p) => p.room === id && p.kind === 'campfire');
-      const sleepers = floor.props.some((p) => p.room === room.id && p.kind === 'bedroll');
-      if (room.type === 'lived-in-hollow' && sleepers && !fireIn(room.id) && !(near[room.id] ?? []).some(fireIn)) out.push(`floor ${f}: a sleeping hollow without a fire near it`);
+      // A hollow that is a crossing, every cell of it a way through, has no place for a fire.
+      if (room.type === 'lived-in-hollow' && !fireIn(room.id) && !(near[room.id] ?? []).some(fireIn) && standsOffWays(model, f, room, roomCellsOf(model, f, room))) out.push(`floor ${f}: a sleeping hollow without a fire near it`);
     }
   });
   return out;

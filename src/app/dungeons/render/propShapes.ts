@@ -5,7 +5,7 @@ import type { GlyphPen } from './glyphPen';
 import { PROP_GLYPHS } from './props/registry';
 
 /**
- * Atlas' own drawings of the furniture, one family in the grammar of `glyphPen.ts`: in cells
+ * Atlas' own drawings of the pieces, one family in the grammar of `glyphPen.ts`: in cells
  * around the piece's centre, its front towards −y (into the room; a back-wall or wall piece's back
  * is the wall, at +y). Stone is bevelled, wood shows its grain or bands, water lies in its basin.
  * Every kind has a drawing for each painter, kept by family in `props/registry.ts`.
@@ -20,7 +20,7 @@ export interface GlyphFit {
 /** One painter's drawing of a piece at its fit; the caller has moved, turned and scaled the context and set the ink and outline width. */
 export type GlyphDraw = (pen: GlyphPen, fit: GlyphFit) => void;
 
-/** One kind of furniture: what it is made of, how tall it stands, its outline and a drawing for each painter. */
+/** One kind of piece: what it is made of, how tall it stands, its outline and a drawing for each painter. */
 export interface PropGlyph {
   material: Material;
   /** About half its size, in its own cells: how far the light's modelling reaches across it. */

@@ -41,7 +41,6 @@ export interface DungeonParams {
   waterLevel: number | null;
   /** Chance of a pool in a room the architecture suits for one (wet and flooded dungeons). */
   poolChance: number;
-  tapestryChance: number;
   crackChance: number;
   shatteredChance: number;
   /** Floor cells per expected stone. */
@@ -128,8 +127,6 @@ export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
   const has = (tag: DungeonTag): boolean => set.has(tag);
   const [minRooms, maxRooms] = roomRange(has);
   const crumbling = has('crumbling');
-  let tapestryChance = 1 / 3;
-  if (crumbling || has('flooded')) tapestryChance /= 3;
   return {
     tags: set,
     minRooms,
@@ -147,7 +144,6 @@ export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
     secretReward: 0,
     waterLevel: waterLevel(has),
     poolChance: has('flooded') ? 0.35 : has('wet') ? 0.25 : 0,
-    tapestryChance,
     crackChance: crumbling ? 1 / 3 : 0.125,
     shatteredChance: crumbling ? 0.1 : 0.0125,
     rubbleArea: crumbling ? 2 : 4,

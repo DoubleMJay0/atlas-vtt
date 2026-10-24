@@ -235,6 +235,12 @@ export class RoomCells {
     return this.doorCells.has(cellKey(c.x + d.x, c.y + d.y));
   }
 
+  /** Whether the cell lies off every way through the room (its lanes, what they keep clear, a cave's main path), whatever stands there. */
+  offWays(c: CellPoint): boolean {
+    const key = cellKey(c.x, c.y);
+    return this.open.has(key) && !this.held.has(key) && !this.lane.has(key);
+  }
+
   /** Whether the cell is one every way through the room keeps: a stairwell, the row it is reached from, the cell before a door. */
   isKeptClear(c: CellPoint): boolean {
     return this.clear.has(cellKey(c.x, c.y));
@@ -243,11 +249,6 @@ export class RoomCells {
   /** Whether a piece already stands on the cell, walkable or not. */
   isTaken(c: CellPoint): boolean {
     return this.taken.has(cellKey(c.x, c.y));
-  }
-
-  /** Lets cells kept clear for a piece take what belongs to it (chairs in a table's ring). */
-  release(cells: readonly CellPoint[]): void {
-    for (const c of cells) this.held.delete(cellKey(c.x, c.y));
   }
 
   /** Whether every walkable floor cell, with `extra` blocked too, reaches every other. */

@@ -11,14 +11,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     near: ['library'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'desk', verb: 'wall' },
-      with: { kind: 'chair', verb: 'withParent', parent: 'desk' },
-      pieces: [
-        { kind: 'bookshelf', verb: 'wall', chance: 0.7 },
-        { kind: 'cabinet', verb: 'corner', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'master-bedroom',
@@ -30,15 +23,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'last',
     apart: ['kitchen'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'four-poster-bed', verb: 'wall' },
-      with: { kind: 'chest', verb: 'withParent', parent: 'four-poster-bed' },
-      pieces: [
-        { kind: 'wardrobe', verb: 'wall', chance: 0.8 },
-        { kind: 'dressing-table', verb: 'wall', chance: 0.6 },
-        { kind: 'hearth', verb: 'wall', chance: 0.6 },
-      ],
-    },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.6 }] },
   },
   {
     id: 'bedroom',
@@ -47,13 +32,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     depth: 'deep',
     floor: 'beyond',
     terrain: {},
-    furnish: {
-      defining: { kind: 'bed', verb: 'wall' },
-      pieces: [
-        { kind: 'wardrobe', verb: 'wall', chance: 0.6 },
-        { kind: 'washstand', verb: 'wall', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'nursery',
@@ -64,14 +43,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'beyond',
     near: ['master-bedroom'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'bed', verb: 'wall', count: [1, 2] },
-      pieces: [
-        { kind: 'chest', verb: 'corner', chance: 0.6 },
-        { kind: 'rocking-chair', verb: 'corner', chance: 0.6 },
-        { kind: 'dust-sheet', verb: 'centre', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'bathroom',
@@ -82,10 +54,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'beyond',
     next: ['bedroom', 'master-bedroom'],
     terrain: {},
-    furnish: {
-      defining: { kind: 'bathtub', verb: 'wall' },
-      pieces: [{ kind: 'washstand', verb: 'wall', chance: 0.6 }],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'attic-room',
@@ -94,13 +63,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'last',
     mayStandEmpty: true,
     terrain: {},
-    furnish: {
-      defining: { kind: 'cot', verb: 'wall', count: [1, 3] },
-      pieces: [
-        { kind: 'chest', verb: 'corner', chance: 0.6 },
-        { kind: 'dust-sheet', verb: 'centre', count: [1, 3], chance: 0.7 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'laboratory',
@@ -110,13 +73,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'beyond',
     terrain: { allows: ['mosaic'] },
-    furnish: {
-      defining: { kind: 'alembic-table', verb: 'centre' },
-      pieces: [
-        { kind: 'workbench', verb: 'wall', chance: 0.7 },
-        { kind: 'shelves', verb: 'wall', chance: 0.6 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'observatory',
@@ -126,10 +83,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'last',
     terrain: {},
-    furnish: {
-      defining: { kind: 'telescope', verb: 'centre' },
-      pieces: [{ kind: 'star-chart', verb: 'wall', chance: 0.7 }],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'portrait-gallery',
@@ -138,13 +92,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     depth: 'middle',
     degree: 'through',
     terrain: {},
-    furnish: {
-      defining: { kind: 'portrait', verb: 'wall', count: [3, 8] },
-      pieces: [
-        { kind: 'bust', verb: 'wall', count: [2, 4], chance: 0.5 },
-        { kind: 'bench', verb: 'wall', chance: 0.5 },
-      ],
-    },
+    furnish: { pieces: [{ kind: 'bust', verb: 'wall', count: [2, 4] }] },
   },
   {
     // The summoning circle is its mosaic (terrain); candle stands stand about it.
@@ -156,7 +104,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'last',
     terrain: { allows: ['mosaic', 'platform'] },
-    furnish: { pieces: [{ kind: 'candle-stand', verb: 'flank', count: [1, 2] }] },
+    furnish: { pieces: [] },
   },
   {
     id: 'landing',
@@ -164,13 +112,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     holdsStairs: true,
     mayStandEmpty: true,
     terrain: { features: ['light-well'], holes: ['gallery'] },
-    furnish: {
-      pieces: [
-        { kind: 'rug', verb: 'centre', chance: 0.4 },
-        { kind: 'portrait', verb: 'wall', chance: 0.4 },
-        { kind: 'side-table', verb: 'wall', chance: 0.3 },
-      ],
-    },
+    furnish: { pieces: [] },
   },
   {
     id: 'collapsed-room',

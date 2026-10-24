@@ -44,7 +44,7 @@ const UNDERDARK_MORE: ReadonlySet<RoomTypeId> = new Set<RoomTypeId>(['fungus-gro
 
 function withoutCalcite(recipe: FurnishRecipe): FurnishRecipe {
   const keep = (piece: Piece | undefined): piece is Piece => piece !== undefined && !CALCITE.has(piece.kind) && !(piece.parent && CALCITE.has(piece.parent));
-  return { ...(keep(recipe.defining) && { defining: recipe.defining }), ...(keep(recipe.with) && { with: recipe.with }), pieces: recipe.pieces.filter(keep) };
+  return { ...(keep(recipe.defining) && { defining: recipe.defining }), pieces: recipe.pieces.filter(keep) };
 }
 
 /** The Cavern's programme for its variant (`caveVariant`). */

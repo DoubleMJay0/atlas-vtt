@@ -5,9 +5,9 @@ import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { blockedCells, clearanceProblems, hasCover, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
 /**
- * Themed dungeons with every furniture kind offered, as they will be once every kind has its
+ * Themed dungeons with every kind of piece offered, as they will be once every kind has its
  * drawing: what the recipes place must keep every way through a floor open and every door and
- * stair approach clear, and chests stand only as storage.
+ * stair approach clear, and only structure that fixes no room's purpose stands in them.
  */
 vi.mock('../../../src/app/dungeons/drawnKinds', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../src/app/dungeons/drawnKinds')>();
@@ -16,10 +16,10 @@ vi.mock('../../../src/app/dungeons/drawnKinds', async (importOriginal) => {
 });
 
 const TAG_SETS: readonly string[][] = [[], ['small'], ['large'], ['secret', 'round'], ['crumbling', 'overgrown']];
-const BEDS = new Set(['bed', 'bunk', 'cot', 'four-poster-bed']);
-const STORAGE = new Set(['storeroom', 'attic-room', 'nursery']);
+/** What a built dungeon may hold: structure, never furniture. */
+const STRUCTURE = new Set(['dais', 'statue', 'bust', 'fountain', 'well', 'hearth']);
 
-describe.each(['fortress', 'mansion'] as const)('furnished %s dungeons', (theme) => {
+describe.each(['fortress', 'mansion'] as const)('%s dungeons with every piece drawn', (theme) => {
   const runs = Array.from({ length: 200 }, (_, k) => {
     const seed = (k + 1) * 6007;
     const tags = TAG_SETS[k % TAG_SETS.length] ?? [];
@@ -27,12 +27,13 @@ describe.each(['fortress', 'mansion'] as const)('furnished %s dungeons', (theme)
   });
   const failures = (check: (model: DungeonModel) => string[]): string[] => runs.flatMap((run) => check(run.model).map((p) => `seed ${run.seed} [${run.tags.join(',')}]: ${p}`)).slice(0, 10);
 
-  it('furnishes its rooms', () => {
-    const props = runs.reduce((sum, run) => sum + run.model.floors.reduce((s, f) => s + f.props.length, 0), 0);
-    expect(props / runs.length).toBeGreaterThan(10);
+  it('builds fireplaces into walls and holds only structure', () => {
+    const props = runs.flatMap((run) => run.model.floors.flatMap((f) => f.props));
+    expect(props.filter((p) => p.kind === 'hearth').length / runs.length).toBeGreaterThan(0.5);
+    expect([...new Set(props.map((p) => p.kind))].filter((kind) => !STRUCTURE.has(kind))).toEqual([]);
   });
 
-  it('keeps every way through, every door and stair approach clear of its furniture', () => {
+  it('keeps every way through, every door and stair approach clear of its pieces', () => {
     expect(failures((m) => m.floors.flatMap((floor, i) => [...routeProblems(floor), ...clearanceProblems(floor, i, stackOf(m)), ...stairClearanceProblems(floor, i, stackOf(m))].map((p) => `floor ${i}: ${p}`)))).toEqual([]);
   });
 
@@ -48,20 +49,9 @@ describe.each(['fortress', 'mansion'] as const)('furnished %s dungeons', (theme)
     expect(arenas.filter(({ floor, boss }) => blockedCells(floor, boss.id) > boss.w * boss.h * 0.4).map(({ boss }) => boss.id)).toEqual([]);
   });
 
-  it('gives the arena a set piece or a seat', () => {
-    const SET_PIECES = new Set(['statue', 'altar', 'portal-ring', 'pillar', 'mosaic']);
-    expect(arenaShare(({ floor, boss }) => floor.terrain.some((p) => p.room === boss.id && SET_PIECES.has(p.kind)) || floor.props.some((p) => p.room === boss.id))).toBeGreaterThan(0.9);
-  });
-
-  it('seats a throne only in a throne room', () => {
-    expect(failures((m) => m.floors.flatMap((floor) => floor.props.filter((p) => p.kind === 'throne' && floor.rooms[p.room]?.type !== 'throne-room').map(() => 'a throne outside a throne room')))).toEqual([]);
-  });
-
-  it('puts a chest only at a bed\'s foot or in a storeroom', () => {
-    expect(failures((m) => m.floors.flatMap((floor) => floor.props.filter((p) => p.kind === 'chest').flatMap((chest) => {
-      const type = floor.rooms[chest.room]?.type ?? '';
-      const byBed = floor.props.some((p) => p.room === chest.room && BEDS.has(p.kind) && Math.hypot(p.x - chest.x, p.y - chest.y) <= 1.8);
-      return STORAGE.has(type) || byBed ? [] : [`a chest in a ${type}`];
-    })))).toEqual([]);
+  it('gives the arena a set piece', () => {
+    const SET_PIECES = new Set(['statue', 'portal-ring', 'pillar', 'mosaic']);
+    // Measured 0.90 (Fortress) once nothing is seated on the platform: a hall's arena takes pillars only, where they fit.
+    expect(arenaShare(({ floor, boss }) => floor.terrain.some((p) => p.room === boss.id && SET_PIECES.has(p.kind)) || floor.props.some((p) => p.room === boss.id))).toBeGreaterThan(0.85);
   });
 });

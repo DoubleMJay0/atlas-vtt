@@ -1,5 +1,5 @@
 /**
- * What a ruin keeps of a room's furniture: the defining piece always (or the room would no longer
+ * What a ruin keeps of a room's pieces: the defining piece always (or the room would no longer
  * read as what it was), of the rest a share of 40 to 70 percent drawn per room.
  */
 

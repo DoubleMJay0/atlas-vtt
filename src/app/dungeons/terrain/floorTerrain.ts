@@ -1,7 +1,8 @@
 /**
- * One floor's terrain while it is being placed: each room's cells (`RoomCells`), the pieces
- * placed so far and the furniture placed on whole cells with them. A piece goes in only where its room allows it (free cells, the room still whole);
- * pieces decided across floors (a hole and the floor under it) are held first and added as they are.
+ * One floor's terrain while it is being placed: each room's cells (`RoomCells`), the pieces of
+ * terrain placed so far and the props placed on whole cells after them. A piece goes in only where
+ * its room allows it (free cells, the room still whole); pieces decided across floors (a hole and
+ * the floor under it) are held first and added as they are.
  */
 
 import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
@@ -25,10 +26,12 @@ export interface FloorPlan {
 
 export class FloorTerrain {
   readonly pieces: DungeonTerrain[] = [];
-  /** Furniture placed on whole cells with the terrain (the recipes of typed rooms). */
+  /** Pieces placed on whole cells after the terrain (the recipes of typed rooms). */
   readonly props: DungeonProp[] = [];
-  /** The cells that furniture stands on, by key. */
+  /** The cells that pieces stand on, by key. */
   private readonly furnished = new Set<string>();
+  /** The rooms' pieces, placed once the floor's water and undergrowth lie. */
+  private readonly pieceJobs: (() => void)[] = [];
   private readonly cells = new Map<number, RoomCells>();
   /** A Cavern floor's lane, by key. */
   readonly lane: ReadonlySet<string>;
@@ -80,15 +83,25 @@ export class FloorTerrain {
     return this.push(piece);
   }
 
-  /** Adds furniture whose cells (`cells`) its room has taken. */
+  /** Adds a piece whose cells (`cells`) its room has taken. */
   addProp(prop: DungeonProp, cells: readonly CellPoint[] = []): void {
     this.props.push(prop);
     for (const c of cells) this.furnished.add(cellKey(c.x, c.y));
   }
 
-  /** Every cell furniture stands on, by key: water keeps dry under it. */
+  /** Every cell a piece stands on, by key. */
   propCells(): Set<string> {
     return new Set(this.furnished);
+  }
+
+  /** Holds the placing of a room's pieces until the floor's water and undergrowth lie (`placePieces`), so no terrain waits on a piece. */
+  deferPieces(place: () => void): void {
+    this.pieceJobs.push(place);
+  }
+
+  /** Places every room's pieces, in the order their rooms were laid out: once, after the floor's water and undergrowth. */
+  placePieces(): void {
+    for (const place of this.pieceJobs.splice(0)) place();
   }
 
   /** Every cell any piece fills, by key. */

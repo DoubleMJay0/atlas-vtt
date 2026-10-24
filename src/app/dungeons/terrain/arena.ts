@@ -1,8 +1,8 @@
 /**
  * The boss room as an arena (Terrain principles 1, 5, 6): open, with few strong features. The high
- * ground at the far side (a platform, 10 ft where the room is deep), one objective set piece the
- * GM can use beyond hit points (three statues, a central altar, a ring of standing stones, or four
- * pillars), wide cover that breaks the sight line from the door to the platform, and a hazard
+ * ground at the far side (a platform, 10 ft where the room is deep, with nothing standing on it),
+ * one objective set piece the GM can use beyond hit points (three statues, a ring of standing
+ * stones, or four pillars), wide cover that breaks the sight line from the door to the platform, and a hazard
  * where it fits (a channel before the platform, bridged; or pits flanking the floor). It stays
  * open: pieces that cannot be walked never take more than a third of its floor.
  */
@@ -48,10 +48,6 @@ function setPiece(floor: FloorTerrain, rc: RoomCells, rng: Rng, choice: ArenaSet
       if (!rc.allows(spots.flat(), 'block')) return false;
       spots.forEach((cells) => floor.place(draft('statue', room, cells, { facing: dir(cells[0]!.x - rc.cell(midI + 1, midJ).x, cells[0]!.y - rc.cell(midI + 1, midJ).y) })));
       return true;
-    }
-    case 'altar': {
-      const cells = rc.width % 2 === 1 ? rc.block(midI, midJ, 2, 1) : rc.block(midI, midJ, 1, 2);
-      return roomy(rc, cells.length) && floor.place(draft('altar', room, cells, { facing })) !== null;
     }
     case 'ring': {
       const size = rc.width >= 10 && open >= 8 ? 3 : 2;
@@ -126,7 +122,6 @@ export function arenaSeeds(room: DungeonRoom): CellPoint[] {
 
 const DEFAULT_SET_PIECES: readonly (readonly [ArenaSetPiece, number])[] = [
   ['statues', 3],
-  ['altar', 1.5],
   ['ring', 2],
   ['pillars', 2],
 ];

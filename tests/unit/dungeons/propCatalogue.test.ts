@@ -12,7 +12,7 @@ import { floorStack } from '../../../src/app/dungeons/floors/floorStack';
 
 const NATURAL = ['stalagmites', 'column-formation', 'flowstone', 'curtain', 'crystals', 'mushrooms', 'boulder'];
 
-describe('furniture catalogue', () => {
+describe('the catalogue of pieces', () => {
   it('has a spec for every kind and a kind for every spec', () => {
     expect(Object.keys(PROP_SPECS).sort()).toEqual([...PROP_KINDS].sort());
     expect(ALL_PROP_KINDS.size).toBe(PROP_KINDS.length);
@@ -31,15 +31,16 @@ describe('furniture catalogue', () => {
   });
 
   it('matches the catalogue table', () => {
-    expect(PROP_SPECS['four-poster-bed']).toMatchObject({ footprint: { along: 2, out: 2 }, wall: 'head', clear: 'sides', cover: 'half', footing: 'block' });
-    expect(PROP_SPECS['long-table'].stretch).toBe(6);
-    expect(PROP_SPECS.wardrobe.cover).toBe('total');
-    expect(PROP_SPECS.chair.footprint).toEqual({ reach: 0.22 });
-    expect(PROP_SPECS.portrait.wallPiece).toBe(true);
-    expect(isCellPiece(PROP_SPECS.bed)).toBe(true);
-    expect(isCellPiece(PROP_SPECS.barrel)).toBe(false);
-    expect(propReach('barrel')).toBe(0.27);
-    expect(propReach('bed')).toBe(0.5);
+    expect(PROP_SPECS.hearth).toMatchObject({ footprint: { along: 2, out: 1 }, wall: 'back', clear: 'front', footing: 'block' });
+    expect(PROP_SPECS.hearth.cover).toBeUndefined();
+    expect(PROP_SPECS.flowstone.stretch).toBe(3);
+    expect(PROP_SPECS.statue.cover).toBe('total');
+    expect(PROP_SPECS.bust).toMatchObject({ footprint: { reach: 0.2 }, wall: 'back', cover: 'half' });
+    expect(PROP_SPECS.curtain.wallPiece).toBe(true);
+    expect(isCellPiece(PROP_SPECS.campfire)).toBe(true);
+    expect(isCellPiece(PROP_SPECS.well)).toBe(false);
+    expect(propReach('well')).toBe(0.42);
+    expect(propReach('boulder')).toBe(0.5);
   });
 
   it('names every kind in English', () => {
@@ -67,8 +68,8 @@ describe('drawn kinds', () => {
 
   it('places no terrain kind it is not offered', () => {
     const room: DungeonRoom = { id: 0, x: 0, y: 0, w: 6, h: 6, kind: 'room', rotunda: false, wing: 'regular', group: 0, parent: null, axis: { x: 0, y: 1 }, colonnade: false, boss: false };
-    const floor = new FloorTerrain(0, { rooms: [room], doors: [], stairs: [], columns: [], offeredTerrain: new Set(['crates']) }, floorStack('down', 1));
+    const floor = new FloorTerrain(0, { rooms: [room], doors: [], stairs: [], columns: [], offeredTerrain: new Set(['rubble-heap']) }, floorStack('down', 1));
     expect(floor.place(draft('rubble-field', 0, [{ x: 2, y: 2 }]))).toBeNull();
-    expect(floor.place(draft('crates', 0, [{ x: 3, y: 3 }]))).toBeTypeOf('number');
+    expect(floor.place(draft('rubble-heap', 0, [{ x: 3, y: 3 }]))).toBeTypeOf('number');
   });
 });

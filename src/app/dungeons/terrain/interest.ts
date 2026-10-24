@@ -18,7 +18,7 @@ function negate(d: CellDir): CellDir {
   return dir(-d.x, -d.y);
 }
 
-export type InterestKind = Extract<TerrainKind, 'mosaic' | 'obelisk' | 'pool' | 'statue' | 'altar'>;
+export type InterestKind = Extract<TerrainKind, 'mosaic' | 'obelisk' | 'pool' | 'statue'>;
 
 function weightsOf(tags: ReadonlySet<DungeonTag>): (readonly [InterestKind, number])[] {
   return [
@@ -59,10 +59,8 @@ export function placeInterest(floor: FloorTerrain, rc: RoomCells, rng: Rng, kind
       const [i, j] = middle(rc, 1);
       return at(floor, rc, 'obelisk', i, j, 1, facing);
     }
-    case 'statue':
-    case 'altar': {
-      const j = Math.floor((rc.width - (kind === 'altar' ? 2 : 1)) / 2);
-      const cells = rc.block(rc.depth - 1, j, 1, kind === 'altar' ? 2 : 1);
+    case 'statue': {
+      const cells = rc.block(rc.depth - 1, Math.floor((rc.width - 1) / 2), 1, 1);
       return standsApart(rc, cells, floor.takenCells()) && floor.place(draft(kind, rc.room.id, cells, { facing })) !== null;
     }
   }

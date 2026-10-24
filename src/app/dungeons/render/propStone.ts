@@ -1,5 +1,5 @@
 import type { PropKind } from '../model';
-import { bevel, block, bothPainters, circlePath, disc, fineLines, fineRing, inkDot, polygonPath, roundedRect, strokeFine, type GlyphPen } from './glyphPen';
+import { bevel, block, bothPainters, circlePath, disc, fineLines, inkDot, polygonPath, roundedRect, strokeFine, type GlyphPen } from './glyphPen';
 import type { PropGlyph } from './propShapes';
 
 /** The props of stone and water, in the glyph family's grammar (`glyphPen.ts`). */
@@ -11,8 +11,6 @@ const WELL = { outer: WELL_RADIUS, inner: 0.25 };
 /** The side of a statue's plinth at scale 1, which its lighting outline (`tall`) keeps to. */
 export const STATUE_PLINTH = 0.6;
 const PLINTH = STATUE_PLINTH;
-const SARCOPHAGUS = { w: 0.52, h: 0.94 };
-const ALTAR = { w: 0.86, h: 0.44 };
 const DAIS = { half: 1.5, depth: 1.35, chamfer: 0.32, step: 0.24 };
 
 function octagon(r: number): number[] {
@@ -58,28 +56,6 @@ function openStep(pen: GlyphPen, points: readonly number[], fine: boolean): void
   if (fine) strokeFine(pen);
   else ctx.stroke();
 }
-
-/** The sword carved on a sarcophagus' lid, its hilt towards the front. */
-function effigySword(pen: GlyphPen): void {
-  const { ctx } = pen;
-  const hilt = -0.29;
-  const guard = -0.2;
-  const tip = 0.31;
-  const blade = 0.035;
-  ctx.beginPath();
-  ctx.moveTo(-blade, guard);
-  ctx.lineTo(-blade, tip - 0.07);
-  ctx.lineTo(0, tip);
-  ctx.lineTo(blade, tip - 0.07);
-  ctx.lineTo(blade, guard);
-  ctx.moveTo(-0.11, guard);
-  ctx.lineTo(0.11, guard);
-  ctx.moveTo(0, guard);
-  ctx.lineTo(0, hilt);
-  strokeFine(pen);
-  inkDot(pen, 0, hilt - 0.02, 0.03);
-}
-
 
 /** What is cut from stone, bevelled, and the water some of it holds. */
 export const STONE_AND_WATER = {
@@ -153,41 +129,6 @@ export const STONE_AND_WATER = {
       block(pen, 0, 0, PLINTH, PLINTH);
       bevel(pen, 0, 0, PLINTH, PLINTH);
       drawStatueFigure(pen);
-    }),
-  },
-  sarcophagus: {
-    material: 'stone',
-    radius: 0.48,
-    lift: 0.45,
-    silhouette: path => roundedRect(path, 0, 0, SARCOPHAGUS.w, SARCOPHAGUS.h),
-    ...bothPainters(pen => {
-      block(pen, 0, 0, SARCOPHAGUS.w, SARCOPHAGUS.h);
-      bevel(pen, 0, 0, SARCOPHAGUS.w, SARCOPHAGUS.h, 0.085);
-      effigySword(pen);
-    }),
-  },
-  altar: {
-    material: 'stone',
-    radius: 0.44,
-    lift: 0.5,
-    silhouette: path => roundedRect(path, 0, 0, ALTAR.w, ALTAR.h),
-    ...bothPainters(pen => {
-      const { ctx, palette } = pen;
-      block(pen, 0, 0, ALTAR.w, ALTAR.h);
-      bevel(pen, 0, 0, ALTAR.w, ALTAR.h);
-      // A cloth laid across it, hanging over front and back.
-      const cloth = 0.11;
-      const over = ALTAR.h / 2 + 0.05;
-      ctx.beginPath();
-      ctx.rect(-cloth, -over, cloth * 2, over * 2);
-      ctx.fillStyle = pen.cloth ?? palette.fill;
-      ctx.fill();
-      strokeFine(pen);
-      const candle = ALTAR.w / 2 - 0.15;
-      for (const x of [-candle, candle]) {
-        fineRing(pen, x, 0, 0.06);
-        inkDot(pen, x, 0, 0.028);
-      }
     }),
   },
   dais: {

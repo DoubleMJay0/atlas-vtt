@@ -1,9 +1,9 @@
 /**
  * The free floor of a room as furnishing sees it: what is already there (columns, props placed so
  * far) and what must stay clear (the cells before its doors, a stairwell and the row it is reached
- * from, the cells furniture already stands on). A disc of a prop is placed below a cell; a cell
- * piece takes whole cells (`occupyCells`); a tapestry hangs on its wall and needs only that. A room
- * that is no rectangle (a cave's chamber) names its floor cells (`cells`).
+ * from, the cells pieces already stand on). A disc is placed below a cell; a cell piece takes whole
+ * cells (`occupyCells`); a wall piece hangs on its wall and needs only that. A room that is no
+ * rectangle (a cave's chamber) names its floor cells (`cells`).
  */
 
 import type { CellPoint, DungeonColumn } from '../model';
@@ -42,31 +42,6 @@ function onRoomFloor(space: RoomSpace, p: CellPoint, margin: number): boolean {
   if (!cells) return true;
   for (const dx of [-margin, margin]) for (const dy of [-margin, margin]) if (!cells.has(`${Math.floor(p.x + dx)},${Math.floor(p.y + dy)}`)) return false;
   return true;
-}
-
-/** A place half a cell inside the floor's edge, with the unit normal pointing into the floor. */
-export interface EdgeSpot {
-  point: CellPoint;
-  inward: CellPoint;
-}
-
-/** Places `step` apart along every edge of the floor (its rectangle, or the boundary of its cells), half a cell inside it. */
-export function edgeSpots(space: RoomSpace, step: number): EdgeSpot[] {
-  const { room } = space.frame;
-  const cells = space.cells ?? new Set(Array.from({ length: room.w * room.h }, (_, k) => `${room.x + (k % room.w)},${room.y + Math.floor(k / room.w)}`));
-  const out: EdgeSpot[] = [];
-  const count = Math.max(1, Math.round(1 / step));
-  for (const key of cells) {
-    const [x, y] = key.split(',').map(Number) as [number, number];
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      if (cells.has(`${x + dx},${y + dy}`)) continue;
-      for (let k = 0; k < count; k++) {
-        const t = (k + 0.5) / count - 0.5;
-        out.push({ point: { x: x + 0.5 + dy * t, y: y + 0.5 + dx * t }, inward: { x: -dx, y: -dy } });
-      }
-    }
-  }
-  return out;
 }
 
 /** Whether a disc of `radius` around `p` overlaps the cell (x, y). */

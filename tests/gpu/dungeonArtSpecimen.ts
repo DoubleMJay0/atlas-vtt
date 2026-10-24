@@ -32,7 +32,6 @@ function upper(): DungeonFloor {
   addDoor(f, -1, 5, { x: 1, y: 0 }, 'opening', null, 0);
   addDoor(f, 22, 2, { x: 1, y: 0 }, 'door', 0, 1);
   addDoor(f, 22, 8, { x: 1, y: 0 }, 'steps', 0, 1).descends = true;
-  place(f, 'pews', 0, box(1, 1, 3, 1));
   place(f, 'rubble-field', 0, box(5, 1, 2, 2));
   place(f, 'broken-floor', 0, box(8, 1, 2, 1));
   place(f, 'mosaic', 0, box(11, 1, 2, 2));
@@ -44,10 +43,6 @@ function upper(): DungeonFloor {
   const lava = place(f, 'channel', 0, box(9, 4, 1, 4), { traits: { hazard: 'lava' } });
   place(f, 'bridge', 0, box(9, 5), { facing: { x: 1, y: 0 }, spans: lava.id });
   place(f, 'low-wall', 0, box(11, 4, 3, 1));
-  place(f, 'crates', 0, box(15, 4));
-  place(f, 'table', 0, box(17, 4, 2, 1));
-  place(f, 'altar', 0, box(15, 6, 2, 1));
-  place(f, 'sarcophagus', 0, box(18, 6, 1, 2));
   place(f, 'rubble-heap', 0, box(1, 9));
   place(f, 'pillar', 0, box(3, 9));
   place(f, 'pillar', 0, box(5, 8, 2, 2));
@@ -74,16 +69,9 @@ function upper(): DungeonFloor {
 function props(): DungeonProp[] {
   const at = (kind: PropKind, x: number, y: number, rotation = 0, scale = 1): DungeonProp => ({ kind, x, y, rotation, scale, room: 1 });
   return [
-    at('barrel', 23.5, 1.5),
-    at('crate', 24.5, 1.5),
-    at('chest', 26, 1.6),
-    at('tapestry', 27.5, 0.1, Math.PI),
     at('fountain', 24.6, 4),
     at('well', 27, 4),
     at('statue', 24.5, 6.6),
-    at('sarcophagus', 27, 6.8, Math.PI / 2),
-    at('altar', 24.6, 9),
-    at('throne', 27.2, 9),
     at('dais', 26, 13),
   ];
 }

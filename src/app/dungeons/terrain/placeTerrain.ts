@@ -4,7 +4,8 @@
  * over a gate passage (they open the floor above) and the light wells of landings, then each floor
  * from the top of the stack down: the arena and the five-room stages, a shaft now and then, the
  * hazards of rooms whose type has a reason for one, then each room by its type's recipe. The rooms
- * that stand empty stay empty but for what passes through them (a hole, the floor under one).
+ * that stand empty hold nothing of their own but cover, and what passes through them (a hole, the
+ * floor under one).
  */
 
 import type { CellPoint, DungeonRoom, DungeonTerrain } from '../model';
@@ -28,9 +29,9 @@ import { lightWells } from './wells';
 import { type TerrainCave, type TerrainWork, terrainWork } from './work';
 
 export interface TerrainFloorInput extends FloorPlan {
-  /** Normal rooms left without furniture. */
+  /** Normal rooms that hold nothing of their type's: no pieces, no terrain of its own, only cover. */
   empty: ReadonlySet<number>;
-  /** The rooms the theme typed, furnished by their recipes. */
+  /** The rooms the theme typed, built by their types. */
   types?: ReadonlyMap<number, TypedRoom>;
 }
 
@@ -67,15 +68,15 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
   }
   if (work.cave) for (const room of rooms) caveGround(work, k, room.id, 'breakdown');
   for (const room of rooms) {
-    if (room.boss || room.stage || input.empty.has(room.id)) continue;
+    if (room.boss || room.stage) continue;
     const typed = types.get(room.id);
     const rc = work.floors[k]?.room(room.id);
-    if (typed && rc) furnishTypedRoom(work, k, rc, typed.spec, typed.context, hazarded.has(room.id));
+    if (typed && rc) furnishTypedRoom(work, k, rc, typed, { hazarded: hazarded.has(room.id), empty: input.empty.has(room.id) });
   }
   if (work.cave) for (const room of rooms) caveGround(work, k, room.id, 'textures');
 }
 
-/** A cave room's breakdown (before its furniture, which keeps off it), or its floor's textures (after). */
+/** A cave room's breakdown (before its cover) or its floor's textures (after it); both before its pieces, which keep off them. */
 function caveGround(work: TerrainWork, k: number, room: number, what: 'breakdown' | 'textures'): void {
   const rc = work.floors[k]?.room(room);
   if (!rc) return;

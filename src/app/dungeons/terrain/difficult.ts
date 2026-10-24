@@ -1,31 +1,15 @@
 /**
- * Difficult ground that shapes a fight (Map-Fu): rows of pews in a temple's hall with an aisle
- * down the middle, fields of loose rubble where the dungeon crumbles (big chunks are cover, loose
- * scatter is difficult), broken floor where the ground has shifted. All of it can be walked.
+ * Difficult ground that shapes a fight (Map-Fu): fields of loose rubble where the dungeon crumbles
+ * (big chunks are cover, loose scatter is difficult), broken floor where the ground has shifted.
+ * All of it can be walked.
  */
 
-import type { CellPoint } from '../model';
 import { type Rng, int } from '../rng';
 import { draft } from './catalog';
 import { CRAMPED_AREA } from './cover';
 import type { FloorTerrain } from './floorTerrain';
 import type { RoomCells } from './roomCells';
 import { grownBlob } from './shapes';
-
-/** Pews across the room every other row from the second, an aisle down the middle. */
-export function pews(floor: FloorTerrain, rc: RoomCells): boolean {
-  if (rc.depth < 5 || rc.width < 5) return false;
-  const aisle = new Set([Math.floor((rc.width - 1) / 2), Math.ceil((rc.width - 1) / 2)]);
-  const cells: CellPoint[] = [];
-  for (let i = 1; i < rc.depth - 2; i += 2) {
-    for (let j = 1; j < rc.width - 1; j++) {
-      const c = rc.cell(i, j);
-      if (!aisle.has(j) && rc.isFree(c)) cells.push(c);
-    }
-  }
-  if (cells.length < 4) return false;
-  return floor.place(draft('pews', rc.room.id, cells)) !== null;
-}
 
 /** A field of loose rubble or broken floor, three to six cells grown from a free cell. */
 export function roughGround(floor: FloorTerrain, rc: RoomCells, rng: Rng, kind: 'rubble-field' | 'broken-floor'): boolean {

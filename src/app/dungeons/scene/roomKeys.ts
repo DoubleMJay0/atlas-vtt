@@ -1,15 +1,14 @@
-import { type MessageKey, t } from '../../i18n';
+import { t } from '../../i18n';
 import type { DungeonRoom } from '../model';
 import { hops, neighbours } from '../roomGraph';
 import type { VisibleFloor } from '../render/visibleDungeon';
-import { roomTypeKey } from '../themes/roomTypes';
 
 /** A room of a floor as its note and its pin name it. */
 export interface KeyedRoom {
   room: DungeonRoom;
   /** "A1" on a dungeon of several floors, "1" on one of one. */
   key: string;
-  /** The note's heading for the room: its key, what it was built for, and what it is where it is something (a five-room stage, the boss room). */
+  /** The note's heading for the room: its key, and what it is where it is something (a five-room stage, the boss room). */
   heading: string;
 }
 
@@ -24,18 +23,10 @@ function roleOf(room: DungeonRoom): string | null {
   return room.boss ? t('dungeonScene.bossRoom') : null;
 }
 
-/** The name of what a room was built for, where the theme typed it. */
-export function roomTypeName(room: DungeonRoom): string | null {
-  return room.type ? t(`dungeonRoom.${roomTypeKey(room.type)}` as MessageKey) : null;
-}
-
-/** A room's heading: its key, what it was built for and what it is in the dungeon's shape, where it is either. */
+/** A room's heading: its key, and what it is in the dungeon's shape where it is something; never what it was built for. */
 function headingOf(room: DungeonRoom, key: string): string {
   const role = roleOf(room);
-  const type = roomTypeName(room);
-  if (type && role) return t('dungeonScene.headingWithRole', { key, type, role });
-  const named = type ?? role;
-  return named ? t('dungeonScene.heading', { key, role: named }) : key;
+  return role ? t('dungeonScene.heading', { key, role }) : key;
 }
 
 /**

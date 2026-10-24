@@ -19,14 +19,13 @@ const FAMILY_KINDS = import.meta.glob<{ KINDS: readonly PropKind[] }>('../../../
 const FAMILY_GLYPHS = import.meta.glob<{ GLYPHS: FamilyGlyphs }>('../../../src/app/dungeons/render/props/*/index.ts', { eager: true });
 
 /**
- * The specimen's SVG in each look before the registry: `VITE_GLYPH_RECORD=print` prints them anew.
- * Recorded again on the merge of the Cavern (43200c5a3), whose SVG recorder groups runs of paths
- * under one clip, before the registry was merged into it.
+ * The specimen's SVG in each look: `VITE_GLYPH_RECORD=print` prints them anew. Recorded again when
+ * the furniture left the generator and its specimen (structure only, 2026-10-24).
  */
 const RECORDED: Record<string, string> = {
-  night: '7e55fd44816c293d51f5945eb95a1df7eb2f1e9c83e908ee5644d920f4c3242d',
-  parchment: '3d969cf6c30089765e93598f14ef91c7f02f74ae568f57b693d864eb763505c8',
-  print: '653ac5b43ecde23011bc764873f0b21f1033bd2bae6e45a4a635e9b70f29c4be',
+  night: '61dc23594fc0e9bf3d85e684c2a0da596ad7683af4a11fdac0b789ac8a6a2d12',
+  parchment: 'c3008c327fbd9a643a6d116e400566cedb9d1b03ce569b2032c16daa8e43ec03',
+  print: '0b70fdf1e7524e9d321aabbd3f4198576a0377e584a9d3ae907ae2932bc21002',
 };
 
 const LOOKS: readonly DungeonStyleId[] = ['parchment', 'print', 'night'];
@@ -46,8 +45,8 @@ describe('the glyph registry', () => {
     }
   });
 
-  it('holds ten families, each registering exactly the kinds it lists', () => {
-    expect(Object.keys(FAMILY_KINDS)).toHaveLength(10);
+  it('holds four families, each registering exactly the kinds it lists', () => {
+    expect(Object.keys(FAMILY_KINDS)).toHaveLength(4);
     for (const [path, { KINDS }] of Object.entries(FAMILY_KINDS)) {
       const glyphs = FAMILY_GLYPHS[path.replace(/kinds\.ts$/, 'index.ts')]!.GLYPHS;
       expect(Object.keys(glyphs).sort(), path).toEqual([...KINDS].sort());
@@ -63,7 +62,7 @@ describe('the glyph registry', () => {
   it("keeps the statue's and the well's lighting outlines", () => {
     expect(propTall('statue')).toEqual({ halfW: STATUE_PLINTH / 2, halfH: STATUE_PLINTH / 2, round: false });
     expect(propTall('well')).toEqual({ halfW: WELL_RADIUS, halfH: WELL_RADIUS, round: true });
-    expect(propTall('barrel')).toBeUndefined();
+    expect(propTall('dais')).toBeUndefined();
   });
 
   it('draws a stretched piece to its fit, not its scale', () => {
@@ -78,7 +77,7 @@ describe('the glyph registry', () => {
     const drawn = (along: number): { length: number; widths: string[] } => {
       const ctx = new SvgCanvas(400, 400);
       const { hand, calls } = recordingHand(ctx as unknown as CanvasRenderingContext2D, () => 0);
-      const prop: DungeonProp = { kind: 'long-table', x: 5, y: 5, rotation: 0, scale: 1, room: 0, size: { along, out: 1 } };
+      const prop: DungeonProp = { kind: 'hearth', x: 5, y: 5, rotation: 0, scale: 1, room: 0, size: { along, out: 1 } };
       drawGlyph(hand, { ...prop, fit: glyphFit(prop) }, glyph, '#88aacc', '#aa3333');
       const box = pathBounds(calls.find(c => c.kind === 'grain')!.path!)!;
       return { length: box.maxX - box.minX, widths: [...ctx.toSvg().matchAll(/stroke-width="([^"]+)"/g)].map(m => m[1]!) };
@@ -88,11 +87,11 @@ describe('the glyph registry', () => {
     expect(short.length).toBeCloseTo(3, 6);
     expect(long.length).toBeCloseTo(6, 6);
     expect(long.widths).toEqual(short.widths);
-    expect(glyphFit({ kind: 'long-table', scale: 1 })).toEqual({ along: 3, out: 1 });
-    expect(glyphFit({ kind: 'chair', scale: 1 })).toEqual({ along: 0.44, out: 0.44 });
+    expect(glyphFit({ kind: 'hearth', scale: 1 })).toEqual({ along: 2, out: 1 });
+    expect(glyphFit({ kind: 'bust', scale: 1 })).toEqual({ along: 0.4, out: 0.4 });
   });
 
-  it('draws the eleven old props as before', () => {
+  it('draws the first props that stay as before', () => {
     const hashes = Object.fromEntries(LOOKS.map(look => [look, svgHash(look)]));
     if (process.env.VITE_GLYPH_RECORD === 'print') console.log(JSON.stringify(hashes, null, 2));
     expect(hashes).toEqual(RECORDED);

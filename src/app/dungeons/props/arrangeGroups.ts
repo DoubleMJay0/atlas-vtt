@@ -1,7 +1,7 @@
 /**
- * Furniture placed by what else stands in the room: a mirrored pair either side of a piece, the
- * inner door or the room's middle; pieces around a parent (chairs round a table, a chest at a
- * bed's foot); pieces on a grid; pieces on the shore of the room's liquid.
+ * Pieces placed by what else stands in the room: a mirrored pair either side of a piece, the inner
+ * door or the room's middle; pieces beside a parent (a column among stalagmites); pieces on a grid;
+ * pieces on the shore of the room's liquid.
  */
 
 import { cellKey, dir, perpendicular } from '../geometry';
@@ -61,24 +61,21 @@ export function flanking(fs: FurnishSpace, kind: PropKind, of: PlacedPiece | 'do
   return second ? [first, second] : [first];
 }
 
-/**
- * Up to `count` of `kind` round `parent`: at its foot first where it lies head to a wall (a
- * chest at a bed's foot), then in the cells its clear side keeps, each facing the parent.
- */
-export function aroundParent(fs: FurnishSpace, kind: PropKind, parent: PlacedPiece, count: number): DungeonProp[] {
+/** Up to `count` of `kind` on free cells beside `parent`, each facing away from it. */
+export function besideParent(fs: FurnishSpace, kind: PropKind, parent: PlacedPiece, count: number): DungeonProp[] {
   const own = new Set(parent.cells.map((c) => cellKey(c.x, c.y)));
-  const foot = PROP_SPECS[parent.prop.kind].wall === 'head' ? parent.cells.map((c) => ({ x: c.x + parent.facing.x, y: c.y + parent.facing.y })).filter((c) => !own.has(cellKey(c.x, c.y))) : [];
+  const beside = new Map<string, { cell: CellPoint; away: CellDir }>();
+  for (const c of parent.cells) {
+    for (const d of STEPS) {
+      const next = { x: c.x + d.x, y: c.y + d.y };
+      if (!own.has(cellKey(next.x, next.y))) beside.set(cellKey(next.x, next.y), { cell: next, away: d });
+    }
+  }
   const out: DungeonProp[] = [];
-  for (const cell of [...foot, ...shuffled(fs.rng, parent.clear)]) {
+  for (const { cell, away } of shuffled(fs.rng, [...beside.values()])) {
     if (out.length >= count) break;
-    const towards = STEPS.find((d) => own.has(cellKey(cell.x + d.x, cell.y + d.y))) ?? parent.facing;
-    fs.cells.release([cell]);
-    // A disc leans towards its parent as far as it can without touching the parent's cells.
-    const lean = isCellPiece(PROP_SPECS[kind]) ? 0 : Math.max(0, Math.min(0.15, 0.45 - propReach(kind)));
-    const centre = { x: cell.x + 0.5 + towards.x * lean, y: cell.y + 0.5 + towards.y * lean };
-    const placed = single(fs, kind, centre, opposite(towards));
+    const placed = single(fs, kind, { x: cell.x + 0.5, y: cell.y + 0.5 }, away);
     if (placed) out.push(placed);
-    else fs.cells.keepClear([cell]);
   }
   return out;
 }

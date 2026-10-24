@@ -1,7 +1,7 @@
 /**
  * Seed, theme, tags and floors in, a whole dungeon out: its theme (one per dungeon), the tags it
  * is built with, every floor's rooms, doors and stairwells planned together, every floor's terrain
- * placed together (holes line up between floors), then each floor's water, undergrowth, furniture
+ * placed together (holes line up between floors), then each floor's water, undergrowth, pieces
  * and vegetation. Architecture only: no story, no text; a dungeon is named by the GM alone.
  */
 
@@ -33,7 +33,7 @@ import { chooseWaterLevel, drainCells, placeWater, poolRooms } from './water';
 interface FloorParts {
   planned: PlannedFloor;
   params: DungeonParams;
-  /** Normal rooms left without furniture. */
+  /** Normal rooms that hold nothing of their type's, only cover. */
   empty: ReadonlySet<number>;
   columns: DungeonFloor['columns'];
   /** Where a built theme lets water stand; null where the layout's low points decide. */
@@ -70,13 +70,15 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const mayPool = (id: number): boolean => parts.water?.pools.has(id) ?? true;
   const wet = cave && caveWater(cave, rooms, terrain.pieces);
   const pools = dry ? new Set<number>() : (wet?.pools ?? poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool));
-  const kept = [...terrain.takenCells(), ...terrain.propCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
+  const kept = [...terrain.takenCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
   const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms }) });
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
   // A cave's life keeps to its zones: daylight by the mouth, fungi by water and roosts, nothing where lava runs.
   const life = site && caveLife(site, { rooms, doors, terrain: terrain.pieces });
   const pieces = addUndergrowth(seed, terrain, waterCells, flora, { built: parts.water !== null, ruined: params.tags.has('ruined'), aboveGround, openAbove: parts.openAbove, ...(life && { mayGrow: life }) });
+  // Pieces come after every piece of terrain, water and undergrowth: none of them waits on what is drawn.
+  terrain.placePieces();
   const { props } = terrain;
   const { rubble, cracks } = placeScatter({ seed, floor: index, stack, rooms, doors, stairs, columns, terrain: pieces, params, furnished: terrain.propCells() });
   const grown = placeGrowth({ seed, floor: index, aboveGround, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);

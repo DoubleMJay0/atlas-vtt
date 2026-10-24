@@ -65,7 +65,6 @@ import { audio } from './audio';
 import { drawing } from './drawing';
 import { dungeon } from './dungeon';
 import { dungeonProp } from './dungeonProp';
-import { dungeonRoom } from './dungeonRoom';
 import { dungeonScene } from './dungeonScene';
 import { editToken } from './editToken';
 import { hex } from './hex';
@@ -171,7 +170,6 @@ export const en = {
   ...drawing,
   ...dungeon,
   ...dungeonProp,
-  ...dungeonRoom,
   ...dungeonScene,
   ...editToken,
   ...hex,

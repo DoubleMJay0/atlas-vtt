@@ -16,7 +16,7 @@ import { leavesRoom, placeCollapse } from './hazards';
 import type { RoomCells } from './roomCells';
 import type { TerrainWork } from './work';
 
-/** How often a room of a type with a hazard's reason takes the hazard rather than its furniture. */
+/** How often a room of a type with a hazard's reason takes the hazard rather than its pieces. */
 const HAZARD_CHANCE: Readonly<Partial<Record<FeatureReason, number>>> = {
   oubliette: 0.5,
   cistern: 0.8,
@@ -56,7 +56,7 @@ function cisternBasin(work: TerrainWork, k: number, rc: RoomCells): boolean {
   return false;
 }
 
-/** The hazard of a typed room, laid for one of its reasons; whether the room took it (a ruined room its collapse or rubble), keeping no furniture but nature's. */
+/** The hazard of a typed room, laid for one of its reasons; whether the room took it (a ruined room its collapse or rubble), keeping no pieces but nature's. */
 export function placeTypeHazard(work: TerrainWork, k: number, rc: RoomCells, spec: RoomTypeSpec, rng: Rng): boolean {
   const ruined = work.theme.ruined;
   for (const reason of spec.terrain.features ?? []) {

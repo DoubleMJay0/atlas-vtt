@@ -1,8 +1,9 @@
 /**
  * What a theme is, as plain data: a room programme of room types, each with how many a dungeon
  * holds, where in it they stand, which neighbours they need or must never have, the terrain they
- * allow and a furnishing recipe. Assignment (`assign/`) types the rooms of a generated layout by
- * it; terrain and furniture then read each room's type.
+ * allow and the pieces it holds. Room types stay internal: assignment (`assign/`) types the rooms
+ * of a generated layout by it, and terrain and pieces then read each room's type; no map, label or
+ * note names one.
  */
 
 import type { FloorRise } from '../floors/floorStack';
@@ -21,15 +22,15 @@ export type ThemeChoice = ThemeId | 'any';
 export const THEME_IDS: readonly ThemeId[] = ['fortress', 'mansion', 'cavern'];
 
 /**
- * How a piece finds its place: before the back wall, against a wall, in rows, in the middle, as a
- * mirrored pair, in a corner, around its parent, on a grid, or beside the room's liquid.
+ * How a piece finds its place: before the back wall, against a wall, in a row, in the middle, as a
+ * mirrored pair, in a corner, beside another piece, on a grid, or beside the room's liquid.
  */
 export type Verb = 'backWall' | 'wall' | 'rows' | 'centre' | 'flank' | 'corner' | 'withParent' | 'grid' | 'shore';
 
 export interface Piece {
   kind: PropKind;
   verb: Verb;
-  /** For `withParent`: the kind it is placed around (the last such piece placed). */
+  /** For `withParent`: the kind it stands beside (the last such piece placed). */
   parent?: PropKind;
   /** For `flank`: a pair either side of the room's inner door; unset, either side of the defining piece. */
   of?: 'door';
@@ -39,11 +40,14 @@ export interface Piece {
   chance?: number;
 }
 
+/**
+ * The pieces a room of a type holds: structure that fixes no purpose (a dais, statues, a fountain,
+ * a fireplace in a wall) and in a cave what nature made there. A type with nothing of its own has
+ * no pieces; its type still shapes the room (its size, its place, its terrain).
+ */
 export interface FurnishRecipe {
-  /** The piece that tells what the room is for, placed first. */
+  /** The piece the room is built round, placed first; where it finds no place the room stays bare. */
   defining?: Piece;
-  /** A piece that belongs to the defining one (the dais's high table or throne). */
-  with?: Piece;
   pieces: readonly Piece[];
 }
 
@@ -52,7 +56,7 @@ export interface RoomTerrain {
   features?: readonly FeatureReason[];
   /** The hazards the type may take; a type without any takes none. */
   hazards?: readonly HazardChoice[];
-  /** Terrain kinds the type allows beyond its furniture. */
+  /** Terrain kinds the type allows beyond its pieces. */
   allows?: readonly TerrainKind[];
   /** Keeps a colonnade where the layout gives one. */
   columns?: true;
@@ -111,12 +115,10 @@ export interface RoomTypeSpec {
   perFloor?: true;
 }
 
-export type ArenaSetPiece = 'statues' | 'altar' | 'ring' | 'pillars' | 'mosaic';
+export type ArenaSetPiece = 'statues' | 'ring' | 'pillars' | 'mosaic';
 
-/** How the boss room of a climax type is furnished as an arena. */
+/** How the boss room of a climax type is built as an arena: its platform stands empty. */
 export interface ArenaSpec {
-  /** What stands on the platform; none for a climax without a seat. */
-  seat: PropKind | null;
   /** Set pieces by weight. */
   setPieces: readonly (readonly [ArenaSetPiece, number])[];
   /** The kinds of mirrored cover it may take. */
@@ -161,8 +163,6 @@ export interface RoomProgramme {
   /** What rooms left over take, by weight. */
   filler: readonly (readonly [RoomTypeId, number])[];
   rooms: readonly RoomTypeSpec[];
-  /** The share of a furnished room's optional pieces under dust sheets past the front third (the Mansion's haunting). */
-  sheeted?: number;
 }
 
 export interface RoomRef {

@@ -1,22 +1,20 @@
 import { type MessageKey, t } from '../../i18n';
 import { MAX_FEATURE_CORNERS, MAX_MAP_FEATURES } from '../../mapFeatures/mapFeatures';
 import type { FeatureTerrain, MapFeature } from '../../types/mapFeatureTypes';
-import type { CellPoint, DungeonColumn, DungeonGrowth, DungeonProp, DungeonRoom, DungeonTerrain, GrowthKind, PropKind } from '../model';
+import type { CellPoint, DungeonColumn, DungeonGrowth, DungeonProp, DungeonTerrain, GrowthKind, PropKind } from '../model';
 import { GROWTH_KINDS } from '../growthModel';
 import { PROP_SPECS, isCellPiece, propReach } from '../props/catalogue';
 import { propKey } from '../props/propKinds';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
-import { rotundaRadius } from '../props/roomFrame';
 import { cellOutlines } from './cellOutline';
-import { roomTypeName } from './roomKeys';
 import { terrainName } from './terrainName';
 import type { DungeonPlacement } from './toWalls';
 
 /**
  * What a floor holds as the map features of its level, so the GM reads its name and what it does
  * to play on hover: every piece of terrain (cover, difficult ground, hazards, bridges, set pieces)
- * on exactly its cells, every piece of furniture and every column on what the map draws of it, and
+ * on exactly its cells, every prop and every column on what the map draws of it, and
  * the vegetation worth naming on its cells. One builder per kind of thing; vegetation first, then
  * terrain, so what stands on them lies over them.
  */
@@ -81,10 +79,9 @@ interface Box {
   y1: number;
 }
 
-/** Props whose drawing is no disc around their origin (`render/propStone.ts`, `propWood.ts`): a dais reaches in from the wall, a tapestry hangs along it. */
+/** Props whose drawing is no disc around their origin (`render/propStone.ts`): a dais reaches in from the wall. */
 const PROP_BOXES: Partial<Record<PropKind, Box>> = {
   dais: { x0: -1.5, x1: 1.5, y0: -1.35, y1: 0 },
-  tapestry: { x0: -0.8, x1: 0.8, y0: -0.15, y1: 0.15 },
 };
 
 /** Corners of a disc's polygon. */
@@ -137,25 +134,11 @@ function columnDrafts(columns: readonly DungeonColumn[]): Draft[] {
   });
 }
 
-/** Corners of a round room's outline. */
-const ROTUNDA_CORNERS = 16;
-
-/** What each typed room shown was built for, on its floor's outline, for the GM to read on hover; it changes nothing in play. */
-export function roomDrafts(rooms: readonly DungeonRoom[], shown: { has(id: number): boolean }): Draft[] {
-  return rooms.filter((room) => room.kind === 'room' && room.type && shown.has(room.id)).map((room): Draft => {
-    const name = roomTypeName(room) ?? '';
-    if (!room.rotunda) return { polygon: [{ x: room.x, y: room.y }, { x: room.x + room.w, y: room.y }, { x: room.x + room.w, y: room.y + room.h }, { x: room.x, y: room.y + room.h }], name };
-    const c = { x: room.x + room.w / 2, y: room.y + room.h / 2 };
-    const r = rotundaRadius(room);
-    return { polygon: Array.from({ length: ROTUNDA_CORNERS }, (_, k) => ({ x: c.x + Math.cos((k * Math.PI * 2) / ROTUNDA_CORNERS) * r, y: c.y + Math.sin((k * Math.PI * 2) / ROTUNDA_CORNERS) * r })), name };
-  });
-}
-
 /**
  * The map features of one floor as shown, in world px on `level` (unset in a scene of one floor),
- * with ids beginning `id`: the first `MAX_MAP_FEATURES` of its terrain, furniture (where the view
- * shows props) and columns, in that order, and under them as much vegetation as fits. Only rooms
- * the view shows have any.
+ * with ids beginning `id`: the first `MAX_MAP_FEATURES` of its terrain, props (where the view
+ * shows them) and columns, in that order, and under them as much vegetation as fits. Only rooms
+ * the view shows have any. No feature names what a room was built for.
  */
 export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, 'props'>, placement: DungeonPlacement, id: string, level?: string): Record<string, MapFeature> {
   const { floor, roomShapes, field } = dungeon;
@@ -166,10 +149,9 @@ export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, '
     ...(view.props ? propDrafts(floor.props.filter(prop => roomShapes.has(prop.room))) : []),
     ...columnDrafts(floor.columns.filter(column => field.distance(column.x, column.y) < 0)),
   ].slice(0, MAX_MAP_FEATURES);
-  // Rooms lie under everything, then vegetation; each takes what room the rest leaves.
-  const rooms = roomDrafts(floor.rooms, roomShapes).slice(0, MAX_MAP_FEATURES - solid.length);
-  const growth = growthDrafts(floor.growth.filter(g => roomShapes.has(g.room))).slice(0, MAX_MAP_FEATURES - solid.length - rooms.length);
-  const drafts = [...rooms, ...growth, ...solid];
+  // Vegetation lies under everything and takes what room the rest leaves.
+  const growth = growthDrafts(floor.growth.filter(g => roomShapes.has(g.room))).slice(0, MAX_MAP_FEATURES - solid.length);
+  const drafts = [...growth, ...solid];
   const { originCell, pxPerCell } = placement;
   const world = (p: CellPoint): CellPoint => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   return Object.fromEntries(drafts.map((draft, index): [string, MapFeature] => {

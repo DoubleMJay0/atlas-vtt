@@ -14,9 +14,10 @@ import { isHazard } from './terrainInvariants';
 const key = (c: CellPoint): string => `${c.x},${c.y}`;
 const LIQUID: ReadonlySet<TerrainKind> = new Set(['deep-water', 'channel', 'pool']);
 const OPENINGS: ReadonlySet<TerrainKind> = new Set(['chasm', 'shaft', 'gallery', 'pit', 'murder-hole']);
-/** What decay brings into a ruin, and the cover a fight room is given where its furniture has none. */
+/** What decay brings into a ruin. */
 const RUIN: ReadonlySet<TerrainKind> = new Set(['rubble-heap', 'rubble-field', 'broken-floor', 'tangled-roots', 'wall-fragment']);
-const FALLBACK_COVER: ReadonlySet<TerrainKind> = new Set(['crates', 'rubble-heap']);
+/** The structure a room that can hold a fight is given where it has no cover: fallen stone, pillars, a statue. */
+const FALLBACK_COVER: ReadonlySet<TerrainKind> = new Set(['rubble-heap', 'pillar', 'statue']);
 /** Natural or broken features, never a plain square and never mirrored. */
 const NATURAL: ReadonlySet<TerrainKind> = new Set(['chasm', 'rubble-field', 'rubble-heap', 'broken-floor', 'chasm-floor', 'brambles', 'thicket', 'tangled-roots']);
 
@@ -27,7 +28,7 @@ function specIn(programme: RoomProgramme, floor: DungeonFloor, room: number): Ro
 
 const checked = (floor: DungeonFloor, room: number): boolean => floor.rooms[room]?.type !== undefined;
 
-const SET_PIECE_KINDS: Readonly<Record<ArenaSetPiece, TerrainKind>> = { statues: 'statue', altar: 'altar', ring: 'portal-ring', pillars: 'pillar', mosaic: 'mosaic' };
+const SET_PIECE_KINDS: Readonly<Record<ArenaSetPiece, TerrainKind>> = { statues: 'statue', ring: 'portal-ring', pillars: 'pillar', mosaic: 'mosaic' };
 
 /** What an arena may hold: its platform, its set pieces, its cover and its hazards. */
 function arenaKinds(arena: ArenaSpec): TerrainKind[] {
@@ -118,7 +119,7 @@ export function mirrorProblems(model: DungeonModel): string[] {
   }));
 }
 
-/** A room that took a hazard holds no furniture but nature's. */
+/** A room that took a hazard holds no pieces but nature's. */
 export function hazardFurnitureProblems(model: DungeonModel): string[] {
   return model.floors.flatMap((floor, f) => floor.rooms.flatMap((room) => {
     if (!checked(floor, room.id) || !floor.terrain.some((p) => p.room === room.id && isHazard(p))) return [];

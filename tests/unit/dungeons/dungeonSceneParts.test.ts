@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyDungeonEdits, NO_EDITS, withWingHidden } from '../../../src/app/dungeons/edits';
+import { t } from '../../../src/app/i18n';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { cellKey, floorCellsOf, holdsCell } from '../../../src/app/dungeons/geometry';
 import { bottomUp, stackOf, stairEnd } from '../../../src/app/dungeons/floors/floorStack';
@@ -14,10 +14,6 @@ import { roomFacts } from '../../../src/app/dungeons/scene/roomFacts';
 import { wallRings } from '../../../src/app/dungeons/scene/wallOutline';
 import { keyedRooms } from '../../../src/app/dungeons/scene/roomKeys';
 import { pinCell } from '../../../src/app/dungeons/scene/roomPins';
-import { roomDrafts } from '../../../src/app/dungeons/scene/toFeatures';
-import { secretWingOf } from '../../../src/app/dungeons/secretWings';
-import { roomTypeKey } from '../../../src/app/dungeons/themes/roomTypes';
-import { type MessageKey, t } from '../../../src/app/i18n';
 import { dungeonNote, roomPins } from '../../../src/app/dungeons/scene/toNote';
 import { dungeonScene, type DungeonSceneParts } from '../../../src/app/dungeons/scene/toScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
@@ -101,8 +97,8 @@ describe('a dungeon of several floors as one scene', () => {
 
   it('writes a note with the GM\'s name and a heading per room its pin links', () => {
     const note = dungeonNote('The Deep Halls', parts.rooms);
-    // Every typed room is labelled with its type: a cave's first with its mouth.
-    expect(note.startsWith('# The Deep Halls\n\n## A1 · ')).toBe(true);
+    // A heading names its key and never what the room was built for.
+    expect(note.startsWith('# The Deep Halls\n\n## A1\n')).toBe(true);
     const headings = [...note.matchAll(/^## (.+)$/gm)].map(match => match[1]);
     expect(headings).toEqual(parts.rooms.map(room => room.heading));
     for (const pin of Object.values(roomPins(parts.rooms, 'n.md'))) expect(headings).toContain(pin.notePath.slice('n.md#'.length));
@@ -267,9 +263,9 @@ describe('a room\'s line of facts', () => {
   it('names exits by compass direction and kind, the way out, stairs, furniture and columns', () => {
     expect(roomFacts(visible, room(0), DEFAULT_VIEW)).toBe('Exits: a door to the north, an opening to the east, and a secret door to the west. An opening to the south leads outside. In the room: a fountain.');
     expect(roomFacts(visible, room(1), DEFAULT_VIEW)).toBe('Exits: 3 doors to the east, south, and west. In the room: a statue, a colonnade, and a broken column.');
-    expect(roomFacts(visible, room(8), DEFAULT_VIEW)).toBe('Exits: a door to the west and steps down to the east. In the room: an altar.');
+    expect(roomFacts(visible, room(8), DEFAULT_VIEW)).toBe('Exits: a door to the west and steps down to the east. In the room: a fire pit.');
     expect(roomFacts(visible, room(4), DEFAULT_VIEW)).toContain('steps up to the west');
-    expect(roomFacts(visible, room(5), DEFAULT_VIEW)).toBe('Exits: a door to the north. Stairs lead down to floor B. In the room: a dais, a throne, and a colonnade.');
+    expect(roomFacts(visible, room(5), DEFAULT_VIEW)).toBe('Exits: a door to the north. Stairs lead down to floor B. In the room: a dais and a colonnade.');
   });
 
   it('leaves out what the view does not show', () => {
@@ -395,9 +391,8 @@ describe('vegetation in the scene', () => {
     expect(ivy.length).toBeGreaterThan(0);
     for (const feature of ivy) expect(feature.terrain).toBeUndefined();
     expect(features.some(feature => feature.name === 'Weeds')).toBe(false);
-    // Room labels lie first, then vegetation, so whatever stands on it is found over it.
-    const roomNames = new Set(floor.rooms.flatMap(room => (room.type ? [t(`dungeonRoom.${roomTypeKey(room.type)}` as MessageKey)] : [])));
-    const firstSolid = features.findIndex(feature => !roomNames.has(feature.name) && !['Ivy', 'Moss', 'Ferns', 'Roots', 'Pale fungi', 'Flowering vines', 'Dead creepers'].includes(feature.name));
+    // Vegetation lies first, so whatever stands on it is found over it.
+    const firstSolid = features.findIndex(feature => !['Ivy', 'Moss', 'Ferns', 'Roots', 'Pale fungi', 'Flowering vines', 'Dead creepers'].includes(feature.name));
     expect(features.slice(firstSolid).some(feature => feature.name === 'Ivy')).toBe(false);
     const grownRooms = new Set(floor.growth.filter(g => floor.rooms[g.room]?.kind === 'room').map(g => g.room)).size;
     expect(parts.rooms.filter(room => room.facts.includes('Growing here: ')).length).toBe(grownRooms);
@@ -405,54 +400,22 @@ describe('vegetation in the scene', () => {
   });
 });
 
-describe('room labels', () => {
-  const nameOf = (type: string): string => t(`dungeonRoom.${roomTypeKey(type as never)}` as MessageKey);
+describe('room types', () => {
+  const typeNames = /^(Gatehouse|Kitchen|Great hall|Throne room|Chapel|Barracks|Library|Drawing room|Ballroom|Entrance hall|Bedroom)$/;
 
-  it('labels every typed room for the GM by its type', () => {
-    const model = generateDungeon({ seed: 21, theme: 'fortress', tags: ['secret'], floors: 2 });
-    const { parts } = partsOf(model);
-    const features = Object.values(parts.scene.mapFeatures ?? {});
-    const ids = parts.levelIds!;
-    model.floors.forEach((floor, index) => {
-      const shown = floor.rooms.filter(room => room.kind === 'room' && room.type && !(floor.hiddenWings ?? []).length);
-      const labels = features.filter(feature => feature.level === ids[index] && shown.some(room => nameOf(room.type!) === feature.name));
-      expect(labels.length).toBeGreaterThanOrEqual(shown.length);
-      for (const feature of labels) expect(feature.terrain).toBeUndefined();
-    });
-    expect(features.some(feature => feature.name === 'Kitchen' || feature.name === 'Gatehouse')).toBe(true);
-    const cavern = Object.values(partsOf(generateDungeon({ seed: 21, theme: 'cavern', tags: [], floors: 1 })).parts.scene.mapFeatures ?? {});
-    expect(cavern.some(feature => /^(Gatehouse|Kitchen|Great hall)$/.test(feature.name))).toBe(false);
-  });
-
-  it('gives a hidden secret wing no label', () => {
-    for (let seed = 1; seed <= 40; seed++) {
-      const generated = generateDungeon({ seed, theme: 'fortress', tags: ['secret'], floors: 1 });
-      const secret = generated.floors[0]!.rooms.find(room => room.wing === 'secret' && room.kind === 'room' && room.type);
-      if (!secret) continue;
-      const model = applyDungeonEdits(generated, withWingHidden(NO_EDITS, 0, secretWingOf(generated.floors[0]!.rooms, secret.id)!));
-      const shown = roomDrafts(model.floors[0]!.rooms, new Set(model.floors[0]!.rooms.filter(room => room.wing !== 'secret').map(room => room.id)));
-      expect(shown.some(draft => draft.polygon[0]!.x === secret.x && draft.polygon[0]!.y === secret.y)).toBe(false);
-      return;
+  it('are never named on the map', () => {
+    for (const theme of ['fortress', 'mansion', 'cavern'] as const) {
+      const features = Object.values(partsOf(generateDungeon({ seed: 21, theme, tags: ['secret'], floors: 2 })).parts.scene.mapFeatures ?? {});
+      expect(features.length).toBeGreaterThan(0);
+      expect(features.filter(feature => typeNames.test(feature.name)).map(feature => feature.name)).toEqual([]);
     }
-    throw new Error('no secret typed room found');
   });
 
-  it('lays room labels under furniture and terrain', () => {
-    const model = generateDungeon({ seed: 21, theme: 'mansion', tags: [], floors: 1 });
-    const features = Object.values(partsOf(model).parts.scene.mapFeatures ?? {});
-    const typed = new Set(model.floors[0]!.rooms.flatMap(room => (room.type ? [nameOf(room.type)] : [])));
-    const lastLabel = features.map(feature => typed.has(feature.name)).lastIndexOf(true);
-    expect(features.slice(0, lastLabel + 1).every(feature => typed.has(feature.name))).toBe(true);
-  });
-
-  it('heads a room\'s note by its type', () => {
+  it('are never named in a heading, which names only the boss room and five-room stages', () => {
     const model = generateDungeon({ seed: 21, theme: 'fortress', tags: [], floors: 2 });
     const keyed = model.floors.flatMap((_, index) => keyedRooms(visibleFloor(model, DEFAULT_VIEW, index), model.floors.length));
     expect(keyed.some(({ heading }) => heading.endsWith('Boss room'))).toBe(true);
-    for (const { room, key, heading } of keyed) {
-      const type = nameOf(room.type!);
-      expect(heading).toBe(room.boss ? `${key} · ${type}, Boss room` : `${key} · ${type}`);
-    }
+    for (const { room, key, heading } of keyed) expect(heading).toBe(room.boss ? `${key} · Boss room` : key);
   });
 });
 

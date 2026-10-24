@@ -21,16 +21,11 @@ const difficult = { difficult: true } as const;
 
 export const TERRAIN_KINDS: Readonly<Record<TerrainKind, KindInfo>> = {
   'low-wall': { name: 'dungeon.terrain.lowWall', traits: half, footing: 'block' },
-  crates: { name: 'dungeon.terrain.crates', traits: half, footing: 'block' },
-  table: { name: 'dungeon.terrain.table', traits: half, footing: 'block' },
-  altar: { name: 'dungeon.terrain.altar', traits: { ...half, interactive: true }, footing: 'block' },
-  sarcophagus: { name: 'dungeon.terrain.sarcophagus', traits: half, footing: 'block' },
   'rubble-heap': { name: 'dungeon.terrain.rubbleHeap', traits: half, footing: 'block' },
   pillar: { name: 'dungeon.terrain.pillar', traits: total, footing: 'block' },
   statue: { name: 'dungeon.terrain.statue', traits: { ...total, interactive: true }, footing: 'block' },
   'wall-fragment': { name: 'dungeon.terrain.wallFragment', traits: total, footing: 'block' },
   obelisk: { name: 'dungeon.terrain.obelisk', traits: { ...total, interactive: true }, footing: 'block' },
-  pews: { name: 'dungeon.terrain.pews', traits: difficult, footing: 'walk' },
   'rubble-field': { name: 'dungeon.terrain.rubbleField', traits: difficult, footing: 'walk' },
   'broken-floor': { name: 'dungeon.terrain.brokenFloor', traits: difficult, footing: 'walk' },
   'shallow-water': { name: 'dungeon.terrain.shallowWater', traits: difficult, footing: 'walk' },

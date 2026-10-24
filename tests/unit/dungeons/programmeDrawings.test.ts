@@ -52,13 +52,8 @@ describe('generated dungeons', () => {
   }, 120_000);
 });
 
-/** Every kind a programme may place: its pieces, the pieces they stand around, its arenas' seats, and its dust sheets. */
+/** Every kind a programme may place: its pieces and the pieces they stand beside. */
 function kindsOf(programme: RoomProgramme): PropKind[] {
-  const pieces = programme.rooms.flatMap(({ furnish }) => [furnish.defining, furnish.with, ...furnish.pieces]);
-  return [
-    ...pieces.flatMap((piece) => (piece ? [piece.kind, ...(piece.parent ? [piece.parent] : [])] : [])),
-    ...programme.climax.flatMap(({ arena }) => (arena.seat ? [arena.seat] : [])),
-    // What lies under a dust sheet, or broken in a ruin, of a haunted house's furniture.
-    ...(programme.sheeted ? (['dust-sheet', 'broken-furniture'] as const) : []),
-  ];
+  const pieces = programme.rooms.flatMap(({ furnish }) => [furnish.defining, ...furnish.pieces]);
+  return pieces.flatMap((piece) => (piece ? [piece.kind, ...(piece.parent ? [piece.parent] : [])] : []));
 }

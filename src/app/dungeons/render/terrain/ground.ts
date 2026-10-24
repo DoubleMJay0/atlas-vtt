@@ -4,30 +4,14 @@ import { castShadow, type Hand } from '../art/hand';
 import { valueNoise } from '../art/noise';
 import { grown, polyPath, polysPath, rectPoly, type PathFn } from '../art/paths';
 import { cellBox, cellRings } from './cellRings';
-import { pewBox } from './footprints';
-import { pieceRng, roomAxis } from './pieces';
+import { pieceRng } from './pieces';
 import { chiselled, stoneOutline } from './stones';
 import { pointsBounds } from '../geometry';
 
 /**
- * Ground that slows a party (pews, loose rubble, broken floor, the rubble under a hole above) and
+ * Ground that slows a party (loose rubble, broken floor, the rubble under a hole above) and
  * mosaics: whole cells, so a cell reads plainly as one thing (Map-Fu), drawn before the shadows.
  */
-
-/** Pews: a wooden bench across each cell, its back towards the room's far wall. */
-export function drawPews(hand: Hand, piece: DungeonTerrain): void {
-  const axis = roomAxis(hand.scene.env, piece);
-  for (const c of piece.cells) {
-    const b = pewBox(c, axis);
-    const seat = rectPoly(b);
-    hand.surface(polyPath(seat), 'wood');
-    // The back: a narrower rail along the far side of the seat.
-    const back = axis.x === 0 ? rectPoly({ x: b.x, y: axis.y > 0 ? b.y + b.h - 0.09 : b.y, w: b.w, h: 0.09 }) : rectPoly({ x: axis.x > 0 ? b.x + b.w - 0.09 : b.x, y: b.y, w: 0.09, h: b.h });
-    hand.surface(polyPath(back), 'wood');
-    hand.edges(back, true);
-    hand.edges(seat, true);
-  }
-}
 
 /** Loose stones over whole cells (difficult ground): a faint tone over the zone and many small stones, none big enough to hide behind. */
 export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, perCell: number): void {

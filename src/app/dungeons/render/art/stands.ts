@@ -2,7 +2,7 @@ import { propLift, tracePropSilhouette } from '../propShapes';
 import type { RenderEnv } from '../renderEnv';
 import { cellRings } from '../terrain/cellRings';
 import { footprint, HEIGHT } from '../terrain/footprints';
-import { roomAxis, shownPieces } from '../terrain/pieces';
+import { shownPieces } from '../terrain/pieces';
 import type { Stand } from './heights';
 import { polysPath } from './paths';
 
@@ -52,7 +52,7 @@ export function standsOf(env: RenderEnv): Stand[] {
       continue;
     }
     const height = HEIGHT[piece.kind];
-    const path = footprint(piece, roomAxis(env, piece));
+    const path = footprint(piece);
     if (height && path) stands.push({ height, path });
   }
   return stands;

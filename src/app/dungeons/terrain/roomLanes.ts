@@ -4,9 +4,9 @@
  * side names.
  */
 
-import { cellKey, dir, perpendicular } from '../geometry';
+import { cellKey, dir } from '../geometry';
 import type { CellDir, CellPoint } from '../model';
-import { type PropSpec, isCellPiece } from '../props/catalogue';
+import type { PropSpec } from '../props/catalogue';
 import type { RoomCells } from './roomCells';
 
 const STEPS: readonly CellDir[] = [dir(0, -1), dir(1, 0), dir(0, 1), dir(-1, 0)];
@@ -33,7 +33,7 @@ function lane(rc: RoomCells, from: CellPoint, to: CellPoint): CellPoint[] {
   return [];
 }
 
-/** Keeps a straight-as-it-gets lane clear between every pair of the room's needed cells, so furniture never stands between doors and stairs. */
+/** Keeps a straight-as-it-gets lane clear between every pair of the room's needed cells, so nothing stands between doors and stairs. */
 export function reserveLanes(rc: RoomCells): void {
   const needed = rc.needed;
   for (let a = 0; a < needed.length; a++) {
@@ -43,8 +43,7 @@ export function reserveLanes(rc: RoomCells): void {
 
 /**
  * The cells a piece standing on `cells` and facing `facing` keeps walkable: the row before it
- * (`front`), both its long sides (`sides`), every cell beside it (`ring`) or the one before its
- * middle (`gate`); only cells of the room's floor.
+ * (`front`) or every cell beside it (`ring`); only cells of the room's floor.
  */
 export function clearCells(rc: RoomCells, cells: readonly CellPoint[], spec: PropSpec, facing: CellDir): CellPoint[] {
   const own = new Set(cells.map((c) => cellKey(c.x, c.y)));
@@ -59,21 +58,11 @@ export function clearCells(rc: RoomCells, cells: readonly CellPoint[], spec: Pro
     }
     return [...out.values()];
   };
-  const side = perpendicular(facing);
   switch (spec.clear) {
     case 'front':
       return around([facing]);
-    case 'sides': {
-      const footprint = isCellPiece(spec) ? spec.footprint : { along: 1, out: 1 };
-      // The long sides run along the piece's longer dimension.
-      return around(footprint.out > footprint.along ? [side, dir(-side.x, -side.y)] : [facing, dir(-facing.x, -facing.y)]);
-    }
     case 'ring':
       return around(STEPS);
-    case 'gate': {
-      const front = around([facing]);
-      return front.length ? [front[Math.floor(front.length / 2)] as CellPoint] : [];
-    }
     case 'none':
       return [];
   }

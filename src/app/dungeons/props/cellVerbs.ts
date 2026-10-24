@@ -1,9 +1,8 @@
 /**
- * Where furniture of whole cells stands in a room: against a wall (its back, or a bed's head),
- * before the back wall, in the middle, in a corner, in rows, or hung on a wall run no door
- * breaks. Each tries the places in turn through `FurnishSpace`; a verb that finds no place adds
- * nothing. A round room has no straight wall, so the wall verbs place nothing there. Disc verbs
- * of the rooms furnished by role are in `arrange.ts`.
+ * Where a piece stands in a room: against a wall, before the back wall, in the middle, in a
+ * corner, in a row, or hung on a wall run no door breaks. Each tries the places in turn through
+ * `FurnishSpace`; a verb that finds no place adds nothing. A round room has no straight wall, so
+ * the wall verbs place nothing there.
  */
 
 import { cellKey, dir } from '../geometry';
@@ -40,7 +39,7 @@ export function wallRuns(fs: FurnishSpace, side: WallSide, length: number, middl
 /** The way opposite `d`. */
 export const opposite = (d: CellDir): CellDir => dir(-d.x, -d.y);
 
-/** A piece against one of `sides` (its back, or its head for a bed), the first place that takes it; a disc stands just before the wall. */
+/** A piece against one of `sides`, the first place that takes it; a disc stands just before the wall. */
 function onSides(fs: FurnishSpace, kind: PropKind, sides: readonly WallSide[], middleFirst: boolean): DungeonProp | null {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
@@ -78,12 +77,12 @@ function byCentre(fs: FurnishSpace): CellPoint[] {
   return out.sort((a, b) => Math.hypot(a.x + 0.5 - centre.x, a.y + 0.5 - centre.y) - Math.hypot(b.x + 0.5 - centre.x, b.y + 0.5 - centre.y));
 }
 
-/** In the room's middle, its long side across the room, facing the way in. */
+/** In the room's middle, else as near it as it finds room, its long side across the room, facing the way in. */
 export function atCentre(fs: FurnishSpace, kind: PropKind): DungeonProp | null {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
   const into = opposite(rc.axis);
-  for (const c of byCentre(fs).slice(0, 9)) {
+  for (const c of byCentre(fs)) {
     const placed = isCellPiece(spec)
       ? placePiece(fs, kind, footprintAt(c, rc.across, into, spec.footprint.along, spec.footprint.out), into)
       : placeDisc(fs, kind, { x: c.x + 0.5, y: c.y + 0.5 }, facing(into));
@@ -121,70 +120,29 @@ function rowColumns(width: number): number[] {
   return out.filter((j) => j >= 1 && j <= width - 2);
 }
 
-/**
- * `count` of a piece in rows: against the side walls for one that backs onto a wall or sleeps
- * head to it (bunks, stalls), down the room's length for a free one (a long table, drawn as long
- * as its stretch and the room allow), a disc in ranks down the room.
- */
+/** `count` of a free-standing cell piece in a row across the room's middle, a ring's width apart (stones a guard post keeps behind). */
 export function inRows(fs: FurnishSpace, kind: PropKind, count: number): DungeonProp[] {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
+  if (!isCellPiece(spec)) return [];
   const out: DungeonProp[] = [];
-  if (isCellPiece(spec) && spec.wall !== 'free') {
-    for (let k = 0; k < count; k++) {
-      const placed = againstWall(fs, kind, k % 2 === 0 ? ['left', 'right'] : ['right', 'left']);
-      if (placed) out.push(placed);
-    }
-    return out;
-  }
-  if (isCellPiece(spec)) {
-    const length = Math.max(spec.footprint.along, Math.min(spec.stretch ?? spec.footprint.along, rc.depth - 2));
-    for (const j of rowColumns(rc.width)) {
-      if (out.length >= count) break;
-      for (let len = length; len >= spec.footprint.along; len--) {
-        const i0 = Math.floor((rc.depth - len) / 2);
-        const cells = Array.from({ length: len }, (_, k) => rc.cell(i0 + k, j));
-        const placed = placePiece(fs, kind, cells, rc.across, len);
-        if (placed) {
-          out.push(placed);
-          break;
-        }
-      }
-    }
-    return out;
-  }
-  const step = Math.max(1, (rc.depth - 1) / Math.max(1, count));
-  for (let k = 0; k < count; k++) {
-    const i = Math.min(rc.depth - 1, Math.floor(0.5 + step * (k + 0.5)));
-    for (const j of rowColumns(rc.width)) {
-      const c = rc.cell(i, j);
-      const placed = placeDisc(fs, kind, { x: c.x + 0.5, y: c.y + 0.5 }, facing(opposite(rc.axis)));
-      if (placed) {
-        out.push(placed);
-        break;
-      }
-    }
+  const i0 = Math.floor((rc.depth - spec.footprint.along) / 2);
+  for (const j of rowColumns(rc.width)) {
+    if (out.length >= count) break;
+    const cells = Array.from({ length: spec.footprint.along }, (_, k) => rc.cell(i0 + k, j));
+    const placed = placePiece(fs, kind, cells, rc.across);
+    if (placed) out.push(placed);
   }
   return out;
 }
 
-/**
- * `count` of a wall piece on wall runs no door breaks: an outer one only on the outer sides, one
- * strung across the room once, wall to wall at its middle.
- */
+/** `count` of a wall piece on wall runs no door breaks. */
 export function onWall(fs: FurnishSpace, kind: PropKind, count: number): DungeonProp[] {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
   if (!spec.wallPiece || !isCellPiece(spec) || rc.room.rotunda) return [];
-  if (spec.wall === 'across') {
-    const i = Math.floor(rc.depth / 2);
-    const run = Array.from({ length: rc.width }, (_, j) => rc.cell(i, j));
-    const across = hangPiece(fs, kind, run, 'across');
-    return across ? [across] : [];
-  }
-  const sides = spec.wall === 'outer' && fs.outer ? WALL_SIDES.filter((side) => fs.outer?.has(side)) : WALL_SIDES;
-  // A hanging is drawn wider than its cells: a cell of whole wall either side keeps it off a corner and a door.
-  const runs = sides.flatMap((side) => wallRuns(fs, side, spec.footprint.along + 2, false).map((padded) => ({ side, padded })));
+  // A wall piece is drawn wider than its cells: a cell of whole wall either side keeps it off a corner and a door.
+  const runs = WALL_SIDES.flatMap((side) => wallRuns(fs, side, spec.footprint.along + 2, false).map((padded) => ({ side, padded })));
   const out: DungeonProp[] = [];
   for (const { side, padded } of shuffled(fs.rng, runs)) {
     if (out.length >= count) break;

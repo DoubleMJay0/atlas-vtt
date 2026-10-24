@@ -3,11 +3,12 @@ import { stackOf } from '../../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
-import { doorProblems, emptyRooms, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
+import { doorProblems, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, riseProblems, stairProblems, storeyProblems, withinShare } from './floorsInvariants';
 import { physicsProblems } from './themeTerrainInvariants';
 import { holeProblems } from './holeInvariants';
-import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
+import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
+import { uncoveredFightRooms } from './coverInvariants';
 
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
@@ -195,12 +196,17 @@ export function describeInvariants(floors: number): void {
       expect(share('deep', (m) => anyFloor(m, (f) => f.doors.some((d) => d.kind === 'steps')))).toBeGreaterThan(0.5);
     });
 
-    it('let the theme show: a throne only in a Fortress, an altar in most Fortresses with a chapel', () => {
-      const thrones = runs.filter((run) => run.model.theme !== 'fortress' && run.model.floors.some((f) => f.props.some((p) => p.kind === 'throne')));
-      expect(thrones.map((run) => run.seed)).toEqual([]);
-      const chapels = runs.filter((run) => run.model.theme === 'fortress' && run.model.floors.some((f) => f.rooms.some((r) => r.type === 'chapel' && !f.terrain.some((p) => p.room === r.id && p.traits.hazard))));
-      const altars = chapels.filter((run) => run.model.floors.some((f) => f.props.some((p) => p.kind === 'altar') || f.terrain.some((p) => p.kind === 'altar')));
-      expect(altars.length / chapels.length).toBeGreaterThan(0.5);
+    it('stand nothing on a platform, a ledge or a dais: no seat names what a room is for', () => {
+      expect(failures(eachFloor((run, i) => {
+        const floor = run.model.floors[i]!;
+        const raised = new Set(floor.terrain.filter((p) => p.kind === 'platform' || p.kind === 'ledge').flatMap((p) => p.cells.map((c) => `${c.x},${c.y}`)));
+        const daises = floor.props.filter((p) => p.kind === 'dais');
+        return floor.props.filter((p) => p.kind !== 'dais').flatMap((p) => {
+          const onRaised = raised.has(`${Math.floor(p.x)},${Math.floor(p.y)}`);
+          const onDais = daises.some((d) => d.room === p.room && Math.hypot(d.x - p.x, d.y - p.y) < 1.2 * d.scale);
+          return onRaised || onDais ? [`a ${p.kind} on ${onRaised ? 'raised ground' : 'a dais'}`] : [];
+        });
+      }))).toEqual([]);
     });
 
     it('lay terrain on whole cells of one room each, never on doors, stairwells or the cells they are reached from', () => {
@@ -240,16 +246,8 @@ export function describeInvariants(floors: number): void {
       expect(share).toBeGreaterThan(0.01);
     });
 
-    it('give every furnished room of a Cavern that can hold a fight some cover', () => {
-      expect(
-        failures(eachFloor((run, i) => {
-          if (run.model.theme !== 'cavern') return [];
-          const floor = run.model.floors[i]!;
-          return normals(floor)
-            .filter((room) => room.w * room.h >= 12 && floor.props.some((p) => p.room === room.id) && !hasCover(floor, room.id))
-            .map((room) => `room ${room.id} (${room.w}×${room.h}) has no cover`);
-        })),
-      ).toEqual([]);
+    it('give every room that can hold a fight some cover', () => {
+      expect(failures((run) => uncoveredFightRooms(run.model))).toEqual([]);
     });
 
     it('generate within the time budget', () => {

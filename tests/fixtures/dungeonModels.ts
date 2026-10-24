@@ -40,16 +40,12 @@ export function smallDungeon(): DungeonModel {
     ['statue', 0.5, -8.5, 0, 1, rotunda.id],
     ['well', 8.5, -7.5, 0, 1, pond.id],
     ['dais', 9.5, 5, 0, 1, throne.id],
-    ['throne', 9.5, 4.3, 0, 1, throne.id],
-    ['chest', -5.5, -4.4, 0.3, 1, secret.id],
-    ['sarcophagus', -4.5, -2, Math.PI / 2, 1, secret.id],
-    ['barrel', -7.4, -10.4, 0, 1, store.id],
-    ['barrel', -6.85, -10.6, 0, 1, store.id],
-    ['barrel', -7.3, -9.85, 0, 1, store.id],
-    ['crate', -7.3, -6.7, 0.2, 1, store.id],
-    ['crate', -6.5, -6.75, -0.1, 1, store.id],
-    ['tapestry', -5.5, -11, Math.PI, 1, store.id],
-    ['altar', 5, -10.3, 0, 1, shrine.id],
+    ['bust', -5.5, -4.4, 0.3, 1, secret.id],
+    ['statue', -4.5, -2, Math.PI / 2, 1, secret.id],
+    ['boulder', -7.5, -10.5, 0, 1, store.id],
+    ['stalagmites', -7.5, -6.5, 0, 1, store.id],
+    ['hearth', -5.5, -10.5, Math.PI, 1, store.id],
+    ['campfire', 5.5, -9.5, 0, 1, shrine.id],
   ];
   for (const [kind, x, y, rotation, scale, room] of props) f.props.push({ kind, x, y, rotation, scale, room });
   f.water.push(pool(rngFrom(7), 10.4, -5.8, 2.1, 1.7));
@@ -60,7 +56,7 @@ export function smallDungeon(): DungeonModel {
 }
 
 const CONNECTORS: readonly DoorKind[] = ['door', 'door', 'door', 'opening', 'opening', 'steps'];
-const ROOM_PROPS: readonly PropKind[] = ['barrel', 'crate', 'chest', 'fountain', 'well', 'statue', 'sarcophagus', 'altar'];
+const ROOM_PROPS: readonly PropKind[] = ['fountain', 'well', 'statue', 'bust', 'boulder', 'campfire', 'stalagmites', 'crystals'];
 
 /** Rooms on a grid, joined by corridors along a random spanning tree and a few loops. */
 function gridDungeon(seed: number, cols: number, rows: number): DungeonModel {

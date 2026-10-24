@@ -1,4 +1,4 @@
-import type { CellDir, DungeonTerrain, TerrainKind } from '../../model';
+import type { DungeonTerrain, TerrainKind } from '../../model';
 import { roundedRect } from '../glyphPen';
 import type { PathFn } from '../art/paths';
 import { cellBox } from './cellRings';
@@ -10,19 +10,13 @@ import { cellBox } from './cellRings';
  */
 
 /** How far inside its cells a block-shaped piece is drawn. */
-export const INSET = { table: 0.12, altar: 0.14, sarcophagus: 0.16, pillar: 0.1, obelisk: 0.14, statue: 0.18 } as const satisfies Partial<Record<TerrainKind, number>>;
+export const INSET = { pillar: 0.1, obelisk: 0.14, statue: 0.18 } as const satisfies Partial<Record<TerrainKind, number>>;
 
 const insetOf = (kind: TerrainKind): number => (INSET as Partial<Record<TerrainKind, number>>)[kind] ?? 0.12;
 /** A wall fragment: half its thickness, and how far its broken ends stop short of its cells. */
 export const FRAGMENT = { half: 0.17, ends: 0.12 };
 /** A low wall's thickness. */
 export const LOW_WALL = 0.3;
-/** Where a cell's crates stand and how large they are: x, y and side, in cells. */
-export const CRATE_SPOTS = [
-  [0.3, 0.3, 0.42],
-  [0.71, 0.33, 0.36],
-  [0.52, 0.71, 0.44],
-] as const;
 /** The standing stones of a portal ring, and each one's radius. */
 export const RING_STONES = 8;
 export const RING_STONE = 0.2;
@@ -30,10 +24,6 @@ export const RING_STONE = 0.2;
 /** How tall each piece stands, a wall's height being 1. */
 export const HEIGHT: Readonly<Partial<Record<TerrainKind, number>>> = {
   'low-wall': 0.4,
-  crates: 0.45,
-  table: 0.32,
-  altar: 0.4,
-  sarcophagus: 0.36,
   'rubble-heap': 0.42,
   pillar: 1,
   statue: 0.85,
@@ -41,7 +31,6 @@ export const HEIGHT: Readonly<Partial<Record<TerrainKind, number>>> = {
   obelisk: 1,
   pool: 0.14,
   'portal-ring': 0.6,
-  pews: 0.18,
 };
 
 export interface Box {
@@ -91,12 +80,8 @@ export function ringRadius(piece: DungeonTerrain): number {
 const rectPath = (box: Box, r = 0.03): PathFn => path => roundedRect(path, box.cx, box.cy, box.w, box.h, r);
 
 /** The shape a standing piece fills, for its shadow; none for what lies on the ground. */
-export function footprint(piece: DungeonTerrain, axis: CellDir): PathFn | null {
+export function footprint(piece: DungeonTerrain): PathFn | null {
   switch (piece.kind) {
-    case 'crates':
-      return path => {
-        for (const c of piece.cells) for (const [dx, dy, s] of CRATE_SPOTS) path.rect(c.x + dx - s / 2, c.y + dy - s / 2, s, s);
-      };
     case 'rubble-heap':
       return path => {
         for (const c of piece.cells) {
@@ -126,16 +111,6 @@ export function footprint(piece: DungeonTerrain, axis: CellDir): PathFn | null {
         }
       };
     }
-    case 'pews':
-      return path => {
-        for (const c of piece.cells) {
-          const b = pewBox(c, axis);
-          path.rect(b.x, b.y, b.w, b.h);
-        }
-      };
-    case 'table':
-    case 'altar':
-    case 'sarcophagus':
     case 'pillar':
     case 'obelisk':
     case 'statue':
@@ -143,14 +118,4 @@ export function footprint(piece: DungeonTerrain, axis: CellDir): PathFn | null {
     default:
       return null;
   }
-}
-
-/** A pew's bench in its cell: across the room's axis, a little towards the far wall. */
-export function pewBox(c: { x: number; y: number }, axis: CellDir): Box {
-  const across = axis.x === 0;
-  const w = across ? 0.9 : 0.34;
-  const h = across ? 0.34 : 0.9;
-  const cx = c.x + 0.5 + axis.x * 0.08;
-  const cy = c.y + 0.5 + axis.y * 0.08;
-  return { x: cx - w / 2, y: cy - h / 2, w, h, cx, cy };
 }

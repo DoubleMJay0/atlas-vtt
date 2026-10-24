@@ -33,8 +33,6 @@ export interface FurnishSpace {
   doors: readonly DungeonDoor[];
   /** The theme's veto on a piece's cells in this room. */
   placeAllowed?: (kind: PropKind, at: CellPoint) => boolean;
-  /** The sides with an outer wall, for pieces that need one (a latrine); unset, any side. */
-  outer?: ReadonlySet<WallSide>;
   /** What has been placed, latest last. */
   placed: PlacedPiece[];
   /** Wall cells a wall piece hangs before, as `x,y,side`. */
@@ -101,19 +99,16 @@ export function placeDisc(fs: FurnishSpace, kind: PropKind, p: CellPoint, rotati
   return record(fs, { prop, cells: [cell], clear: [], facing: dir(0, -1) });
 }
 
-/**
- * A wall piece hung on the run of wall cells `run` of `side`, facing into the room, stretched to
- * the run where it is longer; `across`: strung from wall to wall over `run`, a row across the room.
- */
-export function hangPiece(fs: FurnishSpace, kind: PropKind, run: readonly CellPoint[], side: WallSide | 'across'): DungeonProp | null {
+/** A wall piece hung on the run of wall cells `run` of `side`, facing into the room, stretched to the run where it is longer. */
+export function hangPiece(fs: FurnishSpace, kind: PropKind, run: readonly CellPoint[], side: WallSide): DungeonProp | null {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
   if (!spec.wallPiece || run.length === 0 || !allowedOn(fs, kind, run)) return null;
   const keys = run.map((c) => `${cellKey(c.x, c.y)},${side}`);
-  if (keys.some((key) => fs.hung.has(key)) || run.some((c) => rc.isKeptClear(c)) || (side !== 'across' && run.some((c) => rc.doorOn(side, c)))) return null;
+  if (keys.some((key) => fs.hung.has(key)) || run.some((c) => rc.isKeptClear(c) || rc.doorOn(side, c))) return null;
   for (const key of keys) fs.hung.add(key);
-  const out = side === 'across' ? dir(0, 0) : rc.beyond(side);
-  const into = side === 'across' ? dir(-rc.axis.x, -rc.axis.y) : dir(-out.x, -out.y);
+  const out = rc.beyond(side);
+  const into = dir(-out.x, -out.y);
   const centre = centreOf(run);
   const along = run.length > 1 ? { size: { along: run.length, out: 0 } } : {};
   const prop: DungeonProp = { kind, x: centre.x + out.x * 0.4, y: centre.y + out.y * 0.4, rotation: facing(into), scale: 1, room: rc.room.id, ...along };
