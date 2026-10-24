@@ -1,6 +1,7 @@
 import type { DungeonDoor, DungeonFloor, DungeonModel, DungeonRoom } from '../model';
 import { secretWingOf } from '../secretWings';
 import type { DungeonView } from '../style';
+import { caveFloorShapes } from './cave/visibleCave';
 import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
 
 /**
@@ -42,11 +43,13 @@ export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secre
   const rooms = floor.rooms.filter(room => room.wing !== 'secret' || (view.secrets && !hidden.has(secretWingOf(floor.rooms, room.id) ?? room.id)));
   const shown = new Map(rooms.map(room => [room.id, room] as const));
   const doors = floor.doors.filter(door => (door.from === null || shown.has(door.from)) && (door.to === null || shown.has(door.to)));
-  const wide = new Set(doors.filter(door => isWideOpening(door, shown)));
+  const cave = floor.cave !== undefined;
+  const wide = new Set(cave ? [] : doors.filter(door => isWideOpening(door, shown)));
   const roomShapes = new Map(rooms.map(room => [room.id, roomShape(room)] as const));
   const open = doors.filter(door => door.kind !== 'secret');
-  const floors = [...roomShapes.values(), ...open.flatMap(door => doorShapes(door, !wide.has(door) && door.kind === 'opening'))];
-  const outlines = [...roomShapes.values(), ...open.map(doorShape)];
+  // A cave's narrows are drawn at their full width, as part of its traced floor.
+  const floors = cave ? caveFloorShapes(model, index, rooms, doors) : [...roomShapes.values(), ...open.flatMap(door => doorShapes(door, !wide.has(door) && door.kind === 'opening'))];
+  const outlines = cave ? floors : [...roomShapes.values(), ...open.map(doorShape)];
   const bounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
   return { model, index, floor, rooms, doors, wide, floors, outlines, roomShapes, bounds };
 }

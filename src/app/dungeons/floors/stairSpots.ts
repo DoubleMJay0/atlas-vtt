@@ -6,7 +6,7 @@
  */
 
 import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
-import { type CellRect, cellKey, cellsOf, dir, floorRect, inRect } from '../geometry';
+import { type CellRect, cellKey, cellsOf, dir, doorCells, floorRect, inRect, intersection } from '../geometry';
 
 /**
  * The upper end is where the treads start down; the lower end is where they arrive. Ends are
@@ -58,12 +58,12 @@ export function stairsAndAround(stairs: readonly StairSpot[]): string[] {
   return cells.flatMap((c) => [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => cellKey(c.x + dx, c.y + dy))));
 }
 
-/** The floor cells just inside a room's doors. */
+/** The floor cells just inside a room's doors, one before each cell of a wide narrows. */
 export function doorApproaches(room: Pick<DungeonRoom, 'id'>, doors: readonly DungeonDoor[]): CellPoint[] {
   return doors.flatMap((door) => {
-    if (door.from === room.id) return [{ x: door.x - door.dir.x, y: door.y - door.dir.y }];
-    if (door.to === room.id) return [{ x: door.x + door.dir.x, y: door.y + door.dir.y }];
-    return [];
+    const step = door.from === room.id ? -1 : door.to === room.id ? 1 : 0;
+    if (step === 0) return [];
+    return doorCells(door).map((c) => ({ x: c.x + door.dir.x * step, y: c.y + door.dir.y * step }));
   });
 }
 
@@ -83,6 +83,13 @@ function connected(free: ReadonlySet<string>, cells: readonly CellPoint[]): bool
     }
   }
   return seen.size === free.size;
+}
+
+/** Whether taking `cut` out of `floor` leaves two pieces: it reaches from one wall to the opposite one, wall left on either side. */
+function splits(floor: CellRect, cut: CellRect): boolean {
+  const across = cut.y0 <= floor.y0 && cut.y1 >= floor.y1 && cut.x0 > floor.x0 && cut.x1 < floor.x1;
+  const along = cut.x0 <= floor.x0 && cut.x1 >= floor.x1 && cut.y0 > floor.y0 && cut.y1 < floor.y1;
+  return across || along;
 }
 
 function touchesWall(r: CellRect, floor: CellRect, open: CellDir): boolean {
@@ -115,16 +122,19 @@ export function spotFits(room: StairRoom, space: FloorSpace, spot: StairSpot, en
   ];
   if (!approach.every(inFloor) || cells.some((c) => taken.has(cellKey(c.x, c.y)))) return false;
   if (needed.some((c) => own.has(cellKey(c.x, c.y)) || taken.has(cellKey(c.x, c.y)))) return false;
+  // A rectangle less one rectangle stays one piece unless the cut runs wall to wall through its middle.
+  if (!space.stairs.some((s) => intersection(spotRect(s), floor))) return !splits(floor, rect);
   const floorCells = cellsOf(floor);
   const free = new Set(floorCells.map((c) => cellKey(c.x, c.y)).filter((key) => !taken.has(key) && !own.has(key)));
   return connected(free, floorCells);
 }
 
-/** Every stairwell rectangle that lies inside `rect`, in every direction and shape. */
-export function spotsWithin(rect: CellRect): StairSpot[] {
+/** Every stairwell rectangle that lies inside `rect`, in every direction and shape at least `least` cells across. */
+export function spotsWithin(rect: CellRect, least = 1): StairSpot[] {
   const out: StairSpot[] = [];
   for (const down of STAIR_DIRS) {
     for (const [along, across] of SHAPES) {
+      if (across < least) continue;
       const w = down.x !== 0 ? along : across;
       const h = down.x !== 0 ? across : along;
       for (let y = rect.y0; y + h - 1 <= rect.y1; y++) for (let x = rect.x0; x + w - 1 <= rect.x1; x++) out.push({ x, y, w, h, down });

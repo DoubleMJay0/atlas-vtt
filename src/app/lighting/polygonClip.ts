@@ -38,6 +38,18 @@ export function normalizePolygon(rawRing: QPolygon): QShape {
   return canonicalOutput(union([pathOf(rawRing)], FillRule.NonZero));
 }
 
+/**
+ * A shape with holes grown by `deltaQ` (shrunk where negative): outer rings grow and holes shrink,
+ * with round corners or square ones (`miter`, as a rectangle grows), normalized like a union.
+ */
+export function inflateShape(shape: QShape, deltaQ: Q, join: 'round' | 'miter' = 'round'): QShape {
+  assertQ(deltaQ);
+  const paths = shape.map(pathOf);
+  if (deltaQ === 0) return canonicalOutput(union(paths, FillRule.NonZero));
+  const grown = inflatePaths(paths, deltaQ, join === 'round' ? JoinType.Round : JoinType.Miter, EndType.Polygon, 2, Math.max(1, Math.abs(deltaQ) / 1000));
+  return canonicalOutput(union(grown, FillRule.NonZero));
+}
+
 /** Round caps/joins at one eighth-pixel arc tolerance; integer cleanup has its own rounding. */
 export function inflatePolyline(points: QPolygon, radiusQ: Q): QShape {
   const input = pathOf(points);

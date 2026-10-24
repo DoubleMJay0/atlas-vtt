@@ -9,7 +9,7 @@
 
 import type { CellDir, TerrainKind } from '../model';
 import { dir } from '../geometry';
-import { type Rng, chance, int, pick, shuffled, weighted } from '../rng';
+import { type Rng, int, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
 import type { FloorTerrain } from './floorTerrain';
@@ -87,45 +87,14 @@ export function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
   return rows.some((i) => insets.some((inset) => mirroredPair(floor, rc, shape, Math.max(1, i), inset)));
 }
 
-/** Wall fragments staggered across the way through: one leaning left, one right. */
-function fragments(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
-  const length = Math.min(3, Math.max(2, Math.floor(rc.width / 3)));
-  const shape: CoverShape = { kind: 'wall-fragment', di: 1, dj: length };
-  const first = Math.max(1, Math.floor(rc.depth / 3));
-  const second = Math.min(rc.depth - 2, Math.floor((rc.depth * 2) / 3));
-  const flip = chance(rng, 0.5);
-  const a = tryShape(floor, rc, shape, first, flip ? 1 : rc.width - 1 - length);
-  const b = second > first + 1 && tryShape(floor, rc, shape, second, flip ? rc.width - 1 - length : 1);
-  return a || b;
-}
-
-function statues(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
-  const i = pick(rng, [Math.floor(rc.depth / 2), Math.floor(rc.depth / 3)]);
-  return mirroredPair(floor, rc, { kind: 'statue', di: 1, dj: 1 }, Math.max(1, i), rc.width >= 6 ? 1 : 0);
-}
-
-/** Strong features for an open room: one layout, else the next that fits, else scattered low cover. */
-export function openRoomCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): void {
-  const layouts = shuffled(rng, [pillars, pillars, fragments, statues]);
-  const done = layouts.some((layout) => layout(floor, rc, rng));
-  if (!done || chance(rng, 0.35)) scatterCover(floor, rc, rng, int(rng, 1, 2), tags);
-}
-
-/** Cover for a cramped room: one to three low pieces. */
-export function crampedCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): void {
-  const area = rc.floorCount;
-  scatterCover(floor, rc, rng, 1 + (area >= 16 ? 1 : 0) + (chance(rng, 0.4) ? 1 : 0), tags);
-}
-
 /** Whether the room holds a piece that gives cover. */
 export function hasCover(floor: FloorTerrain, rc: RoomCells): boolean {
   return floor.inRoom(rc.room.id).some((p) => p.traits.cover !== undefined);
 }
 
-/** A last piece of low cover where the room has none yet: tried at every free cell. */
-export function ensureCover(floor: FloorTerrain, rc: RoomCells, tags: ReadonlySet<DungeonTag>): void {
+/** A last piece of low cover where the room has none yet (`kind`, else what the tags suggest): tried at every free cell. */
+export function ensureCover(floor: FloorTerrain, rc: RoomCells, tags: ReadonlySet<DungeonTag>, kind: TerrainKind = tags.has('crumbling') ? 'rubble-heap' : 'crates'): void {
   if (hasCover(floor, rc)) return;
-  const kind: TerrainKind = tags.has('crumbling') ? 'rubble-heap' : 'crates';
   for (let i = 0; i < rc.depth; i++) {
     for (let j = 0; j < rc.width; j++) {
       if (floor.place(draft(kind, rc.room.id, rc.block(i, j, 1, 1), { facing: negate(rc.axis) })) !== null) return;

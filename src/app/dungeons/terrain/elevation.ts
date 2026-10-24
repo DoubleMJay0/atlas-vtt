@@ -21,6 +21,15 @@ function step(c: CellPoint, d: CellDir): CellPoint {
   return { x: c.x + d.x, y: c.y + d.y };
 }
 
+/** A platform's cells `w` wide and `deep` rows against the far wall, centred, and its steps and the cells at their foot. */
+export function farWallBlock(rc: RoomCells, deep: number, w: number): { cells: CellPoint[]; steps: CellPoint[]; foot: CellPoint[] } {
+  const facing = negate(rc.axis);
+  const j0 = Math.floor((rc.width - w) / 2);
+  const middle = w % 2 === 1 ? [j0 + (w - 1) / 2] : [j0 + w / 2 - 1, j0 + w / 2];
+  const steps = middle.map((j) => rc.cell(rc.depth - deep, j));
+  return { cells: rc.block(rc.depth - deep, j0, deep, w), steps, foot: steps.map((c) => step(c, facing)) };
+}
+
 /**
  * A platform `deep` rows against the far wall, as wide as fits from `widest` down to three cells,
  * centred, its steps in the middle of its front facing the way in. Its id, or null.
@@ -29,11 +38,7 @@ export function platformAtFarWall(floor: FloorTerrain, rc: RoomCells, deep: numb
   if (rc.depth < deep + 3) return null;
   const facing = negate(rc.axis);
   for (let w = Math.min(widest, rc.width - 2); w >= 3; w--) {
-    const j0 = Math.floor((rc.width - w) / 2);
-    const cells = rc.block(rc.depth - deep, j0, deep, w);
-    const middle = w % 2 === 1 ? [j0 + (w - 1) / 2] : [j0 + w / 2 - 1, j0 + w / 2];
-    const steps = middle.map((j) => rc.cell(rc.depth - deep, j));
-    const foot = steps.map((c) => step(c, facing));
+    const { cells, steps, foot } = farWallBlock(rc, deep, w);
     if (!foot.every((c) => rc.isFree(c))) continue;
     const id = floor.place(draft('platform', rc.room.id, cells, { facing, steps, traits: { elevation } }));
     if (id === null) continue;

@@ -83,8 +83,8 @@ function clipLanes(env: RenderEnv, mouths: readonly Mouth[]): void {
   const b = dungeon.bounds;
   ctx.beginPath();
   ctx.rect(b.minX - 10, b.minY - 10, b.maxX - b.minX + 20, b.maxY - b.minY + 20);
-  for (const { at, out } of mouths) {
-    const half = 0.5 + LANE.margin;
+  for (const { at, out, width } of mouths) {
+    const half = width / 2 + LANE.margin;
     const across: Vec = { x: -out.y * half, y: out.x * half };
     const far: Vec = { x: at.x + out.x * LANE.length, y: at.y + out.y * LANE.length };
     tracePolygon(ctx, [

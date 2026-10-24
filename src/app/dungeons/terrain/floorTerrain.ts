@@ -5,8 +5,8 @@
  */
 
 import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
-import type { CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
-import { cellKey, floorRect, inRect } from '../geometry';
+import type { CaveFloor, CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
+import { cellKey } from '../geometry';
 import { type FloorStack, stairEnd } from '../floors/floorStack';
 import type { StairEnd } from '../floors/stairSpots';
 import { type TerrainDraft, footingOf } from './catalog';
@@ -19,6 +19,8 @@ export interface FloorPlan {
   columns: readonly DungeonColumn[];
   /** The kinds that may be placed; unset, those with a drawing (`DRAWN_TERRAIN_KINDS`). Tests of placement offer every kind. */
   offeredTerrain?: ReadonlySet<TerrainKind>;
+  /** A Cavern floor's geology: its lane, which nothing that blocks stands on, its faults, basins and streams. */
+  cave?: CaveFloor;
 }
 
 export class FloorTerrain {
@@ -28,6 +30,8 @@ export class FloorTerrain {
   /** The cells that furniture stands on, by key. */
   private readonly furnished = new Set<string>();
   private readonly cells = new Map<number, RoomCells>();
+  /** A Cavern floor's lane, by key. */
+  readonly lane: ReadonlySet<string>;
 
   constructor(
     readonly index: number,
@@ -35,9 +39,10 @@ export class FloorTerrain {
     stack: FloorStack,
   ) {
     const endOf = (stair: DungeonStair): StairEnd => stairEnd(stack, index, stair.to);
+    this.lane = new Set((plan.cave?.lane ?? []).map((c) => cellKey(c.x, c.y)));
     for (const room of plan.rooms) {
       if (room.kind !== 'room') continue;
-      this.cells.set(room.id, new RoomCells(room, plan.doors, plan.stairs, endOf, plan.columns));
+      this.cells.set(room.id, new RoomCells(room, plan.doors, plan.stairs, endOf, plan.columns, this.lane));
     }
   }
 
@@ -50,7 +55,7 @@ export class FloorTerrain {
   roomHolding(cells: readonly CellPoint[]): RoomCells | undefined {
     const first = cells[0];
     if (!first) return undefined;
-    const room = this.plan.rooms.find((r) => r.kind === 'room' && inRect(floorRect(r), first.x, first.y));
+    const room = this.plan.rooms.find((r) => r.kind === 'room' && this.cells.get(r.id)?.isFloor(first));
     const rc = room && this.cells.get(room.id);
     return rc && cells.every((c) => rc.isFloor(c)) ? rc : undefined;
   }

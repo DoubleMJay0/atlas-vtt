@@ -27,14 +27,14 @@ export function themeOf(id: ThemeId): ThemeDefinition {
   return THEMES[id];
 }
 
-/** The tags a theme cannot take, each with the reason the panel shows. */
-export function refusedTags(theme: ThemeId): ReadonlyMap<DungeonTag, MessageKey> {
-  return new Map(THEMES[theme].refuses.map(({ tag, reason }) => [tag, reason]));
+/** The tags a theme cannot take beside `tags`, each with the reason the panel shows. */
+export function refusedTags(theme: ThemeId, tags: readonly DungeonTag[] = []): ReadonlyMap<DungeonTag, MessageKey> {
+  return new Map(THEMES[theme].refuses.filter((r) => r.with === undefined || tags.includes(r.with)).map(({ tag, reason }) => [tag, reason]));
 }
 
 /** `tags` without those the theme refuses: a tag a theme cannot take is ignored for it. */
 export function themedTags(theme: ThemeId, tags: readonly DungeonTag[]): DungeonTag[] {
-  const refused = refusedTags(theme);
+  const refused = refusedTags(theme, tags);
   return tags.filter((tag) => !refused.has(tag));
 }
 
@@ -53,8 +53,8 @@ export function readThemeChoice(value: unknown): ThemeChoice {
   return value === 'any' || (THEME_IDS as readonly unknown[]).includes(value) ? (value as ThemeChoice) : 'any';
 }
 
-/** The programme a theme types its rooms by for these tags; null for a theme that furnishes by roles. */
-export function programmeOf(definition: ThemeDefinition, tags: ReadonlySet<DungeonTag>): RoomProgramme | null {
+/** The programme a theme types its rooms by for these tags. */
+export function programmeOf(definition: ThemeDefinition, tags: ReadonlySet<DungeonTag>): RoomProgramme {
   return definition.programmeFor?.(tags) ?? definition.programme;
 }
 

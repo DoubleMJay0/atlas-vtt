@@ -20,7 +20,15 @@ export type FeatureReason =
   | 'light-well'
   | 'rotted-floor'
   | 'conservatory-pool'
-  | 'flooded-cellar';
+  | 'flooded-cellar'
+  | 'fault-chasm'
+  | 'sinkhole'
+  | 'pitch'
+  | 'cave-lake'
+  | 'cave-stream'
+  | 'sump'
+  | 'lava-flow'
+  | 'sulphur-spring';
 
 export interface FeatureSpec {
   /** The terrain the reason may lay. */
@@ -59,4 +67,15 @@ export const FEATURES: Readonly<Record<FeatureReason, FeatureSpec>> = {
   'rotted-floor': { kinds: ['broken-floor', 'chasm'], shape: 'natural', at: 'here', ruinedOnly: true },
   'conservatory-pool': { kinds: ['pool'], water: 'pool', shape: 'built', at: 'here' },
   'flooded-cellar': { kinds: [], water: 'shallow', shape: 'natural', at: 'here', ruinedOnly: true },
+  // A cave's, as its geology decides them: a chasm along a fault, a collapse opening onto the floor below, a natural shaft.
+  'fault-chasm': { kinds: ['chasm'], shape: 'natural', at: 'here' },
+  sinkhole: { kinds: ['chasm'], shape: 'natural', at: 'here', upperFloor: true },
+  pitch: { kinds: ['shaft'], shape: 'natural', at: 'here', upperFloor: true },
+  // Water where it gathers: a lake in a low chamber, a stream running down to it, a sump at a stream's low end.
+  'cave-lake': { kinds: ['deep-water'], shape: 'natural', at: 'here' },
+  'cave-stream': { kinds: ['channel'], shape: 'natural', at: 'here' },
+  sump: { kinds: ['deep-water'], shape: 'natural', at: 'here' },
+  // Lava running deep down a tube, acid rising at a spring on a fault.
+  'lava-flow': { kinds: ['channel'], shape: 'natural', at: 'here' },
+  'sulphur-spring': { kinds: ['channel', 'deep-water'], shape: 'natural', at: 'here' },
 };

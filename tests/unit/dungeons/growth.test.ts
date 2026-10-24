@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonRequest } from '../../../src/app/dungeons/model';
+import { cellKey, holdsCell } from '../../../src/app/dungeons/geometry';
 import { GROWTH_KINDS } from '../../../src/app/dungeons/growthModel';
 import { roomLight } from '../../../src/app/dungeons/growth/placeGrowth';
 import { en } from '../../../src/app/i18n/locales/en';
@@ -62,7 +63,7 @@ function growthProblems(floor: DungeonFloor): string[] {
     for (const c of g.cells) {
       const k = key(c);
       const where = `${g.kind} ${i} at ${k}`;
-      if (c.x < room.x || c.y < room.y || c.x >= room.x + room.w || c.y >= room.y + room.h) problems.push(`${where} outside its room`);
+      if (!holdsCell(room, c.x, c.y)) problems.push(`${where} outside its room`);
       if (doors.has(k)) problems.push(`${where} in a doorway`);
       if (stairs.has(k)) problems.push(`${where} by a stairwell`);
       if ((g.wall ? shownApproaches : allApproaches).has(k)) problems.push(`${where} before a door`);
@@ -72,7 +73,9 @@ function growthProblems(floor: DungeonFloor): string[] {
     }
     if (g.wall) {
       for (const p of g.wall) {
-        const onEdge = room.rotunda
+        const onEdge = room.cells
+          ? onMaskEdge(room.cells, p)
+          : room.rotunda
           ? Math.abs(Math.hypot(p.x - (room.x + room.w / 2), p.y - (room.y + room.h / 2)) - Math.sqrt(room.w * room.w + 1) / 2) < 1e-6
           : (Math.abs(p.x - room.x) < 1e-9 || Math.abs(p.x - room.x - room.w) < 1e-9 || Math.abs(p.y - room.y) < 1e-9 || Math.abs(p.y - room.y - room.h) < 1e-9);
         if (!onEdge) problems.push(`${g.kind} ${i} off its wall at ${p.x},${p.y}`);
@@ -112,11 +115,12 @@ describe('dungeon vegetation', () => {
   it('grows richly in an overgrown dungeon, a little by the water of a wet one, weeds in a crumbling one', () => {
     const rich = growthOf(overgrown) / 2;
     expect(rich).toBeGreaterThan(25);
-    expect(growthOf(wet)).toBeGreaterThan(1);
+    // A cave grows by its water and in its cracks only where daylight reaches (its zones, caveLife.ts).
+    expect(growthOf(wet)).toBeGreaterThan(0.5);
     expect(growthOf(wet)).toBeLessThan(rich / 2);
-    expect(growthOf(crumbling)).toBeGreaterThan(0.5);
+    expect(growthOf(crumbling)).toBeGreaterThan(0.15);
     expect(growthOf(crumbling)).toBeLessThan(rich / 3);
-    expect(undergrowthOf(overgrown)).toBeGreaterThan(1);
+    expect(undergrowthOf(overgrown)).toBeGreaterThan(0.15);
     expect(undergrowthOf(wet) + undergrowthOf(crumbling)).toBe(0);
     for (const k of kinds(wet)) expect(['moss', 'fern']).toContain(k);
     expect([...kinds(crumbling)]).toEqual(['grass']);
@@ -128,7 +132,8 @@ describe('dungeon vegetation', () => {
       expect(growthOf(models), tags.join(',')).toBe(0);
       expect(undergrowthOf(models), tags.join(',')).toBe(0);
     }
-    expect(growthOf(lava)).toBeGreaterThan(10);
+    // A lava cave grows by its mouth and its water alone, never where the lava runs.
+    expect(growthOf(lava)).toBeGreaterThan(5);
   }, 120_000);
 
   it('picks what grows by the theme', () => {
@@ -168,3 +173,10 @@ describe('dungeon vegetation', () => {
     for (const info of Object.values(GROWTH_KINDS)) expect(Object.hasOwn(en, info.name), info.name).toBe(true);
   });
 });
+
+/** Whether a point lies on the edge between a cave room's cells and the rock round them. */
+function onMaskEdge(cells: readonly CellPoint[], p: CellPoint): boolean {
+  const keys = new Set(cells.map((c) => cellKey(c.x, c.y)));
+  const around = [-0.01, 0.01].flatMap((dx) => [-0.01, 0.01].map((dy) => keys.has(cellKey(Math.floor(p.x + dx), Math.floor(p.y + dy)))));
+  return around.some(Boolean) && around.some((inside) => !inside);
+}

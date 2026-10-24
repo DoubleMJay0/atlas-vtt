@@ -7,18 +7,19 @@
  * open: pieces that cannot be walked never take more than a third of its floor.
  */
 
-import type { CellDir } from '../model';
+import type { CellDir, CellPoint, DungeonRoom } from '../model';
 import { dir } from '../geometry';
 import { type Rng, chance, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import type { ArenaSetPiece, ArenaSpec } from '../themes/themeTypes';
 import { draft } from './catalog';
 import { type CoverShape, ensureCover, tryShape } from './cover';
-import { platformAtFarWall } from './elevation';
+import { farWallBlock, ledgeAlongWall, platformAtFarWall } from './elevation';
 import type { FloorTerrain } from './floorTerrain';
+import { placeCaveHazard } from './cavern/caveHazards';
 import { placeHazard } from './hazards';
 import { placeInterest } from './interest';
-import type { RoomCells } from './roomCells';
+import { RoomCells } from './roomCells';
 import type { TerrainWork } from './work';
 
 /** Pieces that cannot be walked take at most this share of the arena's floor. */
@@ -107,6 +108,22 @@ function wideCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, platformDepth: 
   }
 }
 
+/** The arena's platform: rows deep, at most how wide, and how high. */
+function arenaPlatform(rc: Pick<RoomCells, 'depth' | 'width'>): { deep: number; widest: number; elevation: number } {
+  return { deep: rc.depth >= 8 ? 2 : 1, widest: Math.ceil(rc.width * 0.6), elevation: rc.depth >= 9 ? 2 : 1 };
+}
+
+/** The cells the arena's platform takes at its widest, its steps and the cells at their foot: what a cave keeps floor in its boss room. */
+export function arenaSeeds(room: DungeonRoom): CellPoint[] {
+  const { cells: _mask, ...rect } = room;
+  const rc = new RoomCells(rect, [], [], () => 'lower', []);
+  const { deep, widest } = arenaPlatform(rc);
+  const w = Math.min(widest, rc.width - 2);
+  if (rc.depth < deep + 3 || w < 3) return [];
+  const { cells, foot } = farWallBlock(rc, deep, w);
+  return [...cells, ...foot];
+}
+
 const DEFAULT_SET_PIECES: readonly (readonly [ArenaSetPiece, number])[] = [
   ['statues', 3],
   ['altar', 1.5],
@@ -128,14 +145,17 @@ function placeSetPiece(floor: FloorTerrain, rc: RoomCells, rng: Rng, pieces: rea
 export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>, arena?: ArenaSpec): void {
   const floor = work.floors[k];
   if (!floor) return;
-  const deep = rc.depth >= 8 ? 2 : 1;
-  const raised = platformAtFarWall(floor, rc, deep, Math.ceil(rc.width * 0.6), rc.depth >= 9 ? 2 : 1) !== null;
+  const { deep, widest, elevation } = arenaPlatform(rc);
+  // A cave's high ground is a ledge of rock along a wall, never a dais built at its far end.
+  if (work.cave) ledgeAlongWall(floor, rc, rng);
+  const raised = !work.cave && platformAtFarWall(floor, rc, deep, widest, elevation) !== null;
   const platformDepth = raised ? deep : 0;
   const placed = placeSetPiece(floor, rc, rng, arena ? arena.setPieces : DEFAULT_SET_PIECES, platformDepth);
   wideCover(floor, rc, rng, platformDepth, arena?.mirrored);
-  ensureCover(floor, rc, tags);
+  ensureCover(floor, rc, tags, work.cave ? 'rubble-heap' : undefined);
   if (arena) {
-    if (arena.hazards.length > 0 && chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) placeHazard(work, k, rc, rng, weighted(rng, arena.hazards.map((h) => [h, 1] as const)), arena.hazards);
+    const place = work.cave ? placeCaveHazard : placeHazard;
+    if (arena.hazards.length > 0 && chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) place(work, k, rc, rng, weighted(rng, arena.hazards.map((h) => [h, 1] as const)), arena.hazards);
     return;
   }
   if (chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) placeHazard(work, k, rc, rng, chance(rng, 0.6) ? 'channel' : 'pit');

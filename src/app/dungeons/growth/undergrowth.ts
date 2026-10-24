@@ -36,11 +36,15 @@ function clump(rng: Rng, rc: RoomCells, start: CellPoint, size: number, fits: (c
 }
 
 export interface UndergrowthSetting {
+  /** A built theme's dungeon (Fortress, Mansion): its typed rooms are kept unless it lies in ruins. */
+  built: boolean;
   ruined: boolean;
   /** A storey above the entrance floor, lit by windows the map does not draw. */
   aboveGround: boolean;
   /** The cells under an opening in the floor above, by key: light falls in there. */
   openAbove: ReadonlySet<string>;
+  /** Which kinds may grow in a room (a cave's life keeps to its zones); unset lets every kind grow everywhere. */
+  mayGrow?: (room: number, kind: UndergrowthKind) => boolean;
 }
 
 /** How near light or water a built room's undergrowth may start, in cells. */
@@ -63,7 +67,7 @@ function litCells(rc: RoomCells, rooms: readonly DungeonRoom[], space: GrowthSpa
 
 /** Adds the floor's undergrowth to its terrain; returns every piece. */
 export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: readonly CellPoint[], flora: Flora | null, setting: UndergrowthSetting): DungeonTerrain[] {
-  const { ruined, aboveGround } = setting;
+  const { built, ruined, aboveGround, mayGrow = (): boolean => true } = setting;
   if (!flora?.rich) return floor.pieces;
   const { plan } = floor;
   const space = new GrowthSpace({ ...plan, props: [], terrain: floor.pieces, waterCells });
@@ -71,9 +75,9 @@ export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: re
   for (const room of plan.rooms) {
     const rc = floor.room(room.id);
     if (!rc || rc.floorCount < FIGHT_AREA || room.stage !== undefined) continue;
-    // A built theme's rooms are kept: only a ruin lets thickets in.
-    if (room.type && !ruined) continue;
-    const lit = room.type ? litCells(rc, plan.rooms, space, setting.openAbove) : null;
+    // A built theme's rooms are kept: only a ruin lets thickets in, and only where light or water comes in.
+    if (room.type && built && !ruined) continue;
+    const lit = room.type && built ? litCells(rc, plan.rooms, space, setting.openAbove) : null;
     if (lit?.size === 0) continue;
     const rng = floorStream(seed, 'growth', floor.index, `undergrowth:${room.id}`);
     const l = light[room.id] ?? 0;
@@ -81,6 +85,7 @@ export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: re
     const clumps = rc.floorCount > 30 && chance(rng, 0.4) ? 2 : 1;
     for (let k = 0; k < clumps; k++) {
       const kind = weighted(rng, flora.undergrowth.map(([kind, w]) => [kind, GREEN[kind] ? w * l : w] as const));
+      if (!mayGrow(room.id, kind)) continue;
       const fits = (c: CellPoint): boolean => !rc.nearStairs(c) && space.forPlant(c) && (!lit || lit.has(cellKey(c.x, c.y)));
       const starts: CellPoint[] = [];
       for (let i = 0; i < rc.depth; i++) for (let j = 0; j < rc.width; j++) {

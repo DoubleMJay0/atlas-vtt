@@ -82,7 +82,8 @@ export function addRewardRoom(rngOf: KeyedRng, layout: WorkLayout, params: Dunge
   const rng = rngOf('reward');
   const secret = chance(rng, params.secretReward);
   for (const exit of shuffled(rng, exitsOf(boss))) {
-    for (const size of shuffled(rng, REWARD_SIZES)) {
+    const least = (params.minRoomFloor ?? 0) + 2;
+    for (const size of shuffled(rng, REWARD_SIZES).filter((size) => size.width >= least && size.depth >= least)) {
       const room: WorkRoom = {
         id: layout.rooms.length,
         ...exit,

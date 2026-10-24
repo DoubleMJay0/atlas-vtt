@@ -1,6 +1,6 @@
 import type { CellDir, DungeonDoor } from '../model';
 import { unionRings } from '../render/clipShapes';
-import { doorShape, shapePolygon, type FloorShape, type Vec } from '../render/geometry';
+import { doorShape, shapePolygon, shapeRings, type FloorShape, type Vec } from '../render/geometry';
 
 /**
  * The centre line of a dungeon's drawn walls, in cells. The renderer strokes every floor shape at
@@ -21,7 +21,13 @@ const ROTUNDA_SIDES = 64;
 
 const snap = (cells: number): number => Math.round(cells * STEPS) / STEPS;
 
-function ringOf(shape: FloorShape, grow: number): Vec[] {
+/** A shape's wall rings grown by `grow`: a poly's every ring, the corners square as a rectangle's. */
+function ringsOf(shape: FloorShape, grow: number): Vec[][] {
+  if (shape.kind !== 'poly') return [ringOf(shape, grow)];
+  return shapeRings(shape, grow).map(ring => ring.map(p => ({ x: snap(p.x), y: snap(p.y) })));
+}
+
+function ringOf(shape: Exclude<FloorShape, { kind: 'poly' }>, grow: number): Vec[] {
   if (shape.kind === 'rect') return shapePolygon(shape, grow).map(p => ({ x: snap(p.x), y: snap(p.y) }));
   const r = shape.r + grow;
   const ring: Vec[] = [];
@@ -39,7 +45,7 @@ function ringOf(shape: FloorShape, grow: number): Vec[] {
  */
 export function wallRings(floors: readonly FloorShape[], secretDoors: readonly DungeonDoor[], grow: number): Vec[][] {
   const g = snap(grow);
-  return unionRings([...floors.map(shape => ringOf(shape, g)), ...secretDoors.map(door => ringOf(doorShape(door), g))]);
+  return unionRings([...floors.flatMap(shape => ringsOf(shape, g)), ...secretDoors.map(door => ringOf(doorShape(door), g))]);
 }
 
 /** A line across a door cell: through `at`, along the door's width (perpendicular to its direction). */

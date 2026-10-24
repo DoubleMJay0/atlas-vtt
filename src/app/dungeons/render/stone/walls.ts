@@ -2,7 +2,7 @@ import { withAlpha } from '../palette';
 import type { ArtScene } from '../art/artScene';
 import { hash2 } from '../art/noise';
 import { TO_LIGHT } from '../art/light';
-import { clipOutsideMouths, grownRings, rockSide, traceRings } from '../art/outline';
+import { clipOutsideMouths, grownRings, rockSide, traceRings, traceWallInk } from '../art/outline';
 import { wallInkWidth } from '../wallInk';
 import type { StoneColours } from './colours';
 import { cellPattern } from './patterns';
@@ -118,10 +118,8 @@ export function drawWallEdge(scene: ArtScene, c: StoneColours): void {
   traceRings(ctx, scene.floorRings);
   ctx.clip('evenodd');
   ctx.beginPath();
-  traceRings(ctx, scene.floorRings);
+  traceWallInk(ctx, scene, ink);
   ctx.strokeStyle = c.line;
-  ctx.lineWidth = ink * 2;
-  ctx.lineJoin = 'miter';
   ctx.stroke();
   ctx.restore();
 }

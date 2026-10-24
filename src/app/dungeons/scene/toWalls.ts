@@ -1,4 +1,5 @@
 import type { WallSegment } from '../../types/wallTypes';
+import { doorCells } from '../geometry';
 import type { DoorKind, DungeonDoor, DungeonModel } from '../model';
 import { visibleFloor } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
@@ -29,14 +30,21 @@ const DOOR_WALLS: Partial<Record<DoorKind, DoorWall>> = {
   secret: { type: 'secret-door', v: (door, half) => (door.from === null ? 0.5 - half : half - 0.5) },
 };
 
+/** In a cave a crawl is rock all through, so its secret door closes it in its cell's middle. */
+const CAVE_DOOR_WALLS: Partial<Record<DoorKind, DoorWall>> = { ...DOOR_WALLS, secret: { type: 'secret-door', v: () => 0 } };
+
 /**
  * Whether a point lies on the outer mouth of an entrance: the edge of its cell's wall ring that
  * faces the outside. An entrance leads out, so no wall closes it there (the map draws none either:
  * the ground outside the way in is cleared).
  */
-function entranceMouth(door: DungeonDoor, half: number): (p: Vec) => boolean {
-  const reach = 0.5 + half + 1 / STEPS;
-  const mouth = { x: door.x + 0.5 - door.dir.x * (0.5 + half), y: door.y + 0.5 - door.dir.y * (0.5 + half) };
+function entranceMouth(door: DungeonDoor, half: number, cave: boolean): (p: Vec) => boolean {
+  const cells = doorCells(door);
+  // A cave's outline meets its straight mouth at a slant, so the grown corner lies up to a further half wall along it.
+  const reach = cells.length / 2 + (cave ? 2 : 1) * half + 1 / STEPS;
+  const cx = cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length;
+  const cy = cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length;
+  const mouth = { x: cx - door.dir.x * (0.5 + half), y: cy - door.dir.y * (0.5 + half) };
   return p => {
     const dx = p.x - mouth.x;
     const dy = p.y - mouth.y;
@@ -73,14 +81,15 @@ export function dungeonWalls(
   floor = 0,
   of: WallsOf = { id: 'dungeon' },
 ): DungeonWalls {
-  const { doors, floors } = visibleFloor(model, view, floor);
+  const { doors, floors, floor: shown } = visibleFloor(model, view, floor);
+  const kinds = shown.cave ? CAVE_DOOR_WALLS : DOOR_WALLS;
   const half = wallInkWidth(style) / 2;
   const rings = wallRings(floors, doors.filter(door => door.kind === 'secret'), half);
 
   const placed: { door: DungeonDoor; wall: DoorWall; ends: [RingHit, RingHit] }[] = [];
   let unplaced = 0;
   for (const door of doors) {
-    const wall = DOOR_WALLS[door.kind];
+    const wall = kinds[door.kind];
     if (!wall) continue;
     // The side walls lie half a cell and half a wall from the door's middle
     const reach = 0.5 + half + 1 / STEPS;
@@ -104,7 +113,7 @@ export function dungeonWalls(
     walls[id] = { id, kind: 'wall', p1: world(from), p2: world(to), ...rest, ...(of.levels && { levels: of.levels }) };
   };
 
-  const mouths = doors.filter(door => door.from === null).map(door => entranceMouth(door, half));
+  const mouths = doors.filter(door => door.from === null).map(door => entranceMouth(door, half, shown.cave !== undefined));
   const onMouth = (a: Vec, b: Vec): boolean => mouths.some(mouth => mouth(a) && mouth(b));
   outlines.forEach((ring, index) => {
     const chainId = `chain_${of.id}_${index + 1}`;

@@ -1,6 +1,6 @@
 import type { DungeonStyle } from '../../style';
 import type { ArtScene } from '../art/artScene';
-import { clipOutsideMouths, grownRings, traceRings } from '../art/outline';
+import { clipOutsideMouths, grownRings, traceRings, traceWallInk } from '../art/outline';
 import { wallInkWidth } from '../wallInk';
 import type { Pens } from './pens';
 
@@ -27,8 +27,7 @@ export function drawWalls(scene: ArtScene, pens: Pens): void {
   traceRings(ctx, scene.floorRings);
   ctx.clip('evenodd');
   ctx.beginPath();
-  traceRings(ctx, scene.floorRings);
-  ctx.lineWidth = width * 2;
+  traceWallInk(ctx, scene, width);
   ctx.stroke();
   ctx.restore();
 }

@@ -40,6 +40,11 @@ const CASES: readonly { seed: number; theme?: ThemeChoice; tags: string[]; floor
   // Ivy and moss lie over the walls' foot: the walls must still be found on the ink.
   { seed: 16, theme: 'mansion', tags: ['overgrown'], floors: 1, look: 'parchment', view: {} },
   { seed: 404, theme: 'fortress', tags: ['overgrown', 'colonnades', 'wet'], floors: 2, look: 'print', view: {} },
+  // Caverns: walls following natural rock, narrows, crawls, pitches and scree; every cave art family runs these again.
+  { seed: 606, theme: 'cavern', tags: ['medium'], floors: 1, look: 'parchment', view: {} },
+  { seed: 707, theme: 'cavern', tags: ['large', 'lava'], floors: 3, look: 'volcanic', view: {} },
+  { seed: 808, theme: 'cavern', tags: ['small', 'secret', 'wet'], floors: 2, look: 'print', view: { monochrome: true } },
+  { seed: 909, theme: 'cavern', tags: [], floors: 1, look: 'masonry', view: {}, fiveRoom: true },
 ];
 
 const TALL_TERRAIN = new Set(['pillar', 'obelisk', 'statue', 'wall-fragment']);
@@ -75,6 +80,29 @@ function draw(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floo
   const ctx = canvas.getContext('2d')!;
   renderMap(ctx, model, dungeonStyle(look), view, { pxPerCell: PX_PER_CELL, floor });
   return { data: ctx.getImageData(0, 0, layout.widthPx, layout.heightPx).data, width: layout.widthPx, height: layout.heightPx };
+}
+
+/** Walls that pass through the inside of a narrows or a lane cell, more than `inset` px from its edges, as `x,y` of the first point found. */
+function wallsInWay(floor: DungeonModel['floors'][number], walls: readonly WallSegment[], placement: { originCell: { x: number; y: number }; pxPerCell: number }, inset: number): string[] {
+  const cells = [...(floor.cave?.lane ?? []), ...floor.doors.filter(d => d.kind !== 'secret' && d.from !== null).flatMap(d => [{ x: d.x, y: d.y }, ...(d.wide ? [{ x: d.x + d.wide.x, y: d.y + d.wide.y }] : [])])];
+  const { originCell, pxPerCell } = placement;
+  const out: string[] = [];
+  for (const wall of walls.filter(w => w.type !== 'door')) {
+    for (let t = 0; t <= 1; t += 0.05) {
+      const x = wall.p1.x + (wall.p2.x - wall.p1.x) * t;
+      const y = wall.p1.y + (wall.p2.y - wall.p1.y) * t;
+      const inside = cells.some(c => {
+        const x0 = (c.x - originCell.x) * pxPerCell;
+        const y0 = (c.y - originCell.y) * pxPerCell;
+        return x > x0 + inset && x < x0 + pxPerCell - inset && y > y0 + inset && y < y0 + pxPerCell - inset;
+      });
+      if (inside) {
+        out.push(`${Math.round(x)},${Math.round(y)}`);
+        break;
+      }
+    }
+  }
+  return out.slice(0, 5);
 }
 
 const share = (values: readonly number[], limit: number): number => values.filter(v => v <= limit).length / Math.max(1, values.length);
@@ -135,9 +163,15 @@ describe('a dungeon scene and its map image', () => {
         // (b) Every drawn wall face has a wall along the ink's middle
         const field = visibleDungeon(model, view, index).field;
         const edges = inkEdgesFromWalls(floor, field, walls, mask, picture, placement);
-        const loose = edges.filter(e => e.distance > halfInk + 3).slice(0, 5).map(e => `${e.at.x},${e.at.y} (${e.distance.toFixed(1)} px)`);
+        // A face pixel lies up to 3 px inside the floor's edge (0.015 cells at 200 px), and a pixel's middle half a diagonal past that
+        // where an engraved shadow's hatching meets a curved wall at a slant.
+        const loose = edges.filter(e => e.distance > halfInk + 3 + Math.SQRT1_2).slice(0, 5).map(e => `${e.at.x},${e.at.y} (${e.distance.toFixed(1)} px)`);
         expect(edges.length, `${where}: wall faces found`).toBeGreaterThan(1000);
         expect(loose, `${where}: drawn wall faces without a wall`).toEqual([]);
+
+        // No wall stands inside a cave's narrows or on its main path: the way two cells wide stays open.
+        // A cell's edge may wander a fifth of a cell in (the outline keeps the middle 0.6 of every cell, `holdToCells.ts`).
+        if (floor.cave) expect(wallsInWay(floor, walls, placement, PX_PER_CELL * 0.2 + halfInk), `${where}: walls in a narrows or on the lane`).toEqual([]);
 
         // No wall stands in a hole or on a bridge: sight passes over a chasm. A hole over a floor below is cut out of the image; a bridge is not
         expect(wallsInTerrain(floor, walls, placement), `${where}: walls in holes or on bridges`).toEqual([]);

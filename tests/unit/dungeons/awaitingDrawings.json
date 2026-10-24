@@ -54,8 +54,35 @@
     "broken-furniture",
     "alembic-table",
     "telescope",
-    "star-chart"
+    "star-chart",
+    "stalagmites",
+    "column-formation",
+    "flowstone",
+    "curtain",
+    "crystals",
+    "mushrooms",
+    "boulder",
+    "nest",
+    "bedroll",
+    "campfire",
+    "crude-table",
+    "pen"
   ],
-  "terrain": [],
-  "cave": []
+  "terrain": [
+    "bone-litter",
+    "boulder-choke",
+    "guano",
+    "rimstone",
+    "sulphur-crust"
+  ],
+  "cave": [
+    "floor",
+    "edge",
+    "surround",
+    "narrows",
+    "crawl",
+    "pitch",
+    "aven",
+    "scree"
+  ]
 }

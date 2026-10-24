@@ -1,5 +1,5 @@
 import { unionRings } from './clipShapes';
-import { pointInPolygon, pointsBounds, shapePolygon, signedArea2, type Bounds, type Vec } from './geometry';
+import { pointInPolygon, pointsBounds, shapeRings, signedArea2, type Bounds, type Vec } from './geometry';
 import type { VisibleDungeon } from './visibleDungeon';
 
 /**
@@ -26,7 +26,7 @@ const enclosed = new WeakMap<VisibleDungeon, Pocket[]>();
 function enclosedRock(dungeon: VisibleDungeon): Pocket[] {
   const known = enclosed.get(dungeon);
   if (known) return known;
-  const rings = unionRings(dungeon.floors.map(shape => shapePolygon(shape, 0, OUTLINE_PX_PER_CELL)));
+  const rings = unionRings(dungeon.floors.flatMap(shape => shapeRings(shape, 0, OUTLINE_PX_PER_CELL)));
   // The largest ring is an outline; holes run the other way round.
   let outward = 0;
   for (const ring of rings) {

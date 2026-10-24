@@ -191,10 +191,9 @@ export interface ThemeFactsInput {
 }
 
 /**
- * `programme: null` furnishes by the rooms' architectural roles, as before themes (Cavern until
- * its programme lands). `programmeFor` gives a variant of the programme by the tags (Cavern's lava
- * tube and Underdark); without it, `programme`. `facts` is built once per dungeon, after the
- * layout; without it, nothing beyond the traits counts.
+ * `programmeFor` gives a variant of the programme by the tags (Cavern's lava tube and Underdark);
+ * without it, `programme`. `facts` is built once per dungeon, after the layout; without it,
+ * nothing beyond the traits counts.
  */
 export interface ThemeDefinition {
   id: ThemeId;
@@ -210,9 +209,9 @@ export interface ThemeDefinition {
   stairsFromEntrance?: true;
   /** The least depth of the room the dungeon is entered by, walls included, where it is a normal room: a Fortress's gate passage holds a row of murder holes. */
   entranceDepth?: number;
-  /** Tags the theme cannot take, each with the reason the panel shows. */
-  refuses: readonly { tag: DungeonTag; reason: MessageKey }[];
-  programme: RoomProgramme | null;
+  /** Tags the theme cannot take, each with the reason the panel shows; one with `with` only beside that tag. */
+  refuses: readonly { tag: DungeonTag; reason: MessageKey; with?: DungeonTag }[];
+  programme: RoomProgramme;
   programmeFor?: (tags: ReadonlySet<DungeonTag>) => RoomProgramme;
   facts?: (input: ThemeFactsInput) => ThemeFacts;
 }

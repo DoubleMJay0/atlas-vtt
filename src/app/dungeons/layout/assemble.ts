@@ -21,6 +21,8 @@ import { placeSecretWings } from './secrets';
 import { addSteps } from './steps';
 
 const MAX_ATTEMPTS = 120;
+/** A cave's floor must also fit its chambers' blocks and a lane two cells wide, so it may take more attempts. */
+const MAX_CAVE_ATTEMPTS = 600;
 
 export interface FloorRequest {
   /** 0 is the entry floor. */
@@ -52,22 +54,27 @@ export interface FloorRequest {
 interface Built {
   layout: CompactLayout;
   normals: number;
-  /** Keeps the rules between floors, which no fallback may break. */
-  linked: boolean;
+  /** Keeps the rules between floors, which no fallback may break; asked only where it decides something (null: not yet). */
+  linked: boolean | null;
   /** How many of the floor's own rules it keeps: its fewest rooms, its entrances, its boss room, its loop. */
   kept: number;
 }
 
 const FLOOR_RULES = 4;
 
-function sound(built: Built): boolean {
-  return built.linked && built.kept === FLOOR_RULES;
+/** The rules between floors are asked only of an attempt that keeps its own, or when choosing a fallback. */
+function linked(built: Built, request: FloorRequest): boolean {
+  built.linked ??= request.accept(built.layout);
+  return built.linked;
 }
 
-/** Whether `a` is the better fallback: linked first, then the more rules kept, then the more rooms. */
-function better(a: Built, b: Built): boolean {
-  if (a.linked !== b.linked) return a.linked;
-  return a.kept !== b.kept ? a.kept > b.kept : a.normals > b.normals;
+/**
+ * The fallback where no attempt keeps every rule: of those that keep the rules between floors the
+ * one keeping most of its own (then with the most rooms, then the first), else the same of all.
+ */
+function fallback(built: readonly Built[], request: FloorRequest): Built | null {
+  const ranked = [...built].sort((a, b) => b.kept - a.kept || b.normals - a.normals);
+  return ranked.find((b) => linked(b, request)) ?? ranked[0] ?? null;
 }
 
 function attempt(seed: number, request: FloorRequest, index: number): Built | null {
@@ -92,7 +99,7 @@ function attempt(seed: number, request: FloorRequest, index: number): Built | nu
   shapeRooms(rngOf, work, params);
   const layout = request.fiveRoom ? withStages(compactLayout(work)) : compactLayout(work);
   const kept = [normals >= params.minRooms, entrances, boss, floorRulesHold(layout)].filter(Boolean).length;
-  return { layout, normals, linked: request.accept(layout), kept };
+  return { layout, normals, linked: null, kept };
 }
 
 export interface BuiltFloor {
@@ -101,20 +108,22 @@ export interface BuiltFloor {
   sound: boolean;
 }
 
-/** The first attempt that keeps every rule (after `passOver` such), else the best of them (`better`); null where no attempt found a place for its first room. */
+/** The first attempt that keeps every rule (after `passOver` such), else the best of them (`fallback`); null where no attempt found a place for its first room. */
 export function buildFloorLayout(seed: number, request: FloorRequest): BuiltFloor | null {
-  let best: Built | null = null;
+  const tried: Built[] = [];
   let lastSound: Built | null = null;
   let passed = 0;
-  for (let index = 0; index < MAX_ATTEMPTS; index++) {
+  const attempts = request.params.cave ? MAX_CAVE_ATTEMPTS : MAX_ATTEMPTS;
+  for (let index = 0; index < attempts; index++) {
     const built = attempt(seed, request, index);
     if (!built) continue;
-    if (sound(built)) {
+    if (built.kept === FLOOR_RULES && linked(built, request)) {
       if (passed++ === (request.passOver ?? 0)) return { layout: built.layout, sound: true };
       lastSound = built;
     }
-    if (!best || better(built, best)) best = built;
+    tried.push(built);
   }
   if (lastSound) return { layout: lastSound.layout, sound: true };
+  const best = fallback(tried, request);
   return best ? { layout: best.layout, sound: false } : null;
 }

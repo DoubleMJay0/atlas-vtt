@@ -14,6 +14,7 @@ import { drawWallBand, drawWallEdge } from './walls';
 import { drawPools } from './water';
 import { drawWeathering } from './weathering';
 import { stoneGrowth } from './growth';
+import { type CaveGroundPainting, type CaveGroundPart, builtSurround, caveGround } from '../cave/caveArt';
 
 /**
  * Stone & shadow, bottom to top: the rock, the wall's course, the floor, water, terrain on the
@@ -27,9 +28,12 @@ export function paintStone(scene: ArtScene): void {
   const hand = stoneHand(scene, c);
   const colours = { water: c.water, cloth: c.cloth };
   const growth = stoneGrowth(scene, hand, c);
-  drawRock(env);
-  drawWallBand(scene, c);
-  drawFloor(scene, c);
+  const cave = (part: CaveGroundPart): CaveGroundPainting | undefined => caveGround(part, env);
+  const surround = builtSurround(env) ? cave('surround') : undefined;
+  if (surround) surround.stone(scene, c);
+  else drawRock(env);
+  (cave('edge')?.stone ?? drawWallBand)(scene, c);
+  (cave('floor')?.stone ?? drawFloor)(scene, c);
   drawPools(scene, c);
   drawTerrainGround(hand, colours);
   drawWeathering(scene);

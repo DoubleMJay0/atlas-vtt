@@ -5,7 +5,7 @@
  * props, water, rubble, cracks) live in that continuous space, so a cell's centre is (x + .5, y + .5).
  */
 
-import type { CellDir, CellPoint, DungeonRoom } from './model';
+import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from './model';
 
 /** An inclusive rectangle of cells. */
 export interface CellRect {
@@ -83,4 +83,46 @@ export function stepsWithin(rect: CellRect, from: CellPoint, step: CellDir): Cel
   const out: CellPoint[] = [];
   for (let at = { x: from.x + step.x, y: from.y + step.y }; inRect(rect, at.x, at.y); at = { x: at.x + step.x, y: at.y + step.y }) out.push(at);
   return out;
+}
+
+/** A room's floor: the cells a cave shaped it to, else its rectangle. */
+export function floorCellsOf(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>): CellPoint[] {
+  return room.cells ?? cellsOf(floorRect(room));
+}
+
+const maskKeys = new WeakMap<readonly CellPoint[], ReadonlySet<string>>();
+
+function keysOf(cells: readonly CellPoint[]): ReadonlySet<string> {
+  let keys = maskKeys.get(cells);
+  if (!keys) {
+    keys = new Set(cells.map((c) => cellKey(c.x, c.y)));
+    maskKeys.set(cells, keys);
+  }
+  return keys;
+}
+
+/** A cave room's cells as keys (`x,y`), the same set for the same mask; unset for a room that is its rectangle. */
+export function maskOf(room: Pick<DungeonRoom, 'cells'>): ReadonlySet<string> | undefined {
+  return room.cells && keysOf(room.cells);
+}
+
+/** Whether the cell is floor of the room: in its mask, else in its rectangle. */
+export function holdsCell(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>, x: number, y: number): boolean {
+  return room.cells ? keysOf(room.cells).has(cellKey(x, y)) : inRect(floorRect(room), x, y);
+}
+
+/** The cells a door stands in: its own, and the one beside it where it is a narrows two cells wide. */
+export function doorCells(door: Pick<DungeonDoor, 'x' | 'y' | 'wide'>): CellPoint[] {
+  const own = { x: door.x, y: door.y };
+  return door.wide ? [own, { x: door.x + door.wide.x, y: door.y + door.wide.y }] : [own];
+}
+
+/** A room's floor in cells: its cave cells where it has them, else its rectangle. */
+export function roomArea(room: Pick<DungeonRoom, 'w' | 'h' | 'cells'>): number {
+  return room.cells?.length ?? room.w * room.h;
+}
+
+/** Whether a stairwell lies in the room's floor. */
+export function holdsStairs(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>, stairs: readonly Pick<DungeonStair, 'x' | 'y' | 'w' | 'h'>[]): boolean {
+  return stairs.some((s) => cellsOf({ x0: s.x, y0: s.y, x1: s.x + s.w - 1, y1: s.y + s.h - 1 }).every((c) => holdsCell(room, c.x, c.y)));
 }

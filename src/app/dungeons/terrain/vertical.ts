@@ -39,6 +39,8 @@ export function galleryOverArena(work: TerrainWork, rng: Rng): void {
   const arena = work.floors[farthest]?.plan.rooms.find((room) => room.boss);
   const top = floorAbove(work.stack, farthest);
   const above = work.floors[top ?? -1];
+  // A cave's arena may lie under a fault's chasm, never under a builder's gallery.
+  if (work.theme.definition.id === 'cavern') return;
   if (top === null || !arena || !above || !openingAbove(work, farthest, arena.id, 'gallery') || !chance(rng, GALLERY_CHANCE)) return;
   // The gallery is cut in a room above that may take it: untyped, or a type with a reason for it.
   const cuttable = (id: number): boolean => holeAllowed(work, top, id, 'gallery');
@@ -115,7 +117,8 @@ function shaftSpots(rc: RoomCells, rng: Rng, size: number): CellPoint[][] {
 export function shaftDown(work: TerrainWork, k: number, rng: Rng): void {
   const floor = work.floors[k];
   const below = floorBelow(work.stack, k);
-  if (!floor || below === null || !chance(rng, SHAFT_CHANCE)) return;
+  // A cave's shafts are its pitches, each in a room its type gives one (`caveHazards.ts`).
+  if (!floor || work.cave || below === null || !chance(rng, SHAFT_CHANCE)) return;
   const rooms = shuffled(rng, floor.plan.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.boss && room.stage === undefined && holeAllowed(work, k, room.id, 'shaft')));
   for (const room of rooms) {
     const rc = floor.room(room.id);

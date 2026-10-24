@@ -1,6 +1,8 @@
 /** What every terrain pass shares: the floors being placed, the tags, the theme, the links of holes, the streams. */
 
 import type { FloorStack } from '../floors/floorStack';
+import type { CaveSites } from '../layout/cavern/caveSites';
+import type { CaveVariant } from '../model';
 import { type Rng, floorStream } from '../rng';
 import type { DungeonTag } from '../tags';
 import type { ThemeContext } from '../themes/themes';
@@ -21,6 +23,13 @@ export interface TerrainWork {
   nextLink: () => number;
   /** The terrain stream of a floor, split by `key`. */
   rng: (floor: number, key: string) => Rng;
+  /** A Cavern's geology: what each floor knows of its rooms, and its variant. */
+  cave?: TerrainCave;
+}
+
+export interface TerrainCave {
+  sites: readonly CaveSites[];
+  variant: CaveVariant;
 }
 
 /** What the theme typed: each floor's typed rooms and the rooms that stand empty. */
@@ -29,9 +38,10 @@ export interface TerrainTypes {
   empty: readonly ReadonlySet<number>[];
 }
 
-export function terrainWork(seed: number, floors: readonly FloorTerrain[], stack: FloorStack, tags: ReadonlySet<DungeonTag>, theme: ThemeContext, typed: TerrainTypes): TerrainWork {
+export function terrainWork(seed: number, floors: readonly FloorTerrain[], stack: FloorStack, tags: ReadonlySet<DungeonTag>, theme: ThemeContext, typed: TerrainTypes, cave?: TerrainCave): TerrainWork {
   let link = 0;
   return {
+    ...(cave && { cave }),
     floors,
     stack,
     tags,

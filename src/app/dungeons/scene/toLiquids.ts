@@ -5,7 +5,7 @@ import type { LightEmission, LightSource } from '../../types/lightingTypes';
 import type { LiquidKind, LiquidSurface } from '../../types/liquidTypes';
 import type { CellPoint, DungeonColumn, DungeonTerrain } from '../model';
 import { intersectRings, subtractRings, unionRings } from '../render/clipShapes';
-import { shapePolygon, type Vec } from '../render/geometry';
+import { shapeRings, type Vec } from '../render/geometry';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { liquidColours } from './liquidColours';
@@ -54,12 +54,14 @@ function smoothRing(points: readonly Vec[], steps: number): Vec[] {
 /** What each hazard on the floor holds, if it is a liquid. */
 const HAZARD_LIQUID: Readonly<Partial<Record<string, LiquidKind>>> = { lava: 'lava', acid: 'acid', 'deep-water': 'water' };
 
-function terrainLiquids(pieces: readonly DungeonTerrain[]): Liquid[] {
+/** Where a floor is a traced cave, its liquids keep to the drawn floor, which a cell at the cave's edge reaches past. */
+function terrainLiquids(pieces: readonly DungeonTerrain[], floorRings: Vec[][] | null): Liquid[] {
   return pieces.flatMap(piece => {
     const liquid = piece.traits.hazard && HAZARD_LIQUID[piece.traits.hazard];
     if (!liquid || (piece.kind !== 'channel' && piece.kind !== 'deep-water')) return [];
     const flow = piece.kind === 'channel' && piece.facing ? { x: piece.facing.x, y: piece.facing.y } : undefined;
-    return withHoles(cellRings(piece.cells)).map(({ ring, holes }): Liquid => ({ liquid, ring, ...(holes.length && { holes }), ...(flow && { flow }) }));
+    const rings = cellRings(piece.cells);
+    return withHoles(floorRings ? intersectRings(rings, floorRings) : rings).map(({ ring, holes }): Liquid => ({ liquid, ring, ...(holes.length && { holes }), ...(flow && { flow }) }));
   });
 }
 
@@ -124,10 +126,14 @@ function withHoles(rings: Vec[][]): { ring: Vec[]; holes: Vec[][] }[] {
 
 /** The floor's pools of water, on what of them lies on the floor (the map clips them there too). Lava and acid are hazards of their own, never pools. */
 function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
-  const floorRings = unionRings(dungeon.floors.map(shape => shapePolygon(shape, 0, 100)));
+  const floorRings = floorRingsOf(dungeon);
   return dungeon.floor.water.flatMap(pool => {
     return withHoles(intersectRings([smoothRing(pool.outline, 4)], floorRings)).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }) }));
   });
+}
+
+function floorRingsOf(dungeon: VisibleDungeon): Vec[][] {
+  return unionRings(dungeon.floors.flatMap(shape => shapeRings(shape, 0, 100)));
 }
 
 /** Terrain that is part of the water itself, not drawn over it. */
@@ -215,7 +221,7 @@ export function floorLiquids(
   level?: string,
 ): FloorLiquids {
   const shown = dungeon.floor.terrain.filter(piece => dungeon.roomShapes.has(piece.room));
-  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(shown)].map((piece, index) => ({ ...piece, ...(piece.liquid === 'lava' && { lavaLight: `light_${id}_${index + 1}` }) }));
+  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(shown, dungeon.floors.some(shape => shape.kind === 'poly') ? floorRingsOf(dungeon) : null)].map((piece, index) => ({ ...piece, ...(piece.liquid === 'lava' && { lavaLight: `light_${id}_${index + 1}` }) }));
   const colours = liquidColours(style, view);
   const { originCell, pxPerCell } = placement;
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });

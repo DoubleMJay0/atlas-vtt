@@ -47,9 +47,9 @@ export function mayCutIn(work: TerrainWork, k: number, room: number, reason: Fea
   return !reason.cutIn || type === undefined || reason.cutIn.includes(type);
 }
 
-/** Whether a fall from a hole above may open through or end in room `room` of floor `k`: an untyped or empty room, a hazard type or a collapsed room. */
+/** Whether a fall from a hole above may open through or end in room `room` of floor `k`: an untyped or empty room, a hazard type or a collapsed room; in a cave, any room, since rock falls where it will. */
 export function takesFall(work: TerrainWork, k: number, room: number): boolean {
   const typed = work.typed(k, room);
-  if (!typed || work.empty(k, room)) return true;
+  if (!typed || work.empty(k, room) || work.cave) return true;
   return (typed.spec.terrain.hazards?.length ?? 0) > 0 || typed.spec.id === 'collapsed-room';
 }

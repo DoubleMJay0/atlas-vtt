@@ -6,7 +6,6 @@
 
 import type { CellPoint } from '../model';
 import { type Rng, int } from '../rng';
-import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
 import { CRAMPED_AREA } from './cover';
 import type { FloorTerrain } from './floorTerrain';
@@ -51,13 +50,4 @@ function crumbled(floor: FloorTerrain, rc: RoomCells, rng: Rng, kind: 'rubble-he
     const cells = rc.block(int(rng, 0, Math.max(0, rc.depth - di)), int(rng, 0, Math.max(0, rc.width - dj)), di, dj);
     if (floor.place(draft(kind, rc.room.id, cells)) !== null) return;
   }
-}
-
-/** Difficult ground for a room by the dungeon's tags. */
-export function difficultGround(floor: FloorTerrain, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): void {
-  const rubble = tags.has('crumbling') ? 0.4 : 0.1;
-  const broken = tags.has('crumbling') || tags.has('deep') ? 0.18 : 0.06;
-  const roll = rng();
-  if (roll < rubble) roughGround(floor, rc, rng, 'rubble-field');
-  else if (roll < rubble + broken) roughGround(floor, rc, rng, 'broken-floor');
 }

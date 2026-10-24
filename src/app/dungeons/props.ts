@@ -1,31 +1,28 @@
 /**
- * Everything that stands or lies in a floor's rooms besides its terrain: columns, the furniture
- * each room's place in the architecture calls for (`props/roles.ts`, `props/furnish.ts`; about a
- * third of the rooms stay empty), rubble and cracks. Stairwells, the rows they are reached from,
- * the cells before doors and every cell terrain fills stay clear. Each room draws from a stream of
- * its own, so one room's things never move another's.
+ * What stands or lies in a floor's rooms besides their terrain and the furniture of their recipes
+ * (placed with the terrain, `terrain/typeTerrain.ts`): columns, rubble and cracks. Stairwells, the
+ * rows they are reached from, the cells before doors, every cell terrain fills and every cell
+ * furniture stands on stay clear. Each room draws from a stream of its own, so one room's things
+ * never move another's.
  */
 
 import { type FloorStack, stairEnd } from './floors/floorStack';
-import type { DungeonColumn, DungeonCrack, DungeonDoor, DungeonProp, DungeonRoom, DungeonRubble, DungeonStair, DungeonTerrain } from './model';
+import type { DungeonColumn, DungeonCrack, DungeonDoor, DungeonRoom, DungeonRubble, DungeonStair, DungeonTerrain } from './model';
 import type { DungeonParams } from './params';
-import { cellKey, cellsOf } from './geometry';
+import { cellKey, cellsOf, maskOf } from './geometry';
 import { approachCells, doorApproaches, spotRect } from './floors/stairSpots';
 import { columnStyle, colonnadeOf } from './props/columns';
-import { type FloorFurnishing, furnishRoom } from './props/furnish';
-import type { RoomRoles } from './props/roles';
 import { frameOf } from './props/roomFrame';
 import { cracksIn, rubbleIn } from './props/scatter';
 import { roomSpace } from './props/space';
 import { chance, floorStream, stream } from './rng';
 
-export interface PropsResult {
-  props: DungeonProp[];
+export interface ScatterResult {
   rubble: DungeonRubble[];
   cracks: DungeonCrack[];
 }
 
-export interface PropsInput {
+export interface ScatterInput {
   seed: number;
   /** The floor's index. */
   floor: number;
@@ -36,10 +33,7 @@ export interface PropsInput {
   stairs: readonly DungeonStair[];
   columns: readonly DungeonColumn[];
   terrain: readonly DungeonTerrain[];
-  roles: RoomRoles;
   params: DungeonParams;
-  /** Rooms the theme typed: their recipes furnished them with the terrain, so they take no role furniture here. */
-  typed: ReadonlySet<number>;
   /** The cells that furniture already stands on, by key. */
   furnished: ReadonlySet<string>;
 }
@@ -49,7 +43,7 @@ const CRUMBLED_SHARE = 1 / 3;
 const CRUMBLED_RUBBLE = 3;
 
 /** The cells a floor keeps clear: its stairwells, the rows they are reached from, the cells before its doors and its terrain. */
-function clearCells(input: PropsInput): Set<string> {
+function clearCells(input: ScatterInput): Set<string> {
   const { floor, rooms, doors, stairs, terrain } = input;
   const cells = [
     ...stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, stairEnd(input.stack, floor, s.to))]),
@@ -66,32 +60,24 @@ function inStairs(column: DungeonColumn, stairs: readonly DungeonStair[]): boole
 
 /** A floor's columns: colonnades in the rooms that have them, off its stairwells. */
 export function floorColumns(seed: number, floor: number, rooms: readonly DungeonRoom[], stairs: readonly DungeonStair[], params: DungeonParams): DungeonColumn[] {
+  // A cave has no columns: its stalagmite columns are furniture.
+  if (params.cave) return [];
   const style = columnStyle(stream(seed, 'props', 'style'), params.shatteredChance);
   return rooms.flatMap((room) => colonnadeOf(floorStream(seed, 'props', floor, `columns:${room.id}`), room, style).filter((c) => !inStairs(c, stairs)));
 }
 
-/** Whether the boss arena in `room` has its platform: its seat stands there (`terrain/typeArena.ts`), no other furniture. */
-function hasPlatform(input: PropsInput, room: DungeonRoom): boolean {
-  return room.boss && input.terrain.some((p) => p.room === room.id && p.kind === 'platform' && p.facing);
-}
-
-export function placeProps(input: PropsInput): PropsResult {
+/** Rubble on the floors and cracks running from the walls, off everything that stands there. */
+export function placeScatter(input: ScatterInput): ScatterResult {
   const { seed, floor, rooms, doors, stairs, columns, terrain, params } = input;
-  const { roles, empty } = input.roles;
-  const furnishing: FloorFurnishing = { tags: params.tags, tapestryChance: params.tapestryChance, fountainWeight: 1, wellPlaced: false };
   const clear = clearCells(input);
   const furnished = [...input.furnished].map((k) => k.split(',').map(Number) as [number, number]).map(([x, y]) => ({ x, y }));
   const keepOff = [...stairs.flatMap((s) => cellsOf(spotRect(s))), ...terrain.flatMap((p) => p.cells), ...furnished].map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, radius: 0.75 }));
-  const result: PropsResult = { props: [], rubble: [], cracks: [] };
+  const result: ScatterResult = { rubble: [], cracks: [] };
   for (const room of rooms) {
     const rng = floorStream(seed, 'props', floor, room.id);
     const frame = frameOf(room);
-    const space = roomSpace(frame, clear, columns);
-    const role = roles.get(room.id);
-    const furnishes = role && !empty.has(room.id) && !input.typed.has(room.id) && !hasPlatform(input, room);
-    const props = furnishes ? furnishRoom(rng, space, role, doors, furnishing) : [];
+    const space = roomSpace(frame, clear, columns, maskOf(room));
     const extra = params.tags.has('crumbling') && chance(rng, CRUMBLED_SHARE) ? CRUMBLED_RUBBLE : 0;
-    result.props.push(...props);
     result.rubble.push(...rubbleIn(rng, frame, params.rubbleArea, extra, [...space.taken, ...keepOff]));
     result.cracks.push(...cracksIn(rng, frame, doors, params.crackChance));
   }

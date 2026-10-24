@@ -47,6 +47,8 @@ describe('generateDungeon', () => {
   it('never moves a room when only the look is drawn anew: layout, stairs and props come from streams of their own', () => {
     const a = generateDungeon({ seed: 31, tags: ['wet'], floors: 2, waterLevel: 0.1 });
     const b = generateDungeon({ seed: 31, tags: ['wet'], floors: 2, waterLevel: 0.5 });
-    expect(b.floors.map((f) => [f.rooms, f.doors, f.stairs])).toEqual(a.floors.map((f) => [f.rooms, f.doors, f.stairs]));
+    // A cave's water level decides where its lakes lie, and with them the types of its low rooms.
+    const layout = (model: typeof a): unknown[] => model.floors.map((f) => [f.rooms.map(({ type: _type, ...room }) => room), f.doors, f.stairs]);
+    expect(layout(b)).toEqual(layout(a));
   });
 });

@@ -11,12 +11,26 @@ import type { FeatureReason } from '../themes/features';
 import type { RoomTypeSpec } from '../themes/themeTypes';
 import { draft } from './catalog';
 import { roughGround } from './difficult';
+import { placeCaveReason } from './cavern/caveHazards';
 import { leavesRoom, placeCollapse } from './hazards';
 import type { RoomCells } from './roomCells';
 import type { TerrainWork } from './work';
 
 /** How often a room of a type with a hazard's reason takes the hazard rather than its furniture. */
-const HAZARD_CHANCE: Readonly<Partial<Record<FeatureReason, number>>> = { oubliette: 0.5, cistern: 0.8, collapse: 1, 'rotted-floor': 1 };
+const HAZARD_CHANCE: Readonly<Partial<Record<FeatureReason, number>>> = {
+  oubliette: 0.5,
+  cistern: 0.8,
+  collapse: 1,
+  'rotted-floor': 1,
+  'fault-chasm': 0.9,
+  sinkhole: 0.7,
+  pitch: 0.8,
+  'cave-lake': 1,
+  'cave-stream': 1,
+  sump: 1,
+  'lava-flow': 1,
+  'sulphur-spring': 1,
+};
 
 /** One shaft in the gaol's floor, a cell clear of its walls, the back half first. */
 function oubliette(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
@@ -65,6 +79,7 @@ export function placeTypeHazard(work: TerrainWork, k: number, rc: RoomCells, spe
         return true;
       }
       default:
+        if (work.cave && placeCaveReason(work, k, rc, reason, rng)) return true;
         break;
     }
   }

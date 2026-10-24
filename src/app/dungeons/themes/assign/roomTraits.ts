@@ -6,9 +6,8 @@
  */
 
 import type { PlannedFloor } from '../../floors/planFloors';
-import { type CellRect, rectsTouch, wallRect } from '../../geometry';
+import { type CellRect, holdsStairs, rectsTouch, roomArea, wallRect } from '../../geometry';
 import type { DungeonRoom, FiveRoomStage } from '../../model';
-import { holdsStairs } from '../../props/roles';
 import { hops, neighbours } from '../../roomGraph';
 import type { Degree, DepthBand, SizeClass } from '../themeTypes';
 
@@ -46,12 +45,12 @@ const SMALL_SHARE = 0.4;
 const SQUARE_RATIO = 1.25;
 
 function sizesOf(rooms: readonly DungeonRoom[]): Map<number, SizeClass> {
-  const ranked = [...rooms].sort((a, b) => b.w * b.h - a.w * a.h || a.id - b.id);
+  const ranked = [...rooms].sort((a, b) => roomArea(b) - roomArea(a) || a.id - b.id);
   const large = Math.round(ranked.length * LARGE_SHARE);
   const small = ranked.length - Math.round(ranked.length * SMALL_SHARE);
   return new Map(ranked.map((room, rank): [number, SizeClass] => {
     if (rank === 0) return [room.id, 'largest'];
-    if (room.w * room.h <= TINY_AREA) return [room.id, 'tiny'];
+    if (roomArea(room) <= TINY_AREA) return [room.id, 'tiny'];
     if (rank < large) return [room.id, 'large'];
     return [room.id, rank >= small ? 'small' : 'medium'];
   }));
@@ -99,7 +98,7 @@ export function roomTraits(floors: readonly PlannedFloor[]): RoomTraits[] {
         index: out.length,
         floor: index,
         room: room.id,
-        area: room.w * room.h,
+        area: roomArea(room),
         size: sizes.get(room.id) ?? 'medium',
         long: longSide >= 2 * shortSide,
         square: longSide <= shortSide * SQUARE_RATIO,

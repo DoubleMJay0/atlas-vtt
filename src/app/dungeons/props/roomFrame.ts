@@ -4,7 +4,7 @@
  */
 
 import type { CellDir, CellPoint, DungeonDoor, DungeonRoom } from '../model';
-import { dir, perpendicular } from '../geometry';
+import { dir, holdsCell, perpendicular } from '../geometry';
 
 export interface RoomFrame {
   room: DungeonRoom;
@@ -49,9 +49,10 @@ export function rotundaRadius(room: DungeonRoom): number {
   return Math.sqrt(room.w * room.w + 1) / 2;
 }
 
-/** Whether a point lies on the floor, `margin` cells clear of its edge. */
+/** Whether a point lies on the floor, `margin` cells clear of its edge: of a cave's room, on its cells. */
 export function onFloor(frame: RoomFrame, p: CellPoint, margin: number): boolean {
   const { room } = frame;
+  if (room.cells) return [-margin, margin].every((dx) => [-margin, margin].every((dy) => holdsCell(room, Math.floor(p.x + dx), Math.floor(p.y + dy))));
   if (room.rotunda) return Math.hypot(p.x - frame.centre.x, p.y - frame.centre.y) <= rotundaRadius(room) - margin;
   return p.x >= room.x + margin && p.x <= room.x + room.w - margin && p.y >= room.y + margin && p.y <= room.y + room.h - margin;
 }

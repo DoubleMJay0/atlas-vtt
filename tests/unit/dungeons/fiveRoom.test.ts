@@ -67,25 +67,14 @@ describe('five-room dungeons', () => {
   });
 
   // Stages built by role in a Cavern; a built theme's stages take its types (below).
-  it('build each stage of a Cavern as architecture, in more than one way, and without mechanisms', () => {
+  it('take a Cavern\'s types for its stages where its cave allows them', () => {
     const caverns = runs.filter(({ model }) => model.theme === 'cavern');
-    const share = (check: (floor: DungeonFloor) => boolean): number => caverns.filter(({ model }) => check(model.floors[0]!)).length / caverns.length;
-    const pieces = (floor: DungeonFloor, stage: FiveRoomStage) => floor.terrain.filter((p) => p.room === stageRoom(floor, stage)?.id);
-    const way = (floor: DungeonFloor, stage: FiveRoomStage): string => [...new Set(pieces(floor, stage).map((p) => p.kind))].sort().join('+');
-    expect(share((f) => pieces(f, 'entrance').some((p) => p.kind === 'low-wall'))).toBeGreaterThan(0.2);
-    expect(share((f) => pieces(f, 'entrance').some((p) => p.kind === 'low-wall'))).toBeLessThan(0.8);
-    expect(share((f) => pieces(f, 'puzzle').length > 0)).toBeGreaterThan(0.9);
-    expect(share((f) => pieces(f, 'setback').some((p) => p.traits.hazard || p.traits.difficult || p.kind === 'ledge'))).toBeGreaterThan(0.85);
-    expect(share((f) => pieces(f, 'setback').some((p) => p.traits.hazard))).toBeLessThan(0.8);
-    expect(share((f) => pieces(f, 'climax').some((p) => p.kind === 'platform'))).toBeGreaterThan(0.6);
-    expect(share((f) => pieces(f, 'reward').some((p) => p.traits.interactive))).toBeGreaterThan(0.6);
-    expect(share((f) => stageRoom(f, 'reward')?.wing === 'secret')).toBeGreaterThan(0.4);
-    // No stage is built the same way in most dungeons.
-    for (const stage of ['entrance', 'puzzle', 'setback', 'reward'] as const) {
-      const counts = new Map<string, number>();
-      for (const { model } of caverns) counts.set(way(model.floors[0]!, stage), (counts.get(way(model.floors[0]!, stage)) ?? 0) + 1);
-      expect(Math.max(...counts.values()) / caverns.length, stage).toBeLessThan(0.5);
-    }
+    const typed = (stage: FiveRoomStage, types: readonly string[]): number => caverns.filter(({ model }) => types.includes(stageRoom(model.floors[0]!, stage)?.type ?? '')).length / caverns.length;
+    expect(typed('entrance', ['cave-mouth'])).toBe(1);
+    // A stage room that could not take the hazard its type is named for is a passage chamber.
+    expect(typed('puzzle', ['crystal-grotto', 'chasm-hall', 'passage-chamber'])).toBeGreaterThan(0.5);
+    expect(typed('setback', ['chasm-hall', 'lake-cavern', 'collapse-chamber', 'passage-chamber'])).toBeGreaterThan(0.4);
+    expect(typed('climax', ['grand-cavern', 'lake-cavern', 'den'])).toBe(1);
   });
 
   it('honour the tags that make sense for one string of rooms', () => {
@@ -98,13 +87,15 @@ describe('five-room dungeons', () => {
     expect(secretShare(['no-secrets'])).toBe(0);
     const differs = (tag: string): number => {
       let changed = 0;
-      for (let seed = 1; seed <= 20; seed++) {
-        const rooms = (tags: string[]) => JSON.stringify(generateDungeon({ seed, tags, floors: 1, fiveRoom: true }).floors[0]!.rooms.map((r) => [r.x, r.y, r.w, r.h, r.colonnade, r.rotunda]));
+      for (let seed = 1; seed <= 40; seed++) {
+        // A Cavern builds no colonnades whatever its tags say, so the tags are held on the built themes.
+        const theme = seed % 2 === 0 ? 'fortress' : 'mansion';
+        const rooms = (tags: string[]) => JSON.stringify(generateDungeon({ seed, theme, tags, floors: 1, fiveRoom: true }).floors[0]!.rooms.map((r) => [r.x, r.y, r.w, r.h, r.colonnade, r.rotunda]));
         if (rooms([]) !== rooms([tag])) changed++;
       }
       return changed;
     };
-    for (const tag of ['compact', 'winding', 'small', 'ordered', 'chaotic', 'colonnades']) expect(differs(tag), tag).toBeGreaterThan(5);
+    for (const tag of ['compact', 'winding', 'small', 'ordered', 'chaotic', 'colonnades']) expect(differs(tag), tag).toBeGreaterThan(7);
   });
 
   it('keep every rule of the layout and the terrain', () => {

@@ -1,4 +1,4 @@
-import type { FloorShape, Vec } from './geometry';
+import { shapeRings, type FloorShape, type Vec } from './geometry';
 
 /** A place on a shape's outline: the point, the way along the outline and the way out. */
 export interface EdgePlace {
@@ -12,6 +12,7 @@ export interface EdgePlace {
  * rectangle's rounded corners; `step` is measured on the grown outline.
  */
 export function edgePlaces(shape: FloorShape, offset: number, step: number, phase: number): EdgePlace[] {
+  if (shape.kind === 'poly') return shapeRings(shape, offset).flatMap((ring) => ringPlaces(ring, step, phase));
   const out: EdgePlace[] = [];
   if (shape.kind === 'circle') {
     const r = shape.r + offset;
@@ -38,6 +39,23 @@ export function edgePlaces(shape: FloorShape, offset: number, step: number, phas
     for (let t = phase % step; t <= length + 1e-9; t += step) {
       out.push({ point: { x: start.x + tangent.x * t, y: start.y + tangent.y * t }, tangent, normal });
     }
+  });
+  return out;
+}
+
+/** Places `step` apart round a ring from `phase`, the floor on the right of the way round, so the way out on the left. */
+function ringPlaces(ring: readonly Vec[], step: number, phase: number): EdgePlace[] {
+  const out: EdgePlace[] = [];
+  let carry = phase % step;
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length]!;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length === 0) return;
+    const tangent = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+    const normal = { x: tangent.y, y: -tangent.x };
+    let t = carry;
+    for (; t < length; t += step) out.push({ point: { x: a.x + tangent.x * t, y: a.y + tangent.y * t }, tangent, normal });
+    carry = t - length;
   });
   return out;
 }

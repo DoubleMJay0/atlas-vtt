@@ -93,11 +93,14 @@ export interface StoreyLanding {
   small: boolean;
 }
 
-/** The landing's first room for an attempt, standing as a storey's does where `storey` is given; null where no room drawn fits it. */
-export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd, storey: StoreyLanding | null = null): FloorRoot | null {
+/**
+ * The landing's first room for an attempt, standing as a storey's does where `storey` is given and
+ * with at least `minFloor` cells of floor across; null where no room drawn fits it.
+ */
+export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd, storey: StoreyLanding | null = null, minFloor = 0): FloorRoot | null {
   for (let tries = 0; tries < SIZE_TRIES; tries++) {
     // A storey's landing is a small room, as a stair landing is, leaving the floor below's ground to the rooms round it.
-    const size = storey?.small ? drawSmallRoomSize(rng) : drawRoomSize(rng);
+    const size = storey?.small ? drawSmallRoomSize(rng) : drawRoomSize(rng, minFloor);
     const fitting = landingPlaces(spot, end, size, shuffled(rng, STAIR_DIRS), storey?.ground ?? null);
     if (fitting.length === 0) continue;
     const { f, axis } = pick(rng, storey?.over ? coveringMost(fitting, storey.over) : fitting);

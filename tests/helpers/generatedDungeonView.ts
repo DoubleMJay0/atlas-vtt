@@ -71,7 +71,9 @@ function withOutlines(walls: Record<string, WallSegment>, outlines: OutlineWalls
 
 /** A generated dungeon of three floors (seed 4: its entry floor opens onto the floors below) as its scene holds it, with lava, water and plants. */
 export function generatedDungeon({ seed = 4, pxPerCell: wanted, outlines = 'as-generated' }: GeneratedDungeonOptions = {}): GeneratedDungeon {
-  const model = generateDungeon({ seed, tags: ['lava', 'overgrown', 'wet'], floors: 3 });
+  // The first dungeon from `seed` on whose entry floor a hole opens onto the floor below, which the views look through.
+  let model = generateDungeon({ seed, tags: ['lava', 'overgrown', 'wet'], floors: 3 });
+  for (let next = seed + 1; !model.floors[0]!.terrain.some((p) => p.opening && p.opening.bottom !== null); next++) model = generateDungeon({ seed: next, tags: ['lava', 'overgrown', 'wet'], floors: 3 });
   const pxPerCell = wanted ?? suggestedPxPerCell(model);
   const layout = mapLayout(model, pxPerCell, DEFAULT_VIEW);
   const image = { width: layout.widthPx, height: layout.heightPx };
@@ -97,7 +99,8 @@ export function generatedDungeon({ seed = 4, pxPerCell: wanted, outlines = 'as-g
     .sort((a, b) => Math.hypot(world(a).x - look.x, world(a).y - look.y) - Math.hypot(world(b).x - look.x, world(b).y - look.y));
   const hero = world(rooms[0]!);
   const torches = Object.fromEntries(rooms.slice(1, 7).map((room, i): [string, LightSource] => [`torch${i}`, { id: `torch${i}`, kind: 'light', levels: [ids[0]!], ...world(room), emission: TORCH }]));
-  const lonely = objects.find((o) => objects.every((other) => other === o || Math.hypot(other.x - o.x, other.y - o.y) > 2 * pxPerCell)) ?? objects[0]!;
+  // A cave has no tall object until its formations are drawn: the token then circles where it stands.
+  const lonely = objects.find((o) => objects.every((other) => other === o || Math.hypot(other.x - o.x, other.y - o.y) > 2 * pxPerCell)) ?? objects[0] ?? hero;
   const empty = visibleDungeon(model, DEFAULT_VIEW, 0).rooms
     .filter((room) => objects.every((o) => o.x < world(room).x - (room.w / 2) * pxPerCell || o.x > world(room).x + (room.w / 2) * pxPerCell || o.y < world(room).y - (room.h / 2) * pxPerCell || o.y > world(room).y + (room.h / 2) * pxPerCell))
     .sort((a, b) => b.w * b.h - a.w * a.h);
