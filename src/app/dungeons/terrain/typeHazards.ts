@@ -42,7 +42,7 @@ function cisternBasin(work: TerrainWork, k: number, rc: RoomCells): boolean {
   return false;
 }
 
-/** The hazard of a typed room, laid for one of its reasons; whether one was laid. */
+/** The hazard of a typed room, laid for one of its reasons; whether the room took it (a ruined room its collapse or rubble), keeping no furniture but nature's. */
 export function placeTypeHazard(work: TerrainWork, k: number, rc: RoomCells, spec: RoomTypeSpec, rng: Rng): boolean {
   const ruined = work.theme.ruined;
   for (const reason of spec.terrain.features ?? []) {
@@ -60,9 +60,9 @@ export function placeTypeHazard(work: TerrainWork, k: number, rc: RoomCells, spe
         const floor = work.floors[k];
         if (!ruined || !floor) break;
         const fell = placeCollapse(work, k, rc, rng);
-        if (reason === 'rotted-floor') roughGround(floor, rc, rng, 'broken-floor');
-        if (fell) return true;
-        break;
+        // Where nothing lies below to fall to, the floor has only given way: rubble or rotten boards. Either way the room is its ruin.
+        if (reason === 'rotted-floor' || !fell) roughGround(floor, rc, rng, reason === 'rotted-floor' ? 'broken-floor' : 'rubble-field');
+        return true;
       }
       default:
         break;

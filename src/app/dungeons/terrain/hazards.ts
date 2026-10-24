@@ -165,6 +165,8 @@ function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, natur
     const band = neededBridge(rc, drawn);
     if (!leavesRoom(rc, band.cells, band.bridge) || !overRoomBelow(work, k, band.cells) || !landsOnFloor(rc, band) || !rc.allows(band.cells, 'block', band.bridge)) return false;
     const drop = dropBelow(work, k, band.cells, rng);
+    // A collapse's floor lies below it: never an abyss to nowhere.
+    if (natural && drop?.bottom === null) return false;
     const id = drop && cutHole(work, k, rc, 'chasm', band.cells, drop, { bridge: band.bridge });
     if (id === null || id === undefined) return false;
     if (band.bridge.length > 0) bridgeOver(work, k, rc, band, id, 'dungeon.terrain.ropeBridge');

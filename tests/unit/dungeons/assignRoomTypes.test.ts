@@ -83,3 +83,19 @@ describe('room types and the theme facts', () => {
     }
   });
 });
+
+describe('small dungeons whose entrance room could be the boss room', () => {
+  it('give the boss room its climax type and the entrance another room', () => {
+    for (const theme of ['fortress', 'mansion'] as const) {
+      const programme = theme === 'fortress' ? FORTRESS : MANSION;
+      const climaxes = new Set(programme.climax.map((c) => c.type));
+      for (const seed of [454, 839, 972, 11329324]) {
+        const model = generateDungeon({ seed, theme, tags: ['small'], floors: 1 });
+        const boss = model.floors[0]!.rooms.find((room) => room.boss);
+        expect(boss && climaxes.has(boss.type as never), `${theme} seed ${seed}: boss is a ${boss?.type}`).toBe(true);
+        const hazards = model.floors[0]!.terrain.filter((p) => p.room === boss?.id && p.traits.hazard !== undefined);
+        expect(hazards, `${theme} seed ${seed}`).toEqual([]);
+      }
+    }
+  });
+});

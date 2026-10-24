@@ -79,3 +79,21 @@ describe('what a ruin keeps of a recipe', () => {
     }
   });
 });
+
+describe('a ruin\'s collapse', () => {
+  it('opens only onto a floor below, where its fall lands', () => {
+    const problems: string[] = [];
+    for (let seed = 1; seed <= 200; seed++) {
+      for (const theme of ['fortress', 'mansion'] as const) {
+        const model = generateDungeon({ seed: seed * 53, theme, tags: ['ruined'], floors: 1 + (seed % 3) });
+        model.floors.forEach((floor, f) => {
+          for (const piece of floor.terrain) {
+            const above = model.floors.slice(0, f).some((up) => up.terrain.some((p) => p.opening?.link === piece.opening?.link));
+            if (piece.kind === 'chasm' && piece.opening && !above && piece.opening.bottom === null) problems.push(`${theme} ${seed * 53} floor ${f}: a bottomless chasm in a ${floor.rooms[piece.room]?.type}`);
+          }
+        });
+      }
+    }
+    expect(problems.slice(0, 5)).toEqual([]);
+  }, 120_000);
+});
