@@ -12,7 +12,7 @@ import { OUTER_WALL, windowSpan } from '../houseShapes';
 import type { Vec } from '../geometry';
 import type { VisibleFloor } from '../visibleDungeon';
 import type { Hand } from './hand';
-import { polyPath } from './paths';
+import { axisFrame, polysPath } from './paths';
 
 /** The windows of the rooms a view shows. */
 export function shownWindows(dungeon: Pick<VisibleFloor, 'floor' | 'rooms'>): DungeonWindow[] {
@@ -30,39 +30,57 @@ const MULLION = 0.022;
 /** A light is about this wide; a window has at least two. */
 const LIGHT = 0.32;
 
+/** Every shown window, part by part across all of them, so each part is one call to the hand. */
 export function drawWindows(hand: Hand): void {
-  for (const window of shownWindows(hand.scene.env.dungeon)) drawWindow(hand, window);
+  const parts = shownWindows(hand.scene.env.dungeon).map(windowParts);
+  if (parts.length === 0) return;
+  const all = <K extends keyof WindowParts>(key: K): WindowParts[K][] => parts.map((part) => part[key]);
+  // The embrasure's floor of stone, then the board inside and the sill outside, standing on it.
+  hand.surface(polysPath(all('embrasure')), 'stone');
+  hand.surface(polysPath(all('board')), 'wood');
+  hand.surface(polysPath(all('sill')), 'dressed');
+  for (const sill of all('sill')) hand.edges(sill, true);
+  // The frame: glass between two rails, its lights divided by mullions and glazing bars.
+  hand.surface(polysPath(all('frame')), 'glass');
+  const mullions = all('mullions').flat();
+  hand.surface(polysPath(mullions), 'dressed');
+  for (const mullion of mullions) hand.edges(mullion, true);
+  hand.line([...all('board'), ...all('fine').flat()], 'fine', true);
+  // The reveals: the wall's cut faces at both ends.
+  hand.line(all('reveals').flat(), 'outline');
 }
 
-/** One window in its own frame: `u` along its span from one reveal, `v` across the wall, outwards. */
-function drawWindow(hand: Hand, window: DungeonWindow): void {
+interface WindowParts {
+  embrasure: Vec[];
+  board: Vec[];
+  sill: Vec[];
+  frame: Vec[];
+  mullions: Vec[][];
+  /** The sill's line on the outer face, the frame's rails and its glazing bars. */
+  fine: Vec[][];
+  reveals: Vec[][];
+}
+
+/** One window's parts in its own frame: `u` along its span from one reveal, `v` across the wall, outwards. */
+function windowParts(window: DungeonWindow): WindowParts {
   const [a, b] = windowSpan(window);
   const len = Math.hypot(b.x - a.x, b.y - a.y);
-  const t = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
-  const { dir } = window;
-  const at = (u: number, v: number): Vec => ({ x: a.x + t.x * u + dir.x * v, y: a.y + t.y * u + dir.y * v });
-  const quad = (u0: number, v0: number, u1: number, v1: number): Vec[] => [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
+  const { at, quad } = axisFrame(a, { x: (b.x - a.x) / len, y: (b.y - a.y) / len }, window.dir);
   const half = OUTER_WALL / 2;
-  // The embrasure's floor of stone, then the board inside and the sill outside, standing on it.
-  hand.surface(polyPath(quad(0, -half, len, half)), 'stone');
-  const board = quad(0, -half, len, -half + BOARD);
-  hand.surface(polyPath(board), 'wood');
-  hand.line([board], 'fine', true);
-  const sill = quad(-SILL.overhang, SILL.inner, len + SILL.overhang, SILL.outer);
-  hand.surface(polyPath(sill), 'dressed');
-  hand.line([[at(-SILL.overhang, half), at(len + SILL.overhang, half)]], 'fine');
-  hand.edges(sill, true);
-  // The frame: glass between two rails, its lights divided by mullions and glazing bars.
-  const frame = quad(0, -FRAME, len, FRAME);
-  hand.surface(polyPath(frame), 'glass');
   const lights = Math.max(2, Math.round(len / LIGHT));
   const width = len / lights;
-  hand.line([[at(0, -FRAME), at(len, -FRAME)], [at(0, FRAME), at(len, FRAME)], ...Array.from({ length: lights }, (_, k) => [at((k + 0.5) * width, -FRAME), at((k + 0.5) * width, FRAME)])], 'fine');
-  for (let k = 1; k < lights; k++) {
-    const mullion = quad(k * width - MULLION, -FRAME, k * width + MULLION, FRAME);
-    hand.surface(polyPath(mullion), 'dressed');
-    hand.edges(mullion, true);
-  }
-  // The reveals: the wall's cut faces at both ends.
-  hand.line([[at(0, -half), at(0, half)], [at(len, -half), at(len, half)]], 'outline');
+  return {
+    embrasure: quad(0, -half, len, half),
+    board: quad(0, -half, len, -half + BOARD),
+    sill: quad(-SILL.overhang, SILL.inner, len + SILL.overhang, SILL.outer),
+    frame: quad(0, -FRAME, len, FRAME),
+    mullions: Array.from({ length: lights - 1 }, (_, k) => quad((k + 1) * width - MULLION, -FRAME, (k + 1) * width + MULLION, FRAME)),
+    fine: [
+      [at(-SILL.overhang, half), at(len + SILL.overhang, half)],
+      [at(0, -FRAME), at(len, -FRAME)],
+      [at(0, FRAME), at(len, FRAME)],
+      ...Array.from({ length: lights }, (_, k) => [at((k + 0.5) * width, -FRAME), at((k + 0.5) * width, FRAME)]),
+    ],
+    reveals: [[at(0, -half), at(0, half)], [at(len, -half), at(len, half)]],
+  };
 }

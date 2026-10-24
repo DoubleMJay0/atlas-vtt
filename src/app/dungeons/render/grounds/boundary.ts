@@ -6,14 +6,16 @@
  * gate. Each is drawn on its whole cells, so the scene's walls on their edges lie on its ink.
  */
 
+import { cellKey, cellsBox } from '../../geometry';
 import type { GroundsPiece } from '../../model';
 import type { Hand } from '../art/hand';
 import { TO_LIGHT } from '../art/light';
-import { polyPath, polysPath } from '../art/paths';
+import { axisFrame, polyPath, polysPath } from '../art/paths';
 import { grownRings } from '../clipShapes';
-import { cellsShapes, signedArea2, type Vec } from '../geometry';
-import { boxOf, cellSet, circlePoly } from './groundsShapes';
-import { flatSurface, type GroundsPaint } from './paint';
+import { cellsRings, signedArea2, type Vec } from '../geometry';
+import { circle } from '../terrain/cover';
+import { cellSet } from '../terrain/pieces';
+import type { GroundsPaint } from './paint';
 
 /** The coping's inset from the wall's faces, in cells. */
 const COPING = 0.2;
@@ -23,51 +25,46 @@ const PIER = 0.62;
 const COPING_STONE = 0.5;
 const COURSE = 0.3;
 
-function ringsOf(piece: GroundsPiece): Vec[][] {
-  return cellsShapes(piece.cells).flatMap((shape) => shape.rings);
-}
-
 /** A ring's edges as standing up: a hole's from the other side, since the wall stands round it. */
-function standingEdges(hand: Hand, rings: readonly Vec[][]): void {
+export function standingEdges(hand: Hand, rings: readonly Vec[][]): void {
   for (const ring of rings) hand.edges(ring, signedArea2(ring) > 0);
 }
 
 export function drawBoundaryWall(hand: Hand, wall: GroundsPiece): void {
-  const rings = ringsOf(wall);
+  const rings = cellsRings(wall.cells);
   hand.surface(polysPath(rings), 'dressed');
   const coping = grownRings(rings, -COPING, 'miter');
-  const has = cellSet(wall.cells);
+  const keys = cellSet(wall.cells);
+  const has = (x: number, y: number): boolean => keys.has(cellKey(x, y));
   const ridge: Vec[][] = [];
-  const joints: Vec[][] = [];
+  const faceJoints: Vec[][] = [];
+  const copingJoints: Vec[][] = [];
   for (const c of wall.cells) {
     const mid = { x: c.x + 0.5, y: c.y + 0.5 };
-    const across = has(c.x - 1, c.y) || has(c.x + 1, c.y);
-    const down = has(c.x, c.y - 1) || has(c.x, c.y + 1);
     if (has(c.x + 1, c.y)) ridge.push([mid, { x: mid.x + 1, y: mid.y }]);
     if (has(c.x, c.y + 1)) ridge.push([mid, { x: mid.x, y: mid.y + 1 }]);
-    if (across === down) continue;
-    // Joints across the faces below the coping, staggered between the two faces.
-    for (const [face, shift] of [[COPING / 2, 0], [1 - COPING / 2, COURSE / 2]] as const) {
-      for (let s = 0.1 + shift; s < 1; s += COURSE) joints.push(across ? [{ x: c.x + s, y: c.y + face - COPING / 2 }, { x: c.x + s, y: c.y + face + COPING / 2 }] : [{ x: c.x + face - COPING / 2, y: c.y + s }, { x: c.x + face + COPING / 2, y: c.y + s }]);
-    }
-  }
-  hand.line(joints, 'fine');
-  hand.surface(polysPath(coping), 'stone');
-  const copingJoints = wall.cells.flatMap((c) => {
     const across = has(c.x - 1, c.y) || has(c.x + 1, c.y);
-    const down = has(c.x, c.y - 1) || has(c.x, c.y + 1);
-    if (across === down) return [];
-    return [0, COPING_STONE].map((s): Vec[] => (across ? [{ x: c.x + 0.25 + s, y: c.y + COPING }, { x: c.x + 0.25 + s, y: c.y + 1 - COPING }] : [{ x: c.x + COPING, y: c.y + 0.25 + s }, { x: c.x + 1 - COPING, y: c.y + 0.25 + s }]));
-  });
+    // A corner, or a wall's end alone, takes no joints.
+    if (across === (has(c.x, c.y - 1) || has(c.x, c.y + 1))) continue;
+    // `along` runs the wall's way, `out` across it, both from the cell's corner.
+    const at = (along: number, out: number): Vec => (across ? { x: c.x + along, y: c.y + out } : { x: c.x + out, y: c.y + along });
+    // Joints across the faces below the coping, staggered between the two faces, and across the coping stones.
+    for (const [face, shift] of [[COPING / 2, 0], [1 - COPING / 2, COURSE / 2]] as const) {
+      for (let s = 0.1 + shift; s < 1; s += COURSE) faceJoints.push([at(s, face - COPING / 2), at(s, face + COPING / 2)]);
+    }
+    for (const s of [0.25, 0.25 + COPING_STONE]) copingJoints.push([at(s, COPING), at(s, 1 - COPING)]);
+  }
+  hand.line(faceJoints, 'fine');
+  hand.surface(polysPath(coping), 'stone');
   hand.line([...ridge, ...copingJoints], 'fine');
   standingEdges(hand, coping);
   standingEdges(hand, rings);
 }
 
 export function drawHedge(hand: Hand, paint: GroundsPaint, hedge: GroundsPiece): void {
-  const rings = ringsOf(hedge);
+  const rings = cellsRings(hedge.cells);
   const first = hedge.cells[0]!;
-  paint.foliage(rings, 0.1, first.x * 13 + first.y * 7);
+  paint.foliage(rings, 0.1, first.x * 13 + first.y * 7, { cells: hedge.cells });
   // The flat top a hedge is clipped to, its sides falling away below it.
   hand.line(grownRings(rings, -0.11, 'round'), 'fine', true);
   standingEdges(hand, rings);
@@ -77,16 +74,19 @@ export function drawHedge(hand: Hand, paint: GroundsPaint, hedge: GroundsPiece):
 export function drawGate(hand: Hand, gate: GroundsPiece): void {
   const dir = gate.dir;
   if (!dir) return;
-  const box = boxOf(gate.cells);
+  const box = cellsBox(gate.cells);
   const along = dir.y !== 0;
   const [u0, u1] = along ? [box.x, box.x + box.w] : [box.y, box.y + box.h];
   const v = along ? box.y + box.h / 2 : box.x + box.w / 2;
-  const at = (u: number, dv: number): Vec => (along ? { x: u, y: v + dv } : { x: v + dv, y: u });
-  const quad = (a: number, b: number, half: number): Vec[] => [at(a, -half), at(b, -half), at(b, half), at(a, half)];
-  // The piers are the wall's ends, as wide as the wall, their faces the gateway's sides.
-  const lines = drawPiers(hand, [quad(u0 - PIER, u0, 0.5), quad(u1, u1 + PIER, 0.5)]);
+  // `u` along the boundary, `dv` across it from its middle line.
+  const frame = along ? axisFrame({ x: 0, y: v }, { x: 1, y: 0 }, { x: 0, y: 1 }) : axisFrame({ x: v, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 });
+  const { at } = frame;
+  const quad = (a: number, b: number, half: number): Vec[] => frame.quad(a, -half, b, half);
+  // The piers are the wall's ends, as wide as the wall, their faces the gateway's sides; the leaves first, so the piers' faces stand over their ends.
+  const lines: Vec[][] = [];
   if (u1 - u0 >= 2) lines.push(...ironLeaves(hand, u0, u1, at, quad));
   else timberLeaf(hand, u0, u1, at, quad);
+  lines.push(...drawPiers(hand, [quad(u0 - PIER, u0, 0.5), quad(u1, u1 + PIER, 0.5)]));
   hand.line(lines, 'fine', true);
 }
 
@@ -95,10 +95,10 @@ function ironLeaves(hand: Hand, a: number, b: number, at: (u: number, dv: number
   const mid = (a + b) / 2;
   const rails = [quad(a, mid - 0.015, 0.04), quad(mid + 0.015, b, 0.04)];
   const bars = Math.max(2, Math.round((mid - a) / 0.13));
-  const heads = [a, mid + 0.015].flatMap((from) => Array.from({ length: bars + 1 }, (_, k) => circlePoly(at(from + ((mid - 0.015 - a) * k) / bars, 0), k === 0 || k === bars ? 0.045 : 0.03, 8)));
+  const heads = [a, mid + 0.015].flatMap((from) => Array.from({ length: bars + 1 }, (_, k) => circle(at(from + ((mid - 0.015 - a) * k) / bars, 0), k === 0 || k === bars ? 0.045 : 0.03, 8)));
   const bolt = quad(mid - 0.035, mid + 0.035, 0.065);
   hand.surface(polysPath([...rails, bolt]), 'metal');
-  flatSurface(hand, polysPath(heads), 'metal');
+  hand.fill(polysPath(heads), 'metal');
   return [...rails, bolt, ...heads];
 }
 
@@ -117,9 +117,9 @@ function drawPiers(hand: Hand, piers: readonly Vec[][]): Vec[][] {
   const caps = piers.map((pier, k) => pier.map((p) => ({ x: p.x + Math.sign(centres[k]!.x - p.x) * 0.07, y: p.y + Math.sign(centres[k]!.y - p.y) * 0.07 })));
   hand.surface(polysPath(piers), 'dressed');
   for (const pier of piers) hand.edges(pier, true);
-  const balls = centres.map((c) => circlePoly(c, 0.17, 24));
-  const lit = centres.map((c) => circlePoly({ x: c.x + TO_LIGHT.x * 0.06, y: c.y + TO_LIGHT.y * 0.06 }, 0.08, 16));
-  flatSurface(hand, polysPath(balls), 'stone');
-  flatSurface(hand, polysPath(lit), 'raised');
+  const balls = centres.map((c) => circle(c, 0.17, 24));
+  const lit = centres.map((c) => circle({ x: c.x + TO_LIGHT.x * 0.06, y: c.y + TO_LIGHT.y * 0.06 }, 0.08, 16));
+  hand.fill(polysPath(balls), 'stone');
+  hand.fill(polysPath(lit), 'raised');
   return [...piers.flatMap((pier, k) => caps[k]!.map((p, i) => [pier[i]!, p])), ...caps, ...balls];
 }

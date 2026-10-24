@@ -1,38 +1,70 @@
 /**
  * The grounds of a house as drawn (`DungeonFloor.grounds`, on its entrance floor): where each piece
  * lies, the drive with its turning circle, the open ground the house's and the garden walls' shadows
- * fall on, and how tall what stands there is, worked out once per floor and shared by both painters.
+ * fall on, each tree's crown and each outbuilding's walls, and how tall what stands there is, worked
+ * out once per floor and shared by both painters.
  */
 
-import { cellKey } from '../../geometry';
+import { cellsBox } from '../../geometry';
 import type { DungeonFloor, GroundsKind, GroundsPiece, HouseGrounds } from '../../model';
 import type { Stand } from '../art/heights';
+import { hash2 } from '../art/noise';
 import { polysPath, rectPoly, type PathFn } from '../art/paths';
 import { subtractRings, unionRings } from '../clipShapes';
-import { cellsShapes, type Vec } from '../geometry';
+import { cellsRings, type Vec } from '../geometry';
 import { houseMass } from '../house/houseMass';
+import { circle } from '../terrain/cover';
 
 /** How tall each standing piece of the grounds is, a house's wall being 1. */
-export const GROUNDS_HEIGHT = { hedge: 0.75, boundary: 0.7, pier: 0.95, outbuilding: 1, greenhouse: 0.45, fountain: 0.25 } as const;
+export const GROUNDS_HEIGHT = { hedge: 0.75, boundary: 0.7, outbuilding: 1, greenhouse: 0.45 } as const;
 
 /** The ring a drive sweeps round its fountain: from the island's edge out to the turn's outer edge, in cells from its middle. */
 export const SWEEP = { inner: 1.02, outer: 2.96 };
 
 /** An outbuilding's walls: masonry this thick inside the cells it stands on (a greenhouse's low base wall thinner). */
-export const OUTBUILDING_WALL = { solid: 0.26, greenhouse: 0.12 };
+const OUTBUILDING_WALL = { solid: 0.26, greenhouse: 0.12 };
+
+type Box = { x: number; y: number; w: number; h: number };
+
+/** A tree's crown: its lobed outline round the trunk, and the radius it reaches. */
+export interface Crown {
+  ring: Vec[];
+  centre: Vec;
+  radius: number;
+}
+
+/** An outbuilding: its cells' box, its walls' thickness, the room inside them, its walls as rings and its doorway. */
+export interface Outbuilding {
+  box: Box;
+  wall: number;
+  inside: Box;
+  walls: Vec[][];
+  door: OutbuildingDoor | null;
+}
+
+/** An outbuilding's door: the gap in its wall a cell wide, and the door's frame (`u` across the gap, `v` inwards from the outer face). */
+export interface OutbuildingDoor {
+  gap: Vec[];
+  mid: Vec;
+  across: Vec;
+  inward: Vec;
+}
 
 export interface GroundsLayout {
-  grounds: HouseGrounds;
+  /** The lot, as a box of cells and as an outline. */
+  lotBox: Box;
+  lot: Vec[];
   /** The pieces of each kind, in the model's order. */
   pieces: ReadonlyMap<GroundsKind, readonly GroundsPiece[]>;
-  /** The lot's outline. */
-  lot: Vec[];
   /** The open ground: the lot without the house, as rings. */
   open: Vec[][];
+  /** The cells of the lawn and of the ways, for what is scattered over them. */
+  lawnCells: readonly Vec[];
+  wayCells: readonly Vec[];
   /** The drive and paths, as rings: their cells, a drive's turn round its fountain rounded. */
   ways: Vec[][];
-  /** The fountain a drive turns round, if any: its middle. */
-  sweep: Vec | null;
+  crowns: ReadonlyMap<GroundsPiece, Crown>;
+  outbuildings: ReadonlyMap<GroundsPiece, Outbuilding>;
 }
 
 const layouts = new WeakMap<DungeonFloor, GroundsLayout | null>();
@@ -49,28 +81,63 @@ export function groundsLayout(floor: DungeonFloor): GroundsLayout | null {
 function build(floor: DungeonFloor, grounds: HouseGrounds): GroundsLayout {
   const pieces = new Map<GroundsKind, GroundsPiece[]>();
   for (const piece of grounds.pieces) pieces.set(piece.kind, [...(pieces.get(piece.kind) ?? []), piece]);
-  const fountain = pieces.get('garden-fountain')?.[0];
-  const sweep = fountain?.at ?? null;
+  const of = (kind: GroundsKind): readonly GroundsPiece[] => pieces.get(kind) ?? [];
   const lot = rectPoly(grounds.lot);
-  return { grounds, pieces, lot, open: subtractRings([lot], houseMass(floor)?.outline ?? []), ways: wayRings(pieces, sweep), sweep };
+  const wayCells = (['path', 'drive', 'gate'] as const).flatMap((kind) => of(kind).flatMap((piece) => piece.cells));
+  return {
+    lotBox: grounds.lot,
+    lot,
+    pieces,
+    open: subtractRings([lot], houseMass(floor)?.outline ?? []),
+    lawnCells: of('garden').flatMap((piece) => piece.cells),
+    wayCells,
+    ways: wayRings(wayCells, of('garden-fountain')[0]?.at ?? null),
+    crowns: new Map(of('tree').flatMap((tree) => (tree.at ? [[tree, crownOf(tree.at, tree.radius ?? 1)] as const] : []))),
+    outbuildings: new Map(of('outbuilding').map((piece) => [piece, outbuildingOf(piece)] as const)),
+  };
 }
 
 export function piecesOf(layout: GroundsLayout, kind: GroundsKind): readonly GroundsPiece[] {
   return layout.pieces.get(kind) ?? [];
 }
 
-/** A circle as a polygon of `n` corners. */
-export function circlePoly(c: Vec, r: number, n = 64): Vec[] {
-  return Array.from({ length: n }, (_, k) => ({ x: c.x + Math.cos((k / n) * Math.PI * 2) * r, y: c.y + Math.sin((k / n) * Math.PI * 2) * r }));
+/** The ways' ground as one set of rings: their cells, and where a drive turns round a fountain, a ring instead of the square of cells. */
+function wayRings(cells: readonly Vec[], sweep: Vec | null): Vec[][] {
+  const turn = (c: Vec): boolean => sweep !== null && Math.abs(c.x + 0.5 - sweep.x) < 3 && Math.abs(c.y + 0.5 - sweep.y) < 3;
+  const rings = unionRings(cellsRings(cells.filter((c) => !turn(c))));
+  if (!sweep) return rings;
+  return subtractRings(unionRings([...rings, circle(sweep, SWEEP.outer, 64)]), [circle(sweep, SWEEP.inner, 64)]);
 }
 
-/** The drive's and paths' ground, with the gates' cells the way runs through: where a drive turns round a fountain, a ring instead of the square of cells. */
-function wayRings(pieces: ReadonlyMap<GroundsKind, readonly GroundsPiece[]>, sweep: Vec | null): Vec[][] {
-  const turn = (c: Vec): boolean => sweep !== null && Math.abs(c.x + 0.5 - sweep.x) < 3 && Math.abs(c.y + 0.5 - sweep.y) < 3;
-  const cells = (['path', 'drive', 'gate'] as const).flatMap((kind) => (pieces.get(kind) ?? []).flatMap((piece) => piece.cells)).filter((c) => !turn(c));
-  const rings = cells.length ? cellsShapes(cells).flatMap((shape) => shape.rings) : [];
-  if (!sweep) return rings;
-  return subtractRings(unionRings([...rings, circlePoly(sweep, SWEEP.outer)]), [circlePoly(sweep, SWEEP.inner)]);
+/** Rounded lobes round the trunk, each a little different, the gaps between them shallow. */
+export function crownOf(centre: Vec, radius: number): Crown {
+  const cell = { x: Math.floor(centre.x), y: Math.floor(centre.y) };
+  const lobes = 7 + Math.floor(hash2(cell.x, cell.y, 21) * 4);
+  const phase = hash2(cell.x, cell.y, 22) * Math.PI * 2;
+  const n = 72;
+  const ring = Array.from({ length: n }, (_, k) => {
+    const a = (k / n) * Math.PI * 2;
+    const lobe = Math.abs(Math.sin((a * lobes) / 2 + phase));
+    const r = radius * (0.86 + 0.12 * lobe ** 0.5 - hash2(k, cell.x * 7 + cell.y * 13, 23) * 0.04);
+    return { x: centre.x + Math.cos(a) * r, y: centre.y + Math.sin(a) * r };
+  });
+  return { ring, centre, radius };
+}
+
+export function outbuildingOf(piece: GroundsPiece): Outbuilding {
+  const wall = piece.use === 'greenhouse' ? OUTBUILDING_WALL.greenhouse : OUTBUILDING_WALL.solid;
+  const box = cellsBox(piece.cells);
+  const inside = { x: box.x + wall, y: box.y + wall, w: box.w - wall * 2, h: box.h - wall * 2 };
+  const door = piece.door ? doorOf(piece.door, wall) : null;
+  return { box, wall, inside, door, walls: subtractRings([rectPoly(box)], door ? [rectPoly(inside), door.gap] : [rectPoly(inside)]) };
+}
+
+/** The doorway on the edge between the door's outside cell and the building, across the whole wall. */
+function doorOf(door: NonNullable<GroundsPiece['door']>, wall: number): OutbuildingDoor {
+  const mid = { x: door.x + 0.5 + door.dir.x * 0.5, y: door.y + 0.5 + door.dir.y * 0.5 };
+  const across = { x: -door.dir.y, y: door.dir.x };
+  const corner = (s: number, d: number): Vec => ({ x: mid.x + across.x * 0.36 * s + door.dir.x * d, y: mid.y + across.y * 0.36 * s + door.dir.y * d });
+  return { gap: [corner(-1, -0.02), corner(1, -0.02), corner(1, wall + 0.02), corner(-1, wall + 0.02)], mid, across, inward: door.dir };
 }
 
 /** The open ground round the house, where shadows fall as on a floor: the lot without the house. */
@@ -83,50 +150,10 @@ export function openGround(floor: DungeonFloor): PathFn | null {
 export function groundsStands(floor: DungeonFloor): Stand[] {
   const layout = groundsLayout(floor);
   if (!layout) return [];
-  const cellsPath = (pieces: readonly GroundsPiece[]): PathFn => polysPath(pieces.flatMap((piece) => cellsShapes(piece.cells).flatMap((shape) => shape.rings)));
-  const stands: Stand[] = [
-    { height: GROUNDS_HEIGHT.hedge, path: cellsPath(piecesOf(layout, 'hedge')) },
-    { height: GROUNDS_HEIGHT.boundary, path: cellsPath(piecesOf(layout, 'boundary-wall')) },
+  const cellsPath = (kind: GroundsKind): PathFn => polysPath(piecesOf(layout, kind).flatMap((piece) => cellsRings(piece.cells)));
+  return [
+    { height: GROUNDS_HEIGHT.hedge, path: cellsPath('hedge') },
+    { height: GROUNDS_HEIGHT.boundary, path: cellsPath('boundary-wall') },
+    ...[...layout.outbuildings].map(([piece, building]) => ({ height: piece.use === 'greenhouse' ? GROUNDS_HEIGHT.greenhouse : GROUNDS_HEIGHT.outbuilding, path: polysPath(building.walls) })),
   ];
-  for (const piece of piecesOf(layout, 'outbuilding')) {
-    const glass = piece.use === 'greenhouse';
-    stands.push({ height: glass ? GROUNDS_HEIGHT.greenhouse : GROUNDS_HEIGHT.outbuilding, path: polysPath(outbuildingWalls(piece)) });
-  }
-  return stands;
-}
-
-/** The box of cells a piece stands on. */
-export function boxOf(cells: readonly Vec[]): { x: number; y: number; w: number; h: number } {
-  const xs = cells.map((c) => c.x);
-  const ys = cells.map((c) => c.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, w: Math.max(...xs) + 1 - x, h: Math.max(...ys) + 1 - y };
-}
-
-/** An outbuilding's door: the gap in its wall, across the wall's thickness, a cell wide. */
-export function outbuildingDoor(piece: GroundsPiece, wall: number): { gap: Vec[]; mid: Vec; inward: Vec } | null {
-  const { door } = piece;
-  if (!door) return null;
-  // The door's outside cell and the way in: the edge it stands on lies between it and the building.
-  const mid = { x: door.x + 0.5 + door.dir.x * 0.5, y: door.y + 0.5 + door.dir.y * 0.5 };
-  const across = { x: -door.dir.y, y: door.dir.x };
-  const half = 0.36;
-  const corner = (s: number, d: number): Vec => ({ x: mid.x + across.x * half * s + door.dir.x * d, y: mid.y + across.y * half * s + door.dir.y * d });
-  return { gap: [corner(-1, -0.02), corner(1, -0.02), corner(1, wall + 0.02), corner(-1, wall + 0.02)], mid, inward: door.dir };
-}
-
-/** An outbuilding's walls as rings: its box less its inside and its doorway. */
-export function outbuildingWalls(piece: GroundsPiece): Vec[][] {
-  const wall = piece.use === 'greenhouse' ? OUTBUILDING_WALL.greenhouse : OUTBUILDING_WALL.solid;
-  const box = boxOf(piece.cells);
-  const inside = rectPoly({ x: box.x + wall, y: box.y + wall, w: box.w - wall * 2, h: box.h - wall * 2 });
-  const door = outbuildingDoor(piece, wall);
-  return subtractRings([rectPoly(box)], door ? [inside, door.gap] : [inside]);
-}
-
-/** Whether a cell is one of a set's, by key. */
-export function cellSet(cells: readonly Vec[]): (x: number, y: number) => boolean {
-  const keys = new Set(cells.map((c) => cellKey(c.x, c.y)));
-  return (x, y) => keys.has(cellKey(x, y));
 }

@@ -5,9 +5,9 @@
  */
 
 import { cellsOf, floorCellsOf, floorRect } from '../../geometry';
-import type { DungeonFloor, DungeonStack } from '../../model';
+import type { DungeonFloor } from '../../model';
 import { grownRings } from '../clipShapes';
-import { cellsShapes, signedArea2, tracePolygon, type Vec } from '../geometry';
+import { cellsRings, outerTurn, signedArea2, tracePolygon, type Vec } from '../geometry';
 import { OUTER_WALL, windowClearing } from '../houseShapes';
 import type { ArtScene } from '../art/artScene';
 import { polyPath, rectPoly } from '../art/paths';
@@ -21,7 +21,6 @@ export interface HouseMass {
   /** The outer walls' outer face, as rings; `holes` marks those round a courtyard. */
   outline: Vec[][];
   holes: boolean[];
-  stacks: readonly DungeonStack[];
 }
 
 const masses = new WeakMap<DungeonFloor, HouseMass>();
@@ -31,13 +30,11 @@ export function houseMass(floor: DungeonFloor): HouseMass | null {
   if (floor.walls !== 'edges') return null;
   let mass = masses.get(floor);
   if (!mass) {
-    const stacks = floor.stacks ?? [];
-    const cells = [...floor.rooms.flatMap(floorCellsOf), ...stacks.flatMap((s) => cellsOf(floorRect(s)))];
-    const centre = cellsShapes(cells).flatMap((shape) => shape.rings);
+    const cells = [...floor.rooms.flatMap(floorCellsOf), ...(floor.stacks ?? []).flatMap((s) => cellsOf(floorRect(s)))];
+    const centre = cellsRings(cells);
     const outline = grownRings(centre, OUTER_WALL / 2, 'miter');
-    const largest = outline.reduce((best, ring) => (Math.abs(signedArea2(ring)) > Math.abs(signedArea2(best)) ? ring : best), outline[0] ?? []);
-    const turn = Math.sign(signedArea2(largest));
-    mass = { centre, outline, holes: outline.map((ring) => Math.sign(signedArea2(ring)) !== turn), stacks };
+    const turn = outerTurn(outline);
+    mass = { centre, outline, holes: outline.map((ring) => Math.sign(signedArea2(ring)) !== turn) };
     masses.set(floor, mass);
   }
   return mass;

@@ -39,7 +39,7 @@ function record(model: DungeonModel, index = 0, secrets = true): Hand {
   const view = { ...DEFAULT_VIEW, secrets, shadow: false };
   const env = createRenderEnv(ctx as unknown as Canvas2D, visibleDungeon(model, view, index), dungeonStyle('parchment'), view, 150);
   const scene = buildArtScene(env, { originCell: { x: 0, y: 0 }, widthPx: 1200, heightPx: 1200, pxPerCell: 150 }, [], false, false);
-  return { scene, surface: vi.fn(), grain: vi.fn(), line: vi.fn(), edges: vi.fn(), solid: vi.fn(), tone: vi.fn(), water: vi.fn(), lava: vi.fn(), paint: () => ({ fill: '#ddd', ink: '#111' }), weight: () => 0.02 };
+  return { scene, surface: vi.fn(), fill: vi.fn(), grain: vi.fn(), line: vi.fn(), edges: vi.fn(), solid: vi.fn(), tone: vi.fn(), water: vi.fn(), lava: vi.fn(), paint: () => ({ fill: '#ddd', ink: '#111' }), weight: () => 0.02 };
 }
 
 function draw(part: CaveWayPart, hand: Hand): void {

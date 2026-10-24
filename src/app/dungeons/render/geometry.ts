@@ -51,6 +51,11 @@ export function cellsShapes(cells: readonly CellPoint[]): PolyShape[] {
   return shapes;
 }
 
+/** The outline of a set of cells as rings, holes among them. */
+export function cellsRings(cells: readonly CellPoint[]): Vec[][] {
+  return cells.length ? cellsShapes(cells).flatMap((shape) => shape.rings) : [];
+}
+
 /** Rings as polygons: each hole goes with the outer ring that holds its first point. */
 export function polysOf(rings: readonly Vec[][]): PolyShape[] {
   const outers = rings.filter((ring) => signedArea2(ring) > 0);
@@ -271,6 +276,16 @@ export function signedArea2(points: readonly Vec[]): number {
     sum += a.x * b.y - b.x * a.y;
   }
   return sum;
+}
+
+/** The way round of the largest of `rings`: the outline whose holes run the other way, so every ring keeps what it bounds on one side. */
+export function outerTurn(rings: readonly (readonly Vec[])[]): number {
+  let largest = 0;
+  for (const ring of rings) {
+    const area = signedArea2(ring);
+    if (Math.abs(area) > Math.abs(largest)) largest = area;
+  }
+  return Math.sign(largest);
 }
 
 export function pointInPolygon(points: readonly Vec[], x: number, y: number): boolean {

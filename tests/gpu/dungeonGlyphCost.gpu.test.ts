@@ -23,6 +23,7 @@ import { drawBoundaryWall, drawGate, drawHedge } from '../../src/app/dungeons/re
 import { engravedGroundsPaint } from '../../src/app/dungeons/render/grounds/engravedPaint';
 import { drawColumn, drawFountain, drawTree } from '../../src/app/dungeons/render/grounds/garden';
 import { drawOutbuildingFloor, drawPorchFloor, drawWays } from '../../src/app/dungeons/render/grounds/ground';
+import { crownOf, outbuildingOf } from '../../src/app/dungeons/render/grounds/groundsShapes';
 import { drawOutbuilding } from '../../src/app/dungeons/render/grounds/outbuildings';
 import type { GroundsPaint } from '../../src/app/dungeons/render/grounds/paint';
 import { stoneGroundsPaint } from '../../src/app/dungeons/render/grounds/stonePaint';
@@ -89,9 +90,9 @@ const square = (x: number, y: number, n: number): Vec[][] => [rectPoly({ x, y, w
  * wall) by one cell of it, in the middle of a stretch so its edges are those of a cell in a run.
  */
 const GROUNDS_SAMPLES: Record<GroundsKind, (hand: Hand, paint: GroundsPaint) => void> = {
-  garden: (_, paint) => paint.lawn(polysPath(square(2, 2, 1)), { minX: 2, minY: 2, maxX: 3, maxY: 3 }),
-  path: (hand, paint) => drawWays(hand, paint, square(2, 2, 1)),
-  drive: (hand, paint) => drawWays(hand, paint, square(2, 2, 1)),
+  garden: (_, paint) => paint.lawn(polysPath(square(2, 2, 1)), cells(2, 2, 1, 1)),
+  path: (hand, paint) => drawWays(hand, paint, square(2, 2, 1), cells(2, 2, 1, 1)),
+  drive: (hand, paint) => drawWays(hand, paint, square(2, 2, 1), cells(2, 2, 1, 1)),
   hedge: (hand, paint) => drawHedge(hand, paint, { kind: 'hedge', cells: cells(2, 2, 1, 1) }),
   'boundary-wall': (hand) => drawBoundaryWall(hand, { kind: 'boundary-wall', cells: cells(2, 2, 1, 1) }),
   gate: (hand) => drawGate(hand, { kind: 'gate', cells: cells(1, 2, 3, 1), dir: { x: 0, y: -1 } }),
@@ -100,13 +101,14 @@ const GROUNDS_SAMPLES: Record<GroundsKind, (hand: Hand, paint: GroundsPaint) => 
     drawPorchFloor(hand, porch);
     porch.columns.forEach((at) => drawColumn(hand, at));
   },
-  outbuilding: (hand) => {
+  outbuilding: (hand, paint) => {
     const building = { kind: 'outbuilding' as const, cells: cells(1, 1, 3, 3), use: 'carriage-house' as const, door: { x: 2, y: 4, dir: { x: 0, y: -1 } as const } };
-    drawOutbuildingFloor(hand, building);
-    drawOutbuilding(hand, building);
+    const frame = outbuildingOf(building);
+    drawOutbuildingFloor(hand, building, frame);
+    drawOutbuilding(hand, paint, building, frame);
   },
   // A tree of the middle size the grounds plant (crowns 0.8 to 1.4 cells).
-  tree: (hand, paint) => drawTree(hand, paint, { kind: 'tree', cells: [{ x: 2, y: 2 }], at: { x: 2.5, y: 2.5 }, radius: 1.1 }),
+  tree: (hand, paint) => drawTree(hand, paint, crownOf({ x: 2.5, y: 2.5 }, 1.1)),
   'garden-fountain': (hand, paint) => drawFountain(hand, paint, { kind: 'garden-fountain', cells: cells(2, 2, 2, 2), at: { x: 3, y: 3 } }),
 };
 

@@ -7,39 +7,17 @@
 
 import type { GroundsPiece } from '../../model';
 import type { Hand } from '../art/hand';
-import { hash2 } from '../art/noise';
 import { polyPath, rectPoly } from '../art/paths';
 import type { Vec } from '../geometry';
-import { circlePoly } from './groundsShapes';
-import { flatSurface, type GroundsPaint } from './paint';
+import { circle } from '../terrain/cover';
+import type { Crown } from './groundsShapes';
+import type { GroundsPaint } from './paint';
 
-/** A tree's crown: its lobed outline round the trunk, and the radius it reaches. */
-export function crownOf(tree: GroundsPiece, seed: number): { ring: Vec[]; centre: Vec; radius: number } | null {
-  const centre = tree.at;
-  if (!centre) return null;
-  const radius = tree.radius ?? 1;
-  const lobes = 7 + Math.floor(hash2(Math.floor(centre.x), Math.floor(centre.y), seed + 21) * 4);
-  const phase = hash2(Math.floor(centre.x), Math.floor(centre.y), seed + 22) * Math.PI * 2;
-  const n = 72;
-  const ring = Array.from({ length: n }, (_, k) => {
-    const a = (k / n) * Math.PI * 2;
-    // Rounded lobes, each a little different, the gaps between them shallow.
-    const lobe = Math.abs(Math.sin((a * lobes) / 2 + phase));
-    const jitter = hash2(k % n, Math.floor(centre.x * 7 + centre.y * 13), seed + 23) * 0.04;
-    const r = radius * (0.86 + 0.12 * lobe ** 0.5 - jitter);
-    return { x: centre.x + Math.cos(a) * r, y: centre.y + Math.sin(a) * r };
-  });
-  return { ring, centre, radius };
-}
-
-export function drawTree(hand: Hand, paint: GroundsPaint, tree: GroundsPiece): void {
-  const crown = crownOf(tree, hand.scene.env.dungeon.model.seed);
-  if (!crown) return;
-  const { centre, radius } = crown;
-  paint.foliage([crown.ring], 0.18, Math.floor(centre.x * 31 + centre.y * 17), { centre, radius });
+export function drawTree(hand: Hand, paint: GroundsPaint, { ring, centre, radius }: Crown): void {
+  paint.foliage([ring], 0.18, Math.floor(centre.x * 31 + centre.y * 17), { dome: { centre, radius } });
   // The trunk's point, where it rises under the crown: a ring of bark round its heart.
-  const trunk = circlePoly(centre, 0.06, 16);
-  flatSurface(hand, polyPath(trunk), 'wood');
+  const trunk = circle(centre, 0.06, 16);
+  hand.fill(polyPath(trunk), 'wood');
   hand.line([trunk], 'fine', true);
 }
 
@@ -55,14 +33,14 @@ export function drawFountain(hand: Hand, paint: GroundsPaint, fountain: GroundsP
   paint.pool(polyPath(water), c, 0.76);
   hand.edges(water, false);
   hand.edges(rim, true);
-  const pedestal = circlePoly(c, 0.3, 32);
-  const bowl = circlePoly(c, 0.22, 32);
+  const pedestal = circle(c, 0.3, 32);
+  const bowl = circle(c, 0.22, 32);
   hand.surface(polyPath(pedestal), 'dressed');
   hand.solid(polyPath(pedestal), c, 0.3, 0.8);
   hand.edges(pedestal, true);
   paint.pool(polyPath(bowl), c, 0.22);
   hand.edges(bowl, false);
-  const jet = circlePoly(c, 0.045, 12);
+  const jet = circle(c, 0.045, 12);
   hand.surface(polyPath(jet), 'metal');
   hand.edges(jet, true);
 }
@@ -76,5 +54,5 @@ export function drawColumn(hand: Hand, at: Vec): void {
   hand.surface(polyPath(abacus), 'stone');
   hand.solid(polyPath(abacus), at, 0.12, 0.6);
   hand.edges(abacus, true);
-  hand.line([circlePoly(at, 0.085, 24)], 'fine', true);
+  hand.line([circle(at, 0.085, 24)], 'fine', true);
 }

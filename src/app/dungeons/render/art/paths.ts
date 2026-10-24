@@ -22,6 +22,28 @@ export function rectPoly(r: { x: number; y: number; w: number; h: number }): Vec
   return [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
 }
 
+/**
+ * A frame along a line: `at(u, v)` is `u` along `along` and `v` along `across` from `origin`, and
+ * `quad` the rectangle between two of each.
+ */
+export function axisFrame(origin: Vec, along: Vec, across: Vec): { at: (u: number, v: number) => Vec; quad: (u0: number, v0: number, u1: number, v1: number) => Vec[] } {
+  const at = (u: number, v: number): Vec => ({ x: origin.x + along.x * u + across.x * v, y: origin.y + along.y * u + across.y * v });
+  return { at, quad: (u0, v0, u1, v1) => [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)] };
+}
+
+/** Points every `step` along each edge of a closed ring, from `start` into the edge and stopping `margin` short of its end, with the edge's direction. */
+export function stepsAlong(ring: readonly Vec[], step: number, start: number, margin: number): { p: Vec; t: Vec }[] {
+  const out: { p: Vec; t: Vec }[] = [];
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1e-6) return;
+    const t = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    for (let s = start; s < len - margin; s += step) out.push({ p: { x: a.x + t.x * s, y: a.y + t.y * s }, t });
+  });
+  return out;
+}
+
 export function grown(b: Bounds, m: number): Bounds {
   return { minX: b.minX - m, minY: b.minY - m, maxX: b.maxX + m, maxY: b.maxY + m };
 }

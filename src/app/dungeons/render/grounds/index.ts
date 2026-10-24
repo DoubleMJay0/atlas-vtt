@@ -9,11 +9,11 @@ import type { Hand } from '../art/hand';
 import { drawBoundaryWall, drawGate, drawHedge } from './boundary';
 import { drawColumn, drawFountain, drawTree } from './garden';
 import { drawGroundsGround, drawGroundsShade } from './ground';
-import { groundsLayout, piecesOf } from './groundsShapes';
+import { groundsLayout, piecesOf, type GroundsLayout } from './groundsShapes';
 import { drawOutbuilding } from './outbuildings';
 import type { GroundsPaint } from './paint';
 
-type Draw = (hand: Hand, paint: GroundsPaint, piece: GroundsPiece) => void;
+type Draw = (hand: Hand, paint: GroundsPaint, piece: GroundsPiece, layout: GroundsLayout) => void;
 
 /** Kinds that lie flat, drawn whole by the ground pass: the lawn, the ways, and the floors of the porch and outbuildings. */
 const FLAT: readonly GroundsKind[] = ['garden', 'path', 'drive', 'porch', 'outbuilding'];
@@ -23,10 +23,10 @@ const STANDING: readonly [GroundsKind, Draw][] = [
   ['hedge', drawHedge],
   ['boundary-wall', (hand, _, piece) => drawBoundaryWall(hand, piece)],
   ['gate', (hand, _, piece) => drawGate(hand, piece)],
-  ['outbuilding', (hand, _, piece) => drawOutbuilding(hand, piece)],
+  ['outbuilding', (hand, paint, piece, layout) => drawOutbuilding(hand, paint, piece, layout.outbuildings.get(piece)!)],
   ['porch', (hand, _, piece) => piece.columns?.forEach((at) => drawColumn(hand, at))],
   ['garden-fountain', drawFountain],
-  ['tree', drawTree],
+  ['tree', (hand, paint, piece, layout) => drawTree(hand, paint, layout.crowns.get(piece)!)],
 ];
 
 /** Every grounds kind with a drawing. */
@@ -47,9 +47,9 @@ export function groundsPainter(hand: Hand, makePaint: () => GroundsPaint): Groun
   const paint = makePaint();
   return {
     ground: () => drawGroundsGround(hand, paint, layout),
-    shade: () => drawGroundsShade(hand, layout),
+    shade: () => drawGroundsShade(hand, paint, layout),
     standing: () => {
-      for (const [kind, draw] of STANDING) for (const piece of piecesOf(layout, kind)) draw(hand, paint, piece);
+      for (const [kind, draw] of STANDING) for (const piece of piecesOf(layout, kind)) draw(hand, paint, piece, layout);
     },
   };
 }

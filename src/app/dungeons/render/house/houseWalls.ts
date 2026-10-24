@@ -31,7 +31,7 @@ export function drawHouseMass(hand: Hand): boolean {
   const bounds = pointsBounds(mass.outline.flat());
   hand.tone(() => MASS_TONE, bounds, polysPath(mass.outline), 'shade');
   outerJoints(hand, mass);
-  for (const stack of mass.stacks) drawStack(hand, stack);
+  for (const stack of dungeon.floor.stacks ?? []) drawStack(hand, stack);
   ctx.restore();
   ctx.save();
   clipOutWindowsAndDoors(scene, 0.06);

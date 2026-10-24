@@ -66,13 +66,16 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       }, bounds);
     },
     surface: (path, material) => {
+      hand.fill(path, material);
+      hand.grain(path, material);
+    },
+    fill: (path, material) => {
       ctx.save();
       ctx.beginPath();
       path(ctx);
       ctx.fillStyle = materialColour(c, material);
       ctx.fill();
       ctx.restore();
-      hand.grain(path, material);
     },
     grain: (path, material) => {
       if (!scene.raster || material === 'glass') return;
