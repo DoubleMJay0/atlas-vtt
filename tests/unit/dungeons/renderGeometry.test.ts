@@ -11,6 +11,10 @@ import { pool } from '../../fixtures/dungeonModelBuilder';
 import { rngFrom } from '../../../src/app/dungeons/rng';
 import { pointInPolygon } from '../../../src/app/dungeons/render/geometry';
 import { holeRings } from '../../../src/app/dungeons/render/terrain/holes';
+import { cutsHoles } from '../../../src/app/dungeons/render/terrain/pieces';
+import { stairwellEnd } from '../../../src/app/dungeons/render/art/passages';
+import type { RenderEnv } from '../../../src/app/dungeons/render/renderEnv';
+import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { draft } from '../../../src/app/dungeons/terrain/catalog';
 
 describe('dungeon render geometry', () => {
@@ -72,6 +76,24 @@ describe('dungeon render geometry', () => {
     // The door cell between the hall and the rotunda is floor.
     expect(dungeon.field.distance(0.5, -5.5)).toBeLessThan(0);
     expect(dungeon.field.distance(-20, -20)).toBeGreaterThan(1);
+  });
+});
+
+describe('the picture of each floor of a stack', () => {
+  const fortress = generateDungeon({ seed: 23, theme: 'fortress', tags: [], floors: 3 });
+  const cavern = generateDungeon({ seed: 23, theme: 'cavern', tags: [], floors: 3 });
+  const envOf = (model: typeof fortress, index: number): RenderEnv => ({ openings: 'cut', dungeon: { model, index } }) as unknown as RenderEnv;
+
+  it('cuts holes on every floor of a Fortress but the entrance floor', () => {
+    expect([0, 1, 2].map((index) => cutsHoles(envOf(fortress, index)))).toEqual([false, true, true]);
+    expect([0, 1, 2].map((index) => cutsHoles(envOf(cavern, index)))).toEqual([true, true, false]);
+  });
+
+  it('draws the stairwell going down on the floor above', () => {
+    const up = fortress.floors[1]!.stairs.find((s) => s.to === 0)!;
+    expect(stairwellEnd({ model: fortress, index: 1 }, up)).toBe('upper');
+    expect(stairwellEnd({ model: fortress, index: 0 }, fortress.floors[0]!.stairs[0]!)).toBe('lower');
+    expect(stairwellEnd({ model: cavern, index: 0 }, cavern.floors[0]!.stairs[0]!)).toBe('upper');
   });
 });
 

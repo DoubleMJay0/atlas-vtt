@@ -1,4 +1,5 @@
 import type { CellDir, CellPoint, DungeonTerrain, TerrainKind } from '../../model';
+import { floorBelow, stackOf } from '../../floors/floorStack';
 import { HOLE_KINDS } from '../../terrain/catalog';
 import type { Rng } from '../../rng';
 import type { RenderEnv } from '../renderEnv';
@@ -35,5 +36,10 @@ export function onFloor(env: RenderEnv, c: CellPoint): boolean {
 
 /** Whether holes on this floor are cut out of the picture: a floor lies below and the picture is not to stand alone. */
 export function cutsHoles(env: RenderEnv): boolean {
-  return env.openings === 'cut' && env.dungeon.index < env.dungeon.model.floors.length - 1;
+  return env.openings === 'cut' && hasFloorBelow(env);
+}
+
+/** Whether a floor lies physically below the one shown. */
+export function hasFloorBelow(env: RenderEnv): boolean {
+  return floorBelow(stackOf(env.dungeon.model), env.dungeon.index) !== null;
 }

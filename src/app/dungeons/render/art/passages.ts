@@ -1,5 +1,8 @@
 import type { CellDir, DungeonDoor, DungeonStair } from '../../model';
+import { stackOf, stairEnd } from '../../floors/floorStack';
+import type { StairEnd } from '../../floors/stairSpots';
 import type { Vec } from '../geometry';
+import type { VisibleFloor } from '../visibleDungeon';
 import { drawFlight } from '../terrain/raised';
 import type { Hand } from './hand';
 import { polyPath } from './paths';
@@ -23,8 +26,13 @@ export function drawPassages(hand: Hand): void {
     if (door.kind === 'door') drawDoor(hand, door);
     else if (door.kind === 'steps') drawFlight(hand, { x: door.x, y: door.y, w: 1, h: 1 }, door.descends ? door.dir : flip(door.dir), 0, 0.22);
   }
-  const index = hand.scene.env.dungeon.index;
-  for (const stair of hand.scene.env.dungeon.floor.stairs) drawStairwell(hand, stair, stair.to > index ? 'upper' : 'lower');
+  const { dungeon } = hand.scene.env;
+  for (const stair of dungeon.floor.stairs) drawStairwell(hand, stair, stairwellEnd(dungeon, stair));
+}
+
+/** The end of a stairwell the floor shown holds: its upper end where the stairs lead to a floor below. */
+export function stairwellEnd(dungeon: Pick<VisibleFloor, 'model' | 'index'>, stair: DungeonStair): StairEnd {
+  return stairEnd(stackOf(dungeon.model), dungeon.index, stair.to);
 }
 
 const flip = (d: CellDir): CellDir => ({ x: -d.x as CellDir['x'], y: -d.y as CellDir['y'] });
@@ -55,7 +63,7 @@ function drawDoor(hand: Hand, door: DungeonDoor): void {
  * the same treads on both, walled round. Going down, the treads sink into the dark at the low end;
  * coming up, past a break line where they pass through the ceiling, they fade.
  */
-function drawStairwell(hand: Hand, stair: DungeonStair, end: 'upper' | 'lower'): void {
+function drawStairwell(hand: Hand, stair: DungeonStair, end: StairEnd): void {
   const along = stair.down.x !== 0 ? stair.w : stair.h;
   const across = stair.down.x !== 0 ? stair.h : stair.w;
   const cx = stair.x + stair.w / 2;

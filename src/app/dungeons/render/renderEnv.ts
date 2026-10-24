@@ -21,7 +21,7 @@ export interface RenderEnv {
   pxPerCell: number;
   /**
    * How holes in the floor are drawn where a floor lies below: `cut` leaves them transparent, so
-   * the scene shows the level below through them; `drawn` paints them as depth, as on the deepest
+   * the scene shows the level below through them; `drawn` paints them as depth, as on the lowest
    * floor, for pictures that stand alone (the SVG export).
    */
   openings: 'cut' | 'drawn';

@@ -5,13 +5,13 @@ import { polysPath, smoothstep } from '../art/paths';
 import { drawField, fieldOf, gridOver } from '../art/raster';
 import { cellRings, edgesFacing, type CellEdge } from './cellRings';
 import { drawDrop, dropDepth, dropTone, FACE } from './drops';
-import { cellSet, cutsHoles, isHole, onFloor, shownPieces } from './pieces';
+import { cellSet, cutsHoles, hasFloorBelow, isHole, onFloor, shownPieces } from './pieces';
 import { chiselled } from './stones';
 
 /**
  * Holes in the floor: chasms, shafts and the well of a gallery. Where a floor lies below, the hole
  * is cut out of the picture inside a narrow rock face, so the scene shows the level below through
- * it; on the deepest floor, and where a picture stands alone (the SVG export), it is painted as
+ * it; on the lowest floor, and where a picture stands alone (the SVG export), it is painted as
  * depth. A gallery's rim carries a hollow balustrade on the floor round it.
  */
 
@@ -45,7 +45,7 @@ export function drawHoles(hand: Hand): void {
     if (hole.kind === 'gallery') balustrade(hand, edgesFacing(hole.cells, c => !cellSet(hole.cells).has(`${c.x},${c.y}`) && onFloor(env, c)));
     const rings = holeRings(hole);
     if (cut) cutHole(hand, rings, built(hole));
-    else drawDrop(hand, rings, hole.opening?.bottom === null || env.dungeon.index === env.dungeon.model.floors.length - 1 ? 'void' : 'floor', built(hole));
+    else drawDrop(hand, rings, hole.opening?.bottom === null || !hasFloorBelow(env) ? 'void' : 'floor', built(hole));
   }
 }
 
