@@ -7,7 +7,7 @@
  * climax the boss arena; the reward room a point of interest or nothing at all.
  */
 
-import type { CellDir, FiveRoomStage } from '../model';
+import type { CellDir, FiveRoomStage, TerrainKind } from '../model';
 import { dir } from '../geometry';
 import { type Rng, chance, int, pick, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
@@ -19,10 +19,18 @@ import { ledgeAlongWall, platformAtFarWall } from './elevation';
 import { hazardWeights, placeHazard } from './hazards';
 import { anyInterest, placeInterest } from './interest';
 import type { RoomCells } from './roomCells';
+import { typeAllows } from './typeReasons';
+import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import type { TerrainWork } from './work';
 
 function negate(d: CellDir): CellDir {
   return dir(-d.x, -d.y);
+}
+
+/** What a stage may build: any terrain in an untyped room, only its type's in a typed one, where no setback is a hazard. */
+interface StageRules {
+  allows: (kind: TerrainKind) => boolean;
+  hazards: boolean;
 }
 
 /** Tries the ways in order of a weighted draw, the drawn one first; false where none fits. */
@@ -34,7 +42,7 @@ function firstThatFits<T extends string>(rng: Rng, ways: readonly (readonly [T, 
 }
 
 /** A low wall across most of the way in, a passage left at one side, defenders behind it. */
-function guardPost(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
+function guardPost(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: StageRules): void {
   const floor = work.floors[k];
   if (!floor) return;
   const longest = Math.max(2, Math.min(4, rc.width - 2));
@@ -45,28 +53,28 @@ function guardPost(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void 
     return rows.flatMap((i) => (left ? sides : [...sides].reverse()).map((j) => ({ i, j, length })));
   });
   const built = tries.some(({ i, j, length }) => tryShape(floor, rc, { kind: 'low-wall', di: 1, dj: length }, i, j));
-  scatterCover(floor, rc, rng, built ? 1 : 2, work.tags);
+  scatterCover(floor, rc, rng, built ? 1 : 2, work.tags, rules.allows);
 }
 
 type Entrance = 'guard-post' | 'cover' | 'dais' | 'empty';
 
 /** The way in: held behind a low wall, among scattered cover, from a dais, or an empty hall. */
-function entrance(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
+function entrance(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: StageRules): void {
   const floor = work.floors[k];
   if (!floor) return;
   const ways: (readonly [Entrance, number])[] = [
-    ['guard-post', 3],
+    ['guard-post', rules.allows('low-wall') ? 3 : 0],
     ['cover', 2],
-    ['dais', rc.depth >= 6 ? 1.5 : 0],
+    ['dais', rc.depth >= 6 && rules.allows('platform') ? 1.5 : 0],
     ['empty', 1],
   ];
   firstThatFits(rng, ways, (way) => {
     switch (way) {
       case 'guard-post':
-        guardPost(work, k, rc, rng);
+        guardPost(work, k, rc, rng, rules);
         return true;
       case 'cover':
-        return scatterCover(floor, rc, rng, int(rng, 2, 3), work.tags) > 0;
+        return scatterCover(floor, rc, rng, int(rng, 2, 3), work.tags, rules.allows) > 0;
       case 'dais':
         return platformAtFarWall(floor, rc, 1, Math.ceil(rc.width * 0.5), 1) !== null;
       case 'empty':
@@ -78,17 +86,18 @@ function entrance(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
 type SetPiece = 'statues' | 'basin' | 'obelisk' | 'pews' | 'tombs' | 'plain';
 
 /** The second room's set piece, something to look at that does nothing by itself. */
-function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
+function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: StageRules): void {
   const floor = work.floors[k];
   if (!floor) return;
   const room = rc.room.id;
   const { tags } = work;
+  const { allows } = rules;
   const ways: (readonly [SetPiece, number])[] = [
-    ['statues', 2],
-    ['basin', tags.has('dry') ? 0 : tags.has('wet') || tags.has('flooded') ? 3 : 1.5],
-    ['obelisk', 1.5],
-    ['pews', 0.5],
-    ['tombs', 0.5],
+    ['statues', allows('mosaic') && allows('statue') ? 2 : 0],
+    ['basin', !allows('pool') || !allows('statue') || tags.has('dry') ? 0 : tags.has('wet') || tags.has('flooded') ? 3 : 1.5],
+    ['obelisk', allows('obelisk') ? 1.5 : 0],
+    ['pews', allows('pews') ? 0.5 : 0],
+    ['tombs', allows('sarcophagus') ? 0.5 : 0],
     ['plain', 1],
   ];
   firstThatFits(rng, ways, (way) => {
@@ -112,7 +121,7 @@ function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
       case 'tombs':
         return [1, rc.width - 2].filter((j) => tryShape(floor, rc, { kind: 'sarcophagus', di: 2, dj: 1 }, Math.max(1, Math.floor(rc.depth / 2) - 1), j)).length > 0;
       case 'plain':
-        return anyInterest(floor, rc, rng, tags);
+        return anyInterest(floor, rc, rng, tags, allows);
     }
   });
 }
@@ -120,16 +129,17 @@ function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
 type Setback = 'hazard' | 'rubble' | 'broken' | 'ledge';
 
 /** Something in the way: a hazard of the dungeon's kind, rough ground, or a ledge to fight from. */
-function setback(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
+function setback(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, rules: StageRules): void {
   const floor = work.floors[k];
   if (!floor) return;
   const { tags } = work;
+  const { allows } = rules;
   const crumbling = tags.has('crumbling');
   const ways: (readonly [Setback, number])[] = [
-    ['hazard', 4],
-    ['rubble', crumbling ? 3 : 1],
-    ['broken', crumbling || tags.has('deep') ? 2 : 0.7],
-    ['ledge', tags.has('flat') ? 0 : 1],
+    ['hazard', rules.hazards ? 4 : 0],
+    ['rubble', !allows('rubble-field') ? 0 : crumbling ? 3 : 1],
+    ['broken', !allows('broken-floor') ? 0 : crumbling || tags.has('deep') ? 2 : 0.7],
+    ['ledge', tags.has('flat') || !allows('ledge') ? 0 : 1],
   ];
   firstThatFits(rng, ways, (way) => {
     switch (way) {
@@ -146,24 +156,37 @@ function setback(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
 }
 
 /** The room beyond the boss: a point of interest, or now and then nothing but what the GM puts there. */
-function reward(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): void {
+function reward(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>, rules: StageRules): void {
   const floor = work.floors[k];
   if (!floor || chance(rng, 0.2)) return;
-  if (!placeInterest(floor, rc, rng, pick(rng, ['altar', 'obelisk', 'mosaic', 'statue'] as const))) anyInterest(floor, rc, rng, tags);
+  const kind = pick(rng, ['altar', 'obelisk', 'mosaic', 'statue'] as const);
+  if (!rules.allows(kind) || !placeInterest(floor, rc, rng, kind)) anyInterest(floor, rc, rng, tags, rules.allows);
 }
 
-/** Terrain for a main room of a five-room dungeon. */
-export function furnishStage(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, stage: FiveRoomStage, tags: ReadonlySet<DungeonTag>): void {
+const ANY: StageRules = { allows: () => true, hazards: true };
+
+/**
+ * Terrain for a main room of a five-room dungeon; a typed one builds only what its type allows,
+ * without a hazard, and is then furnished by its type's recipe.
+ */
+export function furnishStage(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, stage: FiveRoomStage, tags: ReadonlySet<DungeonTag>, typed?: TypedRoom): void {
+  const rules = typed ? { allows: (kind: TerrainKind) => typeAllows(typed.spec, kind, work.theme.ruined), hazards: false } : ANY;
   switch (stage) {
     case 'entrance':
-      return entrance(work, k, rc, rng);
+      entrance(work, k, rc, rng, rules);
+      break;
     case 'puzzle':
-      return setPiece(work, k, rc, rng);
+      setPiece(work, k, rc, rng, rules);
+      break;
     case 'setback':
-      return setback(work, k, rc, rng);
+      setback(work, k, rc, rng, rules);
+      break;
     case 'climax':
-      return furnishArena(work, k, rc, rng, tags);
+      furnishArena(work, k, rc, rng, tags);
+      return;
     case 'reward':
-      return reward(work, k, rc, rng, tags);
+      reward(work, k, rc, rng, tags, rules);
+      break;
   }
+  if (typed) furnishTypedRoom(work, k, rc, typed.spec, typed.context);
 }

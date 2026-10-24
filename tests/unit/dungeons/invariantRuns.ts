@@ -252,8 +252,9 @@ export function describeInvariants(floors: number): void {
       expect(hazards / rooms).toBeLessThan(0.26);
     });
 
-    it('furnish the boss room as an open arena: high ground, a set piece, cover, two thirds of it free', () => {
-      const arenas = runs.map((run) => run.model.floors.at(-1)!).map((floor) => ({ floor, boss: floor.rooms.find((room) => room.boss)! }));
+    // The arenas of typed boss rooms follow their climax types (generateThemes.furnished.test.ts).
+    it('furnish the boss room of a Cavern as an open arena: high ground, a set piece, cover, two thirds of it free', () => {
+      const arenas = caverns.map((run) => run.model.floors.at(-1)!).map((floor) => ({ floor, boss: floor.rooms.find((room) => room.boss)! }));
       const share = (check: (a: (typeof arenas)[number]) => boolean): number => arenas.filter(check).length / arenas.length;
       const pieces = ({ floor, boss }: (typeof arenas)[number]): DungeonModel['floors'][number]['terrain'] => floor.terrain.filter((p) => p.room === boss.id);
       expect(share((a) => pieces(a).some((p) => p.kind === 'platform'))).toBeGreaterThan(0.6);

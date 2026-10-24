@@ -130,6 +130,11 @@ export class RoomCells {
     return this.whole(extra);
   }
 
+  /** Whether a piece that cannot be walked could stand on cells already taken walkable (a seat on a platform), the room staying whole. */
+  allowsOnWalked(cells: readonly CellPoint[]): boolean {
+    return cells.length > 0 && cells.every((c) => this.taken.get(cellKey(c.x, c.y)) === 'walk') && this.whole(new Set(cells.map((c) => cellKey(c.x, c.y))));
+  }
+
   /**
    * Whether, with `cells` blocked (but `over`), one more free cell could still take cover and
    * leave the room whole: a hazard never takes the last place for cover.

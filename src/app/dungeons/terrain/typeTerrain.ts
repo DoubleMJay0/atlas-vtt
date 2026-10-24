@@ -8,7 +8,7 @@ import { DRAWN_PROP_KINDS } from '../drawnKinds';
 import { cellsOf, cellKey, inRect, wallRect } from '../geometry';
 import type { DungeonRoom } from '../model';
 import { spotRect } from '../floors/stairSpots';
-import { furnishSpace } from '../props/furnishSpace';
+import { type FurnishSpace, furnishSpace } from '../props/furnishSpace';
 import { type RecipeContext, furnishByRecipe } from '../props/recipe';
 import { frameOf } from '../props/roomFrame';
 import { roomSpace } from '../props/space';
@@ -21,7 +21,6 @@ import { pews } from './difficult';
 import { platformAtFarWall } from './elevation';
 import { placeInterest } from './interest';
 import { againstWall, inCorner } from '../props/cellVerbs';
-import { type FurnishSpace } from '../props/furnishSpace';
 import type { DungeonTag } from '../tags';
 import type { FloorTerrain } from './floorTerrain';
 import { type RoomCells, WALL_SIDES, type WallSide } from './roomCells';
@@ -48,6 +47,21 @@ export function outerSides(rc: RoomCells, rooms: readonly DungeonRoom[]): Readon
 function keptClear(floor: FloorTerrain, rc: RoomCells): Set<string> {
   const stairs = floor.plan.stairs.flatMap((s) => cellsOf(spotRect(s))).filter((c) => rc.isFloor(c));
   return new Set([...floor.takenCells(), ...[...stairs, ...rc.needed].map((c) => cellKey(c.x, c.y))]);
+}
+
+/** The furnishing of a typed room, with what is drawn, the theme's facts and the room's outer walls. */
+export function typedSpace(work: TerrainWork, k: number, rc: RoomCells, floor: FloorTerrain): FurnishSpace {
+  const { room } = rc;
+  return furnishSpace({
+    floor,
+    cells: rc,
+    space: roomSpace(frameOf(room), keptClear(floor, rc), floor.plan.columns),
+    rng: work.rng(k, `recipe:${room.id}`),
+    offered: DRAWN_PROP_KINDS,
+    doors: floor.plan.doors,
+    placeAllowed: (kind, at) => work.theme.facts.placeAllowed(kind, at, { floor: k, room: room.id }),
+    outer: outerSides(rc, floor.plan.rooms),
+  });
 }
 
 /** A recipe as a room that took its hazard keeps it: only the formations nature made. */
@@ -92,20 +106,10 @@ export function ensureTypeCover(fs: FurnishSpace, spec: RoomTypeSpec, tags: Read
 export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, spec: RoomTypeSpec, context: RecipeContext, hazarded = false): void {
   const floor = work.floors[k];
   if (!floor) return;
-  const { room } = rc;
-  const rng = work.rng(k, `type:${room.id}`);
+  const rng = work.rng(k, `type:${rc.room.id}`);
   reserveLanes(rc);
   if (!hazarded) allowedTerrain(work, k, rc, spec, rng);
-  const fs = furnishSpace({
-    floor,
-    cells: rc,
-    space: roomSpace(frameOf(room), keptClear(floor, rc), floor.plan.columns),
-    rng: work.rng(k, `recipe:${room.id}`),
-    offered: DRAWN_PROP_KINDS,
-    doors: floor.plan.doors,
-    placeAllowed: (kind, at) => work.theme.facts.placeAllowed(kind, at, { floor: k, room: room.id }),
-    outer: outerSides(rc, floor.plan.rooms),
-  });
+  const fs = typedSpace(work, k, rc, floor);
   furnishByRecipe(fs, hazarded ? naturalOnly(spec.furnish) : spec.furnish, context);
   if (!hazarded) ensureTypeCover(fs, spec, work.tags);
 }

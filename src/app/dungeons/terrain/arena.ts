@@ -11,8 +11,10 @@ import type { CellDir } from '../model';
 import { dir } from '../geometry';
 import { type Rng, chance, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
+import type { ArenaSetPiece, ArenaSpec } from '../themes/themeTypes';
+import { placeInterest } from './interest';
 import { draft } from './catalog';
-import { ensureCover, tryShape } from './cover';
+import { type CoverShape, ensureCover, tryShape } from './cover';
 import { platformAtFarWall } from './elevation';
 import type { FloorTerrain } from './floorTerrain';
 import { placeHazard } from './hazards';
@@ -22,7 +24,7 @@ import type { TerrainWork } from './work';
 /** Pieces that cannot be walked take at most this share of the arena's floor. */
 const OPEN_SHARE = 1 / 3;
 
-type SetPiece = 'statues' | 'altar' | 'ring' | 'pillars';
+type SetPiece = ArenaSetPiece;
 
 function negate(d: CellDir): CellDir {
   return dir(-d.x, -d.y);
@@ -58,6 +60,8 @@ function setPiece(floor: FloorTerrain, rc: RoomCells, rng: Rng, choice: SetPiece
       const j = Math.floor((rc.width - size) / 2);
       return roomy(rc, size * size) && floor.place(draft('portal-ring', room, rc.block(midI, j, size, size), { facing })) !== null;
     }
+    case 'mosaic':
+      return placeInterest(floor, rc, rng, 'mosaic');
     case 'pillars': {
       if (rc.width < 7 || open < 6) return false;
       const corners = [
@@ -74,38 +78,64 @@ function setPiece(floor: FloorTerrain, rc: RoomCells, rng: Rng, choice: SetPiece
   }
 }
 
-/** Wide cover across the arena's middle: two pillars or two wall fragments, mirrored. */
-function wideCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, platformDepth: number): void {
+type CoverKind = ArenaSpec['mirrored'][number];
+
+/**
+ * Wide cover across the arena's middle, of the kinds it may take (pillars or wall fragments
+ * unless its climax type says otherwise): built pieces mirrored, a rubble heap alone, since
+ * nothing natural is set in pairs by rule.
+ */
+function wideCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, platformDepth: number, kinds: readonly CoverKind[] = ['pillar', 'wall-fragment']): void {
   const open = rc.depth - platformDepth;
   const i = Math.max(1, Math.floor(open * 0.35));
   const size = rc.width >= 9 && open >= 7 ? 2 : 1;
-  const pillarFirst = chance(rng, 0.6);
-  const pillar = { kind: 'pillar' as const, di: size, dj: size };
-  const wall = { kind: 'wall-fragment' as const, di: 1, dj: Math.min(3, Math.max(2, Math.floor(rc.width / 4))) };
-  for (const shape of pillarFirst ? [pillar, wall] : [wall, pillar]) {
+  const shapes: Record<CoverKind, CoverShape> = {
+    pillar: { kind: 'pillar', di: size, dj: size },
+    statue: { kind: 'statue', di: 1, dj: 1 },
+    'wall-fragment': { kind: 'wall-fragment', di: 1, dj: Math.min(3, Math.max(2, Math.floor(rc.width / 4))) },
+    'rubble-heap': { kind: 'rubble-heap', di: 1, dj: 2 },
+  };
+  const order = chance(rng, 0.6) ? kinds : [...kinds].reverse();
+  for (const kind of order) {
+    const shape = shapes[kind];
     const left = Math.max(1, Math.floor(rc.width / 5));
     const right = rc.width - left - shape.dj;
+    if (kind === 'rubble-heap') {
+      if (roomy(rc, shape.di * shape.dj) && tryShape(floor, rc, shape, i, chance(rng, 0.5) ? left : right)) return;
+      continue;
+    }
     if (right - left < shape.dj + 1 || !roomy(rc, shape.di * shape.dj * 2)) continue;
     if (tryShape(floor, rc, shape, i, left) && tryShape(floor, rc, shape, i, right)) return;
   }
 }
 
-/** Turns the boss room into an arena. */
-export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): void {
+const DEFAULT_SET_PIECES: readonly (readonly [SetPiece, number])[] = [
+  ['statues', 3],
+  ['altar', 1.5],
+  ['ring', 2],
+  ['pillars', 2],
+];
+
+/**
+ * Turns the boss room into an arena: by its climax type's `arena` where it has one (its set
+ * pieces, its kinds of cover, its hazards only), else as before themes.
+ */
+export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>, arena?: ArenaSpec): void {
   const floor = work.floors[k];
   if (!floor) return;
   const deep = rc.depth >= 8 ? 2 : 1;
   const raised = platformAtFarWall(floor, rc, deep, Math.ceil(rc.width * 0.6), rc.depth >= 9 ? 2 : 1) !== null;
   const platformDepth = raised ? deep : 0;
-  const pieces: (readonly [SetPiece, number])[] = [
-    ['statues', 3],
-    ['altar', 1.5],
-    ['ring', 2],
-    ['pillars', 2],
-  ];
-  const first = weighted(rng, pieces);
-  const placed = [first, ...pieces.map(([p]) => p).filter((p) => p !== first)].some((p) => setPiece(floor, rc, rng, p, platformDepth));
-  wideCover(floor, rc, rng, platformDepth);
+  const pieces = arena ? arena.setPieces : DEFAULT_SET_PIECES;
+  const placed = pieces.length > 0 && (() => {
+    const first = weighted(rng, pieces);
+    return [first, ...pieces.map(([p]) => p).filter((p) => p !== first)].some((p) => setPiece(floor, rc, rng, p, platformDepth));
+  })();
+  wideCover(floor, rc, rng, platformDepth, arena?.mirrored);
   ensureCover(floor, rc, tags);
+  if (arena) {
+    if (arena.hazards.length > 0 && chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) placeHazard(work, k, rc, rng, weighted(rng, arena.hazards.map((h) => [h, 1] as const)), arena.hazards);
+    return;
+  }
   if (chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) placeHazard(work, k, rc, rng, chance(rng, 0.6) ? 'channel' : 'pit');
 }

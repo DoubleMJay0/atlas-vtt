@@ -253,10 +253,10 @@ export function placeCollapse(work: TerrainWork, k: number, rc: RoomCells, rng: 
   return placeChasm(work, k, rc, rng, true);
 }
 
-/** One hazard of `choice` in the room, else of another kind that fits; false where none does. */
-export function placeHazard(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, choice: HazardChoice): boolean {
+/** One hazard of `choice` in the room, else of another kind that fits (one of `only` where given); false where none does. */
+export function placeHazard(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, choice: HazardChoice, only?: readonly HazardChoice[]): boolean {
   const order: HazardChoice[] = [choice, ...(['chasm', 'channel', 'deep-water', 'pit'] as const).filter((c) => c !== choice)];
-  const allowed = new Set(hazardWeights(work.tags).filter(([, w]) => w > 0).map(([c]) => c));
+  const allowed = new Set(hazardWeights(work.tags).filter(([c, w]) => w > 0 && (only?.includes(c) ?? true)).map(([c]) => c));
   return order.filter((c) => allowed.has(c)).some((c) => {
     switch (c) {
       case 'chasm':

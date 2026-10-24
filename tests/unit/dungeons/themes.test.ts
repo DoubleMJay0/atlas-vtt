@@ -47,6 +47,13 @@ describe('themes', () => {
     expect(readTags(['temple', 'tomb', 'dwelling', 'wet'])).toEqual(['wet']);
   });
 
+  it('seats nothing on a Cavern arena and holds no throne there', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const model = generateDungeon({ seed, theme: 'cavern', tags: [], floors: 1 + (seed % 3) });
+      for (const floor of model.floors) expect(floor.props.some((p) => p.kind === 'throne'), `seed ${seed}`).toBe(false);
+    }
+  });
+
   it('builds a dungeon of the chosen theme', () => {
     const model = generateDungeon({ seed: 3, tags: [], floors: 1, theme: 'fortress' });
     expect(model.theme).toBe('fortress');

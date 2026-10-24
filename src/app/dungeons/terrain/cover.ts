@@ -52,9 +52,10 @@ export function tryShape(floor: FloorTerrain, rc: RoomCells, shape: CoverShape, 
   return floor.place(draft(shape.kind, rc.room.id, cells, { facing: negate(rc.axis) })) !== null;
 }
 
-/** Up to `count` pieces drawn from `shapes`, each at a random free place. */
-export function scatterCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, count: number, tags: ReadonlySet<DungeonTag>): number {
-  const shapes = halfCover(tags).filter(([, w]) => w > 0);
+/** Up to `count` pieces drawn from `shapes` (of the kinds `allows` lets in, where given), each at a random free place. */
+export function scatterCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, count: number, tags: ReadonlySet<DungeonTag>, allows: (kind: TerrainKind) => boolean = () => true): number {
+  const shapes = halfCover(tags).filter(([shape, w]) => w > 0 && allows(shape.kind));
+  if (shapes.length === 0) return 0;
   let placed = 0;
   for (let tries = 0; placed < count && tries < count * 10; tries++) {
     const shape = weighted(rng, shapes);

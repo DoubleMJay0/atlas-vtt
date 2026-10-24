@@ -24,6 +24,7 @@ import { type FloorPlan, FloorTerrain } from './floorTerrain';
 import { hazardWeights, placeChasmOver, placeHazard } from './hazards';
 import { anyInterest } from './interest';
 import { furnishStage } from './stages';
+import { furnishTypedArena } from './typeArena';
 import { placeTypeHazard } from './typeHazards';
 import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import { galleryOverArena, shaftDown } from './vertical';
@@ -114,7 +115,10 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
     const rc = work.floors[k]?.room(room.id);
     const rng = work.rng(k, `main:${room.id}`);
     if (!rc) continue;
-    if (room.stage) furnishStage(work, k, rc, rng, room.stage, work.tags);
+    const typed = input.types?.get(room.id);
+    if (room.stage && room.stage !== 'climax') furnishStage(work, k, rc, rng, room.stage, work.tags, typed);
+    else if (typed && (room.boss || room.stage === 'climax')) furnishTypedArena(work, k, rc, rng, typed);
+    else if (room.stage) furnishStage(work, k, rc, rng, room.stage, work.tags);
     else if (room.boss) furnishArena(work, k, rc, rng, work.tags);
   }
   shaftDown(work, k, work.rng(k, 'shaft'));

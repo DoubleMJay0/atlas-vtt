@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
-import { clearanceProblems, routeProblems, stairClearanceProblems } from './terrainInvariants';
+import { blockedCells, clearanceProblems, hasCover, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
 /**
  * Themed dungeons with every furniture kind offered, as they will be once every kind has its
@@ -33,6 +33,27 @@ describe.each(['fortress', 'mansion'] as const)('furnished %s dungeons', (theme)
 
   it('keeps every way through, every door and stair approach clear of its furniture', () => {
     expect(failures((m) => m.floors.flatMap((floor, i) => [...routeProblems(floor), ...clearanceProblems(floor, i), ...stairClearanceProblems(floor, i)].map((p) => `floor ${i}: ${p}`)))).toEqual([]);
+  });
+
+  const arenas = runs.map((run) => run.model.floors.at(-1)!).flatMap((floor) => {
+    const boss = floor.rooms.find((room) => room.boss);
+    return boss ? [{ floor, boss }] : [];
+  });
+  const arenaShare = (check: (a: (typeof arenas)[number]) => boolean): number => arenas.filter(check).length / arenas.length;
+
+  it('keeps the arena\'s platform and cover, two thirds of it free', () => {
+    expect(arenaShare(({ floor, boss }) => floor.terrain.some((p) => p.room === boss.id && p.kind === 'platform'))).toBeGreaterThan(0.6);
+    expect(arenaShare(({ floor, boss }) => hasCover(floor, boss.id))).toBeGreaterThan(0.9);
+    expect(arenas.filter(({ floor, boss }) => blockedCells(floor, boss.id) > boss.w * boss.h * 0.4).map(({ boss }) => boss.id)).toEqual([]);
+  });
+
+  it('gives the arena a set piece or a seat', () => {
+    const SET_PIECES = new Set(['statue', 'altar', 'portal-ring', 'pillar', 'mosaic']);
+    expect(arenaShare(({ floor, boss }) => floor.terrain.some((p) => p.room === boss.id && SET_PIECES.has(p.kind)) || floor.props.some((p) => p.room === boss.id))).toBeGreaterThan(0.9);
+  });
+
+  it('seats a throne only in a throne room', () => {
+    expect(failures((m) => m.floors.flatMap((floor) => floor.props.filter((p) => p.kind === 'throne' && floor.rooms[p.room]?.type !== 'throne-room').map(() => 'a throne outside a throne room')))).toEqual([]);
   });
 
   it('puts a chest only at a bed\'s foot or in a storeroom', () => {

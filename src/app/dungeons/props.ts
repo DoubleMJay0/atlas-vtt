@@ -11,9 +11,9 @@ import type { DungeonParams } from './params';
 import { cellKey, cellsOf } from './geometry';
 import { approachCells, doorApproaches, spotRect } from './floors/stairSpots';
 import { columnStyle, colonnadeOf } from './props/columns';
-import { type FloorFurnishing, arenaSeat, furnishRoom } from './props/furnish';
+import { type FloorFurnishing, furnishRoom } from './props/furnish';
 import type { RoomRoles } from './props/roles';
-import { facing, frameOf } from './props/roomFrame';
+import { frameOf } from './props/roomFrame';
 import { cracksIn, rubbleIn } from './props/scatter';
 import { roomSpace } from './props/space';
 import { chance, floorStream, stream } from './rng';
@@ -67,18 +67,9 @@ export function floorColumns(seed: number, floor: number, rooms: readonly Dungeo
   return rooms.flatMap((room) => colonnadeOf(floorStream(seed, 'props', floor, `columns:${room.id}`), room, style).filter((c) => !inStairs(c, stairs)));
 }
 
-/** The boss arena's platform in `room`, if its terrain gave it one. */
-function platformOf(input: PropsInput, room: DungeonRoom): DungeonTerrain | undefined {
-  return room.boss ? input.terrain.find((p) => p.room === room.id && p.kind === 'platform' && p.facing) : undefined;
-}
-
-/** The seat on the boss arena's platform, at its middle, facing down its steps; none where the arena has no seat. */
-function seatOnPlatform(platform: DungeonTerrain, room: DungeonRoom): DungeonProp[] {
-  const kind = arenaSeat();
-  if (!kind || !platform.facing) return [];
-  const x = platform.cells.reduce((sum, c) => sum + c.x + 0.5, 0) / platform.cells.length;
-  const y = platform.cells.reduce((sum, c) => sum + c.y + 0.5, 0) / platform.cells.length;
-  return [{ kind, x, y, rotation: facing(platform.facing), scale: 1, room: room.id }];
+/** Whether the boss arena in `room` has its platform: its seat stands there (`terrain/typeArena.ts`), no other furniture. */
+function hasPlatform(input: PropsInput, room: DungeonRoom): boolean {
+  return room.boss && input.terrain.some((p) => p.room === room.id && p.kind === 'platform' && p.facing);
 }
 
 export function placeProps(input: PropsInput): PropsResult {
@@ -94,9 +85,8 @@ export function placeProps(input: PropsInput): PropsResult {
     const frame = frameOf(room);
     const space = roomSpace(frame, clear, columns);
     const role = roles.get(room.id);
-    const platform = platformOf(input, room);
-    const furnishes = role && !empty.has(room.id) && !input.typed.has(room.id);
-    const props = platform ? seatOnPlatform(platform, room) : furnishes ? furnishRoom(rng, space, role, doors, furnishing) : [];
+    const furnishes = role && !empty.has(room.id) && !input.typed.has(room.id) && !hasPlatform(input, room);
+    const props = furnishes ? furnishRoom(rng, space, role, doors, furnishing) : [];
     const extra = params.tags.has('crumbling') && chance(rng, CRUMBLED_SHARE) ? CRUMBLED_RUBBLE : 0;
     result.props.push(...props);
     result.rubble.push(...rubbleIn(rng, frame, params.rubbleArea, extra, [...space.taken, ...keepOff]));

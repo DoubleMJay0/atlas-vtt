@@ -55,7 +55,8 @@ function allowedOn(fs: FurnishSpace, kind: PropKind, cells: readonly CellPoint[]
   return fs.offered.has(kind) && cells.every((c) => fs.placeAllowed?.(kind, c) ?? true);
 }
 
-function record(fs: FurnishSpace, piece: PlacedPiece): DungeonProp {
+/** Adds a placed piece to the room and its floor. */
+export function record(fs: FurnishSpace, piece: PlacedPiece): DungeonProp {
   fs.placed.push(piece);
   fs.floor.addProp(piece.prop, piece.cells);
   return piece.prop;

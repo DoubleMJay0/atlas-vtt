@@ -43,6 +43,11 @@ export function describeThemeTerrain(runs: readonly ThemeRun[], programme: RoomP
     expect(failuresOf(runs, (m) => reasonProblems(m, programme))).toEqual([]);
   });
 
+  it('never lays a hazard in a throne room, ballroom or bedroom', () => {
+    const calm = new Set(['throne-room', 'ballroom', 'master-bedroom', 'bedroom']);
+    expect(failuresOf(runs, (m) => m.floors.flatMap((floor) => floor.terrain.filter((p) => isHazard(p) && calm.has(floor.rooms[p.room]?.type ?? '')).map((p) => `${p.kind} in a ${floor.rooms[p.room]?.type}`)))).toEqual([]);
+  });
+
   it('keeps holes and molten channels clear of standing water', () => {
     expect(failuresOf(runs, physicsProblems)).toEqual([]);
   });

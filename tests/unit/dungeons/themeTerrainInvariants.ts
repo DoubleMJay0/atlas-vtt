@@ -1,13 +1,13 @@
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonTerrain, TerrainKind } from '../../../src/app/dungeons/model';
 import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
 import { FEATURES } from '../../../src/app/dungeons/themes/features';
-import type { RoomProgramme, RoomTypeSpec } from '../../../src/app/dungeons/themes/themeTypes';
+import type { ArenaSetPiece, ArenaSpec, RoomProgramme, RoomTypeSpec } from '../../../src/app/dungeons/themes/themeTypes';
 import { isHazard } from './terrainInvariants';
 
 /**
  * Checks of a themed dungeon's terrain against its rooms' types and the reasons they give
- * (design: "Every feature has a reason"), written apart from the generator. Boss rooms and
- * five-room stages are their arena's and stages' (held elsewhere).
+ * (design: "Every feature has a reason"), written apart from the generator. A boss room's arena
+ * is its climax type's reason for its platform, set pieces, cover and hazards.
  */
 
 const key = (c: CellPoint): string => `${c.x},${c.y}`;
@@ -24,15 +24,21 @@ function specIn(programme: RoomProgramme, floor: DungeonFloor, room: number): Ro
   return type ? programme.rooms.find((s) => s.id === type) : undefined;
 }
 
-const checked = (floor: DungeonFloor, room: number): boolean => {
-  const r = floor.rooms[room];
-  return r !== undefined && r.type !== undefined && !r.boss && r.stage === undefined;
-};
+const checked = (floor: DungeonFloor, room: number): boolean => floor.rooms[room]?.type !== undefined;
 
-/** The kinds a type's reasons, its allowed terrain and (in a ruin) decay give it. */
-function reasonKinds(spec: RoomTypeSpec, ruined: boolean): Set<TerrainKind> {
+const SET_PIECE_KINDS: Readonly<Record<ArenaSetPiece, TerrainKind>> = { statues: 'statue', altar: 'altar', ring: 'portal-ring', pillars: 'pillar', mosaic: 'mosaic' };
+
+/** What an arena may hold: its platform, its set pieces, its cover and its hazards. */
+function arenaKinds(arena: ArenaSpec): TerrainKind[] {
+  const hazards: TerrainKind[] = arena.hazards.map((h) => h);
+  return ['platform', ...arena.setPieces.map(([p]) => SET_PIECE_KINDS[p]), ...arena.mirrored, ...hazards];
+}
+
+/** The kinds a type's reasons, its allowed terrain, a boss room's arena and (in a ruin) decay give it. */
+function reasonKinds(programme: RoomProgramme, spec: RoomTypeSpec, boss: boolean, ruined: boolean): Set<TerrainKind> {
   const reasons = (spec.terrain.features ?? []).map((r) => FEATURES[r]).filter((r) => ruined || !r.ruinedOnly);
-  return new Set<TerrainKind>([...(spec.terrain.allows ?? []), ...reasons.flatMap((r) => r.kinds), ...(ruined ? RUIN : []), ...FALLBACK_COVER]);
+  const arena = boss ? programme.climax.find((c) => c.type === spec.id)?.arena : undefined;
+  return new Set<TerrainKind>([...(spec.terrain.allows ?? []), ...reasons.flatMap((r) => r.kinds), ...(arena ? arenaKinds(arena) : []), ...(ruined ? RUIN : []), ...FALLBACK_COVER]);
 }
 
 /** Every terrain piece of a typed room stands for a reason of its type; water only in rooms with water; falls only into rooms that take them. */
@@ -52,7 +58,7 @@ export function reasonProblems(model: DungeonModel, programme: RoomProgramme): s
         if (!(spec.terrain.features ?? []).some((r) => FEATURES[r].water && (ruined || !FEATURES[r].ruinedOnly))) out.push(`floor ${f}: shallow water in a ${spec.id}`);
         continue;
       }
-      if (!reasonKinds(spec, ruined).has(piece.kind)) out.push(`floor ${f}: ${piece.kind} in a ${spec.id}`);
+      if (!reasonKinds(programme, spec, floor.rooms[piece.room]?.boss === true, ruined).has(piece.kind)) out.push(`floor ${f}: ${piece.kind} in a ${spec.id}`);
     }
     for (const c of floor.waterCells) {
       const room = floor.rooms.find((r) => c.x >= r.x && c.x < r.x + r.w && c.y >= r.y && c.y < r.y + r.h);
