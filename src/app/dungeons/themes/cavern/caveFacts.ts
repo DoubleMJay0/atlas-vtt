@@ -78,7 +78,6 @@ function allowsType(facts: CaveFacts, type: RoomTypeId, ref: RoomRef): boolean {
   if (!site || !floor || !room) return true;
   const cave = floor.cave;
   const basin = cave?.basins.includes(ref.room) ?? false;
-  const dry = facts.tags.has('dry');
   switch (type) {
     case 'cave-mouth':
     case 'den':
@@ -86,7 +85,8 @@ function allowsType(facts: CaveFacts, type: RoomTypeId, ref: RoomRef): boolean {
     case 'flowstone-gallery':
       return nearFault(roomAxis(room), facts.faults, Math.PI / 6);
     case 'lake-cavern':
-      return basin || (room.boss && !dry && (cave?.dams.includes(ref.room) ?? false));
+      // A dam holds water only in a wet cave: a dry one has none.
+      return basin || (room.boss && (cave?.dams.includes(ref.room) ?? false));
     case 'stream-passage':
       return (cave?.streams ?? []).some((s) => s.slice(0, -1).includes(ref.room));
     case 'sump':

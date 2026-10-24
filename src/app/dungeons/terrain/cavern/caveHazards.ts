@@ -52,7 +52,7 @@ function substancesIn(work: TerrainWork, k: number, room: number): Substance[] {
   const site = siteOf(work, k);
   if (!site) return [];
   const out: Substance[] = [];
-  if (!work.tags.has('dry') && downstream(work, k, room) !== null) out.push(STREAM);
+  if (downstream(work, k, room) !== null) out.push(STREAM);
   if (work.tags.has('lava') && site.deep(room)) out.push(LAVA);
   if (work.tags.has('acid') && site.deep(room) && site.faultOf(room)) out.push(ACID);
   return out;
@@ -146,7 +146,7 @@ function pitchShaft(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): bool
 /** Deep water filling a share of the room, grown out from its middle, away from holes. */
 function standingWater(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, share: number, name: string): boolean {
   const floor = work.floors[k];
-  if (!floor || work.tags.has('dry')) return false;
+  if (!floor) return false;
   const hole = besideHole(floor);
   const cells = naturalPool(rc, rng, share, (c) => !hole(c));
   return cells !== null && floor.place(draft('deep-water', rc.room.id, cells, { name })) !== null;
@@ -166,7 +166,7 @@ function channelAlong(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, lin
 function stream(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
   const next = downstream(work, k, rc.room.id);
   const to = next === null ? undefined : work.floors[k]?.plan.rooms[next];
-  if (!to || work.tags.has('dry')) return false;
+  if (!to) return false;
   const from = middleOf(rc);
   const angle = Math.atan2(to.y + to.h / 2 - from.y, to.x + to.w / 2 - from.x);
   return linesAcross(rc, rng, angle).some((line) => channelAlong(work, k, rc, rng, line, STREAM) !== null);

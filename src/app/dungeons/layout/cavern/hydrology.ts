@@ -44,14 +44,17 @@ function nextChambers(floor: Pick<DungeonFloor, 'rooms' | 'doors'>, adjacent: re
   return [...out];
 }
 
-/** The chambers lower than every chamber their passages lead to, lowest first: where water may stand. */
-export function lowRooms(floor: Pick<DungeonFloor, 'rooms' | 'doors'>, heights: readonly number[]): number[] {
+/**
+ * The chambers lower than every chamber their passages lead to, lowest first: where water may
+ * stand. On the cave's deepest floor (`lowest`), where none is, its lowest chamber but the boss's:
+ * the bottom of the whole cave, where its water ends up.
+ */
+export function lowRooms(floor: Pick<DungeonFloor, 'rooms' | 'doors'>, heights: readonly number[], lowest = false): number[] {
   const adjacent = neighbours(floor.rooms.length, floor.doors);
   const height = (id: number): number => heights[id] ?? 0;
-  return floor.rooms
-    .filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.boss && nextChambers(floor, adjacent, room.id).every((n) => height(n) > height(room.id)))
-    .sort((a, b) => height(a.id) - height(b.id) || a.id - b.id)
-    .map((room) => room.id);
+  const chambers = floor.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.boss).sort((a, b) => height(a.id) - height(b.id) || a.id - b.id);
+  const low = chambers.filter((room) => nextChambers(floor, adjacent, room.id).every((n) => height(n) > height(room.id))).map((room) => room.id);
+  return low.length === 0 && lowest && chambers[0] ? [chambers[0].id] : low;
 }
 
 /** How many of a cave's low rooms hold water at `level`: about a third at 0.3, two thirds at 0.6. */
@@ -63,11 +66,11 @@ export function basinCount(lows: number, level: number): number {
  * The floor's basins (`take` of its low rooms, lowest first; unset, as many as `level` gives), the
  * streams that run to them and the dammed lakes it may hold; none when `dry`.
  */
-export function hydrology(rng: Rng, floor: Pick<DungeonFloor, 'rooms' | 'doors'>, heights: readonly number[], level: number, dry: boolean, take?: number): Pick<CaveFloor, 'basins' | 'streams' | 'dams'> {
+export function hydrology(rng: Rng, floor: Pick<DungeonFloor, 'rooms' | 'doors'>, heights: readonly number[], level: number, dry: boolean, take?: number, lowest = false): Pick<CaveFloor, 'basins' | 'streams' | 'dams'> {
   if (dry || level <= 0) return { basins: [], streams: [], dams: [] };
   const adjacent = neighbours(floor.rooms.length, floor.doors);
   const height = (id: number): number => heights[id] ?? 0;
-  const lows = lowRooms(floor, heights);
+  const lows = lowRooms(floor, heights, lowest);
   const basins = lows.slice(0, take ?? basinCount(lows.length, level));
   const taken = new Set(basins);
   const streams: number[][] = [];

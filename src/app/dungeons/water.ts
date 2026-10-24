@@ -24,6 +24,8 @@ export interface WaterRequest {
   pools: ReadonlySet<number>;
   /** Floor cells that stay dry, as `x,y`: what terrain fills (water never runs over a chasm or a platform). */
   dry?: ReadonlySet<string>;
+  /** Only these rooms take water from the level (a cave's basins and the rooms its streams run through); unset, every room. */
+  rooms?: ReadonlySet<number>;
 }
 
 /**
@@ -99,7 +101,8 @@ export function placeWater(seed: number, floor: number, rooms: readonly DungeonR
   const grid = gridAround(rooms);
   const floors = floorCells(rooms);
   const wetFloor = new Uint8Array(grid.w * grid.h);
-  if (request.level > 0) noiseFloor(rng, grid, floors, request.level, wetFloor);
+  const { rooms: only } = request;
+  if (request.level > 0) noiseFloor(rng, grid, only ? floorCells(rooms.filter((room) => only.has(room.id))) : floors, request.level, wetFloor);
   rooms.filter((room) => request.pools.has(room.id)).forEach((room) => poolIn(room, grid, wetFloor));
   const keepDry = new Uint8Array(grid.w * grid.h);
   for (const key of request.dry ?? []) {

@@ -14,7 +14,7 @@ import { floraOf } from './growth/flora';
 import { placeGrowth } from './growth/placeGrowth';
 import { addUndergrowth } from './growth/undergrowth';
 import { stairsAndAround } from './floors/stairSpots';
-import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, requestedFloors } from './model';
+import { type CaveFloor, DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, type DungeonRoom, type DungeonTerrain, requestedFloors } from './model';
 import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './params';
 import { floorColumns, placeScatter } from './props';
 import { floorStream } from './rng';
@@ -38,14 +38,29 @@ interface FloorParts {
   theme: ThemeId;
 }
 
+/** The share of a cave's water level the floor nearest the surface keeps; the deepest keeps it whole. */
+const CAVE_UPPER_WATER = 0.4;
+
+/**
+ * Where a cave's water lies: standing in its basins (and behind the dam of a lake at its end),
+ * running through its stream rooms, never where lava or acid runs.
+ */
+function caveWater(cave: CaveFloor, rooms: readonly DungeonRoom[], pieces: readonly DungeonTerrain[]): { pools: Set<number>; rooms: Set<number> } {
+  const molten = new Set(pieces.filter((p) => p.traits.hazard === 'lava' || p.traits.hazard === 'acid').map((p) => p.room));
+  const dry = (id: number): boolean => !molten.has(id);
+  const pools = [...cave.basins, ...cave.dams.filter((id) => rooms[id]?.type === 'lake-cavern')].filter(dry);
+  return { pools: new Set(pools), rooms: new Set([...pools, ...cave.streams.flat().filter(dry)]) };
+}
+
 function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, level: number): DungeonFloor {
   const { planned, params, columns } = parts;
   const { rooms, doors, stairs, cave } = planned;
   const dry = level <= 0 && params.tags.has('dry');
   const mayPool = (id: number): boolean => parts.water?.pools.has(id) ?? true;
-  const pools = dry ? new Set<number>() : poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool);
+  const wet = cave && caveWater(cave, rooms, terrain.pieces);
+  const pools = dry ? new Set<number>() : (wet?.pools ?? poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool));
   const kept = [...terrain.takenCells(), ...terrain.propCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
-  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept) });
+  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms }) });
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
   // A built theme (one whose water its rooms decide) keeps its typed rooms clear of thickets, unless it lies in ruins.
@@ -94,6 +109,8 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
     themed.theme,
     shaped ? { sites: caveSites(planned), variant: shaped.cave.variant } : undefined,
   );
-  const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, level));
+  // A cave's water drains down: each floor above the deepest stands lower.
+  const levelOf = (index: number): number => (shaped ? level * (CAVE_UPPER_WATER + ((1 - CAVE_UPPER_WATER) * (index + 1)) / parts.length) : level);
+  const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, levelOf(index)));
   return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors, ...(shaped && { cave: shaped.cave }) };
 }

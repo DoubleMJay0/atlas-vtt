@@ -5,7 +5,7 @@ import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { shapeDistance } from '../../../src/app/dungeons/render/geometry';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { caveFloorCells, columnProblems, faultStretch, guardProblems, laneNarrowsProblems, maskProblems, narrowsProblems } from './caveChecks';
-import { breakdownProblems, geologyProblems, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
+import { breakdownProblems, geologyProblems, waterProblems, waterShare, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
 import { mirrorProblems, physicsProblems, shapeProblems } from './themeTerrainInvariants';
 import { cavernProgramme } from '../../../src/app/dungeons/themes/cavern';
 import { readTags } from '../../../src/app/dungeons/tags';
@@ -143,6 +143,18 @@ export function describeCaveInvariants(floors: number): void {
     it('keep hazards, blocking terrain and furniture off the lane and furniture off them, holes off water, and shape natural features as nature does', () => {
       expect(failures(eachFloor((run, i) => laneProblems(run.model.floors[i]!)))).toEqual([]);
       expect(failures((run) => [...physicsProblems(run.model), ...shapeProblems(run.model, cavernProgramme(new Set(readTags(run.model.tags)))), ...mirrorProblems(run.model)])).toEqual([]);
+    });
+
+    it('rule 1: stand water only where it gathers, run it downhill, never on raised rock; a dry cave none', () => {
+      expect(failures((run) => waterProblems(run.model))).toEqual([]);
+      if (floors > 1) {
+        const wet = runs.filter((run) => !run.tags.includes('dry') && run.model.floors.some((f) => waterShare(f) > 0));
+        const deepest = wet.filter((run) => {
+          const shares = run.model.floors.map(waterShare);
+          return shares.at(-1)! >= Math.max(...shares);
+        });
+        expect(deepest.length / wet.length).toBeGreaterThanOrEqual(0.85);
+      }
     });
 
     it('keep every rule of the layout and the terrain', () => {

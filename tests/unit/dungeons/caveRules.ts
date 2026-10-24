@@ -173,3 +173,44 @@ export function laneProblems(floor: DungeonFloor): string[] {
   }
   return out;
 }
+
+const WATER_TYPES = new Set(['lake-cavern', 'stream-passage', 'sump']);
+
+/** Rule 1: water stands only where it gathers, runs only downhill, never on raised rock; a dry cave has none. */
+export function waterProblems(model: DungeonModel): string[] {
+  const dry = model.tags.includes('dry');
+  return model.floors.flatMap((floor, f) => {
+    const out: string[] = [];
+    const cave = floor.cave;
+    const boss = floor.rooms.find((r) => r.boss);
+    const standing = new Set([...(cave?.basins ?? []), ...(boss?.type === 'lake-cavern' ? [boss.id] : [])]);
+    const running = new Set((cave?.streams ?? []).flat());
+    const roomOf = (c: CellPoint): number | undefined => floor.rooms.find((r) => holdsCell(r, c.x, c.y))?.id;
+    for (const c of floor.waterCells) {
+      const room = roomOf(c);
+      if (room === undefined || (!standing.has(room) && !running.has(room))) out.push(`floor ${f}: water at ${keyOf(c)} in room ${room}, where none gathers`);
+    }
+    for (const piece of floor.terrain) {
+      if (piece.traits.hazard === 'deep-water' && piece.kind !== 'channel' && !standing.has(piece.room)) out.push(`floor ${f}: deep water in room ${piece.room}, no basin`);
+      if (piece.kind === 'channel' && piece.traits.hazard === 'deep-water') {
+        const chain = cave?.streams.find((s) => s.slice(0, -1).includes(piece.room));
+        const next = chain ? floor.rooms[chain[chain.indexOf(piece.room) + 1]!] : undefined;
+        const here = floor.rooms[piece.room]!;
+        const down = next ? (next.x + next.w / 2 - here.x - here.w / 2) * (piece.facing?.x ?? 0) + (next.y + next.h / 2 - here.y - here.h / 2) * (piece.facing?.y ?? 0) : -1;
+        if (down <= 0) out.push(`floor ${f}: a stream in room ${piece.room} that does not run downhill`);
+      }
+    }
+    const raised = new Set(floor.terrain.filter((p) => p.kind === 'ledge' || p.kind === 'platform').flatMap((p) => p.cells.map(keyOf)));
+    if (floor.waterCells.some((c) => raised.has(keyOf(c)))) out.push(`floor ${f}: water on raised rock`);
+    if (dry && (floor.waterCells.length > 0 || floor.terrain.some((p) => p.traits.hazard === 'deep-water'))) out.push(`floor ${f}: water in a dry cave`);
+    if (dry && floor.rooms.some((r) => WATER_TYPES.has(r.type ?? '') || (r.boss && r.type === 'lake-cavern'))) out.push(`floor ${f}: a water room in a dry cave`);
+    return out;
+  });
+}
+
+/** The share of a floor's cells under water, standing or running. */
+export function waterShare(floor: DungeonFloor): number {
+  const cells = floor.rooms.reduce((s, r) => s + roomArea(r), 0);
+  const wet = floor.waterCells.length + floor.terrain.filter((p) => p.traits.hazard === 'deep-water').reduce((s, p) => s + p.cells.length, 0);
+  return wet / Math.max(1, cells);
+}

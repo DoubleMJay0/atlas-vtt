@@ -52,13 +52,17 @@ function shapeTunnels(seed: number, index: number, shaping: CaveShaping, floor: 
   }
 }
 
-/** How many basins each floor holds: the cave's share of all its low rooms, given to the deepest floor first. */
+/**
+ * How many basins each floor holds: the cave's share of all its low rooms, given to the deepest
+ * floor first, and no floor above holding more than the deepest: water runs down.
+ */
 function basinsPerFloor(floors: readonly PlannedFloor[], level: number, dry: boolean): number[] {
-  const lows = floors.map((floor) => lowRooms(floor, floor.cave?.heights ?? []).length);
+  const last = floors.length - 1;
+  const lows = floors.map((floor, index) => lowRooms(floor, floor.cave?.heights ?? [], index === last).length);
   let left = dry ? 0 : basinCount(lows.reduce((a, b) => a + b, 0), level);
   const out = lows.map(() => 0);
-  for (let index = floors.length - 1; index >= 0; index--) {
-    out[index] = Math.min(lows[index]!, left);
+  for (let index = last; index >= 0; index--) {
+    out[index] = Math.min(lows[index]!, left, index === last ? Infinity : out[last]!);
     left -= out[index]!;
   }
   return out;
@@ -100,12 +104,13 @@ export function shapeCaves(seed: number, params: DungeonParams, floors: readonly
   const shaping = params.cave;
   if (!shaping) throw new Error('shapeCaves needs a Cavern’s params');
   const faults = faultDirections(stream(seed, 'cave', 'faults'), floors[0]?.rooms ?? []);
-  const how: FloorShaping = { seed, shaping, faults, boss, dry: params.tags.has('dry') };
+  // The GM's water level wins over the tags, as in every theme: a cave is dry where the level is nothing.
+  const how: FloorShaping = { seed, shaping, faults, boss, dry: level <= 0 };
   const shaped = floors.map((_, index) => shapeFloor(how, floors, index));
   const takes = basinsPerFloor(shaped, level, how.dry);
   shaped.forEach((floor, index) => {
     const cave = floor.cave!;
-    Object.assign(cave, hydrology(floorStream(seed, 'cave', index, 'water'), floor, cave.heights, level, how.dry, takes[index]));
+    Object.assign(cave, hydrology(floorStream(seed, 'cave', index, 'water'), floor, cave.heights, level, how.dry, takes[index], index === shaped.length - 1));
   });
   stairWays(stream(seed, 'cave', 'ways'), shaped);
   return { floors: shaped, cave: { variant: shaping.variant, faults } };
