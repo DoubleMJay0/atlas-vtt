@@ -1,4 +1,5 @@
 import type { LevelLink } from '../../types/sceneLevelTypes';
+import { isAbove, stackOf } from '../floors/floorStack';
 import type { CellDir, DungeonModel } from '../model';
 import type { DungeonPlacement } from './toWalls';
 
@@ -16,17 +17,20 @@ function footEdge(down: CellDir): number {
  * ways, walked (`flight`): the foot is the low end the treads descend towards, where they are
  * entered on the floor below, and the head the high end, where they are entered on the floor
  * above; a token changes floor in the last row at the far end, one row per cell of the stairwell's
- * length. `levelIds` are the scene's levels by floor (index 0 the entry floor). Pure.
+ * length. `levelIds` are the scene's levels by floor (index 0 the entry floor), which lies above
+ * or below the next as the stack says (`isAbove`). Pure.
  */
 export function stairLinks(model: DungeonModel, levelIds: readonly string[], placement: DungeonPlacement): Record<string, LevelLink> {
   const { originCell, pxPerCell } = placement;
   const world = (x: number, y: number): { x: number; y: number } => ({ x: (x - originCell.x) * pxPerCell, y: (y - originCell.y) * pxPerCell });
   const links: Record<string, LevelLink> = {};
+  const stack = stackOf(model);
   model.floors.forEach((floor, index) => {
-    // Each stairwell once, from its upper end
+    // Each stairwell once, from the end on the floor nearer the entrance
     for (const stair of floor.stairs.filter(s => s.to > index)) {
-      const upper = levelIds[index];
-      const lower = levelIds[stair.to];
+      const above = isAbove(stack, index, stair.to);
+      const upper = levelIds[above ? index : stair.to];
+      const lower = levelIds[above ? stair.to : index];
       if (!upper || !lower) continue;
       const id = `levellink_dungeon_${stair.link}`;
       const { x, y, w, h, down } = stair;

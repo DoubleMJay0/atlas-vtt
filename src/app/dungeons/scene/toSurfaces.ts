@@ -2,6 +2,7 @@ import { MAX_LEVEL_SURFACES, MAX_SURFACE_CORNERS } from '../../levels/levelSurfa
 import type { LevelSurface } from '../../types/sceneLevelTypes';
 import type { CellPoint, DungeonTerrain } from '../model';
 import type { VisibleDungeon } from '../render/visibleDungeon';
+import { floorBelow, stackOf } from '../floors/floorStack';
 import { HOLE_KINDS, footingOf } from '../terrain/catalog';
 import { cellOutlines } from './cellOutline';
 import { terrainName } from './terrainName';
@@ -12,12 +13,12 @@ import type { DungeonPlacement } from './toWalls';
  * floor below is open (the view shows the level below through it, a token put down there falls
  * to the first floor below that has floor), and a bridge across it is floor laid over the hole,
  * after it, so it holds. The map image of such a floor is cut out on the same cells. A hole on
- * the deepest floor has nothing below it: it is drawn as depth and gets no opening, so a token
+ * the lowest floor has nothing below it: it is drawn as depth and gets no opening, so a token
  * stays, as over a chasm. At most `MAX_LEVEL_SURFACES`: a hole that would not fit with its bridges is left out whole.
  */
 export function floorSurfaces(dungeon: VisibleDungeon, placement: DungeonPlacement, id: string, level: string): Record<string, LevelSurface> {
   const { floor, model, index, roomShapes } = dungeon;
-  if (index >= model.floors.length - 1) return {};
+  if (floorBelow(stackOf(model), index) === null) return {};
   const shown = floor.terrain.filter(piece => roomShapes.has(piece.room));
   // A hole walked over (a murder hole) is too small to fall through.
   const holes = shown.filter(piece => piece.opening && HOLE_KINDS.has(piece.kind) && footingOf(piece.kind) === 'block');

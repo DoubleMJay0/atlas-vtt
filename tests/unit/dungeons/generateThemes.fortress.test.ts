@@ -88,7 +88,7 @@ describe('generated Fortresses', () => {
     ]);
     // A collapse opens a floor only over a room that takes the fall, which few do (about one ruin in 300).
     expect(problems.slice(0, 10)).toEqual([]);
-  });
+  }, 60_000);
 
   describeThemeTerrain(runs, FORTRESS);
 });

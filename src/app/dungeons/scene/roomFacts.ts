@@ -1,4 +1,5 @@
 import { formatList, type MessageKey, t } from '../../i18n';
+import { isAbove, stackOf } from '../floors/floorStack';
 import type { CellDir, CellPoint, DoorKind, DungeonDoor, DungeonRoom, DungeonTerrain, GrowthKind, TerrainKind } from '../model';
 import { PROP_KINDS, propKey } from '../props/propKinds';
 import { dir } from '../geometry';
@@ -72,7 +73,7 @@ const inRoom = (room: DungeonRoom, p: CellPoint): boolean => p.x >= room.x && p.
 function stairSentences(visible: VisibleFloor, room: DungeonRoom): string[] {
   return visible.floor.stairs
     .filter(stair => inRoom(room, { x: stair.x + stair.w / 2, y: stair.y + stair.h / 2 }))
-    .map(stair => t(stair.to > visible.index ? 'dungeonScene.stairsDown' : 'dungeonScene.stairsUp', { floor: floorLetter(stair.to) }));
+    .map(stair => t(isAbove(stackOf(visible.model), visible.index, stair.to) ? 'dungeonScene.stairsDown' : 'dungeonScene.stairsUp', { floor: floorLetter(stair.to) }));
 }
 
 function contents(visible: VisibleFloor, room: DungeonRoom, view: Pick<DungeonView, 'props'>): string[] {

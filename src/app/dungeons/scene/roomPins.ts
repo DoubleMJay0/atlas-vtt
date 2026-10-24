@@ -1,4 +1,5 @@
 import type { CellPoint, DungeonRoom } from '../model';
+import { stackOf, stairEnd } from '../floors/floorStack';
 import { cellKey, cellsOf, floorRect } from '../geometry';
 import { approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
 import { frameOf } from '../props/roomFrame';
@@ -24,7 +25,7 @@ function clearancesOf(visible: VisibleFloor, room: DungeonRoom): Clearances {
   return {
     never: [...floor.stairs.flatMap(s => cellsOf(spotRect(s))), ...pieces.filter(p => footingOf(p.kind) === 'block').flatMap(p => p.cells)],
     preferNot: [
-      ...floor.stairs.flatMap(s => approachCells(s, s.to > visible.index ? 'upper' : 'lower')),
+      ...floor.stairs.flatMap(s => approachCells(s, stairEnd(stackOf(visible.model), visible.index, s.to))),
       ...doorApproaches(room, visible.doors),
       ...floor.waterCells,
       ...pieces.filter(p => footingOf(p.kind) === 'walk').flatMap(p => p.cells),

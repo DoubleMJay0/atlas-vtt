@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import { isAbove, stackOf } from '../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import { paletteOf, parseHex } from '../../src/app/dungeons/render/palette';
 import { createDungeonSceneWith, type DungeonSceneDeps } from '../../src/app/dungeons/scene/createDungeonScene';
@@ -50,7 +51,11 @@ function inkedBorder(mask: Uint8Array, picture: Picture, polygon: LevelLink['pol
 }
 
 describe('a generated dungeon of three floors in its scene', () => {
-  it('has a map per floor of one size and stairs that join the floors they are drawn on', async () => {
+  // A Cavern's floors go down from the entrance floor, a Fortress's up: the scene lists them bottom first either way.
+  it.each([
+    { theme: 'cavern' as const, names: ['Floor C', 'Floor B', 'Floor A'] },
+    { theme: 'fortress' as const, names: ['Floor A', 'Floor B', 'Floor C'] },
+  ])('has a map per floor of one size and stairs that join the floors they are drawn on: $theme', async ({ theme, names }) => {
     const vault = createInMemoryApp();
     AssetService.resetInstance();
     const assets = AssetService.getInstance(vault.app);
@@ -67,29 +72,31 @@ describe('a generated dungeon of three floors in its scene', () => {
       convertImage: (image) => optimizeBitmap(image, IMAGE_PRESETS.map, { thumbnail: THUMBNAIL_SPEC }),
       thumbnails: new AssetThumbnailService(vault.app, assets),
     };
-    const model = generateDungeon({ seed: 404, tags: ['small'], floors: 3 });
+    const request = { seed: 404, theme, tags: ['small'], floors: 3 };
+    const model = generateDungeon(request);
 
-    const result = await createDungeonSceneWith(deps, { name: 'Deep Halls', request: { seed: 404, tags: ['small'], floors: 3 }, model, style: STYLE, view: DEFAULT_VIEW, collectionId: COLLECTION, pxPerCell: PX_PER_CELL });
+    const result = await createDungeonSceneWith(deps, { name: 'Deep Halls', request, model, style: STYLE, view: DEFAULT_VIEW, collectionId: COLLECTION, pxPerCell: PX_PER_CELL });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const { state } = JSON.parse(vault.files.get(result.scenePath)!) as { state: { levels: SceneLevel[]; objects: { levelLinks: Record<string, LevelLink> } } };
     const levels = state.levels;
-    expect(levels.map(level => level.name)).toEqual(['Floor C', 'Floor B', 'Floor A']);
-    expect(result.entryLevel).toBe(levels[2]!.id);
+    expect(levels.map(level => level.name)).toEqual(names);
+    const byFloor = ['A', 'B', 'C'].map(letter => levels.find(level => level.name === `Floor ${letter}`)!.id);
+    expect(result.entryLevel).toBe(byFloor[0]);
     const pictures = await Promise.all(levels.map(level => pictureOf(binaries.get(level.background!)!)));
     // Every floor's map has the one layout: same size, so frame levels lie over each other exactly
     for (const picture of pictures) expect([picture.width, picture.height]).toEqual([pictures[0]!.width, pictures[0]!.height]);
 
     const ink = parseHex(paletteOf(STYLE, DEFAULT_VIEW).ink);
     const masks = pictures.map(picture => inkMask(picture, ink));
-    const byFloor = [2, 1, 0].map(index => levels[index]!.id);
     const links = Object.values(state.objects.levelLinks);
     const stairwells = model.floors.flatMap((floor, index) => floor.stairs.filter(s => s.to > index).map(stair => ({ stair, index })));
     expect(links).toHaveLength(stairwells.length);
     for (const { stair, index } of stairwells) {
       const link = state.objects.levelLinks[`levellink_dungeon_${stair.link}`]!;
-      expect(link.levels).toEqual([byFloor[index], byFloor[stair.to]]);
+      const [upper, lower] = isAbove(stackOf(model), index, stair.to) ? [index, stair.to] : [stair.to, index];
+      expect(link.levels).toEqual([byFloor[upper], byFloor[lower]]);
       expect(linkTargets(link, byFloor[index]!, levels)).toEqual([byFloor[stair.to]]);
       expect(linkTargets(link, byFloor[stair.to]!, levels)).toEqual([byFloor[index]]);
       // Both floors' maps draw the stairwell boxed on exactly the stairs' rectangle

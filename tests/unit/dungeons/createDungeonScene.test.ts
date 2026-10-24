@@ -130,9 +130,9 @@ describe('creating a dungeon scene', () => {
     expect(filesOf(b).filter(path => path.endsWith('.md'))).toEqual([`atlas-vtt/collections/${COLLECTION}/notes/${TITLE}.md`]);
   });
 
-  it('writes a dungeon of three floors as one scene: a level per floor, deepest first, stairs, and one note', async () => {
+  it('writes a Cavern of three floors as one scene: a level per floor, deepest first, stairs, and one note', async () => {
     const b = await bench();
-    const model = generateDungeon({ seed: 7, tags: ['medium'], floors: 3 });
+    const model = generateDungeon({ seed: 7, theme: 'cavern', tags: ['medium'], floors: 3 });
 
     const result = created(await createDungeonSceneWith(b.deps, options(model)));
 
@@ -174,6 +174,39 @@ describe('creating a dungeon scene', () => {
       expect(note).toContain(`\n## ${pin.notePath.split('#')[1]}\n`);
       expect(pin.level).toBe(ids[2 - 'ABC'.indexOf(pin.label![0]!)]);
     }
+  });
+
+  it('writes a three-floor Fortress bottom first, entrance floor first', async () => {
+    const b = await bench();
+    const model = generateDungeon({ seed: 7, theme: 'fortress', tags: ['medium'], floors: 3 });
+
+    const result = created(await createDungeonSceneWith(b.deps, options(model)));
+
+    const maps = (await recordsOf(b)).filter(r => r.type === 'map');
+    const mapPath = (name: string): string | undefined => {
+      const map = maps.find(m => m.name === name);
+      return map?.type === 'map' ? map.mapFilePath : undefined;
+    };
+    const { levels = [], objects, background } = sceneFile(b, result.scenePath).state;
+    expect(levels.map(level => level.name)).toEqual(['Floor A', 'Floor B', 'Floor C']);
+    expect(levels.map(level => level.elevation)).toEqual([{ bottom: 0, top: 10 }, { bottom: 10, top: 20 }, { bottom: 20, top: 30 }]);
+    expect(levels.map(level => level.background)).toEqual([mapPath(`${TITLE}, Floor A`), mapPath(`${TITLE}, Floor B`), mapPath(`${TITLE}, Floor C`)]);
+    expect(background).toBe(levels[0]!.background);
+    expect(result.entryLevel).toBe(levels[0]!.id);
+    const ids = levels.map(level => level.id);
+    // Each stairwell joins the floor above and the floor below, in that order.
+    for (const link of Object.values(objects.levelLinks ?? {})) expect([[ids[1], ids[0]], [ids[2], ids[1]]]).toContainEqual(link.levels);
+    for (const pin of Object.values(objects.pins ?? {})) expect(pin.level).toBe(ids['ABC'.indexOf(pin.label![0]!)]);
+  });
+
+  it('writes a one-floor Fortress without levels', async () => {
+    const b = await bench();
+    const result = created(await createDungeonSceneWith(b.deps, options(generateDungeon({ seed: 7, theme: 'fortress', tags: ['medium'], floors: 1 }))));
+    const file = sceneFile(b, result.scenePath);
+    expect(file.version).toBe(4);
+    expect(file.state.levels).toBeUndefined();
+    expect(file.state.objects.levelSurfaces).toBeUndefined();
+    expect(result.entryLevel).toBeUndefined();
   });
 
   it('takes back every floor\'s map, the thumbnails and the note when the scene cannot be written', async () => {

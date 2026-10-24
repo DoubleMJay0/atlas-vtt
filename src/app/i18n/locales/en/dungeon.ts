@@ -17,7 +17,7 @@ export const dungeon = {
   'dungeon.floors.fewer': 'Fewer floors',
   'dungeon.floors.more': 'More floors',
   'dungeon.bossRoom': 'Boss room',
-  'dungeon.bossRoom.hint': 'A large arena at the deepest point, reached through one room',
+  'dungeon.bossRoom.hint': 'A large arena on the floor farthest from the entrance, reached through one room',
   'dungeon.fiveRoom': 'Five-room dungeon',
   'dungeon.fiveRoom.hint': 'Five main rooms on one floor: entrance, puzzle, setback, climax and reward',
   'dungeon.theme.label': 'Theme',

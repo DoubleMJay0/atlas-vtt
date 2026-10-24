@@ -35,7 +35,7 @@ const CASES: readonly { seed: number; theme?: ThemeChoice; tags: string[]; floor
   { seed: 505, tags: ['medium', 'colonnades'], floors: 1, look: 'blueprint', view: {} },
   // Terrain: a gallery over the arena and a bridged chasm onto the floor below, and a five-room dungeon.
   { seed: 282, tags: ['small'], floors: 2, look: 'parchment', view: {} },
-  { seed: 375, tags: ['small', 'crumbling', 'dry'], floors: 2, look: 'sepia', view: { smallTiles: true } },
+  { seed: 375, theme: 'cavern', tags: ['small', 'crumbling', 'dry'], floors: 2, look: 'sepia', view: { smallTiles: true } },
   { seed: 42, tags: [], floors: 1, look: 'masonry', view: {}, fiveRoom: true },
   // Ivy and moss lie over the walls' foot: the walls must still be found on the ink.
   { seed: 16, theme: 'mansion', tags: ['overgrown'], floors: 1, look: 'parchment', view: {} },

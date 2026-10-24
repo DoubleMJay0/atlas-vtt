@@ -13,7 +13,7 @@ export interface KeyedRoom {
   heading: string;
 }
 
-/** The letter of a floor: A for the entry floor, B below it, and so on. */
+/** The letter of a floor: A for the entry floor, B the next one from it, and so on. */
 export function floorLetter(floor: number): string {
   return String.fromCharCode(65 + floor);
 }

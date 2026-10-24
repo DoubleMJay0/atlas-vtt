@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyDungeonEdits, NO_EDITS, withWingHidden } from '../../../src/app/dungeons/edits';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { cellKey } from '../../../src/app/dungeons/geometry';
+import { bottomUp, stackOf, stairEnd } from '../../../src/app/dungeons/floors/floorStack';
 import { approachCells, doorApproaches, spotRect } from '../../../src/app/dungeons/floors/stairSpots';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { propReach } from '../../../src/app/dungeons/props/catalogue';
@@ -20,7 +21,7 @@ import { dungeonNote, roomPins } from '../../../src/app/dungeons/scene/toNote';
 import { dungeonScene, type DungeonSceneParts } from '../../../src/app/dungeons/scene/toScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { dungeonStyle } from '../../../src/app/dungeons/styleCatalog';
-import { linkTargets } from '../../../src/app/levels/levelLinks';
+import { flightOnLevel, linkLevels, linkTargets } from '../../../src/app/levels/levelLinks';
 import { sealTolerance, worldTexel } from '../../../src/app/lighting/lightingConstants';
 import { sealWalls } from '../../../src/app/lighting/sealWalls';
 import { mapFeatureList } from '../../../src/app/mapFeatures/mapFeatures';
@@ -174,6 +175,41 @@ describe('the holes and bridges of a dungeon of several floors', () => {
   });
 });
 
+describe('a Fortress of several floors, rising from its entrance floor', () => {
+  const model = generateDungeon({ seed: 7, theme: 'fortress', tags: ['medium'], floors: 3 });
+  const { parts, placement } = partsOf(model);
+  const ids = parts.levelIds!;
+  const levels = bottomUp(stackOf(model)).map(index => ({ id: ids[index]!, elevation: { bottom: 0, top: 10 }, background: null }));
+
+  it('joins the floors of a Fortress with stairs walked up from the entrance floor', () => {
+    const stairs = model.floors[0]!.stairs;
+    expect(stairs.length).toBeGreaterThan(0);
+    for (const stair of stairs) {
+      const link = parts.scene.levelLinks![`levellink_dungeon_${stair.link}`]!;
+      expect(link.levels).toEqual([ids[1], ids[0]]);
+      expect(linkLevels(link, levels)).toEqual([ids[0], ids[1]]);
+      // On the entrance floor the stairs are entered at their foot, the edge towards which they descend.
+      const open = flightOnLevel(link, ids[0]!, levels)!.open;
+      const world = (x: number, y: number): { x: number; y: number } => ({ x: (x - placement.originCell.x) * PX, y: (y - placement.originCell.y) * PX });
+      const { x, y, w, h, down } = stair;
+      const foot = down.y > 0 ? [world(x, y + h), world(x + w, y + h)] : down.y < 0 ? [world(x, y), world(x + w, y)] : down.x > 0 ? [world(x + w, y), world(x + w, y + h)] : [world(x, y), world(x, y + h)];
+      const sorted = (edge: readonly { x: number; y: number }[]): string[] => edge.map(p => `${p.x},${p.y}`).sort();
+      expect(sorted(open)).toEqual(sorted(foot));
+    }
+  });
+
+  it("gives a Fortress's entrance floor no openings", () => {
+    expect(Object.values(parts.scene.levelSurfaces ?? {}).filter(surface => surface.level === ids[0])).toEqual([]);
+  });
+
+  it('says the stairs lead up on the entrance floor of a Fortress', () => {
+    const visible = visibleFloor(model, DEFAULT_VIEW, 0);
+    const stair = model.floors[0]!.stairs[0]!;
+    const room = visible.rooms.find(r => r.kind === 'room' && stair.x >= r.x && stair.x < r.x + r.w && stair.y >= r.y && stair.y < r.y + r.h)!;
+    expect(roomFacts(visible, room, DEFAULT_VIEW)).toContain(t('dungeonScene.stairsUp', { floor: 'B' }));
+  });
+});
+
 describe('a dungeon of one floor', () => {
   it('has no levels, and its walls, pins and features none either', () => {
     const { parts } = partsOf(generateDungeon({ seed: 11, tags: ['small'], floors: 1 }));
@@ -225,7 +261,7 @@ describe('a room\'s pin', () => {
         const never = keys([...floor.stairs.flatMap(cellsOfStair), ...floor.terrain.filter(p => footingOf(p.kind) === 'block').flatMap(p => p.cells)]);
         for (const { room } of keyedRooms(visible, model.floors.length)) {
           const preferNot = keys([
-            ...floor.stairs.flatMap(s => approachCells(s, s.to > index ? 'upper' : 'lower')),
+            ...floor.stairs.flatMap(s => approachCells(s, stairEnd(stackOf(model), index, s.to))),
             ...doorApproaches(room, visible.doors),
             ...floor.waterCells,
             ...floor.terrain.flatMap(piece => piece.cells),

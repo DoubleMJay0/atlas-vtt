@@ -3,6 +3,7 @@ import { resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { imageDimensions } from '../../imageProcessing/imageDimensions';
 import { IMAGE_PRESETS, optimizeBitmap, type ProcessedImage } from '../../imageProcessing/imageProcessing';
 import { mapSceneFile, writeMapScene, type MapSceneDeps, type MapToWrite } from '../../import/writeMapScene';
+import { type FloorStack, bottomUp, levelElevation, stackOf } from '../floors/floorStack';
 import { LEVEL_HEIGHT } from '../../levels/levelEdits';
 import type { SceneLevel } from '../../types/sceneLevelTypes';
 import type { AssetService } from '../../services/AssetService';
@@ -64,18 +65,17 @@ function placementOn(layout: MapLayout, saved: { width: number }): DungeonPlacem
 const floorName = (floor: number): string => t('dungeonScene.floor', { letter: floorLetter(floor) });
 
 /**
- * The scene's levels, bottom first: the deepest floor first, the entry floor last, each a floor
- * high (the entry floor from 0 up, each floor below it one lower), each on its floor's map.
+ * The scene's levels, bottom first: a Cavern's deepest floor first and its entry floor last, a
+ * building's entry floor first and its top floor last; each a floor high, the entry floor from 0
+ * up (`levelElevation`), each on its floor's map. "Floor A" is the entry floor either way.
  */
-function floorLevels(levelIds: readonly string[], backgrounds: readonly string[]): SceneLevel[] {
-  return levelIds
-    .map((id, floor): SceneLevel => ({
-      id,
-      name: floorName(floor),
-      elevation: { bottom: -floor * LEVEL_HEIGHT, top: (1 - floor) * LEVEL_HEIGHT },
-      background: backgrounds[floor] ?? null,
-    }))
-    .reverse();
+function floorLevels(levelIds: readonly string[], backgrounds: readonly string[], stack: FloorStack): SceneLevel[] {
+  return bottomUp(stack).map((floor): SceneLevel => ({
+    id: levelIds[floor]!,
+    name: floorName(floor),
+    elevation: levelElevation(stack, floor, LEVEL_HEIGHT),
+    background: backgrounds[floor] ?? null,
+  }));
 }
 
 interface DrawnFloors {
@@ -156,7 +156,7 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
     maps,
     note: { text: () => dungeonNote(options.name.trim() || dungeonSceneName(options.name), rooms) },
     content: (paths, notePath) => {
-      const levels = levelIds && floorLevels(levelIds, paths);
+      const levels = levelIds && floorLevels(levelIds, paths, stackOf(model));
       // The first level's map is the scene's background
       const background = levels?.[0]?.background ?? paths[0]!;
       return mapSceneFile(settings, background, { ...parts.scene, ...(levels && { levels }), pins: roomPins(rooms, notePath!) });
