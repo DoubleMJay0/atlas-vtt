@@ -51,8 +51,11 @@ export interface CompositeFilter {
   setMemoryShown(shown: boolean): void;
   /** Tint of remembered areas and fill of never-seen ones in the player view, picked in sRGB. */
   setMemoryColours(explored: string | undefined, unexplored: string | undefined): void;
-  /** The fog map the players see over never-seen areas (`SceneLighting.unexploredImage`), or null for the unexplored colour. The caller owns it. */
-  setUnexploredImage(texture: Texture | null): void;
+  /**
+   * The fog map the players see over never-seen areas (`SceneLighting.unexploredImage`), or null for
+   * the unexplored colour, and the width in world pixels of the fade into it at a light's edge. The caller owns the texture.
+   */
+  setUnexploredImage(texture: Texture | null, softness: number): void;
   /** The caller owns `texture` and rebinds before destroying it. */
   setExplored(texture: Texture): void;
   /** The marked grid's colour (`UnlitGrid`), or null while no grid is marked and shown. */
@@ -119,6 +122,7 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     uExploredTint: { value: exploredTint, type: 'vec3<f32>' },
     uUnexplored: { value: unexplored, type: 'vec3<f32>' },
     uHasUnexploredImage: { value: 0, type: 'f32' },
+    uUnexploredSoftness: { value: 0, type: 'f32' },
     uGreyKeep: { value: 0, type: 'f32' },
     uGreyTint: { value: greyTint, type: 'vec3<f32>' },
     uDarkTint: { value: darkTint, type: 'vec3<f32>' },
@@ -220,9 +224,10 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
       setLinear(unexplored, unexploredColor ?? DEFAULT_UNEXPLORED_COLOR);
       group.update();
     },
-    setUnexploredImage(texture): void {
-      if (texture === unexploredImage) return;
+    setUnexploredImage(texture, softness): void {
+      if (texture === unexploredImage && softness === u.uUnexploredSoftness) return;
       unexploredImage = texture;
+      u.uUnexploredSoftness = softness;
       filter.resources.uUnexploredImage = (texture ?? noDarkness).source;
       u.uHasUnexploredImage = texture ? 1 : 0;
       group.update();

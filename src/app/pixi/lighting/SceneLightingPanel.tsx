@@ -17,6 +17,8 @@ import {
   sightOnDropOn,
   tokenVisionOn,
   unexploredImageOf,
+  unexploredSoftnessOf,
+  MAX_UNEXPLORED_SOFTNESS,
 } from '../../lighting/sceneLightingOptions';
 import type { DarkSightLook } from '../../types/lightingTypes';
 import type { SegmentedOption } from '../../packages/components/primitives/SegmentedControl';
@@ -60,6 +62,8 @@ function SceneLightingPanel({ app }: { app: App }): React.ReactElement {
   // everything in sight for good.
   const [dragged, setDragged] = useState<number | null>(null);
   const threshold = dragged ?? Math.round(litThresholdOf(lighting) * 100);
+  const [draggedSoftness, setDraggedSoftness] = useState<number | null>(null);
+  const softness = draggedSoftness ?? unexploredSoftnessOf(lighting);
 
   return (
     <motion.section
@@ -112,6 +116,14 @@ function SceneLightingPanel({ app }: { app: App }): React.ReactElement {
           chooseLabel={t('sceneLight.unexploredImageChoose')} clearLabel={t('sceneLight.unexploredImageClear')}
           onChoose={() => pickUnexploredImage(app, (unexploredImage) => setSceneLighting({ unexploredImage }))}
           onClear={() => setSceneLighting({ unexploredImage: undefined })} />
+        {/* Shown while there is no fog map too, disabled, so the panel keeps its shape. Set on release: each step redraws the composite only, but stays one change. */}
+        <SliderField label={t('sceneLight.unexploredSoftness')} value={softness} min={0} max={MAX_UNEXPLORED_SOFTNESS} step={0.5}
+          display={t('sceneLight.unexploredSoftnessCells', { count: softness })} disabled={unexploredImageOf(lighting) === null}
+          onChange={setDraggedSoftness}
+          onCommit={(cells) => {
+            setDraggedSoftness(null);
+            setSceneLighting({ unexploredSoftness: cells });
+          }} />
         <SliderField label={t('sceneLight.litFrom')} value={threshold} min={0} max={100} step={1} display={`${threshold} %`}
           onChange={setDragged}
           onCommit={(percent) => {

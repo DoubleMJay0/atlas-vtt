@@ -4,7 +4,7 @@ import type { StoreApi } from 'zustand/vanilla';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
 import { DEFAULT_LIGHTING_QUALITY, type LightingQuality, type LightingQualitySource } from '../../lighting/lightingQuality';
-import { sceneLook, unexploredImageOf, type SceneLook } from '../../lighting/sceneLightingOptions';
+import { sceneLook, unexploredImageOf, unexploredSoftnessOf, type SceneLook } from '../../lighting/sceneLightingOptions';
 import type { SceneLighting } from '../../types/lightingTypes';
 import type { ViewState } from '../../types/viewState';
 import { SEES_ALL, type AmbientLight, type AmbientZone, type LightReach, type Sight } from '../../vision/sight';
@@ -66,7 +66,7 @@ export interface LightingRendererDeps {
   quality?: LightingQualitySource;
 }
 
-type SceneWithoutLook = Omit<EngineScene, keyof SceneLook | 'albedo' | 'unexploredTexture'>;
+type SceneWithoutLook = Omit<EngineScene, keyof SceneLook | 'albedo' | 'unexploredTexture' | 'unexploredSoftness'>;
 /**
  * From the build that begins an attempt, over the first lit frame and the tick that waits for
  * the graphics process to execute it, to the tick after that one.
@@ -268,6 +268,7 @@ export class LightingRenderer implements SceneLightingView {
     this.unexploredTexture = this.unexploredImage?.textureOf(unexploredImageOf(lighting)) ?? null;
     this.engine.update({
       ...base, albedo: this.albedo, unexploredTexture: this.unexploredTexture, spots: gmSpots,
+      unexploredSoftness: unexploredSoftnessOf(lighting) * (state.grid?.size ?? DEFAULT_CELL_SIZE),
       ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(lighting),
     });
     // The engine holds the current fog map: the one it replaced can go.

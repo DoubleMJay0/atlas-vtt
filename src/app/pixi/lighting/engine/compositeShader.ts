@@ -73,6 +73,7 @@ uniform vec3 uExploredTint;
 uniform vec3 uUnexplored;
 uniform sampler2D uUnexploredImage;
 uniform float uHasUnexploredImage;
+uniform float uUnexploredSoftness;
 uniform float uGreyKeep;
 uniform vec3 uGreyTint;
 uniform vec3 uDarkTint;
@@ -205,6 +206,29 @@ vec3 unexploredAt(vec2 w) {
   return mix(uUnexplored, toLinear(straight), fog.a);
 }
 
+// How far light shows the players the map, from no light to the grid's measure of lit.
+float revealedBy(vec3 light) {
+  return smoothstep(0.01, 0.06, dot(light, LUMA));
+}
+
+// The share of a pixel a light reveals over a fog map, faded in from the light's edge over
+// uUnexploredSoftness world pixels: the light map's reveal averaged over a disc of that radius
+// (24 Vogel taps), from half covered (the edge) to whole. It only ever takes away, so the fade lies
+// inside the light and never darkens the fog map outside it. The disc is not kept off walls (the
+// wall field holds no distance that far): a lit room fades into the fog map along a wall too.
+float softRevealed(vec2 w, vec3 ambient, float here) {
+  float r = uUnexploredSoftness;
+  if (here <= 0.0 || r < uPixelWorld) return here;
+  float sum = 0.0;
+  for (int i = 0; i < 24; i++) {
+    float t = sqrt((float(i) + 0.5) / 24.0);
+    float a = float(i) * 2.39996323;
+    vec2 at = w + vec2(cos(a), sin(a)) * t * r;
+    sum += revealedBy(ambient + textureLod(uLightMap, at / uLightWorld, 0.0).rgb * uExposure);
+  }
+  return min(here, smoothstep(0.5, 1.0, sum / 24.0));
+}
+
 void main() {
   vec2 screen = vTextureCoord * uInputSize.xy + uAreaOrigin;
   vec2 world = (uScreenToWorld * vec3(screen, 1.0)).xy;
@@ -308,13 +332,16 @@ void main() {
   float lacking = max(dot(memory - visible, LUMA), 0.0) / max(dot(memory, LUMA), 1e-5);
   vec3 inSight = visible + memory * (recalls * lacking);
   // Where a light or a sense shows the players the map (the grid's measure below too).
-  float byLight = max(uAllSeen, sight.r) * smoothstep(0.01, 0.06, level);
+  float byLight = max(uAllSeen, sight.r) * revealedBy(light);
   float bySense = max(sight.g, sight.b) * sensed;
   // A fog map is not added to the picture but takes the place of the dark, with or without token
   // vision and memory: the map shows exactly where light or a sense reveals it, the fog map
   // (or memory) everywhere else, and the two cross-fade over a light's last glow. Its pale parts
   // never shine through a lit map.
-  if (uMode > 0.5 && uHasUnexploredImage > 0.5) inSight = mix(memory, visible, max(byLight, bySense));
+  if (uMode > 0.5 && uHasUnexploredImage > 0.5) {
+    float softLight = max(uAllSeen, sight.r) * softRevealed(world, ambient, revealedBy(light));
+    inSight = mix(memory, visible, max(softLight, bySense));
+  }
   // The players see the veil only where the darkness takes something from their picture: ambient
   // light, a light's light (blue of the darkness map), or what a sense that does not see in it
   // would show. Over unlit floor and over memory there is none: it would give away where the

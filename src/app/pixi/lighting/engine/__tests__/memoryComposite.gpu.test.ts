@@ -198,6 +198,17 @@ describe('explored memory in the composite', () => {
     expect(hashOf(await renderWithFogMap('gm', whole, noVision))).toBe(hashOf(await render('gm', noVision)));
   });
 
+  it('fades the map a light reveals into the fog map inside its edge, and leaves its centre as it was', async () => {
+    const whole = (g: Graphics): Graphics => g.rect(0, 0, MAP / 4, MAP / 4).fill({ color: 0xeeeeee });
+    const noVision: Partial<EngineScene> = { sight: SEES_ALL, ambient: 0 };
+    const hard = await renderWithFogMap('player', whole, noVision);
+    const soft = await renderWithFogMap('player', whole, { ...noVision, unexploredSoftness: 60 });
+    expect(soft(...LIT)).toEqual(hard(...LIT));
+    // Near the dim edge (world 250, 900, 10 px inside it) the soft fade shows more of the pale fog map.
+    const sum = (pixel: readonly number[]): number => pixel.reduce((total, channel) => total + channel, 0);
+    expect(sum(soft(62, 225))).toBeGreaterThan(sum(hard(62, 225)) + 30);
+  });
+
   it('leaves what tokens see and the GM view as they were', async () => {
     const custom: MemoryOptions = { exploredMemory: false, exploredColor: '#ff0000', unexploredColor: '#336699' };
     expect((await render('player', custom))(...SEEN)).toEqual((await render('player'))(...SEEN));
