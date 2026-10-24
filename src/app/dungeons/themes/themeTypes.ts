@@ -8,6 +8,7 @@
 
 import type { FloorRise } from '../floors/floorStack';
 import type { PlannedFloor } from '../floors/planFloors';
+import type { DungeonParams } from '../params';
 import type { CellPoint, FiveRoomStage, TerrainKind } from '../model';
 import type { PropKind } from '../props/propKinds';
 import type { DungeonTag } from '../tags';
@@ -218,6 +219,8 @@ export interface ThemeDefinition {
   /** Tags the theme cannot take, each with the reason the panel shows; one with `with` only beside that tag. */
   refuses: readonly { tag: DungeonTag; reason: MessageKey; with?: DungeonTag }[];
   programme: RoomProgramme;
+  /** What the theme changes in the layout's params (a Cavern's chambers, a Fortress's passages and towers); unset, nothing. */
+  params?: (params: DungeonParams) => DungeonParams;
   programmeFor?: (tags: ReadonlySet<DungeonTag>) => RoomProgramme;
   facts?: (input: ThemeFactsInput) => ThemeFacts;
 }

@@ -3,7 +3,7 @@
  * empty stretch beyond their last door.
  */
 
-import { type WorkLayout, type WorkRoom, doorsOf, isNormal, liveRooms, toLocal } from './workLayout';
+import { type WorkLayout, type WorkRoom, doorsOf, isNormal, kindOf, liveRooms, toLocal } from './workLayout';
 
 function removeDeadEnds(layout: WorkLayout): void {
   for (let changed = true; changed; ) {
@@ -30,6 +30,6 @@ function trimCorridor(layout: WorkLayout, room: WorkRoom): void {
 export function cleanUp(layout: WorkLayout): void {
   removeDeadEnds(layout);
   liveRooms(layout)
-    .filter((room) => room.width === 3)
+    .filter((room) => kindOf(room) === 'corridor')
     .forEach((room) => trimCorridor(layout, room));
 }

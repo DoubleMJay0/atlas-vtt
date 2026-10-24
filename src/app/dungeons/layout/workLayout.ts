@@ -27,7 +27,11 @@ export interface WorkRoom {
   /** Holds the landing of the stairs a floor grows from: it keeps its size and corners. */
   fixed: boolean;
   boss: boolean;
+  /** A passage grown wider than a cell (`DungeonParams.passageFloor`): its kind, which its size alone would not tell. */
+  passage?: PassageKind;
 }
+
+export type PassageKind = Exclude<RoomKind, 'room'>;
 
 export interface WorkDoor {
   x: number;
@@ -87,14 +91,15 @@ export function floorOf(room: Pick<WorkRoom, 'origin' | 'axis' | 'width' | 'dept
   return rectThrough(localCell(room, 1, -half), localCell(room, room.depth - 2, half));
 }
 
-export function kindOf(room: Pick<WorkRoom, 'width' | 'depth'>): RoomKind {
+export function kindOf(room: Pick<WorkRoom, 'width' | 'depth' | 'passage'>): RoomKind {
+  if (room.passage) return room.passage;
   const across = room.width - 2;
   const along = room.depth - 2;
   if (across >= 2 && along >= 2) return 'room';
   return across === 1 && along === 1 ? 'junction' : 'corridor';
 }
 
-export function isNormal(room: Pick<WorkRoom, 'width' | 'depth'>): boolean {
+export function isNormal(room: Pick<WorkRoom, 'width' | 'depth' | 'passage'>): boolean {
   return kindOf(room) === 'room';
 }
 

@@ -47,12 +47,14 @@ export function nearRooms(floor: DungeonFloor, room: number): number[] {
   return [...new Set([...next, ...next.flatMap((r) => nextRooms(floor, r))])].filter((r) => r !== room);
 }
 
-/** The room a party enters the dungeon by: room 0 of the entry floor, else its normal room nearest it. */
+/** The room a party enters the dungeon by: room 0 of the entry floor, else its normal room nearest it, the boss room only where it is the only one. */
 export function entranceRoom(model: DungeonModel): Place {
   const floor = model.floors[0] as DungeonFloor;
   if (floor.rooms[0]?.kind === 'room') return { floor: 0, room: 0 };
   const depth = distances(floor, 0);
-  const nearest = [...normals(floor)].sort((a, b) => (depth.get(a.id) ?? Infinity) - (depth.get(b.id) ?? Infinity))[0] as DungeonRoom;
+  // Never the boss room where the floor has another: the boss room is its climax.
+  const others = normals(floor).filter((room) => !room.boss);
+  const nearest = [...(others.length ? others : normals(floor))].sort((a, b) => (depth.get(a.id) ?? Infinity) - (depth.get(b.id) ?? Infinity) || a.id - b.id)[0] as DungeonRoom;
   return { floor: 0, room: nearest.id };
 }
 

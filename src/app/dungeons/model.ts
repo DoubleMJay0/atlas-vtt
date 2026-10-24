@@ -33,7 +33,7 @@ export interface CellDir {
   y: -1 | 0 | 1;
 }
 
-/** Normal rooms count towards size and get numbers; corridors are one cell wide; a junction is 1 × 1. */
+/** Normal rooms count towards size and get numbers; corridors are one cell wide and a junction is 1 × 1, unless the params widen them (`DungeonParams.passageFloor`, `layout/passageWidths.ts`). */
 export type RoomKind = 'room' | 'corridor' | 'junction';
 
 /** Secret rooms lie behind a secret door, off every way a party must take. */
@@ -92,7 +92,7 @@ export interface DungeonDoor {
   to: number | null;
   /** Steps that lead down from `from` to `to`; unset, they lead up. */
   descends?: true;
-  /** A narrows two cells wide: this cell and the one at `x + wide.x, y + wide.y` (`doorCells`). */
+  /** Two cells wide, a cave's narrows or an opening between two wide passages: this cell and the one at `x + wide.x, y + wide.y` (`doorCells`). */
   wide?: CellDir;
 }
 

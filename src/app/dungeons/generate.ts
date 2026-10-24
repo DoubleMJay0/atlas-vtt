@@ -8,7 +8,6 @@
 import { type FloorStack, floorAbove, floorStack, floorWaterLevel, isAbove } from './floors/floorStack';
 import { cellKey } from './geometry';
 import { planFloors, type PlannedFloor } from './floors/planFloors';
-import { caveParams } from './layout/cavern/caveParams';
 import { type CaveSites, caveSites } from './layout/cavern/caveSites';
 import { caveLife } from './themes/cavern/caveLife';
 import { shapeCaves } from './layout/cavern/shapeCave';
@@ -96,14 +95,15 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const asked = readTags(request.tags);
   const theme = pickTheme(seed, request.theme ?? 'any', asked);
   const tags = dungeonTags(seed, themedTags(theme, asked));
-  const base = theme === 'cavern' ? caveParams(dungeonParams(tags)) : dungeonParams(tags);
+  const definition = themeOf(theme);
+  const plain = dungeonParams(tags);
+  const base = definition.params?.(plain) ?? plain;
   const params = fiveRoom ? fiveRoomParams(base) : base;
   const chosen = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   // A lived-in cave has water to live by, unless the GM asked for none.
   const rolled = params.cave && params.tags.has('inhabited') && request.waterLevel === undefined ? Math.max(chosen, LIVED_IN_WATER) : chosen;
   const count = requestedFloors(request);
   const boss = fiveRoom || request.bossRoom !== false;
-  const definition = themeOf(theme);
   const { rise } = definition;
   const laid = planFloors(seed, params, count, boss, fiveRoom, definition);
   // A Cavern shapes its rooms into chambers and tunnels before anything reads them.

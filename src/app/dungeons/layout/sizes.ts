@@ -1,12 +1,15 @@
 import type { DoorKind } from '../model';
 import type { DungeonParams, SizeStyle } from '../params';
 import { type Rng, chance, int, pick, weighted } from '../rng';
+import type { PassageKind } from './workLayout';
 
 export interface RoomSize {
   /** Walls included, odd. */
   width: number;
   /** Walls included, from the door row to the far wall. */
   depth: number;
+  /** A passage wider than a cell: its kind. */
+  passage?: PassageKind;
 }
 
 function sizeOfStyle(rng: Rng, style: SizeStyle): RoomSize {
@@ -28,15 +31,23 @@ function atLeast(size: RoomSize, minFloor: number): RoomSize {
   return size.width >= least && size.depth >= least ? size : { width: Math.max(size.width, least + ((least + 1) % 2)), depth: Math.max(size.depth, least) };
 }
 
+/** A corridor or junction as wide as `floor` cells across (a junction as deep), a corridor `depth` deep as drawn. */
+function widePassage(depth: number, style: SizeStyle, floor: number): RoomSize {
+  const width = floor + 2;
+  return style === 3 ? { width, depth: width, passage: 'junction' } : { width, depth, passage: 'corridor' };
+}
+
 /**
  * A new room's size; with `round`, half of the rooms come out square so they may be round. A
- * normal room grows to `minRoomFloor` after the draw, so the rolls stay as they were.
+ * normal room grows to `minRoomFloor` after the draw, and a passage to `passageFloor`, so the rolls
+ * stay as they were.
  */
 export function drawSize(rng: Rng, params: DungeonParams): RoomSize {
   const style = pick(rng, params.sizeStyles);
   const drawn = sizeOfStyle(rng, style);
-  const size = params.squareRooms && style <= 1 && chance(rng, 0.5) ? { width: drawn.width, depth: drawn.width } : drawn;
-  return style <= 1 && params.minRoomFloor ? atLeast(size, params.minRoomFloor) : size;
+  if (style >= 2) return params.passageFloor ? widePassage(drawn.depth, style, params.passageFloor) : drawn;
+  const size = params.squareRooms && chance(rng, 0.5) ? { width: drawn.width, depth: drawn.width } : drawn;
+  return params.minRoomFloor ? atLeast(size, params.minRoomFloor) : size;
 }
 
 /** A normal room's size, small or large but never a corridor: the room around a landing. */

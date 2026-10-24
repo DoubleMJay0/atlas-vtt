@@ -6,7 +6,7 @@
  * Underdark more groves, lakes and chasms. Nature builds no ruins.
  */
 
-import { caveVariant } from '../layout/cavern/caveParams';
+import { caveParams, caveVariant } from '../layout/cavern/caveParams';
 import type { PropKind } from '../model';
 import type { DungeonTag } from '../tags';
 import { CAVERN_CLIMAX } from './cavern/cavernClimax';
@@ -77,6 +77,7 @@ export const CAVERN: ThemeDefinition = {
     { tag: 'inhabited', reason: 'dungeon.theme.refused.dryUninhabited', with: 'dry' },
   ],
   programme: CAVERN_PROGRAMME,
+  params: caveParams,
   programmeFor: cavernProgramme,
   facts: cavernFacts,
 };

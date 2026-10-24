@@ -7,7 +7,7 @@ import type { CellDir, CellPoint } from '../model';
 import type { DungeonParams } from '../params';
 import { dir, perpendicular } from '../geometry';
 import { MAX_SEED, type Rng, chance, int, pick, shuffled } from '../rng';
-import { type WorkRoom, isNormal, localCell } from './workLayout';
+import { type WorkRoom, isNormal, kindOf, localCell } from './workLayout';
 
 export interface Branch {
   origin: CellPoint;
@@ -54,7 +54,7 @@ function forwardBranch(room: WorkRoom, offset: number, flip: boolean, seed: numb
 /** Corridors always lead on; junctions half the time; rooms rarely. */
 function forwardChance(room: WorkRoom): number {
   if (isNormal(room)) return 0.1;
-  return room.depth === 3 ? 0.5 : 1;
+  return kindOf(room) === 'junction' ? 0.5 : 1;
 }
 
 function randomOffset(rng: Rng, room: WorkRoom): number {
@@ -64,7 +64,7 @@ function randomOffset(rng: Rng, room: WorkRoom): number {
 }
 
 function mirroredBranches(rng: Rng, room: WorkRoom, flip: boolean): Branch[][] {
-  let sides = room.depth === 3 && room.width === 3 ? true : chance(rng, 0.5);
+  let sides = kindOf(room) === 'junction' ? true : chance(rng, 0.5);
   let forward = chance(rng, forwardChance(room));
   if (!sides && !forward) {
     if (chance(rng, 0.5)) sides = true;

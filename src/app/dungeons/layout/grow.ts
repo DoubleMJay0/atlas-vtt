@@ -63,6 +63,7 @@ function newRoom(layout: WorkLayout, item: QueuedRoom, size: RoomSize, fixed: bo
     colonnade: false,
     fixed,
     boss: false,
+    ...(size.passage && { passage: size.passage }),
   };
 }
 

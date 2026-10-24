@@ -49,6 +49,10 @@ export interface DungeonParams {
   minRoomFloor?: number;
   /** The narrowest a stairwell is across; unset, 1. */
   stairAcross?: number;
+  /** How many cells across corridors and junctions grow, fitted once the floor is laid (`layout/passageWidths.ts`); unset, one. */
+  passageFloor?: number;
+  /** The most round rooms a floor has, and the share of its rooms they may be at most; unset, as many as the rolls give. */
+  roundRooms?: { most: number; share: number };
   /** How a Cavern shapes its rooms; set only in a Cavern's params. */
   cave?: CaveShaping;
 }

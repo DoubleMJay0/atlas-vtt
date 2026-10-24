@@ -19,6 +19,7 @@ import { addLoops, addSecretLoops } from './loops';
 import { shapeRooms } from './roomShapes';
 import { placeSecretWings } from './secrets';
 import { addSteps } from './steps';
+import { fitPassages } from './passageWidths';
 
 const MAX_ATTEMPTS = 120;
 /** A cave's floor must also fit its chambers' blocks and a lane two cells wide, so it may take more attempts. */
@@ -97,7 +98,9 @@ function attempt(seed: number, request: FloorRequest, index: number): Built | nu
   const entrances = floor > 0 || placeEntrances(rngOf, work, params, !request.fiveRoom);
   addSteps(rngOf, work, params);
   shapeRooms(rngOf, work, params);
-  const layout = request.fiveRoom ? withStages(compactLayout(work)) : compactLayout(work);
+  const compacted = compactLayout(work);
+  const compact = params.passageFloor ? fitPassages(compacted) : compacted;
+  const layout = request.fiveRoom ? withStages(compact) : compact;
   const kept = [normals >= params.minRooms, entrances, boss, floorRulesHold(layout)].filter(Boolean).length;
   return { layout, normals, linked: null, kept };
 }

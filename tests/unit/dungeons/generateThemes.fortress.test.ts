@@ -5,6 +5,7 @@ import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
 import { normals } from './dungeonInvariants';
 import { apartProblems, entranceRoom, floorDepth, nearRooms, nextRooms, onOuterWall, type Place, roomsOfType, typeOf, typingProblems, wayAvoids } from './themeInvariants';
 import { failuresOf, shareOf, themeRuns } from './themeRuns';
+import { passageProblems, towerProblems } from './fortressLayoutInvariants';
 import { describeThemeTerrain } from './themeTerrainRules';
 
 /** The rules of a Fortress (report §3.2), each held over 500 dungeons of one to three floors. */
@@ -85,6 +86,17 @@ describe('generated Fortresses', () => {
     // A collapse opens a floor only over a room that takes the fall, which few do (about one ruin in 300).
     expect(problems.slice(0, 10)).toEqual([]);
   }, 60_000);
+
+  it('raises few towers, on the plan\'s outer edge', () => {
+    // Before towers were capped, 11 % of the rooms of 400 Fortresses were round, up to 14 on a floor
+    // (the `round` tag multiplies their chance by five); now about 5 %, at most three.
+    expect(failuresOf(runs, towerProblems)).toEqual([]);
+  });
+
+  it('builds passages two cells across, three on the main way, one only where a reason keeps them narrow', () => {
+    // About 5 % of the passages are one cell across (each for its reason), 47 % two and 48 % three; all were one before.
+    expect(failuresOf(runs, passageProblems)).toEqual([]);
+  });
 
   describeThemeTerrain(runs, FORTRESS);
 });

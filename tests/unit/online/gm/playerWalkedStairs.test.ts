@@ -50,11 +50,14 @@ const ogre = (t: Table): { x: number; y: number; level?: string | undefined } =>
 };
 const refused = (t: Table): number => t.sent.filter(({ body }) => body.t === 'move-refused').length;
 
+/** Pixels per cell of the Fortress below: small enough that the dungeon lies within the table's map (2000 × 1500). */
+const FORTRESS_PX = 50;
+
 /** A table on a generated three-floor Fortress: its levels and stairs as the scene writer makes them, the ogre on Floor A. */
 function fortress(): { t: Table; stair: DungeonStair; at: (c: CellPoint) => { x: number; y: number }; levels: SceneLevel[] } {
   const model = generateDungeon({ seed: 7, theme: 'fortress', tags: ['small'], floors: 3 });
-  const layout = mapLayout(model, 100, DEFAULT_VIEW);
-  const placement = { originCell: layout.originCell, pxPerCell: 100 };
+  const layout = mapLayout(model, FORTRESS_PX, DEFAULT_VIEW);
+  const placement = { originCell: layout.originCell, pxPerCell: FORTRESS_PX };
   const parts = dungeonScene(model, dungeonStyle('parchment'), DEFAULT_VIEW, placement, { width: layout.widthPx, height: layout.heightPx }, { unitType: 'feet', ruleDistance: 5 })!;
   const levels = floorLevels(parts.levelIds!, parts.levelIds!.map(() => ''), stackOf(model)).map((level) => ({ ...level, background: null }));
   const stair = model.floors[0]!.stairs[0]!;
@@ -64,7 +67,7 @@ function fortress(): { t: Table; stair: DungeonStair; at: (c: CellPoint) => { x:
     draft.objects.levelLinks = parts.scene.levelLinks;
     Object.assign(draft.objects.tokens.ogre!, { level: levels[0]!.id });
   }));
-  const at = (c: CellPoint): { x: number; y: number } => ({ x: (c.x + 0.5 - placement.originCell.x) * 100, y: (c.y + 0.5 - placement.originCell.y) * 100 });
+  const at = (c: CellPoint): { x: number; y: number } => ({ x: (c.x + 0.5 - placement.originCell.x) * FORTRESS_PX, y: (c.y + 0.5 - placement.originCell.y) * FORTRESS_PX });
   return { t, stair, at, levels };
 }
 

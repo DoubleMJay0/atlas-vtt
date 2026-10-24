@@ -1,11 +1,14 @@
 /**
  * Round rooms and colonnades, decided per mirror group so twins stay alike. A room can be round
  * only when it is square and every door sits in the middle of a wall, and never around a landing.
+ * Where the params cap round rooms (a Fortress's towers), only rooms on the plan's outer edge are
+ * round, those at its corners first, and no more than the cap.
  */
 
+import { rectsTouch } from '../geometry';
 import type { DungeonParams } from '../params';
 import { type KeyedRng, type Rng, chance } from '../rng';
-import { type WorkLayout, type WorkRoom, doorsOf, isNormal, liveRooms, toLocal } from './workLayout';
+import { type WorkLayout, type WorkRoom, doorsOf, isNormal, liveRooms, roomRect, toLocal } from './workLayout';
 
 function mirrorGroups(layout: WorkLayout): WorkRoom[][] {
   const groups = new Map<number, WorkRoom[]>();
@@ -51,16 +54,56 @@ function canHoldColumns(room: WorkRoom): boolean {
   return room.rotunda ? room.width >= 7 : room.width >= 5;
 }
 
-function shapeGroup(rng: Rng, layout: WorkLayout, members: WorkRoom[], params: DungeonParams): void {
+interface GroupShape {
+  members: WorkRoom[];
+  round: boolean;
+  columns: boolean;
+}
+
+/** The rolls of a group, in the order they were always made: round, then colonnades. */
+function rollGroup(rng: Rng, layout: WorkLayout, members: WorkRoom[], params: DungeonParams): GroupShape {
   const round = members.every((room) => mayBeRound(layout, room)) && chance(rng, roundChance(layout, members, params));
-  members.forEach((room) => (room.rotunda = round));
-  const columns = chance(rng, colonnadeChance(members, params));
-  members.forEach((room) => (room.colonnade = columns && canHoldColumns(room)));
+  return { members, round, columns: chance(rng, colonnadeChance(members, params)) };
+}
+
+/** How many sides of the room face open ground: no other of the `live` rooms lies anywhere straight out from that wall. */
+function openSides(live: readonly WorkRoom[], room: WorkRoom): number {
+  const r = roomRect(room);
+  const far = 1_000_000;
+  const others = live.filter((other) => other.id !== room.id).map(roomRect);
+  const bands = [
+    { ...r, x0: r.x1 + 1, x1: far },
+    { ...r, x0: -far, x1: r.x0 - 1 },
+    { ...r, y0: r.y1 + 1, y1: far },
+    { ...r, y0: -far, y1: r.y0 - 1 },
+  ];
+  return bands.filter((band) => !others.some((other) => rectsTouch(band, other))).length;
+}
+
+/** Keeps the round groups to towers: on the plan's outer edge, corners first, at most `most` rooms and `share` of the floor's (one at least). */
+function capTowers(layout: WorkLayout, groups: GroupShape[], cap: NonNullable<DungeonParams['roundRooms']>): void {
+  const live = liveRooms(layout);
+  let left = Math.min(cap.most, Math.max(1, Math.floor(live.filter(isNormal).length * cap.share)));
+  const ranked = groups
+    .filter((group) => group.round)
+    .map((group) => ({ group, sides: Math.min(...group.members.map((room) => openSides(live, room))) }))
+    .sort((a, b) => b.sides - a.sides);
+  for (const { group, sides } of ranked) {
+    group.round = sides > 0 && group.members.length <= left;
+    if (group.round) left -= group.members.length;
+  }
 }
 
 export function shapeRooms(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams): void {
   // A cave's rooms are shaped by the cave (`layout/cavern/`): never round, never colonnaded.
   if (params.cave) return;
   const rng = rngOf('shapes');
-  mirrorGroups(layout).forEach((members) => shapeGroup(rng, layout, members, params));
+  const groups = mirrorGroups(layout).map((members) => rollGroup(rng, layout, members, params));
+  if (params.roundRooms) capTowers(layout, groups, params.roundRooms);
+  for (const { members, round, columns } of groups) {
+    for (const room of members) {
+      room.rotunda = round;
+      room.colonnade = columns && canHoldColumns(room);
+    }
+  }
 }

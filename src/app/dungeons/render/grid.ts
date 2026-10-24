@@ -1,3 +1,4 @@
+import { doorCells } from '../geometry';
 import type { DungeonDoor, DungeonRoom } from '../model';
 import type { Rng } from '../rng';
 import { clipToFloors } from './floors';
@@ -69,10 +70,14 @@ function roomLines(room: DungeonRoom, step: number): Line[] {
 /** A wide opening is floor: the lines where it meets its rooms are drawn as grid. */
 function doorLines(door: DungeonDoor, wide: ReadonlySet<DungeonDoor>): Line[] {
   if (!wide.has(door)) return [];
-  if (door.dir.x !== 0) {
-    return [door.x, door.x + 1].map(x => [{ x, y: door.y }, { x, y: door.y + 1 }] as Line);
-  }
-  return [door.y, door.y + 1].map(y => [{ x: door.x, y }, { x: door.x + 1, y }] as Line);
+  const across = doorCells(door).flatMap(cell => {
+    if (door.dir.x !== 0) return [cell.x, cell.x + 1].map(x => [{ x, y: cell.y }, { x, y: cell.y + 1 }] as Line);
+    return [cell.y, cell.y + 1].map(y => [{ x: cell.x, y }, { x: cell.x + 1, y }] as Line);
+  });
+  if (!door.wide) return across;
+  // The line between an opening's two cells, along the way through.
+  const mid = { x: door.x + Math.max(0, door.wide.x), y: door.y + Math.max(0, door.wide.y) };
+  return [...across, door.wide.x !== 0 ? [{ x: mid.x, y: door.y }, { x: mid.x, y: door.y + 1 }] : [{ x: door.x, y: mid.y }, { x: door.x + 1, y: mid.y }]];
 }
 
 /** One dash in the middle of every cell edge, leaving 10 to 30 % at each corner. */
