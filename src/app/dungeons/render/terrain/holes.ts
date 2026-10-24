@@ -18,10 +18,22 @@ import { chiselled } from './stones';
 /** The face a cut hole keeps before it opens onto the level below, in cells. */
 const CUT_FACE = 0.2;
 
-/** A hole's outline: chiselled rock, or the straight edges of a built well. */
+/** The side of a murder hole's square, in cells: a hand's width of stone round it. */
+const MURDER_HOLE = 0.4;
+
+/** Whether a hole was cut by builders, with dressed straight edges. */
+function built(piece: DungeonTerrain): boolean {
+  return piece.kind === 'gallery' || piece.kind === 'murder-hole';
+}
+
+/** A hole's outline: chiselled rock, the straight edges of a built well, or a murder hole's small square in the middle of its cell. */
 export function holeRings(piece: DungeonTerrain): Vec[][] {
+  if (piece.kind === 'murder-hole') {
+    const [a, b] = [(1 - MURDER_HOLE) / 2, (1 + MURDER_HOLE) / 2];
+    return piece.cells.map(c => [{ x: c.x + a, y: c.y + a }, { x: c.x + b, y: c.y + a }, { x: c.x + b, y: c.y + b }, { x: c.x + a, y: c.y + b }]);
+  }
   const rings = cellRings(piece.cells);
-  return piece.kind === 'gallery' ? rings : rings.map(r => chiselled(r, piece.id * 13 + 5, 0.035));
+  return built(piece) ? rings : rings.map(r => chiselled(r, piece.id * 13 + 5, 0.035));
 }
 
 export function drawHoles(hand: Hand): void {
@@ -32,8 +44,8 @@ export function drawHoles(hand: Hand): void {
   for (const hole of holes) {
     if (hole.kind === 'gallery') balustrade(hand, edgesFacing(hole.cells, c => !cellSet(hole.cells).has(`${c.x},${c.y}`) && onFloor(env, c)));
     const rings = holeRings(hole);
-    if (cut) cutHole(hand, rings, hole.kind === 'gallery');
-    else drawDrop(hand, rings, hole.opening?.bottom === null || env.dungeon.index === env.dungeon.model.floors.length - 1 ? 'void' : 'floor', hole.kind === 'gallery');
+    if (cut) cutHole(hand, rings, built(hole));
+    else drawDrop(hand, rings, hole.opening?.bottom === null || env.dungeon.index === env.dungeon.model.floors.length - 1 ? 'void' : 'floor', built(hole));
   }
 }
 

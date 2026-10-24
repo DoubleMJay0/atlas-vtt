@@ -2,7 +2,7 @@ import { MAX_LEVEL_SURFACES, MAX_SURFACE_CORNERS } from '../../levels/levelSurfa
 import type { LevelSurface } from '../../types/sceneLevelTypes';
 import type { CellPoint, DungeonTerrain } from '../model';
 import type { VisibleDungeon } from '../render/visibleDungeon';
-import { HOLE_KINDS } from '../terrain/catalog';
+import { HOLE_KINDS, footingOf } from '../terrain/catalog';
 import { cellOutlines } from './cellOutline';
 import { terrainName } from './terrainName';
 import type { DungeonPlacement } from './toWalls';
@@ -19,7 +19,8 @@ export function floorSurfaces(dungeon: VisibleDungeon, placement: DungeonPlaceme
   const { floor, model, index, roomShapes } = dungeon;
   if (index >= model.floors.length - 1) return {};
   const shown = floor.terrain.filter(piece => roomShapes.has(piece.room));
-  const holes = shown.filter(piece => piece.opening && HOLE_KINDS.has(piece.kind));
+  // A hole walked over (a murder hole) is too small to fall through.
+  const holes = shown.filter(piece => piece.opening && HOLE_KINDS.has(piece.kind) && footingOf(piece.kind) === 'block');
   const { originCell, pxPerCell } = placement;
   const world = (p: CellPoint): CellPoint => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   const rings = (piece: DungeonTerrain, open: boolean): Omit<LevelSurface, 'id' | 'kind'>[] =>

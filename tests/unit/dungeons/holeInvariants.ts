@@ -12,7 +12,7 @@ import { inFloor, stairCells } from './terrainInvariants';
 
 const key = (c: CellPoint): string => `${c.x},${c.y}`;
 /** Openings cut for the room below them, which nothing falls through onto rubble. */
-const CUT_FOR_BELOW: ReadonlySet<TerrainKind> = new Set(['gallery']);
+const CUT_FOR_BELOW: ReadonlySet<TerrainKind> = new Set(['gallery', 'murder-hole']);
 
 /** Whether a room's type has a reason to have the floor above it opened by a hole of `kind`. */
 export function opensAbove(model: DungeonModel, room: DungeonRoom, kind: TerrainKind): boolean {

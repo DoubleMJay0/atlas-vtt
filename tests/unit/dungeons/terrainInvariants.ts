@@ -122,7 +122,6 @@ export function clearanceProblems(floor: DungeonFloor, index: number, stack: Flo
   return floor.terrain.flatMap((piece) => piece.cells.filter((c) => keep.has(key(c))).map((c) => `${piece.kind} ${piece.id} on ${key(c)}, which stays clear`));
 }
 
-/** Cells of the floor a party can stand on: room floors, door cells and stairwells, less what blocks, bridges walkable again. */
 /** The cells a piece of furniture on whole cells stands on: those whose middles lie inside its box. */
 export function propCells(floor: DungeonFloor, prop: DungeonProp): CellPoint[] {
   const spec = PROP_SPECS[prop.kind];
@@ -148,7 +147,8 @@ export function blockingPropCells(floor: DungeonFloor): CellPoint[] {
   return floor.props.filter((p) => PROP_SPECS[p.kind].footing === 'block').flatMap((p) => propCells(floor, p));
 }
 
-function walkable(floor: DungeonFloor): Set<string> {
+/** The cells a party can stand on: room floors and door cells, less what blocks, bridges walkable again. */
+export function walkable(floor: DungeonFloor): Set<string> {
   const cells = new Set<string>();
   for (const room of floor.rooms) {
     for (let y = room.y; y < room.y + room.h; y++) {

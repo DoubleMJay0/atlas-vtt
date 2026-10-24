@@ -49,6 +49,7 @@ export const DRAWN_TERRAIN_KINDS: ReadonlySet<TerrainKind> = new Set<TerrainKind
   'deep-water',
   'pit',
   'gallery',
+  'murder-hole',
   'bridge',
   'platform',
   'ledge',

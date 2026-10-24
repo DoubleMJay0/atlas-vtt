@@ -185,6 +185,7 @@ export const dungeon = {
   'dungeon.terrain.gallery': 'Gallery',
   'dungeon.terrain.minstrelsGallery': "Minstrels' gallery",
   'dungeon.terrain.stairWell': 'Stair well',
+  'dungeon.terrain.murderHole': 'Murder hole',
   'dungeon.terrain.parapet': 'Parapet',
   'dungeon.terrain.bridge': 'Bridge',
   'dungeon.terrain.ropeBridge': 'Rope bridge',

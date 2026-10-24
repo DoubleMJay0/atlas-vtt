@@ -10,6 +10,8 @@ import { smallDungeon } from '../../fixtures/dungeonModels';
 import { pool } from '../../fixtures/dungeonModelBuilder';
 import { rngFrom } from '../../../src/app/dungeons/rng';
 import { pointInPolygon } from '../../../src/app/dungeons/render/geometry';
+import { holeRings } from '../../../src/app/dungeons/render/terrain/holes';
+import { draft } from '../../../src/app/dungeons/terrain/catalog';
 
 describe('dungeon render geometry', () => {
   it('draws a rotunda through the inner corners of its cardinal door cells', () => {
@@ -70,6 +72,16 @@ describe('dungeon render geometry', () => {
     // The door cell between the hall and the rotunda is floor.
     expect(dungeon.field.distance(0.5, -5.5)).toBeLessThan(0);
     expect(dungeon.field.distance(-20, -20)).toBeGreaterThan(1);
+  });
+});
+
+describe('openings in the floor', () => {
+  it('cuts a murder hole as a small square in the middle of its cell and a gallery along its cells', () => {
+    const hole = { ...draft('murder-hole', 0, [{ x: 3, y: 5 }]), id: 0, opening: { bottom: 0, link: 0 } };
+    expect(holeRings(hole)).toEqual([[{ x: 3.3, y: 5.3 }, { x: 3.7, y: 5.3 }, { x: 3.7, y: 5.7 }, { x: 3.3, y: 5.7 }]]);
+    const gallery = { ...draft('gallery', 0, [{ x: 0, y: 0 }, { x: 1, y: 0 }]), id: 1, opening: { bottom: 0, link: 1 } };
+    const xs = holeRings(gallery).flat().map((p) => p.x);
+    expect([Math.min(...xs), Math.max(...xs)]).toEqual([0, 2]);
   });
 });
 

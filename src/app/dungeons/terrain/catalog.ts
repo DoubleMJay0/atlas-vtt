@@ -44,6 +44,7 @@ export const TERRAIN_KINDS: Readonly<Record<TerrainKind, KindInfo>> = {
   'deep-water': { name: 'dungeon.terrain.deepWater', traits: { hazard: 'deep-water' }, footing: 'block' },
   pit: { name: 'dungeon.terrain.pit', traits: { hazard: 'pit', elevation: -2 }, footing: 'block' },
   gallery: { name: 'dungeon.terrain.gallery', traits: { elevation: -2 }, footing: 'block' },
+  'murder-hole': { name: 'dungeon.terrain.murderHole', traits: {}, footing: 'walk' },
   bridge: { name: 'dungeon.terrain.bridge', traits: {}, footing: 'walk' },
   platform: { name: 'dungeon.terrain.platform', traits: { elevation: 1 }, footing: 'walk' },
   ledge: { name: 'dungeon.terrain.ledge', traits: { elevation: 1 }, footing: 'walk' },
@@ -56,7 +57,7 @@ export const TERRAIN_KINDS: Readonly<Record<TerrainKind, KindInfo>> = {
 export const ALL_TERRAIN_KINDS: ReadonlySet<TerrainKind> = new Set(Object.keys(TERRAIN_KINDS) as TerrainKind[]);
 
 /** Kinds that are holes in a floor when they carry an `opening`. */
-export const HOLE_KINDS: ReadonlySet<TerrainKind> = new Set(['chasm', 'shaft', 'gallery']);
+export const HOLE_KINDS: ReadonlySet<TerrainKind> = new Set(['chasm', 'shaft', 'gallery', 'murder-hole']);
 
 /** Whether a piece can be walked across. */
 export function footingOf(kind: TerrainKind): Footing {

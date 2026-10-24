@@ -39,6 +39,8 @@ export type TerrainKind =
   | 'pit'
   // A railed hole over a hall on the floor below.
   | 'gallery'
+  // A hole a hand wide in the floor over a gate passage: seen through, walked over.
+  | 'murder-hole'
   // Crossings and height.
   | 'bridge'
   | 'platform'
