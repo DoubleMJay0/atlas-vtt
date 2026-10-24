@@ -40,9 +40,13 @@ void main() {
 // taken as a dim range's is (`uReflectLift`, bright over dim), so the tonemap's toe spares it too.
 // The quad (`uRect`) covers the tile and the reflection; the tile starts at `uTileOrigin`.
 // The colour is `uLightColor`: PIXI sets `uColor` itself, as a vec4, on every mesh shader that declares it.
-export const lightMapFragment = `${GLSL_VERSION}
-in vec2 vWorld;
-uniform vec4 uRect;
+/**
+ * A light's falloff, as both pictures draw it: what `lightMapFragment` describes, for a point at
+ * `d` world pixels from the flame (an area light: from its outline). `lightAt` gives the light
+ * there before what blocks it (x) and how much brighter it would be at its bright level (y);
+ * `inCone` the share a beam leaves it (`uCone`, `uEdge`, never under a texel `uTexel` of the map).
+ */
+export const LIGHT_FALLOFF_GLSL = `
 uniform vec2 uLight;
 uniform float uBright;
 uniform float uDim;
@@ -53,20 +57,8 @@ uniform float uDimLevel;
 uniform float uHaloGain;
 uniform float uHaloSize;
 uniform float uTexel;
-// A moving light's tile has coarser texels than this map (Tile.scale); the reflection's are this map's.
-uniform float uTileTexel;
 uniform vec4 uCone;
 uniform float uEdge;
-uniform float uIsArea;
-uniform vec2 uTileOrigin;
-uniform float uHasReflection;
-uniform vec2 uReflectOrigin;
-uniform float uReflectLevel;
-uniform float uReflectLift;
-uniform sampler2D uTile;
-uniform sampler2D uDistance;
-uniform sampler2D uReflection;
-out vec4 finalColor;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 ${FADE_GLSL}
 // The width of the beam's soft edge at d from the light (beamEdge).
@@ -82,6 +74,35 @@ float inCone(vec2 v, float d) {
   float own = fadeOf((uCone.w - d) / edgeAt(uCone.w));
   return max(beam, own);
 }
+vec2 lightAt(float d) {
+  float dim = max(uDim, 1.0);
+  float t = d / max(uBright, 1.0);
+  float t2 = t * t;
+  float e = mix(uDimLevel, uBrightLevel, 1.0 / (1.0 + t2 * t2));
+  float s = max(max(uBright, dim * 0.25) * uHaloSize, 1.0);
+  e += uHaloGain * exp(-(d * d) / (2.0 * s * s));
+  float atBright = max(1.0, uBrightLevel / max(e, 1e-4));
+  float from = min(uBright, dim * ${(1 - LIGHT_FADE_MIN).toFixed(4)});
+  float fade = fadeOf((dim - d) / max(dim - from, 1e-3));
+  return vec2(uIntensity * e * fade, atBright);
+}`;
+
+export const lightMapFragment = `${GLSL_VERSION}
+in vec2 vWorld;
+uniform vec4 uRect;
+// A moving light's tile has coarser texels than this map (Tile.scale); the reflection's are this map's.
+uniform float uTileTexel;
+uniform float uIsArea;
+uniform vec2 uTileOrigin;
+uniform float uHasReflection;
+uniform vec2 uReflectOrigin;
+uniform float uReflectLevel;
+uniform float uReflectLift;
+uniform sampler2D uTile;
+uniform sampler2D uDistance;
+uniform sampler2D uReflection;
+out vec4 finalColor;
+${LIGHT_FALLOFF_GLSL}
 void main() {
   ivec2 texel = ivec2(floor((vWorld - uTileOrigin) / uTileTexel));
   bool inTile = all(greaterThanEqual(texel, ivec2(0))) && all(lessThan(texel, textureSize(uTile, 0)));
@@ -95,16 +116,9 @@ void main() {
   float atBright = 1.0;
   if (inTile) {
     float d = uIsArea > 0.5 ? max(texelFetch(uDistance, texel, 0).r, 0.0) : distance(vWorld, uLight);
-    float dim = max(uDim, 1.0);
-    float t = d / max(uBright, 1.0);
-    float t2 = t * t;
-    float e = mix(uDimLevel, uBrightLevel, 1.0 / (1.0 + t2 * t2));
-    float s = max(max(uBright, dim * 0.25) * uHaloSize, 1.0);
-    e += uHaloGain * exp(-(d * d) / (2.0 * s * s));
-    atBright = max(1.0, uBrightLevel / max(e, 1e-4));
-    float from = min(uBright, dim * ${(1 - LIGHT_FADE_MIN).toFixed(4)});
-    float fade = fadeOf((dim - d) / max(dim - from, 1e-3));
-    direct = uIntensity * e * fade * texelFetch(uTile, texel, 0).r;
+    vec2 light = lightAt(d);
+    atBright = light.y;
+    direct = light.x * texelFetch(uTile, texel, 0).r;
     if (uCone.z < 3.14159) direct *= inCone(vWorld - uLight, d);
   }
   // The reflection fills the shadows: where the light itself is brighter, it is the light.

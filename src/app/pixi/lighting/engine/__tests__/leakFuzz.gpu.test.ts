@@ -255,7 +255,7 @@ describe('leak fuzz', () => {
       expect(Math.min(report.doors, report.oneWay, report.twoLights)).toBeGreaterThan(0);
       expect(report.checked).toBeGreaterThan(8000);
       expect(report.litInside).toBeGreaterThan(800);
-      if (quality.bounceMaxSide >= bounds.width) expect(report.bounceInside).toBeGreaterThan(80);
+      if (quality.picture !== 'polygons' && quality.bounceMaxSide >= bounds.width) expect(report.bounceInside).toBeGreaterThan(80);
       expect(report.senseInside).toBeGreaterThan(800);
       expect(report.spotInside).toBeGreaterThan(400);
       expect(report.darkInside).toBeGreaterThan(50);

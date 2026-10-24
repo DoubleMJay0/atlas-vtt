@@ -1,28 +1,27 @@
 import type { Renderer, Texture } from 'pixi.js';
 import type { WallSegment } from '../../../types/wallTypes';
-import { BOUNCE, DARKNESS, tileWallReach } from '../../../lighting/lightingConstants';
-import { DEFAULT_LIGHTING_QUALITY, bouncesOn, pictureTexel, type LightingQuality } from '../../../lighting/lightingQuality';
+import { BOUNCE, tileWallReach } from '../../../lighting/lightingConstants';
+import { DEFAULT_LIGHTING_QUALITY, bouncesOn, pictureTexel, type LightingQuality, type TracedQuality } from '../../../lighting/lightingQuality';
 import { changedWallRects } from '../../../lighting/wallChanges';
 import type { Rect } from '../../../lighting/segments';
-import { lightReach } from '../../../vision/sight';
-import type { MapBounds, Polygon } from '../../../vision/visibility';
-import { sameCone } from '../../../vision/visionCone';
+import type { MapBounds } from '../../../vision/visibility';
 import { flickerSlots, LightFlicker, STEADY, type FlickerSample } from '../lightFlicker';
 import { animationFrameDue, slotsOf } from '../../utils/animationFrames';
 import type { Box } from '../../../vision/polygonBounds';
 import type { CapsuleField } from './CapsuleField';
 import { glOf } from './gpu';
 import { GpuPacer } from './GpuPacer';
-import { DarknessMap, type DrawnDarkness, type LitShape, type PierceShape } from './DarknessMap';
+import type { DarknessMap, DrawnDarkness, PierceShape } from './DarknessMap';
 import { areaRadius } from '../../../lighting/lightArea';
-import { filledPieces } from '../../../lighting/polygonFill';
+import { ENGINE_SHADERS } from './engineShaders';
 import { LightMap, type DrawnLight } from './LightMap';
 import { RadianceCascades } from './RadianceCascades';
 import { ReflectionTiles } from './ReflectionTiles';
 import { TileCache, type TilePacer } from './TileCache';
+import { SceneMaps, byPriority, sameLights } from './SceneMaps';
 import type { EngineLight, EngineZone } from './types';
 import { WallFields } from './WallFields';
-import { ZoneMap, sameZoneLook, type ZoneLook } from './ZoneMap';
+import type { ZoneLook, ZoneMap } from './ZoneMap';
 
 /**
  * Everything the lighting keeps in world space for one map: the wall field, each light's tile,
@@ -34,6 +33,7 @@ import { ZoneMap, sameZoneLook, type ZoneLook } from './ZoneMap';
  * device runs it (`GpuPacer`), so a slow device builds a scene's lights over several frames.
  */
 export class LightingWorld {
+  readonly picture = 'traced';
   readonly texel: number;
   /** Rays each light's tile traces across its flame (`LightingQuality.tileRays`). */
   readonly tileRays: number;
@@ -44,17 +44,8 @@ export class LightingWorld {
   readonly cascades: RadianceCascades | null;
   /** How often flickering lights are redrawn, or null to keep them steady (`setFlicker`). */
   private flickerMs: number | null;
-  /** Created with the first darkness source; `trim` frees it once the scene has none and the composite has let go of it. */
-  private darkness: DarknessMap | null = null;
-  /** Each darkness source's area as the rule counts it, kept while the source and the walls stay. */
-  private readonly areas = new Map<string, { light: EngineLight; walls: readonly WallSegment[]; polygon: Polygon }>();
-  private pierce: readonly PierceShape[] = [];
-  /** Created with the scene's first ambient zone; `trim` frees it once the scene has none. */
-  private zoneTexture: ZoneMap | null = null;
-  private zones: readonly EngineZone[] = NO_ZONES;
-  private zoneLook: ZoneLook = {};
-  /** The walls changed since the zones were drawn: their soft edges end at walls. */
-  private zonesStale = false;
+  /** The darkness map and the zone map, each made with the scene's first darkness source or zone. */
+  private readonly maps: SceneMaps;
   private readonly tiles: TileCache;
   private readonly reflections: ReflectionTiles;
   private readonly pacer: GpuPacer;
@@ -70,7 +61,7 @@ export class LightingWorld {
   private flickering: { lights: readonly EngineLight[]; animated: readonly EngineLight[]; slots: number } | null = null;
 
   /** `cell` is the map's grid cell in world px, which the texel follows (`pictureTexel`); unknown, the map's size alone decides. */
-  constructor(private readonly renderer: Renderer, readonly bounds: MapBounds, quality: LightingQuality = DEFAULT_LIGHTING_QUALITY, paced = false, private readonly cell?: number) {
+  constructor(renderer: Renderer, readonly bounds: MapBounds, quality: TracedQuality = DEFAULT_LIGHTING_QUALITY, paced = false, private readonly cell?: number) {
     this.texel = pictureTexel(bounds, quality, cell);
     this.tileRays = quality.tileRays;
     this.flickerMs = quality.flickerMs;
@@ -79,6 +70,7 @@ export class LightingWorld {
     this.cascades = bouncesOn(quality, bounds) ? new RadianceCascades(renderer, bounds, this.fields.tiles) : null;
     this.tiles = new TileCache(renderer, this.fields.tiles, bounds, { rays: quality.tileRays });
     this.reflections = new ReflectionTiles(renderer, bounds, this.texel);
+    this.maps = new SceneMaps(renderer, bounds, this.texel, { shader: ENGINE_SHADERS.zone });
     const gl = paced ? glOf(renderer) : null;
     this.pacer = new GpuPacer(gl && 'fenceSync' in gl ? gl : null);
   }
@@ -91,9 +83,14 @@ export class LightingWorld {
     if (ms === null && flickered) this.drawSteady();
   }
 
-  /** Whether this world was made as `quality` makes one for its map and cell (texel, bounce, tile rays): else it is built anew. */
+  /** Whether this world was made as `quality` makes one for its map and cell (a traced picture, texel, bounce, tile rays): else it is built anew. */
   fits(quality: LightingQuality, cell: number | undefined = this.cell): boolean {
-    return this.texel === pictureTexel(this.bounds, quality, cell) && !!this.cascades === bouncesOn(quality, this.bounds) && this.tileRays === quality.tileRays;
+    return quality.picture !== 'polygons' && this.texel === pictureTexel(this.bounds, quality, cell) && !!this.cascades === bouncesOn(quality, this.bounds) && this.tileRays === quality.tileRays;
+  }
+
+  /** What the composite binds of this world, the same object for as long as it binds the same textures. */
+  binding(): object {
+    return this.fields.bound();
   }
 
   /** Every wall that blocks light, one-way walls too, which bounce treats as blocking both ways. */
@@ -103,7 +100,7 @@ export class LightingWorld {
 
   /** The darkness map while the scene has a darkness source: the composite reads it only then. */
   darknessMap(): DarknessMap | null {
-    return this.lights.some((light) => light.darkness) ? this.darkness : null;
+    return this.maps.darknessMap();
   }
 
   /**
@@ -111,17 +108,17 @@ export class LightingWorld {
    * list while nothing changed; it is drawn into the darkness map, so it costs nothing on a map
    * without a darkness source.
    */
-  update(walls: readonly WallSegment[], lights: readonly EngineLight[], albedo: Texture | null, pierce: readonly PierceShape[] = this.pierce): void {
-    const pierceChanged = pierce !== this.pierce;
-    this.pierce = pierce;
+  update(walls: readonly WallSegment[], lights: readonly EngineLight[], albedo: Texture | null, pierce: readonly PierceShape[] = this.maps.pierced): void {
+    const pierceChanged = this.maps.setPierce(pierce);
     let changed: Rect[] | 'all' = [];
+    let moved = false;
     if (walls !== this.walls) {
       changed = this.walls ? changedWallRects(this.walls, walls, tileWallReach(this.texel)) : 'all';
       this.walls = walls;
       if (changed === 'all' || changed.length > 0) {
         this.fields.rebuild(walls);
         this.bounceDirty = true;
-        this.zonesStale = true;
+        moved = true;
       }
     }
     // A darkness has no tile: its area is the rule's polygon, which changes with any wall.
@@ -133,11 +130,12 @@ export class LightingWorld {
     const areasChanged = changed !== 'all' && changed.length === 0 ? false : lights.some((light) => light.darkness);
     if (lightsChanged) this.forgetRemoved(lights);
     this.lights = lights;
+    this.maps.setScene(walls, lights, moved);
     if (tilesChanged || reflectionsChanged || lightsChanged || areasChanged) {
       this.drawSteady();
       this.bounceDirty = true;
     } else if (pierceChanged && this.darknessMap()) {
-      this.drawDarkness();
+      this.maps.drawDarkness();
     }
     if (albedo !== this.albedo) {
       this.albedo = albedo;
@@ -176,11 +174,11 @@ export class LightingWorld {
 
   /** The zone map while the scene has an ambient zone: the composite reads it only then. */
   zoneMap(): ZoneMap | null {
-    return this.zones.length > 0 ? this.zoneTexture : null;
+    return this.maps.zoneMap();
   }
 
   get holdsZoneMap(): boolean {
-    return !!this.zoneTexture;
+    return this.maps.holdsZoneMap;
   }
 
   /**
@@ -189,31 +187,17 @@ export class LightingWorld {
    * only when the zones, the walls or what that look decides changed (`sameZoneLook`).
    */
   setZones(zones: readonly EngineZone[] = NO_ZONES, look: ZoneLook): void {
-    if (zones === this.zones && !this.zonesStale && sameZoneLook(zones, look, this.zoneLook)) return;
-    this.zones = zones;
-    this.zoneLook = { ambient: look.ambient, ambientColor: look.ambientColor, litThreshold: look.litThreshold, brightThreshold: look.brightThreshold };
-    this.zonesStale = false;
-    if (zones.length === 0) return;
-    this.zoneTexture ??= new ZoneMap(this.renderer, this.bounds, this.texel);
-    this.zoneTexture.draw(zones, this.zoneLook, this.fields.zones());
+    this.maps.setZones(zones, look, () => this.fields.zones());
   }
 
   /** Whether the darkness map's texture is allocated. */
   get holdsDarknessMap(): boolean {
-    return !!this.darkness;
+    return this.maps.holdsDarknessMap;
   }
 
   /** Frees the darkness map and the zone map of a scene that has no darkness source or zone left, and the wall fields its walls no longer need; call it once nothing reads them (`darknessMap()`, `zoneMap()` are null, the composite has the fields of now). */
   trim(): void {
-    if (!this.darknessMap()) {
-      this.darkness?.destroy();
-      this.darkness = null;
-      this.areas.clear();
-    }
-    if (!this.zoneMap()) {
-      this.zoneTexture?.destroy();
-      this.zoneTexture = null;
-    }
+    this.maps.trim();
     this.fields.trim();
   }
 
@@ -235,8 +219,7 @@ export class LightingWorld {
     this.reflections.destroy();
     this.cascades?.destroy();
     this.lightMap.destroy();
-    this.darkness?.destroy();
-    this.zoneTexture?.destroy();
+    this.maps.destroy();
     this.fields.destroy();
   }
 
@@ -283,22 +266,13 @@ export class LightingWorld {
     for (const light of this.lights) {
       if (keys.has(light.key)) continue;
       this.flicker.forget(light.key);
-      this.areas.delete(light.key);
     }
   }
 
   private drawSteady(): void {
     this.drawLightMap(() => STEADY);
     this.lastFlicker = -Infinity;
-    if (this.lights.some((light) => light.darkness)) this.drawDarkness();
-  }
-
-  private drawDarkness(): void {
-    this.darkness ??= new DarknessMap(this.renderer, this.bounds, this.texel);
-    const sources = this.lights.filter((light) => light.darkness);
-    // Where a light near a darkness would shine: the darkness veils what it swallows there.
-    const lit = this.lights.filter((light) => !light.darkness && sources.some((source) => Math.hypot(source.x - light.x, source.y - light.y) < source.dim + light.dim + (light.surface ? areaRadius(light.surface, light) : 0)));
-    this.darkness.draw(sources.map((light) => this.darknessOf(light)), this.pierce, lit.flatMap((light) => this.litShapes(light)));
+    this.maps.drawDarkness();
   }
 
   private drawLightMap(sample: (light: EngineLight) => FlickerSample): void {
@@ -306,7 +280,7 @@ export class LightingWorld {
     const drawn: (DrawnLight | DrawnDarkness)[] = [];
     for (const light of byPriority(this.lights)) {
       if (light.darkness) {
-        drawn.push(this.darknessOf(light));
+        drawn.push(this.maps.darknessOf(light));
         continue;
       }
       const tile = tiles.get(light.key);
@@ -317,39 +291,6 @@ export class LightingWorld {
     }
     this.lightMap.draw(drawn);
   }
-
-  /**
-   * A darkness source as it is drawn: the area the rule counts, its reach's polygon as the scene
-   * model hands it on, or `lightReach` from the same place through the same walls, so picture
-   * and rule cannot differ.
-   */
-  private darknessOf(light: EngineLight): DrawnDarkness {
-    return { origin: { x: light.x, y: light.y }, dim: light.dim, soft: Math.min(DARKNESS.rim, DARKNESS.rimShare * light.dim), polygon: this.areaOf(light) };
-  }
-
-  /**
-   * Where a light would shine, as shapes drawn as fans from their origins: a light's area, or an
-   * area light's area in convex pieces and the reaches of its outline the rule counts (`parts`,
-   * where the builder handed them on), and where its reflection reaches.
-   */
-  private litShapes(light: EngineLight): LitShape[] {
-    const reflected = light.reflection ?? [];
-    if (!light.surface) return [{ origin: { x: light.x, y: light.y }, polygon: this.areaOf(light) }, ...reflected];
-    const pieces = filledPieces(light.surface).map((piece) => ({ origin: middleOf(piece), polygon: piece }));
-    return [...pieces, ...(light.parts ?? []), ...reflected];
-  }
-
-  /** The area the rule counts for a light: the one it came with, else traced here and kept while the light and the walls stay. */
-  private areaOf(light: EngineLight): Polygon {
-    if (light.area) return light.area;
-    const walls = this.walls ?? [];
-    let area = this.areas.get(light.key);
-    if (!area || area.walls !== walls || area.light.x !== light.x || area.light.y !== light.y || area.light.dim !== light.dim || !sameCone(area.light.cone, light.cone)) {
-      area = { light, walls, polygon: lightReach({ x: light.x, y: light.y }, light.dim, walls, light.bright, light).polygon };
-      this.areas.set(light.key, area);
-    }
-    return area.polygon;
-  }
 }
 
 const NO_ZONES: readonly EngineZone[] = [];
@@ -358,29 +299,4 @@ const NO_ZONES: readonly EngineZone[] = [];
 function lightsWithin(light: EngineLight, view: Box): boolean {
   const reach = light.dim + (light.surface ? areaRadius(light.surface, light) : 0);
   return light.x + reach >= view.minX && light.x - reach <= view.maxX && light.y + reach >= view.minY && light.y - reach <= view.maxY;
-}
-
-/** The average of a convex piece's corners, inside it. */
-function middleOf(piece: readonly { x: number; y: number }[]): { x: number; y: number } {
-  return { x: piece.reduce((sum, p) => sum + p.x, 0) / piece.length, y: piece.reduce((sum, p) => sum + p.y, 0) / piece.length };
-}
-
-function sameLights(a: readonly EngineLight[], b: readonly EngineLight[]): boolean {
-  return a.length === b.length && a.every((x, i) => {
-    const y = b[i]!;
-    return x.key === y.key && x.x === y.x && x.y === y.y && x.bright === y.bright && x.dim === y.dim && x.flame === y.flame
-      && x.intensity === y.intensity && x.animation === y.animation && x.color.every((c, j) => c === y.color[j])
-      && !!x.darkness === !!y.darkness && (x.priority ?? 0) === (y.priority ?? 0) && sameCone(x.cone, y.cone) && x.edge === y.edge && x.area === y.area && x.surface === y.surface && x.parts === y.parts && x.reflection === y.reflection && x.moving === y.moving;
-  });
-}
-
-/**
- * The lights in the order the light map draws them: by priority, a darkness after the lights of
- * its own priority, so it swallows them and every light below, and a light above it shines in it.
- * A scene without a darkness keeps its order: lights only add up.
- */
-function byPriority(lights: readonly EngineLight[]): readonly EngineLight[] {
-  if (!lights.some((light) => light.darkness)) return lights;
-  // By priority, whatever fraction it is; a darkness after the lights that share its own.
-  return [...lights].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0) || Number(!!a.darkness) - Number(!!b.darkness));
 }
