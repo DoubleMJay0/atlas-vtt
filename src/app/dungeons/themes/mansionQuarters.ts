@@ -77,6 +77,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     id: 'bathroom',
     count: [0, 2],
     size: 'tiny',
+    smallest: true,
     degree: 'dead-end',
     floor: 'beyond',
     next: ['bedroom', 'master-bedroom'],
@@ -136,7 +137,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     shape: 'long',
     depth: 'middle',
     degree: 'through',
-    terrain: { holes: ['gallery'] },
+    terrain: {},
     furnish: {
       defining: { kind: 'portrait', verb: 'wall', count: [3, 8] },
       pieces: [
@@ -162,7 +163,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     count: [0, 64],
     holdsStairs: true,
     mayStandEmpty: true,
-    terrain: { holes: ['gallery'] },
+    terrain: { features: ['light-well'], holes: ['gallery'] },
     furnish: {
       pieces: [
         { kind: 'rug', verb: 'centre', chance: 0.4 },
@@ -176,7 +177,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     count: [0, 2],
     size: 'medium',
     ruinedOnly: true,
-    terrain: { allows: ['rubble-heap', 'rubble-field', 'broken-floor'] },
+    terrain: { features: ['rotted-floor'], hazards: ['chasm'], allows: ['rubble-heap', 'rubble-field', 'broken-floor'] },
     furnish: { pieces: [] },
   },
 ];

@@ -16,7 +16,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     depth: 'front',
     degree: 'hub',
     floor: 'entrance',
-    terrain: { columns: true },
+    terrain: { features: ['stair-well'], columns: true },
     furnish: {
       defining: { kind: 'rug', verb: 'centre' },
       pieces: [
@@ -76,6 +76,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'through',
     floor: 'entrance',
     next: ['kitchen', 'dining-room'],
+    nextRule: 'all',
     terrain: {},
     furnish: {
       defining: { kind: 'shelves', verb: 'wall' },
@@ -108,7 +109,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'entrance',
     next: ['kitchen'],
-    terrain: { water: 'shallow' },
+    terrain: { features: ['flooded-cellar'], water: 'shallow' },
     furnish: {
       defining: { kind: 'sink', verb: 'wall' },
       pieces: [
@@ -137,7 +138,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     size: 'small',
     degree: 'dead-end',
     floor: 'entrance',
-    terrain: { water: 'shallow' },
+    terrain: { features: ['flooded-cellar'], water: 'shallow' },
     furnish: {
       defining: { kind: 'barrel-rack', verb: 'rows' },
       pieces: [{ kind: 'bottle-rack', verb: 'wall', chance: 0.7 }],
@@ -149,7 +150,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     size: 'small',
     degree: 'dead-end',
     floor: 'entrance',
-    terrain: { water: 'shallow' },
+    terrain: { features: ['flooded-cellar'], water: 'shallow' },
     furnish: {
       defining: { kind: 'wash-tub', verb: 'centre', count: [1, 2] },
       pieces: [
@@ -179,7 +180,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     depth: 'middle',
     degree: ['through', 'hub'],
     floor: 'entrance',
-    terrain: { columns: true, allows: ['platform'] },
+    terrain: { features: ['ballroom-gallery'], columns: true, allows: ['platform'] },
     furnish: {
       defining: { kind: 'bust', verb: 'wall', count: [2, 6] },
       pieces: [
@@ -194,7 +195,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     size: 'medium',
     floor: 'entrance',
     outerWall: true,
-    terrain: { water: 'pool', allows: ['pool', 'thicket'] },
+    terrain: { features: ['conservatory-pool'], water: 'pool', allows: ['pool', 'thicket'] },
     furnish: {
       defining: { kind: 'planter', verb: 'grid', count: [2, 6] },
       pieces: [{ kind: 'fountain', verb: 'centre', chance: 0.5 }],

@@ -15,7 +15,7 @@ export const FORTRESS_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'through',
     floor: 'entrance',
     near: ['barracks', 'armoury'],
-    terrain: { allows: ['low-wall'] },
+    terrain: { features: ['murder-holes'], allows: ['low-wall'] },
     furnish: {
       defining: { kind: 'weapon-rack', verb: 'wall' },
       pieces: [
@@ -49,7 +49,7 @@ export const FORTRESS_ROOMS: readonly RoomTypeSpec[] = [
     depth: ['front', 'middle'],
     degree: 'hub',
     floor: 'entrance',
-    terrain: { allows: ['platform', 'pillar'], columns: true },
+    terrain: { features: ['minstrels-gallery'], allows: ['platform', 'pillar'], columns: true },
     furnish: {
       defining: { kind: 'dais', verb: 'backWall' },
       with: { kind: 'high-table', verb: 'backWall' },
@@ -120,7 +120,8 @@ export const FORTRESS_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'entrance',
     next: ['kitchen'],
-    terrain: { water: 'shallow' },
+    nextRule: 'any',
+    terrain: { features: ['flooded-cellar'], water: 'shallow' },
     furnish: {
       defining: { kind: 'shelves', verb: 'wall' },
       pieces: [
@@ -136,7 +137,7 @@ export const FORTRESS_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'entrance',
     mayStandEmpty: true,
-    terrain: { water: 'shallow' },
+    terrain: { features: ['flooded-cellar'], water: 'shallow' },
     furnish: {
       defining: { kind: 'crate', verb: 'corner' },
       pieces: [

@@ -11,6 +11,7 @@ import type { PropKind } from '../props/propKinds';
 import type { DungeonTag } from '../tags';
 import type { HazardChoice } from '../terrain/hazards';
 import type { MessageKey } from '../../i18n';
+import type { FeatureReason } from './features';
 import type { RoomTypeId } from './roomTypes';
 
 export type ThemeId = 'fortress' | 'mansion' | 'cavern';
@@ -46,6 +47,8 @@ export interface FurnishRecipe {
 }
 
 export interface RoomTerrain {
+  /** Why the type has its holes, hazards and standing water: each of those is placed only for one of these (`features.ts`). */
+  features?: readonly FeatureReason[];
   /** The hazards the type may take; a type without any takes none. */
   hazards?: readonly HazardChoice[];
   /** Terrain kinds the type allows beyond its furniture. */
@@ -77,9 +80,14 @@ export interface RoomTypeSpec {
   degree?: Degree | readonly Degree[];
   floor?: FloorRule;
   shape?: 'long' | 'square';
+  /** Only on a room with an outer wall. */
   outerWall?: true;
   /** Types it should share a door with (or only corridors and junctions between). */
   next?: readonly RoomTypeId[];
+  /** Makes `next` a rule, not a wish: one of the types next to it (`any`) or every one (`all`, a servery between kitchen and dining room). */
+  nextRule?: 'any' | 'all';
+  /** Only the smallest room of its floor (a bathroom). */
+  smallest?: true;
   /** Types it should lie within two normal rooms of. */
   near?: readonly RoomTypeId[];
   /** Types it must never stand next to. */
@@ -115,6 +123,8 @@ export interface ClimaxSpec {
   weight: number;
   arena: ArenaSpec;
   onlyOnEntranceFloor?: true;
+  /** Drawn only where the boss room is the largest room of its floor (a ballroom). */
+  onlyInLargest?: true;
 }
 
 export type ClusterId = 'service' | 'private' | 'reception' | 'guard';

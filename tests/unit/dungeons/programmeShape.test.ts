@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
+import { FEATURES } from '../../../src/app/dungeons/themes/features';
 import { ALL_PROP_KINDS, type PropKind } from '../../../src/app/dungeons/props/propKinds';
 import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
 import { MANSION } from '../../../src/app/dungeons/themes/mansion';
@@ -65,6 +66,15 @@ describe.each(PROGRAMMES)('the %s programme', (_, programme, apartPairs) => {
     for (const id of FORMAL) expect(spec(id)?.terrain.hazards ?? [], id).toEqual([]);
   });
 
+  it('gives every hole, hazard and standing water a reason of its type', () => {
+    for (const s of programme.rooms) {
+      const reasons = (s.terrain.features ?? []).map((reason) => FEATURES[reason]);
+      const kinds = new Set(reasons.flatMap((reason) => reason.kinds));
+      for (const kind of [...(s.terrain.hazards ?? []), ...(s.terrain.holes ?? [])]) expect(kinds.has(kind), `${s.id}: ${kind}`).toBe(true);
+      if (s.terrain.water) expect(reasons.some((reason) => reason.water === s.terrain.water), `${s.id}: ${s.terrain.water}`).toBe(true);
+    }
+  });
+
   it('uses only catalogue kinds', () => {
     expect(kindsOf(programme).filter((kind) => !ALL_PROP_KINDS.has(kind))).toEqual([]);
   });
@@ -85,8 +95,9 @@ describe('thrones', () => {
 });
 
 describe('the Haunted Mansion programme', () => {
-  it('refuses every hazard', () => {
-    expect(MANSION.rooms.filter((spec) => spec.terrain.hazards?.length).map((spec) => spec.id)).toEqual([]);
+  it('refuses every hazard but the rotted floor of a ruin', () => {
+    expect(MANSION.rooms.filter((spec) => spec.terrain.hazards?.length).map((spec) => spec.id)).toEqual(['collapsed-room']);
+    expect(MANSION.rooms.find((spec) => spec.id === 'collapsed-room')?.ruinedOnly).toBe(true);
   });
 
   it('offers the ballroom as climax only on the entrance floor', () => {

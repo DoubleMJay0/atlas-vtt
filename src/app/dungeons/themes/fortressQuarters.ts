@@ -62,6 +62,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'beyond',
     outerWall: true,
     next: ['solar', 'chamber'],
+    nextRule: 'any',
     apart: ['kitchen'],
     terrain: {},
     furnish: { defining: { kind: 'latrine', verb: 'wall' }, pieces: [] },
@@ -73,7 +74,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'entrance',
     apart: ['solar'],
-    terrain: { hazards: ['pit'] },
+    terrain: { features: ['oubliette'], hazards: ['pit'] },
     furnish: {
       defining: { kind: 'cell-bars', verb: 'backWall' },
       with: { kind: 'cot', verb: 'withParent', parent: 'cell-bars' },
@@ -90,7 +91,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     shape: 'square',
     degree: 'dead-end',
     floor: 'entrance',
-    terrain: { hazards: ['deep-water'], water: 'pool' },
+    terrain: { features: ['cistern'], hazards: ['deep-water'], water: 'pool' },
     furnish: { defining: { kind: 'well', verb: 'centre' }, pieces: [] },
   },
   {
@@ -129,7 +130,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     shape: 'long',
     depth: 'middle',
     degree: 'through',
-    terrain: { holes: ['gallery'] },
+    terrain: {},
     furnish: {
       defining: { kind: 'portrait', verb: 'wall', count: [2, 6] },
       pieces: [
@@ -144,7 +145,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     count: [0, 64],
     holdsStairs: true,
     mayStandEmpty: true,
-    terrain: { holes: ['gallery'] },
+    terrain: {},
     furnish: {
       pieces: [
         { kind: 'bench', verb: 'wall', chance: 0.3 },
@@ -157,7 +158,7 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
     count: [0, 2],
     size: 'medium',
     ruinedOnly: true,
-    terrain: { hazards: ['chasm'], allows: ['rubble-heap', 'rubble-field', 'broken-floor'] },
+    terrain: { features: ['collapse'], hazards: ['chasm'], allows: ['rubble-heap', 'rubble-field', 'broken-floor'] },
     furnish: { pieces: [] },
   },
 ];
