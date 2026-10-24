@@ -16,7 +16,10 @@ import type { RoomTypeId } from './roomTypes';
 import type { FurnishRecipe, Piece, RoomProgramme, RoomTypeSpec, ThemeDefinition } from './themeTypes';
 
 export const CAVERN_PROGRAMME: RoomProgramme = {
-  entrance: [['cave-mouth', 1]],
+  entrance: [
+    ['cave-mouth', 1],
+    ['guard-post', 1],
+  ],
   pivot: ['grand-cavern'],
   stairs: 'shaft-room',
   climax: CAVERN_CLIMAX,
@@ -68,7 +71,10 @@ export function cavernProgramme(tags: ReadonlySet<DungeonTag>): RoomProgramme {
 export const CAVERN: ThemeDefinition = {
   id: 'cavern',
   built: false,
-  refuses: [{ tag: 'ruined', reason: 'dungeon.theme.refused.notBuilt' }],
+  refuses: [
+    { tag: 'ruined', reason: 'dungeon.theme.refused.notBuilt' },
+    { tag: 'inhabited', reason: 'dungeon.theme.refused.dryUninhabited', with: 'dry' },
+  ],
   programme: CAVERN_PROGRAMME,
   programmeFor: cavernProgramme,
   facts: cavernFacts,

@@ -29,6 +29,7 @@ export const dungeon = {
   'dungeon.theme.refused.noMolten': 'This theme has no lava or acid',
   'dungeon.theme.refused.noFlooding': 'A mansion is never flooded',
   'dungeon.theme.refused.notBuilt': 'Nature builds no ruins',
+  'dungeon.theme.refused.dryUninhabited': 'Nobody lives in a cave without water',
   'dungeon.tags': 'Tags',
   'dungeon.tags.random': 'Random',
   'dungeon.tags.randomHint': 'A new seed with these tags',

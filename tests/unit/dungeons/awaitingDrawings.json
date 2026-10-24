@@ -62,7 +62,11 @@
     "crystals",
     "mushrooms",
     "boulder",
-    "nest"
+    "nest",
+    "bedroll",
+    "campfire",
+    "crude-table",
+    "pen"
   ],
   "terrain": [
     "bone-litter",

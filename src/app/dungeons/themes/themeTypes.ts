@@ -196,8 +196,8 @@ export interface ThemeDefinition {
   id: ThemeId;
   /** Built by hands (a Fortress, a Mansion) rather than by nature. */
   built: boolean;
-  /** Tags the theme cannot take, each with the reason the panel shows. */
-  refuses: readonly { tag: DungeonTag; reason: MessageKey }[];
+  /** Tags the theme cannot take, each with the reason the panel shows; one with `with` only beside that tag. */
+  refuses: readonly { tag: DungeonTag; reason: MessageKey; with?: DungeonTag }[];
   programme: RoomProgramme;
   programmeFor?: (tags: ReadonlySet<DungeonTag>) => RoomProgramme;
   facts?: (input: ThemeFactsInput) => ThemeFacts;

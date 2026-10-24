@@ -145,4 +145,54 @@ export const CAVERN_ROOMS: readonly RoomTypeSpec[] = [
     terrain: { allows: ['platform', 'ledge', 'pool'] },
     furnish: { defining: { kind: 'nest', verb: 'centre' }, pieces: [] },
   },
+  // A lived-in cave's (`inhabited.ts`): its hollows near the mouth and near water.
+  {
+    id: 'guard-post',
+    count: [0, 1],
+    floor: 'entrance',
+    depth: 'front',
+    terrain: {},
+    furnish: { defining: { kind: 'campfire', verb: 'centre' }, pieces: [{ kind: 'boulder', verb: 'rows', count: [2, 3] }] },
+  },
+  {
+    id: 'lived-in-hollow',
+    count: [0, 3],
+    terrain: {},
+    // Sleepers round their fire: the fire first, so every hollow has one.
+    furnish: { defining: { kind: 'campfire', verb: 'centre' }, with: { kind: 'bedroll', verb: 'wall', count: [2, 4] }, pieces: [] },
+  },
+  {
+    id: 'fire-hollow',
+    count: [0, 1],
+    terrain: {},
+    furnish: {
+      defining: { kind: 'campfire', verb: 'centre' },
+      pieces: [
+        { kind: 'crude-table', verb: 'centre', chance: 0.8 },
+        { kind: 'stool', verb: 'withParent', parent: 'crude-table', count: [2, 3] },
+        { kind: 'crate', verb: 'corner', count: [1, 3] },
+      ],
+    },
+  },
+  {
+    id: 'pen',
+    count: [0, 1],
+    terrain: {},
+    furnish: { defining: { kind: 'pen', verb: 'wall', count: [1, 2] }, pieces: [] },
+  },
+  {
+    id: 'store-hollow',
+    count: [0, 1],
+    terrain: {},
+    furnish: { defining: { kind: 'crate', verb: 'corner', count: [2, 4] }, pieces: [{ kind: 'sacks', verb: 'corner', count: [1, 2], chance: 0.6 }] },
+  },
+  {
+    id: 'chief-den',
+    count: [0, 1],
+    climaxOnly: true,
+    depth: 'deepest',
+    degree: 'dead-end',
+    terrain: { allows: ['platform', 'ledge'] },
+    furnish: { pieces: [{ kind: 'campfire', verb: 'centre' }, { kind: 'crate', verb: 'corner', count: [1, 2] }] },
+  },
 ];

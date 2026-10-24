@@ -39,7 +39,7 @@ interface FloorParts {
 }
 
 /** The share of a cave's water level the floor nearest the surface keeps; the deepest keeps it whole. */
-const CAVE_UPPER_WATER = 0.4;
+const CAVE_UPPER_WATER = 0.3;
 
 /**
  * Where a cave's water lies: standing in its basins (and behind the dam of a lake at its end),

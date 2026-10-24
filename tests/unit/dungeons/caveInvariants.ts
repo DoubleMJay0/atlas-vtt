@@ -5,7 +5,7 @@ import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { shapeDistance } from '../../../src/app/dungeons/render/geometry';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { caveFloorCells, columnProblems, faultStretch, guardProblems, laneNarrowsProblems, maskProblems, narrowsProblems } from './caveChecks';
-import { breakdownProblems, geologyProblems, waterProblems, waterShare, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
+import { breakdownProblems, geologyProblems, livedInProblems, waterProblems, waterShare, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
 import { mirrorProblems, physicsProblems, shapeProblems } from './themeTerrainInvariants';
 import { cavernProgramme } from '../../../src/app/dungeons/themes/cavern';
 import { readTags } from '../../../src/app/dungeons/tags';
@@ -30,6 +30,7 @@ const TAG_SETS: readonly string[][] = [
   ['cramped', 'compact', 'dry'],
   ['string', 'no-secrets'],
   ['acid', 'overgrown'],
+  ['inhabited', 'wet'],
 ];
 
 export interface CaveRun {
@@ -120,6 +121,11 @@ export function describeCaveInvariants(floors: number): void {
 
     it('rule 8: lay roosts by the mouth, fungus groves by water or a roost, the den deep', () => {
       expect(failures((run) => lifeProblems(run.model))).toEqual([]);
+    });
+
+    it('rule 8: guard a lived-in cave at its mouth, keep its hollows near the mouth and water, a fire by every sleeping hollow, its chief deepest; no story objects', () => {
+      expect(failures((run) => livedInProblems(run.model))).toEqual([]);
+      expect(runs.filter((run) => run.tags.includes('inhabited')).some((run) => run.model.floors[0]!.rooms.some((r) => r.type === 'guard-post'))).toBe(true);
     });
 
     it('make a room a hazard room or a furnished room, never both, nature\'s formations aside, and hold one liquid at most in a room', () => {

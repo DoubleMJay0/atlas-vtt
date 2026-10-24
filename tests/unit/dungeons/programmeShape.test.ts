@@ -12,6 +12,9 @@ const FORMAL = ['throne-room', 'chapel', 'solar', 'chamber', 'library', 'kitchen
 /** Hazard types whose furniture stands only where the hazard was not placed. */
 const FURNISHED_WITHOUT_HAZARD = ['cistern', 'gaol'];
 
+/** Climax types of which the facts allow one at most: their weights stand in for each other. */
+const EITHER: Readonly<Record<string, readonly string[]>> = { cavern: ['den', 'chief-den'] };
+
 const PROGRAMMES: [string, RoomProgramme, readonly (readonly [string, string])[]][] = [
   ['fortress', FORTRESS, [['kitchen', 'chapel'], ['kitchen', 'solar'], ['gaol', 'solar'], ['garderobe', 'kitchen']]],
   ['mansion', MANSION, [['kitchen', 'drawing-room'], ['kitchen', 'master-bedroom']]],
@@ -28,7 +31,7 @@ function kindsOf(programme: RoomProgramme): PropKind[] {
   return [...programme.rooms.flatMap((spec) => piecesOf(spec).flatMap((p) => [p.kind, ...(p.parent ? [p.parent] : [])])), ...seats];
 }
 
-describe.each(PROGRAMMES)('the %s programme', (_, programme, apartPairs) => {
+describe.each(PROGRAMMES)('the %s programme', (name, programme, apartPairs) => {
   const ids = new Set(programme.rooms.map((spec) => spec.id));
   const spec = (id: string): RoomTypeSpec | undefined => programme.rooms.find((s) => s.id === id);
 
@@ -57,7 +60,11 @@ describe.each(PROGRAMMES)('the %s programme', (_, programme, apartPairs) => {
 
   it('weighs its climax', () => {
     for (const c of programme.climax) expect(c.weight, c.type).toBeGreaterThan(0);
-    expect(Math.abs(programme.climax.reduce((sum, c) => sum + c.weight, 0) - 1)).toBeLessThan(1e-9);
+    const either = EITHER[name] ?? [];
+    const alike = programme.climax.filter((c) => either.includes(c.type));
+    for (const c of alike) expect(c.weight, c.type).toBe(alike[0]!.weight);
+    const sum = programme.climax.filter((c) => !either.includes(c.type)).reduce((s, c) => s + c.weight, 0) + (alike[0]?.weight ?? 0);
+    expect(Math.abs(sum - 1)).toBeLessThan(1e-9);
   });
 
   it('keeps hazards and furniture apart', () => {

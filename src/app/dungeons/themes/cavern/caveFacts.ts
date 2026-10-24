@@ -7,6 +7,7 @@
 import { floorRect, intersection, roomArea } from '../../geometry';
 import { caveSites, type CaveSites } from '../../layout/cavern/caveSites';
 import { caveVariant } from '../../layout/cavern/caveParams';
+import { hollowSite, isInhabited } from './inhabited';
 import { nearFault } from '../../layout/cavern/faults';
 import type { CaveVariant, DungeonFloor } from '../../model';
 import { neighbours } from '../../roomGraph';
@@ -26,7 +27,7 @@ export interface CaveFacts {
 
 export function caveFacts(input: ThemeFactsInput, sites: readonly CaveSites[]): CaveFacts {
   const faults = [...new Set(input.floors.flatMap((floor) => floor.cave?.faults.map((f) => f.angle) ?? []))];
-  return { sites: [...sites], variant: caveVariant(input.tags), inhabited: false, tags: input.tags, floors: input.floors, faults };
+  return { sites: [...sites], variant: caveVariant(input.tags), inhabited: isInhabited(input.tags, sites), tags: input.tags, floors: input.floors, faults };
 }
 
 /** A lava flow or an acid spring needs this much floor: room beside the way through for it and a bank to stand on. */
@@ -78,10 +79,20 @@ function allowsType(facts: CaveFacts, type: RoomTypeId, ref: RoomRef): boolean {
   if (!site || !floor || !room) return true;
   const cave = floor.cave;
   const basin = cave?.basins.includes(ref.room) ?? false;
+  // A lived-in cave ends where its chief sleeps.
+  if (room.boss && facts.inhabited && type !== 'chief-den') return false;
   switch (type) {
     case 'cave-mouth':
     case 'den':
       return !facts.inhabited;
+    case 'guard-post':
+    case 'chief-den':
+      return facts.inhabited;
+    case 'lived-in-hollow':
+    case 'fire-hollow':
+    case 'pen':
+    case 'store-hollow':
+      return facts.inhabited && hollowSite(site, ref.room);
     case 'flowstone-gallery':
       return nearFault(roomAxis(room), facts.faults, Math.PI / 6);
     case 'lake-cavern':

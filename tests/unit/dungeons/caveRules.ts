@@ -214,3 +214,28 @@ export function waterShare(floor: DungeonFloor): number {
   const wet = floor.waterCells.length + floor.terrain.filter((p) => p.traits.hazard === 'deep-water').reduce((s, p) => s + p.cells.length, 0);
   return wet / Math.max(1, cells);
 }
+
+const HOLLOWS = new Set(['lived-in-hollow', 'fire-hollow', 'pen', 'store-hollow']);
+const STORY_OBJECTS = new Set(['chest', 'lever', 'key', 'corpse']);
+
+/** Rule 8 of a lived-in cave: a guard post at its mouth, its chief's den at the end, hollows near the mouth and near water, a fire by every sleeping hollow; no story objects in any cave. */
+export function livedInProblems(model: DungeonModel): string[] {
+  const sites = caveSites(model.floors);
+  const all = model.floors.flatMap((f) => f.rooms);
+  const out: string[] = model.floors.flatMap((floor) => floor.props.filter((p) => STORY_OBJECTS.has(p.kind)).map((p) => `a ${p.kind} in a cave`));
+  const guarded = all.some((r) => r.type === 'guard-post');
+  if (all.some((r) => r.type === 'cave-mouth') && (guarded || all.some((r) => r.type === 'chief-den' || HOLLOWS.has(r.type ?? '')))) out.push('a wild cave mouth in a lived-in cave');
+  const boss = model.floors.at(-1)!.rooms.find((r) => r.boss);
+  if (guarded && boss?.type && boss.type !== 'chief-den') out.push(`a lived-in cave ending in a ${boss.type}`);
+  model.floors.forEach((floor, f) => {
+    const site = sites[f]!;
+    const near = neighbours(floor.rooms.length, floor.doors);
+    for (const room of floor.rooms) {
+      if (!HOLLOWS.has(room.type ?? '')) continue;
+      if ((site.hopsFromMouth[room.id] ?? Infinity) > 2 || !site.nearWater(room.id, 1)) out.push(`floor ${f}: a ${room.type} far from the mouth or from water`);
+      const fireIn = (id: number): boolean => floor.props.some((p) => p.room === id && p.kind === 'campfire');
+      if (room.type === 'lived-in-hollow' && !fireIn(room.id) && !(near[room.id] ?? []).some(fireIn)) out.push(`floor ${f}: a sleeping hollow without a fire near it`);
+    }
+  });
+  return out;
+}

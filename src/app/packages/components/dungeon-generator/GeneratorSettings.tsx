@@ -3,7 +3,7 @@ import type { CollectionMetadata } from '../../../services/AssetService';
 import { CollectionSelect } from '../asset-manager/token-creator/CollectionSelect';
 import { refusedTags } from '../../../dungeons/themes/themes';
 import { THEME_IDS, type ThemeChoice, type ThemeId } from '../../../dungeons/themes/themeTypes';
-import type { DungeonTag } from '../../../dungeons/tags';
+import { type DungeonTag, readTags } from '../../../dungeons/tags';
 import { type MessageKey, t } from '../../../i18n';
 import { DungeonIdentity } from './DungeonIdentity';
 import { SelectRow, SettingsSection, SwitchRow } from './fields';
@@ -33,9 +33,9 @@ function themeOptions(picked: ThemeId | undefined): { value: ThemeChoice; label:
 }
 
 /** The tags the chosen theme refuses, with the reasons as shown; none for Any, which only picks among themes that take them. */
-function refusedOf(choice: ThemeChoice): ReadonlyMap<DungeonTag, string> {
+function refusedOf(choice: ThemeChoice, tags: readonly DungeonTag[]): ReadonlyMap<DungeonTag, string> {
   if (choice === 'any') return new Map();
-  return new Map([...refusedTags(choice)].map(([tag, reason]) => [tag, t(reason)]));
+  return new Map([...refusedTags(choice, tags)].map(([tag, reason]) => [tag, t(reason)]));
 }
 
 /**
@@ -90,7 +90,7 @@ export function GeneratorSettings({ state, layer, collection, thumbnails }: Gene
         />
       </div>
       <SettingsSection title={t('dungeon.tags')}>
-        <TagChips picked={request.tags} refused={refusedOf(theme)} onToggle={state.toggleTag} onRandom={state.random} />
+        <TagChips picked={request.tags} refused={refusedOf(theme, readTags(request.tags))} onToggle={state.toggleTag} onRandom={state.random} />
       </SettingsSection>
       <SettingsSection title={t('dungeon.style')}>
         <StyleSettings state={state} renderer={thumbnails} />
