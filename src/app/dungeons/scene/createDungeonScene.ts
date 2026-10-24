@@ -69,7 +69,7 @@ const floorName = (floor: number): string => t('dungeonScene.floor', { letter: f
  * building's entry floor first and its top floor last; each a floor high, the entry floor from 0
  * up (`levelElevation`), each on its floor's map. "Floor A" is the entry floor either way.
  */
-function floorLevels(levelIds: readonly string[], backgrounds: readonly string[], stack: FloorStack): SceneLevel[] {
+export function floorLevels(levelIds: readonly string[], backgrounds: readonly string[], stack: FloorStack): SceneLevel[] {
   return bottomUp(stack).map((floor): SceneLevel => ({
     id: levelIds[floor]!,
     name: floorName(floor),

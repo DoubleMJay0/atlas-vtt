@@ -6,6 +6,13 @@ import type { SceneLevel } from '../../../../src/app/types/sceneLevelTypes';
 import type { WallSegment } from '../../../../src/app/types/wallTypes';
 import { describe, expect, it } from 'vitest';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
+import { stackOf } from '../../../../src/app/dungeons/floors/floorStack';
+import { generateDungeon } from '../../../../src/app/dungeons/generate';
+import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
+import { floorLevels } from '../../../../src/app/dungeons/scene/createDungeonScene';
+import { dungeonScene } from '../../../../src/app/dungeons/scene/toScene';
+import { DEFAULT_VIEW } from '../../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../../src/app/dungeons/styleCatalog';
 import { sceneState, sequenced, shareHarness, token, tokenLists, type Sent, type ShareHarness } from './shareHarness.ts';
 
 const ANA = 'a'.repeat(20);
@@ -55,6 +62,29 @@ const sceneIdOf = (body: GmMessage): string | undefined => ('scene' in body && t
 /** The ids players know tokens by, the same on every floor. */
 const aliasesOf = (table: ShareHarness): Map<string, string> => (table.share as unknown as { tokens: { aliases: Map<string, string> } }).tokens.aliases;
 const names = (sent: readonly Sent[]): string[] => (tokenLists(sent).at(-1)?.tokens ?? []).map((entry) => entry.name ?? '?').sort();
+
+describe('players climbing a generated Fortress', () => {
+  it('tells players climbing a Fortress the floor above', async () => {
+    const model = generateDungeon({ seed: 7, theme: 'fortress', tags: ['small'], floors: 3 });
+    const layout = mapLayout(model, 100, DEFAULT_VIEW);
+    const parts = dungeonScene(model, dungeonStyle('parchment'), DEFAULT_VIEW, { originCell: layout.originCell, pxPerCell: 100 }, { width: layout.widthPx, height: layout.heightPx }, { unitType: 'feet', ruleDistance: 5 })!;
+    const ids = parts.levelIds!;
+    const paths = ids.map((_, floor) => `maps/floor-${floor}.webp`);
+    const levels = floorLevels(ids, paths, stackOf(model));
+    const images = new Map(paths.map((path, floor) => [path, new Uint8Array(64).map((_, index) => (index * (floor + 3)) % 256)]));
+    const state = sceneState({ levels, viewedLevel: ids[0], background: paths[0] });
+    const tokens = { ana: token('ana', { x: 100, y: 100, level: ids[1] }), ben: token('ben', { x: 100, y: 100, level: ids[2] }) };
+    const climbing = { ...state, objects: { ...state.objects, tokens } };
+    const table = shareHarness(climbing, images, seats());
+    table.presented = ids[0]!;
+    table.share.start();
+    await table.set(climbing);
+    await table.advance(1000);
+    expect(sceneOf(toPlayer(table.sent, ANA))?.floor).toMatchObject({ level: 1, name: 'Floor B' });
+    expect(sceneOf(toPlayer(table.sent, BEN))?.floor).toMatchObject({ level: 2, name: 'Floor C' });
+    expect(sceneOf(toPlayer(table.sent, CARA))?.floor).toMatchObject({ level: 0, name: 'Floor A' });
+  });
+});
 
 describe('players on different floors of one scene', () => {
   it('sends each player the floor their token stands on, with its map and name, and players without a token the presented floor', async () => {

@@ -4,6 +4,16 @@ import { moveWallsOf, type MoveWalls } from '../../../../src/app/online/movement
 import { describe, expect, it } from 'vitest';
 import { runUntracked } from '../../../../src/app/stores/history';
 import type { LevelLink, SceneLevel } from '../../../../src/app/types/sceneLevelTypes';
+import { stackOf } from '../../../../src/app/dungeons/floors/floorStack';
+import { approachCells, spotRect } from '../../../../src/app/dungeons/floors/stairSpots';
+import { generateDungeon } from '../../../../src/app/dungeons/generate';
+import { cellsOf } from '../../../../src/app/dungeons/geometry';
+import type { CellPoint, DungeonStair } from '../../../../src/app/dungeons/model';
+import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
+import { floorLevels } from '../../../../src/app/dungeons/scene/createDungeonScene';
+import { dungeonScene } from '../../../../src/app/dungeons/scene/toScene';
+import { DEFAULT_VIEW } from '../../../../src/app/dungeons/style';
+import { dungeonStyle } from '../../../../src/app/dungeons/styleCatalog';
 import { ALIAS, ANA, SCENE, STORE_FACTORY, table as realTable, type StoreFactory, type Table } from './realStore.ts';
 
 const { createViewAtlasStore } = (await import(/* @vite-ignore */ STORE_FACTORY)) as { createViewAtlasStore: StoreFactory };
@@ -39,6 +49,51 @@ const ogre = (t: Table): { x: number; y: number; level?: string | undefined } =>
   return { x, y, level };
 };
 const refused = (t: Table): number => t.sent.filter(({ body }) => body.t === 'move-refused').length;
+
+/** A table on a generated three-floor Fortress: its levels and stairs as the scene writer makes them, the ogre on Floor A. */
+function fortress(): { t: Table; stair: DungeonStair; at: (c: CellPoint) => { x: number; y: number }; levels: SceneLevel[] } {
+  const model = generateDungeon({ seed: 7, theme: 'fortress', tags: ['small'], floors: 3 });
+  const layout = mapLayout(model, 100, DEFAULT_VIEW);
+  const placement = { originCell: layout.originCell, pxPerCell: 100 };
+  const parts = dungeonScene(model, dungeonStyle('parchment'), DEFAULT_VIEW, placement, { width: layout.widthPx, height: layout.heightPx }, { unitType: 'feet', ruleDistance: 5 })!;
+  const levels = floorLevels(parts.levelIds!, parts.levelIds!.map(() => ''), stackOf(model)).map((level) => ({ ...level, background: null }));
+  const stair = model.floors[0]!.stairs[0]!;
+  const t = realTable(createViewAtlasStore, () => null);
+  runUntracked(t.store, () => t.store.setState((draft) => {
+    (draft as unknown as { levels: SceneLevel[] }).levels = levels;
+    draft.objects.levelLinks = parts.scene.levelLinks;
+    Object.assign(draft.objects.tokens.ogre!, { level: levels[0]!.id });
+  }));
+  const at = (c: CellPoint): { x: number; y: number } => ({ x: (c.x + 0.5 - placement.originCell.x) * 100, y: (c.y + 0.5 - placement.originCell.y) * 100 });
+  return { t, stair, at, levels };
+}
+
+describe('a player\'s token on the stairs of a generated Fortress', () => {
+  it("lets a player walk up a Fortress's stairs only from the entrance floor's foot", () => {
+    const { t, stair, at, levels } = fortress();
+    const [ground, upstairs] = [levels[0]!.id, levels[1]!.id];
+    // The row it is entered from on the entrance floor lies past the low end, the way the treads descend.
+    const start = approachCells(stair, 'lower')[0]!;
+    const up = { x: -stair.down.x, y: -stair.down.y };
+    const rows = stair.down.x !== 0 ? stair.w : stair.h;
+    const place = (c: CellPoint): void => runUntracked(t.store, () => t.store.setState((draft) => { Object.assign(draft.objects.tokens.ogre!, { ...at(c), level: ground }); }));
+    place(start);
+    for (let row = 1; row <= rows; row++) {
+      const c = { x: start.x + up.x * row, y: start.y + up.y * row };
+      t.moves.receive(ANA, move(at(c).x, at(c).y));
+      expect(ogre(t), `row ${row}`).toEqual({ ...at(c), level: row === rows ? upstairs : ground });
+    }
+    expect(refused(t)).toBe(0);
+    // Across a side, on the entrance floor, it stops before the stairs.
+    const across = { x: up.y, y: up.x };
+    const first = { x: start.x + up.x, y: start.y + up.y };
+    const besideFirst = [1, -1].map((k) => ({ x: first.x + across.x * k, y: first.y + across.y * k })).find((c) => !cellsOf(spotRect(stair)).some((s) => s.x === c.x && s.y === c.y))!;
+    place(besideFirst);
+    t.moves.receive(ANA, move(at(first).x, at(first).y));
+    expect(ogre(t)).not.toMatchObject(at(first));
+    expect(refused(t)).toBe(1);
+  });
+});
 
 describe('a player\'s token on walked stairs', () => {
   it('steps on at the foot, climbs, and changes level in the last row, one undo step a move', () => {
