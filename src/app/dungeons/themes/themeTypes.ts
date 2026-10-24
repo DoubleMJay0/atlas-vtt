@@ -214,6 +214,8 @@ export interface ThemeDefinition {
    * ruined. A Haunted Mansion is a house, which statues in every room made a museum of.
    */
   architectureOnly?: true;
+  /** The theme lays out its own floors: a Haunted Mansion is planned as a house (`layout/house/`), its walls on cell edges. */
+  layout?: 'house';
   /** The least depth of the room the dungeon is entered by, walls included, where it is a normal room: a Fortress's gate passage holds a row of murder holes. */
   entranceDepth?: number;
   /** Tags the theme cannot take, each with the reason the panel shows; one with `with` only beside that tag. */

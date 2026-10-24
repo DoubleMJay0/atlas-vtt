@@ -5,7 +5,7 @@
  * props, water, rubble, cracks) live in that continuous space, so a cell's centre is (x + .5, y + .5).
  */
 
-import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from './model';
+import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStack, DungeonStair } from './model';
 
 /** An inclusive rectangle of cells. */
 export interface CellRect {
@@ -143,6 +143,14 @@ export function doorMiddle(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide' | 
     x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length + door.dir.x * shift,
     y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length + door.dir.y * shift,
   };
+}
+
+/** The cells of a house (`DungeonFloor.walls === 'edges'`): every room's floor and every chimney stack, by key. */
+export function houseCells(floor: { rooms: readonly Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>[]; stacks?: readonly DungeonStack[] | undefined }): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const room of floor.rooms) for (const c of floorCellsOf(room)) keys.add(cellKey(c.x, c.y));
+  for (const s of floor.stacks ?? []) for (let x = s.x; x < s.x + s.w; x++) for (let y = s.y; y < s.y + s.h; y++) keys.add(cellKey(x, y));
+  return keys;
 }
 
 /** A room's floor in cells: its cave cells where it has them, else its rectangle. */

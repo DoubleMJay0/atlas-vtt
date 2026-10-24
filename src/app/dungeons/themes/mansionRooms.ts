@@ -5,6 +5,7 @@
  * `mansionQuarters.ts`. No room takes a hazard.
  */
 
+import { MANSION_HOUSE_ROOMS } from './mansionHouse';
 import { MANSION_QUARTERS } from './mansionQuarters';
 import type { RoomTypeSpec } from './themeTypes';
 
@@ -17,7 +18,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'hub',
     floor: 'entrance',
     terrain: { features: ['stair-well'], columns: true },
-    furnish: { pieces: [] },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.5 }] },
   },
   {
     id: 'drawing-room',
@@ -107,7 +108,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     size: 'medium',
     depth: 'middle',
     terrain: {},
-    furnish: { pieces: [] },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.8 }] },
   },
   {
     id: 'ballroom',
@@ -134,4 +135,5 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     furnish: { pieces: [{ kind: 'fountain', verb: 'centre', chance: 0.5 }] },
   },
   ...MANSION_QUARTERS,
+  ...MANSION_HOUSE_ROOMS,
 ];

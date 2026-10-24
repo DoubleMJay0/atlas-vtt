@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { paletteOf, parseHex } from '../../src/app/dungeons/render/palette';
-import { OUTER_WALL, doorwayShape, houseCells, windowSpan } from '../../src/app/dungeons/render/houseShapes';
+import { houseCells } from '../../src/app/dungeons/geometry';
+import { OUTER_WALL, doorwayShape, windowSpan } from '../../src/app/dungeons/render/houseShapes';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { dungeonWalls } from '../../src/app/dungeons/scene/toWalls';
 import { DEFAULT_VIEW } from '../../src/app/dungeons/style';

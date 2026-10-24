@@ -43,6 +43,8 @@ export interface UndergrowthSetting {
   aboveGround: boolean;
   /** The cells under an opening in the floor above, by key: light falls in there. */
   openAbove: ReadonlySet<string>;
+  /** In a house, whether a cell lies outside it (`GrowthFloor.outside`). */
+  outside?: (x: number, y: number) => boolean;
   /** Which kinds may grow in a room (a cave's life keeps to its zones); unset lets every kind grow everywhere. */
   mayGrow?: (room: number, kind: UndergrowthKind) => boolean;
 }
@@ -51,8 +53,8 @@ export interface UndergrowthSetting {
 const LIGHT_REACH = 1;
 
 /** The cells of a built room where plants may root: by an outer wall, under an opening above, by water; by key. */
-function litCells(rc: RoomCells, rooms: readonly DungeonRoom[], space: GrowthSpace, openAbove: ReadonlySet<string>): Set<string> {
-  const sources = new Set([...outerWallCells(rc.room, rooms), ...openAbove]);
+function litCells(rc: RoomCells, rooms: readonly DungeonRoom[], space: GrowthSpace, openAbove: ReadonlySet<string>, outside?: (x: number, y: number) => boolean): Set<string> {
+  const sources = new Set([...outerWallCells(rc.room, rooms, outside), ...openAbove]);
   const nearSource = (c: CellPoint): boolean => {
     for (let dy = -LIGHT_REACH; dy <= LIGHT_REACH; dy++) for (let dx = -LIGHT_REACH; dx <= LIGHT_REACH; dx++) if (sources.has(cellKey(c.x + dx, c.y + dy))) return true;
     return false;
@@ -77,7 +79,7 @@ export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: re
     if (!rc || rc.floorCount < FIGHT_AREA || room.stage !== undefined) continue;
     // A built theme's rooms are kept: only a ruin lets thickets in, and only where light or water comes in.
     if (room.type && built && !ruined) continue;
-    const lit = room.type && built ? litCells(rc, plan.rooms, space, setting.openAbove) : null;
+    const lit = room.type && built ? litCells(rc, plan.rooms, space, setting.openAbove, setting.outside) : null;
     if (lit?.size === 0) continue;
     const rng = floorStream(seed, 'growth', floor.index, `undergrowth:${room.id}`);
     const l = light[room.id] ?? 0;

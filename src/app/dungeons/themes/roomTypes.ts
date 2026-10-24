@@ -71,6 +71,11 @@ export const ROOM_TYPE_IDS = [
   'pen',
   'store-hollow',
   'chief-den',
+  'saloon',
+  'staircase-hall',
+  'dressing-room',
+  'servants-room',
+  'parlour',
 ] as const;
 
 export type RoomTypeId = (typeof ROOM_TYPE_IDS)[number];

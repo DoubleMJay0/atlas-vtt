@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DRAWN_PROP_KINDS, DRAWN_TERRAIN_KINDS } from '../../../src/app/dungeons/drawnKinds';
+import { DRAWN_GROUNDS_KINDS, DRAWN_PROP_KINDS, DRAWN_TERRAIN_KINDS } from '../../../src/app/dungeons/drawnKinds';
+import { GROUNDS_KINDS } from '../../../src/app/dungeons/houseModel';
 import { ALL_PROP_KINDS, type PropKind } from '../../../src/app/dungeons/props/propKinds';
 import { ALL_TERRAIN_KINDS } from '../../../src/app/dungeons/terrain/catalog';
 import { THEMES, programmeOf } from '../../../src/app/dungeons/themes/themes';
@@ -22,6 +23,10 @@ describe('drawings still awaited', () => {
     expect([...awaiting.terrain].sort()).toEqual([...ALL_TERRAIN_KINDS].filter((kind) => !DRAWN_TERRAIN_KINDS.has(kind)).sort());
   });
 
+  it("lists every piece of a house's grounds still without a drawing", () => {
+    expect([...awaiting.grounds].sort()).toEqual(GROUNDS_KINDS.filter((kind) => !DRAWN_GROUNDS_KINDS.has(kind)).sort());
+  });
+
   it('lists every cave drawing still missing', () => {
     expect([...awaiting.cave].sort()).toEqual(CAVE_PARTS.filter((part) => !drawnCaveParts().includes(part)).sort());
   });
@@ -37,7 +42,7 @@ describe('drawings still awaited', () => {
 });
 
 describe('generated dungeons', () => {
-  it('hold no prop or terrain kind without a drawing', () => {
+  it('hold no prop, terrain or grounds kind without a drawing', () => {
     const undrawn = new Set<string>();
     for (let seed = 1; seed <= 300; seed++) {
       for (const theme of ['fortress', 'mansion', 'cavern'] as const) {
@@ -45,6 +50,7 @@ describe('generated dungeons', () => {
         for (const floor of model.floors) {
           for (const prop of floor.props) if (!DRAWN_PROP_KINDS.has(prop.kind)) undrawn.add(prop.kind);
           for (const piece of floor.terrain) if (!DRAWN_TERRAIN_KINDS.has(piece.kind)) undrawn.add(piece.kind);
+          for (const piece of floor.grounds?.pieces ?? []) if (!DRAWN_GROUNDS_KINDS.has(piece.kind)) undrawn.add(piece.kind);
         }
       }
     }

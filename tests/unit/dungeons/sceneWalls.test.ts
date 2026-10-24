@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import { cellsOf, doorCells } from '../../../src/app/dungeons/geometry';
+import { cellsOf, doorCells, doorMiddle } from '../../../src/app/dungeons/geometry';
 import type { DoorKind, DungeonDoor, DungeonModel, DungeonRoom } from '../../../src/app/dungeons/model';
 import { pointSegmentDistance } from '../../../src/app/dungeons/render/geometry';
 import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
@@ -43,7 +43,8 @@ function mouthsClosed(model: DungeonModel, floor: number, placement: DungeonPlac
   const loose = looseEnds(walls);
   return model.floors[floor]!.doors.filter(door => door.from === null).flatMap((door, k): WallSegment[] => {
     const cells = doorCells(door);
-    const mouth = toWorld({ x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length - door.dir.x * 0.5, y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length - door.dir.y * 0.5 }, placement);
+    // A cell door's mouth is its cell's outer edge; a house's door stands on its edge already.
+    const mouth = toWorld(door.edge ? doorMiddle(door) : { x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length - door.dir.x * 0.5, y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length - door.dir.y * 0.5 }, placement);
     const ends = loose.filter(p => Math.hypot(p.x - mouth.x, p.y - mouth.y) <= (cells.length / 2 + 0.5) * placement.pxPerCell);
     return ends.length === 2 ? [{ id: `mouth_${k}`, kind: 'wall', type: 'solid', p1: ends[0]!, p2: ends[1]! }] : [];
   });

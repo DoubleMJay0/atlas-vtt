@@ -7,7 +7,8 @@
 
 import type { DungeonDoor, DungeonRoom, DungeonWindow } from '../model';
 import type { RectShape, Vec } from '../render/geometry';
-import { OUTER_WALL, doorwayShape, houseCells, windowSpan } from '../render/houseShapes';
+import { houseCells } from '../geometry';
+import { OUTER_WALL, doorwayShape, windowSpan } from '../render/houseShapes';
 import type { VisibleFloor } from '../render/visibleDungeon';
 import { STEPS, type DoorLine, type RingHit } from './wallOutline';
 

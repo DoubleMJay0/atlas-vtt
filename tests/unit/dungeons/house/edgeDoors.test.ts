@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { doorCells, doorMiddle, doorSide, doorwayCells } from '../../../../src/app/dungeons/geometry';
 import type { DungeonDoor } from '../../../../src/app/dungeons/model';
-import { doorwayShape, houseCells, houseRoomShape, INNER_WALL, OUTER_WALL } from '../../../../src/app/dungeons/render/houseShapes';
+import { houseCells } from '../../../../src/app/dungeons/geometry';
+import { doorwayShape, houseRoomShape, INNER_WALL, OUTER_WALL } from '../../../../src/app/dungeons/render/houseShapes';
 import { visibleFloor } from '../../../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW } from '../../../../src/app/dungeons/style';
 import { edgeHouse } from './edgeFixtures';

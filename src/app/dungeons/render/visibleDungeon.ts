@@ -3,7 +3,8 @@ import { secretWingOf } from '../secretWings';
 import type { DungeonView } from '../style';
 import { caveFloorShapes } from './cave/visibleCave';
 import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
-import { doorwayShape, houseCells, houseRoomShape } from './houseShapes';
+import { houseCells } from '../geometry';
+import { doorwayShape, houseRoomShape } from './houseShapes';
 
 /**
  * What a view shows of one floor of a dungeon: secret wings leave with their doors when secrets
@@ -65,7 +66,9 @@ function houseFloors(floor: DungeonFloor, shown: ReadonlyMap<number, DungeonRoom
 
 function withBounds(visible: Omit<VisibleFloor, 'bounds'>): VisibleFloor {
   const { floors } = visible;
-  const bounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+  // A house's lot lies on its map once its garden is drawn.
+  const lot = visible.floor.grounds?.pieces.some(piece => piece.kind === 'garden') ? [{ kind: 'rect', ...visible.floor.grounds.lot } as FloorShape] : [];
+  const bounds = floors.length ? unionBounds([...floors, ...lot].map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
   return { ...visible, bounds };
 }
 

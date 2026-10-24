@@ -70,10 +70,12 @@ export function stairApproaches(floor: DungeonFloor, index: number, stack: Floor
   });
 }
 
+/** The cells either side of a doorway: beside a cell door's wall, or the two cells a door on an edge stands between. */
 function doorApproaches(floor: DungeonFloor): CellPoint[] {
+  const back = (d: DungeonFloor['doors'][number]): number => (d.edge ? 0 : 1);
   return floor.doors.flatMap((d) =>
     doorCells(d).flatMap((c) => [
-      ...(d.from !== null ? [{ x: c.x - d.dir.x, y: c.y - d.dir.y }] : []),
+      ...(d.from !== null ? [{ x: c.x - d.dir.x * back(d), y: c.y - d.dir.y * back(d) }] : []),
       ...(d.to !== null ? [{ x: c.x + d.dir.x, y: c.y + d.dir.y }] : []),
     ]),
   );

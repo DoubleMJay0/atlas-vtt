@@ -1,10 +1,18 @@
-/** The floor cells of a room that lie along an outer wall: a side with no other room's walls on it or a cell beyond. */
+/**
+ * The floor cells of a room that lie along an outer wall: a side with no other room's walls on it
+ * or a cell beyond; in a house (`outside` given: its walls on cell edges), every cell with the
+ * outside across one of its edges.
+ */
 
-import { type CellRect, cellKey, rectsTouch, wallRect } from '../geometry';
+import { type CellRect, cellKey, floorCellsOf, rectsTouch, wallRect } from '../geometry';
 import type { DungeonRoom } from '../model';
 
-export function outerWallCells(room: DungeonRoom, rooms: readonly DungeonRoom[]): Set<string> {
+export function outerWallCells(room: DungeonRoom, rooms: readonly DungeonRoom[], outside?: (x: number, y: number) => boolean): Set<string> {
   const out = new Set<string>();
+  if (outside) {
+    for (const c of floorCellsOf(room)) if (outside(c.x + 1, c.y) || outside(c.x - 1, c.y) || outside(c.x, c.y + 1) || outside(c.x, c.y - 1)) out.add(cellKey(c.x, c.y));
+    return out;
+  }
   if (room.rotunda) return out;
   const w = wallRect(room);
   const others = rooms.filter((r) => r.id !== room.id).map(wallRect);

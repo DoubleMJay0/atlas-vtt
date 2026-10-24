@@ -13,7 +13,7 @@ import { coverProblems } from './coverInvariants';
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
  * two of the tag sets below, so each floor count meets every set over two hundred seeds. Runs
- * rotate the theme over Fortress, Haunted Mansion and Cavern.
+ * rotate the theme over Fortress and Cavern; a Haunted Mansion is a house, held by the house rules.
  */
 
 const SEEDS = 1000;
@@ -28,7 +28,8 @@ const TAG_SETS: readonly string[][] = [
   ['no-secrets', 'square', 'flat', 'dry', 'compact'],
   ['cramped', 'crumbling', 'large'],
 ];
-const THEMES: readonly ThemeId[] = ['fortress', 'mansion', 'cavern'];
+// A Haunted Mansion is a house, held by its own rules (`house/houseInvariants.test.ts`).
+const THEMES: readonly ThemeId[] = ['fortress', 'cavern'];
 const RANGES: Record<string, [number, number]> = { small: [3, 6], medium: [6, 12], large: [12, 25], '': [6, 15] };
 
 export interface Run {
@@ -190,7 +191,8 @@ export function describeInvariants(floors: number): void {
       };
       const anyFloor = (model: DungeonModel, check: (floor: DungeonModel['floors'][number]) => boolean): boolean => model.floors.some(check);
       expect(share('secret', (m) => anyFloor(m, (f) => f.doors.some((d) => d.kind === 'secret')))).toBeGreaterThan(0.7);
-      expect(share('round', (m) => anyFloor(m, (f) => f.rooms.some((r) => r.rotunda)))).toBeGreaterThan(0.5);
+      // A cave's chambers are never round: the tag shows in the built theme.
+      expect(shareIn(runs.filter((run) => run.model.theme !== 'cavern'), 'round', (m) => anyFloor(m, (f) => f.rooms.some((r) => r.rotunda)))).toBeGreaterThan(0.5);
       // A built theme's water stands only in the rooms that hold it.
       expect(shareIn(caverns, 'flooded', (m) => anyFloor(m, (f) => f.waterCells.length > 0))).toBeGreaterThan(0.9);
       expect(share('deep', (m) => anyFloor(m, (f) => f.doors.some((d) => d.kind === 'steps')))).toBeGreaterThan(0.5);

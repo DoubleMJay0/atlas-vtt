@@ -6,7 +6,8 @@
  */
 
 import type { PlannedFloor } from '../../floors/planFloors';
-import { type CellRect, holdsStairs, rectsTouch, roomArea, wallRect } from '../../geometry';
+import { type CellRect, cellKey, holdsStairs, houseCells, rectsTouch, roomArea, wallRect } from '../../geometry';
+import { outerWallCells } from '../../growth/outerWalls';
 import type { DungeonRoom, FiveRoomStage } from '../../model';
 import { hops, neighbours } from '../../roomGraph';
 import type { Degree, DepthBand, SizeClass } from '../themeTypes';
@@ -83,6 +84,8 @@ function bandOf(depth: number): DepthBand {
 export function roomTraits(floors: readonly PlannedFloor[]): RoomTraits[] {
   const out: RoomTraits[] = [];
   floors.forEach((floor, index) => {
+    // A house's walls stand on cell edges: its rooms' outer walls face cells outside it.
+    const house = floor.house && houseCells({ rooms: floor.rooms, stacks: floor.house.stacks });
     const normal = floor.rooms.filter((room) => room.kind === 'room');
     const sizes = sizesOf(normal);
     const distance = hops(neighbours(floor.rooms.length, floor.doors), 0);
@@ -108,7 +111,7 @@ export function roomTraits(floors: readonly PlannedFloor[]): RoomTraits[] {
         floorBand: bandOf(floorDepth),
         doors,
         degree: degreeOf(doors),
-        outerWall: onOuterWall(room, floor.rooms),
+        outerWall: house ? outerWallCells(room, floor.rooms, (x, y) => !house.has(cellKey(x, y))).size > 0 : onOuterWall(room, floor.rooms),
         secret: room.wing === 'secret',
         boss: room.boss,
         ...(room.stage && { stage: room.stage }),

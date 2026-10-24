@@ -74,7 +74,7 @@ function uniqueCells(cells: readonly CellPoint[]): CellPoint[] {
 
 function climbersOf(rng: Rng, input: GrowthInput, room: DungeonRoom, space: GrowthSpace, flora: Flora, light: number): DungeonGrowth[] {
   const out: DungeonGrowth[] = [];
-  const outer = flora.ruins ? outerWallCells(room, input.rooms) : new Set<string>();
+  const outer = flora.ruins ? outerWallCells(room, input.rooms, input.outside) : new Set<string>();
   for (const run of wallRuns(room, input.doors, space)) {
     const wet = run.cells.some((c) => space.byWater(c));
     // A ruin's growth climbs its outer walls, where light and rain come in.

@@ -6,9 +6,9 @@
  * floors as it always does, so an inner wall comes out a thin line and an outer wall a full course.
  */
 
-import { cellKey, doorCells, floorCellsOf } from '../geometry';
-import type { CellDir, DungeonDoor, DungeonFloor, DungeonRoom, DungeonWindow } from '../model';
-import type { RectShape, Vec } from './geometry';
+import { cellKey, doorCells } from '../geometry';
+import type { CellDir, DungeonDoor, DungeonRoom, DungeonWindow } from '../model';
+import { cellsShapes, shapeBounds, type PolyShape, type RectShape, type Vec } from './geometry';
 
 /** An inner wall's thickness, in cells: wider than the widest wall ink (0.073), so the wall rings of two rooms never meet. */
 export const INNER_WALL = 0.1;
@@ -18,14 +18,6 @@ export const OUTER_WALL = 0.16;
 const OVERLAP = 0.01;
 /** A window's span along its edge: wall stays at each end, so neighbouring windows never run together. */
 export const WINDOW_INSET = 0.18;
-
-/** The cells of a house: every room's floor and every stack, by key. */
-export function houseCells(floor: Pick<DungeonFloor, 'rooms' | 'stacks'>): ReadonlySet<string> {
-  const keys = new Set<string>();
-  for (const room of floor.rooms) for (const c of floorCellsOf(room)) keys.add(cellKey(c.x, c.y));
-  for (const s of floor.stacks ?? []) for (let x = s.x; x < s.x + s.w; x++) for (let y = s.y; y < s.y + s.h; y++) keys.add(cellKey(x, y));
-  return keys;
-}
 
 const SIDES: readonly CellDir[] = [
   { x: 0, y: -1 },
@@ -49,10 +41,57 @@ export function sideInset(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>, side: 
   return beyond(room, side).every((c) => house.has(cellKey(c.x, c.y))) ? INNER_WALL / 2 : OUTER_WALL / 2;
 }
 
-/** A room's floor in a house: its rectangle drawn back from each side by half the wall that stands there. */
-export function houseRoomShape(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>, house: ReadonlySet<string>): RectShape {
+/**
+ * A room's floor in a house: its rectangle drawn back from each side by half the wall that stands
+ * there; a room a chimney stack was cut from, its outline drawn back edge by edge.
+ */
+export function houseRoomShape(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>, house: ReadonlySet<string>): RectShape | PolyShape {
+  if (room.cells) return { kind: 'poly', rings: cellsShapes(room.cells).slice(0, 1).map((shape) => insetRing(shape.rings[0] ?? [], house)) };
   const [top, right, bottom, left] = SIDES.map((side) => sideInset(room, side, house)) as [number, number, number, number];
   return { kind: 'rect', x: room.x + left, y: room.y + top, w: room.w - left - right, h: room.h - top - bottom };
+}
+
+/**
+ * A clockwise ring of cell corners drawn back into the room, each unit of edge by half the wall
+ * beyond it: perpendicular runs meet at the corner of their lines, runs in line with another inset
+ * step between them.
+ */
+function insetRing(ring: readonly Vec[], house: ReadonlySet<string>): Vec[] {
+  const units: { p: Vec; t: Vec; d: number }[] = [];
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length]!;
+    const len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+    const t = { x: Math.sign(b.x - a.x), y: Math.sign(b.y - a.y) };
+    for (let k = 0; k < len; k++) {
+      const p = { x: a.x + t.x * k, y: a.y + t.y * k };
+      // Inward is to the right of the way round; the cell beyond lies half a cell the other way from the unit's middle.
+      const out = { x: t.y, y: -t.x };
+      const beyond = cellKey(Math.floor(p.x + t.x / 2 + out.x / 2), Math.floor(p.y + t.y / 2 + out.y / 2));
+      units.push({ p, t, d: house.has(beyond) ? INNER_WALL / 2 : OUTER_WALL / 2 });
+    }
+  });
+  const runs: { p: Vec; t: Vec; d: number }[] = [];
+  for (const u of units) {
+    const last = runs[runs.length - 1];
+    if (last && last.t.x === u.t.x && last.t.y === u.t.y && last.d === u.d) continue;
+    runs.push(u);
+  }
+  const first = runs[0];
+  const lastRun = runs[runs.length - 1];
+  if (runs.length > 1 && first && lastRun && first.t.x === lastRun.t.x && first.t.y === lastRun.t.y && first.d === lastRun.d) runs.shift();
+  const offset = (r: { p: Vec; t: Vec; d: number }): number => (r.t.y === 0 ? r.p.y + -r.t.x * -r.d : r.p.x + -r.t.y * r.d);
+  const out: Vec[] = [];
+  runs.forEach((r, i) => {
+    const next = runs[(i + 1) % runs.length]!;
+    if (r.t.x === next.t.x && r.t.y === next.t.y) {
+      const q = next.p;
+      const n = { x: -r.t.y, y: r.t.x };
+      out.push({ x: q.x + n.x * r.d, y: q.y + n.y * r.d }, { x: q.x + n.x * next.d, y: q.y + n.y * next.d });
+      return;
+    }
+    out.push(r.t.y === 0 ? { x: offset(next), y: offset(r) } : { x: offset(r), y: offset(next) });
+  });
+  return out;
 }
 
 /** The line a door on an edge stands on: its two ends, from the first cell's side. */
@@ -81,10 +120,10 @@ export function doorwayShape(door: DungeonDoor, rooms: ReadonlyMap<number, Dunge
   const vertical = door.dir.y !== 0;
   const shapes = [door.from, door.to].flatMap((id) => {
     const room = id === null ? undefined : rooms.get(id);
-    return room ? [houseRoomShape(room, house)] : [];
+    return room ? [shapeBounds(houseRoomShape(room, house))] : [];
   });
-  const lo = Math.max(vertical ? a.x : a.y, ...shapes.map((s) => (vertical ? s.x : s.y)));
-  const hi = Math.min(vertical ? b.x : b.y, ...shapes.map((s) => (vertical ? s.x + s.w : s.y + s.h)));
+  const lo = Math.max(vertical ? a.x : a.y, ...shapes.map((s) => (vertical ? s.minX : s.minY)));
+  const hi = Math.min(vertical ? b.x : b.y, ...shapes.map((s) => (vertical ? s.maxX : s.maxY)));
   const reach = (id: number | null, side: CellDir): number => {
     const room = id === null ? undefined : rooms.get(id);
     return room ? sideInset(room, side, house) + OVERLAP : OUTER_WALL / 2;
