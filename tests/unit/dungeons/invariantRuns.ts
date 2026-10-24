@@ -221,9 +221,10 @@ export function describeInvariants(floors: number): void {
       expect(failures(eachFloor((run, i) => stairClearanceProblems(run.model.floors[i]!, i, stackOf(run.model))))).toEqual([]);
     });
 
+    // Walking every floor of a thousand dungeons takes a while beside the whole suite.
     it('keep a way through every floor that steps into no hazard, cover or hole, and bridge what they lay across a room', () => {
       expect(failures(eachFloor((run, i) => [...routeProblems(run.model.floors[i]!), ...bridgeProblems(run.model.floors[i]!)]))).toEqual([]);
-    });
+    }, 60_000);
 
     it('open holes only over rooms of the floors below, down to rubble or a bottomless void', () => {
       expect(failures((run) => holeProblems(run.model))).toEqual([]);
