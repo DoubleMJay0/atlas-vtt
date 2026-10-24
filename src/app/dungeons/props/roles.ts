@@ -33,7 +33,8 @@ function area(room: DungeonRoom): number {
   return room.w * room.h;
 }
 
-function holdsStairs(room: DungeonRoom, stairs: readonly DungeonStair[]): boolean {
+/** Whether a stairwell lies in the room's floor. */
+export function holdsStairs(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>, stairs: readonly Pick<DungeonStair, 'x' | 'y' | 'w' | 'h'>[]): boolean {
   const f = floorRect(room);
   return stairs.some((s) => s.x >= f.x0 && s.x + s.w - 1 <= f.x1 && s.y >= f.y0 && s.y + s.h - 1 <= f.y1);
 }
