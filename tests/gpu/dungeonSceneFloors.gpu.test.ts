@@ -50,6 +50,19 @@ function inkedBorder(mask: Uint8Array, picture: Picture, polygon: LevelLink['pol
   return samples.filter(Boolean).length / samples.length;
 }
 
+/** The share of a rectangle's inside the picture inks: a cave's way (pitch, aven, scree) is drawn in it, with broken rock sides instead of a box. */
+function inkedInside(mask: Uint8Array, picture: Picture, polygon: LevelLink['polygon']): number {
+  const [x0, x1] = [Math.min(...polygon.map(p => p.x)), Math.max(...polygon.map(p => p.x))];
+  const [y0, y1] = [Math.min(...polygon.map(p => p.y)), Math.max(...polygon.map(p => p.y))];
+  let inked = 0;
+  let all = 0;
+  for (let y = y0 + 2; y <= y1 - 2; y += 2) for (let x = x0 + 2; x <= x1 - 2; x += 2) {
+    all++;
+    if (mask[Math.round(y) * picture.width + Math.round(x)]) inked++;
+  }
+  return all === 0 ? 0 : inked / all;
+}
+
 describe('a generated dungeon of three floors in its scene', () => {
   // A Cavern's floors go down from the entrance floor, a Fortress's up: the scene lists them bottom first either way.
   it.each([
@@ -99,10 +112,13 @@ describe('a generated dungeon of three floors in its scene', () => {
       expect(link.levels).toEqual([byFloor[upper], byFloor[lower]]);
       expect(linkTargets(link, byFloor[index]!, levels)).toEqual([byFloor[stair.to]]);
       expect(linkTargets(link, byFloor[stair.to]!, levels)).toEqual([byFloor[index]]);
-      // Both floors' maps draw the stairwell boxed on exactly the stairs' rectangle
+      // Both floors' maps draw the way on exactly the stairs' rectangle: a built stairwell boxed, a cave's way inside it
       for (const floor of [index, stair.to]) {
         const at = levels.findIndex(level => level.id === byFloor[floor]);
-        expect(inkedBorder(masks[at]!, pictures[at]!, link.polygon), `stairwell ${stair.link} on floor ${floor}`).toBeGreaterThan(0.7);
+        const boxed = inkedBorder(masks[at]!, pictures[at]!, link.polygon);
+        // A cave's way is drawn boxed until its natural drawing lands, then with ink inside and broken sides
+        if (theme === 'cavern') expect(boxed > 0.7 || inkedInside(masks[at]!, pictures[at]!, link.polygon) > 0.005, `cave way ${stair.link} on floor ${floor}`).toBe(true);
+        else expect(boxed, `stairwell ${stair.link} on floor ${floor}`).toBeGreaterThan(0.7);
       }
     }
   });
