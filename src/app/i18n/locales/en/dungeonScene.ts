@@ -3,6 +3,7 @@ import type { Message } from '../../types';
 /** What a generated dungeon's scene names: its floors, and the facts of each room in its note. */
 export const dungeonScene = {
   'dungeonScene.floor': 'Floor {letter}',
+  'dungeonScene.cellar': 'Cellar',
   'dungeonScene.mapName': '{scene}, {floor}',
   'dungeonScene.heading': '{key} · {role}',
   'dungeonScene.bossRoom': 'Boss room',

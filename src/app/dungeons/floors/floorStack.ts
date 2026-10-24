@@ -1,7 +1,8 @@
 /**
  * Which way a dungeon's floors stack. Floors keep their planning order (index 0 is the entrance
  * floor, each next one farther from it); the stack says where each lies: below the last in a
- * Cavern, above it in a Fortress or Haunted Mansion. Every "is this floor below that one" asks here.
+ * Cavern, above it in a Fortress or Haunted Mansion, and a house's cellar (`below`, the last
+ * indices) under its entrance floor. Every "is this floor below that one" asks here.
  */
 
 import type { DungeonModel } from '../model';
@@ -15,36 +16,45 @@ export type FloorRise = 'up' | 'down';
 export interface FloorStack {
   readonly rise: FloorRise;
   readonly count: number;
+  /** In a rising stack, how many of the last floors lie under the entrance floor, each below the one before: a house's cellar. */
+  readonly below: number;
 }
 
-export function floorStack(rise: FloorRise, count: number): FloorStack {
-  return { rise, count };
+export function floorStack(rise: FloorRise, count: number, below = 0): FloorStack {
+  return { rise, count, below: rise === 'up' ? Math.max(0, Math.min(below, count - 1)) : 0 };
 }
 
 /** A model's stack, from its theme; a model without one (an older export) or with one this version does not know goes down. */
-export function stackOf(model: Pick<DungeonModel, 'floors'> & { theme?: ThemeId }): FloorStack {
+export function stackOf(model: Pick<DungeonModel, 'floors'> & { theme?: ThemeId; below?: number }): FloorStack {
   const known = (THEME_IDS as readonly unknown[]).includes(model.theme);
-  return floorStack(known ? THEMES[model.theme as ThemeId].rise : 'down', model.floors.length);
+  return floorStack(known ? THEMES[model.theme as ThemeId].rise : 'down', model.floors.length, model.below ?? 0);
 }
 
-function step(stack: FloorStack, floor: number, toward: 1 | -1): number | null {
-  const next = floor + toward;
-  return next >= 0 && next < stack.count ? next : null;
+/** Where a floor lies, in floors from the entrance floor: up positive, down negative. */
+export function levelOf(stack: FloorStack, floor: number): number {
+  if (stack.rise === 'down') return 0 - floor;
+  const storeys = stack.count - stack.below;
+  return floor < storeys ? floor : storeys - 1 - floor;
+}
+
+function floorAt(stack: FloorStack, level: number): number | null {
+  for (let floor = 0; floor < stack.count; floor++) if (levelOf(stack, floor) === level) return floor;
+  return null;
 }
 
 /** The floor physically under `floor`, or null where none lies there. */
 export function floorBelow(stack: FloorStack, floor: number): number | null {
-  return step(stack, floor, stack.rise === 'down' ? 1 : -1);
+  return floorAt(stack, levelOf(stack, floor) - 1);
 }
 
 /** The floor physically over `floor`, or null where none lies there. */
 export function floorAbove(stack: FloorStack, floor: number): number | null {
-  return step(stack, floor, stack.rise === 'down' ? -1 : 1);
+  return floorAt(stack, levelOf(stack, floor) + 1);
 }
 
 /** Whether floor `a` lies above floor `b`. */
 export function isAbove(stack: FloorStack, a: number, b: number): boolean {
-  return stack.rise === 'down' ? a < b : a > b;
+  return levelOf(stack, a) > levelOf(stack, b);
 }
 
 /** The end of a stairwell on `floor` that leads to `to`: its upper end where `floor` lies above. */
@@ -54,8 +64,7 @@ export function stairEnd(stack: FloorStack, floor: number, to: number): StairEnd
 
 /** The floors from the top of the stack to its bottom. */
 export function topDown(stack: FloorStack): number[] {
-  const order = Array.from({ length: stack.count }, (_, k) => k);
-  return stack.rise === 'down' ? order : order.reverse();
+  return Array.from({ length: stack.count }, (_, k) => k).sort((a, b) => levelOf(stack, b) - levelOf(stack, a));
 }
 
 /** The floors from the bottom of the stack to its top. */
@@ -66,7 +75,7 @@ export function bottomUp(stack: FloorStack): number[] {
 /** A floor's elevation in game units, `height` a floor, the entrance floor from 0 to `height`. */
 export function levelElevation(stack: FloorStack, floor: number, height: number): { bottom: number; top: number } {
   // + 0 writes the entrance floor of a Cavern as 0, not −0.
-  const bottom = (stack.rise === 'down' ? -1 : 1) * floor * height + 0;
+  const bottom = levelOf(stack, floor) * height + 0;
   return { bottom, top: bottom + height };
 }
 

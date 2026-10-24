@@ -21,13 +21,13 @@ export interface ThemedFloors {
   rooms: ReadonlyMap<number, TypedRoom>[];
 }
 
-export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<DungeonTag>, floors: readonly PlannedFloor[]): ThemedFloors {
+export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<DungeonTag>, floors: readonly PlannedFloor[], below = 0): ThemedFloors {
   const definition = themeOf(id);
   const ruined = tags.has('ruined');
   const facts = definition.facts?.({ seed, tags, floors }) ?? NO_FACTS;
   const theme: ThemeContext = { definition, ruined, facts };
   const programme = programmeOf(definition, tags);
-  const stack = floorStack(definition.rise, floors.length);
+  const stack = floorStack(definition.rise, floors.length, below);
   const typed = assignRoomTypes({ seed, programme, floors, ruined, facts, above: (floor) => floorAbove(stack, floor) });
   const traits = roomTraits(floors);
   const traitOf = (floor: number, room: number): (typeof traits)[number] | undefined => traits.find((t) => t.floor === floor && t.room === room);
