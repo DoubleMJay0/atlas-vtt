@@ -7,6 +7,8 @@ import { drawFlight } from '../terrain/raised';
 import type { Hand } from './hand';
 import { polyPath } from './paths';
 import { drawWindows } from './windows';
+import { doorMiddle, houseCells } from '../../geometry';
+import { doorwayShape } from '../houseShapes';
 import { type CaveWayDraw, type CaveWayPart, caveWay } from '../cave/caveArt';
 
 /**
@@ -18,12 +20,22 @@ import { type CaveWayDraw, type CaveWayPart, caveWay } from '../cave/caveArt';
  */
 
 /** Maps a point of a door's own frame (u across the way, v along it, −0.5..0.5) into cells: round its cell's middle, or its edge's. */
-function cellFrame(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'edge'>): (u: number, v: number) => Vec {
+function cellFrame(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'edge' | 'wide'>): (u: number, v: number) => Vec {
   const { dir } = door;
-  const shift = door.edge ? 0.5 : 0;
-  const x = door.x + dir.x * shift;
-  const y = door.y + dir.y * shift;
-  return (u, v) => ({ x: x + 0.5 + -dir.y * u + dir.x * v, y: y + 0.5 + dir.x * u + dir.y * v });
+  const o = door.edge ? doorMiddle(door) : { x: door.x + 0.5, y: door.y + 0.5 };
+  return (u, v) => ({ x: o.x + -dir.y * u + dir.x * v, y: o.y + dir.x * u + dir.y * v });
+}
+
+/**
+ * Where a door's leaf and jambs stand across its way (`u` of its frame): its cell, or a house's
+ * doorway as the floors either side reach it, so jambs never lie over the ink of a wall it meets.
+ */
+function doorSpan(door: DungeonDoor, dungeon: VisibleFloor): [number, number] {
+  if (!door.edge) return [-0.5, 0.5];
+  const shape = doorwayShape(door, new Map(dungeon.rooms.map((r) => [r.id, r])), houseCells(dungeon.floor));
+  const mid = doorMiddle(door);
+  const ends = door.dir.y !== 0 ? [shape.x, shape.x + shape.w].map((x) => (x - mid.x) * -door.dir.y) : [shape.y, shape.y + shape.h].map((y) => (y - mid.y) * door.dir.x);
+  return [Math.min(...ends), Math.max(...ends)];
 }
 
 export function drawPassages(hand: Hand): void {
@@ -60,15 +72,19 @@ function stairPart(stair: Pick<DungeonStair, 'way'>, end: StairEnd): CaveWayPart
 
 /** A door: a leaf of planks bound with iron, hung between two dressed jambs set into the walls. */
 function drawDoor(hand: Hand, door: DungeonDoor): void {
-  const at = cellFrame(door);
+  const [lo, hi] = doorSpan(door, hand.scene.env.dungeon);
+  const centre = (lo + hi) / 2;
+  const frame = cellFrame(door);
+  const at = (u: number, v: number): Vec => frame(centre + u, v);
   const quad = (u0: number, v0: number, u1: number, v1: number): Vec[] => [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
   const jamb = 0.15;
+  const width = (hi - lo) / 2;
   for (const side of [-1, 1]) {
-    const q = side < 0 ? quad(-0.5, -0.15, -0.5 + jamb, 0.15) : quad(0.5 - jamb, -0.15, 0.5, 0.15);
+    const q = side < 0 ? quad(-width, -0.15, -width + jamb, 0.15) : quad(width - jamb, -0.15, width, 0.15);
     hand.surface(polyPath(q), 'dressed');
     hand.edges(q, true);
   }
-  const half = 0.5 - jamb + 0.03;
+  const half = width - jamb + 0.03;
   const leaf = quad(-half, -0.075, half, 0.075);
   hand.surface(polyPath(leaf), 'wood');
   hand.line([-0.18, 0, 0.18].map(u => [at(u, -0.075), at(u, 0.075)]), 'fine');

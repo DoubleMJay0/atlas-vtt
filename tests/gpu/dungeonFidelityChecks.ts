@@ -94,8 +94,10 @@ export function inkEdgesFromWalls(
   const cellOf = (x: number, y: number): Point => ({ x: x / pxPerCell + originCell.x, y: y / pxPerCell + originCell.y });
   const inRect = (c: Point, x: number, y: number, w: number, h: number, grow: number): boolean =>
     c.x >= x - grow && c.x <= x + w + grow && c.y >= y - grow && c.y <= y + h + grow;
+  // A door on an edge stands between its cell and the one across; a window's jambs and pane are ink in its outer wall.
+  const doorways = floor.doors.flatMap(d => doorCells(d).flatMap(cell => (d.edge ? [cell, { x: cell.x + d.dir.x, y: cell.y + d.dir.y }] : [cell])));
   const excluded = (c: Point): boolean =>
-    floor.doors.some(d => doorCells(d).some(cell => inRect(c, cell.x, cell.y, 1, 1, 0.05))) || floor.stairs.some(s => inRect(c, s.x, s.y, s.w, s.h, 0.1));
+    doorways.some(cell => inRect(c, cell.x, cell.y, 1, 1, 0.05)) || (floor.windows ?? []).some(w => inRect(c, w.x, w.y, 1, 1, 0.2)) || floor.stairs.some(s => inRect(c, s.x, s.y, s.w, s.h, 0.1));
   const nearest = wallIndex(walls);
   const out: { distance: number; at: Point }[] = [];
   const { width, height } = picture;
@@ -120,9 +122,9 @@ export function inkEdgesFromWalls(
 export function gridAgreement(floor: DungeonFloor, grid: Pick<GridState, 'size' | 'offsetX' | 'offsetY'>, picture: Picture, placement: DungeonPlacement, colours: { grid: Rgb; floor: Rgb }): { on: number; off: number } {
   const { originCell, pxPerCell } = placement;
   // Terrain covers the grid where it lies, a little beyond its cells (shadows, a bridge's ends), and a
-  // column's hatching lies on the cells round it: both are left out, as they are drawn over the grid.
+  // column's hatching and a piece (a fireplace, a bust) lie on the cells round them: all are left out, as they are drawn over the grid.
   const around = (x: number, y: number): string[] => [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => `${x + dx},${y + dy}`));
-  const terrain = new Set([...floor.terrain.flatMap(piece => piece.cells.flatMap(c => around(c.x, c.y))), ...floor.columns.flatMap(c => around(Math.floor(c.x), Math.floor(c.y)))]);
+  const terrain = new Set([...floor.terrain.flatMap(piece => piece.cells.flatMap(c => around(c.x, c.y))), ...[...floor.columns, ...floor.props].flatMap(c => around(Math.floor(c.x), Math.floor(c.y)))]);
   const gridLike = (x: number, y: number): boolean => {
     if (terrain.has(`${Math.floor(x / pxPerCell + originCell.x)},${Math.floor(y / pxPerCell + originCell.y)}`)) return false;
     const i = (Math.floor(y) * picture.width + Math.floor(x)) * 4;

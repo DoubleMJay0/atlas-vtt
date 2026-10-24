@@ -96,8 +96,8 @@ function enfilade(rooms: readonly TypedRoom[], between: Between): void {
       const b = rooms[j]!;
       if (a.boss || b.boss || a.role !== 'band' && a.role !== 'saloon' || b.role !== 'band' && b.role !== 'saloon' || !joined(a.type, b.type)) continue;
       const run = sharedRun(a, b);
-      // Only across a cross wall, at the end by the outer wall: the run leads away from the corridor.
-      if (!run || run.dir.x * (a.toCorridor?.x ?? 0) + run.dir.y * (a.toCorridor?.y ?? 0) !== 0) continue;
+      // Only across a cross wall, at the end by the outer wall, a cell clear of its corner (a stack may cut the wall short).
+      if (!run || run.cells.length < 3 || run.dir.x * (a.toCorridor?.x ?? 0) + run.dir.y * (a.toCorridor?.y ?? 0) !== 0) continue;
       const corridorFirst = (run.cells[0]!.x - run.cells[run.cells.length - 1]!.x) * (a.toCorridor?.x ?? 0) + (run.cells[0]!.y - run.cells[run.cells.length - 1]!.y) * (a.toCorridor?.y ?? 0) > 0;
       between(a, b, 'door', corridorFirst ? 'far' : 'corner', 1, run);
     }
