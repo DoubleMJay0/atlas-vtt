@@ -3,6 +3,8 @@ import { HOLE_KINDS } from '../../terrain/catalog';
 import type { Hand } from '../art/hand';
 import { UNDERGROWTH } from '../growth/growthForms';
 import { drawBridges } from './bridges';
+import { drawBoneLitter, drawGuano, drawSulphurCrust } from './caveStains';
+import { drawBoulderChoke, drawRimstone } from './caveStones';
 import { drawLowWall, drawRubbleHeap } from './cover';
 import { drawBrokenFloor, drawMosaic, drawScatter } from './ground';
 import { drawChannel, drawDeepWater, drawPit } from './hazards';
@@ -27,6 +29,11 @@ export interface TerrainColours {
 }
 
 const GROUND: Partial<Record<TerrainKind, Draw>> = {
+  guano: drawGuano,
+  'bone-litter': drawBoneLitter,
+  'sulphur-crust': drawSulphurCrust,
+  rimstone: drawRimstone,
+  'boulder-choke': drawBoulderChoke,
   'rubble-field': (hand, piece) => drawScatter(hand, piece, 0.05, 15),
   'chasm-floor': (hand, piece) => drawScatter(hand, piece, 0.075, 9),
   'broken-floor': drawBrokenFloor,

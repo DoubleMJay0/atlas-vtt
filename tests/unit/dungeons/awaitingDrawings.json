@@ -11,12 +11,6 @@
     "boulder",
     "campfire"
   ],
-  "terrain": [
-    "bone-litter",
-    "boulder-choke",
-    "guano",
-    "rimstone",
-    "sulphur-crust"
-  ],
+  "terrain": [],
   "cave": []
 }

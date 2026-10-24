@@ -21,6 +21,11 @@ export const FIRST_PROP_KINDS: readonly PropKind[] = ['dais', 'statue', 'fountai
 export const DRAWN_PROP_KINDS: ReadonlySet<PropKind> = new Set<PropKind>([...FIRST_PROP_KINDS, ...HEARTH, ...DRESSING, ...FORMATIONS, ...LIVED_IN]);
 
 export const DRAWN_TERRAIN_KINDS: ReadonlySet<TerrainKind> = new Set<TerrainKind>([
+  'guano',
+  'bone-litter',
+  'sulphur-crust',
+  'rimstone',
+  'boulder-choke',
   'low-wall',
   'rubble-heap',
   'pillar',
