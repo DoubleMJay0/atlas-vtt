@@ -33,8 +33,12 @@ export interface PropGlyph {
   silhouette?: (path: CanvasPath, fit: GlyphFit) => void;
   stone: GlyphDraw;
   engraved: GlyphDraw;
-  /** The outline lighting takes as a wall (total cover only), lying on the drawing, in its own cells at scale 1. */
-  tall?: { halfW: number; halfH: number; round: boolean };
+  /**
+   * The outline lighting takes as a wall (total cover only), lying on the drawing, in its own cells
+   * at scale 1: half its width and depth, and its centre where that is not the piece's (a case at
+   * the back of its cell).
+   */
+  tall?: { halfW: number; halfH: number; round: boolean; x?: number; y?: number };
 }
 
 /** A family's drawings by kind. */

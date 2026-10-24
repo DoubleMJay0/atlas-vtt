@@ -1,5 +1,6 @@
 import type { WallSegment } from '../../types/wallTypes';
 import type { DungeonProp, DungeonTerrain, TerrainKind } from '../model';
+import { rotate } from '../render/geometry';
 import { propTall } from '../render/propShapes';
 import { cellBox } from '../render/terrain/cellRings';
 import { FRAGMENT, INSET as DRAWN_INSET } from '../render/terrain/footprints';
@@ -45,11 +46,15 @@ const SHRINK_STEPS = 12;
 /** Pixels an outline keeps beyond the seal tolerance. */
 const MARGIN = 1;
 
-/** A tall prop's outline, by the size of what the map draws of it (`tall` on its drawing: a statue's plinth, a well's ring), so it always lies on its drawn object. */
-function propFootprint(prop: DungeonProp): Footprint | null {
-  const tall = propTall(prop.kind);
+/**
+ * A tall prop's outline, by the size and place of what the map draws of it (`tall` on its drawing:
+ * a statue's plinth, a well's ring, a wardrobe's case at the back of its cell), so it always lies
+ * on its drawn object.
+ */
+export function propFootprint(prop: DungeonProp, tall = propTall(prop.kind)): Footprint | null {
   if (!tall) return null;
-  return { x: prop.x, y: prop.y, halfW: tall.halfW * prop.scale, halfH: tall.halfH * prop.scale, round: tall.round, rotation: prop.rotation };
+  const off = rotate({ x: (tall.x ?? 0) * prop.scale, y: (tall.y ?? 0) * prop.scale }, prop.rotation);
+  return { x: prop.x + off.x, y: prop.y + off.y, halfW: tall.halfW * prop.scale, halfH: tall.halfH * prop.scale, round: tall.round, rotation: prop.rotation };
 }
 
 function terrainFootprint(piece: DungeonTerrain): Footprint | null {

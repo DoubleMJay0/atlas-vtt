@@ -1,11 +1,12 @@
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { PROP_SPECS } from '../../src/app/dungeons/props/catalogue';
 import { rotate } from '../../src/app/dungeons/render/geometry';
-import { luminance, parseHex, paletteOf } from '../../src/app/dungeons/render/palette';
+import { luminance } from '../../src/app/dungeons/render/palette';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import type { DungeonStyle, DungeonView } from '../../src/app/dungeons/style';
 import { withoutText } from './dungeonRenderHarness';
 import type { PlacedPiece } from './glyphSheetModel';
+import { mixDistance, monochromeCorners } from './monochromeMix';
 
 /** What the glyph sheets measure: a room drawn alone, a piece's ink against its footprint and floor, monochrome's two colours. */
 
@@ -125,62 +126,17 @@ export function outlineContrast(drawn: Drawn, ink: { mask: Uint8Array; a: Uint8C
   return apart[Math.floor(apart.length * 0.75)]!;
 }
 
-type Vec3 = [number, number, number];
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-
-function segmentDistance(p: Vec3, a: Vec3, b: Vec3): number {
-  const ab = sub(b, a);
-  const t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / (dot(ab, ab) || 1)));
-  const d = sub(p, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t]);
-  return Math.sqrt(dot(d, d));
-}
-
-/** How far a colour lies from every mix of three colours (the triangle they span). */
-function triangleDistance(p: Vec3, a: Vec3, b: Vec3, c: Vec3): number {
-  const ab = sub(b, a);
-  const ac = sub(c, a);
-  const ap = sub(p, a);
-  const d00 = dot(ab, ab);
-  const d01 = dot(ab, ac);
-  const d11 = dot(ac, ac);
-  const det = d00 * d11 - d01 * d01;
-  if (det > 1e-6) {
-    const v = (d11 * dot(ap, ab) - d01 * dot(ap, ac)) / det;
-    const w = (d00 * dot(ap, ac) - d01 * dot(ap, ab)) / det;
-    if (v >= 0 && w >= 0 && v + w <= 1) {
-      const q = sub(ap, [ab[0] * v + ac[0] * w, ab[1] * v + ac[1] * w, ab[2] * v + ac[2] * w]);
-      return Math.sqrt(dot(q, q));
-    }
-  }
-  return Math.min(segmentDistance(p, a, b), segmentDistance(p, b, c), segmentDistance(p, a, c));
-}
-
-/** How far a colour lies from every mix of four colours (the tetrahedron they span). */
-function tetrahedronDistance(p: Vec3, corners: readonly [Vec3, Vec3, Vec3, Vec3]): number {
-  const [a, b, c, d] = corners;
-  const faces: [Vec3, Vec3, Vec3, Vec3][] = [[a, b, c, d], [a, b, d, c], [a, c, d, b], [b, c, d, a]];
-  // Inside when p lies on the far corner's side of every face.
-  const inside = faces.every(([f0, f1, f2, far]) => {
-    const n = cross(sub(f1, f0), sub(f2, f0));
-    return dot(n, sub(p, f0)) * dot(n, sub(far, f0)) >= 0;
-  });
-  return inside ? 0 : Math.min(...faces.map(([f0, f1, f2]) => triangleDistance(p, f0, f1, f2)));
-}
-
 /**
  * The share of a monochrome picture's pixels that are no mix of its colours: the look's ink, its
  * other colour (paper, or floor where the paper is ink), and the white and black Stone & shadow's
  * lit lips, highlights and shade lighten and darken towards, so no part has a hue of its own.
  */
 export function offMonochrome(canvas: OffscreenCanvas, style: DungeonStyle): number {
-  const palette = paletteOf(style, { monochrome: true, shadow: true });
-  const corners: [Vec3, Vec3, Vec3, Vec3] = [parseHex(palette.ink), parseHex(palette.paper === palette.ink ? palette.floor : palette.paper), [255, 255, 255], [0, 0, 0]];
+  const corners = monochromeCorners(style);
   const data = pixels(canvas);
   let off = 0;
   for (let i = 0; i < data.length; i += 4) {
-    if (tetrahedronDistance([data[i]!, data[i + 1]!, data[i + 2]!], corners) > MONO_SLACK) off++;
+    if (mixDistance([data[i]!, data[i + 1]!, data[i + 2]!], corners) > MONO_SLACK) off++;
   }
   return off / (data.length / 4);
 }

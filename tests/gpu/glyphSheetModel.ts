@@ -111,15 +111,28 @@ function rows(pieces: readonly SpecimenPiece[], corner: CellPoint, width: number
   return { placed, w, h: placed.length ? y + rowH : 0 };
 }
 
+/** How deep a crowded piece reaches from the group's corner: what stands on the wall as deep as it stands off it, anything else from its place. */
+function crowdedDepth(piece: SpecimenPiece): number {
+  const y = piece.at?.y ?? 0;
+  if (isDisc(piece)) return (onWall(piece) ? offWall(piece) : y) + propReach(piece.kind);
+  return (onWall(piece) ? 0 : y) + cellsTaken(piece).h;
+}
+
 /** How deep the crowded group reaches from its corner towards the bottom wall. */
 function groupDepth(crowded: readonly SpecimenPiece[]): number {
-  let depth = 0;
-  for (const piece of crowded) {
-    const at = piece.at ?? { x: 0, y: 0 };
-    const extra = isDisc(piece) ? (ON_THE_WALL.has(piece.kind) ? 0 : propReach(piece.kind)) : cellsTaken(piece).h;
-    depth = Math.max(depth, at.y + extra);
-  }
-  return Math.ceil(depth - 1e-9);
+  return Math.ceil(Math.max(0, ...crowded.map(crowdedDepth)) - 1e-9);
+}
+
+/**
+ * A crowded piece at its place in the group: `at` is a disc's centre or a cell piece's corner,
+ * from the group's corner. What hangs on or stands against a wall keeps only its `at.x` and takes
+ * the group's wall, the bottom one, as recipes put a portrait or a chest at a wall.
+ */
+function crowdedPiece(piece: SpecimenPiece, along: number, h: number, depth: number): PlacedPiece {
+  const at = piece.at ?? { x: 0, y: 0 };
+  const x = along + at.x;
+  if (isDisc(piece)) return propCentred(piece, { x, y: onWall(piece) ? h - offWall(piece) : h - depth + at.y });
+  return onWall(piece) ? propAt(piece, { x, y: h - cellsTaken(piece).h }, 'bottom') : propAt(piece, { x, y: h - depth + at.y }, null);
 }
 
 function groupWidth(crowded: readonly SpecimenPiece[]): number {
@@ -151,12 +164,7 @@ export function sheetRoom(pieces: readonly SpecimenPiece[], crowded: readonly Sp
     placed.push(propAt(piece, { x: along, y: h - size.h }, 'bottom'));
     along += size.w + 1;
   }
-  for (const piece of crowded) {
-    const at = piece.at ?? { x: 0, y: 0 };
-    const corner = { x: along + at.x, y: h - bottomDepth + at.y };
-    // A disc's place is its centre, a cell piece's the corner of its cells.
-    placed.push(isDisc(piece) ? propCentred(piece, corner) : propAt(piece, corner, null));
-  }
+  for (const piece of crowded) placed.push(crowdedPiece(piece, along, h, bottomDepth));
   along = 1;
   for (const piece of byWall.get('top')!) {
     const size = cellsTaken(piece);
