@@ -1,6 +1,6 @@
 import { shuffled } from '../rng';
 import type { FloorShape, Vec } from './geometry';
-import { inPocket, narrowPockets } from './pockets';
+import { inPocket, filledPockets } from './pockets';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 import { edgePlaces } from './shapeEdges';
 
@@ -14,7 +14,7 @@ export function drawStonework(env: RenderEnv): void {
   const size = Math.max(style.surround.size, 0.1);
   const depth = style.surround.reach;
   // Rock the rooms close in on is filled whole: no course is laid into it from either side.
-  const pockets = narrowPockets(dungeon, depth);
+  const pockets = filledPockets(dungeon, depth);
   const blocks: Vec[][] = [];
   for (const shape of dungeon.outlines) {
     for (const place of edgePlaces(shape, 0, size * 0.9, rng() * size)) {

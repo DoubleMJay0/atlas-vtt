@@ -1,8 +1,11 @@
 import type { Rng } from '../rng';
 import type { Bounds, Vec } from './geometry';
+import type { VisibleFloor } from './visibleDungeon';
 
 /** Candidates tried around an active sample before it retires (Bridson's k). */
 const ATTEMPTS = 18;
+/** Spacing of the seeds along a cave's outline, in cells. */
+const OUTLINE_SEED_STEP = 2;
 
 /**
  * Poisson-disc samples at least `radius` apart, grown from `seeds` through the region `inside`
@@ -70,8 +73,33 @@ export function poissonDisc(bounds: Bounds, radius: number, inside: (x: number, 
   return samples;
 }
 
+/**
+ * Where a band round the floors starts growing: just outside every floor's box and, on a cave
+ * floor, along its traced outline every `OUTLINE_SEED_STEP` cells, since a box's sides tell
+ * nothing of where a winding outline runs and seeds past the band would grow no band at all.
+ */
+export function bandSeeds(visible: Pick<VisibleFloor, 'floor' | 'floors'>, boxes: readonly Bounds[], outward: number): Vec[] {
+  const seeds = edgeSeeds(boxes, outward);
+  if (!visible.floor.cave) return seeds;
+  for (const shape of visible.floors) {
+    if (shape.kind !== 'poly') continue;
+    for (const ring of shape.rings) {
+      let since = OUTLINE_SEED_STEP;
+      ring.forEach((p, i) => {
+        const next = ring[(i + 1) % ring.length]!;
+        if (since >= OUTLINE_SEED_STEP) {
+          seeds.push(p);
+          since = 0;
+        }
+        since += Math.hypot(next.x - p.x, next.y - p.y);
+      });
+    }
+  }
+  return seeds;
+}
+
 /** Points just outside every floor shape's edge, so growth reaches each part of a band. */
-export function edgeSeeds(boxes: readonly Bounds[], outward: number): Vec[] {
+function edgeSeeds(boxes: readonly Bounds[], outward: number): Vec[] {
   const seeds: Vec[] = [];
   for (const b of boxes) {
     const cx = (b.minX + b.maxX) / 2;

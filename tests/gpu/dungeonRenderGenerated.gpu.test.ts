@@ -4,7 +4,7 @@ import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { parseHex } from '../../src/app/dungeons/render/palette';
-import { narrowPockets, inPocket } from '../../src/app/dungeons/render/pockets';
+import { filledPockets, inPocket } from '../../src/app/dungeons/render/pockets';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { fittedPxPerCell, renderMap } from '../../src/app/dungeons/render/renderMap';
 import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
@@ -94,7 +94,7 @@ function map(model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number, vi
 function paperInPockets(canvas: OffscreenCanvas, model: DungeonModel, styleId: DungeonStyleId, pxPerCell: number): string[] {
   const style = dungeonStyle(styleId);
   const dungeon = visibleDungeon(model, DEFAULT_VIEW);
-  const pockets = narrowPockets(dungeon, style.surround.reach);
+  const pockets = filledPockets(dungeon, style.surround.reach);
   const { originCell } = mapLayout(model, pxPerCell, DEFAULT_VIEW);
   const ctx = canvas.getContext('2d')!;
   const [pr, pg, pb] = parseHex(style.colors.paper);
@@ -138,7 +138,7 @@ describe('generated dungeons', () => {
       it(`draws the ${name} map in ${styleId}`, async () => {
         const { canvas } = map(modelOf(name), styleId, 100);
         expectSane(canvas, styleId);
-        if (name === 'default') expect(narrowPockets(visibleDungeon(modelOf(name), DEFAULT_VIEW), 0.5).length).toBeGreaterThan(0);
+        if (name === 'default') expect(filledPockets(visibleDungeon(modelOf(name), DEFAULT_VIEW), 0.5).length).toBeGreaterThan(0);
         // Stippling thins out on its own and fills no rock whole.
         if (dungeonStyle(styleId).surround.mode !== 'dots') expect(paperInPockets(canvas, modelOf(name), styleId, 100)).toEqual([]);
         await savePng(canvas, `gen-map-${name}-${styleId}`);

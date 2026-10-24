@@ -7,7 +7,7 @@ import { polyPath, runsPath } from '../../art/paths';
 import type { Pens } from '../../engraved/pens';
 import type { Vec } from '../../geometry';
 import { mixColours, withAlpha } from '../../palette';
-import { narrowPockets } from '../../pockets';
+import { filledPockets } from '../../pockets';
 import { strokeWidth } from '../../renderEnv';
 import { stoneOutline } from '../../terrain/stones';
 import type { StoneColours } from '../../stone/colours';
@@ -54,7 +54,7 @@ function slabs(scene: ArtScene): Vec[][] {
 function fillPockets(scene: ArtScene, colour: string): void {
   const { ctx, dungeon, style } = scene.env;
   ctx.beginPath();
-  traceRings(ctx, narrowPockets(dungeon, style.surround.reach).map(pocket => pocket.ring));
+  traceRings(ctx, filledPockets(dungeon, style.surround.reach).map(pocket => pocket.ring));
   ctx.fillStyle = colour;
   ctx.fill();
 }

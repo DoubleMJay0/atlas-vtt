@@ -1,5 +1,5 @@
 import { shapeBounds, unionBounds } from './geometry';
-import { edgeSeeds, poissonDisc } from './poisson';
+import { bandSeeds, poissonDisc } from './poisson';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 
 /**
@@ -21,7 +21,7 @@ export function drawDots(env: RenderEnv): void {
       const d = field.distance(x, y);
       return d > -spacing && d < distance;
     },
-    edgeSeeds(boxes, distance / 3),
+    bandSeeds(dungeon, boxes, distance / 3),
     env.rng('dots'),
   );
   ctx.save();

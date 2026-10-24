@@ -5,7 +5,7 @@ import { cellsOf, floorCellsOf, floorRect } from '../geometry';
 import { OUTER_WALL, windowClearing } from './houseShapes';
 import { shownWindows } from './art/windows';
 import { drawHatching } from './hatching';
-import { narrowPockets } from './pockets';
+import { filledPockets } from './pockets';
 import { withAlpha } from './palette';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 import { drawStonework } from './stonework';
@@ -65,7 +65,7 @@ function drawRockBand(env: RenderEnv): void {
 
 /** Fills the narrow pockets of rock between rooms with the rock colour. */
 function fillPockets(env: RenderEnv): void {
-  const pockets = narrowPockets(env.dungeon, env.style.surround.reach);
+  const pockets = filledPockets(env.dungeon, env.style.surround.reach);
   if (pockets.length === 0) return;
   const { ctx, palette } = env;
   ctx.save();
