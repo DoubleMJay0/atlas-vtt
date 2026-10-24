@@ -28,5 +28,5 @@ ${FADE_GLSL}
 void main() {
   float seen = 1.0;
   if (uFade.z > 0.0) seen = fadeOf((uFade.z - distance(vWorld, uFade.xy)) / (uFade.z * ${SENSE_FADE.toFixed(4)}));
-  finalColor = uChannel * wedgeShare(vWorld, uFade.xy, seen);
+  finalColor = uChannel * wedgeShare(vWorld, uFade.xy, seen, 0.0);
 }`;

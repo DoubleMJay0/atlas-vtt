@@ -4,6 +4,9 @@ import { LIGHT_FALLOFF_GLSL } from './lightMapShader';
 import { WEDGE_GLSL } from './wedges';
 import { BAND_GLSL } from './wallBandShader';
 
+/** Texels over which a light rises from nothing on a shadow's edge to the lit half of its penumbra: fewer show the texel grid's steps. */
+const SHADOW_EDGE_TEXELS = 1.5;
+
 /** A polygon in world pixels (`aPosition`), drawn into a target that covers `uTargetRect` of the world. */
 export const polygonVertex = `${GLSL_VERSION}
 in vec2 aPosition;
@@ -27,8 +30,10 @@ vec2 texelCentre() {
  * A light as the polygon picture draws it into the light map (`PolygonLightMap`): its reach, the
  * polygon the rule counts (a fan from the light, cut by the walls and the beam), lit with the
  * traced picture's falloff (`LIGHT_FALLOFF_GLSL`) in the light's colour, alpha its luminance at the
- * bright level, added to the lights before it. Its shadows' edges fade inside it as a flame's
- * penumbra does (`WEDGE_GLSL`), so they are soft and never lie past the rule's edge. The reach ends on the walls' centre lines, so the
+ * bright level, added to the lights before it. Its shadows' edges fade inside it as the lit half
+ * of a flame's penumbra does, half the light on the shadow's edge, rising from nothing there over
+ * a texel and a half so no edge shows the texel grid's steps (`WEDGE_GLSL`): soft, never past the
+ * rule's edge, and dark only along it. The reach ends on the walls' centre lines, so the
  * texels of the walls' band (`BAND_GLSL`) are left out, and those beside it take only their share
  * (`wallShade`): no bilinear read carries the light across, and it ends along a wall smoothly.
  */
@@ -44,7 +49,7 @@ void main() {
   if (shade <= 0.0) discard;
   float d = distance(vWorld, uLight);
   vec2 light = lightAt(d);
-  float direct = wedgeShare(vWorld, uLight, light.x * shade);
+  float direct = wedgeShare(vWorld, uLight, light.x * shade, ${SHADOW_EDGE_TEXELS.toFixed(2)} * uTexel);
   if (uCone.z < 3.14159) direct *= inCone(vWorld - uLight, d);
   finalColor = vec4(uLightColor * direct, dot(uLightColor, LUMA) * direct * light.y);
 }`;

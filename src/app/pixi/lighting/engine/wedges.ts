@@ -14,8 +14,11 @@ const SECTOR_SLACK = 0.01;
 
 /**
  * A polygon's soft shadow edges (`sightWedges`, `wedgeTexture`): `wedgeShare` multiplies `share`
- * by what each wedge leaves at world point `w`, 0 on the shadow edge rising to 1 at its inner side,
- * following a round source's footprint. Only ever lowers, and only inside the polygon. A wedge
+ * by what each wedge leaves at world point `w`, rising to 1 at its inner side as a round source
+ * comes into view: from 0 on the shadow edge with `edge` 0 (sight fades out there); with `edge`
+ * above 0 (light) the lit half of a flame's penumbra, half the flame in view on the shadow's edge,
+ * which a light map's texels would draw as steps, so it rises from 0 to that half over the first
+ * `edge` world pixels. Only ever lowers, and only inside the polygon. A wedge
  * lies beyond its corner and opens by its angle, so seen from the polygon's `origin` it spans no
  * more than that angle from its corner's bearing: only the wedges listed in the sector of `w`'s
  * bearing are tested, which leaves out none that could lower it.
@@ -23,7 +26,7 @@ const SECTOR_SLACK = 0.01;
 export const WEDGE_GLSL = `
 uniform sampler2D uWedges;
 ${DISC_SHARE_GLSL}
-float wedgeShare(vec2 w, vec2 origin, float share) {
+float wedgeShare(vec2 w, vec2 origin, float share, float edge) {
   vec2 o = w - origin;
   float bearing = atan(o.y, o.x);
   int sector = clamp(int(floor((bearing + 3.14159265) / ${SECTOR.toFixed(8)})), 0, ${SECTORS - 1});
@@ -37,7 +40,14 @@ float wedgeShare(vec2 w, vec2 origin, float share) {
     vec2 sp = texelFetch(uWedges, ivec2(i, 1), 0).xy;
     vec2 v = w - ae.xy;
     float theta = atan(sp.x * (ae.z * v.y - ae.w * v.x), dot(ae.zw, v));
-    if (theta >= 0.0 && theta < sp.y) share *= discShare(2.0 * theta / sp.y - 1.0);
+    if (theta < 0.0 || theta >= sp.y) continue;
+    if (edge <= 0.0) {
+      share *= discShare(2.0 * theta / sp.y - 1.0);
+    } else {
+      // How far from the shadow's edge, across it, and the penumbra's lit half.
+      float across = length(v) * sin(min(theta, 1.5707963));
+      share *= discShare(theta / sp.y) * clamp(across / edge, 0.0, 1.0);
+    }
   }
   return share;
 }`;
