@@ -6,11 +6,13 @@
  * gamma)`) and along the cave's faults; then smoothed, never giving up what it must keep.
  */
 
+import { doorApproaches } from '../../floors/stairSpots';
 import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
 import { arenaSeeds } from '../../terrain/arena';
 import { type CaveGrid, NEAR4, NEAR8, unkey } from './caveGrid';
+import { type ChamberField, chamberField } from './chamberField';
 
 export interface ChamberShape {
   gamma: number;
@@ -21,6 +23,8 @@ export interface ChamberShape {
 
 /** A chamber never fills less than its seeds and this many cells more. */
 const FLOOR_EXTRA = 9;
+/** How strongly growth follows the chamber's field rather than its neighbours. */
+const FOLLOW_FIELD = 6;
 
 const key = (c: CellPoint): string => cellKey(c.x, c.y);
 
@@ -121,18 +125,18 @@ export function chamberSeeds(grid: CaveGrid, room: DungeonRoom, lane: ReadonlySe
   return [...joined].map(unkey).sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
-/** Angle between a direction and the nearer fault, as cos². */
-function alongFault(angle: number, faults: readonly number[]): number {
-  return faults.reduce((best, fault) => Math.max(best, Math.cos(angle - fault) ** 2), 0);
-}
-
-/** Grows the chamber from its seeds to its fill share of the rectangle (never below seeds + 9). */
-export function growChamber(rng: Rng, grid: CaveGrid, room: DungeonRoom, seeds: readonly CellPoint[], shape: ChamberShape): void {
+/**
+ * Grows the chamber from its seeds to its fill share of the rectangle (never below seeds + 9): each
+ * step takes a cell beside it, likelier the more of its neighbours are chamber (`pow(c, gamma)`)
+ * and the higher the chamber's field there (its lobes along the fault, its mouths). The field is
+ * returned, for growing the chamber past its rectangle once the tunnels are carved.
+ */
+export function growChamber(rng: Rng, grid: CaveGrid, room: DungeonRoom, seeds: readonly CellPoint[], shape: ChamberShape): ChamberField {
   for (const c of seeds) grid.claim(c.x, c.y, room.id);
-  const mask = new Set(grid.cellsOf(room.id).filter((c) => inRect(floorRect(room), c.x, c.y)).map(key));
+  const rect = floorRect(room);
+  const field = chamberField(rng, room, shape.faults, shape.stretch, doorApproaches(room, grid.doors).filter((c) => inRect(rect, c.x, c.y)));
+  const mask = new Set(grid.cellsOf(room.id).filter((c) => inRect(rect, c.x, c.y)).map(key));
   const target = Math.min(room.w * room.h, Math.max(Math.round(shape.fill * room.w * room.h), seeds.length + FLOOR_EXTRA));
-  const cx = room.x + room.w / 2;
-  const cy = room.y + room.h / 2;
   while (mask.size < target) {
     const options: [CellPoint, number][] = [];
     const seen = new Set<string>();
@@ -144,8 +148,7 @@ export function growChamber(rng: Rng, grid: CaveGrid, room: DungeonRoom, seeds: 
         if (mask.has(nk) || seen.has(nk) || !mayTake(grid, room, n)) continue;
         seen.add(nk);
         const around = NEAR8.filter(([ax, ay]) => mask.has(cellKey(n.x + ax, n.y + ay))).length;
-        const angle = Math.atan2(n.y + 0.5 - cy, n.x + 0.5 - cx);
-        options.push([n, around ** shape.gamma * shape.stretch ** alongFault(angle, shape.faults)]);
+        options.push([n, around ** shape.gamma * Math.exp(FOLLOW_FIELD * field(n.x, n.y))]);
       }
     }
     if (options.length === 0) break;
@@ -156,6 +159,7 @@ export function growChamber(rng: Rng, grid: CaveGrid, room: DungeonRoom, seeds: 
     grid.claim(chosen.x, chosen.y, room.id);
     mask.add(key(chosen));
   }
+  return field;
 }
 
 /** Whether the mask stays one piece without `without`. */

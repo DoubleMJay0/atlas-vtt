@@ -11,6 +11,8 @@ import type { DungeonParams } from '../../params';
 import { floorStream, stream } from '../../rng';
 import { CaveGrid } from './caveGrid';
 import type { CaveShaping } from './caveParams';
+import { swellChamber, widenTunnel } from './bulges';
+import type { ChamberField } from './chamberField';
 import { chamberSeeds, growChamber, reserveCores, smoothChamber } from './chambers';
 import { faultDirections, faultLines } from './faults';
 import { repairGuards } from './guards';
@@ -30,7 +32,8 @@ const HUB_DOORS = 3;
 
 const lerp = (range: readonly [number, number], t: number): number => range[0] + (range[1] - range[0]) * t;
 
-function shapeChambers(seed: number, index: number, shaping: CaveShaping, faults: readonly number[], floor: PlannedFloor, grid: CaveGrid, lane: ReadonlySet<string>): void {
+function shapeChambers(seed: number, index: number, shaping: CaveShaping, faults: readonly number[], floor: PlannedFloor, grid: CaveGrid, lane: ReadonlySet<string>): Map<DungeonRoom, ChamberField> {
+  const fields = new Map<DungeonRoom, ChamberField>();
   const normal = floor.rooms.filter((room) => room.kind === 'room');
   const largest = normal.reduce<DungeonRoom | undefined>((best, room) => (!best || room.w * room.h > best.w * best.h ? room : best), undefined);
   for (const room of normal) {
@@ -39,8 +42,18 @@ function shapeChambers(seed: number, index: number, shaping: CaveShaping, faults
     const roll = rng();
     const fill = doors >= HUB_DOORS || room === largest ? shaping.fill[1] : lerp(shaping.fill, roll);
     const seeds = chamberSeeds(grid, room, lane);
-    growChamber(rng, grid, room, seeds, { gamma: lerp(shaping.gamma, rng()), stretch: shaping.stretch, fill, faults });
+    fields.set(room, growChamber(rng, grid, room, seeds, { gamma: lerp(shaping.gamma, rng()), stretch: shaping.stretch, fill, faults }));
     smoothChamber(grid, room, new Set(seeds.map((c) => cellKey(c.x, c.y))), rng() < 0.5 ? 1 : 2);
+  }
+  return fields;
+}
+
+/** Chambers swell past their rectangles and tunnels widen here and there, once every room has its cells. */
+function swellRooms(seed: number, index: number, floor: PlannedFloor, grid: CaveGrid, fields: ReadonlyMap<DungeonRoom, ChamberField>): void {
+  for (const room of floor.rooms) {
+    const field = fields.get(room);
+    if (field) swellChamber(grid, floor.doors, room, field);
+    else widenTunnel(floorStream(seed, 'cave', index, `widen:${room.id}`), grid, floor, room);
   }
 }
 
@@ -49,7 +62,7 @@ function shapeTunnels(seed: number, index: number, shaping: CaveShaping, floor: 
     if (room.kind === 'room') continue;
     const rng = floorStream(seed, 'cave', index, `tunnel:${room.id}`);
     const onLane = grid.cellsOf(room.id).some((c) => lane.has(cellKey(c.x, c.y)));
-    carveTunnel(rng, grid, room, tunnelEnds(grid, room, floor.doors), onLane || rng() < shaping.sideWide ? 2 : 1, lane);
+    carveTunnel(rng, grid, room, tunnelEnds(grid, room, floor.doors), onLane || rng() < shaping.sideWide ? 2 : 1, lane, floor.rooms);
   }
 }
 
@@ -87,8 +100,9 @@ function shapeFloor(how: FloorShaping, floors: readonly PlannedFloor[], index: n
   claimLane(grid, floor, route, lane);
   reserveCores(grid, floor.rooms);
   const laneKeys = new Set(lane.map((c) => cellKey(c.x, c.y)));
-  shapeChambers(seed, index, shaping, faults, floor, grid, laneKeys);
+  const fields = shapeChambers(seed, index, shaping, faults, floor, grid, laneKeys);
   shapeTunnels(seed, index, shaping, floor, grid, laneKeys);
+  swellRooms(seed, index, floor, grid, fields);
   const doors = shapeDoors(floor.doors, laneKeys, grid);
   const left = repairGuards(grid, { ...floor, doors }, lane);
   if (left.length > 0) console.debug(`[Atlas] cave floor ${index} of seed ${seed} keeps ${left.length} token-fit problems`, left.map((p) => p.kind));

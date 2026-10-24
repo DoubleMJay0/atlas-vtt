@@ -106,6 +106,8 @@ export function placeWater(seed: number, floor: number, rooms: readonly DungeonR
   if (request.level > 0) noiseFloor(rng, grid, only ? floorCells(rooms.filter((room) => only.has(room.id))) : floors, request.level, wetFloor);
   rooms.filter((room) => request.pools.has(room.id)).forEach((room) => poolIn(room, grid, wetFloor));
   const keepDry = new Uint8Array(grid.w * grid.h);
+  // Rooms that take no water stay dry, also where water closes round them (a cave's chamber swelling round a tunnel).
+  if (only) for (const c of floorCells(rooms.filter((room) => !only.has(room.id)))) keepDry[indexOf(grid, c.x, c.y)] = 1;
   for (const key of request.dry ?? []) {
     const [x, y] = key.split(',').map(Number) as [number, number];
     const i = indexOf(grid, x, y);

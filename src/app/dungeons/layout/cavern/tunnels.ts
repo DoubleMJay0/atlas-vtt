@@ -7,13 +7,18 @@
  */
 
 import { doorApproaches } from '../../floors/stairSpots';
-import { cellKey, cellsOf, dir, floorRect, inRect, wallRect } from '../../geometry';
+import { cellKey, cellsOf, dir, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonDoor, DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
 import { type CaveGrid, NEAR4, ROCK, doorOwner, unkey } from './caveGrid';
+import { inTunnelReach, tunnelReach } from './laneCells';
 
-/** How strongly the cells near the straight way go first, so what is left winds. */
+/** How strongly the cells off the winding way go first, so what is left follows it. */
 const WIGGLE = 1.5;
+/** How far a way swings aside between its ends, in cells, and how long a stretch one bend takes. */
+const MEANDER: readonly [number, number] = [1, 2];
+const BEND_LENGTH = 7;
+
 
 const key = (c: CellPoint): string => cellKey(c.x, c.y);
 
@@ -49,20 +54,29 @@ function witness(alive: ReadonlySet<string>, keep: readonly string[]): Set<strin
   return out;
 }
 
-/** How near the cell lies to the straight ways between the ends: 1 on them, 0 two cells off. */
-function nearness(c: CellPoint, ends: readonly CellPoint[]): number {
-  let best = Infinity;
-  for (let i = 0; i < ends.length; i++) {
-    for (let j = i + 1; j < ends.length; j++) {
-      const a = ends[i]!;
-      const b = ends[j]!;
-      const ex = b.x - a.x;
-      const ey = b.y - a.y;
-      const t = Math.max(0, Math.min(1, ((c.x - a.x) * ex + (c.y - a.y) * ey) / (ex * ex + ey * ey || 1)));
-      best = Math.min(best, Math.hypot(c.x - a.x - ex * t, c.y - a.y - ey * t));
+/** How near the cell lies to a winding way from the first end to each other: 1 on it, 0 two cells off. */
+function meanderNearness(rng: Rng, ends: readonly CellPoint[]): (c: CellPoint) => number {
+  const [first, ...rest] = ends;
+  if (!first || rest.length === 0) return () => 0;
+  const ways = rest.map((end) => {
+    const ex = end.x - first.x;
+    const ey = end.y - first.y;
+    const length = Math.hypot(ex, ey) || 1;
+    return { end, ex, ey, length, swing: (rng() < 0.5 ? -1 : 1) * (MEANDER[0] + rng() * (MEANDER[1] - MEANDER[0])), bends: 1 + Math.floor(length / BEND_LENGTH), phase: rng() * Math.PI };
+  });
+  return (c) => {
+    let best = Infinity;
+    for (const way of ways) {
+      const dx = c.x - first.x;
+      const dy = c.y - first.y;
+      const t = Math.max(0, Math.min(1, (dx * way.ex + dy * way.ey) / (way.length * way.length)));
+      const side = (dx * way.ey - dy * way.ex) / way.length;
+      // The way swings to either side between its ends, and is held to them at both.
+      const offset = way.swing * Math.sin(Math.PI * t) * Math.sin(Math.PI * t * way.bends + way.phase);
+      best = Math.min(best, Math.abs(side - offset));
     }
-  }
-  return Number.isFinite(best) ? Math.max(0, 1 - best / 2) : 0;
+    return Math.max(0, 1 - best / 2);
+  };
 }
 
 /** Grows a one-cell way to two where the cells allow: each cell joins a 2 × 2 block of the way. */
@@ -81,10 +95,11 @@ function widen(alive: Set<string>, may: ReadonlySet<string>): void {
  * Carves the tunnel of `room` (a corridor or junction) between `ends`, within its rectangle and
  * the walls round it, keeping the lane cells it holds and widening to `width`.
  */
-export function carveTunnel(rng: Rng, grid: CaveGrid, room: DungeonRoom, ends: readonly CellPoint[], width: 1 | 2, lane: ReadonlySet<string>): void {
+export function carveTunnel(rng: Rng, grid: CaveGrid, room: DungeonRoom, ends: readonly CellPoint[], width: 1 | 2, lane: ReadonlySet<string>, rooms: readonly DungeonRoom[] = [room]): void {
+  const reach = tunnelReach(room);
   const may = new Set(
-    cellsOf(wallRect(room))
-      .filter((c) => grid.holds(c.x, c.y, room.id) || grid.mayClaim(c.x, c.y, room.id))
+    cellsOf(reach)
+      .filter((c) => grid.holds(c.x, c.y, room.id) || (inTunnelReach(rooms, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && grid.mayClaim(c.x, c.y, room.id)))
       .map(key),
   );
   const keep = [...new Set([...ends.map(key), ...grid.required(room.id), ...lane])].filter((k) => may.has(k));
@@ -92,9 +107,10 @@ export function carveTunnel(rng: Rng, grid: CaveGrid, room: DungeonRoom, ends: r
   const alive = new Set(may);
   let way = witness(alive, keep);
   if (way) {
+    const near = meanderNearness(rng, ends);
     const order = [...may]
       .filter((k) => !kept.has(k))
-      .map((k) => [k, rng() + WIGGLE * nearness(unkey(k), ends)] as const)
+      .map((k) => [k, rng() - WIGGLE * near(unkey(k))] as const)
       .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
     for (const [k] of order) {
       alive.delete(k);
@@ -105,7 +121,7 @@ export function carveTunnel(rng: Rng, grid: CaveGrid, room: DungeonRoom, ends: r
     }
   }
   if (width === 2) widen(alive, may);
-  for (const c of cellsOf(wallRect(room))) {
+  for (const c of cellsOf(reach)) {
     const k = key(c);
     if (alive.has(k)) grid.claim(c.x, c.y, room.id);
     else if (grid.holds(c.x, c.y, room.id)) grid.release(c.x, c.y);

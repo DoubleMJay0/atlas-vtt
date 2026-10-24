@@ -113,24 +113,47 @@ function wholeWithout(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean 
   return seen.size === keys.size;
 }
 
-/** A spur one cell thin: widened where its room may take a cell beside it, else given back to the rock where nothing needs it. */
-function repairThin(grid: CaveGrid, room: DungeonRoom, at: CellPoint): void {
-  if (NEAR4.some(([dx, dy]) => giveBack(grid, room, { x: at.x + dx, y: at.y + dy }))) return;
+/**
+ * A spur one cell thin: widened where its room may take a cell beside it that is not left thin in
+ * turn (else the next round gives it back and the spur is thin again), else given back to the rock
+ * where nothing needs it.
+ */
+function repairThin(grid: CaveGrid, isFloor: (x: number, y: number) => boolean, room: DungeonRoom, at: CellPoint): void {
+  const held = (c: CellPoint): boolean => NEAR4.filter(([dx, dy]) => isFloor(c.x + dx, c.y + dy)).length >= 2;
+  if (NEAR4.some(([dx, dy]) => held({ x: at.x + dx, y: at.y + dy }) && giveBack(grid, room, { x: at.x + dx, y: at.y + dy }))) return;
   if (!grid.required(room.id).has(cellKey(at.x, at.y)) && wholeWithout(grid, room, at)) grid.release(at.x, at.y);
 }
 
 function repairOne(grid: CaveGrid, floor: PlannedFloor, problem: GuardProblem): void {
   const room = problem.room === undefined ? undefined : floor.rooms[problem.room];
   if (problem.kind === 'no-block' && room) completeBlock(grid, room);
-  if (problem.kind === 'thin' && room) repairThin(grid, room, problem.at);
+  if (problem.kind === 'thin' && room) repairThin(grid, floorAt(grid, floor), room, problem.at);
   if (problem.kind === 'corner') {
     const { x, y } = problem.at;
-    const gaps = [{ x: x + 1, y }, { x, y: y + 1 }, { x, y }, { x: x + 1, y: y + 1 }].filter((c) => grid.owner(c.x, c.y) === ROCK);
-    gaps.some((c) => {
-      const owner = floor.rooms[grid.envelope(c.x, c.y)];
-      return owner !== undefined && giveBack(grid, owner, c);
-    });
+    const square = [{ x: x + 1, y }, { x, y: y + 1 }, { x, y }, { x: x + 1, y: y + 1 }];
+    const filled = square
+      .filter((c) => grid.owner(c.x, c.y) === ROCK)
+      .some((c) => {
+        const owner = floor.rooms[grid.envelope(c.x, c.y)];
+        return owner !== undefined && giveBack(grid, owner, c);
+      });
+    if (!filled) square.some((c) => releaseSwung(grid, floor, c));
   }
+}
+
+/**
+ * Gives a cell back to the rock where a room took it past its own rectangle (a chamber's swell, a
+ * tunnel's swing), nothing needs it and nothing is parted: what a pinch leaves when no gap beside
+ * it can be filled.
+ */
+function releaseSwung(grid: CaveGrid, floor: PlannedFloor, c: CellPoint): boolean {
+  const room = floor.rooms[grid.owner(c.x, c.y)];
+  if (!room || grid.envelope(c.x, c.y) === room.id || grid.required(room.id).has(cellKey(c.x, c.y))) return false;
+  // A cell with at most one floor cell beside it parts nothing; a tunnel's own cells meet only through its narrows.
+  const isFloor = floorAt(grid, floor);
+  if (NEAR4.filter(([dx, dy]) => isFloor(c.x + dx, c.y + dy)).length > 1 && !wholeWithout(grid, room, c)) return false;
+  grid.release(c.x, c.y);
+  return true;
 }
 
 /** Repairs what it can, the cells nearest each problem first, and checks again; the problems left. */

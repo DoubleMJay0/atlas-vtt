@@ -5,7 +5,9 @@
  * rooms, and chambers stretched along the cave's faults.
  */
 
-import { cellKey, doorCells, floorRect, inRect, wallRect } from '../../../src/app/dungeons/geometry';
+import { cellKey, doorCells, floorRect, inRect } from '../../../src/app/dungeons/geometry';
+import { CHAMBER_SWELL } from '../../../src/app/dungeons/layout/cavern/bulges';
+import { tunnelReach } from '../../../src/app/dungeons/layout/cavern/laneCells';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonStair } from '../../../src/app/dungeons/model';
 
 const key = (c: CellPoint): string => cellKey(c.x, c.y);
@@ -132,11 +134,12 @@ export function laneNarrowsProblems(floor: DungeonFloor): string[] {
   });
 }
 
-/** Chambers inside their rectangle, tunnels at most one cell past it, nothing on another room's rectangle. */
+/** Chambers at most `CHAMBER_SWELL` cells past their rectangle, tunnels within their reach, nothing on another room's rectangle. */
 export function maskProblems(floor: DungeonFloor): string[] {
   const out: string[] = [];
   for (const room of floor.rooms) {
-    const bounds = room.kind === 'room' ? floorRect(room) : wallRect(room);
+    const r = floorRect(room);
+    const bounds = room.kind === 'room' ? { x0: r.x0 - CHAMBER_SWELL, y0: r.y0 - CHAMBER_SWELL, x1: r.x1 + CHAMBER_SWELL, y1: r.y1 + CHAMBER_SWELL } : tunnelReach(room);
     if (!room.cells?.length) out.push(`room ${room.id} has no cells`);
     for (const c of room.cells ?? []) {
       if (!inRect(bounds, c.x, c.y)) out.push(`room ${room.id}: ${key(c)} past its rectangle`);

@@ -10,10 +10,22 @@ import { type StairSpot, approachCells, spotRect } from '../../floors/stairSpots
 import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import { hops, neighbours, openDoor } from '../../roomGraph';
+import { rngFrom } from '../../rng';
+import { fractalNoise } from '../../water/noise';
 import { CaveGrid, type CaveFloorPlan, NEAR4, NEAR8, unkey } from './caveGrid';
+import { MinHeap } from './minHeap';
 import { type LaneOwner, crossingConflict, entranceDoor, laneConflict, laneOwners } from './laneCells';
 
 export { claimLane } from './laneCells';
+
+/** How much dearer a block may be to walk on than the cheapest, and over how many cells that changes. */
+const WANDER = 2.5;
+const WANDER_PERIOD = 4;
+/** The seed of the lane's cost: fixed, so a layout's fit and its shaping find the same lane. */
+const WANDER_SEED = 0x5ca1ab1e;
+const wanderNoise = fractalNoise(rngFrom(WANDER_SEED), 1, 0.5, WANDER_PERIOD);
+/** The cost of stepping onto the block at (ax, ay): the same on every device and in every check of a layout. */
+const wander = (ax: number, ay: number): number => 1 + WANDER * Math.max(0, wanderNoise(ax + 1, ay + 1) + 0.5);
 
 export type LaneEnd = { kind: 'entrance' } | { kind: 'stair'; spot: StairSpot } | { kind: 'room'; id: number };
 
@@ -84,23 +96,39 @@ function endBlocks(end: { area: Set<string>; touch: Set<string> }, ok: (x: numbe
   return [...out];
 }
 
-/** A walk of 2 × 2 blocks from the start's blocks to the goal's over cells `owners` allow; its cells, or null. */
+/**
+ * A walk of 2 × 2 blocks from the start's blocks to the goal's over cells `owners` allow; its
+ * cells, or null. It goes the cheapest way over a gently varying cost (`wander`), so where a
+ * tunnel leaves it room the lane winds from side to side rather than running straight.
+ */
 function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { area: Set<string>; touch: Set<string> }, owners: LaneOwner): CellPoint[] | null {
   const ok = (x: number, y: number): boolean => owners(x, y) !== null;
   const goals = new Set(endBlocks(goal, ok));
   const fits = (ax: number, ay: number): boolean => blockCells(ax, ay).every((c) => ok(c.x, c.y));
-  const back = new Map<string, string>(endBlocks(start, ok).map((key) => [key, key]));
-  const queue = [...back.keys()];
+  const back = new Map<string, string>();
+  const cost = new Map<string, number>();
+  const open = new MinHeap<string>();
+  for (const key of endBlocks(start, ok)) {
+    back.set(key, key);
+    cost.set(key, 0);
+    open.push(key, 0);
+  }
   let found: string | null = null;
-  for (let head = 0; head < queue.length && found === null; head++) {
-    const at = queue[head]!;
-    if (goals.has(at)) found = at;
+  for (let next = open.pop(); next && found === null; next = open.pop()) {
+    const { item: at, cost: spent } = next;
+    if (spent > cost.get(at)!) continue;
+    if (goals.has(at)) {
+      found = at;
+      break;
+    }
     const { x: ax, y: ay } = unkey(at);
     for (const [dx, dy] of NEAR4) {
       const key = cellKey(ax + dx, ay + dy);
-      if (back.has(key) || !fits(ax + dx, ay + dy)) continue;
+      const step = spent + wander(ax + dx, ay + dy);
+      if (step >= (cost.get(key) ?? Infinity) || !fits(ax + dx, ay + dy)) continue;
       back.set(key, at);
-      queue.push(key);
+      cost.set(key, step);
+      open.push(key, step);
     }
   }
   if (found === null) return null;

@@ -5,9 +5,24 @@
  */
 
 import { type StairSpot, spotRect } from '../../floors/stairSpots';
-import { cellKey, cellsOf, inRect, wallRect } from '../../geometry';
+import { type CellRect, cellKey, cellsOf, inRect, wallRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import { type CaveFloorPlan, type CaveGrid, ROCK, doorOwner } from './caveGrid';
+
+/** The rectangle a tunnel's cells lie in: its walls and, where it winds, the ring of rock round them. */
+export function tunnelReach(room: DungeonRoom): CellRect {
+  const r = wallRect(room);
+  return { x0: r.x0 - TUNNEL_SWING, y0: r.y0 - TUNNEL_SWING, x1: r.x1 + TUNNEL_SWING, y1: r.y1 + TUNNEL_SWING };
+}
+
+/** Whether a tunnel may wind through the cell: one of its walls, or rock past them that no other room's walls hold. */
+export function inTunnelReach(rooms: readonly DungeonRoom[], room: DungeonRoom, x: number, y: number): boolean {
+  if (inRect(wallRect(room), x, y)) return true;
+  return inRect(tunnelReach(room), x, y) && !rooms.some((other) => other.id !== room.id && inRect(wallRect(other), x, y));
+}
+
+/** How far past its walls a tunnel may wind, in cells. */
+const TUNNEL_SWING = 1;
 
 /** The entrance door's index, the first that leads in from outside and is no secret one. */
 export function entranceDoor(floor: Pick<CaveFloorPlan, 'doors'>): number {
@@ -50,7 +65,7 @@ export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly
     if (owner !== ROCK) return laneDoors.some((k) => owner === doorOwner(k)) ? owner : null;
     const beside = besideDoor(floor, laneDoors, x, y, (k) => lane?.has(cellKey(floor.doors[k]!.x, floor.doors[k]!.y)) ?? true);
     if (beside !== undefined) return grid.mayClaim(x, y, doorOwner(beside)) ? doorOwner(beside) : null;
-    return tunnels.find((room) => inRect(wallRect(room), x, y) && grid.mayClaim(x, y, room.id))?.id ?? null;
+    return tunnels.find((room) => inTunnelReach(floor.rooms, room, x, y) && grid.mayClaim(x, y, room.id))?.id ?? null;
   };
   return (x, y) => {
     const key = cellKey(x, y);
