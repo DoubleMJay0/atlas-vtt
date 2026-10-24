@@ -18,10 +18,13 @@ export function drawWalls(scene: ArtScene, pens: Pens): void {
   clipOutsideMouths(scene, width + CUT.gap + CUT.thin);
   ctx.strokeStyle = pens.ink;
   ctx.lineJoin = 'miter';
-  ctx.beginPath();
-  traceRings(ctx, grownRings(scene, width + CUT.gap + CUT.thin / 2));
-  ctx.lineWidth = CUT.thin;
-  ctx.stroke();
+  // A house draws its outer walls' outer face itself (`house/houseWalls.ts`).
+  if (scene.env.dungeon.floor.walls !== 'edges') {
+    ctx.beginPath();
+    traceRings(ctx, grownRings(scene, width + CUT.gap + CUT.thin / 2));
+    ctx.lineWidth = CUT.thin;
+    ctx.stroke();
+  }
   ctx.beginPath();
   traceRings(ctx, grownRings(scene, width + 0.02));
   traceRings(ctx, scene.floorRings);

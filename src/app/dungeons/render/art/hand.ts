@@ -5,8 +5,8 @@ import { grown, type Field, type PathFn } from './paths';
 import { blurField, gridOver, sampleField } from './raster';
 
 /** What a surface is made of; each direction gives it its own colour and texture. */
-/** `raised`: the top of a platform, lighter than the floor it stands on. */
-export type Material = 'stone' | 'dressed' | 'rock' | 'wood' | 'rope' | 'floor' | 'raised' | 'metal' | 'cloth';
+/** `raised`: the top of a platform, lighter than the floor it stands on; `glass`: a window's pane, pale and smooth, without texture. */
+export type Material = 'stone' | 'dressed' | 'rock' | 'wood' | 'rope' | 'floor' | 'raised' | 'metal' | 'cloth' | 'glass';
 export type Weight = 'heavy' | 'outline' | 'fine';
 
 /**

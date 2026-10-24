@@ -2,8 +2,8 @@
  * The floors of a house as drawn (`DungeonFloor.walls === 'edges'`): its walls stand on the edges
  * between cells, so each room's floor is its rectangle drawn back from every edge it shares with
  * the house by half an inner wall and from the house's outside by half an outer wall, and a doorway
- * is a thin floor across its edge that joins the two rooms. The renderer draws walls outside the
- * floors as it always does, so an inner wall comes out a thin line and an outer wall a full course.
+ * is a thin floor across its edge that joins the two rooms. Everything else inside the outer walls'
+ * outer face is masonry (`house/houseWalls.ts`): an inner wall a thin partition, an outer wall solid.
  */
 
 import { cellKey, cellsBox, doorCells, houseCells } from '../geometry';
@@ -12,8 +12,8 @@ import { cellsShapes, shapeBounds, type FloorShape, type PolyShape, type RectSha
 
 /** An inner wall's thickness, in cells: wider than the widest wall ink (0.073), so the wall rings of two rooms never meet. */
 export const INNER_WALL = 0.1;
-/** An outer wall's thickness, in cells. */
-export const OUTER_WALL = 0.16;
+/** An outer wall's thickness, in cells: solid masonry of 1.7 ft, the cell edge its middle line. */
+export const OUTER_WALL = 0.34;
 /** How far a doorway's floor reaches past the floors it joins, so the two become one. */
 const OVERLAP = 0.01;
 /** A window's span along its edge: wall stays at each end, so neighbouring windows never run together. */

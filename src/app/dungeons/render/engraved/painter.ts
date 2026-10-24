@@ -13,6 +13,7 @@ import { drawShade } from './shade';
 import { drawWalls } from './walls';
 import { drawPools } from './water';
 import { engravedGrowth } from './growth';
+import { drawHouseMass } from '../house/houseWalls';
 import { type CaveGroundPainting, type CaveGroundPart, builtSurround, caveGround } from '../cave/caveArt';
 
 /**
@@ -28,8 +29,10 @@ export function paintEngraved(scene: ArtScene): void {
   const growth = engravedGrowth(scene, hand, pens);
   const cave = (part: CaveGroundPart): CaveGroundPainting | undefined => caveGround(part, scene.env);
   const surround = builtSurround(scene.env) ? cave('surround') : undefined;
-  if (surround) surround.engraved(scene, pens);
-  else drawRock(scene.env);
+  if (!drawHouseMass(hand)) {
+    if (surround) surround.engraved(scene, pens);
+    else drawRock(scene.env);
+  }
   (cave('floor')?.engraved ?? drawFloor)(scene, pens);
   drawPools(scene, pens);
   drawTerrainGround(hand, colours);
