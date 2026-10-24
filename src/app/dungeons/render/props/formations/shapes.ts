@@ -3,6 +3,7 @@ import type { Vec } from '../../geometry';
 import type { GlyphFit } from '../../propShapes';
 import { rngFrom } from '../../../rng';
 import { stoneOutline } from '../../terrain/stones';
+import { hash2, valueNoise } from '../../art/noise';
 
 /**
  * What nature built in a cave, seen from straight above, in cells round the piece's centre (the
@@ -94,26 +95,30 @@ export const WALL = 0.1;
 /** How far a wall piece's sheet reaches up to its wall. */
 export const SHEET_TOP = 0.072;
 
-/** Flowstone's lower edge, lobe by lobe: tongues of different length poured from the wall into the room. */
+/**
+ * Flowstone's lower edge: tongues of different breadth and length poured from the wall into the
+ * room, spaced unevenly, run together at their roots, the ends of the sheet tucked back to the wall.
+ */
 export function flowLobes(fit: GlyphFit): { edge: Vec[]; tips: Vec[] } {
   const half = fit.along / 2 - 0.07;
-  const count = Math.max(3, Math.round((half * 2) / 0.21));
-  const edge: Vec[] = [];
-  const tips: Vec[] = [];
-  const steps = count * 6;
-  for (let k = 0; k <= steps; k++) {
-    const t = k / steps;
-    const x = -half + t * half * 2;
-    const lobe = Math.floor(t * count - 1e-9);
-    const within = t * count - lobe;
-    // Each tongue's length from its place along the wall, the ends tucked back to it.
-    const reach = 0.08 + 0.045 * Math.abs(Math.sin(lobe * 2.39 + 0.7));
-    const end = Math.min(1, Math.min(t, 1 - t) * count * 0.9);
-    const y = SHEET_TOP - (0.03 + reach * Math.sin(Math.PI * within) ** 0.6) * end;
-    edge.push({ x, y });
-    if (k % 6 === 3) tips.push({ x, y });
+  const tongues: { x: number; w: number; reach: number }[] = [];
+  for (let x = -half + 0.08, i = 0; x < half - 0.04; i++) {
+    const w = 0.1 + 0.09 * hash2(i, 3, 41);
+    tongues.push({ x, w, reach: 0.05 + 0.075 * hash2(i, 5, 43) });
+    x += w * (1.15 + 0.5 * hash2(i, 7, 47));
   }
-  return { edge, tips };
+  const steps = Math.max(12, Math.round((half * 2) / 0.02));
+  const edge = Array.from({ length: steps + 1 }, (_, k) => {
+    const x = -half + (k / steps) * half * 2;
+    let drop = 0.035;
+    for (const t of tongues) {
+      const u = (x - t.x) / t.w;
+      if (Math.abs(u) < 1) drop = Math.max(drop, 0.035 + t.reach * (1 - u * u) ** 0.55);
+    }
+    const end = Math.min(1, (half - Math.abs(x)) / 0.08);
+    return { x, y: SHEET_TOP - drop * Math.sqrt(Math.max(0, end)) };
+  });
+  return { edge, tips: tongues.map(t => ({ x: t.x, y: SHEET_TOP - 0.035 - t.reach })) };
 }
 
 /** The flowstone sheet as a closed outline: its lobed lower edge and the wall side it pours from. */
@@ -131,8 +136,11 @@ export function curtainLine(fit: GlyphFit): Vec[] {
     const t = k / steps;
     const end = Math.min(1, Math.min(t, 1 - t) * folds);
     // Folds of slightly different depth, as a drapery grows.
-    const deep = 0.03 + 0.005 * Math.sin(Math.floor(t * folds) * 1.7);
-    return { x: -half + t * half * 2, y: -0.018 - Math.sin(t * folds * Math.PI * 2) * deep * (0.4 + 0.6 * end) };
+    // Folds of different depth, as a drapery grows, its line drifting a little off the wall and back.
+    const fold = Math.floor(t * folds * 2);
+    const deep = 0.022 + 0.013 * hash2(fold, 1, 53);
+    const drift = (valueNoise(t * folds * 0.7, 0.5, 59) - 0.5) * 0.02;
+    return { x: -half + t * half * 2, y: -0.018 + drift - Math.sin(t * folds * Math.PI * 2) * deep * (0.4 + 0.6 * end) };
   });
 }
 

@@ -2,7 +2,7 @@ import { glyphEdges, glyphSolid, glyphTone, lightInGlyph } from '../../art/glyph
 import { pathBounds, polyPath, runsPath, type PathFn } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
-import { withAlpha } from '../../palette';
+import { mixColours, withAlpha } from '../../palette';
 import { isDarkColour } from '../../stone/colours';
 
 /**
@@ -26,7 +26,14 @@ export interface Finish {
 /** What a lit wash brightens towards: white, or the light ink of a dark look. */
 function lightOf(pen: GlyphPen): { colour: string; alpha: number } {
   const dark = isDarkColour(pen.palette.floor);
-  return { colour: dark ? pen.palette.ink : '#ffffff', alpha: dark ? 0.28 : 0.5 };
+  // The look's own ink, which is light on a dark floor; the pen's ink is the glyph's deep shade.
+  return { colour: dark ? pen.hand.scene.env.palette.ink : '#ffffff', alpha: dark ? 0.28 : 0.5 };
+}
+
+/** Calcite, paler than the stone round it: what water leaves behind; on a dark floor drawn towards the look's light ink, so it still stands pale. */
+export function calcite(pen: GlyphPen): string {
+  const raised = pen.paint('raised').fill;
+  return pen.hand.scene.env.style.direction === 'stone' && isDarkColour(pen.palette.floor) ? mixColours(raised, pen.hand.scene.env.palette.ink, 0.24) : raised;
 }
 
 function wash(pen: GlyphPen, path: PathFn, colour: string): void {
@@ -45,7 +52,7 @@ export const STONE_FINISH: Finish = {
     const light = lightOf(pen);
     wash(pen, path, withAlpha(light.colour, light.alpha * strength));
   },
-  shaded: (pen, path, strength) => wash(pen, path, withAlpha('#000000', 0.32 * strength)),
+  shaded: (pen, path, strength) => wash(pen, path, withAlpha('#000000', (isDarkColour(pen.palette.floor) ? 0.2 : 0.32) * strength)),
   stain: (pen, path) => wash(pen, path, withAlpha(pen.paint('wood').fill, 0.22)),
   sheen: (pen, runs) => {
     const light = lightOf(pen);

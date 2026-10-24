@@ -3,7 +3,7 @@ import { polyPath } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
 import type { GlyphFit } from '../../propShapes';
-import { calciteGrain, coneShade, facing, modelled, raisedEdges, fillOutline, fineRuns, outlineRuns, splitByLight, type Finish } from './finish';
+import { calcite, calciteGrain, coneShade, facing, modelled, raisedEdges, fillOutline, fineRuns, outlineRuns, splitByLight, type Finish } from './finish';
 import { COLUMN, MOUND_PAD, MOUNDS, SHEET_TOP, curtainFoot, curtainLine, flowLobes, flowSheet, ribbon, type Mound } from './shapes';
 
 /**
@@ -11,11 +11,6 @@ import { COLUMN, MOUND_PAD, MOUNDS, SHEET_TOP, curtainFoot, curtainLine, flowLob
  * climbing to a wet tip), a column's broad fluted foot, flowstone poured down a wall and a
  * curtain folded along it. Each is drawn once here; the painter's finish lights and shades it.
  */
-
-/** Calcite, paler than the stone round it: what water leaves behind. */
-function calcite(pen: GlyphPen): string {
-  return pen.paint('raised').fill;
-}
 
 /** A short arc of `r` round `c`, centred on the light's side: where a wet cone glints. */
 function glint(pen: GlyphPen, c: Vec, r: number, spread: number): Vec[] {
@@ -114,9 +109,10 @@ export function flowstone(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
 /** A curtain: calcite folded to and fro along the wall, every other fold catching the light, over the flowstone at its foot. */
 export function curtain(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
   const foot = curtainFoot(fit);
-  fillOutline(pen, foot, pen.palette.fill, 'none');
+  fillOutline(pen, foot, calcite(pen), 'none');
   calciteGrain(pen, polyPath(foot), finish);
-  pen.hand.line([foot.slice(0, -2)], 'fine');
+  finish.stain(pen, polyPath(foot));
+  outlineRuns(pen, [foot.slice(0, -2)]);
   const line = curtainLine(fit);
   const rib = ribbon(line, 0.072);
   fillOutline(pen, rib, calcite(pen), 'none');
