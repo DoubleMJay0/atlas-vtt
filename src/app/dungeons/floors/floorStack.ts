@@ -6,7 +6,7 @@
 
 import type { DungeonModel } from '../model';
 import { THEMES } from '../themes/themes';
-import type { ThemeId } from '../themes/themeTypes';
+import { THEME_IDS, type ThemeId } from '../themes/themeTypes';
 import type { StairEnd } from './stairSpots';
 
 /** Where each next floor lies: above the entrance floor (`up`) or below it (`down`). */
@@ -21,9 +21,10 @@ export function floorStack(rise: FloorRise, count: number): FloorStack {
   return { rise, count };
 }
 
-/** A model's stack, from its theme; a model without one (an older export) goes down. */
+/** A model's stack, from its theme; a model without one (an older export) or with one this version does not know goes down. */
 export function stackOf(model: Pick<DungeonModel, 'floors'> & { theme?: ThemeId }): FloorStack {
-  return floorStack(model.theme ? THEMES[model.theme].rise : 'down', model.floors.length);
+  const known = (THEME_IDS as readonly unknown[]).includes(model.theme);
+  return floorStack(known ? THEMES[model.theme as ThemeId].rise : 'down', model.floors.length);
 }
 
 function step(stack: FloorStack, floor: number, toward: 1 | -1): number | null {

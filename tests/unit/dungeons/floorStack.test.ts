@@ -54,6 +54,12 @@ describe('the floor stack', () => {
     expect(stackOf({ floors, theme: 'mansion' })).toEqual(up3);
   });
 
+  it('reads a theme this version does not know (a newer export) as going down', () => {
+    const floors = [{}, {}, {}] as never[];
+    expect(stackOf({ floors, theme: 'castle' as never })).toEqual(down3);
+    expect(stackOf({ floors, theme: 'toString' as never })).toEqual(down3);
+  });
+
   it('rises for the Fortress and the Haunted Mansion only', () => {
     expect(THEMES.fortress.rise).toBe('up');
     expect(THEMES.mansion.rise).toBe('up');
