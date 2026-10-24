@@ -21,7 +21,7 @@ import { caveSites } from './caveSites';
 import { type LaneWay, claimLane, laneEnds, mainRoute, wideLane, windingWay } from './mainPath';
 import { stairWays } from './stairWays';
 import { carveTunnel, shapeDoors, tunnelEnds } from './tunnels';
-import { warpCave } from './caveWarp';
+import { fillPockets, warpCave } from './caveWarp';
 
 export interface ShapedCaves {
   floors: PlannedFloor[];
@@ -92,16 +92,22 @@ function basinsPerFloor(floors: readonly PlannedFloor[], level: number, dry: boo
 function laneGrid(seed: number, index: number, floor: PlannedFloor, boss: boolean, count: number): { grid: CaveGrid; lane: CellPoint[] } {
   const [from, to] = laneEnds(index, count, floor, boss);
   const route = mainRoute(floor, from, to);
+  // A lane does not hang on the cores, so the plain one is found once for both tries that take it.
+  const lanes = new Map<LaneWay | undefined, CellPoint[] | null>();
   const laid = (way: LaneWay | undefined, out: boolean): { grid: CaveGrid; lane: CellPoint[] | null; cores: boolean } => {
     const grid = new CaveGrid(floor, index);
-    const lane = wideLane(grid, floor, route, from, to, way);
+    if (!lanes.has(way)) lanes.set(way, wideLane(grid, floor, route, from, to, way));
+    const lane = lanes.get(way)!;
     if (lane) claimLane(grid, floor, route, lane, way?.swell);
     return { grid, lane, cores: lane !== null && reserveCores(grid, floor.rooms, out) };
   };
   // The last try is the layout's own, which it made sure of.
   const tries: readonly [LaneWay | undefined, boolean][] = [[windingWay(floorStream(seed, 'cave', index, 'lane')), true], [undefined, true], [undefined, false]];
   let tried = laid(...tries[0]!);
-  for (let k = 1; !tried.cores && k < tries.length; k++) tried = laid(...tries[k]!);
+  for (const next of tries.slice(1)) {
+    if (tried.cores) break;
+    tried = laid(...next);
+  }
   return { grid: tried.grid, lane: tried.lane ?? [] };
 }
 
@@ -122,6 +128,7 @@ function shapeFloor(how: FloorShaping, floors: readonly PlannedFloor[], index: n
   shapeTunnels(seed, index, shaping, floor, grid, laneKeys);
   swellRooms(seed, index, floor, grid, fields);
   warpCave(floorStream(seed, 'cave', index, 'warp'), grid, floor, faults);
+  fillPockets(grid);
   const doors = shapeDoors(floor.doors, laneKeys, grid);
   const left = repairGuards(grid, { ...floor, doors }, lane);
   if (left.length > 0) console.debug(`[Atlas] cave floor ${index} of seed ${seed} keeps ${left.length} token-fit problems`, left.map((p) => p.kind));

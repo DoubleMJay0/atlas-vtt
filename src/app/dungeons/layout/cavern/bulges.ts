@@ -13,9 +13,7 @@ import type { Rng } from '../../rng';
 import { fractalNoise } from '../../water/noise';
 import { type CaveGrid, NEAR4, ROCK, doorOwner } from './caveGrid';
 import type { ChamberField } from './chamberField';
-import { CHAMBER_SWELL, besideEntrance, inTunnelReach, swellDistance } from './laneCells';
-
-export { CHAMBER_SWELL };
+import { CHAMBER_SWELL, inSwell, inTunnelReach, swellDistance } from './laneCells';
 
 /** The least field a cell past the rectangle needs to be taken. */
 const SWELL_FIELD = -0.1;
@@ -26,7 +24,7 @@ const WIDEN_PERIOD = 2.5;
 type Score = (x: number, y: number) => number;
 
 /** Whether the cell is floor as drawn: owned, and not a crawl. */
-function floorOf(grid: CaveGrid, doors: readonly DungeonDoor[]): (x: number, y: number) => boolean {
+export function floorOf(grid: CaveGrid, doors: readonly DungeonDoor[]): (x: number, y: number) => boolean {
   const crawls = new Set(doors.flatMap((door, k) => (door.kind === 'secret' ? [doorOwner(k)] : [])));
   return (x, y) => {
     const owner = grid.owner(x, y);
@@ -89,20 +87,23 @@ export function releaseSpurs(grid: CaveGrid, owner: number, taken: readonly Cell
   }
 }
 
+/** Whether a tunnel may widen into the cell: where it may wind, on no other room's rectangle, never to three cells both ways. */
+function widenCell(grid: CaveGrid, floor: { rooms: readonly DungeonRoom[]; doors: readonly DungeonDoor[] }, room: DungeonRoom, c: CellPoint): boolean {
+  return inTunnelReach(floor, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && !completesBlock(grid, room.id, c);
+}
 
 /** Whether the room may take the rock cell as a chamber's swell or a tunnel's widening may, besides the grid's own rules. */
 export function mayWiden(grid: CaveGrid, floor: { rooms: readonly DungeonRoom[]; doors: readonly DungeonDoor[] }, room: DungeonRoom, c: CellPoint, isFloor = floorOf(grid, floor.doors)): boolean {
   if (!grid.mayClaim(c.x, c.y, room.id) || pinches(isFloor, c)) return false;
-  if (room.kind !== 'room') return inTunnelReach(floor, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && !completesBlock(grid, room.id, c);
-  const away = swellDistance(room, c.x, c.y);
-  return away === 0 || (away <= CHAMBER_SWELL && grid.envelope(c.x, c.y) === ROCK && !besideEntrance(floor.doors, c.x, c.y));
+  if (room.kind !== 'room') return widenCell(grid, floor, room, c);
+  return swellDistance(room, c.x, c.y) === 0 || inSwell(grid, floor.doors, room, c.x, c.y);
 }
 
 /** Swells a chamber past its rectangle where its field reaches, into rock no room's rectangle holds. */
 export function swellChamber(grid: CaveGrid, doors: readonly DungeonDoor[], room: DungeonRoom, field: ChamberField): void {
   swellInto(grid, doors, {
     owner: room.id,
-    may: (c) => swellDistance(room, c.x, c.y) > 0 && swellDistance(room, c.x, c.y) <= CHAMBER_SWELL && grid.envelope(c.x, c.y) === ROCK && !besideEntrance(doors, c.x, c.y) && field(c.x, c.y) >= SWELL_FIELD,
+    may: (c) => inSwell(grid, doors, room, c.x, c.y) && field(c.x, c.y) >= SWELL_FIELD,
     score: field,
     rounds: CHAMBER_SWELL,
   });
@@ -117,7 +118,7 @@ export function widenNoise(rng: Rng): Score {
 export function widenTunnel(noise: Score, grid: CaveGrid, floor: { rooms: readonly DungeonRoom[]; doors: readonly DungeonDoor[] }, room: DungeonRoom): void {
   swellInto(grid, floor.doors, {
     owner: room.id,
-    may: (c) => inTunnelReach(floor, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && noise(c.x, c.y) > WIDEN_ABOVE && !completesBlock(grid, room.id, c),
+    may: (c) => widenCell(grid, floor, room, c) && noise(c.x, c.y) > WIDEN_ABOVE,
     score: noise,
     rounds: 1,
   });

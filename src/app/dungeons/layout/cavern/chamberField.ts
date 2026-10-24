@@ -33,21 +33,40 @@ const NOISE_PERIOD = 3.5;
 const OUTSIDE_FALL = 0.2;
 
 /** The fault the room runs along best: the one nearest its own long side. */
-export function roomFault(room: DungeonRoom, faults: readonly number[]): number {
+function roomFault(room: DungeonRoom, faults: readonly number[]): number {
   const long = room.w >= room.h ? 0 : Math.PI / 2;
   return faults.reduce((best, f) => (Math.abs(Math.cos(f - long)) > Math.abs(Math.cos(best - long)) ? f : best), faults[0] ?? long);
 }
 
-/** The field of a chamber in `room`, elongated by up to `stretch` along the cave's faults, with mouths at `openings`. */
-export function chamberField(rng: Rng, room: DungeonRoom, faults: readonly number[], stretch: number, openings: readonly CellPoint[]): ChamberField {
+/** The room's fault and its way along it, the room's middle, and how far the room reaches each way from it along the fault and across. */
+export interface FaultFrame {
+  angle: number;
+  ux: number;
+  uy: number;
+  cx: number;
+  cy: number;
+  reachAlong: number;
+  reachAcross: number;
+}
+
+export function faultFrame(room: DungeonRoom, faults: readonly number[]): FaultFrame {
   const angle = roomFault(room, faults);
   const ux = Math.cos(angle);
   const uy = Math.sin(angle);
-  const cx = room.x + room.w / 2;
-  const cy = room.y + room.h / 2;
-  // How far the rectangle reaches along the fault and across it, each way from its middle.
-  const reachAlong = (Math.abs(ux) * room.w + Math.abs(uy) * room.h) / 2;
-  const reachAcross = (Math.abs(uy) * room.w + Math.abs(ux) * room.h) / 2;
+  return {
+    angle,
+    ux,
+    uy,
+    cx: room.x + room.w / 2,
+    cy: room.y + room.h / 2,
+    reachAlong: (Math.abs(ux) * room.w + Math.abs(uy) * room.h) / 2,
+    reachAcross: (Math.abs(uy) * room.w + Math.abs(ux) * room.h) / 2,
+  };
+}
+
+/** The field of a chamber in `room`, elongated by up to `stretch` along the cave's faults, with mouths at `openings`. */
+export function chamberField(rng: Rng, room: DungeonRoom, faults: readonly number[], stretch: number, openings: readonly CellPoint[]): ChamberField {
+  const { ux, uy, cx, cy, reachAlong, reachAcross } = faultFrame(room, faults);
   const area = room.w * room.h;
   const count = Math.min(MOST_LOBES, 1 + Math.floor(area / CELLS_PER_LOBE));
   const base = Math.sqrt(area / Math.PI);

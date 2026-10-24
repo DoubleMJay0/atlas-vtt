@@ -6,7 +6,8 @@
  * unless it needs it or would fall apart; where it says floor, the room takes the rock as a
  * chamber's swell or a tunnel's widening does. So a straight wall becomes a sweeping one, a
  * passage sways and swells, the rock between two rooms thickens and thins, and two walls never
- * run parallel for long; the guards repair whatever that leaves.
+ * run parallel for long; the guards repair whatever that leaves. Small pockets of rock left inside
+ * a room are filled after (`fillPockets`).
  */
 
 import { cellKey } from '../../geometry';
@@ -14,7 +15,7 @@ import type { CellPoint, DungeonDoor, DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
 import { fractalNoise } from '../../water/noise';
 import { type CaveGrid, NEAR4, NEAR8, ROCK, doorOwner } from './caveGrid';
-import { mayWiden, releaseSpurs } from './bulges';
+import { floorOf, mayWiden, releaseSpurs } from './bulges';
 import { type Lobes, chamberLobes } from './chamberLobes';
 import { wholeWithout } from './guards';
 
@@ -150,14 +151,15 @@ function warpRoom(grid: CaveGrid, floor: Floorish, room: DungeonRoom, noise: { p
   // A cell is given up only where no floor beside it is left with fewer than two floor cells beside
   // it, nor, in a chamber, without a 2 × 2 block of floor: a chamber gets no new one-cell neck.
   const floorWithout = (c: CellPoint) => (x: number, y: number): boolean => (x !== c.x || y !== c.y) && isFloor(x, y);
-  const leavesThin = (c: CellPoint): boolean =>
-    NEAR4.some(([dx, dy]) => {
+  const leavesThin = (c: CellPoint): boolean => {
+    const rest = floorWithout(c);
+    return NEAR4.some(([dx, dy]) => {
       const n = { x: c.x + dx, y: c.y + dy };
-      const rest = floorWithout(c);
       if (!isFloor(n.x, n.y)) return false;
       if (NEAR4.filter(([ex, ey]) => rest(n.x + ex, n.y + ey)).length < 2) return true;
       return room.kind === 'room' && grid.holds(n.x, n.y, room.id) && !inBlock(rest, n);
     });
+  };
   for (const c of cells) if (!required.has(cellKey(c.x, c.y)) && gives(c) && !leavesThin(c) && wholeWithout(grid, room, c)) grid.release(c.x, c.y);
   const taken: CellPoint[] = [];
   for (let round = 0; round < ROUNDS; round++) {
@@ -208,20 +210,22 @@ function smallPockets(grid: CaveGrid): CellPoint[][] {
   return out;
 }
 
-/** Gives every small pocket of rock to the room round it, where one room alone surrounds it. */
-function fillPockets(grid: CaveGrid): void {
+/**
+ * Gives every small pocket of rock left inside the floor to the room round it, where one room alone
+ * surrounds it and may take it whole: the outline could draw it only as a square.
+ */
+export function fillPockets(grid: CaveGrid): void {
   for (const pocket of smallPockets(grid)) {
     const owners = new Set(pocket.flatMap((c) => NEAR8.map(([dx, dy]) => grid.owner(c.x + dx, c.y + dy))).filter((o) => o !== ROCK));
     const [owner] = owners;
-    if (owners.size === 1 && owner !== undefined && owner >= 0) for (const c of pocket) grid.claim(c.x, c.y, owner);
+    if (owners.size !== 1 || owner === undefined || owner < 0 || !pocket.every((c) => grid.mayClaim(c.x, c.y, owner))) continue;
+    for (const c of pocket) grid.claim(c.x, c.y, owner);
   }
 }
 
 /** Bends every room of the shaped floor, in turn. */
 export function warpCave(rng: Rng, grid: CaveGrid, floor: Floorish, faults: readonly number[]): void {
-  const crawls = new Set(floor.doors.flatMap((door, k) => (door.kind === 'secret' ? [doorOwner(k)] : [])));
-  const isFloor = (x: number, y: number): boolean => grid.owner(x, y) !== ROCK && !crawls.has(grid.owner(x, y));
+  const isFloor = floorOf(grid, floor.doors);
   const noise = floorNoise(rng);
   for (const room of floor.rooms) warpRoom(grid, floor, room, noise, isFloor, room.kind === 'room' ? chamberLobes(rng, room, faults) : undefined);
-  fillPockets(grid);
 }

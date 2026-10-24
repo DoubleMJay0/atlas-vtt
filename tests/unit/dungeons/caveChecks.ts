@@ -6,7 +6,7 @@
  */
 
 import { cellKey, doorCells, floorRect, inRect } from '../../../src/app/dungeons/geometry';
-import { CHAMBER_SWELL } from '../../../src/app/dungeons/layout/cavern/bulges';
+import { CHAMBER_SWELL } from '../../../src/app/dungeons/layout/cavern/laneCells';
 import { tunnelReach } from '../../../src/app/dungeons/layout/cavern/laneCells';
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonStair } from '../../../src/app/dungeons/model';
 

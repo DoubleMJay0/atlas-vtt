@@ -10,7 +10,7 @@
 
 import { fnv1a32 } from '../../../utils/hashing';
 import { fractalNoise } from '../../water/noise';
-import { rngFrom } from '../../rng';
+import { type Rng, rngFrom } from '../../rng';
 
 /** Where the wall at (x, y), whose rock lies towards (nx, ny), is drawn instead. */
 export type Relief = (x: number, y: number, nx: number, ny: number) => { x: number; y: number };
@@ -80,7 +80,7 @@ function spurs(key: string): Offset {
   };
 }
 
-function rippleOf(rng: ReturnType<typeof rngFrom>): Offset {
+function rippleOf(rng: Rng): Offset {
   const phaseX = fractalNoise(rng, 1, 0.5, RIPPLE.phasePeriod);
   const phaseY = fractalNoise(rng, 1, 0.5, RIPPLE.phasePeriod);
   const k = (2 * Math.PI) / RIPPLE.period;

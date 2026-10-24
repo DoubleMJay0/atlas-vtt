@@ -12,7 +12,7 @@ import type { CellPoint, DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
 import { arenaSeeds } from '../../terrain/arena';
 import { type CaveGrid, NEAR4, NEAR8, ROCK, unkey } from './caveGrid';
-import { besideEntrance, swellDistance } from './laneCells';
+import { inSwell } from './laneCells';
 import { type ChamberField, chamberField } from './chamberField';
 
 export interface ChamberShape {
@@ -38,7 +38,7 @@ function mayTake(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
 /** Whether the room may take the cell for its core out in its swell: one cell past its rectangle, in rock no room's rectangle holds. */
 function mayTakeOut(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
   if (mayTake(grid, room, c)) return true;
-  return swellDistance(room, c.x, c.y) === 1 && grid.envelope(c.x, c.y) === ROCK && !besideEntrance(grid.doors, c.x, c.y) && grid.mayClaim(c.x, c.y, room.id);
+  return inSwell(grid, grid.doors, room, c.x, c.y, 1) && grid.mayClaim(c.x, c.y, room.id);
 }
 
 /** How many of the block's cells lie within two cells of another room's rectangle: with only a wall between. */
@@ -51,7 +51,7 @@ function crowding(grid: CaveGrid, room: DungeonRoom, block: readonly CellPoint[]
  * that size fits. Shaping (`out`), it may also stand a cell out in the room's swell, and keeps
  * off other rooms' rectangles where it can, so the rock between two rooms may thicken.
  */
-export function coreBlock(grid: CaveGrid, room: DungeonRoom, out = false): CellPoint[] {
+function coreBlock(grid: CaveGrid, room: DungeonRoom, out = false): CellPoint[] {
   const r = floorRect(room);
   const reach = out ? 1 : 0;
   const cx = room.x + room.w / 2;

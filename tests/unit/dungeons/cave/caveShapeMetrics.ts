@@ -17,7 +17,7 @@ import { DEFAULT_VIEW } from '../../../../src/app/dungeons/style';
 const STEP = 0.1;
 const SMOOTH = 0.3;
 /** A straight run turns by less than this in all. */
-export const STRAIGHT_TURN = (10 * Math.PI) / 180;
+const STRAIGHT_TURN = (10 * Math.PI) / 180;
 
 /** A ring walked every `STEP` along its length. */
 function resample(ring: readonly Vec[]): Vec[] {
@@ -198,11 +198,15 @@ export function passageProfiles(model: DungeonModel, index: number): PassageProf
       const slice = cells.filter((c) => along(c) === Math.floor(u));
       if (slice.length === 0) continue;
       const mid = slice.reduce((sum, c) => sum + across(c) + 0.5, 0) / slice.length;
-      if (!field.inside(point(u, mid).x, point(u, mid).y)) continue;
+      const drawn = (v: number): boolean => {
+        const p = point(u, v);
+        return field.inside(p.x, p.y);
+      };
+      if (!drawn(mid)) continue;
       let lo = mid;
       let hi = mid;
-      while (mid - lo < ACROSS_REACH && field.inside(point(u, lo - ACROSS_STEP).x, point(u, lo - ACROSS_STEP).y)) lo -= ACROSS_STEP;
-      while (hi - mid < ACROSS_REACH && field.inside(point(u, hi + ACROSS_STEP).x, point(u, hi + ACROSS_STEP).y)) hi += ACROSS_STEP;
+      while (mid - lo < ACROSS_REACH && drawn(lo - ACROSS_STEP)) lo -= ACROSS_STEP;
+      while (hi - mid < ACROSS_REACH && drawn(hi + ACROSS_STEP)) hi += ACROSS_STEP;
       widths.push(hi - lo);
       centre.push(point(u, (lo + hi) / 2));
     }

@@ -31,9 +31,6 @@ export interface WaterRequest {
   shoreCorners?: number;
 }
 
-/** Enough corners for a pool of one cell to be drawn round. */
-export const ROUND_SHORE = 8;
-
 /**
  * Water gathers where the floor falls away: in rooms steps lead down into, and in dead ends; only
  * in the rooms `mayPool` allows (a built theme's pools are its rooms' reasons).

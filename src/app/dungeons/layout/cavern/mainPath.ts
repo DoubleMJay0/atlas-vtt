@@ -11,7 +11,7 @@ import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import { hops, neighbours, openDoor } from '../../roomGraph';
 import { type Rng, rngFrom } from '../../rng';
-import { fractalNoise } from '../../water/noise';
+import { type Noise2, fractalNoise } from '../../water/noise';
 import { CaveGrid, type CaveFloorPlan, NEAR4, NEAR8, unkey } from './caveGrid';
 import { MinHeap } from './minHeap';
 import { type LaneOwner, crossingConflict, entranceDoor, laneConflict, laneOwners } from './laneCells';
@@ -21,27 +21,34 @@ export { claimLane } from './laneCells';
 /** How much dearer a block may be to walk on than the cheapest, and over how many cells that changes. */
 const WANDER = 2.5;
 const WANDER_PERIOD = 4;
-/** The seed of the lane's cost: fixed, so a layout's fit and its shaping find the same lane. */
+/** The seed of the layout's lane cost: fixed, so every check of a layout finds the same lane. */
 const WANDER_SEED = 0x5ca1ab1e;
 const wanderNoise = fractalNoise(rngFrom(WANDER_SEED), 1, 0.5, WANDER_PERIOD);
+
+/** The cost of stepping onto the block at (ax, ay): 1, and up to `weight` more where the noise is high. */
+function noiseCost(noise: Noise2, weight: number): (ax: number, ay: number) => number {
+  return (ax, ay) => 1 + weight * Math.max(0, noise(ax + 1, ay + 1) + 0.5);
+}
+
 /** The cost of stepping onto the block at (ax, ay): the same on every device and in every check of a layout. */
-const wander = (ax: number, ay: number): number => 1 + WANDER * Math.max(0, wanderNoise(ax + 1, ay + 1) + 0.5);
+const wander = noiseCost(wanderNoise, WANDER);
 /** The winding lane a floor is shaped with: dearer and finer, its own per floor. */
 const WINDING = 20;
 const WINDING_PERIOD = 4.5;
 
-/** How a lane is found: what each block costs, and whether it may wind out into the rock its chambers may swell into. */
+/** How a lane is found: what each block costs, whether it may wind out into the rock its chambers may swell into, and whether the walk is guided towards its goal (A*). */
 export interface LaneWay {
   cost: (ax: number, ay: number) => number;
   swell: boolean;
+  guided: boolean;
 }
 
-const LAYOUT_WAY: LaneWay = { cost: wander, swell: false };
+const LAYOUT_WAY: LaneWay = { cost: wander, swell: false, guided: false };
 
 /** The way a floor's shaping finds its lane: winding from side to side, past its chambers' rectangles where it may. */
 export function windingWay(rng: Rng): LaneWay {
   const noise = fractalNoise(rng, 1, 0.5, WINDING_PERIOD);
-  return { cost: (ax, ay) => 1 + WINDING * Math.max(0, noise(ax + 1, ay + 1) + 0.5), swell: true };
+  return { cost: noiseCost(noise, WINDING), swell: true, guided: true };
 }
 
 export type LaneEnd = { kind: 'entrance' } | { kind: 'stair'; spot: StairSpot } | { kind: 'room'; id: number };
@@ -119,7 +126,7 @@ const blockAt = (id: number): CellPoint => ({ x: Math.floor(id / 65536) - 32768,
 
 /**
  * A walk of 2 × 2 blocks from the start's blocks to the goal's over cells `owners` allow; its
- * cells, or null. It goes the cheapest way over a gently varying cost (`wander`), so where a
+ * cells, or null. It goes the cheapest way over a gently varying cost (`price`), so where a
  * tunnel leaves it room the lane winds from side to side rather than running straight.
  */
 function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { area: Set<string>; touch: Set<string> }, owners: LaneOwner, price: LaneWay['cost'], guided = false): CellPoint[] | null {
@@ -141,10 +148,17 @@ function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { are
   };
   // Guided, the walk goes first where the steps left can be fewest (every step costs 1 at least), as A* does.
   const goalBlocks = [...goals].map(blockAt);
+  const lefts = new Map<number, number>();
   const left = (id: number): number => {
     if (!guided) return 0;
-    const { x, y } = blockAt(id);
-    return Math.min(...goalBlocks.map((g) => Math.abs(g.x - x) + Math.abs(g.y - y)));
+    let steps = lefts.get(id);
+    if (steps === undefined) {
+      const { x, y } = blockAt(id);
+      steps = Infinity;
+      for (const g of goalBlocks) steps = Math.min(steps, Math.abs(g.x - x) + Math.abs(g.y - y));
+      lefts.set(id, steps);
+    }
+    return steps;
   };
   const back = new Map<number, number>();
   const cost = new Map<number, number>();
@@ -199,7 +213,7 @@ export function wideLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly n
   const banned = new Set<string>();
   const owners = laneOwners(grid, floor, route, [start.area, goal.area], banned, undefined, way.swell);
   for (let tries = 0; tries <= LANE_RETRIES; tries++) {
-    const lane = blockWalk(start, goal, owners, way.cost, way.swell);
+    const lane = blockWalk(start, goal, owners, way.cost, way.guided);
     if (!lane) return null;
     const conflict = crossingConflict(grid, floor, route, lane) ?? laneConflict(grid, lane, owners);
     if (conflict === null) return lane;

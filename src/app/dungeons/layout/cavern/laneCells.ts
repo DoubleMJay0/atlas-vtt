@@ -39,6 +39,15 @@ export function swellDistance(room: DungeonRoom, x: number, y: number): number {
   return Math.max(r.x0 - x, x - r.x1, r.y0 - y, y - r.y1, 0);
 }
 
+/**
+ * Whether the cell lies in the room's swell: past its rectangle by `reach` cells at most, in rock no
+ * room's rectangle holds, beside no way in from outside.
+ */
+export function inSwell(grid: Pick<CaveGrid, 'envelope'>, doors: readonly DungeonDoor[], room: DungeonRoom, x: number, y: number, reach = CHAMBER_SWELL): boolean {
+  const away = swellDistance(room, x, y);
+  return away > 0 && away <= reach && grid.envelope(x, y) === ROCK && !besideEntrance(doors, x, y);
+}
+
 /** How far past its walls a tunnel may wind, in cells. */
 const TUNNEL_SWING = 1;
 
@@ -101,9 +110,7 @@ export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly
     if (beside !== undefined) return grid.mayClaim(x, y, doorOwner(beside)) ? doorOwner(beside) : null;
     const tunnel = tunnels.find((room) => inTunnelReach(floor, room, x, y) && grid.mayClaim(x, y, room.id));
     if (tunnel || !swell) return tunnel?.id ?? null;
-    const near = chambers.filter((room) => swellDistance(room, x, y) <= CHAMBER_SWELL);
-    if (near.length === 0 || besideEntrance(floor.doors, x, y)) return null;
-    return near.find((room) => !nearOtherRoom(x, y, room.id) && grid.mayClaim(x, y, room.id))?.id ?? null;
+    return chambers.find((room) => inSwell(grid, floor.doors, room, x, y) && !nearOtherRoom(x, y, room.id) && grid.mayClaim(x, y, room.id))?.id ?? null;
   };
   return (x, y) => {
     const key = cellKey(x, y);

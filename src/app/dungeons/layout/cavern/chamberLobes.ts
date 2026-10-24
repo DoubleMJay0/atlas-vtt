@@ -8,7 +8,7 @@
 
 import type { DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
-import { roomFault } from './chamberField';
+import { faultFrame } from './chamberField';
 
 export interface Lobes {
   /** Whether the cell's middle lies in a lobe. */
@@ -49,14 +49,7 @@ function onEdge(rng: Rng, room: DungeonRoom, push: number): { x: number; y: numb
 }
 
 export function chamberLobes(rng: Rng, room: DungeonRoom, faults: readonly number[]): Lobes {
-  const angle = roomFault(room, faults);
-  const ux = Math.cos(angle);
-  const uy = Math.sin(angle);
-  const cx = room.x + room.w / 2;
-  const cy = room.y + room.h / 2;
-  // How far the rectangle reaches along the fault and across it, each way from its middle.
-  const reachAlong = (Math.abs(ux) * room.w + Math.abs(uy) * room.h) / 2;
-  const reachAcross = (Math.abs(uy) * room.w + Math.abs(ux) * room.h) / 2;
+  const { angle, ux, uy, cx, cy, reachAlong, reachAcross } = faultFrame(room, faults);
   const at = (t: number, s: number): { x: number; y: number } => ({ x: cx + ux * t - uy * s, y: cy + uy * t + ux * s });
   const count = Math.max(1, Math.round((2 * (room.w + room.h)) / EDGE_PER_LOBE));
   // The first lobe reaches on along the fault past one end; the others stand anywhere round the rectangle.

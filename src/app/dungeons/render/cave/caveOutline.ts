@@ -33,6 +33,7 @@ const EASINGS = 8;
 const EASE = 0.6;
 /** How far the drawn ring may stray from the rounded one when it drops corners, in cells: far below a pixel at any zoom. */
 const SIMPLIFY = 0.01;
+/** How many times the corners are thinned: each round drops at most every other corner. */
 const THINNINGS = 2;
 /** Corners either side of a fault that are eased with it. */
 const EASE_REACH = 2;
@@ -252,6 +253,7 @@ function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readon
 /** The rings with the corners they hardly bend at left out, where that leaves them as true to their cells. */
 function fewerCorners(rings: readonly Vec[][], cells: Cells): Vec[][] {
   const fewer = rings.map((ring) => thinCorners(ring, SIMPLIFY, THINNINGS));
+  if (fewer.every((ring, k) => ring.length === rings[k]!.length)) return [...rings];
   return faultless(outlineFaults(fewer, cells.floor, cells.box, cells.kept)) ? fewer : [...rings];
 }
 
