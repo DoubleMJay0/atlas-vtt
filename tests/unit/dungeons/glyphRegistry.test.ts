@@ -20,12 +20,13 @@ const FAMILY_GLYPHS = import.meta.glob<{ GLYPHS: FamilyGlyphs }>('../../../src/a
 
 /**
  * The specimen's SVG in each look: `VITE_GLYPH_RECORD=print` prints them anew. Recorded again when
- * the furniture left the generator and its specimen (structure only, 2026-10-24).
+ * the furniture left the generator and its specimen, and the statue, fountain, well and dais took
+ * their reworked drawings (structure only, 2026-10-24).
  */
 const RECORDED: Record<string, string> = {
-  night: '61dc23594fc0e9bf3d85e684c2a0da596ad7683af4a11fdac0b789ac8a6a2d12',
-  parchment: 'c3008c327fbd9a643a6d116e400566cedb9d1b03ce569b2032c16daa8e43ec03',
-  print: '0b70fdf1e7524e9d321aabbd3f4198576a0377e584a9d3ae907ae2932bc21002',
+  night: '343d49b7bea7f38b910096c0711069a5f9e832fbc98fdaa34ab0ade29f691726',
+  parchment: '1b4546fae0b69a807ef36ab298b4efdf9f363305accb94853ca483610661aba6',
+  print: 'f6812314a9fe429ef4bf6215feb710d38465ebdeb376253e152e77f94596b6a9',
 };
 
 const LOOKS: readonly DungeonStyleId[] = ['parchment', 'print', 'night'];
