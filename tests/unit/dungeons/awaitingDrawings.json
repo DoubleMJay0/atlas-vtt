@@ -18,11 +18,5 @@
     "rimstone",
     "sulphur-crust"
   ],
-  "cave": [
-    "narrows",
-    "crawl",
-    "pitch",
-    "aven",
-    "scree"
-  ]
+  "cave": []
 }
