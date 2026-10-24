@@ -1,6 +1,7 @@
 import type { DungeonDoor, DungeonFloor, DungeonModel, DungeonRoom } from '../model';
 import { secretWingOf } from '../secretWings';
 import type { DungeonView } from '../style';
+import { caveWayOuts, wayExtent } from './cave/mouth/wayOut';
 import { caveFloorShapes } from './cave/visibleCave';
 import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
 
@@ -23,7 +24,7 @@ export interface VisibleFloor {
   /** The floors with every door cell whole: what courses of brick and stone are laid around. */
   outlines: FloorShape[];
   roomShapes: Map<number, FloorShape>;
-  /** Of the floors. */
+  /** Of the floors, and of what a cave's ways out may cover. */
   bounds: Bounds;
 }
 
@@ -35,6 +36,9 @@ function isWideOpening(door: DungeonDoor, byId: ReadonlyMap<number, DungeonRoom>
   if (door.kind !== 'opening' || door.from === null || door.to === null) return false;
   return byId.get(door.from)?.kind !== 'room' && byId.get(door.to)?.kind !== 'room';
 }
+
+/** How much of a way out may lie in the map's margin, in cells: the ground has faded to nothing there. */
+const WAY_INSIDE_MARGIN = 1.6;
 
 export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secrets'>, index = 0): VisibleFloor {
   const floor = model.floors[index] ?? model.floors[0];
@@ -50,7 +54,10 @@ export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secre
   // A cave's narrows are drawn at their full width, as part of its traced floor.
   const floors = cave ? caveFloorShapes(model, index, rooms, doors) : [...roomShapes.values(), ...open.flatMap(door => doorShapes(door, !wide.has(door) && door.kind === 'opening'))];
   const outlines = cave ? floors : [...roomShapes.values(), ...open.map(doorShape)];
-  const bounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+  const floorBounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+  // A cave's ways out fade into the paper before the map's edge: the margin grows where one would reach it.
+  const ways = caveWayOuts({ model, index, floor, doors }).map(way => wayExtent(way, way.length - WAY_INSIDE_MARGIN));
+  const bounds = ways.length ? unionBounds([floorBounds, ...ways]) : floorBounds;
   return { model, index, floor, rooms, doors, wide, floors, outlines, roomShapes, bounds };
 }
 

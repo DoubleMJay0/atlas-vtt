@@ -1,7 +1,7 @@
-import { mouthLane, mouthsOf, type Mouth } from './art/mouths';
+import { openGround } from './cave/mouth/wayOut';
 import { drawBricks } from './bricks';
 import { drawDots } from './dots';
-import { traceShapes, tracePolygon } from './geometry';
+import { traceShapes, tracePolygon, type Vec } from './geometry';
 import { drawHatching } from './hatching';
 import { narrowPockets } from './pockets';
 import { withAlpha } from './palette';
@@ -16,7 +16,7 @@ import { drawStonework } from './stonework';
 export function drawRock(env: RenderEnv): void {
   const { ctx } = env;
   ctx.save();
-  clipLanes(env, mouthsOf(env.dungeon));
+  clipLanes(env, openGround(env.dungeon));
   drawRockMode(env);
   ctx.restore();
 }
@@ -73,13 +73,13 @@ function fillPockets(env: RenderEnv): void {
   ctx.restore();
 }
 
-/** Keeps drawing out of the lane before each entrance: its lane (`mouthLane`). */
-function clipLanes(env: RenderEnv, mouths: readonly Mouth[]): void {
-  if (mouths.length === 0) return;
+/** Keeps drawing out of the open ground before each entrance (`openGround`). */
+function clipLanes(env: RenderEnv, open: readonly Vec[][]): void {
+  if (open.length === 0) return;
   const { ctx, dungeon } = env;
   const b = dungeon.bounds;
   ctx.beginPath();
   ctx.rect(b.minX - 10, b.minY - 10, b.maxX - b.minX + 20, b.maxY - b.minY + 20);
-  for (const mouth of mouths) tracePolygon(ctx, mouthLane(mouth));
+  for (const ground of open) tracePolygon(ctx, ground);
   ctx.clip('evenodd');
 }

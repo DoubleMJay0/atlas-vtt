@@ -17,7 +17,7 @@ import { stoneGrowth } from './growth';
 import { type CaveGroundPainting, type CaveGroundPart, builtSurround, caveGround } from '../cave/caveArt';
 
 /**
- * Stone & shadow, bottom to top: the rock, the wall's course, the floor, water, terrain on the
+ * Stone & shadow, bottom to top: the rock, the wall's course, a cave's ways out, the floor, water, terrain on the
  * ground and raised floors, moss and plants, light and shade, the grid, climbers with the wall's
  * ink running under their upper leaves, then rubble, whatever stands, columns and what climbs
  * them, passages and stairs, and holes in the floor with their bridges.
@@ -33,6 +33,7 @@ export function paintStone(scene: ArtScene): void {
   if (surround) surround.stone(scene, c);
   else drawRock(env);
   (cave('edge')?.stone ?? drawWallBand)(scene, c);
+  cave('mouth')?.stone(scene, c);
   (cave('floor')?.stone ?? drawFloor)(scene, c);
   drawPools(scene, c);
   drawTerrainGround(hand, colours);

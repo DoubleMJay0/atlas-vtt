@@ -13,7 +13,7 @@ import type { StoneColours } from '../stone/colours';
 import { CAVE_GROUND } from './ground';
 import { CAVE_WAYS } from './ways';
 
-const GROUND_PARTS = ['floor', 'edge', 'surround'] as const;
+const GROUND_PARTS = ['floor', 'edge', 'surround', 'mouth'] as const;
 const WAY_PARTS = ['narrows', 'crawl', 'pitch', 'aven', 'scree'] as const;
 export const CAVE_PARTS = [...GROUND_PARTS, ...WAY_PARTS] as const;
 export type CavePart = (typeof CAVE_PARTS)[number];

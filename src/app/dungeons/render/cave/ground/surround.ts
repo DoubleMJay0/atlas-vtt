@@ -1,7 +1,7 @@
 import { rngFrom } from '../../../rng';
 import { viewBounds, type ArtScene } from '../../art/artScene';
 import { shadeEdges, TO_LIGHT } from '../../art/light';
-import { mouthLane, mouthsOf } from '../../art/mouths';
+import { openGround } from '../mouth/wayOut';
 import { hash2 } from '../../art/noise';
 import { traceRings } from '../../art/outline';
 import { polyPath, runsPath } from '../../art/paths';
@@ -16,13 +16,13 @@ import { stoneHand } from '../../stone/hand';
 
 function clipLanes(scene: ArtScene): void {
   const { ctx, dungeon } = scene.env;
-  const mouths = mouthsOf(dungeon);
-  if (!mouths.length) return;
+  const open = openGround(dungeon);
+  if (!open.length) return;
   const b = viewBounds(scene.frame, 10);
   ctx.beginPath();
   ctx.rect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
-  // The same lane as the built surround's: rock never closes an entrance's two-cell mouth.
-  for (const mouth of mouths) polyPath(mouthLane(mouth))(ctx);
+  // The same open ground as the built surround's: rock never closes an entrance's mouth or its way out.
+  for (const ground of open) polyPath(ground)(ctx);
   ctx.clip('evenodd');
 }
 
