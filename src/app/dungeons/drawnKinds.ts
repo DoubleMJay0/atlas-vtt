@@ -11,6 +11,7 @@
 import type { GroundsKind, TerrainKind } from './model';
 import type { PropKind } from './props/propKinds';
 import { KINDS as DRESSING } from './render/props/dressing/kinds';
+import { KINDS as GROUNDS } from './render/grounds/kinds';
 import { KINDS as FORMATIONS } from './render/props/formations/kinds';
 import { KINDS as HEARTH } from './render/props/hearth/kinds';
 import { KINDS as LIVED_IN } from './render/props/livedIn/kinds';
@@ -54,9 +55,5 @@ export const DRAWN_TERRAIN_KINDS: ReadonlySet<TerrainKind> = new Set<TerrainKind
   'portal-ring',
 ]);
 
-/**
- * The pieces of a house's grounds with a drawing (`houseModel.ts`): none yet. The lot, garden, paths,
- * hedges, boundary, gate, porch, outbuildings, trees and fountain wait for the art plan, so the
- * planner lays them out and the generator keeps none of them.
- */
-export const DRAWN_GROUNDS_KINDS: ReadonlySet<GroundsKind> = new Set<GroundsKind>([]);
+/** The pieces of a house's grounds with a drawing (`houseModel.ts`, drawn in `render/grounds/`). */
+export const DRAWN_GROUNDS_KINDS: ReadonlySet<GroundsKind> = new Set<GroundsKind>(GROUNDS);

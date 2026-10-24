@@ -5,6 +5,7 @@ import { footprint, HEIGHT } from '../terrain/footprints';
 import { shownPieces } from '../terrain/pieces';
 import type { Stand } from './heights';
 import { polysPath } from './paths';
+import { groundsStands } from '../grounds/groundsShapes';
 
 /** How tall a prop stands per unit of its lift. */
 const PROP_HEIGHT = 0.6;
@@ -55,5 +56,6 @@ export function standsOf(env: RenderEnv): Stand[] {
     const path = footprint(piece);
     if (height && path) stands.push({ height, path });
   }
+  stands.push(...groundsStands(dungeon.floor));
   return stands;
 }

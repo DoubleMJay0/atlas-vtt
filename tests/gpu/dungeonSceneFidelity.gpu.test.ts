@@ -9,6 +9,7 @@ import { propTall } from '../../src/app/dungeons/render/propShapes';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { dungeonScene } from '../../src/app/dungeons/scene/toScene';
+import { groundsWalls } from '../../src/app/dungeons/scene/toGroundsWalls';
 import { dungeonWalls } from '../../src/app/dungeons/scene/toWalls';
 import { wallInkWidth } from '../../src/app/dungeons/render/wallInk';
 import { DEFAULT_VIEW, type DungeonView } from '../../src/app/dungeons/style';
@@ -132,8 +133,10 @@ describe('a dungeon scene and its map image', () => {
         const onFloor = Object.values(scene.scene.walls).filter(wall => wall.levels?.[0] === level(index));
         const outlines = onFloor.filter(wall => wall.id.includes('_shadow_'));
         const walls = onFloor.filter(wall => !wall.id.includes('_shadow_'));
-        // The floor's own walls are the scene's on its level, as the scene writer builds them alone
-        expect(walls.length, where).toBe(Object.keys(dungeonWalls(model, style, view, placement, index, { id: 'x' }).walls).length);
+        // The floor's own walls are the scene's on its level, as the scene writer builds them alone, and so are its grounds' (a house's garden)
+        const grounds = walls.filter(wall => wall.id.includes('_grounds_'));
+        expect(walls.length - grounds.length, where).toBe(Object.keys(dungeonWalls(model, style, view, placement, index, { id: 'x' }).walls).length);
+        expect(grounds.length, where).toBe(Object.keys(groundsWalls(floor.grounds, placement, { id: 'x' })).length);
         const toPx = (x: number, y: number): { x: number; y: number } => ({ x: (x - layout.originCell.x) * PX_PER_CELL, y: (y - layout.originCell.y) * PX_PER_CELL });
 
         // (a) Solid walls lie on drawn ink; the sides of a secret door's passage are not drawn, as the passage is not
