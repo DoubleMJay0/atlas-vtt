@@ -27,6 +27,7 @@ import { sealWalls } from '../../../src/app/lighting/sealWalls';
 import { mapFeatureList } from '../../../src/app/mapFeatures/mapFeatures';
 import type { WallSegment } from '../../../src/app/types/wallTypes';
 import { smallDungeon } from '../../fixtures/dungeonModels';
+import { pointInPolygon } from '../../../src/app/dungeons/render/geometry';
 
 /** A dungeon's scene parts as the scene writer gets them, without the vault: walls, stairs, features, note and pins. */
 
@@ -207,6 +208,25 @@ describe('a Fortress of several floors, rising from its entrance floor', () => {
     const stair = model.floors[0]!.stairs[0]!;
     const room = visible.rooms.find(r => r.kind === 'room' && stair.x >= r.x && stair.x < r.x + r.w && stair.y >= r.y && stair.y < r.y + r.h)!;
     expect(roomFacts(visible, room, DEFAULT_VIEW)).toContain(t('dungeonScene.stairsUp', { floor: 'B' }));
+  });
+});
+
+describe('murder holes in the scene', () => {
+  it('lay floor over each murder hole, so a token stands on it rather than falling through the cut picture', () => {
+    const model = generateDungeon({ seed: 10, theme: 'fortress', tags: [], floors: 3 });
+    const { parts, placement } = partsOf(model);
+    const ids = parts.levelIds!;
+    let holes = 0;
+    model.floors.forEach((floor, index) => {
+      for (const hole of floor.terrain.filter(p => p.kind === 'murder-hole')) {
+        holes++;
+        const c = hole.cells[0]!;
+        const centre = { x: (c.x + 0.5 - placement.originCell.x) * PX, y: (c.y + 0.5 - placement.originCell.y) * PX };
+        const over = Object.values(parts.scene.levelSurfaces ?? {}).filter(s => s.level === ids[index] && pointInPolygon(s.polygon, centre.x, centre.y));
+        expect(over.map(s => s.open), `murder hole ${hole.id}`).toEqual([false]);
+      }
+    });
+    expect(holes).toBeGreaterThan(1);
   });
 });
 

@@ -20,6 +20,8 @@ const CUT_FACE = 0.2;
 
 /** The side of a murder hole's square, in cells: a hand's width of stone round it. */
 const MURDER_HOLE = 0.4;
+/** A murder hole's face: a quarter of the way to its middle, so the half of it inside opens through. */
+const MURDER_HOLE_FACE = MURDER_HOLE / 8;
 
 /** Whether a hole was cut by builders, with dressed straight edges. */
 function built(piece: DungeonTerrain): boolean {
@@ -44,13 +46,13 @@ export function drawHoles(hand: Hand): void {
   for (const hole of holes) {
     if (hole.kind === 'gallery') balustrade(hand, edgesFacing(hole.cells, c => !cellSet(hole.cells).has(`${c.x},${c.y}`) && onFloor(env, c)));
     const rings = holeRings(hole);
-    if (cut) cutHole(hand, rings, built(hole));
+    if (cut) cutHole(hand, rings, built(hole), hole.kind === 'murder-hole' ? MURDER_HOLE_FACE : CUT_FACE);
     else drawDrop(hand, rings, hole.opening?.bottom === null || !hasFloorBelow(env) ? 'void' : 'floor', built(hole));
   }
 }
 
 /** A hole over a floor below: its lip and a narrow face, then nothing, so the level below shows. */
-function cutHole(hand: Hand, rings: Vec[][], built: boolean): void {
+function cutHole(hand: Hand, rings: Vec[][], built: boolean, face: number): void {
   const { scene } = hand;
   const path = polysPath(rings);
   const b = pointsBounds(rings.flat());
@@ -58,13 +60,13 @@ function cutHole(hand: Hand, rings: Vec[][], built: boolean): void {
   const { depth, inward } = dropDepth(hand, rings);
   hand.surface(path, built ? 'dressed' : 'rock');
   const tone = dropTone(depth, inward, 'void');
-  hand.tone((x, y) => tone(x, y) * (FACE.void / CUT_FACE) ** 0.3, bounds, path, 'depth');
+  hand.tone((x, y) => tone(x, y) * (FACE.void / face) ** 0.3, bounds, path, 'depth');
   const { ctx } = scene.env;
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
   if (scene.raster) {
     const grid = gridOver(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY, scene.grid.res);
-    drawField(ctx, grid, [0, 0, 0], fieldOf(grid, (x, y) => smoothstep(CUT_FACE, CUT_FACE + 0.05, depth(x, y))));
+    drawField(ctx, grid, [0, 0, 0], fieldOf(grid, (x, y) => smoothstep(face, face + 0.05, depth(x, y))));
   } else {
     ctx.beginPath();
     path(ctx);

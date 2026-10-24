@@ -20,8 +20,10 @@ export function floorSurfaces(dungeon: VisibleDungeon, placement: DungeonPlaceme
   const { floor, model, index, roomShapes } = dungeon;
   if (floorBelow(stackOf(model), index) === null) return {};
   const shown = floor.terrain.filter(piece => roomShapes.has(piece.room));
-  // A hole walked over (a murder hole) is too small to fall through.
-  const holes = shown.filter(piece => piece.opening && HOLE_KINDS.has(piece.kind) && footingOf(piece.kind) === 'block');
+  const openings = shown.filter(piece => piece.opening && HOLE_KINDS.has(piece.kind));
+  const holes = openings.filter(piece => footingOf(piece.kind) === 'block');
+  // A hole walked over (a murder hole) is too small to fall through: floor is laid over the picture cut out there.
+  const narrow = openings.filter(piece => footingOf(piece.kind) === 'walk');
   const { originCell, pxPerCell } = placement;
   const world = (p: CellPoint): CellPoint => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   const rings = (piece: DungeonTerrain, open: boolean): Omit<LevelSurface, 'id' | 'kind'>[] =>
@@ -33,6 +35,11 @@ export function floorSurfaces(dungeon: VisibleDungeon, placement: DungeonPlaceme
     const cut = rings(hole, true);
     if (open.length + laid.length + cut.length + over.length > MAX_LEVEL_SURFACES) break;
     open.push(...cut);
+    laid.push(...over);
+  }
+  for (const hole of narrow) {
+    const over = rings(hole, false);
+    if (open.length + laid.length + over.length > MAX_LEVEL_SURFACES) break;
     laid.push(...over);
   }
   // Bridges after every hole: a later surface lies over an earlier one
