@@ -78,11 +78,6 @@
   "cave": [
     "floor",
     "edge",
-    "surround",
-    "narrows",
-    "crawl",
-    "pitch",
-    "aven",
-    "scree"
+    "surround"
   ]
 }
