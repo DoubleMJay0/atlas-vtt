@@ -1,7 +1,6 @@
 {
   "props": [
-    "mushrooms",
-    "campfire"
+    "mushrooms"
   ],
   "terrain": [],
   "cave": []
