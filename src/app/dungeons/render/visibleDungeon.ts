@@ -4,6 +4,7 @@ import type { DungeonView } from '../style';
 import { openGroundOf, wayExtent, wayOutsOf, type WayOut } from './cave/mouth/wayOut';
 import { caveFloorShapes } from './cave/visibleCave';
 import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape, type Vec } from './geometry';
+import { type HouseLayout, houseLayout } from './houseShapes';
 
 /**
  * What a view shows of one floor of a dungeon: secret wings leave with their doors when secrets
@@ -26,7 +27,9 @@ export interface VisibleFloor {
   roomShapes: Map<number, FloorShape>;
   /** A cave's ways out, one before each entrance; none on a built floor. */
   ways: WayOut[];
-  /** Of the floors, and of what a cave's ways out may cover. */
+  /** A house's cells and doorways (`DungeonFloor.walls === 'edges'`), as its floors were drawn from them. */
+  house?: HouseLayout;
+  /** Of the floors, of a house's lot once its garden is drawn, and of what a cave's ways out may cover. */
   bounds: Bounds;
 }
 
@@ -52,17 +55,31 @@ export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secre
   const shown = new Map(rooms.map(room => [room.id, room] as const));
   const doors = floor.doors.filter(door => (door.from === null || shown.has(door.from)) && (door.to === null || shown.has(door.to)));
   const cave = floor.cave !== undefined;
+  const open = doors.filter(door => door.kind !== 'secret');
+  if (floor.walls === 'edges') return withBounds({ model, index, floor, rooms, doors, ways: [], ...houseFloors(houseLayout(floor, shown, doors), open) });
   const wide = new Set(cave ? [] : doors.filter(door => isWideOpening(door, shown)));
   const roomShapes = new Map(rooms.map(room => [room.id, roomShape(room)] as const));
-  const open = doors.filter(door => door.kind !== 'secret');
   // A cave's narrows are drawn at their full width, as part of its traced floor.
   const floors = cave ? caveFloorShapes(model, index, rooms, doors) : [...roomShapes.values(), ...open.flatMap(door => doorShapes(door, !wide.has(door) && door.kind === 'opening'))];
   const outlines = cave ? floors : [...roomShapes.values(), ...open.map(doorShape)];
-  const floorBounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
-  // A cave's ways out fade into the paper before the map's edge: the margin grows where one would reach it.
   const ways = wayOutsOf(floor, doors, model.seed + index * 101);
+  return withBounds({ model, index, floor, rooms, doors, wide, floors, outlines, roomShapes, ways });
+}
+
+/** A house's floors (`houseShapes.ts`): every doorway's floor whole, and every opening drawn as wide as it is, its grid lines across. */
+function houseFloors(house: HouseLayout, open: readonly DungeonDoor[]): Pick<VisibleFloor, 'wide' | 'floors' | 'outlines' | 'roomShapes' | 'house'> {
+  const floors = [...house.roomShapes.values(), ...open.map(door => house.doorways.get(door)!)];
+  return { wide: new Set(open.filter(door => door.kind === 'opening')), floors, outlines: floors, roomShapes: house.roomShapes, house };
+}
+
+function withBounds(visible: Omit<VisibleFloor, 'bounds'>): VisibleFloor {
+  const { floors, ways } = visible;
+  // A house's lot lies on its map once its garden is drawn.
+  const lot = visible.floor.grounds?.pieces.some(piece => piece.kind === 'garden') ? [{ kind: 'rect', ...visible.floor.grounds.lot } as FloorShape] : [];
+  const floorBounds = floors.length ? unionBounds([...floors, ...lot].map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+  // A cave's ways out fade into the paper before the map's edge: the margin grows where one would reach it.
   const bounds = unionBounds([floorBounds, ...ways.map(way => wayExtent(way, way.length - WAY_INSIDE_MARGIN))]);
-  return { model, index, floor, rooms, doors, wide, floors, outlines, roomShapes, ways, bounds };
+  return { ...visible, bounds };
 }
 
 /** One floor as drawn (`visibleFloor`), with the distance field its surroundings are drawn from. */

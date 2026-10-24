@@ -1,4 +1,5 @@
 import { t } from '../../i18n';
+import { type FloorStack, levelOf } from '../floors/floorStack';
 import type { DungeonRoom } from '../model';
 import { hops, neighbours } from '../roomGraph';
 import type { VisibleFloor } from '../render/visibleDungeon';
@@ -15,6 +16,11 @@ export interface KeyedRoom {
 /** The letter of a floor: A for the entry floor, B the next one from it, and so on. */
 export function floorLetter(floor: number): string {
   return String.fromCharCode(65 + floor);
+}
+
+/** A floor as the scene's level, its map and the floor switcher name it: "Floor A", or "Cellar" for a floor under a building's entrance floor. */
+export function floorName(stack: FloorStack, floor: number): string {
+  return stack.rise === 'up' && levelOf(stack, floor) < 0 ? t('dungeonScene.cellar') : t('dungeonScene.floor', { letter: floorLetter(floor) });
 }
 
 /** What a room is in the dungeon's shape, for its heading: its five-room stage, else the boss room; null for any other room. */

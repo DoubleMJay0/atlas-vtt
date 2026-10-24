@@ -9,7 +9,7 @@
  */
 
 import type { CellRect } from '../geometry';
-import type { CaveFloor, CellDir, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
+import type { CaveFloor, CellDir, DungeonDoor, DungeonFloor, DungeonRoom, DungeonStair } from '../model';
 import { type DungeonParams, floorParams } from '../params';
 import { MAX_SEED, floorStream, int, pick } from '../rng';
 import { type BuiltFloor, type FloorRequest, buildFloorLayout } from '../layout/assemble';
@@ -35,6 +35,8 @@ export interface PlannedFloor {
   stairs: DungeonStair[];
   /** A Cavern floor's geology, written by `shapeCaves`, so the Cavern's facts read it from the floors assignment receives. */
   cave?: CaveFloor;
+  /** A house's floor (`layout/house/`): walls on cell edges, its windows and chimney stacks, and on its entrance floor the grounds. */
+  house?: Required<Pick<DungeonFloor, 'walls' | 'windows' | 'stacks'>> & Pick<DungeonFloor, 'grounds'>;
 }
 
 interface Link {

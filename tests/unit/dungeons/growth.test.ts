@@ -39,7 +39,9 @@ function approaches(floor: DungeonFloor, secretToo: boolean): Set<string> {
   const out = new Set<string>();
   for (const d of floor.doors) {
     if (!secretToo && d.kind === 'secret') continue;
-    out.add(key({ x: d.x - d.dir.x, y: d.y - d.dir.y }));
+    // A door on an edge stands between its own cell and the one across.
+    const back = d.edge ? 0 : 1;
+    out.add(key({ x: d.x - d.dir.x * back, y: d.y - d.dir.y * back }));
     out.add(key({ x: d.x + d.dir.x, y: d.y + d.dir.y }));
   }
   return out;

@@ -6,7 +6,7 @@
  */
 
 import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
-import { type CellRect, cellKey, cellsOf, dir, doorCells, floorRect, inRect, intersection } from '../geometry';
+import { type CellRect, cellKey, cellsOf, dir, doorSide, floorRect, inRect, intersection } from '../geometry';
 
 /**
  * The upper end is where the treads start down; the lower end is where they arrive. Ends are
@@ -60,11 +60,7 @@ export function stairsAndAround(stairs: readonly StairSpot[]): string[] {
 
 /** The floor cells just inside a room's doors, one before each cell of a wide narrows. */
 export function doorApproaches(room: Pick<DungeonRoom, 'id'>, doors: readonly DungeonDoor[]): CellPoint[] {
-  return doors.flatMap((door) => {
-    const step = door.from === room.id ? -1 : door.to === room.id ? 1 : 0;
-    if (step === 0) return [];
-    return doorCells(door).map((c) => ({ x: c.x + door.dir.x * step, y: c.y + door.dir.y * step }));
-  });
+  return doors.flatMap((door) => doorSide(door, room.id));
 }
 
 /** Whether the `free` cells (keys of `cells`) are all reachable from each other, side by side. */

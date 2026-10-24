@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ThemeChoice } from '../../src/app/dungeons/themes/themeTypes';
 import { generateDungeon } from '../../src/app/dungeons/generate';
+import { doorMiddle } from '../../src/app/dungeons/geometry';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { paletteOf, parseHex } from '../../src/app/dungeons/render/palette';
@@ -136,8 +137,11 @@ describe('a dungeon scene and its map image', () => {
         const toPx = (x: number, y: number): { x: number; y: number } => ({ x: (x - layout.originCell.x) * PX_PER_CELL, y: (y - layout.originCell.y) * PX_PER_CELL });
 
         // (a) Solid walls lie on drawn ink; the sides of a secret door's passage are not drawn, as the passage is not
-        const inSecretCell = (p: { x: number; y: number }): boolean => floor.doors.some(d => d.kind === 'secret' && Math.abs(p.x - toPx(d.x + 0.5, d.y + 0.5).x) <= PX_PER_CELL / 2 + halfInk + 1 && Math.abs(p.y - toPx(d.x + 0.5, d.y + 0.5).y) <= PX_PER_CELL / 2 + halfInk + 1);
-        const solid = walls.filter(w => w.type !== 'door');
+        // A door's middle: its cell's, or the edge a house's door stands on.
+        const middleOf = (d: (typeof floor.doors)[number]): { x: number; y: number } => (d.edge ? toPx(doorMiddle(d).x, doorMiddle(d).y) : toPx(d.x + 0.5, d.y + 0.5));
+        const inSecretCell = (p: { x: number; y: number }): boolean => floor.doors.some(d => d.kind === 'secret' && Math.abs(p.x - middleOf(d).x) <= PX_PER_CELL / 2 + halfInk + 1 && Math.abs(p.y - middleOf(d).y) <= PX_PER_CELL / 2 + halfInk + 1);
+        // A window stands in the cut of its outer wall, by a thin pane (`houseRender.gpu.test.ts` holds it).
+        const solid = walls.filter(w => w.type !== 'door' && w.blocks !== 'movement');
         // Where something grows, the walls are held to the picture drawn without it, and the
         // picture with it must still show its walls nearly everywhere.
         const grows = floor.growth.length > 0;
@@ -152,10 +156,10 @@ describe('a dungeon scene and its map image', () => {
           expect(share(shown.map(s => s.distance), 2), `${where}: walls within 2 px of ink under the growth`).toBeGreaterThanOrEqual(0.97);
         }
 
-        // Doors stand across the middle of the drawn door, at right angles to the way through
+        // Doors stand across the middle of the drawn door, at right angles to the way through (a house's within its doorway, which its rooms' floors may shorten)
         for (const door of floor.doors.filter(d => d.kind === 'door')) {
-          const centre = toPx(door.x + 0.5, door.y + 0.5);
-          const wall = walls.filter(w => w.type === 'door').find(w => Math.hypot((w.p1.x + w.p2.x) / 2 - centre.x, (w.p1.y + w.p2.y) / 2 - centre.y) <= 2);
+          const centre = middleOf(door);
+          const wall = walls.filter(w => w.type === 'door').find(w => Math.hypot((w.p1.x + w.p2.x) / 2 - centre.x, (w.p1.y + w.p2.y) / 2 - centre.y) <= (door.edge ? PX_PER_CELL * 0.06 : 2));
           expect(wall, `${where}: door at ${door.x},${door.y}`).toBeDefined();
           const along = { x: wall!.p2.x - wall!.p1.x, y: wall!.p2.y - wall!.p1.y };
           expect(Math.abs(along.x * door.dir.x + along.y * door.dir.y)).toBeLessThan(0.5);
@@ -166,7 +170,9 @@ describe('a dungeon scene and its map image', () => {
         const edges = inkEdgesFromWalls(floor, field, walls, mask, picture, placement);
         // A face pixel lies up to 3 px inside the floor's edge (0.015 cells at 200 px), and a pixel's middle half a diagonal past that
         // where an engraved shadow's hatching meets a curved wall at a slant.
-        const loose = edges.filter(e => e.distance > halfInk + 3 + Math.SQRT1_2).slice(0, 5).map(e => `${e.at.x},${e.at.y} (${e.distance.toFixed(1)} px)`);
+        // A house's thin walls meet stacks and each other in T-junctions, whose inner corner pixels lie up to two pixels further from the ring of walls.
+        const slack = floor.walls === 'edges' ? 2 : 0;
+        const loose = edges.filter(e => e.distance > halfInk + 3 + Math.SQRT1_2 + slack).slice(0, 5).map(e => `${e.at.x},${e.at.y} (${e.distance.toFixed(1)} px)`);
         expect(edges.length, `${where}: wall faces found`).toBeGreaterThan(1000);
         expect(loose, `${where}: drawn wall faces without a wall`).toEqual([]);
 

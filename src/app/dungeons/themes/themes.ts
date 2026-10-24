@@ -9,6 +9,7 @@ import type { MessageKey } from '../../i18n';
 import { fortressParams } from '../layout/fortressParams';
 import { CAVERN } from './cavern';
 import { FORTRESS } from './fortress';
+import { houseFacts } from './houseFacts';
 import { MANSION } from './mansion';
 import { THEME_IDS, type RoomProgramme, type ThemeChoice, type ThemeDefinition, type ThemeFacts, type ThemeId } from './themeTypes';
 
@@ -20,7 +21,7 @@ const NO_MOLTEN: readonly { tag: DungeonTag; reason: MessageKey }[] = [
 export const THEMES: Readonly<Record<ThemeId, ThemeDefinition>> = {
   // A gate passage three cells long holds two murder holes a cell apart.
   fortress: { id: 'fortress', built: true, rise: 'up', stairsFromEntrance: true, entranceDepth: 5, refuses: NO_MOLTEN, params: fortressParams, programme: FORTRESS },
-  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, architectureOnly: true, refuses: [...NO_MOLTEN, { tag: 'flooded', reason: 'dungeon.theme.refused.noFlooding' }], programme: MANSION },
+  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, architectureOnly: true, layout: 'house', facts: houseFacts, refuses: [...NO_MOLTEN, { tag: 'flooded', reason: 'dungeon.theme.refused.noFlooding' }], programme: MANSION },
   cavern: CAVERN,
 };
 

@@ -9,6 +9,7 @@
 
 import type { CaveFloor, CaveModel, StairWay } from './caveModel';
 import type { DungeonGrowth } from './growthModel';
+import type { DungeonStack, DungeonWindow, FloorWalls, HouseGrounds } from './houseModel';
 import type { PropKind } from './props/propKinds';
 import type { RoomTypeId } from './themes/roomTypes';
 import type { ThemeChoice, ThemeId } from './themes/themeTypes';
@@ -18,6 +19,7 @@ export type { CoverLevel, DungeonTerrain, FiveRoomStage, HazardKind, TerrainKind
 export { FIVE_ROOM_STAGES } from './terrainModel';
 export type { DungeonGrowth, GrowthKind } from './growthModel';
 export type { CaveFault, CaveFloor, CaveModel, CaveVariant, StairWay } from './caveModel';
+export type { DungeonStack, DungeonWindow, FloorWalls, GroundsKind, GroundsPiece, HouseGrounds, OutbuildingUse } from './houseModel';
 export type { PropKind } from './props/propKinds';
 
 /** Bump when the same seed and tags would give another dungeon. */
@@ -94,6 +96,12 @@ export interface DungeonDoor {
   descends?: true;
   /** Two cells wide, a cave's narrows or an opening between two wide passages: this cell and the one at `x + wide.x, y + wide.y` (`doorCells`). */
   wide?: CellDir;
+  /**
+   * On a floor whose walls stand on cell edges (`DungeonFloor.walls`): the door stands on the edge
+   * between `(x, y)`, the cell on its `from` side (outside, for an entrance), and the cell across it
+   * towards `dir`. Read where it is through `doorSide`, `doorwayCells` and `doorMiddle`.
+   */
+  edge?: true;
 }
 
 /**
@@ -177,6 +185,14 @@ export interface DungeonFloor {
   hiddenWings?: number[];
   /** A Cavern floor's lane, heights, water and faults. */
   cave?: CaveFloor;
+  /** Set on every floor of a house: walls on the edges between cells (`houseModel.ts`); unset, rooms are walled by whole cells. */
+  walls?: FloorWalls;
+  /** A house's windows, in its outer walls. */
+  windows?: DungeonWindow[];
+  /** A house's chimney stacks on this floor. */
+  stacks?: DungeonStack[];
+  /** The grounds round a house, on its entrance floor. */
+  grounds?: HouseGrounds;
 }
 
 export interface DungeonModel {
@@ -190,6 +206,8 @@ export interface DungeonModel {
   floors: DungeonFloor[];
   /** A Cavern's variant and fault directions. */
   cave?: CaveModel;
+  /** How many floors lie under the entrance floor: the last indices, going down (a house's cellar). Unset is none. */
+  below?: number;
 }
 
 /** What a GM asks for: everything else follows from it. */

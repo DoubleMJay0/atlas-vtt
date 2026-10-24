@@ -9,6 +9,7 @@ import type { PlannedFloor } from '../floors/planFloors';
 import type { DungeonTag } from '../tags';
 import { type TypedRoom, depthRanks } from '../terrain/typeTerrain';
 import { assignRoomTypes, type RoomTypes } from './assign/assignRoomTypes';
+import { pinnedTypes } from './assign/pinnedTypes';
 import { roomTraits } from './assign/roomTraits';
 import { specOf } from './assign/score';
 import { NO_FACTS, type ThemeContext, programmeOf, themeOf } from './themes';
@@ -21,14 +22,16 @@ export interface ThemedFloors {
   rooms: ReadonlyMap<number, TypedRoom>[];
 }
 
-export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<DungeonTag>, floors: readonly PlannedFloor[]): ThemedFloors {
+export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<DungeonTag>, floors: readonly PlannedFloor[], below = 0): ThemedFloors {
   const definition = themeOf(id);
   const ruined = tags.has('ruined');
+  const lived = definition.layout === 'house' && tags.has('inhabited') ? (true as const) : undefined;
   const facts = definition.facts?.({ seed, tags, floors }) ?? NO_FACTS;
   const theme: ThemeContext = { definition, ruined, facts };
   const programme = programmeOf(definition, tags);
-  const stack = floorStack(definition.rise, floors.length);
-  const typed = assignRoomTypes({ seed, programme, floors, ruined, facts, above: (floor) => floorAbove(stack, floor) });
+  const stack = floorStack(definition.rise, floors.length, below);
+  // A house's planner typed every room where it stands; any other theme's rooms are typed here.
+  const typed = definition.layout === 'house' ? pinnedTypes(seed, floors, programme, facts, ruined) : assignRoomTypes({ seed, programme, floors, ruined, facts, above: (floor) => floorAbove(stack, floor) });
   const traits = roomTraits(floors);
   const traitOf = (floor: number, room: number): (typeof traits)[number] | undefined => traits.find((t) => t.floor === floor && t.room === room);
   const ranks = depthRanks(typed.byFloor, (floor, room) => traitOf(floor, room)?.depth ?? 0);
@@ -41,7 +44,7 @@ export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<Dungeon
       room.type = type;
       // Only a type that keeps columns keeps the colonnade the layout gave its room.
       if (!spec.terrain.columns) room.colonnade = false;
-      out.set(room.id, { spec, context: { depthRank: ranks[index]?.get(room.id) ?? 0.5, ruined, richness: facts.richness({ floor: index, room: room.id }) } });
+      out.set(room.id, { spec, context: { depthRank: ranks[index]?.get(room.id) ?? 0.5, ruined, richness: facts.richness({ floor: index, room: room.id }), ...(lived && { lived }) } });
     }
     return out;
   });

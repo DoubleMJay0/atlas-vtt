@@ -5,8 +5,9 @@
  * and vegetation. Architecture only: no story, no text; a dungeon is named by the GM alone.
  */
 
-import { type FloorStack, floorAbove, floorStack, floorWaterLevel, isAbove } from './floors/floorStack';
-import { cellKey } from './geometry';
+import { type FloorStack, floorAbove, floorStack, floorWaterLevel, isAbove, levelOf as storeyOf } from './floors/floorStack';
+import { planHouse } from './layout/house/planHouse';
+import { cellKey, houseCells } from './geometry';
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { type CaveSites, caveSites } from './layout/cavern/caveSites';
 import { caveLife } from './themes/cavern/caveLife';
@@ -76,17 +77,19 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const kept = [...terrain.takenCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
   const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms, shoreCorners: wet.shoreCorners }) });
   const flora = floraOf(params.tags, parts.theme);
+  const house = planned.house && houseCells({ rooms, stacks: planned.house.stacks });
+  const outside = house && ((x: number, y: number): boolean => !house.has(cellKey(x, y)));
   addShallowWater(terrain, waterCells);
   // A cave's life keeps to its zones: daylight by the mouth, fungi by water and roosts, nothing where lava runs.
   const life = site && caveLife(site, { rooms, doors, terrain: terrain.pieces });
-  const pieces = addUndergrowth(seed, terrain, waterCells, flora, { built: parts.water !== null, ruined: params.tags.has('ruined'), aboveGround, openAbove: parts.openAbove, ...(life && { mayGrow: life }) });
+  const pieces = addUndergrowth(seed, terrain, waterCells, flora, { built: parts.water !== null, ruined: params.tags.has('ruined'), aboveGround, openAbove: parts.openAbove, ...(life && { mayGrow: life }), ...(outside && { outside }) });
   // Pieces come after every piece of terrain, water and undergrowth: none of them waits on what is drawn.
   terrain.placePieces();
   const { props } = terrain;
   const { rubble, cracks } = placeScatter({ seed, floor: index, stack, rooms, doors, stairs, columns, terrain: pieces, params, furnished: terrain.propCells() });
-  const grown = placeGrowth({ seed, floor: index, aboveGround, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
+  const grown = placeGrowth({ seed, floor: index, aboveGround, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks, ...(outside && { outside }) }, flora);
   const growth = life ? grown.filter((g) => life(g.room, g.kind)) : grown;
-  return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth, ...(cave && { cave }) };
+  return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth, ...(cave && { cave }), ...planned.house };
 }
 
 export function generateDungeon(request: DungeonRequest): DungeonModel {
@@ -105,18 +108,22 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const count = requestedFloors(request);
   const boss = fiveRoom || request.bossRoom !== false;
   const { rise } = definition;
-  const laid = planFloors(seed, params, count, boss, fiveRoom, definition);
+  const house = definition.layout === 'house' ? planHouse(seed, params.tags, count, boss, fiveRoom) : null;
+  const laid = house?.floors ?? planFloors(seed, params, count, boss, fiveRoom, definition);
+  const below = house?.below ?? 0;
   // A Cavern shapes its rooms into chambers and tunnels before anything reads them.
   const shaped = params.cave ? shapeCaves(seed, params, laid, boss, rolled) : null;
   const planned = shaped?.floors ?? laid;
   const sites = shaped ? caveSites(planned) : null;
-  const themed = typeDungeon(seed, theme, params.tags, planned);
+  const themed = typeDungeon(seed, theme, params.tags, planned, below);
   const { typed } = themed;
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.
   const { built } = themed.theme.definition;
   const level = built && request.waterLevel === undefined && params.waterLevel === null ? 0 : rolled;
+  const stack = floorStack(rise, planned.length, below);
   const parts = planned.map((floor, index): Omit<FloorParts, 'stack' | 'openAbove'> => {
-    const floorPar = floorParams(params, index, rise);
+    // A cellar is built as a floor below ground.
+    const floorPar = floorParams(params, index, storeyOf(stack, index) < 0 ? 'down' : rise);
     return {
       planned: floor,
       params: floorPar,
@@ -126,7 +133,6 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
       water: built ? themeWater(floor.rooms, themed.rooms[index] ?? new Map(), params.tags.has('ruined')) : null,
     };
   });
-  const stack = floorStack(rise, planned.length);
   const terrain = planTerrain(
     seed,
     parts.map(({ planned: floor, empty, columns }, index) => ({ ...floor, columns, empty, types: themed.rooms[index] ?? new Map() })),
@@ -142,5 +148,5 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   // A cave's water drains down: each floor above the deepest stands lower.
   const levelOf = (index: number): number => (shaped ? level * (CAVE_UPPER_WATER + ((1 - CAVE_UPPER_WATER) * (index + 1)) / parts.length) : level);
   const floors = parts.map((part, index) => finishFloor(seed, index, { ...part, stack, openAbove: openAbove(index) }, terrain[index] as FloorTerrain, levelOf(index), sites?.[index]));
-  return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors, ...(shaped && { cave: shaped.cave }) };
+  return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors, ...(shaped && { cave: shaped.cave }), ...(below > 0 && { below }) };
 }

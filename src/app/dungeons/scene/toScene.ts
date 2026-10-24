@@ -19,6 +19,7 @@ import { objectShadows, tallObjects } from './objectShadows';
 import { noteRooms, type NoteRoom } from './toNote';
 import { stairLinks } from './toStairs';
 import { newLevelId } from '../../levels/levelEdits';
+import { groundsWalls } from './toGroundsWalls';
 import { dungeonWalls, type DungeonPlacement, type DungeonWalls } from './toWalls';
 
 /** A dungeon's scene, and what became of its doors, for the log. */
@@ -44,7 +45,7 @@ function floorWalls(dungeon: VisibleDungeon, style: DungeonStyle, view: DungeonV
   const own = dungeonWalls(dungeon.model, style, view, placement, dungeon.index, { id, ...(levels && { levels }) });
   const tolerance = sealTolerance(worldTexel(image));
   const shadows = objectShadows(tallObjects(dungeon, view), Object.values(own.walls), placement, tolerance, `wall_${id}_shadow`, levels);
-  return { ...own, walls: { ...own.walls, ...shadows } };
+  return { ...own, walls: { ...own.walls, ...shadows, ...groundsWalls(dungeon.floor.grounds, placement, { id, ...(levels && { levels }) }) } };
 }
 
 /**

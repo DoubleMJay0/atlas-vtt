@@ -76,7 +76,7 @@ function GeneratorPanel({ app, collectionId, collections, onCollectionChange, in
         {header}
       </div>
       <div className="atlas-dungeon-generator__preview">
-        <FloorSwitcher floors={state.floors} floor={state.floor} onFloor={state.setFloor} />
+        <FloorSwitcher floors={state.floors} floor={state.floor} onFloor={state.setFloor} model={state.model} />
         <MapPreview
           preview={preview}
           view={settings.view}

@@ -1,10 +1,13 @@
 import type { WallSegment } from '../../types/wallTypes';
-import { doorCells } from '../geometry';
+import { doorCells, doorMiddle } from '../geometry';
 import type { DoorKind, DungeonDoor, DungeonModel } from '../model';
 import { visibleFloor } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { wallInkWidth } from '../render/wallInk';
 import type { Vec } from '../render/geometry';
+import { OUTER_WALL, mouthDepth } from '../render/houseShapes';
+import { shownWindows } from '../render/art/windows';
+import { onWindow, secretDoorways, windowCuts } from './houseWalls';
 import { STEPS, doorEnds, doorLine, splitRings, wallRings, type RingHit } from './wallOutline';
 
 /** Where a dungeon map lies in the world: its pixel (0, 0) is the corner of `originCell`. */
@@ -30,8 +33,8 @@ const DOOR_WALLS: Partial<Record<DoorKind, DoorWall>> = {
   secret: { type: 'secret-door', v: (door, half) => (door.from === null ? 0.5 - half : half - 0.5) },
 };
 
-/** In a cave a crawl is rock all through, so its secret door closes it in its cell's middle. */
-const CAVE_DOOR_WALLS: Partial<Record<DoorKind, DoorWall>> = { ...DOOR_WALLS, secret: { type: 'secret-door', v: () => 0 } };
+/** Doors closed on their own line: a cave's crawl is rock all through and a house's doorway is its wall, so even a secret door closes there. */
+const ON_LINE_DOOR_WALLS: Partial<Record<DoorKind, DoorWall>> = { ...DOOR_WALLS, secret: { type: 'secret-door', v: () => 0 } };
 
 /**
  * Whether a point lies on the outer mouth of an entrance: the edge of its cell's wall ring that
@@ -42,9 +45,8 @@ function entranceMouth(door: DungeonDoor, half: number, cave: boolean): (p: Vec)
   const cells = doorCells(door);
   // A cave's outline meets its straight mouth at a slant, so the grown corner lies up to a further half wall along it.
   const reach = cells.length / 2 + (cave ? 2 : 1) * half + 1 / STEPS;
-  const cx = cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length;
-  const cy = cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length;
-  const mouth = { x: cx - door.dir.x * (0.5 + half), y: cy - door.dir.y * (0.5 + half) };
+  const m = doorMiddle(door);
+  const mouth = { x: m.x - door.dir.x * (mouthDepth(door) + half), y: m.y - door.dir.y * (mouthDepth(door) + half) };
   return p => {
     const dx = p.x - mouth.x;
     const dy = p.y - mouth.y;
@@ -81,10 +83,12 @@ export function dungeonWalls(
   floor = 0,
   of: WallsOf = { id: 'dungeon' },
 ): DungeonWalls {
-  const { doors, floors, floor: shown } = visibleFloor(model, view, floor);
-  const kinds = shown.cave ? CAVE_DOOR_WALLS : DOOR_WALLS;
+  const visible = visibleFloor(model, view, floor);
+  const { doors, floors, floor: shown } = visible;
+  // A door on an edge closes its doorway on the edge itself, whatever its kind.
+  const kinds = shown.cave || shown.walls === 'edges' ? ON_LINE_DOOR_WALLS : DOOR_WALLS;
   const half = wallInkWidth(style) / 2;
-  const rings = wallRings(floors, doors.filter(door => door.kind === 'secret'), half);
+  const rings = wallRings([...floors, ...secretDoorways(visible)], doors.filter(door => door.kind === 'secret' && !door.edge), half);
 
   const placed: { door: DungeonDoor; wall: DoorWall; ends: [RingHit, RingHit] }[] = [];
   let unplaced = 0;
@@ -92,13 +96,19 @@ export function dungeonWalls(
     const wall = kinds[door.kind];
     if (!wall) continue;
     // The side walls lie half a cell and half a wall from the door's middle
-    const reach = 0.5 + half + 1 / STEPS;
+    const reach = (door.edge ? doorCells(door).length / 2 : 0.5) + half + 1 / STEPS;
     const ends = doorEnds(rings, doorLine(door, wall.v(door, half)), reach) ?? doorEnds(rings, doorLine(door, 0), reach);
     if (ends) placed.push({ door, wall, ends });
     else unplaced++;
   }
 
-  const outlines = splitRings(rings, placed.flatMap(p => p.ends));
+  // A window cuts the outer wall: between its two cuts stands a wall only a token is stopped by.
+  const cuts = shownWindows(visible).flatMap(window => {
+    const cut = windowCuts(rings, window, OUTER_WALL / 2 + half);
+    return cut ? [cut] : [];
+  });
+  const glass = onWindow(cuts);
+  const outlines = splitRings(rings, [...placed.flatMap(p => p.ends), ...cuts.flat()]);
   const { originCell, pxPerCell } = placement;
   const world = (p: { x: number; y: number }): { x: number; y: number } => ({
     x: (p.x - originCell.x) * pxPerCell,
@@ -119,7 +129,8 @@ export function dungeonWalls(
     const chainId = `chain_${of.id}_${index + 1}`;
     ring.forEach((corner, i) => {
       const next = ring[(i + 1) % ring.length]!;
-      if (!onMouth(corner, next)) add(corner, next, { type: 'solid', chainId });
+      if (onMouth(corner, next)) return;
+      add(corner, next, { type: 'solid', chainId, ...(glass(corner, next) && { blocks: 'movement' as const }) });
     });
   });
   const counts: Partial<Record<DoorKind, number>> = {};

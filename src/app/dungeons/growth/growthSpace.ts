@@ -19,6 +19,8 @@ export interface GrowthFloor {
   props: readonly DungeonProp[];
   terrain: readonly DungeonTerrain[];
   waterCells: readonly CellPoint[];
+  /** In a house, whether a cell lies outside it: its outer walls stand on the edges towards such cells. */
+  outside?: (x: number, y: number) => boolean;
 }
 
 /** Terrain a climber may hang over at a wall's foot: what lies on the floor, low and walked. */

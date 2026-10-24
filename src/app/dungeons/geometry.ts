@@ -5,7 +5,7 @@
  * props, water, rubble, cracks) live in that continuous space, so a cell's centre is (x + .5, y + .5).
  */
 
-import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from './model';
+import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStack, DungeonStair } from './model';
 
 /** An inclusive rectangle of cells. */
 export interface CellRect {
@@ -115,6 +115,54 @@ export function holdsCell(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells
 export function doorCells(door: Pick<DungeonDoor, 'x' | 'y' | 'wide'>): CellPoint[] {
   const own = { x: door.x, y: door.y };
   return door.wide ? [own, { x: door.x + door.wide.x, y: door.y + door.wide.y }] : [own];
+}
+
+/** The cells a door stands in, which no room's floor holds: a cell door's (`doorCells`), none for a door on an edge between two floors. */
+export function doorwayCells(door: Pick<DungeonDoor, 'x' | 'y' | 'wide' | 'edge'>): CellPoint[] {
+  return door.edge ? [] : doorCells(door);
+}
+
+/**
+ * The floor cells of `room` beside a doorway, one per cell of a wide door: just inside a cell
+ * door's wall, or the cell on the room's side of a door on an edge. None where the door does not
+ * open into the room.
+ */
+export function doorSide(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide' | 'from' | 'to' | 'edge'>, room: number): CellPoint[] {
+  const step = door.from === room ? -1 : door.to === room ? 1 : 0;
+  if (step === 0) return [];
+  // An edge door's own cell lies on its `from` side, so the room it leads from steps nowhere.
+  const by = door.edge ? (step < 0 ? 0 : 1) : step;
+  return doorCells(door).map((c) => ({ x: c.x + door.dir.x * by, y: c.y + door.dir.y * by }));
+}
+
+/** The middle of a doorway, in cells: of its cells, or of the edge a door on an edge stands on. */
+export function doorMiddle(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide' | 'edge'>): CellPoint {
+  const cells = doorCells(door);
+  const shift = door.edge ? 0.5 : 0;
+  return {
+    x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length + door.dir.x * shift,
+    y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length + door.dir.y * shift,
+  };
+}
+
+/** The smallest rectangle round some cells, as a room's `x`, `y`, `w`, `h`. */
+export function cellsBox(cells: readonly CellPoint[]): { x: number; y: number; w: number; h: number } {
+  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const c of cells) [x0, y0, x1, y1] = [Math.min(x0, c.x), Math.min(y0, c.y), Math.max(x1, c.x), Math.max(y1, c.y)];
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+/** The cells of a house (`DungeonFloor.walls === 'edges'`): every room's floor and every chimney stack, by key. */
+export function houseCells(floor: { rooms: readonly Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>[]; stacks?: readonly DungeonStack[] | undefined }): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const room of floor.rooms) for (const c of floorCellsOf(room)) keys.add(cellKey(c.x, c.y));
+  for (const s of floor.stacks ?? []) for (let x = s.x; x < s.x + s.w; x++) for (let y = s.y; y < s.y + s.h; y++) keys.add(cellKey(x, y));
+  return keys;
+}
+
+/** Where a door's own frame is centred: its first cell's middle, or the middle of the edge a house's door stands on. */
+export function doorAnchor(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide' | 'edge'>): CellPoint {
+  return door.edge ? doorMiddle(door) : { x: door.x + 0.5, y: door.y + 0.5 };
 }
 
 /** A room's floor in cells: its cave cells where it has them, else its rectangle. */

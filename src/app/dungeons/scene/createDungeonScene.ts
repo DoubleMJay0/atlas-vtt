@@ -15,7 +15,7 @@ import { DEFAULT_PX_PER_CELL, SCENE_MAP_PIXELS, SCENE_MAP_QUALITY, type MapLayou
 import type { DungeonStyle, DungeonView } from '../style';
 import { DungeonWorkerClient } from '../worker/DungeonWorkerClient';
 import type { DungeonJob, DungeonRendered } from '../worker/dungeonJob';
-import { floorLetter } from './roomKeys';
+import { floorName } from './roomKeys';
 import { dungeonNote, roomPins } from './toNote';
 import { dungeonScene } from './toScene';
 import type { DungeonPlacement } from './toWalls';
@@ -61,9 +61,6 @@ function placementOn(layout: MapLayout, saved: { width: number }): DungeonPlacem
   return { originCell: layout.originCell, pxPerCell };
 }
 
-/** A floor as its level and its map name it: "Floor A". */
-const floorName = (floor: number): string => t('dungeonScene.floor', { letter: floorLetter(floor) });
-
 /**
  * The scene's levels, bottom first: a Cavern's deepest floor first and its entry floor last, a
  * building's entry floor first and its top floor last; each a floor high, the entry floor from 0
@@ -72,7 +69,7 @@ const floorName = (floor: number): string => t('dungeonScene.floor', { letter: f
 export function floorLevels(levelIds: readonly string[], backgrounds: readonly string[], stack: FloorStack): SceneLevel[] {
   return bottomUp(stack).map((floor): SceneLevel => ({
     id: levelIds[floor]!,
-    name: floorName(floor),
+    name: floorName(stack, floor),
     elevation: levelElevation(stack, floor, LEVEL_HEIGHT),
     background: backgrounds[floor] ?? null,
   }));
@@ -148,7 +145,7 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
   const { levelIds, rooms } = parts;
   const maps: MapToWrite[] = images.map((image, floor) => ({
     image,
-    name: (scene) => (levelIds ? t('dungeonScene.mapName', { scene, floor: floorName(floor) }) : scene),
+    name: (scene) => (levelIds ? t('dungeonScene.mapName', { scene, floor: floorName(stackOf(model), floor) }) : scene),
   }));
   const written = await writeMapScene(deps, {
     collection,

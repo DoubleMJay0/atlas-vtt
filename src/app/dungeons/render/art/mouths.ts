@@ -1,4 +1,5 @@
-import { doorCells } from '../../geometry';
+import { doorCells, doorMiddle } from '../../geometry';
+import { mouthDepth } from '../houseShapes';
 import type { DungeonDoor } from '../../model';
 import type { Vec } from '../geometry';
 import { rectPoly } from './paths';
@@ -23,9 +24,10 @@ export function mouthsOf(dungeon: { doors: readonly DungeonDoor[] }): Mouth[] {
     .filter(door => door.from === null && door.kind !== 'secret')
     .map(door => {
       const cells = doorCells(door);
-      const cx = cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length;
-      const cy = cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length;
-      return { door, out: { x: -door.dir.x, y: -door.dir.y }, at: { x: cx - door.dir.x * 0.5, y: cy - door.dir.y * 0.5 }, width: cells.length };
+      // A cell door's mouth is its cell's outer edge; a door on an edge stands on the house's outer wall.
+      const m = doorMiddle(door);
+      const back = mouthDepth(door);
+      return { door, out: { x: -door.dir.x, y: -door.dir.y }, at: { x: m.x - door.dir.x * back, y: m.y - door.dir.y * back }, width: cells.length };
     });
 }
 

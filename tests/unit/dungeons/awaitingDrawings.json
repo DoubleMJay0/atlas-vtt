@@ -1,5 +1,17 @@
 {
   "props": [],
   "terrain": [],
-  "cave": []
+  "cave": [],
+  "grounds": [
+    "garden",
+    "path",
+    "drive",
+    "hedge",
+    "boundary-wall",
+    "gate",
+    "porch",
+    "outbuilding",
+    "tree",
+    "garden-fountain"
+  ]
 }

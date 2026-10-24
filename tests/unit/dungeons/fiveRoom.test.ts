@@ -17,14 +17,15 @@ const ONE_FLOOR = floorStack('down', 1);
 const SEEDS = 1000;
 const TAG_SETS: readonly string[][] = [[], ['colonnades'], ['crumbling'], ['wet'], ['dry'], ['large'], ['small'], ['round']];
 /** The theme each tag set is asked with: what the retired temple, tomb and dwelling tags stood for, else Any. */
-const THEMES: readonly (ThemeChoice | undefined)[] = [undefined, 'fortress', undefined, 'cavern', 'mansion', undefined, undefined, undefined];
+const THEMES: readonly (ThemeChoice | undefined)[] = [undefined, 'fortress', undefined, 'cavern', 'fortress', undefined, undefined, undefined];
 
 const runs: { seed: number; theme: ThemeChoice | undefined; tags: string[]; model: DungeonModel }[] = Array.from({ length: SEEDS }, (_, k) => {
   const seed = (k + 1) * 6271;
   const tags = TAG_SETS[k % TAG_SETS.length] ?? [];
   const theme = THEMES[k % THEMES.length];
   return { seed, theme, tags, model: generateDungeon({ seed, theme, tags, floors: 1 + (k % 4), fiveRoom: true, bossRoom: k % 3 === 0 ? false : undefined }) };
-});
+  // A Haunted Mansion's five rooms are a house (`house/housePrograms.test.ts`), which Any may pick.
+}).filter((run) => run.model.theme !== 'mansion');
 
 function failures(check: (floor: DungeonFloor, model: DungeonModel) => string[]): string[] {
   return runs.flatMap(({ seed, tags, model }) => check(model.floors[0]!, model).map((p) => `seed ${seed} [${tags.join(',')}]: ${p}`)).slice(0, 10);
@@ -80,16 +81,22 @@ describe('five-room dungeons', () => {
   it('honour the tags that make sense for one string of rooms', () => {
     const secretShare = (tags: string[]): number => {
       let secret = 0;
-      for (let seed = 1; seed <= 40; seed++) if (stageRoom(generateDungeon({ seed, tags, floors: 1, fiveRoom: true }).floors[0]!, 'reward')?.wing === 'secret') secret++;
-      return secret / 40;
+      let asked = 0;
+      for (let seed = 1; seed <= 48; seed++) {
+        const model = generateDungeon({ seed, tags, floors: 1, fiveRoom: true });
+        if (model.theme === 'mansion') continue;
+        asked++;
+        if (stageRoom(model.floors[0]!, 'reward')?.wing === 'secret') secret++;
+      }
+      return secret / asked;
     };
     expect(secretShare(['secret'])).toBeGreaterThan(0.9);
     expect(secretShare(['no-secrets'])).toBe(0);
     const differs = (tag: string): number => {
       let changed = 0;
-      for (let seed = 1; seed <= 40; seed++) {
-        // A Cavern builds no colonnades whatever its tags say, so the tags are held on the built themes.
-        const theme = seed % 2 === 0 ? 'fortress' : 'mansion';
+      for (let seed = 1; seed <= 60; seed++) {
+        // A Cavern builds no colonnades whatever its tags say, and a Mansion is a house, so the tags are held on the Fortress.
+        const theme = 'fortress';
         const rooms = (tags: string[]) => JSON.stringify(generateDungeon({ seed, theme, tags, floors: 1, fiveRoom: true }).floors[0]!.rooms.map((r) => [r.x, r.y, r.w, r.h, r.colonnade, r.rotunda]));
         if (rooms([]) !== rooms([tag])) changed++;
       }
@@ -111,7 +118,6 @@ describe('five-room dungeons', () => {
 
 describe.each([
   ['fortress', { entrance: ['gatehouse'], puzzle: ['gallery', 'library'], reward: ['solar'] }],
-  ['mansion', { entrance: ['entrance-hall'], puzzle: ['portrait-gallery', 'library'], reward: ['study', 'master-bedroom'] }],
 ] as const)('five-room %s dungeons', (theme, types) => {
   const themed = Array.from({ length: 300 }, (_, k) => generateDungeon({ seed: (k + 1) * 4447, theme, tags: [], floors: 1, fiveRoom: true }));
 

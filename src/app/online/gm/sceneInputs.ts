@@ -59,7 +59,7 @@ export function sharedWall(wall: WallSegment): SharedWall {
   const door = wall.type === 'door' || (wall.type === 'secret-door' && !closed) ? { door: closed ? 'closed' as const : 'open' as const } : {};
   return {
     p: [wall.p1.x, wall.p1.y, wall.p2.x, wall.p2.y], ...door,
-    ...(wall.direction && { direction: wall.direction }), ...(wall.blocks && { blocks: wall.blocks }), ...(wall.limited === true && { limited: true as const }),
+    ...(wall.direction && { direction: wall.direction }), ...((wall.blocks === 'sight' || wall.blocks === 'light') && { blocks: wall.blocks }), ...(wall.limited === true && { limited: true as const }),
   };
 }
 
@@ -69,7 +69,8 @@ export function sharedLightingScene(state: SceneState, rules: SightRules, measur
   return {
     cellSize,
     unitDistance,
-    walls: wallList(levelObjects(state).walls).map(sharedWall),
+    // A window stops a token and nothing players see by, so their lighting never gets it.
+    walls: wallList(levelObjects(state).walls).filter((wall) => wall.blocks !== 'movement').map(sharedWall),
     zones: lightZoneList(levelObjects(state).lightZones).map((zone) => ({
       polygon: zone.polygon.flatMap((corner) => [corner.x, corner.y]), ambient: zone.ambient, ...(zone.ambientColor && { colour: zone.ambientColor }),
     })),

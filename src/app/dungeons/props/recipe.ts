@@ -24,6 +24,8 @@ export interface RecipeContext {
   ruined: boolean;
   /** The theme's richness for the room, 0..1; 1 knowing nothing more. */
   richness: number;
+  /** A lived-in house: pieces marked `keptWhenLived` are always there. */
+  lived?: true;
 }
 
 /** The room's free cells whose middles lie within `half` cells of a prop's middle across its front and `from`..`to` cells ahead of it. */
@@ -101,7 +103,7 @@ export function furnishByRecipe(fs: FurnishSpace, recipe: FurnishRecipe, context
   // A ruin keeps its defining piece and part of the rest.
   const pieces = context.ruined ? keptPieces(fs.rng, recipe.pieces, ruinedKeep(fs.rng)) : recipe.pieces;
   for (const piece of pieces) {
-    const odds = Math.min(1, (piece.chance ?? 1) * (0.7 + 0.6 * context.depthRank)) * context.richness;
+    const odds = context.lived && piece.keptWhenLived ? 1 : Math.min(1, (piece.chance ?? 1) * (0.7 + 0.6 * context.depthRank)) * context.richness;
     if (!chance(fs.rng, odds)) continue;
     out.push(...placeByVerb(fs, piece, countOf(fs, piece), definingPiece));
   }

@@ -22,6 +22,8 @@ export const ART_DUNGEONS: readonly { name: string; request: DungeonRequest }[] 
   { name: 'overgrown-fortress', request: { seed: 404, theme: 'fortress', tags: ['round', 'colonnades', 'overgrown'], floors: 1 } },
   { name: 'overgrown-cavern', request: { seed: 909, theme: 'cavern', tags: ['wet', 'overgrown'], floors: 1, waterLevel: 0.4 } },
   { name: 'overgrown-mansion', request: { seed: 16, theme: 'mansion', tags: ['overgrown', 'ruined'], floors: 1 } },
+  // A large house of three floors, its cellar the last: ground floor, first floor, cellar.
+  { name: 'mansion-large-cellar', request: { seed: 2, theme: 'mansion', tags: ['large', 'overgrown'], floors: 3 } },
   { name: 'overgrown-halls', request: { seed: 202, tags: ['crumbling', 'medium', 'overgrown'], floors: 1 } },
   { name: 'wet-moss', request: { seed: 909, tags: ['wet'], floors: 1, waterLevel: 0.45 } },
   // Caverns, each variant: `VITE_ART_DUNGEON=cavern` draws them all.

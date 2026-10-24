@@ -10,7 +10,7 @@
  */
 
 import type { CellDir, CellPoint, DungeonColumn, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
-import { cellKey, cellsOf, dir, floorCellsOf, holdsCell } from '../geometry';
+import { cellKey, cellsOf, dir, doorSide, floorCellsOf, holdsCell } from '../geometry';
 import { type StairEnd, approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
 import type { Footing } from './catalog';
 
@@ -39,6 +39,8 @@ export class RoomCells {
   private readonly byStairs = new Set<string>();
   /** The cells of the room's doors other than secret ones, which keep the wall whole, by key. */
   private readonly doorCells: Set<string>;
+  /** Where doors on edges open, as `edgeSlot`s of the room's cell beside each and the way out across it. */
+  private readonly edgeDoors: Set<string>;
   /** The main path's way through a cave, by key: nothing that blocks stands on it. */
   private readonly lane: ReadonlySet<string>;
 
@@ -59,7 +61,12 @@ export class RoomCells {
     const stairCells = inside.flatMap((s) => cellsOf(spotRect(s)));
     const approaches = inside.flatMap((s) => approachCells(s, endOf(s)));
     this.needed = [...doorApproaches(room, doors), ...approaches].filter(own);
-    this.doorCells = new Set(doors.filter((d) => d.kind !== 'secret' && (d.from === room.id || d.to === room.id)).map((d) => cellKey(d.x, d.y)));
+    const shown = doors.filter((d) => d.kind !== 'secret' && (d.from === room.id || d.to === room.id));
+    this.doorCells = new Set(shown.filter((d) => !d.edge).map((d) => cellKey(d.x, d.y)));
+    // A door on an edge is no cell: it opens beyond the room's own cell beside it, towards the room across.
+    this.edgeDoors = new Set(
+      shown.filter((d) => d.edge).flatMap((d) => doorSide(d, room.id).map((c) => edgeSlot(c, d.from === room.id ? d.dir : { x: -d.dir.x, y: -d.dir.y }))),
+    );
     for (const c of [...stairCells, ...this.needed]) this.clear.add(cellKey(c.x, c.y));
     // Every stairwell of the floor counts, not only this room's: a cave chamber may reach beside another's.
     const stairway = stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, endOf(s))]);
@@ -228,7 +235,7 @@ export class RoomCells {
   /** Whether a door (not a secret one) opens in the wall beyond `c` on `side`. */
   doorOn(side: WallSide, c: CellPoint): boolean {
     const d = this.beyond(side);
-    return this.doorCells.has(cellKey(c.x + d.x, c.y + d.y));
+    return this.doorCells.has(cellKey(c.x + d.x, c.y + d.y)) || this.edgeDoors.has(edgeSlot(c, d));
   }
 
   /** Whether the cell lies off every way through the room (its lanes, what they keep clear, a cave's main path), whatever stands there. */
@@ -284,4 +291,9 @@ function touches(column: DungeonColumn, c: CellPoint): boolean {
   const dx = Math.max(c.x - column.x, 0, column.x - (c.x + 1));
   const dy = Math.max(c.y - column.y, 0, column.y - (c.y + 1));
   return Math.hypot(dx, dy) < column.radius + 0.05;
+}
+
+/** The edge of cell `c` towards `d`, as a key. */
+function edgeSlot(c: CellPoint, d: CellPoint): string {
+  return `${cellKey(c.x, c.y)}>${d.x},${d.y}`;
 }

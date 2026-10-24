@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { floorAbove, stackOf } from '../../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { outerWallCells } from '../../../src/app/dungeons/growth/outerWalls';
+import { houseCells } from '../../../src/app/dungeons/geometry';
+import type { DungeonFloor } from '../../../src/app/dungeons/model';
+
+/** A house's outside, where its outer walls face; none for a floor walled by whole cells. */
+function outsideOf(floor: DungeonFloor): ((x: number, y: number) => boolean) | undefined {
+  if (floor.walls !== 'edges') return undefined;
+  const house = houseCells(floor);
+  return (x, y) => !house.has(`${x},${y}`);
+}
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
 import { keptPieces, ruinedKeep } from '../../../src/app/dungeons/props/ruined';
@@ -33,7 +42,8 @@ describe.each(['fortress', 'mansion'] as const)('a ruined %s', (theme) => {
 
   it('keeps 40 to 70 percent of its furniture', () => {
     const share = furniture(ruined) / furniture(plain);
-    expect(share).toBeGreaterThanOrEqual(0.4);
+    // A ruined house also lost the floors over its fallen wing, and their pieces with them.
+    expect(share).toBeGreaterThanOrEqual(theme === 'mansion' ? 0.3 : 0.4);
     expect(share).toBeLessThanOrEqual(0.7);
   });
 
@@ -49,7 +59,7 @@ describe.each(['fortress', 'mansion'] as const)('a ruined %s', (theme) => {
     const stray = ruined.flatMap((m) => m.floors.flatMap((f) => f.growth.filter((g) => {
       const room = f.rooms[g.room];
       if (!room) return true;
-      const outer = outerWallCells(room, f.rooms);
+      const outer = outerWallCells(room, f.rooms, outsideOf(f));
       return !g.cells.every((c) => outer.has(`${c.x},${c.y}`));
     }).map((g) => `${m.seed}: ${g.kind} off an outer wall in a ${f.rooms[g.room]?.type}`)));
     expect(ruined.some((m) => m.floors.some((f) => f.growth.length > 0))).toBe(true);
@@ -64,7 +74,7 @@ describe.each(['fortress', 'mansion'] as const)('a ruined %s', (theme) => {
       const wet = new Set(f.waterCells.map((c) => `${c.x},${c.y}`));
       const near = (c: { x: number; y: number }, set: ReadonlySet<string>): boolean => [-2, -1, 0, 1, 2].some((dx) => [-2, -1, 0, 1, 2].some((dy) => set.has(`${c.x + dx},${c.y + dy}`)));
       return f.terrain.filter((p) => UNDERGROWTH.has(p.kind) && f.rooms[p.room]?.type).filter((p) => {
-        const outer = outerWallCells(f.rooms[p.room]!, f.rooms);
+        const outer = outerWallCells(f.rooms[p.room]!, f.rooms, outsideOf(f));
         return !p.cells.some((c) => near(c, outer) || near(c, under) || near(c, wet));
       }).map((p) => `${m.seed}: ${p.kind} in a sealed ${f.rooms[p.room]?.type} on floor ${k}`);
     }));
