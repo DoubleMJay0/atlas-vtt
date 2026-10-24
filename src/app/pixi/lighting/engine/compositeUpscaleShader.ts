@@ -55,9 +55,10 @@ void main() {
   vec4 t11 = texelFetch(uReduced, clamp(at + ivec2(1, 1), ivec2(0), last), 0);
   vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
   vec4 e = vec4(shownOf(t00), shownOf(t10), shownOf(t01), shownOf(t11));
-  // Only the texels the pixel takes anything of count towards the darkest.
-  vec4 big = vec4(1e9);
-  vec4 counted = mix(big, e, step(1e-6, w));
+  // Only the texels the pixel takes anything of count towards the darkest. Selected, not blended:
+  // a mix by a float weight is big + w * (e - big) on some devices (SwiftShader), which rounds e
+  // away to 0, so every texel was darker than the darkest and the picture came out black.
+  vec4 counted = mix(vec4(1e9), e, greaterThanEqual(w, vec4(1e-6)));
   float darkest = min(min(counted.x, counted.y), min(counted.z, counted.w));
   w *= vec4(keeps(e.x, darkest), keeps(e.y, darkest), keeps(e.z, darkest), keeps(e.w, darkest));
   vec3 color = (t00.rgb * w.x + t10.rgb * w.y + t01.rgb * w.z + t11.rgb * w.w) / max(dot(w, vec4(1.0)), 1e-6);
