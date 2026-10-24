@@ -2,13 +2,7 @@
   "props": [
     "hearth",
     "bust",
-    "stalagmites",
-    "column-formation",
-    "flowstone",
-    "curtain",
-    "crystals",
     "mushrooms",
-    "boulder",
     "campfire"
   ],
   "terrain": [],
