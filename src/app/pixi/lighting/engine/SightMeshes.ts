@@ -1,4 +1,4 @@
-import { BufferImageSource, Container, Mesh, UniformGroup, type Geometry, type Shader } from 'pixi.js';
+import { Container, Mesh, UniformGroup, type BufferImageSource, type Geometry, type Shader } from 'pixi.js';
 import type { Point } from '../../../types/visionTypes';
 import type { SeenSpot } from '../../../vision/perception';
 import type { Sight } from '../../../vision/sight';
@@ -9,7 +9,7 @@ import { fanGeometry } from './DarknessMap';
 import { ENGINE_SHADERS } from './engineShaders';
 import { createShader } from './gpu';
 import { SPOT_CHANNELS, sightChannels, type SightChannels } from './senseDrawing';
-import { MAX_WEDGES } from './sightShader';
+import { MAX_WEDGES, wedgeTexture } from './wedges';
 
 /** A sight mesh with the GPU objects it owns besides the mesh itself. */
 interface SightMesh {
@@ -82,9 +82,8 @@ export class SightMeshes {
 
   /** A mesh of `polygon` around `origin`; a `range` above 0 fades its picture towards that radius (`SENSE_FADE`). */
   private create(polygon: Polygon, origin: Point, wedges: readonly SightWedge[], channels: SightChannels, range = 0): SightMesh {
-    const wedgeSource = wedgeTexture(wedges);
+    const wedgeSource = wedgeTexture(wedges, origin);
     const uniforms = new UniformGroup({
-      uWedgeCount: { value: wedges.length, type: 'i32' },
       uChannel: { value: new Float32Array(channels), type: 'vec4<f32>' },
       uFade: { value: new Float32Array([origin.x, origin.y, range]), type: 'vec3<f32>' },
     });
@@ -109,23 +108,4 @@ export class SightMeshes {
     this.spots = [];
     destroyTree(this.view);
   }
-}
-
-/** Two rows of `rgba32float` texels, one column per wedge: corner and edge, then side and angle. */
-function wedgeTexture(wedges: readonly SightWedge[]): BufferImageSource {
-  const count = Math.max(1, wedges.length);
-  const data = new Float32Array(count * 2 * 4);
-  wedges.forEach((w, i) => {
-    data.set([w.a.x, w.a.y, w.e.x, w.e.y], i * 4);
-    data.set([w.side, w.phi, 0, 0], (count + i) * 4);
-  });
-  // Premultiplying on upload is invalid for float data and leaves the texture empty.
-  return new BufferImageSource({
-    resource: data,
-    width: count,
-    height: 2,
-    format: 'rgba32float',
-    scaleMode: 'nearest',
-    alphaMode: 'no-premultiply-alpha',
-  });
 }
