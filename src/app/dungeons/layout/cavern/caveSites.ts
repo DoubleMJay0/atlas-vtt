@@ -20,7 +20,7 @@ export interface CaveSites {
   lane: ReadonlySet<string>;
   /** A fault line that crosses three or more of the room's cells. */
   faultOf(room: number): CaveFault | null;
-  /** On the deepest floor of several, or in the last third by hops on one. */
+  /** On the deepest floor of several; on one, the boss room or in the last third by hops. */
   deep(room: number): boolean;
   nearWater(room: number, hops?: number): boolean;
 }
@@ -91,7 +91,7 @@ export function caveSites(floors: readonly SiteFloor[]): CaveSites[] {
         const cells = floor.rooms[room]?.cells ?? [];
         return cave?.faults.find((fault) => crossings(fault, cells) >= CROSSED_CELLS) ?? null;
       },
-      deep: (room) => (several ? deepest : Number.isFinite(own[room]) && (own[room] ?? 0) >= (reach * 2) / 3),
+      deep: (room) => (several ? deepest : floor.rooms[room]?.boss === true || (Number.isFinite(own[room]) && (own[room] ?? 0) >= (reach * 2) / 3)),
       nearWater: (room, within = 1) => {
         let ring = [room];
         const seen = new Set(ring);
