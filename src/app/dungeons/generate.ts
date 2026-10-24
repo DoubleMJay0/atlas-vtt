@@ -71,7 +71,8 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const params = fiveRoom ? fiveRoomParams(base) : base;
   const rolled = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   const count = requestedFloors(request);
-  const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom, themeOf(theme).rise);
+  const { rise } = themeOf(theme);
+  const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom, rise);
   const themed = typeDungeon(seed, theme, params.tags, planned);
   const { typed } = themed;
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.
@@ -88,7 +89,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
       water: typed ? themeWater(floor.rooms, themed.rooms[index] ?? new Map(), params.tags.has('ruined')) : null,
     };
   });
-  const stack = floorStack(themeOf(theme).rise, planned.length);
+  const stack = floorStack(rise, planned.length);
   const terrain = planTerrain(
     seed,
     parts.map(({ planned: floor, roles, columns }, index) => ({ ...floor, columns, roles: roles.roles, empty: roles.empty, types: themed.rooms[index] ?? new Map() })),

@@ -97,7 +97,8 @@ function overlappingPairs(earlier: FloorShape, later: FloorShape): { a: DungeonR
 export function extraConnection(rng: Rng, earlier: FloorShape, later: FloorShape, index: number, stack: FloorStack): StairSpot | null {
   const earlierSpace = spaceOf(earlier, index, stack);
   const laterSpace = spaceOf(later, index + 1, stack);
-  const [earlierEnd, laterEnd] = [stairEnd(stack, index, index + 1), stairEnd(stack, index + 1, index)];
+  const earlierEnd = stairEnd(stack, index, index + 1);
+  const laterEnd = stairEnd(stack, index + 1, index);
   const spots: StairSpot[] = [];
   let widest = 0;
   for (const { a, b, spread } of overlappingPairs(earlier, later)) {

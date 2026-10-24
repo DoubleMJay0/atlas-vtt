@@ -9,6 +9,7 @@ import type { CellPoint, DungeonDoor, DungeonRoom } from '../model';
 import { floorAbove } from '../floors/floorStack';
 import { type Rng, chance } from '../rng';
 import { draft } from './catalog';
+import type { FloorTerrain } from './floorTerrain';
 import { reasonsOf } from './typeReasons';
 import type { TerrainWork } from './work';
 
@@ -39,7 +40,7 @@ export function murderHoles(work: TerrainWork): void {
       const typed = work.typed(k, room.id);
       if (!typed || !reasonsOf(typed.spec, work.theme.ruined).some((r) => r.at === 'above' && r.kinds.includes('murder-hole'))) continue;
       const door = gateDoor(floor.plan.doors, room);
-      if (door) cutRow(work, top, k, passage(room, door), work.rng(top, `murder-holes:${room.id}`));
+      if (door) cutRow(work, above, floor, passage(room, door), work.rng(top, `murder-holes:${room.id}`));
     }
   });
 }
@@ -48,10 +49,9 @@ export function murderHoles(work: TerrainWork): void {
  * A row of holes over every other cell of the passage, from just inside the gate or from the cell
  * after it, in the one room above that lies over the most of them; at least two.
  */
-function cutRow(work: TerrainWork, top: number, k: number, way: readonly CellPoint[], rng: Rng): void {
-  const above = work.floors[top];
-  const gate = work.floors[k]?.roomHolding(way.slice(0, 1));
-  if (!above || !gate || !chance(rng, MURDER_HOLE_CHANCE)) return;
+function cutRow(work: TerrainWork, above: FloorTerrain, below: FloorTerrain, way: readonly CellPoint[], rng: Rng): void {
+  const gate = below.roomHolding(way.slice(0, 1));
+  if (!gate || !chance(rng, MURDER_HOLE_CHANCE)) return;
   const rows = [0, 1].flatMap((first) => {
     const spots = way.filter((c, t) => t % 2 === first && gate.isFloor(c));
     const rooms = [...new Set(spots.map((c) => above.roomHolding([c])))];
@@ -60,5 +60,5 @@ function cutRow(work: TerrainWork, top: number, k: number, way: readonly CellPoi
   const fits = rows.filter(({ rc, cells }) => cells.length >= 2 && rc.room.wing === 'regular' && !rc.room.boss && rc.room.stage === undefined && rc.allows(cells, 'walk'));
   const best = fits.sort((a, b) => b.cells.length - a.cells.length)[0];
   if (!best) return;
-  for (const c of best.cells) above.place({ ...draft('murder-hole', best.rc.room.id, [c]), opening: { bottom: k, link: work.nextLink() } });
+  for (const c of best.cells) above.place({ ...draft('murder-hole', best.rc.room.id, [c]), opening: { bottom: below.index, link: work.nextLink() } });
 }

@@ -48,15 +48,15 @@ const LIGHT_REACH = 1;
 
 /** The cells of a built room where plants may root: by an outer wall, under an opening above, by water; by key. */
 function litCells(rc: RoomCells, rooms: readonly DungeonRoom[], space: GrowthSpace, openAbove: ReadonlySet<string>): Set<string> {
-  const sources = [...outerWallCells(rc.room, rooms), ...openAbove];
-  const near = (c: CellPoint): boolean => space.byWater(c) || sources.some((key) => {
-    const [x, y] = key.split(',').map(Number) as [number, number];
-    return Math.abs(x - c.x) <= LIGHT_REACH && Math.abs(y - c.y) <= LIGHT_REACH;
-  });
+  const sources = new Set([...outerWallCells(rc.room, rooms), ...openAbove]);
+  const nearSource = (c: CellPoint): boolean => {
+    for (let dy = -LIGHT_REACH; dy <= LIGHT_REACH; dy++) for (let dx = -LIGHT_REACH; dx <= LIGHT_REACH; dx++) if (sources.has(cellKey(c.x + dx, c.y + dy))) return true;
+    return false;
+  };
   const out = new Set<string>();
   for (let i = 0; i < rc.depth; i++) for (let j = 0; j < rc.width; j++) {
     const c = rc.cell(i, j);
-    if (rc.isFloor(c) && near(c)) out.add(cellKey(c.x, c.y));
+    if (rc.isFloor(c) && (space.byWater(c) || nearSource(c))) out.add(cellKey(c.x, c.y));
   }
   return out;
 }

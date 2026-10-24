@@ -12,6 +12,7 @@ import { floorAbove, floorBelow } from '../floors/floorStack';
 import type { MessageKey } from '../../i18n';
 import { type Rng, chance, int, shuffled } from '../rng';
 import { draft } from './catalog';
+import type { FloorTerrain } from './floorTerrain';
 import { cutHole, dropBelow } from './holes';
 import type { RoomCells } from './roomCells';
 import { holeAllowed, openingAbove, reasonsOf } from './typeReasons';
@@ -80,14 +81,13 @@ export function galleriesOverHalls(work: TerrainWork): void {
       const typed = work.typed(k, hall.id);
       const reason = typed && !hall.boss ? reasonsOf(typed.spec, work.theme.ruined).find((r) => r.at === 'above' && r.kinds.includes('gallery')) : undefined;
       if (!reason || hall.wing !== 'regular' || hall.rotunda || !chance(work.rng(top, `gallery:${hall.id}`), GALLERY_CHANCE)) continue;
-      cutGalleryOver(work, top, floorRect(hall), reason.name);
+      cutGalleryOver(work, above, k, floorRect(hall), reason.name);
     }
   });
 }
 
-function cutGalleryOver(work: TerrainWork, top: number, hall: CellRect, name: MessageKey | undefined): void {
-  const above = work.floors[top];
-  if (!above) return;
+/** The gallery cut in `above` over the hall with floor `hall` on floor `k`, which lies right below it. */
+function cutGalleryOver(work: TerrainWork, above: FloorTerrain, k: number, hall: CellRect, name: MessageKey | undefined): void {
   const area = (r: CellRect): number => cellsOf(r).length;
   const places = above.plan.rooms
     .filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda && !room.boss && room.stage === undefined)
@@ -100,7 +100,7 @@ function cutGalleryOver(work: TerrainWork, top: number, hall: CellRect, name: Me
   for (const { rc, rect } of places) {
     const cells = cellsOf(rect);
     if (cells.length > rc.floorCount * (1 - GALLERY_FLOOR) || cells.some((c) => rc.nearStairs(c)) || !rc.allows(cells, 'block')) continue;
-    if (above.place({ ...draft('gallery', rc.room.id, cells, { name }), opening: { bottom: floorBelow(work.stack, top), link: work.nextLink() } }) !== null) return;
+    if (above.place({ ...draft('gallery', rc.room.id, cells, { name }), opening: { bottom: k, link: work.nextLink() } }) !== null) return;
   }
 }
 
