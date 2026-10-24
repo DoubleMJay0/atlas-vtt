@@ -7,7 +7,7 @@ export type Rng = () => number;
  * The concerns that draw numbers. Each has a stream of its own, so restyling never changes the
  * layout, and a change in one never shifts the others.
  */
-export type RngStream = 'layout' | 'stairs' | 'terrain' | 'props' | 'water' | 'growth' | 'rooms' | 'render';
+export type RngStream = 'layout' | 'stairs' | 'terrain' | 'props' | 'water' | 'growth' | 'rooms' | 'cave' | 'render';
 
 /** Largest seed a GM can type (as Watabou's: 1 to 2³¹ − 2). */
 export const MAX_SEED = 2_147_483_646;

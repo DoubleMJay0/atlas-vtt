@@ -5,7 +5,7 @@
  * props, water, rubble, cracks) live in that continuous space, so a cell's centre is (x + .5, y + .5).
  */
 
-import type { CellDir, CellPoint, DungeonRoom } from './model';
+import type { CellDir, CellPoint, DungeonDoor, DungeonRoom } from './model';
 
 /** An inclusive rectangle of cells. */
 export interface CellRect {
@@ -71,4 +71,31 @@ export function cellsOf(rect: CellRect): CellPoint[] {
   const cells: CellPoint[] = [];
   for (let y = rect.y0; y <= rect.y1; y++) for (let x = rect.x0; x <= rect.x1; x++) cells.push({ x, y });
   return cells;
+}
+
+/** A room's floor: the cells a cave shaped it to, else its rectangle. */
+export function floorCellsOf(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>): CellPoint[] {
+  return room.cells ?? cellsOf(floorRect(room));
+}
+
+const maskKeys = new WeakMap<readonly CellPoint[], ReadonlySet<string>>();
+
+function keysOf(cells: readonly CellPoint[]): ReadonlySet<string> {
+  let keys = maskKeys.get(cells);
+  if (!keys) {
+    keys = new Set(cells.map((c) => cellKey(c.x, c.y)));
+    maskKeys.set(cells, keys);
+  }
+  return keys;
+}
+
+/** Whether the cell is floor of the room: in its mask, else in its rectangle. */
+export function holdsCell(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>, x: number, y: number): boolean {
+  return room.cells ? keysOf(room.cells).has(cellKey(x, y)) : inRect(floorRect(room), x, y);
+}
+
+/** The cells a door stands in: its own, and the one beside it where it is a narrows two cells wide. */
+export function doorCells(door: Pick<DungeonDoor, 'x' | 'y' | 'wide'>): CellPoint[] {
+  const own = { x: door.x, y: door.y };
+  return door.wide ? [own, { x: door.x + door.wide.x, y: door.y + door.wide.y }] : [own];
 }

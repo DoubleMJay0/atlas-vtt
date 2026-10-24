@@ -7,6 +7,7 @@
  * in that continuous space, so a cell's centre is (x + 0.5, y + 0.5) and columns stand on grid vertices.
  */
 
+import type { CaveFloor, CaveModel, StairWay } from './caveModel';
 import type { DungeonGrowth } from './growthModel';
 import type { PropKind } from './props/propKinds';
 import type { RoomTypeId } from './themes/roomTypes';
@@ -16,6 +17,7 @@ import type { DungeonTerrain, FiveRoomStage } from './terrainModel';
 export type { CoverLevel, DungeonTerrain, FiveRoomStage, HazardKind, TerrainKind, TerrainOpening, TerrainTraits } from './terrainModel';
 export { FIVE_ROOM_STAGES } from './terrainModel';
 export type { DungeonGrowth, GrowthKind } from './growthModel';
+export type { CaveFault, CaveFloor, CaveModel, CaveVariant, StairWay } from './caveModel';
 export type { PropKind } from './props/propKinds';
 
 /** Bump when the same seed and tags would give another dungeon. */
@@ -65,6 +67,11 @@ export interface DungeonRoom {
   stage?: FiveRoomStage;
   /** What a normal room was built for, in a theme with a room programme; unset otherwise. */
   type?: RoomTypeId;
+  /**
+   * The room's floor once a cave shaped it: a chamber's cells inside its rectangle, a tunnel's up
+   * to one cell past it. Unset, the floor is the rectangle (`floorCellsOf`).
+   */
+  cells?: CellPoint[];
 }
 
 /**
@@ -85,6 +92,8 @@ export interface DungeonDoor {
   to: number | null;
   /** Steps that lead down from `from` to `to`; unset, they lead up. */
   descends?: true;
+  /** A narrows two cells wide: this cell and the one at `x + wide.x, y + wide.y` (`doorCells`). */
+  wide?: CellDir;
 }
 
 /**
@@ -102,6 +111,8 @@ export interface DungeonStair {
   to: number;
   /** Shared by the two ends of one stairwell. */
   link: number;
+  /** In a cave, how the two floors are joined; both ends carry the same. */
+  way?: StairWay;
 }
 
 export interface DungeonProp {
@@ -164,6 +175,8 @@ export interface DungeonFloor {
    * generator. The view's secret rooms switch hides every secret wing whatever this says.
    */
   hiddenWings?: number[];
+  /** A Cavern floor's lane, heights, water and faults. */
+  cave?: CaveFloor;
 }
 
 export interface DungeonModel {
@@ -175,6 +188,8 @@ export interface DungeonModel {
   tags: string[];
   /** Index 0 is the entry floor (A), each next one below the last. */
   floors: DungeonFloor[];
+  /** A Cavern's variant and fault directions. */
+  cave?: CaveModel;
 }
 
 /** What a GM asks for: everything else follows from it. */
