@@ -57,7 +57,7 @@ export interface DungeonRoom {
   /** Column rows along the long walls, or a ring in a rotunda. */
   colonnade: boolean;
   /**
-   * The boss room: the deepest floor's room farthest from where it is entered, larger than the
+   * The boss room: the room of the floor furthest from the entrance floor farthest from where it is entered, larger than the
    * rooms around it and reached through one room only. An arena, not a story: nothing is locked.
    */
   boss: boolean;
@@ -173,7 +173,7 @@ export interface DungeonModel {
   theme: ThemeId;
   /** The tags the dungeon was built with: the GM's that its theme takes, and those added by chance (`dungeonTags`). */
   tags: string[];
-  /** Index 0 is the entry floor (A), each next one below the last. */
+  /** Index 0 is the entry floor (A), each next one farther from it: below in a Cavern, above in a Fortress or Haunted Mansion (`stackOf`). */
   floors: DungeonFloor[];
 }
 
@@ -185,7 +185,7 @@ export interface DungeonRequest {
   tags: string[];
   /** How many floors, 1 to `MAX_FLOORS`. */
   floors: number;
-  /** Whether the deepest floor has a boss room (`DungeonRoom.boss`); unset is yes. */
+  /** Whether the floor furthest from the entrance has a boss room (`DungeonRoom.boss`); unset is yes. */
   bossRoom?: boolean;
   /**
    * A five-room dungeon (`DungeonRoom.stage`): one floor, five main rooms in a row joined by

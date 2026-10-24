@@ -9,6 +9,7 @@ import type { ThemeDefinition } from './themeTypes';
 export const CAVERN: ThemeDefinition = {
   id: 'cavern',
   built: false,
+  rise: 'down',
   refuses: [{ tag: 'ruined', reason: 'dungeon.theme.refused.notBuilt' }],
   programme: null,
 };

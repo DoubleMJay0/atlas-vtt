@@ -17,8 +17,8 @@ const NO_MOLTEN: readonly { tag: DungeonTag; reason: MessageKey }[] = [
 ];
 
 export const THEMES: Readonly<Record<ThemeId, ThemeDefinition>> = {
-  fortress: { id: 'fortress', built: true, refuses: NO_MOLTEN, programme: FORTRESS },
-  mansion: { id: 'mansion', built: true, refuses: [...NO_MOLTEN, { tag: 'flooded', reason: 'dungeon.theme.refused.noFlooding' }], programme: MANSION },
+  fortress: { id: 'fortress', built: true, rise: 'up', refuses: NO_MOLTEN, programme: FORTRESS },
+  mansion: { id: 'mansion', built: true, rise: 'up', refuses: [...NO_MOLTEN, { tag: 'flooded', reason: 'dungeon.theme.refused.noFlooding' }], programme: MANSION },
   cavern: CAVERN,
 };
 

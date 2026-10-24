@@ -5,6 +5,7 @@
  * it; terrain and furniture then read each room's type.
  */
 
+import type { FloorRise } from '../floors/floorStack';
 import type { PlannedFloor } from '../floors/planFloors';
 import type { CellPoint, FiveRoomStage, TerrainKind } from '../model';
 import type { PropKind } from '../props/propKinds';
@@ -197,6 +198,8 @@ export interface ThemeDefinition {
   id: ThemeId;
   /** Built by hands (a Fortress, a Mansion) rather than by nature. */
   built: boolean;
+  /** Where each floor past the entrance floor lies: above it in a building, below it in a cave. */
+  rise: FloorRise;
   /** Tags the theme cannot take, each with the reason the panel shows. */
   refuses: readonly { tag: DungeonTag; reason: MessageKey }[];
   programme: RoomProgramme | null;
