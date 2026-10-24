@@ -1,4 +1,9 @@
 import type { FamilyGlyphs } from '../../propShapes';
+import * as stone from './stone';
+import * as engraved from './engraved';
+import { HEARTH, partPath } from './shapes';
 
-/** This family's drawings, one entry per kind of `kinds.ts`, each with a drawing for both painters. */
-export const GLYPHS: FamilyGlyphs = {};
+/** Each glyph receives its base material's final grain pass over the shared silhouette. */
+export const GLYPHS: FamilyGlyphs = {
+  hearth: { material: 'dressed', radius: 0.9, lift: 0.7, silhouette: partPath(HEARTH), stone: stone.hearth, engraved: engraved.hearth },
+};
