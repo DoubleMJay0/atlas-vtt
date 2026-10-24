@@ -11,7 +11,7 @@ import { hash2 } from '../art/noise';
 import { polyPath, rectPoly } from '../art/paths';
 import type { Vec } from '../geometry';
 import { circlePoly } from './groundsShapes';
-import type { GroundsPaint } from './paint';
+import { flatSurface, type GroundsPaint } from './paint';
 
 /** A tree's crown: its lobed outline round the trunk, and the radius it reaches. */
 export function crownOf(tree: GroundsPiece, seed: number): { ring: Vec[]; centre: Vec; radius: number } | null {
@@ -36,15 +36,15 @@ export function drawTree(hand: Hand, paint: GroundsPaint, tree: GroundsPiece): v
   const crown = crownOf(tree, hand.scene.env.dungeon.model.seed);
   if (!crown) return;
   const { centre, radius } = crown;
-  paint.foliage([crown.ring], 0.15, Math.floor(centre.x * 31 + centre.y * 17), { centre, radius });
+  paint.foliage([crown.ring], 0.18, Math.floor(centre.x * 31 + centre.y * 17), { centre, radius });
   // The trunk's point, where it rises under the crown: a ring of bark round its heart.
   const trunk = circlePoly(centre, 0.06, 16);
-  hand.surface(polyPath(trunk), 'wood');
+  flatSurface(hand, polyPath(trunk), 'wood');
   hand.line([trunk], 'fine', true);
 }
 
 /** The fountain a drive turns round: on its island of grass, a basin of eight sides and a bowl on a pedestal in its middle. */
-export function drawFountain(hand: Hand, fountain: GroundsPiece): void {
+export function drawFountain(hand: Hand, paint: GroundsPaint, fountain: GroundsPiece): void {
   const c = fountain.at;
   if (!c) return;
   const octagon = (r: number): Vec[] => Array.from({ length: 8 }, (_, k) => ({ x: c.x + Math.cos(((k + 0.5) / 8) * Math.PI * 2) * r, y: c.y + Math.sin(((k + 0.5) / 8) * Math.PI * 2) * r }));
@@ -52,10 +52,7 @@ export function drawFountain(hand: Hand, fountain: GroundsPiece): void {
   const water = octagon(0.76);
   hand.surface(polyPath(rim), 'dressed');
   hand.line(rim.map((p, k) => [p, water[k]!]), 'fine');
-  hand.water([water], (x, y) => Math.max(0, 0.76 - Math.hypot(x - c.x, y - c.y)) * 1.4, false);
-  // Rings spreading from where the jet falls back.
-  const ripples = [0.42, 0.58].map((r, k) => circlePoly(c, r, 40).slice(k * 4, 26 + k * 4));
-  hand.line(ripples, 'fine');
+  paint.pool(polyPath(water), c, 0.76);
   hand.edges(water, false);
   hand.edges(rim, true);
   const pedestal = circlePoly(c, 0.3, 32);
@@ -63,7 +60,7 @@ export function drawFountain(hand: Hand, fountain: GroundsPiece): void {
   hand.surface(polyPath(pedestal), 'dressed');
   hand.solid(polyPath(pedestal), c, 0.3, 0.8);
   hand.edges(pedestal, true);
-  hand.water([bowl], (x, y) => Math.max(0, 0.22 - Math.hypot(x - c.x, y - c.y)) * 1.6, false);
+  paint.pool(polyPath(bowl), c, 0.22);
   hand.edges(bowl, false);
   const jet = circlePoly(c, 0.045, 12);
   hand.surface(polyPath(jet), 'metal');

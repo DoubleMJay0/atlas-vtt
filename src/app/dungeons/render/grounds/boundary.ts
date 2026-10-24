@@ -8,11 +8,12 @@
 
 import type { GroundsPiece } from '../../model';
 import type { Hand } from '../art/hand';
+import { TO_LIGHT } from '../art/light';
 import { polyPath, polysPath } from '../art/paths';
 import { grownRings } from '../clipShapes';
 import { cellsShapes, signedArea2, type Vec } from '../geometry';
 import { boxOf, cellSet, circlePoly } from './groundsShapes';
-import type { GroundsPaint } from './paint';
+import { flatSurface, type GroundsPaint } from './paint';
 
 /** The coping's inset from the wall's faces, in cells. */
 const COPING = 0.2;
@@ -66,7 +67,7 @@ export function drawBoundaryWall(hand: Hand, wall: GroundsPiece): void {
 export function drawHedge(hand: Hand, paint: GroundsPaint, hedge: GroundsPiece): void {
   const rings = ringsOf(hedge);
   const first = hedge.cells[0]!;
-  paint.foliage(rings, 0.08, first.x * 13 + first.y * 7);
+  paint.foliage(rings, 0.1, first.x * 13 + first.y * 7);
   // The flat top a hedge is clipped to, its sides falling away below it.
   hand.line(grownRings(rings, -0.11, 'round'), 'fine', true);
   standingEdges(hand, rings);
@@ -82,31 +83,23 @@ export function drawGate(hand: Hand, gate: GroundsPiece): void {
   const v = along ? box.y + box.h / 2 : box.x + box.w / 2;
   const at = (u: number, dv: number): Vec => (along ? { x: u, y: v + dv } : { x: v + dv, y: u });
   const quad = (a: number, b: number, half: number): Vec[] => [at(a, -half), at(b, -half), at(b, half), at(a, half)];
-  const span = u1 - u0;
-  if (span >= 2) ironLeaves(hand, u0, u1, at, quad);
-  else timberLeaf(hand, u0, u1, at, quad);
   // The piers are the wall's ends, as wide as the wall, their faces the gateway's sides.
-  drawPier(hand, quad(u0 - PIER, u0, 0.5));
-  drawPier(hand, quad(u1, u1 + PIER, 0.5));
+  const lines = drawPiers(hand, [quad(u0 - PIER, u0, 0.5), quad(u1, u1 + PIER, 0.5)]);
+  if (u1 - u0 >= 2) lines.push(...ironLeaves(hand, u0, u1, at, quad));
+  else timberLeaf(hand, u0, u1, at, quad);
+  hand.line(lines, 'fine', true);
 }
 
-function ironLeaves(hand: Hand, a: number, b: number, at: (u: number, dv: number) => Vec, quad: (a: number, b: number, half: number) => Vec[]): void {
+/** Two iron leaves meeting in the middle: each a top rail with the spear heads of its bars, a drop bolt where they meet; their outlines for the caller to draw. */
+function ironLeaves(hand: Hand, a: number, b: number, at: (u: number, dv: number) => Vec, quad: (a: number, b: number, half: number) => Vec[]): Vec[][] {
   const mid = (a + b) / 2;
-  for (const [from, to] of [[a, mid - 0.015], [mid + 0.015, b]] as const) {
-    const rail = quad(from, to, 0.04);
-    hand.surface(polyPath(rail), 'metal');
-    hand.edges(rail, true);
-    const bars = Math.max(2, Math.round((to - from) / 0.1));
-    for (let k = 0; k <= bars; k++) {
-      const head = circlePoly(at(from + ((to - from) * k) / bars, 0), k === 0 || k === bars ? 0.045 : 0.03, 12);
-      hand.surface(polyPath(head), 'metal');
-      hand.line([head], 'fine', true);
-    }
-  }
-  // The drop bolt where the leaves meet.
+  const rails = [quad(a, mid - 0.015, 0.04), quad(mid + 0.015, b, 0.04)];
+  const bars = Math.max(2, Math.round((mid - a) / 0.13));
+  const heads = [a, mid + 0.015].flatMap((from) => Array.from({ length: bars + 1 }, (_, k) => circlePoly(at(from + ((mid - 0.015 - a) * k) / bars, 0), k === 0 || k === bars ? 0.045 : 0.03, 8)));
   const bolt = quad(mid - 0.035, mid + 0.035, 0.065);
-  hand.surface(polyPath(bolt), 'metal');
-  hand.edges(bolt, true);
+  hand.surface(polysPath([...rails, bolt]), 'metal');
+  flatSurface(hand, polysPath(heads), 'metal');
+  return [...rails, bolt, ...heads];
 }
 
 function timberLeaf(hand: Hand, a: number, b: number, at: (u: number, dv: number) => Vec, quad: (a: number, b: number, half: number) => Vec[]): void {
@@ -118,16 +111,15 @@ function timberLeaf(hand: Hand, a: number, b: number, at: (u: number, dv: number
   hand.edges(leaf, true);
 }
 
-/** A gate pier: a block of dressed stone, its cap bevelled, a ball on top. */
-function drawPier(hand: Hand, pier: Vec[]): void {
-  const c = { x: (pier[0]!.x + pier[2]!.x) / 2, y: (pier[0]!.y + pier[2]!.y) / 2 };
-  const cap = pier.map((p) => ({ x: p.x + Math.sign(c.x - p.x) * 0.07, y: p.y + Math.sign(c.y - p.y) * 0.07 }));
-  hand.surface(polyPath(pier), 'dressed');
-  hand.line(cap.map((p, k) => [pier[k]!, p]), 'fine');
-  hand.line([cap], 'fine', true);
-  hand.edges(pier, true);
-  const ball = circlePoly(c, 0.17, 28);
-  hand.surface(polyPath(ball), 'stone');
-  hand.solid(polyPath(ball), c, 0.17, 1.2);
-  hand.edges(ball, true);
+/** Gate piers: blocks of dressed stone, their caps bevelled, a ball on each lit on its crown; their fine lines for the caller to draw. */
+function drawPiers(hand: Hand, piers: readonly Vec[][]): Vec[][] {
+  const centres = piers.map((pier) => ({ x: (pier[0]!.x + pier[2]!.x) / 2, y: (pier[0]!.y + pier[2]!.y) / 2 }));
+  const caps = piers.map((pier, k) => pier.map((p) => ({ x: p.x + Math.sign(centres[k]!.x - p.x) * 0.07, y: p.y + Math.sign(centres[k]!.y - p.y) * 0.07 })));
+  hand.surface(polysPath(piers), 'dressed');
+  for (const pier of piers) hand.edges(pier, true);
+  const balls = centres.map((c) => circlePoly(c, 0.17, 24));
+  const lit = centres.map((c) => circlePoly({ x: c.x + TO_LIGHT.x * 0.06, y: c.y + TO_LIGHT.y * 0.06 }, 0.08, 16));
+  flatSurface(hand, polysPath(balls), 'stone');
+  flatSurface(hand, polysPath(lit), 'raised');
+  return [...piers.flatMap((pier, k) => caps[k]!.map((p, i) => [pier[i]!, p])), ...caps, ...balls];
 }

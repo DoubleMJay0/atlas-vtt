@@ -25,7 +25,7 @@ const STANDING: readonly [GroundsKind, Draw][] = [
   ['gate', (hand, _, piece) => drawGate(hand, piece)],
   ['outbuilding', (hand, _, piece) => drawOutbuilding(hand, piece)],
   ['porch', (hand, _, piece) => piece.columns?.forEach((at) => drawColumn(hand, at))],
-  ['garden-fountain', (hand, _, piece) => drawFountain(hand, piece)],
+  ['garden-fountain', drawFountain],
   ['tree', drawTree],
 ];
 

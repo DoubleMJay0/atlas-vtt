@@ -11,9 +11,11 @@ import type { Hand } from '../art/hand';
 import { noiseSampler } from '../art/noise';
 import { polysPath, type PathFn } from '../art/paths';
 import { drawGridCanvas, fieldOf, gridOver, rgbaCanvas } from '../art/raster';
+import { boundedCached } from '../boundedCache';
 import { pointsBounds, type Bounds, type Vec } from '../geometry';
-import { hex, mixColours, parseHex, type Rgb } from '../palette';
+import { hex, mixColours, parseHex, withAlpha, type Rgb } from '../palette';
 import type { StoneColours } from '../stone/colours';
+import { lightInside } from '../stone/lightInside';
 import { cellPattern } from '../stone/patterns';
 import { css, plantColours, rampAt, type Ramp } from '../stone/plantColours';
 import { grainTile, tileTexels } from '../stone/textures';
@@ -73,15 +75,14 @@ export function stoneGroundsPaint(hand: Hand, c: StoneColours): GroundsPaint {
       const ramp = dome ? plants.leaves.green : plants.leaves.bramble;
       const bounds = pointsBounds(rings.flat());
       clipped(path, () => {
-        ctx.fillStyle = rampAt(ramp, 0.12);
+        // The deep between clumps is the base; each clump stands out of it, lit towards the light.
+        ctx.fillStyle = rampAt(ramp, 0.06);
         ctx.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
         const clumps = scatter(bounds, 1 / (clump * 1.2) ** 2, seed + salt);
         const at = (d: Vec, k: number, r: number) => clumps.map((p) => ({ x: p.x + d.x * clump * k, y: p.y + d.y * clump * k, r: clump * r * (0.85 + 0.3 * p.t) }));
-        dots(at(SHADOW_DIR, 0.35, 1), rampAt(ramp, 0.04));
-        dots(at({ x: 0, y: 0 }, 0, 0.88).filter((_, k) => clumps[k]!.t < 0.5), rampAt(ramp, 0.4));
-        dots(at({ x: 0, y: 0 }, 0, 0.88).filter((_, k) => clumps[k]!.t >= 0.5), rampAt(ramp, 0.52));
+        dots(at(TO_LIGHT, 0.12, 0.86), rampAt(ramp, 0.45));
         dots(at(TO_LIGHT, 0.32, 0.48), rampAt(ramp, 0.86, c.dark ? 0.5 : 0.85));
-        if (dome) hand.solid(path, dome.centre, dome.radius, 0.9);
+        if (dome && scene.raster) lightInside(ctx, c, dome.centre, dome.radius, 0.9);
       });
       if (!dome) return;
       ctx.save();
@@ -93,16 +94,49 @@ export function stoneGroundsPaint(hand: Hand, c: StoneColours): GroundsPaint {
       ctx.stroke();
       ctx.restore();
     },
+    pool: (path, centre, radius) =>
+      clipped(path, () => {
+        ctx.fillStyle = c.water;
+        ctx.fill();
+        if (scene.raster) {
+          // Deeper, and darker, towards the middle.
+          const deep = ctx.createRadialGradient(centre.x, centre.y, 0, centre.x, centre.y, radius);
+          deep.addColorStop(0, withAlpha(c.dark ? '#000000' : c.line, c.dark ? 0.35 : 0.22));
+          deep.addColorStop(1, withAlpha(c.dark ? '#000000' : c.line, 0));
+          ctx.fillStyle = deep;
+          ctx.fill();
+        }
+        ctx.beginPath();
+        for (const r of [0.45, 0.68].map((k) => radius * k)) {
+          ctx.moveTo(centre.x + r * Math.cos(0.4), centre.y + r * Math.sin(0.4));
+          ctx.arc(centre.x, centre.y, r, 0.4, 0.4 + Math.PI * 1.3);
+        }
+        ctx.strokeStyle = withAlpha(c.light, c.dark ? 0.25 : 0.6);
+        ctx.lineWidth = hand.weight('fine');
+        ctx.stroke();
+      }),
   };
 }
 
-/** Broad patches of lighter and deeper grass, soft-edged, a few cells across. */
+/** The mottling repeats every this many cells, seamlessly. */
+const MOTTLE_CELLS = 6;
+const mottles = new Map<string, OffscreenCanvas>();
+
+/** Broad patches of lighter and deeper grass, soft-edged, a few cells across: one seamless tile per look and seed, laid as a pattern. */
 function mottle(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, bounds: Bounds, grass: Ramp, seed: number): void {
-  const grid = gridOver(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY, 3);
-  const noise = noiseSampler(seed + 61, 6, 3, 3);
-  const values = fieldOf(grid, (x, y) => noise(x, y));
-  drawGridCanvas(ctx, grid, rgbaCanvas(grid, grass[0], values.map((v) => Math.max(0, v - 0.55) * 0.55)));
-  drawGridCanvas(ctx, grid, rgbaCanvas(grid, grass[2], values.map((v) => Math.max(0, 0.42 - v) * 0.45)));
+  const tile = boundedCached(mottles, `${grass.flat().join(',')}:${seed}`, 8, () => {
+    const grid = gridOver(0, 0, MOTTLE_CELLS, MOTTLE_CELLS, 16);
+    const noise = noiseSampler(seed + 61, MOTTLE_CELLS, 3, 3);
+    const values = fieldOf(grid, (x, y) => noise(x, y));
+    const canvas = new OffscreenCanvas(grid.w, grid.h);
+    const tileCtx = canvas.getContext('2d')!;
+    tileCtx.setTransform(grid.res, 0, 0, grid.res, 0, 0);
+    drawGridCanvas(tileCtx, grid, rgbaCanvas(grid, grass[0], values.map((v) => Math.max(0, v - 0.55) * 0.55)));
+    drawGridCanvas(tileCtx, grid, rgbaCanvas(grid, grass[2], values.map((v) => Math.max(0, 0.42 - v) * 0.45)));
+    return canvas;
+  });
+  ctx.fillStyle = cellPattern(ctx, tile, MOTTLE_CELLS);
+  ctx.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
 }
 
 /** Blades of grass seen from above: short strokes every way, deeper ones and lit ones. */

@@ -11,7 +11,7 @@ import { polysPath, rectPoly } from '../art/paths';
 import { grownRings, unionRings } from '../clipShapes';
 import { pointsBounds, signedArea2, type Vec } from '../geometry';
 import { OUTBUILDING_WALL, boxOf, outbuildingDoor, piecesOf, type GroundsLayout } from './groundsShapes';
-import type { GroundsPaint } from './paint';
+import { flatSurface, type GroundsPaint } from './paint';
 import { crownOf } from './garden';
 
 /** A kerb of setts along the ways: its width and the length of a sett, in cells. */
@@ -20,13 +20,17 @@ const KERB = { width: 0.07, sett: 0.14 };
 export function drawGroundsGround(hand: Hand, paint: GroundsPaint, layout: GroundsLayout): void {
   const lotBounds = pointsBounds(layout.lot);
   paint.lawn(polysPath(layout.open), lotBounds);
-  const ways = unionRings(layout.ways);
-  if (ways.length) {
-    paint.gravel(polysPath(ways), pointsBounds(ways.flat()));
-    kerb(hand, ways);
-  }
+  drawWays(hand, paint, layout.ways);
   for (const porch of piecesOf(layout, 'porch')) drawPorchFloor(hand, porch);
   for (const building of piecesOf(layout, 'outbuilding')) drawOutbuildingFloor(hand, building);
+}
+
+/** The gravel of the paths and drive, kerbed along every edge. */
+export function drawWays(hand: Hand, paint: GroundsPaint, rings: readonly Vec[][]): void {
+  const ways = unionRings(rings);
+  if (!ways.length) return;
+  paint.gravel(polysPath(ways), pointsBounds(ways.flat()));
+  kerb(hand, ways);
 }
 
 /** A row of setts along the inside of every edge of the ways. */
@@ -62,7 +66,7 @@ function porchFrame(porch: GroundsPiece): { box: { x: number; y: number; w: numb
 }
 
 /** The porch's platform of stone slabs, two steps down at its front. */
-function drawPorchFloor(hand: Hand, porch: GroundsPiece): void {
+export function drawPorchFloor(hand: Hand, porch: GroundsPiece): void {
   const { box, out } = porchFrame(porch);
   const front = out.y > 0 ? box.y + box.h : box.y;
   const at = (depth: number): number => front - out.y * depth;
@@ -81,14 +85,15 @@ function drawPorchFloor(hand: Hand, porch: GroundsPiece): void {
 }
 
 /** An outbuilding's paving: setts in a carriage house or stable, flags in a crypt, a brick walk between beds in a greenhouse. */
-function drawOutbuildingFloor(hand: Hand, building: GroundsPiece): void {
+export function drawOutbuildingFloor(hand: Hand, building: GroundsPiece): void {
   const glass = building.use === 'greenhouse';
   const wall = glass ? OUTBUILDING_WALL.greenhouse : OUTBUILDING_WALL.solid;
   const box = boxOf(building.cells);
   const inside = { x: box.x + wall, y: box.y + wall, w: box.w - wall * 2, h: box.h - wall * 2 };
   const door = outbuildingDoor(building, wall);
   const floor = unionRings([rectPoly(inside), ...(door ? [door.gap] : [])]);
-  hand.surface(polysPath(floor), building.use === 'crypt' ? 'dressed' : 'stone');
+  // Plain paving: its joints carry it.
+  flatSurface(hand, polysPath(floor), building.use === 'crypt' ? 'dressed' : 'stone');
   const [unit, course] = building.use === 'crypt' ? [0.6, 0.6] : glass ? [0.2, 0.1] : [0.24, 0.15];
   const lines: Vec[][] = [];
   for (let y = inside.y + course, row = 0; y < inside.y + inside.h - 0.02; y += course, row++) {

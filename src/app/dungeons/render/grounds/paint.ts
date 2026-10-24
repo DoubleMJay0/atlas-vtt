@@ -1,4 +1,5 @@
 import type { Bounds, Vec } from '../geometry';
+import type { Hand, Material } from '../art/hand';
 import type { PathFn } from '../art/paths';
 import { hash2 } from '../art/noise';
 
@@ -16,6 +17,19 @@ export interface GroundsPaint {
    * `dome` models a crown round as a whole (a tree's); without it the mass is a clipped hedge.
    */
   foliage(rings: readonly Vec[][], clump: number, salt: number, dome?: { centre: Vec; radius: number }): void;
+  /** Still water in a basin `path`, deepening towards `centre`: its colour, and rings where the jet falls back. */
+  pool(path: PathFn, centre: Vec, radius: number): void;
+}
+
+/** A part too small or too plain to show a grain (a finial, a ball's lit crown, paving the joints carry): the material's colour alone. */
+export function flatSurface(hand: Hand, path: PathFn, material: Material): void {
+  const { ctx } = hand.scene.env;
+  ctx.save();
+  ctx.beginPath();
+  path(ctx);
+  ctx.fillStyle = hand.paint(material).fill;
+  ctx.fill();
+  ctx.restore();
 }
 
 /** Points scattered over `bounds` about `per` to a cell, each jittered within its share, with a value 0..1 for the drawing to use. */

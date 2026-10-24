@@ -4,10 +4,10 @@
  * short arc cut on its side away from the light, a crown's roundness hatched on its shaded side.
  */
 
-import { SHADOW_DIR } from '../art/light';
+import { SHADOW_DIR, shadeEdges } from '../art/light';
 import type { Hand } from '../art/hand';
 import { polysPath, type PathFn } from '../art/paths';
-import { pointsBounds, type Bounds } from '../geometry';
+import { pointsBounds, type Bounds, type Vec } from '../geometry';
 import type { Pens } from '../engraved/pens';
 import { scatter, type GroundsPaint } from './paint';
 
@@ -56,6 +56,22 @@ export function engravedGroundsPaint(hand: Hand, pens: Pens): GroundsPaint {
         ctx.stroke();
         stipple(bounds, 6, 12, 0.005);
       }),
+    pool: (path, centre, radius) =>
+      paper(path, pointsBounds([{ x: centre.x - radius, y: centre.y - radius }, { x: centre.x + radius, y: centre.y + radius }]), () => {
+        ctx.fillStyle = pens.water;
+        ctx.fill();
+        // Water's level lines, broken where the light lies on it.
+        ctx.beginPath();
+        for (let y = centre.y - radius + 0.06; y < centre.y + radius; y += pens.spacing * 1.6) {
+          const half = Math.sqrt(Math.max(0, radius * radius - (y - centre.y) ** 2));
+          ctx.moveTo(centre.x - half, y);
+          ctx.lineTo(centre.x - half * 0.15, y);
+          ctx.moveTo(centre.x + half * 0.2, y);
+          ctx.lineTo(centre.x + half, y);
+        }
+        ctx.lineWidth = fine * 0.7;
+        ctx.stroke();
+      }),
     gravel: (path, bounds) =>
       paper(path, bounds, () => {
         // Raked gravel reads paler than the lawn: open paper with a few pebbles, each a small ring.
@@ -72,20 +88,26 @@ export function engravedGroundsPaint(hand: Hand, pens: Pens): GroundsPaint {
     foliage: (rings, clump, salt, dome) => {
       const path = polysPath(rings);
       const bounds = pointsBounds(rings.flat());
+      // Each clump an arc cut on its side away from the light; on a crown, the farther a clump lies towards its shaded side the heavier its cut.
+      const clumps = scatter(bounds, 1 / (clump * 1.2) ** 2, seed + salt);
+      const shade = (p: Vec): number => (dome ? Math.max(0, Math.min(2, Math.floor((((p.x - dome.centre.x) * SHADOW_DIR.x + (p.y - dome.centre.y) * SHADOW_DIR.y) / dome.radius + 0.6) * 1.6))) : 0);
       paper(path, bounds, () => {
-        ctx.beginPath();
-        for (const p of scatter(bounds, 1 / (clump * 1.2) ** 2, seed + salt)) {
-          const r = clump * (0.7 + 0.3 * p.t);
-          const a = SHADE_ANGLE + (p.t - 0.5) * 0.6;
-          ctx.moveTo(p.x + Math.cos(a - 1.25) * r, p.y + Math.sin(a - 1.25) * r);
-          ctx.arc(p.x, p.y, r, a - 1.25, a + 1.25);
+        for (const level of dome ? [0, 1, 2] : [0]) {
+          ctx.beginPath();
+          for (const p of clumps) {
+            if (shade(p) !== level) continue;
+            const r = clump * (0.7 + 0.3 * p.t);
+            const a = SHADE_ANGLE + (p.t - 0.5) * 0.6;
+            ctx.moveTo(p.x + Math.cos(a - 1.25) * r, p.y + Math.sin(a - 1.25) * r);
+            ctx.arc(p.x, p.y, r, a - 1.25, a + 1.25);
+          }
+          ctx.lineWidth = fine * (1 + level * 0.9);
+          ctx.stroke();
         }
-        ctx.lineWidth = fine;
-        ctx.stroke();
       });
       if (!dome) return;
-      hand.solid(path, dome.centre, dome.radius, 1);
       hand.line(rings, 'outline', true);
+      hand.line(shadeEdges(rings[0]!, true), 'heavy');
     },
   };
 }
