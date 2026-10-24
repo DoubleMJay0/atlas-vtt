@@ -35,12 +35,12 @@ export function standsOf(env: RenderEnv): Stand[] {
       stands.push({
         height: Math.min(1, lift * PROP_HEIGHT * prop.scale),
         path: ctx => {
-          // The silhouette is traced in the prop's own frame; the path keeps the frame it was traced in.
+          // The silhouette is traced in the prop's own frame at its fit; the path keeps the frame it was traced in.
           ctx.save();
           ctx.translate(prop.x, prop.y);
           ctx.rotate(prop.rotation);
           ctx.scale(prop.scale, prop.scale);
-          tracePropSilhouette(prop.kind, ctx);
+          tracePropSilhouette(prop, ctx);
           ctx.restore();
         },
       });

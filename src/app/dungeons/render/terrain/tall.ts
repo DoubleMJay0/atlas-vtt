@@ -32,7 +32,7 @@ export function drawStatue(hand: Hand, piece: DungeonTerrain, water: string, clo
   const rotation = facing(piece.facing ?? { x: -axis.x as -1 | 0 | 1, y: -axis.y as -1 | 0 | 1 });
   // The plinth keeps to the cells; the figure on it may face any way, a diagonal too.
   bevelledBlock(hand, box, 0.06);
-  drawGlyph(hand, { x: box.cx, y: box.cy, rotation, scale: Math.min(box.w, box.h) / STATUE_PLINTH }, { material: 'stone', radius: 0.24, dome: true, draw: STATUE_FIGURE.draw, silhouette: path => STATUE_FIGURE.silhouette!(path as CanvasRenderingContext2D) }, water, cloth);
+  drawGlyph(hand, { x: box.cx, y: box.cy, rotation, scale: Math.min(box.w, box.h) / STATUE_PLINTH, fit: { along: STATUE_PLINTH, out: STATUE_PLINTH } }, STATUE_FIGURE, water, cloth);
 }
 
 /** A standing piece of wall: a slab of the wall's course, its ends broken, its joints irregular. */

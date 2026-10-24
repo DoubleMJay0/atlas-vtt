@@ -1,5 +1,7 @@
+import type { Hand, Material } from './art/hand';
 import type { Canvas2D } from './geometry';
 import type { Palette } from './palette';
+import type { GlyphDraw, PropGlyph } from './propShapes';
 import type { RenderEnv } from './renderEnv';
 
 /**
@@ -17,6 +19,18 @@ export interface GlyphPen {
   fine: number;
   /** What cloth is filled with (an altar's runner, a throne's cushion); the fill where unset. */
   cloth?: string;
+  /** The painter's hand, for a part's texture (`hand.grain`); light it only through `art/glyphLight.ts`. */
+  hand: Hand;
+  /** The glyph's turn on the map, radians, and its scale: the context is turned and scaled by both. */
+  rotation: number;
+  scale: number;
+  /** The colours of a part made of another material than the glyph's own. */
+  paint: (material: Material) => { fill: string; ink: string };
+}
+
+/** One drawing for both painters: the eleven first props, which the hands finish each in its manner. */
+export function bothPainters(draw: GlyphDraw): Pick<PropGlyph, 'stone' | 'engraved'> {
+  return { stone: draw, engraved: draw };
 }
 
 /**
@@ -37,7 +51,7 @@ export const CORNER = 0.035;
 export const BEVEL = 0.07;
 
 /** A rounded rectangle's path, centred on (x, y). */
-export function roundedRect(ctx: Canvas2D, x: number, y: number, w: number, h: number, r = CORNER): void {
+export function roundedRect(ctx: CanvasPath, x: number, y: number, w: number, h: number, r = CORNER): void {
   const left = x - w / 2;
   const top = y - h / 2;
   const radius = Math.min(r, w / 2, h / 2);
@@ -60,7 +74,7 @@ export function block(pen: GlyphPen, x: number, y: number, w: number, h: number,
 }
 
 /** A circle's path, centred on (x, y). */
-export function circlePath(ctx: Canvas2D, r: number, x = 0, y = 0): void {
+export function circlePath(ctx: CanvasPath, r: number, x = 0, y = 0): void {
   ctx.moveTo(x + r, y);
   ctx.arc(x, y, r, 0, Math.PI * 2);
 }
@@ -131,7 +145,7 @@ export function bevel(pen: GlyphPen, x: number, y: number, w: number, h: number,
 }
 
 /** A closed polygon's path from x, y pairs. */
-export function polygonPath(ctx: Canvas2D, points: readonly number[]): void {
+export function polygonPath(ctx: CanvasPath, points: readonly number[]): void {
   ctx.moveTo(points[0]!, points[1]!);
   for (let i = 2; i < points.length; i += 2) ctx.lineTo(points[i]!, points[i + 1]!);
   ctx.closePath();

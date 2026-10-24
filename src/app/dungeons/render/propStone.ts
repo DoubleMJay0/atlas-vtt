@@ -1,14 +1,14 @@
 import type { PropKind } from '../model';
-import { bevel, block, circlePath, disc, fineLines, fineRing, inkDot, polygonPath, roundedRect, strokeFine } from './glyphPen';
-import type { PropGlyph, PropPen } from './propShapes';
+import { bevel, block, bothPainters, circlePath, disc, fineLines, fineRing, inkDot, polygonPath, roundedRect, strokeFine, type GlyphPen } from './glyphPen';
+import type { PropGlyph } from './propShapes';
 
 /** The props of stone and water, in the glyph family's grammar (`glyphPen.ts`). */
 
 const FOUNTAIN_R = 0.5;
-/** A well's outer radius at scale 1 (`scene/objectShadows.ts` outlines it). */
+/** A well's outer radius at scale 1, which its lighting outline (`tall`) keeps to. */
 export const WELL_RADIUS = 0.4;
 const WELL = { outer: WELL_RADIUS, inner: 0.25 };
-/** The side of a statue's plinth at scale 1 (`scene/objectShadows.ts` outlines it). */
+/** The side of a statue's plinth at scale 1, which its lighting outline (`tall`) keeps to. */
 export const STATUE_PLINTH = 0.6;
 const PLINTH = STATUE_PLINTH;
 const SARCOPHAGUS = { w: 0.52, h: 0.94 };
@@ -25,7 +25,7 @@ function octagon(r: number): number[] {
 }
 
 /** Broken arcs of ripple at radius `r`: `runs` pieces, each `share` of its sector, turned by `phase`. */
-function ripples(pen: PropPen, r: number, runs: number, share: number, phase: number): void {
+function ripples(pen: GlyphPen, r: number, runs: number, share: number, phase: number): void {
   const { ctx } = pen;
   ctx.beginPath();
   for (let i = 0; i < runs; i++) {
@@ -46,7 +46,7 @@ function daisStep(inset: number): number[] {
 }
 
 /** An open polygon (its last edge is the wall, never inked), filled. */
-function openStep(pen: PropPen, points: readonly number[], fine: boolean): void {
+function openStep(pen: GlyphPen, points: readonly number[], fine: boolean): void {
   const { ctx } = pen;
   ctx.beginPath();
   polygonPath(ctx, points);
@@ -60,7 +60,7 @@ function openStep(pen: PropPen, points: readonly number[], fine: boolean): void 
 }
 
 /** The sword carved on a sarcophagus' lid, its hilt towards the front. */
-function effigySword(pen: PropPen): void {
+function effigySword(pen: GlyphPen): void {
   const { ctx } = pen;
   const hilt = -0.29;
   const guard = -0.2;
@@ -84,9 +84,12 @@ function effigySword(pen: PropPen): void {
 /** What is cut from stone, bevelled, and the water some of it holds. */
 export const STONE_AND_WATER = {
   fountain: {
+    material: 'stone',
+    radius: 0.5,
+    dome: true,
     lift: 0.3,
-    silhouette: ctx => polygonPath(ctx, octagon(FOUNTAIN_R)),
-    draw: pen => {
+    silhouette: path => polygonPath(path, octagon(FOUNTAIN_R)),
+    ...bothPainters(pen => {
       const { ctx, palette } = pen;
       ctx.beginPath();
       polygonPath(ctx, octagon(FOUNTAIN_R));
@@ -102,12 +105,16 @@ export const STONE_AND_WATER = {
       ripples(pen, 0.21, 2, 0.6, 2.1);
       disc(pen, 0, 0, 0.11);
       inkDot(pen, 0, 0, 0.035);
-    },
+    }),
   },
   well: {
+    material: 'stone',
+    radius: 0.4,
+    dome: true,
+    tall: { halfW: WELL.outer, halfH: WELL.outer, round: true },
     lift: 0.35,
-    silhouette: ctx => circlePath(ctx, WELL.outer),
-    draw: pen => {
+    silhouette: path => circlePath(path, WELL.outer),
+    ...bothPainters(pen => {
       const { ctx, palette } = pen;
       disc(pen, 0, 0, WELL.outer);
       disc(pen, 0, 0, WELL.inner, palette.water);
@@ -134,30 +141,37 @@ export const STONE_AND_WATER = {
       strokeFine(pen);
       block(pen, -post, 0, 0.11, 0.11);
       block(pen, post, 0, 0.11, 0.11);
-    },
+    }),
   },
   statue: {
+    material: 'dressed',
+    radius: 0.3,
+    tall: { halfW: PLINTH / 2, halfH: PLINTH / 2, round: false },
     lift: 1,
-    silhouette: ctx => roundedRect(ctx, 0, 0, PLINTH, PLINTH),
-    draw: pen => {
+    silhouette: path => roundedRect(path, 0, 0, PLINTH, PLINTH),
+    ...bothPainters(pen => {
       block(pen, 0, 0, PLINTH, PLINTH);
       bevel(pen, 0, 0, PLINTH, PLINTH);
       drawStatueFigure(pen);
-    },
+    }),
   },
   sarcophagus: {
+    material: 'stone',
+    radius: 0.48,
     lift: 0.45,
-    silhouette: ctx => roundedRect(ctx, 0, 0, SARCOPHAGUS.w, SARCOPHAGUS.h),
-    draw: pen => {
+    silhouette: path => roundedRect(path, 0, 0, SARCOPHAGUS.w, SARCOPHAGUS.h),
+    ...bothPainters(pen => {
       block(pen, 0, 0, SARCOPHAGUS.w, SARCOPHAGUS.h);
       bevel(pen, 0, 0, SARCOPHAGUS.w, SARCOPHAGUS.h, 0.085);
       effigySword(pen);
-    },
+    }),
   },
   altar: {
+    material: 'stone',
+    radius: 0.44,
     lift: 0.5,
-    silhouette: ctx => roundedRect(ctx, 0, 0, ALTAR.w, ALTAR.h),
-    draw: pen => {
+    silhouette: path => roundedRect(path, 0, 0, ALTAR.w, ALTAR.h),
+    ...bothPainters(pen => {
       const { ctx, palette } = pen;
       block(pen, 0, 0, ALTAR.w, ALTAR.h);
       bevel(pen, 0, 0, ALTAR.w, ALTAR.h);
@@ -174,11 +188,13 @@ export const STONE_AND_WATER = {
         fineRing(pen, x, 0, 0.06);
         inkDot(pen, x, 0, 0.028);
       }
-    },
+    }),
   },
   dais: {
+    material: 'dressed',
+    radius: 1.4,
     lift: 0.15,
-    draw: pen => {
+    ...bothPainters(pen => {
       const outer = daisStep(0);
       const middle = daisStep(DAIS.step);
       const top = daisStep(DAIS.step * 2);
@@ -189,7 +205,7 @@ export const STONE_AND_WATER = {
       const mitres: number[] = [];
       for (const i of [2, 4, 6, 8]) mitres.push(outer[i]!, outer[i + 1]!, top[i]!, top[i + 1]!);
       fineLines(pen, mitres);
-    },
+    }),
   },
 } satisfies Partial<Record<PropKind, PropGlyph>>;
 
@@ -197,7 +213,7 @@ export const STONE_AND_WATER = {
  * A statue's figure from above, facing −y: a cloaked warrior on a round base, shoulders broad, the
  * cloak falling behind, both hands on the hilt of a sword whose point rests before the feet.
  */
-export function drawStatueFigure(pen: PropPen): void {
+export function drawStatueFigure(pen: GlyphPen): void {
   const { ctx, palette } = pen;
   // Drawn at 1.25 of the numbers below: the figure fills its plinth.
   ctx.save();
@@ -210,7 +226,7 @@ export function drawStatueFigure(pen: PropPen): void {
 
 const FIGURE = 1.25;
 
-function drawFigure(pen: PropPen, palette: PropPen['palette']): void {
+function drawFigure(pen: GlyphPen, palette: GlyphPen['palette']): void {
   const { ctx } = pen;
   disc(pen, 0, 0.02, 0.22);
   // The cloak, falling behind the shoulders in three folds.
@@ -255,4 +271,11 @@ function drawFigure(pen: PropPen, palette: PropPen['palette']): void {
 }
 
 /** The figure alone, for a statue whose plinth is drawn apart from it. */
-export const STATUE_FIGURE: PropGlyph = { lift: 1, draw: drawStatueFigure, silhouette: ctx => circlePath(ctx, 0.22 * FIGURE, 0, 0.02 * FIGURE) };
+export const STATUE_FIGURE: PropGlyph = {
+  material: 'stone',
+  radius: 0.24,
+  dome: true,
+  lift: 1,
+  silhouette: path => circlePath(path, 0.22 * FIGURE, 0, 0.02 * FIGURE),
+  ...bothPainters(drawStatueFigure),
+};

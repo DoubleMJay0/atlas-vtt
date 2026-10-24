@@ -4,13 +4,25 @@
  * stand-in. Unit tests hold each set equal to its drawing registry (`drawnPropKinds()` in
  * `render/propShapes.ts`, `drawnTerrainKinds()` in `render/terrain/drawTerrain.ts`); kinds still
  * waiting are listed in `tests/unit/dungeons/awaitingDrawings.json`, which `npm run preflight`
- * holds empty.
+ * holds empty. Furniture is drawn by family: each family's `kinds.ts` lists what it draws, and
+ * only those lists are read here, so the generator never loads a drawing.
  */
 
 import type { TerrainKind } from './model';
 import type { PropKind } from './props/propKinds';
+import { KINDS as BEDS } from './render/props/beds/kinds';
+import { KINDS as CHAMBERS } from './render/props/chambers/kinds';
+import { KINDS as DRESSING } from './render/props/dressing/kinds';
+import { KINDS as FORMATIONS } from './render/props/formations/kinds';
+import { KINDS as FORTRESS } from './render/props/fortress/kinds';
+import { KINDS as HEARTH } from './render/props/hearth/kinds';
+import { KINDS as LIVED_IN } from './render/props/livedIn/kinds';
+import { KINDS as PARLOUR } from './render/props/parlour/kinds';
+import { KINDS as SEATING } from './render/props/seating/kinds';
+import { KINDS as SHELVES } from './render/props/shelves/kinds';
 
-export const DRAWN_PROP_KINDS: ReadonlySet<PropKind> = new Set<PropKind>([
+/** The eleven props of the first generator, drawn in `render/propWood.ts` and `render/propStone.ts`. */
+export const FIRST_PROP_KINDS: readonly PropKind[] = [
   'dais',
   'throne',
   'altar',
@@ -22,6 +34,20 @@ export const DRAWN_PROP_KINDS: ReadonlySet<PropKind> = new Set<PropKind>([
   'chest',
   'crate',
   'barrel',
+];
+
+export const DRAWN_PROP_KINDS: ReadonlySet<PropKind> = new Set<PropKind>([
+  ...FIRST_PROP_KINDS,
+  ...SEATING,
+  ...SHELVES,
+  ...HEARTH,
+  ...BEDS,
+  ...DRESSING,
+  ...PARLOUR,
+  ...FORMATIONS,
+  ...LIVED_IN,
+  ...CHAMBERS,
+  ...FORTRESS,
 ]);
 
 export const DRAWN_TERRAIN_KINDS: ReadonlySet<TerrainKind> = new Set<TerrainKind>([
