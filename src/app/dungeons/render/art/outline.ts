@@ -1,12 +1,12 @@
 import { unionRings } from '../clipShapes';
-import { shapePolygon, type Vec } from '../geometry';
+import { shapeRings, type Vec } from '../geometry';
 import type { ArtScene } from './artScene';
 import { mouthClearing, mouthsOf } from './mouths';
 import { polyPath, type PathFn } from './paths';
 
 /** Rings of the union of the floors grown by `grow` cells (rectangles keep square corners). */
 export function grownRings(scene: ArtScene, grow: number): Vec[][] {
-  return unionRings(scene.floors.map(shape => shapePolygon(shape, grow, scene.frame.pxPerCell)));
+  return unionRings(scene.floors.flatMap(shape => shapeRings(shape, grow, scene.frame.pxPerCell)));
 }
 
 export function traceRings(path: CanvasPath, rings: readonly (readonly Vec[])[]): void {

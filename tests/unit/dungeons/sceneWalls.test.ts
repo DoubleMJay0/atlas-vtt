@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import type { DoorKind, DungeonDoor, DungeonModel } from '../../../src/app/dungeons/model';
+import { cellsOf } from '../../../src/app/dungeons/geometry';
+import type { DoorKind, DungeonDoor, DungeonModel, DungeonRoom } from '../../../src/app/dungeons/model';
+import { pointSegmentDistance } from '../../../src/app/dungeons/render/geometry';
+import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
+import { wallRings } from '../../../src/app/dungeons/scene/wallOutline';
+import { addDoor, addRoom, emptyModel, entryFloor } from '../../fixtures/dungeonModelBuilder';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { dungeonWalls, type DungeonPlacement } from '../../../src/app/dungeons/scene/toWalls';
 import { wallInkWidth } from '../../../src/app/dungeons/render/wallInk';
@@ -135,5 +140,21 @@ describe('dungeon walls', () => {
         expect(Object.values(doors).reduce((sum, n) => sum + n, 0)).toBe(closing);
       });
     }
+  });
+
+  it('walls of a poly floor lie on its grown outline', () => {
+    const model: DungeonModel = { ...emptyModel(8), theme: 'cavern' };
+    const floor = entryFloor(model);
+    const cells = cellsOf({ x0: 0, y0: 0, x1: 6, y1: 5 }).filter(c => !(c.x >= 4 && c.y >= 3) && !(c.x === 2 && c.y === 2));
+    addRoom(floor, { x: 0, y: 0, w: 7, h: 6, axis: { x: 0, y: 1 }, cells } as DungeonRoom);
+    addDoor(floor, 1, -1, { x: 0, y: 1 }, 'opening', null, 0);
+    const placement = placementOf(model);
+    const half = wallInkWidth(STYLE) / 2;
+    const rings = wallRings(visibleFloor(model, DEFAULT_VIEW).floors, [], half);
+    const cell = (p: { x: number; y: number }): { x: number; y: number } => ({ x: p.x / placement.pxPerCell + placement.originCell.x, y: p.y / placement.pxPerCell + placement.originCell.y });
+    const near = (p: { x: number; y: number }): number => Math.min(...rings.flatMap(ring => ring.map((a, i) => pointSegmentDistance(p, a, ring[(i + 1) % ring.length]!))));
+    const walls = wallsOf(model, placement);
+    expect(walls.length).toBeGreaterThan(8);
+    for (const wall of walls) for (const p of [wall.p1, wall.p2]) expect(near(cell(p))).toBeLessThan(1e-3);
   });
 });

@@ -1,15 +1,23 @@
 import type { CellPoint, DungeonDoor, DungeonRoom } from '../model';
+import { traceLoops } from '../water/contour';
+import { cellMask } from '../water/wetGrid';
+import { grownRings } from './clipShapes';
+import { PolyField } from './cave/polyField';
 
 /**
  * Floor geometry in cells. A room's floor is its rectangle, or for a rotunda the circle through
- * the inner corners of its four door cells; every visible door cell but a secret one is floor too.
+ * the inner corners of its four door cells, or for a cave's room the outline of its cells; every
+ * visible door cell but a secret one is floor too.
  */
 
 export type Vec = CellPoint;
 
-export type FloorShape =
-  | { kind: 'rect'; x: number; y: number; w: number; h: number }
-  | { kind: 'circle'; cx: number; cy: number; r: number };
+/** A polygon's rings: the first outer, clockwise on screen, the rest holes in it, counter-clockwise. */
+export type PolyShape = { kind: 'poly'; rings: Vec[][] };
+
+export type RectShape = { kind: 'rect'; x: number; y: number; w: number; h: number };
+
+export type FloorShape = RectShape | { kind: 'circle'; cx: number; cy: number; r: number } | PolyShape;
 
 export interface Bounds {
   minX: number;
@@ -30,13 +38,39 @@ export function roomCentre(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>): Vec 
   return { x: room.x + room.w / 2, y: room.y + room.h / 2 };
 }
 
+const cellShapes = new WeakMap<readonly CellPoint[], PolyShape[]>();
+
+/** The outline of a set of cells as polygons, one per piece with its holes; the same for the same cells. */
+export function cellsShapes(cells: readonly CellPoint[]): PolyShape[] {
+  let shapes = cellShapes.get(cells);
+  if (!shapes) {
+    const { grid, marks } = cellMask(cells);
+    shapes = polysOf(traceLoops(grid, marks));
+    cellShapes.set(cells, shapes);
+  }
+  return shapes;
+}
+
+/** Rings as polygons: each hole goes with the outer ring that holds its first point. */
+export function polysOf(rings: readonly Vec[][]): PolyShape[] {
+  const outers = rings.filter((ring) => signedArea2(ring) > 0);
+  const shapes: PolyShape[] = outers.map((ring) => ({ kind: 'poly', rings: [ring] }));
+  for (const hole of rings.filter((ring) => signedArea2(ring) < 0)) {
+    const first = hole[0]!;
+    const owner = shapes.find((shape, k) => pointInPolygon(outers[k]!, first.x, first.y) && shape);
+    owner?.rings.push(hole);
+  }
+  return shapes;
+}
+
 export function roomShape(room: DungeonRoom): FloorShape {
+  if (room.cells) return cellsShapes(room.cells)[0] ?? { kind: 'rect', x: room.x, y: room.y, w: 0, h: 0 };
   if (!room.rotunda) return { kind: 'rect', x: room.x, y: room.y, w: room.w, h: room.h };
   const c = roomCentre(room);
   return { kind: 'circle', cx: c.x, cy: c.y, r: rotundaRadius(room) };
 }
 
-export function doorShape(door: Pick<DungeonDoor, 'x' | 'y'>): FloorShape {
+export function doorShape(door: Pick<DungeonDoor, 'x' | 'y'>): RectShape {
   return { kind: 'rect', x: door.x, y: door.y, w: 1, h: 1 };
 }
 
@@ -68,6 +102,10 @@ export function doorShapes(door: Pick<DungeonDoor, 'x' | 'y' | 'dir'>, narrow: b
 }
 
 export function shapeBounds(shape: FloorShape, grow = 0): Bounds {
+  if (shape.kind === 'poly') {
+    const b = pointsBounds(shape.rings[0] ?? []);
+    return { minX: b.minX - grow, minY: b.minY - grow, maxX: b.maxX + grow, maxY: b.maxY + grow };
+  }
   if (shape.kind === 'rect') {
     return { minX: shape.x - grow, minY: shape.y - grow, maxX: shape.x + shape.w + grow, maxY: shape.y + shape.h + grow };
   }
@@ -105,8 +143,20 @@ export function pointSegmentDistance(p: Vec, a: Vec, b: Vec): number {
   return Math.hypot(p.x - (a.x + abx * t), p.y - (a.y + aby * t));
 }
 
+const polyFields = new WeakMap<PolyShape, PolyField>();
+
+function polyField(shape: PolyShape): PolyField {
+  let field = polyFields.get(shape);
+  if (!field) {
+    field = new PolyField(shape.rings);
+    polyFields.set(shape, field);
+  }
+  return field;
+}
+
 /** Signed distance from a point to a shape's edge: negative inside. */
 export function shapeDistance(shape: FloorShape, x: number, y: number): number {
+  if (shape.kind === 'poly') return polyField(shape).distance(x, y);
   if (shape.kind === 'circle') return Math.hypot(x - shape.cx, y - shape.cy) - shape.r;
   const hx = shape.w / 2;
   const hy = shape.h / 2;
@@ -121,6 +171,10 @@ export function shapeDistance(shape: FloorShape, x: number, y: number): number {
  * clockwise on screen so a nonzero fill of many shapes is their union.
  */
 function traceShape(path: CanvasPath, shape: FloorShape, grow = 0, cornerRadius = grow): void {
+  if (shape.kind === 'poly') {
+    for (const ring of grown(shape, grow, 'round')) tracePolygon(path, ring);
+    return;
+  }
   if (shape.kind === 'circle') {
     path.moveTo(shape.cx + shape.r + grow, shape.cy);
     path.arc(shape.cx, shape.cy, shape.r + grow, 0, Math.PI * 2);
@@ -153,8 +207,36 @@ export function traceShapes(path: CanvasPath, shapes: readonly FloorShape[], gro
   for (const shape of shapes) traceShape(path, shape, grow, cornerRadius);
 }
 
-/** A shape as a polygon (clockwise on screen); circles get enough corners for `pxPerCell`. */
-export function shapePolygon(shape: FloorShape, grow = 0, pxPerCell = 100): Vec[] {
+const grownPolys = new WeakMap<PolyShape, Map<string, Vec[][]>>();
+
+/** A poly's rings grown by `grow` (round or square corners), kept for the next call with the same. */
+function grown(shape: PolyShape, grow: number, join: 'round' | 'miter'): Vec[][] {
+  if (grow === 0) return shape.rings;
+  let memo = grownPolys.get(shape);
+  if (!memo) {
+    memo = new Map();
+    grownPolys.set(shape, memo);
+  }
+  const key = `${join}:${grow}`;
+  let rings = memo.get(key);
+  if (!rings) {
+    rings = grownRings(shape.rings, grow, join);
+    memo.set(key, rings);
+  }
+  return rings;
+}
+
+/**
+ * A shape's rings grown by `grow`, as the clipping helpers take them: outer rings clockwise on
+ * screen, holes counter-clockwise; circles get enough corners for `pxPerCell`, a poly's corners
+ * stay square where it grows, as a rectangle's do.
+ */
+export function shapeRings(shape: FloorShape, grow = 0, pxPerCell = 100): Vec[][] {
+  return shape.kind === 'poly' ? grown(shape, grow, 'miter') : [shapePolygon(shape, grow, pxPerCell)];
+}
+
+/** A rectangle or circle as a polygon (clockwise on screen); circles get enough corners for `pxPerCell`. */
+export function shapePolygon(shape: Exclude<FloorShape, PolyShape>, grow = 0, pxPerCell = 100): Vec[] {
   if (shape.kind === 'rect') {
     const { minX, minY, maxX, maxY } = shapeBounds(shape, grow);
     return [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];

@@ -1,4 +1,4 @@
-import { intersectShapes, subtractShapes, unionShapes } from '../../lighting/polygonClip';
+import { inflateShape, intersectShapes, subtractShapes, unionShapes } from '../../lighting/polygonClip';
 import type { QShape } from '../../types/shapeTypes';
 import type { Vec } from './geometry';
 
@@ -31,6 +31,11 @@ export function unionRings(rings: readonly (readonly Vec[])[]): Rings {
 /** What `a` and `b` cover both. */
 export function intersectRings(a: readonly (readonly Vec[])[], b: readonly (readonly Vec[])[]): Rings {
   return fromQ(intersectShapes(toQ(a), toQ(b)));
+}
+
+/** Rings grown by `grow` cells (shrunk where negative), holes shrinking as the outer grows, with round or square corners. */
+export function grownRings(rings: readonly (readonly Vec[])[], grow: number, join: 'round' | 'miter' = 'round'): Rings {
+  return fromQ(inflateShape(toQ(rings), Math.round(grow * SCALE), join));
 }
 
 /** What `a` covers and `b` does not. */

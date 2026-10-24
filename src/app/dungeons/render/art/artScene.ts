@@ -1,5 +1,5 @@
 import { unionRings } from '../clipShapes';
-import { shapePolygon, type FloorShape, type Vec } from '../geometry';
+import { shapeRings, type FloorShape, type Vec } from '../geometry';
 import { narrowPockets } from '../pockets';
 import type { RenderEnv } from '../renderEnv';
 import { rasterRelief, type Stand } from './heights';
@@ -63,7 +63,7 @@ export function viewBounds(frame: ArtFrame, margin = 0.5): { minX: number; minY:
 export function buildArtScene(env: RenderEnv, frame: ArtFrame, stands: readonly Stand[], dark: boolean, pictures = true): ArtScene {
   const { dungeon } = env;
   const floors = dungeon.floors;
-  const floorRings = unionRings(floors.map(shape => shapePolygon(shape, 0, frame.pxPerCell)));
+  const floorRings = unionRings(floors.flatMap(shape => shapeRings(shape, 0, frame.pxPerCell)));
   const res = fieldResolution(frame.pxPerCell);
   const b = viewBounds(frame, 1);
   const grid = gridOver(b.minX, b.minY, b.maxX, b.maxY, res);
