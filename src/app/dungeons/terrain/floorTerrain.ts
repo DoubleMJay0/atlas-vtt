@@ -1,11 +1,11 @@
 /**
- * One floor's terrain while it is being placed: each room's cells (`RoomCells`) and the pieces
- * placed so far. A piece goes in only where its room allows it (free cells, the room still whole);
+ * One floor's terrain while it is being placed: each room's cells (`RoomCells`), the pieces
+ * placed so far and the furniture placed on whole cells with them. A piece goes in only where its room allows it (free cells, the room still whole);
  * pieces decided across floors (a hole and the floor under it) are held first and added as they are.
  */
 
 import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
-import type { CellPoint, DungeonColumn, DungeonDoor, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
+import type { CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
 import { cellKey, floorRect, inRect } from '../geometry';
 import { type TerrainDraft, footingOf } from './catalog';
 import { RoomCells } from './roomCells';
@@ -21,6 +21,8 @@ export interface FloorPlan {
 
 export class FloorTerrain {
   readonly pieces: DungeonTerrain[] = [];
+  /** Furniture placed on whole cells with the terrain (the recipes of typed rooms). */
+  readonly props: DungeonProp[] = [];
   private readonly cells = new Map<number, RoomCells>();
 
   constructor(
@@ -65,6 +67,11 @@ export class FloorTerrain {
   addHeld(piece: TerrainDraft): number {
     this.cells.get(piece.room)?.take(piece.cells, footingOf(piece.kind));
     return this.push(piece);
+  }
+
+  /** Adds furniture whose cells its room has taken. */
+  addProp(prop: DungeonProp): void {
+    this.props.push(prop);
   }
 
   /** Every cell any piece fills, by key. */

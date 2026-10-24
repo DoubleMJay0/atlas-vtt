@@ -8,7 +8,7 @@ import type { CellPoint, DungeonDoor, DungeonProp, PropKind } from '../model';
 import { type Rng, int, shuffled } from '../rng';
 import { backWallOpen, facingIn, pointIn } from './roomFrame';
 import { propReach } from './catalogue';
-import { type RoomSpace, isFree, take } from './space';
+import { type EdgeSpot, type RoomSpace, edgeSpots, isFree, take } from './space';
 
 /** Across-the-room slots, middle first. */
 const SLOTS = [0, -1, 1, -2, 2, -3, 3];
@@ -30,10 +30,34 @@ export function centrepiece(space: RoomSpace, kind: PropKind): DungeonProp[] {
   return tryPlace(space, kind, space.frame.centre, 0);
 }
 
+/**
+ * Where the back wall of a room that names its cells (a cave's chamber) runs: places half a cell
+ * before it, facing in, nearest the middle of its rectangle's back wall first.
+ */
+function backWallSpots(space: RoomSpace): EdgeSpot[] {
+  const { frame } = space;
+  const middle = pointIn(frame, frame.halfDepth, 0);
+  return edgeSpots(space, 1)
+    .filter((spot) => spot.inward.x === -frame.axis.x && spot.inward.y === -frame.axis.y)
+    .sort((a, b) => Math.hypot(a.point.x - middle.x, a.point.y - middle.y) - Math.hypot(b.point.x - middle.x, b.point.y - middle.y));
+}
+
+/** A point `distance` before the wall a spot lies half a cell before. */
+const beforeWall = (spot: EdgeSpot, distance: number): CellPoint => ({ x: spot.point.x + spot.inward.x * (distance - 0.5), y: spot.point.y + spot.inward.y * (distance - 0.5) });
+
 /** Props side by side in the aisle before the back wall, the middle first, facing into the room. */
 export function beforeBackWall(space: RoomSpace, doors: readonly DungeonDoor[], kinds: readonly PropKind[]): DungeonProp[] {
   const { frame } = space;
   if (backWallOpen(frame, doors)) return [];
+  if (space.cells) {
+    let spots = backWallSpots(space);
+    return kinds.flatMap((kind) => {
+      const spot = spots.find((s) => isFree(space, beforeWall(s, Math.max(0.5, propReach(kind) + 0.1)), propReach(kind)));
+      if (!spot) return [];
+      spots = spots.filter((s) => s !== spot);
+      return tryPlace(space, kind, beforeWall(spot, Math.max(0.5, propReach(kind) + 0.1)), facingIn(frame));
+    });
+  }
   const out: DungeonProp[] = [];
   let slots = SLOTS;
   for (const kind of kinds) {
@@ -66,6 +90,10 @@ export function dais(space: RoomSpace, doors: readonly DungeonDoor[], item: Prop
 export function tapestry(space: RoomSpace, doors: readonly DungeonDoor[]): DungeonProp[] {
   const { frame } = space;
   if (backWallOpen(frame, doors) || frame.halfWidth < 1) return [];
+  if (space.cells) {
+    const spot = backWallSpots(space).find((s) => isFree(space, beforeWall(s, 0.4), 0.35, 0));
+    return spot ? [propAt(space, 'tapestry', beforeWall(spot, 0.1), facingIn(frame))] : [];
+  }
   const p = pointIn(frame, frame.halfDepth - 0.1, 0);
   const reach = pointIn(frame, frame.halfDepth - 0.4, 0);
   if (!isFree(space, reach, 0.35, 0)) return [];

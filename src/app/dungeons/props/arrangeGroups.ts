@@ -1,0 +1,117 @@
+/**
+ * Furniture placed by what else stands in the room: a mirrored pair either side of a piece, the
+ * inner door or the room's middle; pieces around a parent (chairs round a table, a chest at a
+ * bed's foot); pieces on a grid; pieces on the shore of the room's liquid.
+ */
+
+import { cellKey, dir } from '../geometry';
+import type { CellDir, CellPoint, DungeonProp, PropKind } from '../model';
+import { shuffled } from '../rng';
+import { PROP_SPECS, isCellPiece, propReach } from './catalogue';
+import { footprintAt } from './cellVerbs';
+import { type FurnishSpace, type PlacedPiece, placeDisc, placePiece } from './furnishSpace';
+import { facing } from './roomFrame';
+import { isFree } from './space';
+
+const STEPS: readonly CellDir[] = [dir(0, -1), dir(1, 0), dir(0, 1), dir(-1, 0)];
+/** Terrain that is liquid a shore lies beside. */
+const LIQUID = new Set(['deep-water', 'channel', 'pool']);
+
+/** One piece of `kind` at `at`, facing `towards`: a disc at its middle, a cell piece on its cell. */
+function single(fs: FurnishSpace, kind: PropKind, at: CellPoint, towards: CellDir): DungeonProp | null {
+  const spec = PROP_SPECS[kind];
+  if (!isCellPiece(spec)) return placeDisc(fs, kind, at, facing(towards));
+  const cell = { x: Math.floor(at.x), y: Math.floor(at.y) };
+  return placePiece(fs, kind, footprintAt(cell, dir(-towards.y, towards.x), towards, spec.footprint.along, spec.footprint.out), towards);
+}
+
+/** Whether a piece of `kind` could stand at `at`: on the room's floor, free there. */
+function couldStand(fs: FurnishSpace, kind: PropKind, at: CellPoint): boolean {
+  const cell = { x: Math.floor(at.x), y: Math.floor(at.y) };
+  return fs.cells.isFloor(cell) && !fs.cells.isTaken(cell) && (isCellPiece(PROP_SPECS[kind]) ? fs.cells.isFree(cell) : isFree(fs.space, at, propReach(kind)));
+}
+
+/** Where a pair stands round: the piece's middle and facing, the inner door's first cell and the way in, or the room's middle. */
+function pairAxis(fs: FurnishSpace, of: PlacedPiece | 'door' | null): { at: CellPoint; facing: CellDir; half: number } | null {
+  const { cells: rc } = fs;
+  if (of && of !== 'door') {
+    // How many cells the piece spans across its facing: a pair stands a cell clear of its ends.
+    const span = new Set(of.cells.map((c) => c.x * of.facing.y + c.y * of.facing.x)).size;
+    return { at: { x: of.prop.x, y: of.prop.y }, facing: of.facing, half: span / 2 + 0.5 };
+  }
+  if (of === 'door') {
+    const door = fs.doors.find((d) => d.to === rc.room.id && d.kind !== 'secret') ?? fs.doors.find((d) => (d.from === rc.room.id || d.to === rc.room.id) && d.kind !== 'secret');
+    if (!door) return null;
+    const inward = door.to === rc.room.id ? door.dir : dir(-door.dir.x, -door.dir.y);
+    return { at: { x: door.x + 0.5 + inward.x, y: door.y + 0.5 + inward.y }, facing: inward, half: 1 };
+  }
+  return { at: fs.space.frame.centre, facing: dir(-rc.axis.x, -rc.axis.y), half: 1 };
+}
+
+/** A mirrored pair of `kind` either side of `of` (a placed piece, the inner door, or with null the room's middle); both or none. */
+export function flanking(fs: FurnishSpace, kind: PropKind, of: PlacedPiece | 'door' | null): DungeonProp[] {
+  const axis = pairAxis(fs, of);
+  if (!axis) return [];
+  const side = dir(-axis.facing.y, axis.facing.x);
+  const spots = [1, -1].map((sign) => ({ x: axis.at.x + side.x * axis.half * sign, y: axis.at.y + side.y * axis.half * sign }));
+  if (!spots.every((p) => couldStand(fs, kind, p))) return [];
+  const first = single(fs, kind, spots[0] as CellPoint, axis.facing);
+  if (!first) return [];
+  const second = single(fs, kind, spots[1] as CellPoint, axis.facing);
+  return second ? [first, second] : [first];
+}
+
+/**
+ * Up to `count` of `kind` round `parent`: at its foot first where it lies head to a wall (a
+ * chest at a bed's foot), then in the cells its clear side keeps, each facing the parent.
+ */
+export function aroundParent(fs: FurnishSpace, kind: PropKind, parent: PlacedPiece, count: number): DungeonProp[] {
+  const own = new Set(parent.cells.map((c) => cellKey(c.x, c.y)));
+  const foot = PROP_SPECS[parent.prop.kind].wall === 'head' ? parent.cells.map((c) => ({ x: c.x + parent.facing.x, y: c.y + parent.facing.y })).filter((c) => !own.has(cellKey(c.x, c.y))) : [];
+  const out: DungeonProp[] = [];
+  for (const cell of [...foot, ...shuffled(fs.rng, parent.clear)]) {
+    if (out.length >= count) break;
+    const towards = STEPS.find((d) => own.has(cellKey(cell.x + d.x, cell.y + d.y))) ?? parent.facing;
+    fs.cells.release([cell]);
+    const centre = { x: cell.x + 0.5 + towards.x * 0.15, y: cell.y + 0.5 + towards.y * 0.15 };
+    const placed = single(fs, kind, centre, dir(-towards.x, -towards.y));
+    if (placed) out.push(placed);
+    else fs.cells.keepClear([cell]);
+  }
+  return out;
+}
+
+/** Up to `count` of `kind` on a regular grid a cell apart. */
+export function inGrid(fs: FurnishSpace, kind: PropKind, count: number): DungeonProp[] {
+  const { cells: rc } = fs;
+  const spots: CellPoint[] = [];
+  for (let i = 1; i < rc.depth - 1; i += 2) for (let j = 1; j < rc.width - 1; j += 2) spots.push(rc.cell(i, j));
+  const out: DungeonProp[] = [];
+  for (const c of spots) {
+    if (out.length >= count) break;
+    const placed = single(fs, kind, { x: c.x + 0.5, y: c.y + 0.5 }, dir(-rc.axis.x, -rc.axis.y));
+    if (placed) out.push(placed);
+  }
+  return out;
+}
+
+/** Up to `count` of `kind` on free cells beside the room's liquid (deep water, a channel, a pool); none in a dry room. */
+export function onShore(fs: FurnishSpace, kind: PropKind, count: number): DungeonProp[] {
+  const liquid = fs.floor.inRoom(fs.cells.room.id).filter((piece) => LIQUID.has(piece.kind)).flatMap((piece) => piece.cells);
+  const wet = new Set(liquid.map((c) => cellKey(c.x, c.y)));
+  const shore = new Map<string, { cell: CellPoint; towards: CellDir }>();
+  for (const c of liquid) {
+    for (const d of STEPS) {
+      const next = { x: c.x - d.x, y: c.y - d.y };
+      // A shore piece backs onto the water's edge, as a wall piece backs onto its wall.
+      if (!wet.has(cellKey(next.x, next.y)) && fs.cells.isFree(next)) shore.set(cellKey(next.x, next.y), { cell: next, towards: dir(-d.x, -d.y) });
+    }
+  }
+  const out: DungeonProp[] = [];
+  for (const { cell, towards } of shuffled(fs.rng, [...shore.values()])) {
+    if (out.length >= count) break;
+    const placed = single(fs, kind, { x: cell.x + 0.5, y: cell.y + 0.5 }, towards);
+    if (placed) out.push(placed);
+  }
+  return out;
+}

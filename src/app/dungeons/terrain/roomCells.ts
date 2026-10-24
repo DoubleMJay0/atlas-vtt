@@ -16,6 +16,10 @@ import type { Footing } from './catalog';
 
 const STEPS: readonly CellDir[] = [dir(1, 0), dir(-1, 0), dir(0, 1), dir(0, -1)];
 
+/** A side of the room in its own frame: the far wall, the wall it was entered by, and the two across. */
+export type WallSide = 'back' | 'left' | 'right' | 'near';
+export const WALL_SIDES: readonly WallSide[] = ['back', 'left', 'right', 'near'];
+
 export class RoomCells {
   readonly depth: number;
   readonly width: number;
@@ -33,6 +37,8 @@ export class RoomCells {
   readonly needed: CellPoint[];
   /** Stairwells, the rows they are reached from and every cell beside them, by key: no hazard lies there and no bridge lands there. */
   private readonly byStairs = new Set<string>();
+  /** The cells of the room's doors other than secret ones, which keep the wall whole, by key. */
+  private readonly doorCells: Set<string>;
 
   constructor(
     readonly room: DungeonRoom,
@@ -49,6 +55,7 @@ export class RoomCells {
     const stairCells = inside.flatMap((s) => cellsOf(spotRect(s)));
     const approaches = inside.flatMap((s) => approachCells(s, s.to > floorIndex ? 'upper' : 'lower'));
     this.needed = [...doorApproaches(room, doors), ...approaches].filter((c) => inRect(rect, c.x, c.y));
+    this.doorCells = new Set(doors.filter((d) => d.kind !== 'secret' && (d.from === room.id || d.to === room.id)).map((d) => cellKey(d.x, d.y)));
     for (const c of [...stairCells, ...this.needed]) this.clear.add(cellKey(c.x, c.y));
     const stairway = [...stairCells, ...approaches];
     for (const c of stairway) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) this.byStairs.add(cellKey(c.x + dx, c.y + dy));
@@ -165,6 +172,48 @@ export class RoomCells {
     let n = 0;
     for (const footing of this.taken.values()) if (footing === 'block') n++;
     return n;
+  }
+
+  /** The way out of the room through `side`. */
+  beyond(side: WallSide): CellDir {
+    const { axis, across } = this;
+    switch (side) {
+      case 'back':
+        return axis;
+      case 'near':
+        return dir(-axis.x, -axis.y);
+      case 'right':
+        return across;
+      case 'left':
+        return dir(-across.x, -across.y);
+    }
+  }
+
+  /** Every floor cell whose neighbour beyond `side` is no floor of the room, along the wall in order. */
+  wallCells(side: WallSide): CellPoint[] {
+    const d = this.beyond(side);
+    const along = side === 'back' || side === 'near' ? this.across : this.axis;
+    return [...this.floor]
+      .map((key) => key.split(',').map(Number) as [number, number])
+      .filter(([x, y]) => !this.floor.has(cellKey(x + d.x, y + d.y)))
+      .map(([x, y]) => ({ x, y }))
+      .sort((a, b) => a.x * along.x + a.y * along.y - (b.x * along.x + b.y * along.y));
+  }
+
+  /** Whether a door (not a secret one) opens in the wall beyond `c` on `side`. */
+  doorOn(side: WallSide, c: CellPoint): boolean {
+    const d = this.beyond(side);
+    return this.doorCells.has(cellKey(c.x + d.x, c.y + d.y));
+  }
+
+  /** Whether a piece already stands on the cell, walkable or not. */
+  isTaken(c: CellPoint): boolean {
+    return this.taken.has(cellKey(c.x, c.y));
+  }
+
+  /** Lets cells kept clear for a piece take what belongs to it (chairs in a table's ring). */
+  release(cells: readonly CellPoint[]): void {
+    for (const c of cells) this.held.delete(cellKey(c.x, c.y));
   }
 
   /** Whether every walkable floor cell, with `extra` blocked too, reaches every other. */
