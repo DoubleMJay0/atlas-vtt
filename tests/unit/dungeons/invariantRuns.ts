@@ -187,6 +187,14 @@ export function describeInvariants(floors: number): void {
       expect(share('deep', (m) => anyFloor(m, (f) => f.doors.some((d) => d.kind === 'steps')))).toBeGreaterThan(0.5);
     });
 
+    it('let the theme show: a throne only in a Fortress, an altar in most Fortresses with a chapel', () => {
+      const thrones = runs.filter((run) => run.model.theme !== 'fortress' && run.model.floors.some((f) => f.props.some((p) => p.kind === 'throne')));
+      expect(thrones.map((run) => run.seed)).toEqual([]);
+      const chapels = runs.filter((run) => run.model.theme === 'fortress' && run.model.floors.some((f) => f.rooms.some((r) => r.type === 'chapel' && !f.terrain.some((p) => p.room === r.id && p.traits.hazard))));
+      const altars = chapels.filter((run) => run.model.floors.some((f) => f.props.some((p) => p.kind === 'altar') || f.terrain.some((p) => p.kind === 'altar')));
+      expect(altars.length / chapels.length).toBeGreaterThan(0.5);
+    });
+
     it('furnish the largest hall of a Cavern with a centrepiece, a dais or a set piece of terrain, and set every dais against a wall', () => {
       const halls = caverns.flatMap((run) => run.model.floors.map((floor) => ({ floor, hall: [...normals(floor)].sort((a, b) => b.w * b.h - a.w * a.h)[0] }))).filter(({ hall }) => hall && hall.w * hall.h >= 12);
       const setPieces = ['platform', 'ledge', 'statue', 'obelisk', 'portal-ring', 'altar', 'pool', 'mosaic', 'pillar', 'wall-fragment', 'pews', 'chasm', 'channel'];

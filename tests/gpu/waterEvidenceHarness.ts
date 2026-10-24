@@ -24,7 +24,7 @@ export async function waterScene(look: DungeonStyleId, monochrome: boolean, chan
   step: (seconds: number) => void; quality: (detail: LiquidDetail) => void; destroy: () => void;
 }> {
   const view = { ...DEFAULT_VIEW, monochrome };
-  const model = channel ? channelDungeon() : generateDungeon({ seed: 909, tags: ['small', 'wet', 'tomb'], floors: 1 });
+  const model = channel ? channelDungeon() : generateDungeon({ seed: 909, theme: 'cavern', tags: ['small', 'wet'], floors: 1 });
   const style = dungeonStyle(look);
   const layout = mapLayout(model, WATER_CELL, view);
   const scene = dungeonScene(model, style, view, { originCell: layout.originCell, pxPerCell: WATER_CELL }, { width: layout.widthPx, height: layout.heightPx }, { unitType: 'feet', ruleDistance: 5 })!.scene;

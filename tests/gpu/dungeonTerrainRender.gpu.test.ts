@@ -19,11 +19,11 @@ const PX = 48;
 const CASES: readonly { name: string; request: DungeonRequest; look: DungeonStyleId; view?: Partial<DungeonView> }[] = [
   { name: 'one-floor', request: { seed: 16, tags: [], floors: 1 }, look: 'parchment' },
   { name: 'one-floor-no-boss', request: { seed: 16, tags: [], floors: 1, bossRoom: false }, look: 'parchment' },
-  { name: 'large-temple', request: { seed: 777, tags: ['large', 'temple'], floors: 1 }, look: 'masonry' },
+  { name: 'large-fortress', request: { seed: 777, theme: 'fortress', tags: ['large', 'colonnades'], floors: 1 }, look: 'masonry' },
   { name: 'crumbling', request: { seed: 202, tags: ['crumbling', 'medium'], floors: 1 }, look: 'stipple' },
-  { name: 'wet-tomb', request: { seed: 909, tags: ['wet', 'tomb'], floors: 1 }, look: 'parchment' },
+  { name: 'wet-cavern', request: { seed: 909, theme: 'cavern', tags: ['wet'], floors: 1 }, look: 'parchment' },
   { name: 'five-room-a', request: { seed: 42, tags: [], floors: 1, fiveRoom: true }, look: 'parchment' },
-  { name: 'five-room-b', request: { seed: 4242, tags: ['temple'], floors: 1, fiveRoom: true }, look: 'night' },
+  { name: 'five-room-b', request: { seed: 4242, theme: 'fortress', tags: ['colonnades'], floors: 1, fiveRoom: true }, look: 'night' },
   { name: 'five-room-c', request: { seed: 99, tags: ['crumbling'], floors: 1, fiveRoom: true }, look: 'drafting' },
   { name: 'two-floors', request: { seed: 31, tags: [], floors: 2 }, look: 'parchment' },
   { name: 'three-floors', request: { seed: 404, tags: ['deep'], floors: 3 }, look: 'parchment' },
@@ -33,7 +33,7 @@ const CASES: readonly { name: string; request: DungeonRequest; look: DungeonStyl
   ...[1, 2, 3, 4].flatMap((floors) =>
     [11, 23, 37].map((seed) => ({ name: `sweep-${floors}f-${seed}`, request: { seed: seed * 1013 + floors, tags: [], floors, bossRoom: seed !== 23 }, look: 'parchment' as const })),
   ),
-  ...[7, 8, 9, 10].map((seed) => ({ name: `sweep-five-room-${seed}`, request: { seed: seed * 977, tags: seed % 2 ? ['temple'] : ['wet'], floors: 1, fiveRoom: true }, look: 'masonry' as const })),
+  ...[7, 8, 9, 10].map((seed) => ({ name: `sweep-five-room-${seed}`, request: { seed: seed * 977, theme: seed % 2 ? 'fortress' : undefined, tags: seed % 2 ? ['colonnades'] : ['wet'], floors: 1, fiveRoom: true }, look: 'masonry' as const })),
 ];
 
 function floorCanvas(model: DungeonModel, look: DungeonStyleId, view: DungeonView, floor: number): OffscreenCanvas {

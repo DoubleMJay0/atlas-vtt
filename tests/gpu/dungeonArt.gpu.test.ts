@@ -69,7 +69,7 @@ describe.skipIf(!asked)('dungeon looks, for judging by eye', () => {
     if (shots.includes('scene')) {
       it(`${id} vegetation at a scene's resolution`, async () => {
         // As a created scene draws it: 400 px a cell, whole (written reduced) and a window with tokens.
-        for (const name of ['overgrown-temple', 'overgrown-tomb', 'overgrown-dwelling', 'overgrown-halls']) {
+        for (const name of ['overgrown-fortress', 'overgrown-cavern', 'overgrown-mansion', 'overgrown-halls']) {
           if (dungeons && !dungeons.includes(name)) continue;
           const model = artModel(name);
           const pxPerCell = suggestedPxPerCell(model);

@@ -27,6 +27,8 @@ const req = (seed: number, tags: string[], floors = 1): DungeonRequest => ({ see
 const CASES: [string, DungeonRequest, DungeonStyleId][] = [
   ['small', req(11, ['small']), 'parchment'],
   ['medium', req(7, ['medium']), 'parchment'],
+  ['medium fortress', { ...req(7, ['medium']), theme: 'fortress' }, 'parchment'],
+  ['medium mansion', { ...req(7, ['medium']), theme: 'mansion' }, 'parchment'],
   ['medium overgrown wet', req(7, ['medium', 'overgrown', 'wet']), 'parchment'],
   ['medium 3 floors flooded', req(5, ['medium', 'flooded'], 3), 'masonry'],
   ['large 3 floors lava overgrown', req(3, ['large', 'lava', 'overgrown'], 3), 'volcanic'],

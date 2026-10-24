@@ -33,8 +33,8 @@ function colorsFor(look: DungeonStyleId, liquid: LiquidKind): LiquidColors {
 }
 
 const CASES: readonly { name: string; request: DungeonRequest; look: DungeonStyleId; liquid: LiquidKind; flow?: Point }[] = [
-  { name: 'water-parchment-pool', request: { seed: 909, tags: ['wet', 'tomb'], floors: 1 }, look: 'parchment', liquid: 'water' },
-  { name: 'water-parchment-flowing', request: { seed: 909, tags: ['wet', 'tomb'], floors: 1 }, look: 'parchment', liquid: 'water', flow: { x: 0.8, y: 0.6 } },
+  { name: 'water-parchment-pool', request: { seed: 909, theme: 'cavern', tags: ['wet'], floors: 1 }, look: 'parchment', liquid: 'water' },
+  { name: 'water-parchment-flowing', request: { seed: 909, theme: 'cavern', tags: ['wet'], floors: 1 }, look: 'parchment', liquid: 'water', flow: { x: 0.8, y: 0.6 } },
   { name: 'water-night-pool', request: { seed: 31, tags: ['wet'], floors: 1 }, look: 'night', liquid: 'water' },
   { name: 'lava-volcanic', request: { seed: 909, tags: ['wet'], floors: 1 }, look: 'volcanic', liquid: 'lava' },
   { name: 'lava-volcanic-flowing', request: { seed: 909, tags: ['wet'], floors: 1 }, look: 'volcanic', liquid: 'lava', flow: { x: 1, y: 0 } },
