@@ -25,6 +25,7 @@ import { houseLot } from './houseLot';
 import { type HouseSize, houseParams, houseSize } from './houseParams';
 import { houseStairs, type HouseStair } from './houseStairs';
 import { buildStorey } from './houseStorey';
+import { chooseStacks } from './houseStacks';
 import { type Facade, entranceEdges, facadePeriod, houseFacade } from './houseFacade';
 import { WindowFloor } from './houseWindows';
 import { type TypedRoom, typeStorey } from './houseZones';
@@ -119,7 +120,7 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
   let facade: Facade | null = null;
   let link = 0;
   const links = stairs.map(() => link++);
-  for (const level of levels) {
+  const planned = levels.map((level) => {
     const storey = buildStorey(frame, cut, level);
     const typed = typeStorey({
       rng: floorStream(seed, 'rooms', indexOf(level), 'house'),
@@ -131,6 +132,15 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
       servery: frame.baizeX < frame.width,
       ruined,
     });
+    return { level, storey, typed };
+  });
+  // The places no stack is built on stay the rooms' floor.
+  const built = chooseStacks(frame, cut, planned.map((p) => p.typed));
+  for (const { storey, typed } of planned) {
+    storey.stacks = storey.stacks.filter((s) => built.has(s));
+    for (const r of typed) if (r.notch && !built.has(r.notch)) r.notch = null;
+  }
+  for (const { level, storey, typed } of planned) {
     const rooms = entryFirst(typed, level);
     const inHouse = inBoxes([...rooms.map((r) => r.box), ...storey.stacks]);
     const doors = houseDoors({ frame, rooms, blocked: blockedBy(stairs, level), inHouse, ground: level === 0 });

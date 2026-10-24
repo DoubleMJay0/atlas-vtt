@@ -25,7 +25,6 @@ export interface ThemedFloors {
 export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<DungeonTag>, floors: readonly PlannedFloor[], below = 0): ThemedFloors {
   const definition = themeOf(id);
   const ruined = tags.has('ruined');
-  const lived = definition.layout === 'house' && tags.has('inhabited') ? (true as const) : undefined;
   const facts = definition.facts?.({ seed, tags, floors }) ?? NO_FACTS;
   const theme: ThemeContext = { definition, ruined, facts };
   const programme = programmeOf(definition, tags);
@@ -44,7 +43,7 @@ export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<Dungeon
       room.type = type;
       // Only a type that keeps columns keeps the colonnade the layout gave its room.
       if (!spec.terrain.columns) room.colonnade = false;
-      out.set(room.id, { spec, context: { depthRank: ranks[index]?.get(room.id) ?? 0.5, ruined, richness: facts.richness({ floor: index, room: room.id }), ...(lived && { lived }) } });
+      out.set(room.id, { spec, context: { depthRank: ranks[index]?.get(room.id) ?? 0.5, ruined, richness: facts.richness({ floor: index, room: room.id }) } });
     }
     return out;
   });

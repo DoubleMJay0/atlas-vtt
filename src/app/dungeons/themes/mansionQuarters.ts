@@ -1,5 +1,6 @@
 /** The Haunted Mansion's private rooms, attics, study, laboratory, observatory, gallery, ritual room, landings and ruins (`mansionRooms.ts`). */
 
+import { HEARTH } from './mansionHouse';
 import type { RoomTypeSpec } from './themeTypes';
 
 export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
@@ -11,7 +12,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     near: ['library'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.6 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'master-bedroom',
@@ -23,7 +24,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'last',
     apart: ['kitchen'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.6 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'bedroom',
@@ -32,7 +33,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     depth: 'deep',
     floor: 'beyond',
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.7 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'nursery',
@@ -43,7 +44,7 @@ export const MANSION_QUARTERS: readonly RoomTypeSpec[] = [
     floor: 'beyond',
     near: ['master-bedroom'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.7 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'bathroom',
