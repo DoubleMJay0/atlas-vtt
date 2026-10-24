@@ -5,8 +5,8 @@
  */
 
 import { type StairSpot, spotRect } from '../../floors/stairSpots';
-import { type CellRect, cellKey, cellsOf, inRect, wallRect } from '../../geometry';
-import type { CellPoint, DungeonRoom } from '../../model';
+import { type CellRect, cellKey, cellsOf, doorCells, inRect, wallRect } from '../../geometry';
+import type { CellPoint, DungeonDoor, DungeonRoom } from '../../model';
 import { type CaveFloorPlan, type CaveGrid, ROCK, doorOwner } from './caveGrid';
 
 /** The rectangle a tunnel's cells lie in: its walls and, where it winds, the ring of rock round them. */
@@ -15,10 +15,19 @@ export function tunnelReach(room: DungeonRoom): CellRect {
   return { x0: r.x0 - TUNNEL_SWING, y0: r.y0 - TUNNEL_SWING, x1: r.x1 + TUNNEL_SWING, y1: r.y1 + TUNNEL_SWING };
 }
 
-/** Whether a tunnel may wind through the cell: one of its walls, or rock past them that no other room's walls hold. */
-export function inTunnelReach(rooms: readonly DungeonRoom[], room: DungeonRoom, x: number, y: number): boolean {
+/** Whether a tunnel may wind through the cell: one of its walls, or rock past them that no other room's walls hold and no entrance stands beside. */
+export function inTunnelReach(floor: Pick<CaveFloorPlan, 'rooms' | 'doors'>, room: DungeonRoom, x: number, y: number): boolean {
   if (inRect(wallRect(room), x, y)) return true;
-  return inRect(tunnelReach(room), x, y) && !rooms.some((other) => other.id !== room.id && inRect(wallRect(other), x, y));
+  return inRect(tunnelReach(room), x, y) && !floor.rooms.some((other) => other.id !== room.id && inRect(wallRect(other), x, y)) && !besideEntrance(floor.doors, x, y);
+}
+
+/**
+ * Whether the cell touches a cell of a way in from outside (at a side or a corner). A cave taken
+ * past its rooms' walls keeps off these, as a built room's wall does: floor there would stand on
+ * the entrance's open mouth, and its wall would be left open with it.
+ */
+export function besideEntrance(doors: readonly DungeonDoor[], x: number, y: number): boolean {
+  return doors.some((door) => door.from === null && doorCells(door).some((c) => Math.abs(c.x - x) <= 1 && Math.abs(c.y - y) <= 1));
 }
 
 /** How far past its walls a tunnel may wind, in cells. */
@@ -65,7 +74,7 @@ export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly
     if (owner !== ROCK) return laneDoors.some((k) => owner === doorOwner(k)) ? owner : null;
     const beside = besideDoor(floor, laneDoors, x, y, (k) => lane?.has(cellKey(floor.doors[k]!.x, floor.doors[k]!.y)) ?? true);
     if (beside !== undefined) return grid.mayClaim(x, y, doorOwner(beside)) ? doorOwner(beside) : null;
-    return tunnels.find((room) => inTunnelReach(floor.rooms, room, x, y) && grid.mayClaim(x, y, room.id))?.id ?? null;
+    return tunnels.find((room) => inTunnelReach(floor, room, x, y) && grid.mayClaim(x, y, room.id))?.id ?? null;
   };
   return (x, y) => {
     const key = cellKey(x, y);

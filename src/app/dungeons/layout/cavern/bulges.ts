@@ -2,8 +2,8 @@
  * Caves past their rooms' straight sides: once every chamber and tunnel has its cells, a chamber's
  * lobes may swell up to two cells past its rectangle into free rock, and a tunnel widens here and
  * there, so no wall runs straight along a rectangle's edge. Only rock that touches nothing it may
- * not touch is taken (`CaveGrid.mayClaim`), never a cell of another room's rectangle, never so two
- * floor cells meet only at a corner; and a cell left with fewer than two floor cells beside it is
+ * not touch is taken (`CaveGrid.mayClaim`), never a cell of another room's rectangle or beside an
+ * entrance, never so two floor cells meet only at a corner; and a cell left with fewer than two floor cells beside it is
  * given back, so no thin spur is left.
  */
 
@@ -13,7 +13,7 @@ import type { Rng } from '../../rng';
 import { fractalNoise } from '../../water/noise';
 import { type CaveGrid, NEAR4, ROCK, doorOwner } from './caveGrid';
 import type { ChamberField } from './chamberField';
-import { inTunnelReach } from './laneCells';
+import { besideEntrance, inTunnelReach } from './laneCells';
 
 /** How far past its rectangle a chamber may swell, in cells. */
 export const CHAMBER_SWELL = 2;
@@ -91,7 +91,7 @@ export function swellChamber(grid: CaveGrid, doors: readonly DungeonDoor[], room
   const rect = floorRect(room);
   swellInto(grid, doors, {
     owner: room.id,
-    may: (c) => outside(rect, c) > 0 && outside(rect, c) <= CHAMBER_SWELL && grid.envelope(c.x, c.y) === ROCK && field(c.x, c.y) >= SWELL_FIELD,
+    may: (c) => outside(rect, c) > 0 && outside(rect, c) <= CHAMBER_SWELL && grid.envelope(c.x, c.y) === ROCK && !besideEntrance(doors, c.x, c.y) && field(c.x, c.y) >= SWELL_FIELD,
     score: field,
     rounds: CHAMBER_SWELL,
   });
@@ -102,7 +102,7 @@ export function widenTunnel(rng: Rng, grid: CaveGrid, floor: { rooms: readonly D
   const noise = fractalNoise(rng, 1, 0.5, WIDEN_PERIOD);
   swellInto(grid, floor.doors, {
     owner: room.id,
-    may: (c) => inTunnelReach(floor.rooms, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && noise(c.x, c.y) > WIDEN_ABOVE && !completesBlock(grid, room.id, c),
+    may: (c) => inTunnelReach(floor, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && noise(c.x, c.y) > WIDEN_ABOVE && !completesBlock(grid, room.id, c),
     score: noise,
     rounds: 1,
   });

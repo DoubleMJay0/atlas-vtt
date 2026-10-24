@@ -37,19 +37,9 @@ const STEPS = [
   { x: 0, y: 1 },
 ] as const;
 
-/** Whether a piece of `kind` on `cells` would be the mirror image of one in the room across its middle: what nature never makes. */
-function mirrorsAnother(floor: FloorTerrain, rc: RoomCells, kind: TerrainKind, cells: readonly CellPoint[]): boolean {
-  const { x, y, w, h } = rc.room;
-  const flips = [(c: CellPoint): string => cellKey(2 * x + w - 1 - c.x, c.y), (c: CellPoint): string => cellKey(c.x, 2 * y + h - 1 - c.y)];
-  return floor.inRoom(rc.room.id).some((p) => p.kind === kind && p.cells.length === cells.length && flips.some((flip) => {
-    const own = new Set(p.cells.map((c) => cellKey(c.x, c.y)));
-    return cells.every((c) => own.has(flip(c)));
-  }));
-}
-
 /** Lays `kind` on `cells` unless it mirrors a piece already there; whether it did. */
 function layLoose(floor: FloorTerrain, rc: RoomCells, kind: TerrainKind, cells: CellPoint[]): boolean {
-  return !mirrorsAnother(floor, rc, kind, cells) && floor.place(draft(kind, rc.room.id, cells)) !== null;
+  return !floor.mirrorsAnother(rc.room, kind, cells) && floor.place(draft(kind, rc.room.id, cells)) !== null;
 }
 
 /** A heap of fallen blocks on a cell or two of `spots`, else loose rubble; whether either was laid. */

@@ -99,7 +99,7 @@ export function carveTunnel(rng: Rng, grid: CaveGrid, room: DungeonRoom, ends: r
   const reach = tunnelReach(room);
   const may = new Set(
     cellsOf(reach)
-      .filter((c) => grid.holds(c.x, c.y, room.id) || (inTunnelReach(rooms, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && grid.mayClaim(c.x, c.y, room.id)))
+      .filter((c) => grid.holds(c.x, c.y, room.id) || (inTunnelReach({ rooms, doors: grid.doors }, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && grid.mayClaim(c.x, c.y, room.id)))
       .map(key),
   );
   const keep = [...new Set([...ends.map(key), ...grid.required(room.id), ...lane])].filter((k) => may.has(k));

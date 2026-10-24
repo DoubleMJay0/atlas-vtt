@@ -97,7 +97,8 @@ export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: re
       const start = starts[Math.floor(rng() * starts.length)];
       if (!start) continue;
       const cells = clump(rng, rc, start, Math.min(int(rng, 2, 6), Math.floor(rc.floorCount / 5)), fits);
-      if (cells.length >= 2) floor.place(draft(kind, room.id, cells));
+      // Nature never grows a second clump as the first one's mirror image.
+      if (cells.length >= 2 && !floor.mirrorsAnother(room, kind, cells)) floor.place(draft(kind, room.id, cells));
     }
   }
   return floor.pieces;
