@@ -1,6 +1,7 @@
 import type { WallSegment } from '../../types/wallTypes';
-import type { DungeonProp, DungeonTerrain, PropKind, TerrainKind } from '../model';
-import { STATUE_PLINTH, WELL_RADIUS } from '../render/propStone';
+import type { DungeonProp, DungeonTerrain, TerrainKind } from '../model';
+import { rotate } from '../render/geometry';
+import { propTall } from '../render/propShapes';
 import { cellBox } from '../render/terrain/cellRings';
 import { FRAGMENT, INSET as DRAWN_INSET } from '../render/terrain/footprints';
 import type { VisibleDungeon } from '../render/visibleDungeon';
@@ -31,15 +32,6 @@ export interface Footprint {
 }
 
 /**
- * The tall props, by the size of what the map draws of them at scale 1 (`render/propStone.ts`: a
- * statue's plinth, a well's ring), so an outline always lies on its drawn object.
- */
-const TALL_PROPS: Partial<Record<PropKind, { half: number; round: boolean }>> = {
-  statue: { half: STATUE_PLINTH / 2, round: false },
-  well: { half: WELL_RADIUS, round: true },
-};
-
-/**
  * The tall terrain, by how far its drawing keeps inside the cells it fills (`render/terrain/footprints.ts`);
  * a wall fragment is a slab of `FRAGMENT` along its longer side, its broken ends short of the cells.
  */
@@ -54,11 +46,15 @@ const SHRINK_STEPS = 12;
 /** Pixels an outline keeps beyond the seal tolerance. */
 const MARGIN = 1;
 
-function propFootprint(prop: DungeonProp): Footprint | null {
-  const tall = TALL_PROPS[prop.kind];
+/**
+ * A tall prop's outline, by the size and place of what the map draws of it (`tall` on its drawing:
+ * a statue's plinth, a well's ring, a wardrobe's case at the back of its cell), so it always lies
+ * on its drawn object.
+ */
+export function propFootprint(prop: DungeonProp, tall = propTall(prop.kind)): Footprint | null {
   if (!tall) return null;
-  const half = tall.half * prop.scale;
-  return { x: prop.x, y: prop.y, halfW: half, halfH: half, round: tall.round, rotation: prop.rotation };
+  const off = rotate({ x: (tall.x ?? 0) * prop.scale, y: (tall.y ?? 0) * prop.scale }, prop.rotation);
+  return { x: prop.x + off.x, y: prop.y + off.y, halfW: tall.halfW * prop.scale, halfH: tall.halfH * prop.scale, round: tall.round, rotation: prop.rotation };
 }
 
 function terrainFootprint(piece: DungeonTerrain): Footprint | null {

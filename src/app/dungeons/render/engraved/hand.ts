@@ -1,8 +1,8 @@
-import { pointsBounds, type Bounds, type Vec } from '../geometry';
+import type { Bounds } from '../geometry';
 import type { ArtScene } from '../art/artScene';
 import type { Hand, Material } from '../art/hand';
 import { SHADOW_DIR, shadeEdges } from '../art/light';
-import { polysPath, runsPath, type PathFn } from '../art/paths';
+import { pathBounds, polysPath, runsPath, type PathFn } from '../art/paths';
 import { hatchFill } from './hatch';
 import type { Pens } from './pens';
 import { paintMolten, paintWater } from './water';
@@ -51,7 +51,7 @@ export function engravedHand(scene: ArtScene, pens: Pens): Hand {
     grain: (path, material) => {
       const t = TEXTURE[material];
       if (!t) return;
-      const box = boundsOf(path);
+      const box = pathBounds(path);
       if (!box) return;
       hatch(box, path, t.angle, pens.spacing * t.spacing, () => pens.spacing * t.spacing * t.width);
     },
@@ -83,38 +83,4 @@ export function engravedHand(scene: ArtScene, pens: Pens): Hand {
     weight: weight => WEIGHTS[weight],
   };
   return hand;
-}
-
-/** The box a path covers, in its own frame, from the points it is traced through. */
-function boundsOf(path: PathFn): Bounds | null {
-  const points: Vec[] = [];
-  const add = (x: number, y: number): void => void points.push({ x, y });
-  path({
-    moveTo: add,
-    lineTo: add,
-    rect: (x, y, w, h) => {
-      add(x, y);
-      add(x + w, y + h);
-    },
-    arc: (x, y, r) => {
-      add(x - r, y - r);
-      add(x + r, y + r);
-    },
-    arcTo: (x1, y1) => add(x1, y1),
-    quadraticCurveTo: (cx, cy, x, y) => {
-      add(cx, cy);
-      add(x, y);
-    },
-    bezierCurveTo: (_a, _b, _c, _d, x, y) => add(x, y),
-    closePath: () => undefined,
-    ellipse: (x, y, rx, ry) => {
-      add(x - rx, y - ry);
-      add(x + rx, y + ry);
-    },
-    roundRect: (x, y, w, h) => {
-      add(x, y);
-      add(x + w, y + h);
-    },
-  });
-  return points.length ? pointsBounds(points) : null;
 }

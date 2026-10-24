@@ -1,4 +1,4 @@
-import type { Bounds, Vec } from '../geometry';
+import { pointsBounds, type Bounds, type Vec } from '../geometry';
 
 /** Adds something to the current path; drawing code passes these around instead of shapes. */
 export type PathFn = (path: CanvasPath) => void;
@@ -46,4 +46,47 @@ export function runsPath(runs: readonly (readonly Vec[])[], closed = false): Pat
       if (closed) path.closePath();
     }
   };
+}
+
+/** The box a path covers, in its own frame, from the points it is traced through (an arc's or ellipse's whole outline, a curve's control points, which hold it). */
+export function pathBounds(path: PathFn): Bounds | null {
+  const points: Vec[] = [];
+  const add = (x: number, y: number): void => void points.push({ x, y });
+  path({
+    moveTo: add,
+    lineTo: add,
+    rect: (x, y, w, h) => {
+      add(x, y);
+      add(x + w, y + h);
+    },
+    arc: (x, y, r) => {
+      add(x - r, y - r);
+      add(x + r, y + r);
+    },
+    arcTo: (x1, y1) => add(x1, y1),
+    quadraticCurveTo: (cx, cy, x, y) => {
+      add(cx, cy);
+      add(x, y);
+    },
+    bezierCurveTo: (c1x, c1y, c2x, c2y, x, y) => {
+      add(c1x, c1y);
+      add(c2x, c2y);
+      add(x, y);
+    },
+    closePath: () => undefined,
+    ellipse: (x, y, rx, ry, rotation) => {
+      // A turned ellipse's box: its half extents along each axis.
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      const hx = Math.hypot(rx * cos, ry * sin);
+      const hy = Math.hypot(rx * sin, ry * cos);
+      add(x - hx, y - hy);
+      add(x + hx, y + hy);
+    },
+    roundRect: (x, y, w, h) => {
+      add(x, y);
+      add(x + w, y + h);
+    },
+  });
+  return points.length ? pointsBounds(points) : null;
 }

@@ -52,7 +52,7 @@ export function drawWhole(model: DungeonModel, look: DungeonStyleId, view: Dunge
 const TOKEN_COLOURS = ['#c0392b', '#2e86c1', '#d4a017', '#27ae60', '#8e44ad'];
 
 /** A token as a VTT draws one: a disc in its colour with a pale ring and a figure, casting a small shadow. */
-function drawToken(ctx: OffscreenCanvasRenderingContext2D, x: number, y: number, r: number, colour: string): void {
+export function drawToken(ctx: OffscreenCanvasRenderingContext2D, x: number, y: number, r: number, colour: string): void {
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.45)';
   ctx.shadowBlur = r * 0.25;
