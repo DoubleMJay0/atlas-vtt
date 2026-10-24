@@ -118,7 +118,9 @@ export function roomTraits(floors: readonly PlannedFloor[]): RoomTraits[] {
       });
     }
   });
-  const last = out.filter((t) => t.floor === floors.length - 1).reduce<RoomTraits | undefined>((best, t) => (!best || t.depth > best.depth ? t : best), undefined);
+  // Of rooms equally deep, the boss room is the deepest.
+  const deeper = (t: RoomTraits, best: RoomTraits): boolean => t.depth > best.depth || (t.depth === best.depth && t.boss && !best.boss);
+  const last = out.filter((t) => t.floor === floors.length - 1).reduce<RoomTraits | undefined>((best, t) => (!best || deeper(t, best) ? t : best), undefined);
   if (last) last.band = 'deepest';
   return out;
 }

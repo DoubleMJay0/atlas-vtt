@@ -73,3 +73,40 @@ export function hubWithBranches(): PlannedFloor {
     ],
   );
 }
+
+/**
+ * A keep of eight rooms: 0 the entrance, 1 a hall (the largest), 2 and 3 east of it, 4 and 5
+ * south, 6 north and 7 beyond it, the boss room where `boss` is set.
+ */
+export function keep(boss = true): PlannedFloor {
+  return plannedFloor(
+    [
+      { x: 0, y: 0, w: 4, h: 4 },
+      { x: 5, y: 0, w: 8, h: 6 },
+      { x: 14, y: 0, w: 4, h: 4 },
+      { x: 19, y: 0, w: 4, h: 4 },
+      { x: 5, y: 7, w: 4, h: 4 },
+      { x: 10, y: 7, w: 4, h: 4 },
+      { x: 5, y: -6, w: 5, h: 5 },
+      { x: 11, y: -6, w: 6, h: 5, boss },
+    ],
+    [
+      [0, 1, 4, 1],
+      [1, 2, 13, 1],
+      [2, 3, 18, 1],
+      [1, 4, 6, 6],
+      [4, 5, 9, 8],
+      [1, 6, 6, -1],
+      [6, 7, 10, -4],
+    ],
+  );
+}
+
+/** `count` floors of the keep, the boss room on the last; the floors below are entered at their room 0. */
+export function keepFloors(count: number): PlannedFloor[] {
+  return Array.from({ length: count }, (_, k) => {
+    const floor = keep(k === count - 1);
+    return k === 0 ? floor : { ...floor, doors: floor.doors.filter((door) => door.from !== null) };
+  });
+}
+
