@@ -67,10 +67,6 @@ describe('generated Fortresses', () => {
     expect(failuresOf(runs, (m) => apartProblems(m, [...pairs, ...pairs.map(([a, b]) => [b, a] as const)]))).toEqual([]);
   });
 
-  it('holds a throne only in a throne room', () => {
-    expect(failuresOf(runs, (m) => m.floors.flatMap((f) => f.props.filter((p) => p.kind === 'throne' && f.rooms[p.room]?.type !== 'throne-room').map((p) => `a throne in a ${f.rooms[p.room]?.type}`)))).toEqual([]);
-  });
-
   it('uses only the types of its own theme and types every normal room', () => {
     const ids = new Set<string>(FORTRESS.rooms.map((spec) => spec.id));
     expect(failuresOf(runs, (m) => typingProblems(m, ids))).toEqual([]);

@@ -2,6 +2,8 @@ import { glyphEdges, glyphTone } from '../../art/glyphLight';
 import type { Hand, Material } from '../../art/hand';
 import { polyPath, type PathFn } from '../../art/paths';
 import { fineLines, inkDot, type GlyphPen } from '../../glyphPen';
+import { mixColours } from '../../palette';
+import { isDarkColour } from '../../stone/colours';
 import { partPath, partPoly, type Part } from './shapes';
 
 type Paint = ReturnType<GlyphPen['paint']>;
@@ -9,13 +11,22 @@ type Paint = ReturnType<GlyphPen['paint']>;
 // and repeated glyphs; the weak key releases them with the rendered scene.
 const paints = new WeakMap<Hand, Partial<Record<Material, Paint>>>();
 
+/** Masonry a look draws towards its light ink on a dark floor, so a fireplace stands pale there as calcite does. */
+const PALE_ON_DARK: ReadonlySet<Material> = new Set(['dressed', 'stone']);
+
 function materialPaint(pen: GlyphPen, material: Material): Paint {
   let colours = paints.get(pen.hand);
   if (!colours) {
     colours = {};
     paints.set(pen.hand, colours);
   }
-  return colours[material] ??= pen.paint(material);
+  return colours[material] ??= paleOnDark(pen, material, pen.paint(material));
+}
+
+function paleOnDark(pen: GlyphPen, material: Material, paint: Paint): Paint {
+  const { env } = pen.hand.scene;
+  const dark = env.style.direction === 'stone' && !env.view.monochrome && isDarkColour(pen.paint('floor').fill);
+  return dark && PALE_ON_DARK.has(material) ? { fill: mixColours(paint.fill, env.palette.ink, 0.24), ink: paint.ink } : paint;
 }
 
 /** A part always uses its own material's ink, including in the dark looks. */

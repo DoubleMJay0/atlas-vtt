@@ -41,6 +41,14 @@ export function onDarkFloor(pen: GlyphPen): boolean {
 }
 
 /**
+ * The line Stone & shadow draws round a raised edge on a dark floor: the look's light ink, a little
+ * towards the floor, as a deep shade of a fill close to the floor would sink into it.
+ */
+export function darkFloorLine(pen: GlyphPen): string {
+  return mixColours(pen.hand.scene.env.palette.ink, pen.paint('floor').fill, 0.3);
+}
+
+/**
  * Fills `path` with `material` (or `fill`), outlined in that material's ink unless `outlined` is
  * false; `texture` lays the material's grain over it (Engraved's line texture, Stone's tile).
  */

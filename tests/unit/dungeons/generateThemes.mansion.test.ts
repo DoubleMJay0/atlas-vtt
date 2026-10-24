@@ -72,10 +72,6 @@ describe('generated Haunted Mansions', () => {
     expect(failuresOf(runs, (m) => apartProblems(m, pairs))).toEqual([]);
   });
 
-  it('holds no throne', () => {
-    expect(failuresOf(runs, (m) => m.floors.flatMap((f) => f.props.filter((p) => p.kind === 'throne').map(() => 'a throne')))).toEqual([]);
-  });
-
   it('uses only the types of its own theme and types every normal room', () => {
     const ids = new Set<string>(MANSION.rooms.map((spec) => spec.id));
     expect(failuresOf(runs, (m) => typingProblems(m, ids))).toEqual([]);

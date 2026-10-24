@@ -5,7 +5,7 @@ import type { Vec } from '../../geometry';
 import { circlePath, type GlyphPen } from '../../glyphPen';
 import { mixColours } from '../../palette';
 import { stoneOutline } from '../../terrain/stones';
-import { colours, fine, isPainted, lips, polys, ring, seeded, stick, surface } from './parts';
+import { colours, darkFloorLine, fine, isPainted, lips, onDarkFloor, polys, ring, seeded, stick, surface } from './parts';
 
 /**
  * A cold campfire: a ring of fieldstones round a bed of ash, the charred ends of the last sticks
@@ -110,7 +110,7 @@ export function campfire(pen: GlyphPen): void {
   surface(pen, path => { polys(CHAR_POLYS)(path); crumbsPath(path); }, 'wood', false, false, mixColours(colours(pen, 'wood').ink, '#000000', 0.55));
   // The ash's cracks lie between the sticks, so they share the sticks' grain pass.
   fine(pen, path => { ashCracks(path); grainPath(path); }, 'wood');
-  // The ring of stones over the ash's edge, each lit on the side towards the light.
-  surface(pen, campfireSilhouette, 'rock');
+  // The ring of stones over the ash's edge, each lit on the side towards the light; on a dark floor outlined in the look's light line.
+  surface(pen, campfireSilhouette, 'rock', false, true, undefined, painted && onDarkFloor(pen) ? darkFloorLine(pen) : undefined);
   lips(pen, RING_STONES);
 }

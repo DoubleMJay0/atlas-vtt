@@ -9,7 +9,7 @@ import { paintPlantForm } from '../../stone/growth';
 import { rngFrom } from '../../../rng';
 
 /**
- * A patch of cave mushrooms: three knee-high clusters of caps on one cell of floor, grown by the
+ * A patch of cave mushrooms: knee-high clusters of caps on one cell of floor, grown by the
  * vegetation's own fungus (`fungi`) and painted or cut as the vegetation is, so a grove's patches
  * and the fungi of an overgrown room are one family. Never a giant: the largest cap is a sixth of a
  * cell across. Its caps are laid out once, in the piece's own frame.
@@ -18,12 +18,16 @@ import { rngFrom } from '../../../rng';
 /** How high a patch stands, as a share of a column's shadow. */
 export const MUSHROOM_LIFT = 0.12;
 
-/** The patch's caps in the piece's own cells: three clusters, the largest towards the back. */
+/** The most caps a patch keeps: each is a domed, lit ellipse, and a patch must cost no more than the props it stands among. */
+const MOST_CAPS = 6;
+
+/** The patch's caps in the piece's own cells: the largest of three clusters, the largest cluster towards the back. */
 const MUSHROOM_CAPS: readonly Cap[] = (() => {
   const form = emptyForm('fungus', MUSHROOM_LIFT);
   const rng = rngFrom(0x5eed);
   for (const [x, y, size] of [[-0.17, 0.12, 0.32], [0.2, -0.1, 0.27], [0.06, 0.28, 0.2]] as const) fungi(form, rng, { x, y }, size);
-  return form.caps;
+  const kept = new Set([...form.caps].sort((a, b) => b.radius - a.radius).slice(0, MOST_CAPS));
+  return form.caps.filter((cap) => kept.has(cap));
 })();
 
 /** The caps as a shadow's outline, in the piece's own frame. */

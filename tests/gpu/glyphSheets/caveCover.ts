@@ -171,7 +171,7 @@ if (!import.meta.env.VITE_GLYPH_FAMILY || import.meta.env.VITE_GLYPH_FAMILY === 
         }
         return times.sort((a, b) => a - b)[2]!;
       };
-      const reference = (['fountain', 'well', 'statue', 'throne'] as const).map(kind => measure(() => drawGlyph(hand, { x: 2.5, y: 2.5, rotation: 0, scale: 1, fit: glyphFit({ kind, scale: 1 }) }, PROP_GLYPHS[kind]!, water, cloth)));
+      const reference = (['fountain', 'well', 'statue'] as const).map(kind => measure(() => drawGlyph(hand, { x: 2.5, y: 2.5, rotation: 0, scale: 1, fit: glyphFit({ kind, scale: 1 }) }, PROP_GLYPHS[kind]!, water, cloth)));
       const limit = 2 * Math.max(...reference);
       for (const kind of KINDS) {
         model.floors[0]!.terrain = [{ id: 0, ...draft(kind, 0, [{ x: 2, y: 2 }]) }];
