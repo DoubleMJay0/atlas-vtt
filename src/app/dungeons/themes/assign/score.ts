@@ -90,7 +90,9 @@ export function fitScore(spec: RoomTypeSpec, t: RoomTraits, floors: number): num
   return score;
 }
 
-const typesAround = (a: Assignment, rooms: readonly number[]): Set<RoomTypeId> => new Set(rooms.flatMap((j) => (a.types[j] ? [a.types[j] as RoomTypeId] : [])));
+function typesAround(a: Assignment, rooms: readonly number[]): Set<RoomTypeId> {
+  return new Set(rooms.flatMap((j) => a.types[j] ?? []));
+}
 
 /** How well a room's type sits among its neighbours' types: wanted ones next or near, never an `apart` one next. */
 export function adjacencyScore(a: Assignment, i: number): number {
@@ -140,6 +142,6 @@ export function breaksHardRule(a: Assignment, i: number, id: RoomTypeId): boolea
   if (spec.climaxOnly && !t.boss) return true;
   if (spec.holdsStairs && !t.stairs) return true;
   if (heldCount(a, id, i, spec.perFloor) >= spec.count[1]) return true;
-  if (a.graph.next(i).some((j) => a.types[j] && apart(a.programme, id, a.types[j] as RoomTypeId))) return true;
+  if (a.graph.next(i).some((j) => a.types[j] && apart(a.programme, id, a.types[j]))) return true;
   return !a.facts.allows(id, { floor: t.floor, room: t.room });
 }
