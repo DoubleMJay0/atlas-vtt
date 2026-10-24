@@ -7,6 +7,7 @@
  * as far as needed. Entrances, crawls and stairwells keep their pinned cell edges straight.
  */
 
+import type { CellPoint } from '../../model';
 import { traceLoops } from '../../water/contour';
 import { type CellGrid, WET } from '../../water/wetGrid';
 import { type FloorShape, type Vec, polysOf } from '../geometry';
@@ -41,8 +42,11 @@ interface Walk {
   /** Corners that keep their place when the ring is rounded: the pinned ones, and those the last easing sent to their cell edge. */
   held: boolean[];
   free: Vec[];
-  /** How much of the free drawing each corner keeps: 1 all, 0 the cell edge. */
-  keep: Float64Array;
+  /** Each corner's way out into the rock, square to the cell edges it lies on. */
+  normal: Vec[];
+  /** How much of the free drawing's move into the floor and into the rock each corner keeps: 1 all, 0 none. */
+  keepIn: Float64Array;
+  keepOut: Float64Array;
 }
 
 function onEdge(p: Vec, edge: PinnedEdge): boolean {
@@ -110,9 +114,31 @@ function freeDrawing(base: readonly Vec[], fade: readonly number[], relief: Reli
 /** The corners as drawn now: each between its cell edge and its free place, by how much it keeps. */
 function placed(walk: Walk): Vec[] {
   return walk.base.map((b, i) => {
-    const k = walk.keep[i]!;
     const f = walk.free[i]!;
-    return { x: b.x + k * (f.x - b.x), y: b.y + k * (f.y - b.y) };
+    const n = walk.normal[i]!;
+    const kIn = walk.keepIn[i]!;
+    const kOut = walk.keepOut[i]!;
+    const ox = f.x - b.x;
+    const oy = f.y - b.y;
+    // Out into the rock and along the wall are eased apart from in onto the floor.
+    const out = ox * n.x + oy * n.y;
+    const along = Math.min(kIn, kOut);
+    const across = out < 0 ? kIn : kOut;
+    return { x: b.x + along * (ox - out * n.x) + across * out * n.x, y: b.y + along * (oy - out * n.y) + across * out * n.y };
+  });
+}
+
+/** Each walked corner's way out into the rock, from the corners two steps either side. */
+function normals(base: readonly Vec[]): Vec[] {
+  const n = base.length;
+  return base.map((_, i) => {
+    const before = base[(i - 2 + n) % n]!;
+    const after = base[(i + 2) % n]!;
+    const dx = after.x - before.x;
+    const dy = after.y - before.y;
+    const length = Math.hypot(dx, dy) || 1;
+    // Floor lies on the right of the way round, so the rock lies on the left: (dy, −dx).
+    return { x: dy / length, y: -dx / length };
   });
 }
 
@@ -162,38 +188,58 @@ function readCells(isFloor: IsFloor, box: CellGrid, kept?: IsFloor): Cells {
   return { box, floor: at(read(isFloor), isFloor), ...(kept && { kept: at(read(kept), () => false) }) };
 }
 
-/** Eases the corners near every fault back towards their cell edges; `all` sends them the whole way and holds them there, unrounded. */
-function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readonly number[][], cells: Cells, all: boolean): boolean {
-  const { box } = cells;
-  const faults = outlineFaults(rounded, cells.floor, box, cells.kept);
-  if (faultless(faults)) return false;
-  // The misdrawn cells and every cell beside them, over the box grown by two cells.
+/** The cells within one of any of `cells`, over the box grown by two: a corner there may have drawn them wrong. */
+function nearAny(cells: readonly CellPoint[], box: CellGrid): (p: Vec) => boolean {
   const x0 = box.x0 - 2;
   const y0 = box.y0 - 2;
   const w = box.w + 4;
   const h = box.h + 4;
-  const nearBad = new Uint8Array(w * h);
-  for (const c of faults.cells) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) nearBad[(c.y + dy - y0) * w + (c.x + dx - x0)] = 1;
-  const isNearBad = (p: Vec): boolean => {
+  const grid = new Uint8Array(w * h);
+  for (const c of cells) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) grid[(c.y + dy - y0) * w + (c.x + dx - x0)] = 1;
+  return (p) => {
     const gx = Math.floor(p.x) - x0;
     const gy = Math.floor(p.y) - y0;
-    return gx >= 0 && gy >= 0 && gx < w && gy < h && nearBad[gy * w + gx] === 1;
+    return gx >= 0 && gy >= 0 && gx < w && gy < h && grid[gy * w + gx] === 1;
   };
+}
+
+/**
+ * Eases the corners near every fault back towards their cell edges, only in the way that made it:
+ * a floor cell drawn too thin (or a kept cell's middle entered) eases their moves onto the floor,
+ * a rock cell drawn too full their moves into the rock, a crossing both. `all` sends them the
+ * whole way and holds them there, unrounded.
+ */
+function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readonly number[][], cells: Cells, all: boolean): boolean {
+  const { box } = cells;
+  const faults = outlineFaults(rounded, cells.floor, box, cells.kept);
+  if (faultless(faults)) return false;
+  const nearThin = nearAny(faults.cells.filter((c) => cells.floor(c.x, c.y)), box);
+  const nearFull = nearAny(faults.cells.filter((c) => !cells.floor(c.x, c.y)), box);
   walks.forEach((walk, r) => {
-    const marked = new Set<number>();
+    const inward = new Set<number>();
+    const outward = new Set<number>();
     for (const segment of faults.crossings[r]!) {
-      marked.add(origins[r]![segment]!);
-      marked.add(origins[r]![(segment + 1) % origins[r]!.length]!);
+      for (const k of [segment, (segment + 1) % origins[r]!.length]) {
+        inward.add(origins[r]![k]!);
+        outward.add(origins[r]![k]!);
+      }
     }
     rounded[r]!.forEach((p, k) => {
-      if (isNearBad(p)) marked.add(origins[r]![k]!);
+      if (nearThin(p)) inward.add(origins[r]![k]!);
+      if (nearFull(p)) outward.add(origins[r]![k]!);
     });
     const n = walk.base.length;
-    const eased = new Set<number>();
-    for (const i of marked) for (let k = -EASE_REACH; k <= EASE_REACH; k++) eased.add((i + k + n) % n);
-    for (const j of eased) {
-      walk.keep[j] = all ? 0 : walk.keep[j]! * EASE;
-      if (all) walk.held[j] = true;
+    const spread = (marked: ReadonlySet<number>): Set<number> => {
+      const out = new Set<number>();
+      for (const i of marked) for (let k = -EASE_REACH; k <= EASE_REACH; k++) out.add((i + k + n) % n);
+      return out;
+    };
+    for (const j of spread(inward)) walk.keepIn[j] = all ? 0 : walk.keepIn[j]! * EASE;
+    for (const j of spread(outward)) walk.keepOut[j] = all ? 0 : walk.keepOut[j]! * EASE;
+    if (all) for (const j of spread(new Set([...inward, ...outward]))) {
+      walk.keepIn[j] = 0;
+      walk.keepOut[j] = 0;
+      walk.held[j] = true;
     }
   });
   return true;
@@ -211,7 +257,7 @@ export function caveOutline(seed: number, floor: number, isFloor: IsFloor, box: 
   const walks: Walk[] = traceLoops(box, marks).map((loop) => {
     const base = quarterSteps(loop);
     const pins = base.map((p) => pinned.some((edge) => onEdge(p, edge)));
-    return { base, pinned: pins, held: [...pins], free: freeDrawing(base, fades(pins), relief), keep: new Float64Array(base.length).fill(1) };
+    return { base, pinned: pins, held: [...pins], free: freeDrawing(base, fades(pins), relief), normal: normals(base), keepIn: new Float64Array(base.length).fill(1), keepOut: new Float64Array(base.length).fill(1) };
   });
   const draw = (): Vec[][] => walks.map((walk) => cutCorners(placed(walk), walk.held));
   let rounded = draw();
