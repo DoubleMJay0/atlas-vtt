@@ -217,6 +217,21 @@ describe('the theme', () => {
     expect(reason?.textContent).toBe(t('dungeon.theme.refused.noMolten'));
   });
 
+  it('shows a tag picked before the theme refused it as off and disabled, and gives it back with a theme that takes it', async () => {
+    renderPanel();
+    chooseTheme('Cavern');
+    fireEvent.click(tag('lava'));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['lava']));
+    expect(tag('lava').getAttribute('aria-pressed')).toBe('true');
+    chooseTheme('Fortress');
+    await waitFor(() => expect(lastJob().request.theme).toBe('fortress'));
+    expect([tag('lava').getAttribute('aria-pressed'), tag('lava').getAttribute('aria-disabled')]).toEqual(['false', 'true']);
+    expect(tag('lava').classList.contains('atlas-active')).toBe(false);
+    chooseTheme('Cavern');
+    await waitFor(() => expect(lastJob().request.theme).toBe('cavern'));
+    expect(tag('lava').getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('refuses ruined only for the Cavern', () => {
     renderPanel();
     chooseTheme('Cavern');

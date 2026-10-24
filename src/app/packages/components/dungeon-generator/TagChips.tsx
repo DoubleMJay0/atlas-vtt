@@ -28,8 +28,8 @@ function tagDescription(tag: DungeonTag): string {
 /**
  * Every tag as a chip that switches it on and off at once, on the same seed, so the map shows
  * what the tag does, grouped under headings (`TAG_GROUPS`); switching one on switches off the
- * tags it rules out. A tag the chosen theme refuses keeps its place, shown disabled with the
- * reason as its tooltip, so the chips never move. Random takes a new seed.
+ * tags it rules out. A tag the chosen theme refuses keeps its place, shown off and disabled with
+ * the reason as its tooltip, so the chips never move. Random takes a new seed.
  */
 export function TagChips({ picked, refused, onToggle, onRandom }: TagChipsProps): React.JSX.Element {
   const labelId = useId();
@@ -40,8 +40,9 @@ export function TagChips({ picked, refused, onToggle, onRandom }: TagChipsProps)
           <span id={`${labelId}-${group.id}`} className="atlas-dungeon-tags__label">{t(`dungeon.tagGroup.${group.id}` as MessageKey)}</span>
           <div className="atlas-dungeon-tags__chips">
             {group.tags.map((tag) => {
-              const on = picked.includes(tag);
               const reason = refused.get(tag);
+              // A refused tag reads as off: the theme ignores it, though the pick stays for a theme that takes it.
+              const on = picked.includes(tag) && reason === undefined;
               return (
                 <LabelTooltip key={tag} label={reason ?? tagDescription(tag)} describe>
                   <button
