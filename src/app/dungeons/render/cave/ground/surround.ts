@@ -1,14 +1,13 @@
 import { rngFrom } from '../../../rng';
 import { viewBounds, type ArtScene } from '../../art/artScene';
 import { shadeEdges, TO_LIGHT } from '../../art/light';
-import { mouthLane, mouthsOf } from '../../art/mouths';
 import { hash2 } from '../../art/noise';
 import { traceRings } from '../../art/outline';
 import { polyPath, runsPath } from '../../art/paths';
 import type { Pens } from '../../engraved/pens';
 import type { Vec } from '../../geometry';
 import { mixColours, withAlpha } from '../../palette';
-import { narrowPockets } from '../../pockets';
+import { filledPockets } from '../../pockets';
 import { strokeWidth } from '../../renderEnv';
 import { stoneOutline } from '../../terrain/stones';
 import type { StoneColours } from '../../stone/colours';
@@ -16,13 +15,13 @@ import { stoneHand } from '../../stone/hand';
 
 function clipLanes(scene: ArtScene): void {
   const { ctx, dungeon } = scene.env;
-  const mouths = mouthsOf(dungeon);
-  if (!mouths.length) return;
+  const { open } = dungeon;
+  if (!open.length) return;
   const b = viewBounds(scene.frame, 10);
   ctx.beginPath();
   ctx.rect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
-  // The same lane as the built surround's: rock never closes an entrance's two-cell mouth.
-  for (const mouth of mouths) polyPath(mouthLane(mouth))(ctx);
+  // The same open ground as the built surround's: rock never closes an entrance's mouth or its way out.
+  for (const ground of open) polyPath(ground)(ctx);
   ctx.clip('evenodd');
 }
 
@@ -55,7 +54,7 @@ function slabs(scene: ArtScene): Vec[][] {
 function fillPockets(scene: ArtScene, colour: string): void {
   const { ctx, dungeon, style } = scene.env;
   ctx.beginPath();
-  traceRings(ctx, narrowPockets(dungeon, style.surround.reach).map(pocket => pocket.ring));
+  traceRings(ctx, filledPockets(dungeon, style.surround.reach).map(pocket => pocket.ring));
   ctx.fillStyle = colour;
   ctx.fill();
 }

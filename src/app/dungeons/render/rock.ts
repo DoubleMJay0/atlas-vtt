@@ -1,12 +1,11 @@
-import { mouthLane, mouthsOf, type Mouth } from './art/mouths';
 import { drawBricks } from './bricks';
 import { drawDots } from './dots';
-import { cellsShapes, traceShapes, tracePolygon } from './geometry';
+import { cellsShapes, traceShapes, tracePolygon, type Vec } from './geometry';
 import { cellsOf, floorCellsOf, floorRect } from '../geometry';
 import { OUTER_WALL, windowClearing } from './houseShapes';
 import { shownWindows } from './art/windows';
 import { drawHatching } from './hatching';
-import { narrowPockets } from './pockets';
+import { filledPockets } from './pockets';
 import { withAlpha } from './palette';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 import { drawStonework } from './stonework';
@@ -19,7 +18,7 @@ import { drawStonework } from './stonework';
 export function drawRock(env: RenderEnv): void {
   const { ctx } = env;
   ctx.save();
-  clipLanes(env, mouthsOf(env.dungeon));
+  clipLanes(env, env.dungeon.open);
   clipToHouse(env);
   drawRockMode(env);
   ctx.restore();
@@ -66,7 +65,7 @@ function drawRockBand(env: RenderEnv): void {
 
 /** Fills the narrow pockets of rock between rooms with the rock colour. */
 function fillPockets(env: RenderEnv): void {
-  const pockets = narrowPockets(env.dungeon, env.style.surround.reach);
+  const pockets = filledPockets(env.dungeon, env.style.surround.reach);
   if (pockets.length === 0) return;
   const { ctx, palette } = env;
   ctx.save();
@@ -77,14 +76,14 @@ function fillPockets(env: RenderEnv): void {
   ctx.restore();
 }
 
-/** Keeps drawing out of the lane before each entrance: its lane (`mouthLane`). */
-function clipLanes(env: RenderEnv, mouths: readonly Mouth[]): void {
-  if (mouths.length === 0) return;
+/** Keeps drawing out of the open ground before each entrance (`VisibleDungeon.open`). */
+function clipLanes(env: RenderEnv, open: readonly Vec[][]): void {
+  if (open.length === 0) return;
   const { ctx, dungeon } = env;
   const b = dungeon.bounds;
   ctx.beginPath();
   ctx.rect(b.minX - 10, b.minY - 10, b.maxX - b.minX + 20, b.maxY - b.minY + 20);
-  for (const mouth of mouths) tracePolygon(ctx, mouthLane(mouth));
+  for (const ground of open) tracePolygon(ctx, ground);
   ctx.clip('evenodd');
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import { inPocket, narrowPockets } from '../../../src/app/dungeons/render/pockets';
+import { inPocket, filledPockets } from '../../../src/app/dungeons/render/pockets';
 import { visibleDungeon } from '../../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { addDoor, addRoom, emptyModel, entryFloor } from '../../fixtures/dungeonModelBuilder';
@@ -8,7 +8,7 @@ import { addDoor, addRoom, emptyModel, entryFloor } from '../../fixtures/dungeon
 describe('rock the rooms close in on', () => {
   // A dungeon with rock walled in between its rooms.
   const dungeon = visibleDungeon(generateDungeon({ seed: 16, tags: [], floors: 1 }), DEFAULT_VIEW);
-  const pockets = narrowPockets(dungeon, 0.5);
+  const pockets = filledPockets(dungeon, 0.5);
 
   it('finds rock walled in on all sides, where the band did not reach', () => {
     expect(pockets.length).toBeGreaterThan(0);
@@ -41,7 +41,17 @@ describe('rock the rooms close in on', () => {
     addRoom(floor, { x: 5, y: 1, w: 1, h: 4 });
     addDoor(floor, -1, 0, { x: 1, y: 0 }, 'opening', null, 0);
     const ring = visibleDungeon(model, DEFAULT_VIEW);
-    expect(narrowPockets(ring, 0.5)).toEqual([]);
-    expect(narrowPockets(ring, 1.5)).toHaveLength(1);
+    expect(filledPockets(ring, 0.5)).toEqual([]);
+    expect(filledPockets(ring, 1.5)).toHaveLength(1);
+  });
+
+  it('in a cave, fills the rock the band closes off however wide, but never the open paper round it', () => {
+    // Seed 606: a lozenge of rock the passages ring, open to the outer rock by a neck narrower than two bands.
+    const cave = visibleDungeon(generateDungeon({ seed: 606, theme: 'cavern', tags: ['medium', 'wet'], floors: 2 }), DEFAULT_VIEW);
+    const filled = filledPockets(cave, 0.62);
+    expect(cave.field.distance(-16, -8)).toBeGreaterThan(1.24);
+    expect(inPocket(filled, -16, -8)).toBe(true);
+    expect(inPocket(filled, cave.bounds.minX - 1, cave.bounds.minY - 1)).toBe(false);
+    expect(inPocket(filled, -23, -23)).toBe(false);
   });
 });

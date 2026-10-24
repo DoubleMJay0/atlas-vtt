@@ -2,7 +2,6 @@ import { doorCells, doorMiddle } from '../../geometry';
 import { mouthDepth } from '../houseShapes';
 import type { DungeonDoor } from '../../model';
 import type { Vec } from '../geometry';
-import type { VisibleDungeon } from '../visibleDungeon';
 import { rectPoly } from './paths';
 
 /**
@@ -20,7 +19,7 @@ export interface Mouth {
   width: number;
 }
 
-export function mouthsOf(dungeon: VisibleDungeon): Mouth[] {
+export function mouthsOf(dungeon: { doors: readonly DungeonDoor[] }): Mouth[] {
   return dungeon.doors
     .filter(door => door.from === null && door.kind !== 'secret')
     .map(door => {

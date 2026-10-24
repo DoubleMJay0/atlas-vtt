@@ -16,7 +16,7 @@ import { engravedGrowth } from './growth';
 import { type CaveGroundPainting, type CaveGroundPart, builtSurround, caveGround } from '../cave/caveArt';
 
 /**
- * Engraved, the copperplate, bottom to top: the rock, the floor and its faint joints,
+ * Engraved, the copperplate, bottom to top: the rock, a cave's ways out, the floor and its faint joints,
  * water, terrain on the ground and raised floors, moss and plants, hatched shadows, the grid,
  * climbers with the wall's cut running under their upper leaves, then rubble, whatever stands,
  * columns and what climbs them, passages and stairs, and holes with their bridges. Ink and its paper.
@@ -30,6 +30,7 @@ export function paintEngraved(scene: ArtScene): void {
   const surround = builtSurround(scene.env) ? cave('surround') : undefined;
   if (surround) surround.engraved(scene, pens);
   else drawRock(scene.env);
+  cave('mouth')?.engraved(scene, pens);
   (cave('floor')?.engraved ?? drawFloor)(scene, pens);
   drawPools(scene, pens);
   drawTerrainGround(hand, colours);

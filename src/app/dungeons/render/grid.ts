@@ -3,14 +3,16 @@ import { doorEdge } from './houseShapes';
 import type { DungeonDoor, DungeonRoom } from '../model';
 import type { Rng } from '../rng';
 import { clipToFloors } from './floors';
-import type { Vec } from './geometry';
+import { floorRing, type WayOut } from './cave/mouth/wayOut';
+import { pointsBounds, type Bounds, type Vec } from './geometry';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 
 type Line = [Vec, Vec];
 
 /**
- * The grid inside the floors: interior cell lines of every room (chords in a rotunda) and the
- * lines where an open passage meets its rooms, in the view's style.
+ * The grid inside the floors: interior cell lines of every room (chords in a rotunda), the
+ * lines where an open passage meets its rooms, and a cave's ways out as far as they read as floor,
+ * in the view's style.
  */
 export function drawGrid(env: RenderEnv): void {
   const { view, ctx, palette, style } = env;
@@ -19,9 +21,13 @@ export function drawGrid(env: RenderEnv): void {
   const lines: Line[] = [];
   for (const room of env.dungeon.rooms) lines.push(...roomLines(room, step));
   for (const door of env.dungeon.doors) lines.push(...doorLines(door, env.dungeon.wide));
+  // A cave's way out is floor as far as it is drawn as floor: its cells carry the grid there.
+  const { ways } = env.dungeon;
+  const wayRings = ways.map(way => floorRing(env.dungeon.field, way));
+  ways.forEach((way, k) => lines.push(...wayLines(way, pointsBounds(wayRings[k]!), step)));
   const rng = env.rng('grid');
   ctx.save();
-  clipToFloors(env);
+  clipToFloors(env, wayRings);
   ctx.strokeStyle = palette.grid;
   ctx.lineCap = 'round';
   ctx.lineWidth = strokeWidth(env, view.grid === 'dotted' && !view.smallTiles ? style.strokes.normal : style.strokes.thin) * style.grid.weight;
@@ -42,6 +48,24 @@ export function drawGrid(env: RenderEnv): void {
   }
   ctx.stroke();
   ctx.restore();
+}
+
+/**
+ * The grid lines over a way out's box beyond its mouth, on whole cells (half cells with small
+ * tiles): the line on the mouth's own edge, and from there out, never back over the floor's own.
+ */
+function wayLines(way: WayOut, b: Bounds, step: number): Line[] {
+  const { at, out } = way.mouth;
+  const box = {
+    minX: out.x > 0 ? at.x : Math.floor(b.minX / step) * step,
+    maxX: out.x < 0 ? at.x : Math.ceil(b.maxX / step) * step,
+    minY: out.y > 0 ? at.y : Math.floor(b.minY / step) * step,
+    maxY: out.y < 0 ? at.y : Math.ceil(b.maxY / step) * step,
+  };
+  const lines: Line[] = [];
+  for (let x = Math.ceil(box.minX / step - 1e-9) * step; x <= box.maxX + 1e-9; x += step) lines.push([{ x, y: box.minY }, { x, y: box.maxY }]);
+  for (let y = Math.ceil(box.minY / step - 1e-9) * step; y <= box.maxY + 1e-9; y += step) lines.push([{ x: box.minX, y }, { x: box.maxX, y }]);
+  return lines;
 }
 
 function traceLine(ctx: CanvasPath, a: Vec, b: Vec): void {
