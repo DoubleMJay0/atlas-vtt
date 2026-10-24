@@ -26,6 +26,8 @@ export interface FloorRoot {
   seed: number;
   /** The room holds the landing of the stairs from above: no door leads in, and it keeps this size. */
   landing?: RoomSize;
+  /** The least depth of the first room, walls included, where it is a normal room: a gate passage long enough to hold murder holes. */
+  minDepth?: number;
 }
 
 interface QueuedRoom {
@@ -82,7 +84,8 @@ export function growTree(rngOf: KeyedRng, params: DungeonParams, root: FloorRoot
     const item = queue[head] as QueuedRoom;
     const first = item.parent === null;
     const rng = rngOf(item.seed);
-    const size = first && root.landing ? root.landing : drawSize(rng, params);
+    const drawn = first && root.landing ? root.landing : drawSize(rng, params);
+    const size = first && root.minDepth !== undefined && isNormal(drawn) ? { ...drawn, depth: Math.max(drawn.depth, root.minDepth) } : drawn;
     const room = newRoom(layout, item, size, first && root.landing !== undefined);
     const fits = first || (roomFits(layout, roomRect(room), new Set(), false) && doorMayOpen(layout, item.origin, item.axis));
     if (!fits) {

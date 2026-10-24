@@ -5,6 +5,7 @@
  * richness). A theme without a programme types nothing.
  */
 
+import { floorAbove, floorStack } from '../floors/floorStack';
 import type { PlannedFloor } from '../floors/planFloors';
 import type { DungeonTag } from '../tags';
 import { type TypedRoom, depthRanks } from '../terrain/typeTerrain';
@@ -29,7 +30,8 @@ export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<Dungeon
   const theme: ThemeContext = { definition, ruined, facts };
   const programme = programmeOf(definition, tags);
   if (!programme) return { theme, typed: null, rooms: floors.map(() => new Map()) };
-  const typed = assignRoomTypes({ seed, programme, floors, ruined, facts });
+  const stack = floorStack(definition.rise, floors.length);
+  const typed = assignRoomTypes({ seed, programme, floors, ruined, facts, above: (floor) => floorAbove(stack, floor) });
   const traits = roomTraits(floors);
   const traitOf = (floor: number, room: number): (typeof traits)[number] | undefined => traits.find((t) => t.floor === floor && t.room === room);
   const ranks = depthRanks(typed.byFloor, (floor, room) => traitOf(floor, room)?.depth ?? 0);

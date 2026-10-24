@@ -1,7 +1,8 @@
 /**
  * Every normal room of a themed dungeon typed by the theme's programme, after the layout and the
- * floors are planned: anchors, pivot, clusters, the types needed, optional types, fillers, a few
- * hundred improving swaps, then the rooms that stand empty. Every random choice comes from the
+ * floors are planned: anchors, pivot, clusters, the types needed, optional types, fillers, the
+ * rooms built to overlook a hall or gate below, a few hundred improving swaps, then the rooms that
+ * stand empty. Every random choice comes from the
  * `rooms` stream, so layout, stairs and terrain never move.
  */
 
@@ -13,6 +14,7 @@ import { placeAnchors, placePivot, placeStairRooms } from './anchors';
 import { placeClusters } from './clusters';
 import { emptyRooms } from './emptyRooms';
 import { fillOptional, fillRequired, fillRest } from './fill';
+import { placeOverlooks } from './overlook';
 import { newAssignment } from './score';
 import { improve } from './swaps';
 
@@ -22,6 +24,8 @@ export interface AssignInput {
   floors: readonly PlannedFloor[];
   ruined: boolean;
   facts: ThemeFacts;
+  /** The floor right above each floor, or null: where a room may be built to overlook one below. Unset: none. */
+  above?: (floor: number) => number | null;
 }
 
 export interface RoomTypes {
@@ -41,6 +45,7 @@ export function assignRoomTypes(input: AssignInput): RoomTypes {
   fillRequired(a);
   fillOptional(stream(seed, 'rooms', 'optional'), a);
   fillRest(a);
+  placeOverlooks(a, input.floors, input.above ?? (() => null));
   improve(stream(seed, 'rooms', 'swaps'), a);
   const byFloor = input.floors.map(() => new Map<number, RoomTypeId>());
   for (const t of a.traits) {

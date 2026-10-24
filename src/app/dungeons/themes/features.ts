@@ -46,7 +46,7 @@ export const FEATURES: Readonly<Record<FeatureReason, FeatureSpec>> = {
   // An upper floor's opening overlooking the great hall, behind a balustrade.
   'minstrels-gallery': { kinds: ['gallery'], shape: 'built', at: 'above', name: 'dungeon.terrain.minstrelsGallery', cutIn: ['gallery', 'stair-hall', 'solar'] },
   // Small holes in a row over the gate passage, cut in the floor above it.
-  'murder-holes': { kinds: ['murder-hole'], shape: 'built', at: 'above' },
+  'murder-holes': { kinds: ['murder-hole'], shape: 'built', at: 'above', cutIn: ['gate-chamber'] },
   // One shaft in the gaol, under a grate.
   oubliette: { kinds: ['pit'], shape: 'built', at: 'here' },
   cistern: { kinds: ['deep-water'], water: 'pool', shape: 'built', at: 'here' },

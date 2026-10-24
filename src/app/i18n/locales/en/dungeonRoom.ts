@@ -22,6 +22,7 @@ export const dungeonRoom = {
   'dungeonRoom.library': 'Library',
   'dungeonRoom.gallery': 'Gallery',
   'dungeonRoom.stairHall': 'Stair hall',
+  'dungeonRoom.gateChamber': 'Gate chamber',
   'dungeonRoom.collapsedRoom': 'Collapsed room',
   'dungeonRoom.entranceHall': 'Entrance hall',
   'dungeonRoom.drawingRoom': 'Drawing room',

@@ -47,7 +47,7 @@ export function fillRequired(a: Assignment): void {
 
 /** Optional types by weighted draw, each up to its largest count, while a room fits one with a score of 0 or more. */
 export function fillOptional(rng: Rng, a: Assignment): void {
-  let open = a.programme.rooms.filter((spec) => !isNeeded(spec) && !spec.climaxOnly && !spec.holdsStairs);
+  let open = a.programme.rooms.filter((spec) => !isNeeded(spec) && !spec.climaxOnly && !spec.holdsStairs && !spec.over);
   for (;;) {
     const fitting = open.flatMap((spec) => {
       const at = best(a, candidates(a, spec.id), spec.id);

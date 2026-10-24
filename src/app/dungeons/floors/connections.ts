@@ -6,12 +6,12 @@
  * between them.
  */
 
-import type { DungeonDoor, DungeonRoom } from '../model';
-import { floorRect, intersection } from '../geometry';
+import type { CellPoint, DungeonDoor, DungeonRoom } from '../model';
+import { cellKey, cellsOf, floorRect, inRect, intersection } from '../geometry';
 import { type Rng, pick, weighted } from '../rng';
 import { hops, neighbours } from '../roomGraph';
 import { type FloorStack, stairEnd } from './floorStack';
-import { type FloorSpace, type StairSpot, spotFits, spotRect, spotsWithin } from './stairSpots';
+import { type FloorSpace, type StairSpot, approachCells, spotFits, spotRect, spotsWithin } from './stairSpots';
 
 /** Two ways between floors from this many normal rooms on each. */
 export const TWO_CONNECTIONS_FROM = 6;
@@ -60,18 +60,38 @@ function holdsStairs(room: DungeonRoom): boolean {
   return room.kind === 'room' && !room.rotunda && !room.boss && room.wing === 'regular';
 }
 
+/** The cells of the way straight in from the room's door from outside, across the room; none without one. */
+function wayIn(room: DungeonRoom, doors: readonly DungeonDoor[]): CellPoint[] {
+  const door = doors.find((d) => d.from === null && d.to === room.id);
+  const out: CellPoint[] = [];
+  if (!door) return out;
+  const f = floorRect(room);
+  for (let at = { x: door.x + door.dir.x, y: door.y + door.dir.y }; inRect(f, at.x, at.y); at = { x: at.x + door.dir.x, y: at.y + door.dir.y }) out.push(at);
+  return out;
+}
+
+/** The room a floor is entered by: room 0 where it is a normal room, else the normal room fewest doors from it. */
+export function entranceRoom(floor: Pick<FloorShape, 'rooms' | 'doors'>): DungeonRoom | undefined {
+  const reach = hops(neighbours(floor.rooms.length, floor.doors), 0);
+  return floor.rooms.filter((room) => room.kind === 'room').sort((a, b) => (reach[a.id] ?? Infinity) - (reach[b.id] ?? Infinity) || a.id - b.id)[0];
+}
+
 /**
- * Where the first stairwell on from floor `index` to the next stands: in room `first` where it can
- * hold one (a grand staircase in the entrance room), else a room the farther from its entry and
- * other stairs, the likelier.
+ * Where the first stairwell on from floor `index` to the next stands: in the room the floor is
+ * entered by where `fromEntrance` and it can hold one (a gate tower's stair, a grand staircase),
+ * else a room the farther from its entry and other stairs, the likelier.
  */
-export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: FloorStack, first: number | null = null): PlacedStair | null {
+export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: FloorStack, fromEntrance = false): PlacedStair | null {
   const space = spaceOf(floor, index, stack);
   const end = stairEnd(stack, index, index + 1);
-  const firstRoom = first === null ? undefined : floor.rooms[first];
+  const firstRoom = fromEntrance ? entranceRoom(floor) : undefined;
   if (firstRoom && holdsStairs(firstRoom)) {
     const spots = spotsWithin(floorRect(firstRoom)).filter((spot) => spotFits(firstRoom, space, spot, end));
-    if (spots.length > 0) return { room: firstRoom.id, spot: pick(rng, spots) };
+    // The stairs stand beside the way in, never across it, on either floor.
+    const way = new Set(wayIn(firstRoom, floor.doors).map((c) => cellKey(c.x, c.y)));
+    const off = spots.filter((spot) => ![...cellsOf(spotRect(spot)), ...approachCells(spot, 'upper'), ...approachCells(spot, 'lower')].some((c) => way.has(cellKey(c.x, c.y))));
+    const chosen = off.length > 0 ? off : spots;
+    if (chosen.length > 0) return { room: firstRoom.id, spot: pick(rng, chosen) };
   }
   const distance = distanceFrom(floor, anchors(floor));
   let options = floor.rooms.filter(holdsStairs).map((room) => [room, ((distance[room.id] ?? 0) + 1) ** 2] as const);

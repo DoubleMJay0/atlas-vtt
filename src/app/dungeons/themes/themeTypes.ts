@@ -105,6 +105,8 @@ export interface RoomTypeSpec {
   climaxOnly?: true;
   /** Taken by rooms holding a stairwell that no other anchor took. */
   holdsStairs?: true;
+  /** Given only to a room over the room it was built to overlook (`placeOverlooks`): a gate chamber over the gate passage. */
+  over?: true;
   /** `count` holds per floor, not per dungeon. */
   perFloor?: true;
 }
@@ -200,8 +202,14 @@ export interface ThemeDefinition {
   built: boolean;
   /** Where each floor past the entrance floor lies: above it in a building, below it in a cave. */
   rise: FloorRise;
-  /** The stairs up rise from the room the dungeon is entered by, where it can hold them: a Mansion's grand staircase in its entrance hall. */
-  grandStair?: true;
+  /**
+   * The stairs up from the entrance floor rise from the room the dungeon is entered by, where it can
+   * hold them: a Fortress's gate tower stair, a Mansion's grand staircase in its entrance hall. The
+   * floor above then stands over the front of the building, its gate and its hall.
+   */
+  stairsFromEntrance?: true;
+  /** The least depth of the room the dungeon is entered by, walls included, where it is a normal room: a Fortress's gate passage holds a row of murder holes. */
+  entranceDepth?: number;
   /** Tags the theme cannot take, each with the reason the panel shows. */
   refuses: readonly { tag: DungeonTag; reason: MessageKey }[];
   programme: RoomProgramme | null;

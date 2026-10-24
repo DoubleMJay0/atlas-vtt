@@ -43,8 +43,19 @@ function placements(spot: StairSpot, end: StairEnd, w: number, h: number): CellR
   return out;
 }
 
-/** The landing's first room for an attempt, or null where no room drawn fits it. */
-export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd): FloorRoot | null {
+/** How many cells of `f` lie over `below`. */
+function overlap(f: CellRect, below: CellRect): number {
+  const w = Math.min(f.x1, below.x1) - Math.max(f.x0, below.x0) + 1;
+  const h = Math.min(f.y1, below.y1) - Math.max(f.y0, below.y0) + 1;
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
+/**
+ * The landing's first room for an attempt, or null where no room drawn fits it. Over `below` (the
+ * floor of the room the stairs rise from, for a storey) it stands where it covers most of that
+ * room, as an upper room of a tower stands over the room below it.
+ */
+export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd, below: CellRect | null = null): FloorRoot | null {
   for (let tries = 0; tries < SIZE_TRIES; tries++) {
     const size = drawRoomSize(rng);
     const options = shuffled(rng, STAIR_DIRS).flatMap((axis) => {
@@ -56,7 +67,8 @@ export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd): FloorRoot
       return spotFits(room, { doors: [], stairs: [], ends: [] }, spot, end);
     });
     if (fitting.length === 0) continue;
-    const { f, axis } = pick(rng, fitting);
+    const most = below ? Math.max(...fitting.map(({ f }) => overlap(f, below))) : 0;
+    const { f, axis } = pick(rng, below ? fitting.filter(({ f }) => overlap(f, below) === most) : fitting);
     return { origin: originOf(f, axis), axis, seed: int(rng, 1, MAX_SEED), landing: size };
   }
   return null;

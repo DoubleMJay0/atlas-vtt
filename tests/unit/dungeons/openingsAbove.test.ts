@@ -58,6 +58,22 @@ function sidesOnWalls(cells: readonly CellPoint[], room: DungeonRoom): number {
 const inRect = (r: { x: number; y: number; w: number; h: number }, c: CellPoint): boolean => c.x >= r.x && c.x < r.x + r.w && c.y >= r.y && c.y < r.y + r.h;
 const stairCells = (s: DungeonStair): CellPoint[] => Array.from({ length: s.w * s.h }, (_, i) => ({ x: s.x + (i % s.w), y: s.y + Math.floor(i / s.w) }));
 
+/** Whether two rooms' floors overlap by two cells or more both ways. */
+function overlapsTwoByTwo(a: DungeonRoom, b: DungeonRoom): boolean {
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return w >= 2 && h >= 2;
+}
+
+/** Whether a room above covers two cells of a gate passage a cell apart: the passage from the gatehouse's door in, straight across it. */
+function coversGateRow(over: DungeonRoom, gate: DungeonRoom, floor: DungeonFloor): boolean {
+  const door = floor.doors.find((d) => d.from === null && d.to === gate.id) ?? floor.doors.find((d) => d.to === gate.id);
+  if (!door) return false;
+  const way: CellPoint[] = [];
+  for (let at = { x: door.x + door.dir.x, y: door.y + door.dir.y }; inFloor(gate, at); at = { x: at.x + door.dir.x, y: at.y + door.dir.y }) way.push(at);
+  return [0, 1].some((first) => way.filter((c, t) => t % 2 === first && inFloor(over, c)).length >= 2);
+}
+
 /** Whether `cells` lie beside the stairwell `s`, along its run: next to one of its long sides, as long as it is. */
 function besideStairs(cells: readonly CellPoint[], s: DungeonStair): boolean {
   const along = s.down.x !== 0 ? (c: CellPoint) => c.x >= s.x && c.x < s.x + s.w : (c: CellPoint) => c.y >= s.y && c.y < s.y + s.h;
@@ -88,8 +104,8 @@ describe('openings above a room, for its reason', () => {
       }),
     );
     expect(problems.slice(0, 10)).toEqual([]);
-    // Measured 19 of 800, where the room above is one built to overlook the hall.
-    expect(all.filter((m) => openings(m, 'gallery').length > 0).length).toBeGreaterThan(8);
+    // Measured 287 of 800 with a gallery or stair well over a hall (19 before rooms above were typed to overlook one).
+    expect(all.filter((m) => openings(m, 'gallery').some(({ piece }) => piece.name !== 'dungeon.terrain.lightWell')).length).toBeGreaterThan(200);
   });
 
   it('stand a balustrade on floor round every gallery and well, where the room above can be walked', () => {
@@ -131,8 +147,43 @@ describe('openings above a room, for its reason', () => {
       return out;
     });
     expect(problems.slice(0, 10)).toEqual([]);
-    // Measured 0.058: the floor above lies over the gate passage of one gatehouse in three, and over two cells of it more rarely.
-    expect(rows / fortresses.length).toBeGreaterThan(0.025);
+    // Measured 0.48: the stairs up rise from the gatehouse, so the gate chamber above lies over the passage.
+    expect(rows / fortresses.length).toBeGreaterThan(0.4);
+  });
+
+  it('type a room above that covers a hall or a gate passage as one built to overlook it', () => {
+    let covered = 0;
+    let overlooking = 0;
+    for (const m of all) {
+      const stack = stackOf(m);
+      m.floors.forEach((upper, k) => {
+        const under = floorBelow(stack, k);
+        const below = m.floors[under ?? -1];
+        if (!below) return;
+        for (const hall of below.rooms.filter((r) => !r.boss)) {
+          const reason = (THEMES[m.theme].programme?.rooms.find((spec) => spec.id === hall.type)?.terrain.features ?? []).map((r) => FEATURES[r]).find((r) => r.at === 'above' && r.cutIn);
+          if (!reason) continue;
+          const covers = reason.kinds.includes('murder-hole') ? (r: DungeonRoom) => coversGateRow(r, hall, below) : (r: DungeonRoom) => overlapsTwoByTwo(r, hall);
+          const over = upper.rooms.filter((r) => r.kind === 'room' && r.wing === 'regular' && !r.rotunda && !r.boss && r.stage === undefined && covers(r));
+          if (over.length === 0) continue;
+          covered += 1;
+          if (over.some((r) => reason.cutIn!.includes(r.type!))) overlooking += 1;
+        }
+      });
+    }
+    // Measured 0.68 before rooms above were typed for it (the halls alone: murder holes named no room).
+    expect(overlooking / covered).toBeGreaterThan(0.85);
+  });
+
+  it("show a minstrels' gallery or murder holes in about half the Fortresses of several floors, and a stair well or a ballroom's gallery in most Mansions", () => {
+    const seen = (models: readonly DungeonModel[], opens: (m: DungeonModel) => boolean): number => models.filter(opens).length / models.length;
+    const fortress = seen(fortresses, (m) => m.floors.some((f) => f.terrain.some((p) => p.name === 'dungeon.terrain.minstrelsGallery' || p.kind === 'murder-hole')));
+    const mansion = seen(mansions, (m) => openings(m, 'gallery').some(({ piece, hall }) => piece.name === 'dungeon.terrain.stairWell' || hall.type === 'ballroom'));
+    // Measured 0.095 and 0.25 before; 0.52 and 0.65 since the stairs up rise from the gatehouse or entrance
+    // hall with the room above over it, and that room is typed to overlook it. A Fortress's great hall lies
+    // two rooms from the gate and seldom under the floor above, so its minstrels' gallery stays rare (0.07).
+    expect(fortress).toBeGreaterThan(0.45);
+    expect(mansion).toBeGreaterThan(0.55);
   });
 
   it('cut murder holes in Fortresses only', () => {

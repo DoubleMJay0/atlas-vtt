@@ -9,7 +9,7 @@ import { type Assignment, FILLER_RELAXED, breaksHardRule, roomScore } from './sc
 export const SWAPS = 300;
 
 /** The rooms whose score a trade between `i` and `j` can change: both, and every room within two of them. */
-function touched(a: Assignment, i: number, j: number): number[] {
+export function touched(a: Assignment, i: number, j: number): number[] {
   return [...new Set([i, j, ...a.graph.near(i), ...a.graph.near(j)])];
 }
 
@@ -21,7 +21,7 @@ function scoreOf(a: Assignment, rooms: readonly number[]): number {
 }
 
 /** Whether the rooms keep every rule; anchored rooms are what the layout made them and fillers have no count. */
-function keepsRules(a: Assignment, rooms: readonly number[]): boolean {
+export function keepsRules(a: Assignment, rooms: readonly number[]): boolean {
   return rooms.every((k) => {
     const type = a.types[k];
     const filler = a.programme.filler.some(([id]) => id === type);

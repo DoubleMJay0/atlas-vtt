@@ -1,4 +1,4 @@
-/** The Fortress's chapel, private quarters, gaol, cistern, stable, library, gallery, stair halls and ruins (`fortressRooms.ts`). */
+/** The Fortress's chapel, private quarters, gaol, cistern, stable, library, gallery, gate chamber, stair halls and ruins (`fortressRooms.ts`). */
 
 import type { RoomTypeSpec } from './themeTypes';
 
@@ -140,6 +140,21 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
         { kind: 'bust', verb: 'wall', count: [2, 4], chance: 0.6 },
         { kind: 'bench', verb: 'wall', chance: 0.5 },
         { kind: 'tapestry', verb: 'wall', chance: 0.4 },
+      ],
+    },
+  },
+  {
+    // The room over the gate passage, where the portcullis is worked and the murder holes are opened.
+    id: 'gate-chamber',
+    count: [0, 1],
+    floor: 'beyond',
+    over: true,
+    terrain: {},
+    furnish: {
+      defining: { kind: 'weapon-rack', verb: 'wall' },
+      pieces: [
+        { kind: 'bench', verb: 'wall', chance: 0.6 },
+        { kind: 'crate', verb: 'corner', chance: 0.4 },
       ],
     },
   },

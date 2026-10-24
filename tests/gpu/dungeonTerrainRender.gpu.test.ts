@@ -29,8 +29,9 @@ const CASES: readonly { name: string; request: DungeonRequest; look: DungeonStyl
   { name: 'two-floors', request: { seed: 31, tags: [], floors: 2 }, look: 'parchment' },
   { name: 'three-floors', request: { seed: 404, tags: ['deep'], floors: 3 }, look: 'parchment' },
   { name: 'four-floors', request: { seed: 1121, tags: ['large'], floors: 4 }, look: 'parchment' },
-  // Rising stacks: the entrance floor is the lowest; galleries, a stair well and murder holes look down into it.
-  { name: 'fortress-rising-3f', request: { seed: 10, theme: 'fortress', tags: [], floors: 3 }, look: 'masonry' },
+  // Rising stacks: the entrance floor is the lowest; a minstrels' gallery, murder holes in a gate chamber, a stair well and a light well look down into it.
+  { name: 'fortress-rising-3f', request: { seed: 42, theme: 'fortress', tags: [], floors: 3 }, look: 'masonry' },
+  { name: 'fortress-rising-3f-gate', request: { seed: 11, theme: 'fortress', tags: [], floors: 3 }, look: 'masonry' },
   { name: 'mansion-rising-3f', request: { seed: 7, theme: 'mansion', tags: [], floors: 3 }, look: 'parchment' },
   { name: 'four-floors-mono', request: { seed: 515, tags: ['crumbling'], floors: 4 }, look: 'slate', view: { monochrome: true } },
   // A sweep of seeds over every floor count, a boss room or none, and five-room dungeons.

@@ -49,6 +49,7 @@ export const ROOM_TYPE_IDS = [
   'portrait-gallery',
   'ritual-room',
   'landing',
+  'gate-chamber',
 ] as const;
 
 export type RoomTypeId = (typeof ROOM_TYPE_IDS)[number];
