@@ -11,7 +11,7 @@ import type { DungeonParams } from '../../params';
 import { floorStream, stream } from '../../rng';
 import { CaveGrid } from './caveGrid';
 import type { CaveShaping } from './caveParams';
-import { swellChamber, widenTunnel } from './bulges';
+import { swellChamber, widenNoise, widenTunnel } from './bulges';
 import type { ChamberField } from './chamberField';
 import { chamberSeeds, growChamber, reserveCores, smoothChamber } from './chambers';
 import { faultDirections, faultLines } from './faults';
@@ -50,10 +50,11 @@ function shapeChambers(seed: number, index: number, shaping: CaveShaping, faults
 
 /** Chambers swell past their rectangles and tunnels widen here and there, once every room has its cells. */
 function swellRooms(seed: number, index: number, floor: PlannedFloor, grid: CaveGrid, fields: ReadonlyMap<DungeonRoom, ChamberField>): void {
+  const noise = widenNoise(floorStream(seed, 'cave', index, 'widen'));
   for (const room of floor.rooms) {
     const field = fields.get(room);
     if (field) swellChamber(grid, floor.doors, room, field);
-    else widenTunnel(floorStream(seed, 'cave', index, `widen:${room.id}`), grid, floor, room);
+    else widenTunnel(noise, grid, floor, room);
   }
 }
 

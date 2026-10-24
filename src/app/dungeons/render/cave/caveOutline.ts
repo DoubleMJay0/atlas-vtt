@@ -38,6 +38,8 @@ type IsFloor = (x: number, y: number) => boolean;
 interface Walk {
   base: Vec[];
   pinned: boolean[];
+  /** Corners that keep their place when the ring is rounded: the pinned ones, and those the last easing sent to their cell edge. */
+  held: boolean[];
   free: Vec[];
   /** How much of the free drawing each corner keeps: 1 all, 0 the cell edge. */
   keep: Float64Array;
@@ -139,9 +141,31 @@ function roundedOrigins(pinned: readonly boolean[]): number[] {
   });
 }
 
-/** Eases the corners near every fault back towards their cell edges; `all` sends them the whole way. */
-function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readonly number[][], isFloor: IsFloor, box: CellGrid, all: boolean): boolean {
-  const faults = outlineFaults(rounded, isFloor, box);
+/** The cells an outline is checked against, read once into grids over its box: floor (asked again outside the box), and those kept. */
+interface Cells {
+  box: CellGrid;
+  floor: IsFloor;
+  kept?: IsFloor;
+}
+
+function readCells(isFloor: IsFloor, box: CellGrid, kept?: IsFloor): Cells {
+  const read = (is: IsFloor): Uint8Array => {
+    const grid = new Uint8Array(box.w * box.h);
+    for (let gy = 0; gy < box.h; gy++) for (let gx = 0; gx < box.w; gx++) if (is(box.x0 + gx, box.y0 + gy)) grid[gy * box.w + gx] = 1;
+    return grid;
+  };
+  const at = (grid: Uint8Array, outside: IsFloor): IsFloor => (x, y) => {
+    const gx = x - box.x0;
+    const gy = y - box.y0;
+    return gx >= 0 && gy >= 0 && gx < box.w && gy < box.h ? grid[gy * box.w + gx] === 1 : outside(x, y);
+  };
+  return { box, floor: at(read(isFloor), isFloor), ...(kept && { kept: at(read(kept), () => false) }) };
+}
+
+/** Eases the corners near every fault back towards their cell edges; `all` sends them the whole way and holds them there, unrounded. */
+function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readonly number[][], cells: Cells, all: boolean): boolean {
+  const { box } = cells;
+  const faults = outlineFaults(rounded, cells.floor, box, cells.kept);
   if (faultless(faults)) return false;
   // The misdrawn cells and every cell beside them, over the box grown by two cells.
   const x0 = box.x0 - 2;
@@ -167,34 +191,34 @@ function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readon
     const n = walk.base.length;
     const eased = new Set<number>();
     for (const i of marked) for (let k = -EASE_REACH; k <= EASE_REACH; k++) eased.add((i + k + n) % n);
-    for (const j of eased) walk.keep[j] = all ? 0 : walk.keep[j]! * EASE;
+    for (const j of eased) {
+      walk.keep[j] = all ? 0 : walk.keep[j]! * EASE;
+      if (all) walk.held[j] = true;
+    }
   });
   return true;
 }
 
-/** The traced, smoothed outline of the cells `isFloor` names in `box`, one poly per piece with its holes. */
-export function caveOutline(seed: number, floor: number, isFloor: IsFloor, box: CellGrid, pinned: readonly PinnedEdge[]): FloorShape[] {
+/**
+ * The traced, smoothed outline of the cells `isFloor` names in `box`, one poly per piece with its
+ * holes. No wall enters the middle `CELL_CORE` of a cell `kept` names.
+ */
+export function caveOutline(seed: number, floor: number, isFloor: IsFloor, box: CellGrid, pinned: readonly PinnedEdge[], kept?: IsFloor): FloorShape[] {
+  const cells = readCells(isFloor, box, kept);
   const marks = new Uint8Array(box.w * box.h);
-  for (let gy = 0; gy < box.h; gy++) for (let gx = 0; gx < box.w; gx++) if (isFloor(box.x0 + gx, box.y0 + gy)) marks[gy * box.w + gx] = WET;
-  // The cells as read once, for the checks every easing makes again.
-  const floorAt: IsFloor = (x, y) => {
-    const gx = x - box.x0;
-    const gy = y - box.y0;
-    return gx >= 0 && gy >= 0 && gx < box.w && gy < box.h ? marks[gy * box.w + gx] === WET : isFloor(x, y);
-  };
+  for (let gy = 0; gy < box.h; gy++) for (let gx = 0; gx < box.w; gx++) if (cells.floor(box.x0 + gx, box.y0 + gy)) marks[gy * box.w + gx] = WET;
   const relief = outlineRelief(seed, floor);
   const walks: Walk[] = traceLoops(box, marks).map((loop) => {
     const base = quarterSteps(loop);
     const pins = base.map((p) => pinned.some((edge) => onEdge(p, edge)));
-    return { base, pinned: pins, free: freeDrawing(base, fades(pins), relief), keep: new Float64Array(base.length).fill(1) };
+    return { base, pinned: pins, held: [...pins], free: freeDrawing(base, fades(pins), relief), keep: new Float64Array(base.length).fill(1) };
   });
-  const origins = walks.map((walk) => roundedOrigins(walk.pinned));
-  const draw = (): Vec[][] => walks.map((walk) => cutCorners(placed(walk), walk.pinned));
+  const draw = (): Vec[][] => walks.map((walk) => cutCorners(placed(walk), walk.held));
   let rounded = draw();
   for (let round = 0; round <= EASINGS; round++) {
-    if (!ease(walks, rounded, origins, floorAt, box, round === EASINGS)) return polysOf(rounded);
+    if (!ease(walks, rounded, walks.map((walk) => roundedOrigins(walk.held)), cells, round === EASINGS)) return polysOf(rounded);
     rounded = draw();
   }
-  // Eased to their cell edges where faults remained: what is left is the cells' own outline.
-  return polysOf(faultless(outlineFaults(rounded, floorAt, box)) ? rounded : walks.map((walk) => cutCorners(walk.base, walk.base.map(() => true))));
+  // Held to their cell edges where faults remained; should any be left, the cells' own outline.
+  return polysOf(faultless(outlineFaults(rounded, cells.floor, box, cells.kept)) ? rounded : walks.map((walk) => cutCorners(walk.base, walk.base.map(() => true))));
 }

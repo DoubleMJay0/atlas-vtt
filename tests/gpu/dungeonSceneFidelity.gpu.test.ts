@@ -170,7 +170,7 @@ describe('a dungeon scene and its map image', () => {
         expect(loose, `${where}: drawn wall faces without a wall`).toEqual([]);
 
         // No wall stands inside a cave's narrows or on its main path: the way two cells wide stays open.
-        // A cell's edge may wander a fifth of a cell in (the outline keeps the middle 0.6 of every cell, `holdToCells.ts`).
+        // A cell's edge may wander a fifth of a cell in (the outline keeps the middle 0.6 of every such cell, `CELL_CORE` in `outlineGuard.ts`).
         if (floor.cave) expect(wallsInWay(floor, walls, placement, PX_PER_CELL * 0.2 + halfInk), `${where}: walls in a narrows or on the lane`).toEqual([]);
 
         // No wall stands in a hole or on a bridge: sight passes over a chasm. A hole over a floor below is cut out of the image; a bridge is not

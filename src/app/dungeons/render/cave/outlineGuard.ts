@@ -2,8 +2,9 @@
  * Whether a drawn cave outline tells the truth about its cells, and where it does not. The drawing
  * is free, but the grid and the drawing must agree for movement: a floor cell has its middle on
  * drawn floor and at least `FLOOR_SHARE` of it drawn floor; a rock cell has its middle on rock and
- * at most `ROCK_SHARE` of it drawn floor. And the outline is one clean ring per piece: no ring
- * crosses itself or another.
+ * at most `ROCK_SHARE` of it drawn floor. In a kept cell (the way through, where something stands)
+ * no wall enters the middle `CELL_CORE` at all. And the outline is one clean ring per piece: no
+ * ring crosses itself or another.
  */
 
 import type { CellPoint } from '../../model';
@@ -17,6 +18,9 @@ const MIDDLE = (SAMPLES - 1) / 2;
 export const FLOOR_SHARE = 0.66;
 export const ROCK_SHARE = 0.34;
 const EPS = 1e-12;
+/** The share of a kept cell, about its middle, that no wall enters, each way. */
+export const CELL_CORE = 0.6;
+const CORE_MARGIN = (1 - CELL_CORE) / 2;
 
 type IsFloor = (x: number, y: number) => boolean;
 
@@ -174,9 +178,50 @@ function crossingSegments(rings: readonly Vec[][]): Set<number>[] {
   return out;
 }
 
-/** Everything wrong with the outline: misdrawn cells and crossing segments. */
-export function outlineFaults(rings: readonly Vec[][], isFloor: IsFloor, box: CellGrid): OutlineFaults {
-  return { cells: misdrawnCells(rings, isFloor, box), crossings: crossingSegments(rings) };
+/** Whether the segment enters the open square [x0, x1] × [y0, y1]. */
+function entersSquare(a: Vec, b: Vec, x0: number, y0: number, x1: number, y1: number): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  for (const [p, q] of [
+    [-dx, a.x - x0],
+    [dx, x1 - a.x],
+    [-dy, a.y - y0],
+    [dy, y1 - a.y],
+  ] as const) {
+    if (p === 0) {
+      if (q <= EPS) return false;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) t0 = Math.max(t0, r);
+    else t1 = Math.min(t1, r);
+  }
+  return t1 - t0 > EPS;
+}
+
+/** The kept cells whose middle `CELL_CORE` a segment of the outline enters. */
+function breachedCores(rings: readonly Vec[][], kept: IsFloor): CellPoint[] {
+  const out = new Map<number, CellPoint>();
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]!;
+      const b = ring[(i + 1) % ring.length]!;
+      for (let y = Math.floor(Math.min(a.y, b.y)); y <= Math.floor(Math.max(a.y, b.y)); y++) {
+        for (let x = Math.floor(Math.min(a.x, b.x)); x <= Math.floor(Math.max(a.x, b.x)); x++) {
+          if (kept(x, y) && entersSquare(a, b, x + CORE_MARGIN, y + CORE_MARGIN, x + 1 - CORE_MARGIN, y + 1 - CORE_MARGIN)) out.set((x + 32768) * 65536 + (y + 32768), { x, y });
+        }
+      }
+    }
+  }
+  return [...out.values()];
+}
+
+/** Everything wrong with the outline: misdrawn cells, kept cells whose middle a wall enters, and crossing segments. */
+export function outlineFaults(rings: readonly Vec[][], isFloor: IsFloor, box: CellGrid, kept?: IsFloor): OutlineFaults {
+  const cells = misdrawnCells(rings, isFloor, box);
+  return { cells: kept ? [...cells, ...breachedCores(rings, kept)] : cells, crossings: crossingSegments(rings) };
 }
 
 export function faultless(faults: OutlineFaults): boolean {

@@ -136,6 +136,21 @@ describe('a cave outline', () => {
     expect(wrong.slice(0, 10)).toEqual([]);
   }, 60_000);
 
+  it('keeps the middle of every kept cell (a narrows, the main path, where something stands) drawn floor', () => {
+    const wrong: string[] = [];
+    for (const mask of all.slice(0, 120)) {
+      const kept = (x: number, y: number): boolean => has(mask, x, y) && (x + 2 * y) % 3 === 0;
+      const rings = ringsOf(caveOutline(5, 0, (x, y) => has(mask, x, y), BOX, [], kept));
+      for (let y = BOX.y0; y < BOX.y0 + BOX.h; y++) {
+        for (let x = BOX.x0; x < BOX.x0 + BOX.w; x++) {
+          if (!kept(x, y)) continue;
+          for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) if (!insideAll(rings, x + 0.21 + (0.58 * i) / 8, y + 0.21 + (0.58 * j) / 8)) wrong.push(`${x},${y}`);
+        }
+      }
+    }
+    expect([...new Set(wrong)].slice(0, 10)).toEqual([]);
+  });
+
   it('keeps a pinned edge a straight segment on its cell edge', () => {
     const mask = all[1]!;
     const top = [...mask].map((k) => k.split(',').map(Number) as [number, number]).filter(([x, y]) => !has(mask, x, y - 1))[0]!;

@@ -97,9 +97,13 @@ export function swellChamber(grid: CaveGrid, doors: readonly DungeonDoor[], room
   });
 }
 
-/** Widens a tunnel by a cell where its noise is high, where it may wind (`inTunnelReach`), never to three cells both ways. */
-export function widenTunnel(rng: Rng, grid: CaveGrid, floor: { rooms: readonly DungeonRoom[]; doors: readonly DungeonDoor[] }, room: DungeonRoom): void {
-  const noise = fractalNoise(rng, 1, 0.5, WIDEN_PERIOD);
+/** Where the floor's tunnels widen: high where they do. One per floor, as every tunnel reads it at its own cells. */
+export function widenNoise(rng: Rng): Score {
+  return fractalNoise(rng, 1, 0.5, WIDEN_PERIOD);
+}
+
+/** Widens a tunnel by a cell where `noise` is high, where it may wind (`inTunnelReach`), never to three cells both ways. */
+export function widenTunnel(noise: Score, grid: CaveGrid, floor: { rooms: readonly DungeonRoom[]; doors: readonly DungeonDoor[] }, room: DungeonRoom): void {
   swellInto(grid, floor.doors, {
     owner: room.id,
     may: (c) => inTunnelReach(floor, room, c.x, c.y) && [ROCK, room.id].includes(grid.envelope(c.x, c.y)) && noise(c.x, c.y) > WIDEN_ABOVE && !completesBlock(grid, room.id, c),

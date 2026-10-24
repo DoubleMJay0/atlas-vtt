@@ -96,6 +96,10 @@ function endBlocks(end: { area: Set<string>; touch: Set<string> }, ok: (x: numbe
   return [...out];
 }
 
+/** A block's number: its corner's place, for the walk's maps. */
+const blockId = (ax: number, ay: number): number => (ax + 32768) * 65536 + (ay + 32768);
+const blockAt = (id: number): CellPoint => ({ x: Math.floor(id / 65536) - 32768, y: (id % 65536) - 32768 });
+
 /**
  * A walk of 2 × 2 blocks from the start's blocks to the goal's over cells `owners` allow; its
  * cells, or null. It goes the cheapest way over a gently varying cost (`wander`), so where a
@@ -103,17 +107,30 @@ function endBlocks(end: { area: Set<string>; touch: Set<string> }, ok: (x: numbe
  */
 function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { area: Set<string>; touch: Set<string> }, owners: LaneOwner): CellPoint[] | null {
   const ok = (x: number, y: number): boolean => owners(x, y) !== null;
-  const goals = new Set(endBlocks(goal, ok));
-  const fits = (ax: number, ay: number): boolean => blockCells(ax, ay).every((c) => ok(c.x, c.y));
-  const back = new Map<string, string>();
-  const cost = new Map<string, number>();
-  const open = new MinHeap<string>();
-  for (const key of endBlocks(start, ok)) {
-    back.set(key, key);
-    cost.set(key, 0);
-    open.push(key, 0);
+  const ids = (keys: readonly string[]): number[] => keys.map((key) => {
+    const { x, y } = unkey(key);
+    return blockId(x, y);
+  });
+  const goals = new Set(ids(endBlocks(goal, ok)));
+  // The cost of stepping onto each block met, Infinity where it does not fit: worked out once a block.
+  const weights = new Map<number, number>();
+  const weightOf = (id: number, ax: number, ay: number): number => {
+    let w = weights.get(id);
+    if (w === undefined) {
+      w = ok(ax, ay) && ok(ax + 1, ay) && ok(ax, ay + 1) && ok(ax + 1, ay + 1) ? wander(ax, ay) : Infinity;
+      weights.set(id, w);
+    }
+    return w;
+  };
+  const back = new Map<number, number>();
+  const cost = new Map<number, number>();
+  const open = new MinHeap<number>();
+  for (const id of ids(endBlocks(start, ok))) {
+    back.set(id, id);
+    cost.set(id, 0);
+    open.push(id, 0);
   }
-  let found: string | null = null;
+  let found: number | null = null;
   for (let next = open.pop(); next && found === null; next = open.pop()) {
     const { item: at, cost: spent } = next;
     if (spent > cost.get(at)!) continue;
@@ -121,22 +138,23 @@ function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { are
       found = at;
       break;
     }
-    const { x: ax, y: ay } = unkey(at);
+    const { x: ax, y: ay } = blockAt(at);
     for (const [dx, dy] of NEAR4) {
-      const key = cellKey(ax + dx, ay + dy);
-      const step = spent + wander(ax + dx, ay + dy);
-      if (step >= (cost.get(key) ?? Infinity) || !fits(ax + dx, ay + dy)) continue;
-      back.set(key, at);
-      cost.set(key, step);
-      open.push(key, step);
+      const id = blockId(ax + dx, ay + dy);
+      const w = weightOf(id, ax + dx, ay + dy);
+      const step = spent + w;
+      if (w === Infinity || step >= (cost.get(id) ?? Infinity)) continue;
+      back.set(id, at);
+      cost.set(id, step);
+      open.push(id, step);
     }
   }
   if (found === null) return null;
   const lane = new Map<string, CellPoint>();
-  for (let key = found; ; key = back.get(key)!) {
-    const { x: ax, y: ay } = unkey(key);
+  for (let id = found; ; id = back.get(id)!) {
+    const { x: ax, y: ay } = blockAt(id);
     for (const c of blockCells(ax, ay)) lane.set(cellKey(c.x, c.y), c);
-    if (back.get(key) === key) break;
+    if (back.get(id) === id) break;
   }
   return [...lane.values()].reverse();
 }

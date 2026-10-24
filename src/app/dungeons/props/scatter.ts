@@ -18,7 +18,7 @@ function stone(rng: Rng, at: CellPoint): DungeonRubble {
   return { points: chaikin(quad, 1) };
 }
 
-/** A cave's outline may wander a fifth of a cell into a floor cell (`holdToCells.ts`): its stones keep that and their own size off a cell's edge. */
+/** A cave's outline may wander into a floor cell (`outlineGuard.ts`): its stones keep that and their own size off a cell's edge. */
 const CAVE_STONE_MARGIN = 0.4;
 
 /** About one stone per `areaPerStone` floor cells, at random; `extra` more where the plan marks rubble. */
