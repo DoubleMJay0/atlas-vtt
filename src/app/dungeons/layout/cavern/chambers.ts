@@ -61,9 +61,12 @@ export function coreBlock(grid: CaveGrid, room: DungeonRoom, out = false): CellP
   let bestScore = Infinity;
   for (let y = r.y0 - reach; y + 2 <= r.y1 + reach; y++) {
     for (let x = r.x0 - reach; x + 2 <= r.x1 + reach; x++) {
+      const distance = Math.hypot(x + 1.5 - cx, y + 1.5 - cy);
+      if (distance >= bestScore) continue;
       const block = cellsOf({ x0: x, y0: y, x1: x + 2, y1: y + 2 });
-      const score = Math.hypot(x + 1.5 - cx, y + 1.5 - cy) + (out ? CROWDED * crowding(grid, room, block) : 0);
-      if (score < bestScore && block.every((c) => may(grid, room, c))) {
+      if (!block.every((c) => may(grid, room, c))) continue;
+      const score = distance + (out ? CROWDED * crowding(grid, room, block) : 0);
+      if (score < bestScore) {
         best = block;
         bestScore = score;
       }

@@ -136,7 +136,17 @@ function warpRoom(grid: CaveGrid, floor: Floorish, room: DungeonRoom, noise: { p
     return depth(px, py) + noise.bays(c.x + 0.5, c.y + 0.5) - APART * crowded(c) > 0;
   };
   const required = grid.required(room.id);
-  const gives = (c: CellPoint): boolean => (!wants(c) || lobes?.bitten(c.x, c.y) === true) && lobes?.grows(c.x, c.y) !== true;
+  // What the bent field and the lobes make of a cell never changes while the room is bent: read once a cell.
+  const given = new Map<string, boolean>();
+  const gives = (c: CellPoint): boolean => {
+    const k = cellKey(c.x, c.y);
+    let out = given.get(k);
+    if (out === undefined) {
+      out = (!wants(c) || lobes?.bitten(c.x, c.y) === true) && lobes?.grows(c.x, c.y) !== true;
+      given.set(k, out);
+    }
+    return out;
+  };
   // A cell is given up only where no floor beside it is left with fewer than two floor cells beside
   // it, nor, in a chamber, without a 2 × 2 block of floor: a chamber gets no new one-cell neck.
   const floorWithout = (c: CellPoint) => (x: number, y: number): boolean => (x !== c.x || y !== c.y) && isFloor(x, y);
@@ -170,28 +180,30 @@ function warpRoom(grid: CaveGrid, floor: Floorish, room: DungeonRoom, noise: { p
 /** The rock pieces cut off from the rock round the floor, of `POCKET` cells or fewer: too small to draw as a pillar. */
 function smallPockets(grid: CaveGrid): CellPoint[][] {
   const { x0, y0, w, h } = grid.box();
-  const seen = new Set<string>();
+  const rock = new Uint8Array(w * h);
+  for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) if (grid.owner(x0 + gx, y0 + gy) === ROCK) rock[gy * w + gx] = 1;
+  const seen = new Uint8Array(w * h);
   const out: CellPoint[][] = [];
-  for (let gy = 0; gy < h; gy++) {
-    for (let gx = 0; gx < w; gx++) {
-      const start = { x: x0 + gx, y: y0 + gy };
-      if (grid.owner(start.x, start.y) !== ROCK || seen.has(cellKey(start.x, start.y))) continue;
-      const piece = [start];
-      seen.add(cellKey(start.x, start.y));
-      let open = false;
-      for (let head = 0; head < piece.length; head++) {
-        const c = piece[head]!;
-        for (const [dx, dy] of NEAR4) {
-          const n = { x: c.x + dx, y: c.y + dy };
-          if (n.x < x0 || n.y < y0 || n.x >= x0 + w || n.y >= y0 + h) open = true;
-          else if (grid.owner(n.x, n.y) === ROCK && !seen.has(cellKey(n.x, n.y))) {
-            seen.add(cellKey(n.x, n.y));
-            piece.push(n);
-          }
+  for (let start = 0; start < w * h; start++) {
+    if (!rock[start] || seen[start]) continue;
+    const piece = [start];
+    seen[start] = 1;
+    let open = false;
+    for (let head = 0; head < piece.length; head++) {
+      const i = piece[head]!;
+      const gx = i % w;
+      const gy = Math.floor(i / w);
+      for (const [dx, dy] of NEAR4) {
+        const nx = gx + dx;
+        const ny = gy + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) open = true;
+        else if (rock[ny * w + nx] && !seen[ny * w + nx]) {
+          seen[ny * w + nx] = 1;
+          piece.push(ny * w + nx);
         }
       }
-      if (!open && piece.length <= POCKET) out.push(piece);
     }
+    if (!open && piece.length <= POCKET) out.push(piece.map((i) => ({ x: x0 + (i % w), y: y0 + Math.floor(i / w) })));
   }
   return out;
 }

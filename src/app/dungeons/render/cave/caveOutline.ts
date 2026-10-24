@@ -11,7 +11,7 @@ import type { CellPoint } from '../../model';
 import { traceLoops } from '../../water/contour';
 import { type CellGrid, WET } from '../../water/wetGrid';
 import { type FloorShape, type Vec, polysOf } from '../geometry';
-import { simplifyRing } from '../simplifyRing';
+import { thinCorners } from '../simplifyRing';
 import { faultless, outlineFaults } from './outlineGuard';
 import { outlineRelief, type Relief } from './outlineRelief';
 
@@ -33,6 +33,7 @@ const EASINGS = 8;
 const EASE = 0.6;
 /** How far the drawn ring may stray from the rounded one when it drops corners, in cells: far below a pixel at any zoom. */
 const SIMPLIFY = 0.01;
+const THINNINGS = 2;
 /** Corners either side of a fault that are eased with it. */
 const EASE_REACH = 2;
 
@@ -250,7 +251,7 @@ function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readon
 
 /** The rings with the corners they hardly bend at left out, where that leaves them as true to their cells. */
 function fewerCorners(rings: readonly Vec[][], cells: Cells): Vec[][] {
-  const fewer = rings.map((ring) => simplifyRing(ring, SIMPLIFY));
+  const fewer = rings.map((ring) => thinCorners(ring, SIMPLIFY, THINNINGS));
   return faultless(outlineFaults(fewer, cells.floor, cells.box, cells.kept)) ? fewer : [...rings];
 }
 

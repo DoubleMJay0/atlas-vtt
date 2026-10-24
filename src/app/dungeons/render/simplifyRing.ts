@@ -1,4 +1,8 @@
-/** A closed ring with fewer corners: Douglas–Peucker, keeping every corner the ring strays from by more than a tolerance. */
+/**
+ * A closed ring with fewer corners, never straying from it by more than a tolerance: by
+ * Douglas–Peucker (the fewest corners), or corner by corner (`thinCorners`: each decided by its
+ * neighbours alone, so a change of the ring changes nothing far from it).
+ */
 
 import type { Vec } from './geometry';
 
@@ -26,6 +30,23 @@ export function simplifyRing(ring: readonly Vec[], tolerance: number): Vec[] {
     stack.push([from, far], [far, to]);
   }
   return ring.filter((_, i) => keep[i]);
+}
+
+/**
+ * The ring without the corners it hardly bends at: a corner goes where it lies within `tolerance`
+ * of the line between its neighbours and nearer it than either of them does to theirs, so no two
+ * neighbours go together; `rounds` times.
+ */
+export function thinCorners(ring: readonly Vec[], tolerance: number, rounds: number): Vec[] {
+  let points = [...ring];
+  for (let round = 0; round < rounds && points.length > 8; round++) {
+    const n = points.length;
+    const bend = points.map((p, i) => segmentDistance(p, points[(i - 1 + n) % n]!, points[(i + 1) % n]!));
+    // Ties go by place, so the choice never hangs on where the ring starts.
+    const before = (i: number, j: number): boolean => bend[i]! < bend[j]! || (bend[i] === bend[j] && (points[i]!.x < points[j]!.x || (points[i]!.x === points[j]!.x && points[i]!.y < points[j]!.y)));
+    points = points.filter((_, i) => !(bend[i]! < tolerance && before(i, (i - 1 + n) % n) && before(i, (i + 1) % n)));
+  }
+  return points;
 }
 
 function segmentDistance(p: Vec, a: Vec, b: Vec): number {
