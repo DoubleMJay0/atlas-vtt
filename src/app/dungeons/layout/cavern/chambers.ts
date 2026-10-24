@@ -11,7 +11,8 @@ import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
 import { arenaSeeds } from '../../terrain/arena';
-import { type CaveGrid, NEAR4, NEAR8, unkey } from './caveGrid';
+import { type CaveGrid, NEAR4, NEAR8, ROCK, unkey } from './caveGrid';
+import { besideEntrance, swellDistance } from './laneCells';
 import { type ChamberField, chamberField } from './chamberField';
 
 export interface ChamberShape {
@@ -25,6 +26,8 @@ export interface ChamberShape {
 const FLOOR_EXTRA = 9;
 /** How strongly growth follows the chamber's field rather than its neighbours. */
 const FOLLOW_FIELD = 6;
+/** How much farther from the middle a core may stand for each of its cells it keeps off another room's rectangle. */
+const CROWDED = 0.5;
 
 const key = (c: CellPoint): string => cellKey(c.x, c.y);
 
@@ -32,20 +35,37 @@ function mayTake(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
   return inRect(floorRect(room), c.x, c.y) && (grid.holds(c.x, c.y, room.id) || grid.mayClaim(c.x, c.y, room.id));
 }
 
-/** The 3 × 3 block nearest the room's middle that the room may take whole; none where nothing of that size fits. */
-export function coreBlock(grid: CaveGrid, room: DungeonRoom): CellPoint[] {
+/** Whether the room may take the cell for its core out in its swell: one cell past its rectangle, in rock no room's rectangle holds. */
+function mayTakeOut(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
+  if (mayTake(grid, room, c)) return true;
+  return swellDistance(room, c.x, c.y) === 1 && grid.envelope(c.x, c.y) === ROCK && !besideEntrance(grid.doors, c.x, c.y) && grid.mayClaim(c.x, c.y, room.id);
+}
+
+/** How many of the block's cells lie within two cells of another room's rectangle: with only a wall between. */
+function crowding(grid: CaveGrid, room: DungeonRoom, block: readonly CellPoint[]): number {
+  return block.filter((c) => NEAR8.some(([dx, dy]) => [1, 2].some((k) => ![ROCK, room.id].includes(grid.envelope(c.x + k * dx, c.y + k * dy))))).length;
+}
+
+/**
+ * The 3 × 3 block nearest the room's middle that the room may take whole; none where nothing of
+ * that size fits. Shaping (`out`), it may also stand a cell out in the room's swell, and keeps
+ * off other rooms' rectangles where it can, so the rock between two rooms may thicken.
+ */
+export function coreBlock(grid: CaveGrid, room: DungeonRoom, out = false): CellPoint[] {
   const r = floorRect(room);
+  const reach = out ? 1 : 0;
   const cx = room.x + room.w / 2;
   const cy = room.y + room.h / 2;
+  const may = out ? mayTakeOut : mayTake;
   let best: CellPoint[] = [];
-  let bestDistance = Infinity;
-  for (let y = r.y0; y + 2 <= r.y1; y++) {
-    for (let x = r.x0; x + 2 <= r.x1; x++) {
+  let bestScore = Infinity;
+  for (let y = r.y0 - reach; y + 2 <= r.y1 + reach; y++) {
+    for (let x = r.x0 - reach; x + 2 <= r.x1 + reach; x++) {
       const block = cellsOf({ x0: x, y0: y, x1: x + 2, y1: y + 2 });
-      const d = Math.hypot(x + 1.5 - cx, y + 1.5 - cy);
-      if (d < bestDistance && block.every((c) => mayTake(grid, room, c))) {
+      const score = Math.hypot(x + 1.5 - cx, y + 1.5 - cy) + (out ? CROWDED * crowding(grid, room, block) : 0);
+      if (score < bestScore && block.every((c) => may(grid, room, c))) {
         best = block;
-        bestDistance = d;
+        bestScore = score;
       }
     }
   }
@@ -56,10 +76,10 @@ export function coreBlock(grid: CaveGrid, room: DungeonRoom): CellPoint[] {
  * Keeps a 3 × 3 block in every chamber before anything else is shaped, so no tunnel or narrows
  * takes the cells it needs; whether every chamber has one.
  */
-export function reserveCores(grid: CaveGrid, rooms: readonly DungeonRoom[]): boolean {
+export function reserveCores(grid: CaveGrid, rooms: readonly DungeonRoom[], out = false): boolean {
   return rooms.every((room) => {
     if (room.kind !== 'room') return true;
-    const core = coreBlock(grid, room);
+    const core = coreBlock(grid, room, out);
     grid.require(room.id, core);
     return core.length > 0;
   });
@@ -113,7 +133,8 @@ function pieces(cells: ReadonlySet<string>): string[][] {
 /** What a chamber must keep, joined into one piece: its core, its kept cells, the lane in it and, for the boss, the arena's platform. */
 export function chamberSeeds(grid: CaveGrid, room: DungeonRoom, lane: ReadonlySet<string>): CellPoint[] {
   const r = floorRect(room);
-  const seeds = new Set<string>([...coreBlock(grid, room).map(key), ...grid.required(room.id)]);
+  // The core is kept already (`reserveCores`), with the rest the room needs.
+  const seeds = new Set<string>(grid.required(room.id));
   for (const k of lane) if (inRect(r, unkey(k).x, unkey(k).y)) seeds.add(k);
   if (room.boss) for (const c of arenaSeeds(room)) if (mayTake(grid, room, c)) seeds.add(key(c));
   const [main, ...rest] = pieces(seeds).sort((a, b) => b.length - a.length);

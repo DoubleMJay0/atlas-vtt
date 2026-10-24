@@ -27,8 +27,8 @@ const wanderNoise = fractalNoise(rngFrom(WANDER_SEED), 1, 0.5, WANDER_PERIOD);
 /** The cost of stepping onto the block at (ax, ay): the same on every device and in every check of a layout. */
 const wander = (ax: number, ay: number): number => 1 + WANDER * Math.max(0, wanderNoise(ax + 1, ay + 1) + 0.5);
 /** The winding lane a floor is shaped with: dearer and finer, its own per floor. */
-const WINDING = 8;
-const WINDING_PERIOD = 3;
+const WINDING = 20;
+const WINDING_PERIOD = 4.5;
 
 /** How a lane is found: what each block costs, and whether it may wind out into the rock its chambers may swell into. */
 export interface LaneWay {

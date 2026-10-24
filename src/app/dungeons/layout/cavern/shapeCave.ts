@@ -86,21 +86,23 @@ function basinsPerFloor(floors: readonly PlannedFloor[], level: number, dry: boo
 
 /**
  * The floor's grid with its lane claimed and every chamber's core kept: a winding lane where one
- * fits and leaves every chamber its core, else the plain one the layout made sure of.
+ * fits and leaves every chamber a core, which may stand out in its swell; else the plain lane; else
+ * the plain lane with cores inside their rectangles, as the layout made sure of.
  */
 function laneGrid(seed: number, index: number, floor: PlannedFloor, boss: boolean, count: number): { grid: CaveGrid; lane: CellPoint[] } {
   const [from, to] = laneEnds(index, count, floor, boss);
   const route = mainRoute(floor, from, to);
-  const laid = (way?: LaneWay): { grid: CaveGrid; lane: CellPoint[] | null; cores: boolean } => {
+  const laid = (way: LaneWay | undefined, out: boolean): { grid: CaveGrid; lane: CellPoint[] | null; cores: boolean } => {
     const grid = new CaveGrid(floor, index);
     const lane = wideLane(grid, floor, route, from, to, way);
     if (lane) claimLane(grid, floor, route, lane, way?.swell);
-    return { grid, lane, cores: lane !== null && reserveCores(grid, floor.rooms) };
+    return { grid, lane, cores: lane !== null && reserveCores(grid, floor.rooms, out) };
   };
-  const winding = laid(windingWay(floorStream(seed, 'cave', index, 'lane')));
-  if (winding.cores) return { grid: winding.grid, lane: winding.lane! };
-  const plain = laid();
-  return { grid: plain.grid, lane: plain.lane ?? [] };
+  // The last try is the layout's own, which it made sure of.
+  const tries: readonly [LaneWay | undefined, boolean][] = [[windingWay(floorStream(seed, 'cave', index, 'lane')), true], [undefined, true], [undefined, false]];
+  let tried = laid(...tries[0]!);
+  for (let k = 1; !tried.cores && k < tries.length; k++) tried = laid(...tries[k]!);
+  return { grid: tried.grid, lane: tried.lane ?? [] };
 }
 
 interface FloorShaping {

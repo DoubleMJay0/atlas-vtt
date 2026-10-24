@@ -81,6 +81,16 @@ export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly
   const tunnels = routeRooms.filter((room) => room.kind !== 'room');
   const chambers = routeRooms.filter((room) => room.kind === 'room');
   const memo = new Map<string, number | null>();
+  // Out in the swell, the lane keeps two cells off every room's rectangle, so two rooms' lanes meet only at their narrows.
+  const nearOtherRoom = (x: number, y: number, room: number): boolean => {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const envelope = grid.envelope(x + dx, y + dy);
+        if (envelope !== ROCK && envelope !== room) return true;
+      }
+    }
+    return false;
+  };
   const ownerOf = (x: number, y: number, key: string): number | null => {
     if (stairCells.has(key) && !ends.some((end) => end.has(key))) return null;
     const envelope = grid.envelope(x, y);
@@ -92,7 +102,8 @@ export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly
     const tunnel = tunnels.find((room) => inTunnelReach(floor, room, x, y) && grid.mayClaim(x, y, room.id));
     if (tunnel || !swell) return tunnel?.id ?? null;
     const near = chambers.filter((room) => swellDistance(room, x, y) <= CHAMBER_SWELL);
-    return near.length === 0 || besideEntrance(floor.doors, x, y) ? null : (near.find((room) => grid.mayClaim(x, y, room.id))?.id ?? null);
+    if (near.length === 0 || besideEntrance(floor.doors, x, y)) return null;
+    return near.find((room) => !nearOtherRoom(x, y, room.id) && grid.mayClaim(x, y, room.id))?.id ?? null;
   };
   return (x, y) => {
     const key = cellKey(x, y);

@@ -26,6 +26,12 @@ const SCALES: readonly { period: number; octaves: number; amount: number }[] = [
   { period: 1.3, octaves: 1, amount: 0.4 },
   { period: 0.55, octaves: 2, amount: 0.1 },
 ];
+/**
+ * A ripple of about two cells along both axes, its phase pushed about by slow noise: whichever way
+ * a wall runs, one of its two waves runs along it, so no wall stays straight for long, however
+ * quiet the noise is there.
+ */
+const RIPPLE = { period: 2.2, amount: 0.16, phase: 2.5, phasePeriod: 4 };
 /** Spurs and recesses: one may stand in each square of this side, this often, this far out and this wide. */
 const SPUR_SPACING = 1.4;
 const SPUR_CHANCE = 0.3;
@@ -74,6 +80,13 @@ function spurs(key: string): Offset {
   };
 }
 
+function rippleOf(rng: ReturnType<typeof rngFrom>): Offset {
+  const phaseX = fractalNoise(rng, 1, 0.5, RIPPLE.phasePeriod);
+  const phaseY = fractalNoise(rng, 1, 0.5, RIPPLE.phasePeriod);
+  const k = (2 * Math.PI) / RIPPLE.period;
+  return (x, y) => (RIPPLE.amount / 2) * (Math.sin(k * x + RIPPLE.phase * 2 * Math.PI * phaseX(x, y)) + Math.sin(k * y + RIPPLE.phase * 2 * Math.PI * phaseY(x, y)));
+}
+
 /** The relief of floor `floor` of the cave of `seed`. */
 export function outlineRelief(seed: number, floor: number): Relief {
   const key = `relief:${seed}:${floor}`;
@@ -82,8 +95,9 @@ export function outlineRelief(seed: number, floor: number): Relief {
   const spur = spurs(key);
   const swayX = fractalNoise(rng, 1, 0.5, SWAY.period);
   const swayY = fractalNoise(rng, 1, 0.5, SWAY.period);
+  const ripple = rippleOf(rng);
   return (x, y, nx, ny) => {
-    const out = layers.reduce((sum, { noise, amount }) => sum + amount * noise(x, y), LEAN) + spur(x, y);
+    const out = layers.reduce((sum, { noise, amount }) => sum + amount * noise(x, y), LEAN) + spur(x, y) + ripple(x, y);
     return { x: x + SWAY.amount * swayX(x, y) + nx * out, y: y + SWAY.amount * swayY(x, y) + ny * out };
   };
 }

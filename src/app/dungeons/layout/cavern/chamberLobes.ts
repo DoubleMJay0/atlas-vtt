@@ -3,7 +3,7 @@
  * a little from the line it stands on. One lobe stands out past an end of the rectangle along the
  * cave's fault (so the chamber reaches on along it), the others out past its edges anywhere (bays
  * the chamber grows into); a bite stands on a long side (an alcove of rock it gives up, so it
- * narrows across). Seeded per chamber, never mirrored.
+ * narrows across) or takes a corner of the rectangle. Seeded per chamber, never mirrored.
  */
 
 import type { DungeonRoom } from '../../model';
@@ -28,7 +28,7 @@ interface Ellipse {
 }
 
 /** One lobe for every this many cells round the rectangle, at least one; bites half as many. */
-const EDGE_PER_LOBE = 7;
+const EDGE_PER_LOBE = 5;
 /** How far a lobe or bite turns from the line it stands on, at most. */
 const TILT = (35 * Math.PI) / 180;
 
@@ -69,7 +69,12 @@ export function chamberLobes(rng: Rng, room: DungeonRoom, faults: readonly numbe
       return tilted(rng, p.angle, p.x, p.y, span(rng, [1.2, 2.4]), span(rng, [0.9, 1.6]));
     }),
   ];
-  const bites = Array.from({ length: Math.ceil(count / 2) }, () => {
+  // Every other bite takes a corner of the rectangle, the rest stand on a long side.
+  const bites = Array.from({ length: count }, (_, k) => {
+    if (k % 2 === 1) {
+      const p = { x: rng() < 0.5 ? room.x : room.x + room.w, y: rng() < 0.5 ? room.y : room.y + room.h };
+      return tilted(rng, angle, p.x, p.y, span(rng, [1.4, 2.2]), span(rng, [1.1, 1.7]));
+    }
     const side = rng() < 0.5 ? 1 : -1;
     const p = at((rng() * 2 - 1) * reachAlong * 0.7, side * (reachAcross + span(rng, [-0.3, 0.2])));
     return tilted(rng, angle, p.x, p.y, span(rng, [1, 2]), span(rng, [0.8, 1.3]));
