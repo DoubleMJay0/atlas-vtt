@@ -49,7 +49,7 @@ export function outerSides(rc: RoomCells, rooms: readonly DungeonRoom[]): Readon
 /** The cells furniture keeps off in a room: its stairwells, the cells it must keep reachable, and every cell terrain fills. */
 function keptClear(floor: FloorTerrain, rc: RoomCells): Set<string> {
   const stairs = floor.plan.stairs.flatMap((s) => cellsOf(spotRect(s))).filter((c) => rc.isFloor(c));
-  return new Set([...floor.takenCells(), ...[...stairs, ...rc.needed].map((c) => cellKey(c.x, c.y))]);
+  return new Set([...floor.takenCells(), ...floor.lane, ...[...stairs, ...rc.needed].map((c) => cellKey(c.x, c.y))]);
 }
 
 /** The furnishing of a typed room, with what is drawn, the theme's facts and the room's outer walls. */
@@ -94,7 +94,7 @@ function allowedTerrain(work: TerrainWork, k: number, rc: RoomCells, spec: RoomT
  * gives cover, else a crate in a corner, else crates as terrain. A room with only pictures on its
  * walls is not furnished for a fight.
  */
-export function ensureTypeCover(fs: FurnishSpace, spec: RoomTypeSpec, tags: ReadonlySet<DungeonTag>): void {
+export function ensureTypeCover(fs: FurnishSpace, spec: RoomTypeSpec, tags: ReadonlySet<DungeonTag>, natural = false): void {
   const { floor, cells: rc } = fs;
   if (rc.floorCount < FIGHT_AREA || !fs.placed.some((p) => !PROP_SPECS[p.prop.kind].wallPiece)) return;
   const covered = (): boolean => hasCover(floor, rc) || fs.placed.some((p) => PROP_SPECS[p.prop.kind].cover !== undefined);
@@ -102,6 +102,8 @@ export function ensureTypeCover(fs: FurnishSpace, spec: RoomTypeSpec, tags: Read
   const pieces = [spec.furnish.defining, spec.furnish.with, ...spec.furnish.pieces].filter((p): p is Piece => p !== undefined);
   const cover = pieces.find((p) => PROP_SPECS[p.kind].cover !== undefined && !PROP_SPECS[p.kind].wallPiece && fs.offered.has(p.kind));
   if (cover && againstWall(fs, cover.kind, WALL_SIDES)) return;
+  // Nature stacks no crates: a cave's last cover is fallen rock.
+  if (natural) return ensureCover(floor, rc, tags, 'rubble-heap');
   if (inCorner(fs, 'crate')) return;
   ensureCover(floor, rc, tags);
 }
@@ -116,7 +118,7 @@ export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, sp
   if (!hazarded && work.theme.ruined && chance(rng, RUINED_GROUND_CHANCE)) ruinedGround(floor, rc, rng);
   const fs = typedSpace(work, k, rc, floor);
   furnishByRecipe(fs, hazarded ? naturalOnly(spec.furnish) : spec.furnish, context);
-  if (!hazarded) ensureTypeCover(fs, spec, work.tags);
+  if (!hazarded) ensureTypeCover(fs, spec, work.tags, !work.theme.definition.built);
 }
 
 /**

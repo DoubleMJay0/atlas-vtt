@@ -5,7 +5,10 @@ import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { shapeDistance } from '../../../src/app/dungeons/render/geometry';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { caveFloorCells, columnProblems, faultStretch, guardProblems, laneNarrowsProblems, maskProblems, narrowsProblems } from './caveChecks';
-import { hazardFurnishProblems, lifeProblems, liquidProblems } from './caveRules';
+import { breakdownProblems, geologyProblems, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
+import { mirrorProblems, physicsProblems, shapeProblems } from './themeTerrainInvariants';
+import { cavernProgramme } from '../../../src/app/dungeons/themes/cavern';
+import { readTags } from '../../../src/app/dungeons/tags';
 import { doorProblems, floorProblems, loopProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, stairProblems } from './floorsInvariants';
 import { bridgeProblems, cellProblems, holeProblems, routeProblems, stairClearanceProblems } from './terrainInvariants';
@@ -120,7 +123,26 @@ export function describeCaveInvariants(floors: number): void {
     });
 
     it('make a room a hazard room or a furnished room, never both, nature\'s formations aside, and hold one liquid at most in a room', () => {
-      expect(failures(eachFloor((run, i) => [...hazardFurnishProblems(run.model.floors[i]!), ...liquidProblems(run.model.floors[i]!)]))).toEqual([]);
+      expect(failures(eachFloor((run, i) => [...hazardFurnishProblems(run.model, i), ...liquidProblems(run.model.floors[i]!)]))).toEqual([]);
+    });
+
+    it('rules 2, 3 and 4: lay lava deep with a ledge, acid deep on a fault ringed by crust, every chasm along a fault', () => {
+      expect(failures((run) => geologyProblems(run.model, true))).toEqual([]);
+    });
+
+    it('rule 6: lay breakdown under the largest span of most floors, rubble at the foot of every pitch and shaft, chokes at a collapse chamber\'s door', () => {
+      const all = runs.map((run) => breakdownProblems(run.model));
+      expect(failures((run) => breakdownProblems(run.model).problems)).toEqual([]);
+      expect(all.reduce((s, b) => s + b.held, 0) / all.reduce((s, b) => s + b.spans, 0)).toBeGreaterThan(0.9);
+    });
+
+    it('rule 5: lay rimstone only where water steps down', () => {
+      expect(failures((run) => rimstoneProblems(run.model))).toEqual([]);
+    });
+
+    it('keep hazards, blocking terrain and furniture off the lane and furniture off them, holes off water, and shape natural features as nature does', () => {
+      expect(failures(eachFloor((run, i) => laneProblems(run.model.floors[i]!)))).toEqual([]);
+      expect(failures((run) => [...physicsProblems(run.model), ...shapeProblems(run.model, cavernProgramme(new Set(readTags(run.model.tags)))), ...mirrorProblems(run.model)])).toEqual([]);
     });
 
     it('keep every rule of the layout and the terrain', () => {

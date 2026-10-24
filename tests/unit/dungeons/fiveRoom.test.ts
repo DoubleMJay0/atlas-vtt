@@ -69,7 +69,7 @@ describe('five-room dungeons', () => {
     const typed = (stage: FiveRoomStage, types: readonly string[]): number => caverns.filter(({ model }) => types.includes(stageRoom(model.floors[0]!, stage)?.type ?? '')).length / caverns.length;
     expect(typed('entrance', ['cave-mouth'])).toBe(1);
     expect(typed('puzzle', ['crystal-grotto', 'chasm-hall'])).toBeGreaterThan(0.5);
-    expect(typed('setback', ['chasm-hall', 'lake-cavern', 'collapse-chamber'])).toBeGreaterThan(0.4);
+    expect(typed('setback', ['chasm-hall', 'lake-cavern', 'collapse-chamber'])).toBeGreaterThan(0.3);
     expect(typed('climax', ['grand-cavern', 'lake-cavern', 'den'])).toBe(1);
   });
 

@@ -92,10 +92,9 @@ export function hasCover(floor: FloorTerrain, rc: RoomCells): boolean {
   return floor.inRoom(rc.room.id).some((p) => p.traits.cover !== undefined);
 }
 
-/** A last piece of low cover where the room has none yet: tried at every free cell. */
-export function ensureCover(floor: FloorTerrain, rc: RoomCells, tags: ReadonlySet<DungeonTag>): void {
+/** A last piece of low cover where the room has none yet (`kind`, else what the tags suggest): tried at every free cell. */
+export function ensureCover(floor: FloorTerrain, rc: RoomCells, tags: ReadonlySet<DungeonTag>, kind: TerrainKind = tags.has('crumbling') ? 'rubble-heap' : 'crates'): void {
   if (hasCover(floor, rc)) return;
-  const kind: TerrainKind = tags.has('crumbling') ? 'rubble-heap' : 'crates';
   for (let i = 0; i < rc.depth; i++) {
     for (let j = 0; j < rc.width; j++) {
       if (floor.place(draft(kind, rc.room.id, rc.block(i, j, 1, 1), { facing: negate(rc.axis) })) !== null) return;

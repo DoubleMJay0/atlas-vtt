@@ -155,7 +155,14 @@ describe('the holes and bridges of a dungeon of several floors', () => {
     let bridges = 0;
     const area = (ring: { x: number; y: number }[]): number => Math.abs(ring.reduce((sum, p, i) => sum + p.x * ring[(i + 1) % ring.length]!.y - ring[(i + 1) % ring.length]!.x * p.y, 0) / 2);
     for (let seed = 1; seed <= 60 && (holes < 5 || bridges === 0); seed++) {
-      const model = generateDungeon({ seed, theme: 'cavern', tags: ['large'], floors: 3 });
+      const generated = generateDungeon({ seed, theme: 'cavern', tags: ['large'], floors: 3 });
+      // A cave's chasms keep rock to cross by; a bridge is laid by hand over the first of each floor's holes.
+      const model = { ...generated, floors: generated.floors.map((floor) => {
+        const hole = floor.terrain.find((p) => p.opening && p.kind === 'chasm');
+        if (!hole) return floor;
+        const { opening: _opening, ...rest } = hole;
+        return { ...floor, terrain: [...floor.terrain, { ...rest, id: floor.terrain.length, kind: 'bridge' as const, traits: {}, cells: [hole.cells[0]!], spans: hole.id }] };
+      }) };
       const { parts } = partsOf(model);
       const ids = parts.levelIds!;
       const surfaces = Object.values(parts.scene.levelSurfaces ?? {});

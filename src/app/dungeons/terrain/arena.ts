@@ -16,6 +16,7 @@ import { draft } from './catalog';
 import { type CoverShape, ensureCover, tryShape } from './cover';
 import { farWallBlock, platformAtFarWall } from './elevation';
 import type { FloorTerrain } from './floorTerrain';
+import { placeCaveHazard } from './cavern/caveHazards';
 import { placeHazard } from './hazards';
 import { placeInterest } from './interest';
 import { RoomCells } from './roomCells';
@@ -149,9 +150,10 @@ export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: R
   const platformDepth = raised ? deep : 0;
   const placed = placeSetPiece(floor, rc, rng, arena ? arena.setPieces : DEFAULT_SET_PIECES, platformDepth);
   wideCover(floor, rc, rng, platformDepth, arena?.mirrored);
-  ensureCover(floor, rc, tags);
+  ensureCover(floor, rc, tags, work.cave ? 'rubble-heap' : undefined);
   if (arena) {
-    if (arena.hazards.length > 0 && chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) placeHazard(work, k, rc, rng, weighted(rng, arena.hazards.map((h) => [h, 1] as const)), arena.hazards);
+    const place = work.cave ? placeCaveHazard : placeHazard;
+    if (arena.hazards.length > 0 && chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) place(work, k, rc, rng, weighted(rng, arena.hazards.map((h) => [h, 1] as const)), arena.hazards);
     return;
   }
   if (chance(rng, placed ? 0.5 : 0.8) && roomy(rc, rc.width)) placeHazard(work, k, rc, rng, chance(rng, 0.6) ? 'channel' : 'pit');

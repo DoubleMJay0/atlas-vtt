@@ -5,7 +5,7 @@
  */
 
 import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
-import type { CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
+import type { CaveFloor, CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
 import { cellKey } from '../geometry';
 import { type TerrainDraft, footingOf } from './catalog';
 import { RoomCells } from './roomCells';
@@ -17,6 +17,8 @@ export interface FloorPlan {
   columns: readonly DungeonColumn[];
   /** The kinds that may be placed; unset, those with a drawing (`DRAWN_TERRAIN_KINDS`). Tests of placement offer every kind. */
   offeredTerrain?: ReadonlySet<TerrainKind>;
+  /** A Cavern floor's geology: its lane, which nothing that blocks stands on, its faults, basins and streams. */
+  cave?: CaveFloor;
 }
 
 export class FloorTerrain {
@@ -26,14 +28,17 @@ export class FloorTerrain {
   /** The cells that furniture stands on, by key. */
   private readonly furnished = new Set<string>();
   private readonly cells = new Map<number, RoomCells>();
+  /** A Cavern floor's lane, by key. */
+  readonly lane: ReadonlySet<string>;
 
   constructor(
     readonly index: number,
     readonly plan: FloorPlan,
   ) {
+    this.lane = new Set((plan.cave?.lane ?? []).map((c) => cellKey(c.x, c.y)));
     for (const room of plan.rooms) {
       if (room.kind !== 'room') continue;
-      this.cells.set(room.id, new RoomCells(room, plan.doors, plan.stairs, index, plan.columns));
+      this.cells.set(room.id, new RoomCells(room, plan.doors, plan.stairs, index, plan.columns, this.lane));
     }
   }
 

@@ -43,7 +43,7 @@ export function isHazard(piece: DungeonTerrain): boolean {
   return piece.traits.hazard !== undefined;
 }
 
-function stairCells(floor: DungeonFloor): CellPoint[] {
+export function stairCells(floor: DungeonFloor): CellPoint[] {
   return floor.stairs.flatMap((s) => {
     const out: CellPoint[] = [];
     for (let y = s.y; y < s.y + s.h; y++) for (let x = s.x; x < s.x + s.w; x++) out.push({ x, y });
@@ -64,7 +64,7 @@ export function stairClearanceProblems(floor: DungeonFloor, index: number): stri
 }
 
 /** The row each stair end on this floor is reached from: before its high end above, past its low end below. */
-function stairApproaches(floor: DungeonFloor, index: number): CellPoint[] {
+export function stairApproaches(floor: DungeonFloor, index: number): CellPoint[] {
   return floor.stairs.flatMap((s) => {
     const upper = s.to > index;
     const d = upper ? { x: -s.down.x, y: -s.down.y } : s.down;

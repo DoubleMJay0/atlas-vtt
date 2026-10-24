@@ -11,6 +11,8 @@ import { cellKey } from '../geometry';
 import type { DungeonTag } from '../tags';
 import type { ThemeContext } from '../themes/themes';
 import { furnishArena } from './arena';
+import { placeBreakdown } from './cavern/breakdown';
+import { floorTextures } from './cavern/caveTextures';
 import { draft } from './catalog';
 import { type FloorPlan, FloorTerrain } from './floorTerrain';
 import { furnishStage } from './stages';
@@ -18,7 +20,7 @@ import { furnishTypedArena } from './typeArena';
 import { placeTypeHazard } from './typeHazards';
 import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import { galleryOverArena, shaftDown } from './vertical';
-import { type TerrainWork, terrainWork } from './work';
+import { type TerrainCave, type TerrainWork, terrainWork } from './work';
 
 export interface TerrainFloorInput extends FloorPlan {
   /** Normal rooms left without furniture. */
@@ -53,18 +55,28 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
   }
   shaftDown(work, k, work.rng(k, 'shaft'));
   const hazarded = placeTypeHazards(work, k, rooms);
+  if (work.cave) for (const room of rooms) caveGround(work, k, room.id, 'breakdown');
   for (const room of rooms) {
     if (room.boss || room.stage || input.empty.has(room.id)) continue;
     const typed = input.types?.get(room.id);
     const rc = work.floors[k]?.room(room.id);
     if (typed && rc) furnishTypedRoom(work, k, rc, typed.spec, typed.context, hazarded.has(room.id));
   }
+  if (work.cave) for (const room of rooms) caveGround(work, k, room.id, 'textures');
+}
+
+/** A cave room's breakdown (before its furniture, which keeps off it), or its floor's textures (after). */
+function caveGround(work: TerrainWork, k: number, room: number, what: 'breakdown' | 'textures'): void {
+  const rc = work.floors[k]?.room(room);
+  if (!rc) return;
+  if (what === 'breakdown') placeBreakdown(work, k, rc, work.rng(k, `breakdown:${room}`));
+  else floorTextures(work, k, rc, work.rng(k, `textures:${room}`));
 }
 
 /** The terrain of every floor, as builders that still take the shallow water once it is known (`addShallowWater`). */
-export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext): FloorTerrain[] {
+export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext, cave?: TerrainCave): FloorTerrain[] {
   const builders = floors.map((floor, index) => new FloorTerrain(index, floor));
-  const work = terrainWork(seed, builders, tags, theme, { types: floors.map((floor) => floor.types), empty: floors.map((floor) => floor.empty) });
+  const work = terrainWork(seed, builders, tags, theme, { types: floors.map((floor) => floor.types), empty: floors.map((floor) => floor.empty) }, cave);
   galleryOverArena(work, work.rng(builders.length - 1, 'gallery'));
   floors.forEach((floor, k) => furnishFloor(work, k, floor));
   return builders;

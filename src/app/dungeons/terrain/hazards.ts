@@ -30,7 +30,7 @@ export function hazardWeights(tags: ReadonlySet<DungeonTag>): (readonly [HazardC
   ];
 }
 
-type Substance = { hazard: 'lava' | 'acid' | 'deep-water'; name: string };
+export type Substance = { hazard: 'lava' | 'acid' | 'deep-water'; name: string };
 
 /**
  * What may run in a channel, by the tags: lava and acid only where asked for, water wherever the
@@ -145,7 +145,7 @@ function blobBridge(rc: RoomCells, cells: readonly CellPoint[]): Band {
 }
 
 /** Whether cells may open onto the floor below: every one over the floor of one regular room there. */
-function overRoomBelow(work: TerrainWork, k: number, cells: readonly CellPoint[]): boolean {
+export function overRoomBelow(work: TerrainWork, k: number, cells: readonly CellPoint[]): boolean {
   const below = work.floors[k + 1];
   return !below || below.roomHolding(cells)?.room.wing === 'regular';
 }

@@ -4,6 +4,7 @@
  * acid only deep and with their tags), and which it suits best.
  */
 
+import { floorRect, intersection, roomArea } from '../../geometry';
 import { caveSites, type CaveSites } from '../../layout/cavern/caveSites';
 import { caveVariant } from '../../layout/cavern/caveParams';
 import { nearFault } from '../../layout/cavern/faults';
@@ -28,6 +29,13 @@ export function caveFacts(input: ThemeFactsInput, sites: readonly CaveSites[]): 
   return { sites: [...sites], variant: caveVariant(input.tags), inhabited: false, tags: input.tags, floors: input.floors, faults };
 }
 
+/** A lava flow or an acid spring needs this much floor: room beside the way through for it and a bank to stand on. */
+const MOLTEN_AREA = 16;
+/** A chasm hall needs this much: floor on both sides of its chasm and rock left to cross it by. */
+const CHASM_AREA = 20;
+/** ...and, above another floor, a room below lying under this many of its cells. */
+const UNDER_CHASM = 8;
+
 /** The angle the room is longest along, from its rectangle. */
 function roomAxis(room: DungeonFloor['rooms'][number]): number {
   return room.w >= room.h ? 0 : Math.PI / 2;
@@ -44,6 +52,17 @@ function underPitch(facts: CaveFacts, ref: RoomRef): boolean {
   const room = floor?.rooms[ref.room];
   if (!floor || !room) return false;
   return floor.stairs.some((s) => s.way === 'pitch' && s.to < ref.floor && s.x >= room.x && s.x + s.w <= room.x + room.w && s.y >= room.y && s.y + s.h <= room.y + room.h);
+}
+
+/** Whether a chasm in the room has somewhere to open onto: nothing below it, or a room below lying under a good part of it. */
+function opensBelow(facts: CaveFacts, ref: RoomRef): boolean {
+  const room = facts.floors[ref.floor]?.rooms[ref.room];
+  const below = facts.floors[ref.floor + 1];
+  if (!room || !below) return true;
+  return below.rooms.some((other) => {
+    const over = other.kind === 'room' && other.wing === 'regular' ? intersection(floorRect(room), floorRect(other)) : null;
+    return over !== null && (over.x1 - over.x0 + 1) * (over.y1 - over.y0 + 1) >= UNDER_CHASM;
+  });
 }
 
 function doors(facts: CaveFacts, ref: RoomRef): number {
@@ -73,7 +92,7 @@ function allowsType(facts: CaveFacts, type: RoomTypeId, ref: RoomRef): boolean {
     case 'sump':
       return basin && streamEnd(facts, ref);
     case 'chasm-hall':
-      return site.faultOf(ref.room) !== null;
+      return site.faultOf(ref.room) !== null && roomArea(room) >= CHASM_AREA && opensBelow(facts, ref);
     case 'collapse-chamber':
       return doors(facts, ref) >= 3 || underPitch(facts, ref);
     case 'fungus-grove':
@@ -81,9 +100,9 @@ function allowsType(facts: CaveFacts, type: RoomTypeId, ref: RoomRef): boolean {
     case 'crystal-grotto':
       return basin || (neighbours(floor.rooms.length, floor.doors)[ref.room] ?? []).some((n) => cave?.basins.includes(n));
     case 'lava-tube':
-      return facts.tags.has('lava') && site.deep(ref.room);
+      return facts.tags.has('lava') && site.deep(ref.room) && roomArea(room) >= MOLTEN_AREA;
     case 'sulphur-spring':
-      return facts.tags.has('acid') && site.deep(ref.room) && site.faultOf(ref.room) !== null;
+      return facts.tags.has('acid') && site.deep(ref.room) && site.faultOf(ref.room) !== null && roomArea(room) >= MOLTEN_AREA;
     case 'roost':
       return (site.hopsFromMouth[ref.room] ?? Infinity) <= 1;
     default:
@@ -97,6 +116,8 @@ export function cavernThemeFacts(facts: CaveFacts): ThemeFacts {
     score: (type, ref) => {
       if (type === 'lake-cavern' && facts.sites[ref.floor]?.deepest) return 2;
       if (type === 'crystal-grotto' && facts.floors[ref.floor]?.cave?.basins.includes(ref.room)) return 1;
+      // A lava cave shows its lava, an acid cave its spring, wherever they may lie.
+      if (type === 'lava-tube' || type === 'sulphur-spring') return 3;
       return 0;
     },
     placeAllowed: () => true,

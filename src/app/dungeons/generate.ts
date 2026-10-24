@@ -7,6 +7,7 @@
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { caveParams } from './layout/cavern/caveParams';
+import { caveSites } from './layout/cavern/caveSites';
 import { shapeCaves } from './layout/cavern/shapeCave';
 import { fiveRoomParams } from './layout/fiveRoom';
 import { floraOf } from './growth/flora';
@@ -91,6 +92,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
     parts.map(({ planned: floor, empty, columns }, index) => ({ ...floor, columns, empty, types: themed.rooms[index] ?? new Map() })),
     params.tags,
     themed.theme,
+    shaped ? { sites: caveSites(planned), variant: shaped.cave.variant } : undefined,
   );
   const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, level));
   return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors, ...(shaped && { cave: shaped.cave }) };

@@ -65,7 +65,8 @@ function shaftSpots(rc: RoomCells, rng: Rng, size: number): CellPoint[][] {
 /** Now and then a shaft from a room of floor `k` straight down into a room of the floor below. */
 export function shaftDown(work: TerrainWork, k: number, rng: Rng): void {
   const floor = work.floors[k];
-  if (!floor || k + 1 >= work.floors.length || !chance(rng, SHAFT_CHANCE)) return;
+  // A cave's shafts are its pitches, each in a room its type gives one (`caveHazards.ts`).
+  if (!floor || work.cave || k + 1 >= work.floors.length || !chance(rng, SHAFT_CHANCE)) return;
   const rooms = shuffled(rng, floor.plan.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.boss && room.stage === undefined && holeAllowed(work, k, room.id, 'shaft')));
   for (const room of rooms) {
     const rc = floor.room(room.id);

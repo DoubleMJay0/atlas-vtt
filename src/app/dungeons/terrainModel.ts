@@ -29,6 +29,12 @@ export type TerrainKind =
   | 'brambles'
   | 'thicket'
   | 'tangled-roots'
+  // A cave's floor: crusts and droppings walked as any floor, rimstone dams and choked boulders that slow a step.
+  | 'guano'
+  | 'bone-litter'
+  | 'sulphur-crust'
+  | 'rimstone'
+  | 'boulder-choke'
   // Where a fall from a hole above ends: loose rubble, difficult terrain.
   | 'chasm-floor'
   // Hazards.
