@@ -13,6 +13,8 @@ import { CaveGrid } from './caveGrid';
 import type { CaveShaping } from './caveParams';
 import { chamberSeeds, growChamber, reserveCores, smoothChamber } from './chambers';
 import { faultDirections, faultLines } from './faults';
+import { basinCount, caveHeights, hydrology, lowRooms } from './hydrology';
+import { stairWays } from './stairWays';
 import { repairGuards } from './guards';
 import { claimLane, laneEnds, mainRoute, wideLane } from './mainPath';
 import { carveTunnel, shapeDoors, tunnelEnds } from './tunnels';
@@ -50,7 +52,28 @@ function shapeTunnels(seed: number, index: number, shaping: CaveShaping, floor: 
   }
 }
 
-function shapeFloor(seed: number, shaping: CaveShaping, faults: readonly number[], floors: readonly PlannedFloor[], index: number, boss: boolean): PlannedFloor {
+/** How many basins each floor holds: the cave's share of all its low rooms, given to the deepest floor first. */
+function basinsPerFloor(floors: readonly PlannedFloor[], level: number, dry: boolean): number[] {
+  const lows = floors.map((floor) => lowRooms(floor, floor.cave?.heights ?? []).length);
+  let left = dry ? 0 : basinCount(lows.reduce((a, b) => a + b, 0), level);
+  const out = lows.map(() => 0);
+  for (let index = floors.length - 1; index >= 0; index--) {
+    out[index] = Math.min(lows[index]!, left);
+    left -= out[index]!;
+  }
+  return out;
+}
+
+interface FloorShaping {
+  seed: number;
+  shaping: CaveShaping;
+  faults: readonly number[];
+  boss: boolean;
+  dry: boolean;
+}
+
+function shapeFloor(how: FloorShaping, floors: readonly PlannedFloor[], index: number): PlannedFloor {
+  const { seed, shaping, faults, boss } = how;
   const floor = floors[index]!;
   const grid = new CaveGrid(floor, index);
   const [from, to] = laneEnds(index, floors.length, floor, boss);
@@ -65,14 +88,25 @@ function shapeFloor(seed: number, shaping: CaveShaping, faults: readonly number[
   const left = repairGuards(grid, { ...floor, doors }, lane);
   if (left.length > 0) console.debug(`[Atlas] cave floor ${index} of seed ${seed} keeps ${left.length} token-fit problems`, left.map((p) => p.kind));
   const rooms = floor.rooms.map((room) => ({ ...room, cells: grid.cellsOf(room.id) }));
-  const cave: CaveFloor = { lane, heights: [], faults: faultLines(floorStream(seed, 'cave', index, 'faults'), { rooms }, faults), basins: [], streams: [], dams: [] };
-  return { rooms, doors, stairs: floor.stairs, cave };
+  const cave: CaveFloor = { lane, heights: caveHeights(seed, index, rooms), faults: faultLines(floorStream(seed, 'cave', index, 'faults'), { rooms }, faults), basins: [], streams: [], dams: [] };
+  return { rooms, doors, stairs: floor.stairs.map((stair) => ({ ...stair })), cave };
 }
 
-/** Every floor of a Cavern shaped, and the cave's variant and fault directions. */
-export function shapeCaves(seed: number, params: DungeonParams, floors: readonly PlannedFloor[], boss: boolean): ShapedCaves {
+/**
+ * Every floor of a Cavern shaped, its heights, water and ways between floors worked out, and the
+ * cave's variant and fault directions. `level` is the dungeon's water level.
+ */
+export function shapeCaves(seed: number, params: DungeonParams, floors: readonly PlannedFloor[], boss: boolean, level: number): ShapedCaves {
   const shaping = params.cave;
   if (!shaping) throw new Error('shapeCaves needs a Cavern’s params');
   const faults = faultDirections(stream(seed, 'cave', 'faults'), floors[0]?.rooms ?? []);
-  return { floors: floors.map((_, index) => shapeFloor(seed, shaping, faults, floors, index, boss)), cave: { variant: shaping.variant, faults } };
+  const how: FloorShaping = { seed, shaping, faults, boss, dry: params.tags.has('dry') };
+  const shaped = floors.map((_, index) => shapeFloor(how, floors, index));
+  const takes = basinsPerFloor(shaped, level, how.dry);
+  shaped.forEach((floor, index) => {
+    const cave = floor.cave!;
+    Object.assign(cave, hydrology(floorStream(seed, 'cave', index, 'water'), floor, cave.heights, level, how.dry, takes[index]));
+  });
+  stairWays(stream(seed, 'cave', 'ways'), shaped);
+  return { floors: shaped, cave: { variant: shaping.variant, faults } };
 }

@@ -69,7 +69,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const boss = fiveRoom || request.bossRoom !== false;
   const laid = planFloors(seed, params, count, boss, fiveRoom);
   // A Cavern shapes its rooms into chambers and tunnels before anything reads them.
-  const shaped = params.cave ? shapeCaves(seed, params, laid, boss) : null;
+  const shaped = params.cave ? shapeCaves(seed, params, laid, boss, rolled) : null;
   const planned = shaped?.floors ?? laid;
   const themed = typeDungeon(seed, theme, params.tags, planned);
   const { typed } = themed;
