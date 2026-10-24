@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { applyDungeonEdits, NO_EDITS, withWingHidden } from '../../../src/app/dungeons/edits';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { cellKey } from '../../../src/app/dungeons/geometry';
 import { approachCells, doorApproaches, spotRect } from '../../../src/app/dungeons/floors/stairSpots';
@@ -11,6 +12,10 @@ import { cellOutlines } from '../../../src/app/dungeons/scene/cellOutline';
 import { roomFacts } from '../../../src/app/dungeons/scene/roomFacts';
 import { keyedRooms } from '../../../src/app/dungeons/scene/roomKeys';
 import { pinCell } from '../../../src/app/dungeons/scene/roomPins';
+import { roomDrafts } from '../../../src/app/dungeons/scene/toFeatures';
+import { secretWingOf } from '../../../src/app/dungeons/secretWings';
+import { roomTypeKey } from '../../../src/app/dungeons/themes/roomTypes';
+import { type MessageKey, t } from '../../../src/app/i18n';
 import { dungeonNote, roomPins } from '../../../src/app/dungeons/scene/toNote';
 import { dungeonScene, type DungeonSceneParts } from '../../../src/app/dungeons/scene/toScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
@@ -43,7 +48,7 @@ const wallsOn = (parts: DungeonSceneParts, level: string | undefined): WallSegme
   Object.values(parts.scene.walls).filter(wall => (level ? wall.levels?.[0] === level : wall.levels === undefined));
 
 describe('a dungeon of several floors as one scene', () => {
-  const model = generateDungeon({ seed: 7, tags: ['medium'], floors: 3 });
+  const model = generateDungeon({ seed: 7, theme: 'cavern', tags: ['medium'], floors: 3 });
   const { parts, placement } = partsOf(model);
   const ids = parts.levelIds!;
 
@@ -318,11 +323,63 @@ describe('vegetation in the scene', () => {
     expect(ivy.length).toBeGreaterThan(0);
     for (const feature of ivy) expect(feature.terrain).toBeUndefined();
     expect(features.some(feature => feature.name === 'Weeds')).toBe(false);
-    // Vegetation lies first, so whatever stands on it is found over it.
-    const firstSolid = features.findIndex(feature => !['Ivy', 'Moss', 'Ferns', 'Roots', 'Pale fungi', 'Flowering vines', 'Dead creepers'].includes(feature.name));
+    // Room labels lie first, then vegetation, so whatever stands on it is found over it.
+    const roomNames = new Set(floor.rooms.flatMap(room => (room.type ? [t(`dungeonRoom.${roomTypeKey(room.type)}` as MessageKey)] : [])));
+    const firstSolid = features.findIndex(feature => !roomNames.has(feature.name) && !['Ivy', 'Moss', 'Ferns', 'Roots', 'Pale fungi', 'Flowering vines', 'Dead creepers'].includes(feature.name));
     expect(features.slice(firstSolid).some(feature => feature.name === 'Ivy')).toBe(false);
     const grownRooms = new Set(floor.growth.filter(g => floor.rooms[g.room]?.kind === 'room').map(g => g.room)).size;
     expect(parts.rooms.filter(room => room.facts.includes('Growing here: ')).length).toBe(grownRooms);
     expect(parts.rooms.some(room => room.facts.includes('Terrain: ') && room.facts.includes('Brambles'))).toBe(true);
+  });
+});
+
+describe('room labels', () => {
+  const nameOf = (type: string): string => t(`dungeonRoom.${roomTypeKey(type as never)}` as MessageKey);
+
+  it('labels every typed room for the GM by its type', () => {
+    const model = generateDungeon({ seed: 21, theme: 'fortress', tags: ['secret'], floors: 2 });
+    const { parts } = partsOf(model);
+    const features = Object.values(parts.scene.mapFeatures ?? {});
+    const ids = parts.levelIds!;
+    model.floors.forEach((floor, index) => {
+      const shown = floor.rooms.filter(room => room.kind === 'room' && room.type && !(floor.hiddenWings ?? []).length);
+      const labels = features.filter(feature => feature.level === ids[index] && shown.some(room => nameOf(room.type!) === feature.name));
+      expect(labels.length).toBeGreaterThanOrEqual(shown.length);
+      for (const feature of labels) expect(feature.terrain).toBeUndefined();
+    });
+    expect(features.some(feature => feature.name === 'Kitchen' || feature.name === 'Gatehouse')).toBe(true);
+    const cavern = Object.values(partsOf(generateDungeon({ seed: 21, theme: 'cavern', tags: [], floors: 1 })).parts.scene.mapFeatures ?? {});
+    expect(cavern.some(feature => /^(Gatehouse|Kitchen|Great hall)$/.test(feature.name))).toBe(false);
+  });
+
+  it('gives a hidden secret wing no label', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const generated = generateDungeon({ seed, theme: 'fortress', tags: ['secret'], floors: 1 });
+      const secret = generated.floors[0]!.rooms.find(room => room.wing === 'secret' && room.kind === 'room' && room.type);
+      if (!secret) continue;
+      const model = applyDungeonEdits(generated, withWingHidden(NO_EDITS, 0, secretWingOf(generated.floors[0]!.rooms, secret.id)!));
+      const shown = roomDrafts(model.floors[0]!.rooms, new Set(model.floors[0]!.rooms.filter(room => room.wing !== 'secret').map(room => room.id)));
+      expect(shown.some(draft => draft.polygon[0]!.x === secret.x && draft.polygon[0]!.y === secret.y)).toBe(false);
+      return;
+    }
+    throw new Error('no secret typed room found');
+  });
+
+  it('lays room labels under furniture and terrain', () => {
+    const model = generateDungeon({ seed: 21, theme: 'mansion', tags: [], floors: 1 });
+    const features = Object.values(partsOf(model).parts.scene.mapFeatures ?? {});
+    const typed = new Set(model.floors[0]!.rooms.flatMap(room => (room.type ? [nameOf(room.type)] : [])));
+    const lastLabel = features.map(feature => typed.has(feature.name)).lastIndexOf(true);
+    expect(features.slice(0, lastLabel + 1).every(feature => typed.has(feature.name))).toBe(true);
+  });
+
+  it('heads a room\'s note by its type', () => {
+    const model = generateDungeon({ seed: 21, theme: 'fortress', tags: [], floors: 2 });
+    const keyed = model.floors.flatMap((_, index) => keyedRooms(visibleFloor(model, DEFAULT_VIEW, index), model.floors.length));
+    expect(keyed.some(({ heading }) => heading.endsWith('Boss room'))).toBe(true);
+    for (const { room, key, heading } of keyed) {
+      const type = nameOf(room.type!);
+      expect(heading).toBe(room.boss ? `${key} · ${type}, Boss room` : `${key} · ${type}`);
+    }
   });
 });
