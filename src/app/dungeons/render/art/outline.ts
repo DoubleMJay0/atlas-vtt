@@ -13,14 +13,14 @@ export function traceRings(path: CanvasPath, rings: readonly (readonly Vec[])[])
   for (const ring of rings) polyPath(ring)(path);
 }
 
-/** Clips to everything but the ground just beyond each way in, where no wall stands. */
-export function clipOutsideMouths(scene: ArtScene, ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D = scene.env.ctx): void {
+/** Clips to everything but the ground just beyond each way in, where no wall stands: as deep as what the caller draws reaches past the floor's edge, `reach` cells. */
+export function clipOutsideMouths(scene: ArtScene, reach: number, ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D = scene.env.ctx): void {
   const mouths = mouthsOf(scene.env.dungeon);
   if (mouths.length === 0) return;
   const g = scene.grid;
   ctx.beginPath();
   ctx.rect(g.x0, g.y0, g.w / g.res, g.h / g.res);
-  for (const mouth of mouths) polyPath(mouthClearing(mouth))(ctx);
+  for (const mouth of mouths) polyPath(mouthClearing(mouth, reach))(ctx);
   ctx.clip('evenodd');
 }
 

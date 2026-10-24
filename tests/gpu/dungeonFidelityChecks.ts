@@ -32,7 +32,7 @@ export function inkMask(picture: Picture, ink: Rgb): Uint8Array {
   return mask;
 }
 
-function nearestInk(mask: Uint8Array, picture: Picture, p: Point, reach: number): number {
+export function nearestInk(mask: Uint8Array, picture: Picture, p: Point, reach: number): number {
   let best = Infinity;
   const cx = Math.round(p.x);
   const cy = Math.round(p.y);

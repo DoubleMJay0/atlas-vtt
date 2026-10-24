@@ -15,7 +15,7 @@ export function drawWalls(scene: ArtScene, pens: Pens): void {
   const { ctx, style } = scene.env;
   const width = CUT.width(style);
   ctx.save();
-  clipOutsideMouths(scene);
+  clipOutsideMouths(scene, width + CUT.gap + CUT.thin);
   ctx.strokeStyle = pens.ink;
   ctx.lineJoin = 'miter';
   ctx.beginPath();

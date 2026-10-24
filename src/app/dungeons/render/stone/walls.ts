@@ -22,7 +22,7 @@ export function drawWallBand(scene: ArtScene, c: StoneColours): void {
   const seed = dungeon.model.seed;
   const outer = grownRings(scene, BAND);
   ctx.save();
-  clipOutsideMouths(scene);
+  clipOutsideMouths(scene, BAND);
   ctx.beginPath();
   traceRings(ctx, outer);
   traceRings(ctx, scene.floorRings);
@@ -37,7 +37,7 @@ export function drawWallBand(scene: ArtScene, c: StoneColours): void {
   litEdges(scene, c, outer);
   ctx.restore();
   ctx.save();
-  clipOutsideMouths(scene);
+  clipOutsideMouths(scene, BAND + 0.01);
   ctx.beginPath();
   traceRings(ctx, outer);
   ctx.strokeStyle = withAlpha(c.dark ? '#000000' : c.line, c.dark ? 0.55 : 0.4);
@@ -112,7 +112,7 @@ export function drawWallEdge(scene: ArtScene, c: StoneColours): void {
   const { ctx, style } = scene.env;
   const ink = wallInkWidth(style);
   ctx.save();
-  clipOutsideMouths(scene);
+  clipOutsideMouths(scene, ink + 0.02);
   ctx.beginPath();
   traceRings(ctx, grownRings(scene, ink + 0.02));
   traceRings(ctx, scene.floorRings);

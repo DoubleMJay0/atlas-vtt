@@ -1,15 +1,12 @@
-import { mouthsOf, type Mouth } from './art/mouths';
+import { mouthLane, mouthsOf, type Mouth } from './art/mouths';
 import { drawBricks } from './bricks';
 import { drawDots } from './dots';
-import { traceShapes, tracePolygon, type Vec } from './geometry';
+import { traceShapes, tracePolygon } from './geometry';
 import { drawHatching } from './hatching';
 import { narrowPockets } from './pockets';
 import { withAlpha } from './palette';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 import { drawStonework } from './stonework';
-
-/** How far the rock stays parted in front of an entrance, and how much wider than its passage, in cells. */
-const LANE = { length: 3.2, margin: 0.2 };
 
 /**
  * The rock round the walls, in the look's mode (`DungeonSurround.mode`), under the walls and the
@@ -76,23 +73,13 @@ function fillPockets(env: RenderEnv): void {
   ctx.restore();
 }
 
-/** Keeps drawing out of the lane before each entrance: a strip as long as `LANE` and a little wider than the passage. */
+/** Keeps drawing out of the lane before each entrance: its lane (`mouthLane`). */
 function clipLanes(env: RenderEnv, mouths: readonly Mouth[]): void {
   if (mouths.length === 0) return;
   const { ctx, dungeon } = env;
   const b = dungeon.bounds;
   ctx.beginPath();
   ctx.rect(b.minX - 10, b.minY - 10, b.maxX - b.minX + 20, b.maxY - b.minY + 20);
-  for (const { at, out, width } of mouths) {
-    const half = width / 2 + LANE.margin;
-    const across: Vec = { x: -out.y * half, y: out.x * half };
-    const far: Vec = { x: at.x + out.x * LANE.length, y: at.y + out.y * LANE.length };
-    tracePolygon(ctx, [
-      { x: at.x + across.x, y: at.y + across.y },
-      { x: far.x + across.x, y: far.y + across.y },
-      { x: far.x - across.x, y: far.y - across.y },
-      { x: at.x - across.x, y: at.y - across.y },
-    ]);
-  }
+  for (const mouth of mouths) tracePolygon(ctx, mouthLane(mouth));
   ctx.clip('evenodd');
 }

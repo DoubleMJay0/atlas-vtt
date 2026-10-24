@@ -1,4 +1,4 @@
-import { traceShapes, type Canvas2D, type FloorShape, type Vec } from '../geometry';
+import { pointInPolygon, tracePolygon, traceShapes, type Canvas2D, type FloorShape, type Vec } from '../geometry';
 import type { Grid } from './raster';
 
 /** Something that stands on the floor: its footprint and its height (a wall's is 1). */
@@ -22,14 +22,15 @@ const grey = (h: number): string => {
 
 /**
  * Rasterises the relief on a canvas the grid's size: heights in red (whatever lies outside the
- * floors is rock, as tall as a wall), pockets in green. Without a canvas (outside a browser) the
- * floors alone, from the field.
+ * floors is rock, as tall as a wall, but the open ground before each way in), pockets in green.
+ * Without a canvas (outside a browser) the floors and open ground alone, from the field.
  */
-export function rasterRelief(grid: Grid, floors: readonly FloorShape[], pockets: readonly (readonly Vec[])[], stands: readonly Stand[], outside: (x: number, y: number) => boolean): Relief {
+export function rasterRelief(grid: Grid, floors: readonly FloorShape[], open: readonly (readonly Vec[])[], pockets: readonly (readonly Vec[])[], stands: readonly Stand[], outside: (x: number, y: number) => boolean): Relief {
   const size = grid.w * grid.h;
   if (typeof OffscreenCanvas === 'undefined') {
     const heights = new Float32Array(size);
-    for (let j = 0; j < grid.h; j++) for (let i = 0; i < grid.w; i++) heights[j * grid.w + i] = outside(grid.x0 + (i + 0.5) / grid.res, grid.y0 + (j + 0.5) / grid.res) ? 1 : 0;
+    const rock = (x: number, y: number): boolean => outside(x, y) && !open.some(ring => pointInPolygon(ring, x, y));
+    for (let j = 0; j < grid.h; j++) for (let i = 0; i < grid.w; i++) heights[j * grid.w + i] = rock(grid.x0 + (i + 0.5) / grid.res, grid.y0 + (j + 0.5) / grid.res) ? 1 : 0;
     return { heights, pocket: new Float32Array(size) };
   }
   const canvas = new OffscreenCanvas(grid.w, grid.h);
@@ -41,6 +42,11 @@ export function rasterRelief(grid: Grid, floors: readonly FloorShape[], pockets:
   traceShapes(ctx, floors);
   ctx.fillStyle = '#000000';
   ctx.fill();
+  for (const ring of open) {
+    ctx.beginPath();
+    tracePolygon(ctx, ring);
+    ctx.fill();
+  }
   ctx.globalCompositeOperation = 'lighten';
   for (const stand of [...stands].sort((a, b) => a.height - b.height)) {
     ctx.beginPath();

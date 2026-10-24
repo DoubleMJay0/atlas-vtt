@@ -3,6 +3,7 @@ import { shapeRings, type FloorShape, type Vec } from '../geometry';
 import { narrowPockets } from '../pockets';
 import type { RenderEnv } from '../renderEnv';
 import { rasterRelief, type Stand } from './heights';
+import { mouthLane, mouthsOf } from './mouths';
 import { SHADOW_DIR, WALL_SHADOW } from './light';
 import { blurField, fieldOf, gridOver, sampleField, type Grid } from './raster';
 import type { LayerTarget } from './strips';
@@ -71,7 +72,9 @@ export function buildArtScene(env: RenderEnv, frame: ArtFrame, stands: readonly 
   const sdfGrid = gridOver(b.minX, b.minY, b.maxX, b.maxY, res / 2);
   const sdf = fieldOf(sdfGrid, (x, y) => dungeon.field.distance(x, y));
   const pockets = narrowPockets(dungeon, env.style.surround.reach).map(p => p.ring);
-  const relief = rasterRelief(grid, floors, pockets, stands, (x, y) => dungeon.field.distance(x, y) > 0);
+  // The ground before a way in is open, not rock: no wall's shadow falls across a mouth.
+  const open = mouthsOf(dungeon).map(mouthLane);
+  const relief = rasterRelief(grid, floors, open, pockets, stands, (x, y) => dungeon.field.distance(x, y) > 0);
   const shadow = env.view.shadow ? castShadow(grid, relief.heights) : new Float32Array(relief.heights.length);
   const occlusion = occlusionOf(grid, relief.heights);
   return {

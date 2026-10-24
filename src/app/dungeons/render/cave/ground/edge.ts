@@ -19,8 +19,14 @@ interface Lip {
   hachures: Vec[][];
 }
 
+const LIP = { least: 0.08, more: 0.12 };
+/** How far the rock lip and its strokes reach past the floor's edge at most, in cells. */
+const LIP_REACH = LIP.least + LIP.more + 0.02;
+/** How far an engraved cave's lip lines and wall ink reach past the floor's edge, in cells. */
+const ENGRAVED_REACH = 0.23;
+
 function lipWidth(p: Vec, seed: number): number {
-  return 0.08 + valueNoise(p.x * 2.1, p.y * 2.1, seed + 21) * 0.12;
+  return LIP.least + valueNoise(p.x * 2.1, p.y * 2.1, seed + 21) * LIP.more;
 }
 
 /** A varying rock lip outside the unchanged floor boundary; no dressed blocks or radial joints. */
@@ -76,7 +82,7 @@ export function stoneEdge(scene: ArtScene, c: StoneColours): void {
   const { ctx } = scene.env;
   const lip = rockLip(scene);
   ctx.save();
-  clipOutsideMouths(scene);
+  clipOutsideMouths(scene, LIP_REACH);
   ctx.beginPath();
   traceRings(ctx, lip.outer);
   traceRings(ctx, scene.floorRings);
@@ -100,9 +106,9 @@ export function engravedEdge(scene: ArtScene, pens: Pens): void {
   const lip = rockLip(scene);
   const width = wallInkWidth(style);
   ctx.save();
-  clipOutsideMouths(scene);
+  clipOutsideMouths(scene, ENGRAVED_REACH);
   ctx.beginPath();
-  traceRings(ctx, grownRings(scene, 0.23));
+  traceRings(ctx, grownRings(scene, ENGRAVED_REACH));
   traceRings(ctx, scene.floorRings);
   ctx.clip('evenodd');
   stroke(scene, lip.ledges, withAlpha(pens.ink, 0.65), 0.009);
