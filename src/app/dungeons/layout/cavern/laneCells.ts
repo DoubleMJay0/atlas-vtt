@@ -4,8 +4,8 @@
  * walls, where no other room's rectangle is near).
  */
 
-import { type StairSpot, spotRect } from '../../floors/stairSpots';
-import { type CellRect, cellKey, cellsOf, doorCells, inRect, wallRect } from '../../geometry';
+import { type StairSpot, approachCells, spotRect } from '../../floors/stairSpots';
+import { type CellRect, cellKey, cellsOf, doorCells, floorRect, inRect, wallRect } from '../../geometry';
 import type { CellPoint, DungeonDoor, DungeonRoom } from '../../model';
 import { type CaveFloorPlan, type CaveGrid, ROCK, doorOwner } from './caveGrid';
 
@@ -28,6 +28,15 @@ export function inTunnelReach(floor: Pick<CaveFloorPlan, 'rooms' | 'doors'>, roo
  */
 export function besideEntrance(doors: readonly DungeonDoor[], x: number, y: number): boolean {
   return doors.some((door) => door.from === null && doorCells(door).some((c) => Math.abs(c.x - x) <= 1 && Math.abs(c.y - y) <= 1));
+}
+
+/** How far past its rectangle a chamber may swell, in cells. */
+export const CHAMBER_SWELL = 2;
+
+/** How many cells the cell lies past the room's rectangle, 0 inside it. */
+export function swellDistance(room: DungeonRoom, x: number, y: number): number {
+  const r = floorRect(room);
+  return Math.max(r.x0 - x, x - r.x1, r.y0 - y, y - r.y1, 0);
 }
 
 /** How far past its walls a tunnel may wind, in cells. */
@@ -60,24 +69,35 @@ function besideDoor(floor: Pick<CaveFloorPlan, 'doors'>, doors: readonly number[
 /** Whose a lane cell would be, or null where the lane may not go: off the route, on a stairwell other than `ends`', or `banned`. */
 export type LaneOwner = (x: number, y: number) => number | null;
 
-export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], ends: readonly ReadonlySet<string>[], banned: ReadonlySet<string> = new Set(), lane?: ReadonlySet<string>): LaneOwner {
+/**
+ * Whose a lane cell would be. With `swell`, a chamber's lane may also wind out into the rock its
+ * chamber may swell into, and keeps off the rows every stairwell but its own ends is reached from.
+ */
+export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], ends: readonly ReadonlySet<string>[], banned: ReadonlySet<string> = new Set(), lane?: ReadonlySet<string>, swell = false): LaneOwner {
   const onRoute = new Set(route);
   const laneDoors = laneDoorsOf(floor, route);
-  const stairCells = new Set(floor.stairs.flatMap((s: StairSpot) => cellsOf(spotRect(s))).map((c) => cellKey(c.x, c.y)));
-  const tunnels = route.map((id) => floor.rooms[id]).filter((room): room is DungeonRoom => room !== undefined && room.kind !== 'room');
+  const stairCells = new Set(floor.stairs.flatMap((s: StairSpot) => [...cellsOf(spotRect(s)), ...(swell ? [...approachCells(s, 'upper'), ...approachCells(s, 'lower')] : [])]).map((c) => cellKey(c.x, c.y)));
+  const routeRooms = route.map((id) => floor.rooms[id]).filter((room): room is DungeonRoom => room !== undefined);
+  const tunnels = routeRooms.filter((room) => room.kind !== 'room');
+  const chambers = routeRooms.filter((room) => room.kind === 'room');
   const memo = new Map<string, number | null>();
   const ownerOf = (x: number, y: number, key: string): number | null => {
-    if (banned.has(key) || (stairCells.has(key) && !ends.some((end) => end.has(key)))) return null;
+    if (stairCells.has(key) && !ends.some((end) => end.has(key))) return null;
     const envelope = grid.envelope(x, y);
     if (envelope !== ROCK) return onRoute.has(envelope) ? envelope : null;
     const owner = grid.owner(x, y);
     if (owner !== ROCK) return laneDoors.some((k) => owner === doorOwner(k)) ? owner : null;
     const beside = besideDoor(floor, laneDoors, x, y, (k) => lane?.has(cellKey(floor.doors[k]!.x, floor.doors[k]!.y)) ?? true);
     if (beside !== undefined) return grid.mayClaim(x, y, doorOwner(beside)) ? doorOwner(beside) : null;
-    return tunnels.find((room) => inTunnelReach(floor, room, x, y) && grid.mayClaim(x, y, room.id))?.id ?? null;
+    const tunnel = tunnels.find((room) => inTunnelReach(floor, room, x, y) && grid.mayClaim(x, y, room.id));
+    if (tunnel || !swell) return tunnel?.id ?? null;
+    const near = chambers.filter((room) => swellDistance(room, x, y) <= CHAMBER_SWELL);
+    return near.length === 0 || besideEntrance(floor.doors, x, y) ? null : (near.find((room) => grid.mayClaim(x, y, room.id))?.id ?? null);
   };
   return (x, y) => {
     const key = cellKey(x, y);
+    // Read anew each time: a lane that is found again bans more cells.
+    if (banned.has(key)) return null;
     let owner = memo.get(key);
     if (owner === undefined) {
       owner = ownerOf(x, y, key);
@@ -138,9 +158,9 @@ export function crossingConflict(grid: CaveGrid, floor: CaveFloorPlan, route: re
 }
 
 /** Gives every lane cell its owner for good, as `laneOwners` read them before anything was claimed. */
-export function claimLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], lane: readonly CellPoint[]): void {
+export function claimLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], lane: readonly CellPoint[], swell = false): void {
   const keys = new Set(lane.map((c) => cellKey(c.x, c.y)));
-  const owners = laneOwners(grid, floor, route, [keys], new Set(), keys);
+  const owners = laneOwners(grid, floor, route, [keys], new Set(), keys, swell);
   const given = lane.map((c) => [c, owners(c.x, c.y)] as const);
   for (const [c, owner] of given) if (owner !== null) grid.require(owner, [c]);
 }

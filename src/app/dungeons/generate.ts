@@ -28,7 +28,7 @@ import { pickTheme, themeOf, themedTags } from './themes/themes';
 import type { ThemeId } from './themes/themeTypes';
 import { typeDungeon } from './themes/typeDungeon';
 import { themeWater, type ThemeWater } from './themes/themeWater';
-import { chooseWaterLevel, drainCells, placeWater, poolRooms } from './water';
+import { ROUND_SHORE, chooseWaterLevel, drainCells, placeWater, poolRooms } from './water';
 
 interface FloorParts {
   planned: PlannedFloor;
@@ -71,7 +71,7 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const wet = cave && caveWater(cave, rooms, terrain.pieces);
   const pools = dry ? new Set<number>() : (wet?.pools ?? poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool));
   const kept = [...terrain.takenCells(), ...terrain.propCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
-  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms }) });
+  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms, shoreCorners: ROUND_SHORE }) });
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
   // A cave's life keeps to its zones: daylight by the mouth, fungi by water and roosts, nothing where lava runs.

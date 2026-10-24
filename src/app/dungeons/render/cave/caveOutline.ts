@@ -11,6 +11,7 @@ import type { CellPoint } from '../../model';
 import { traceLoops } from '../../water/contour';
 import { type CellGrid, WET } from '../../water/wetGrid';
 import { type FloorShape, type Vec, polysOf } from '../geometry';
+import { simplifyRing } from '../simplifyRing';
 import { faultless, outlineFaults } from './outlineGuard';
 import { outlineRelief, type Relief } from './outlineRelief';
 
@@ -30,6 +31,8 @@ const FADE = 1;
 /** How many times a misdrawn stretch is eased back, by this much each time, before it keeps to its cells. */
 const EASINGS = 8;
 const EASE = 0.6;
+/** How far the drawn ring may stray from the rounded one when it drops corners, in cells: far below a pixel at any zoom. */
+const SIMPLIFY = 0.01;
 /** Corners either side of a fault that are eased with it. */
 const EASE_REACH = 2;
 
@@ -245,6 +248,12 @@ function ease(walks: readonly Walk[], rounded: readonly Vec[][], origins: readon
   return true;
 }
 
+/** The rings with the corners they hardly bend at left out, where that leaves them as true to their cells. */
+function fewerCorners(rings: readonly Vec[][], cells: Cells): Vec[][] {
+  const fewer = rings.map((ring) => simplifyRing(ring, SIMPLIFY));
+  return faultless(outlineFaults(fewer, cells.floor, cells.box, cells.kept)) ? fewer : [...rings];
+}
+
 /**
  * The traced, smoothed outline of the cells `isFloor` names in `box`, one poly per piece with its
  * holes. No wall enters the middle `CELL_CORE` of a cell `kept` names.
@@ -262,7 +271,7 @@ export function caveOutline(seed: number, floor: number, isFloor: IsFloor, box: 
   const draw = (): Vec[][] => walks.map((walk) => cutCorners(placed(walk), walk.held));
   let rounded = draw();
   for (let round = 0; round <= EASINGS; round++) {
-    if (!ease(walks, rounded, walks.map((walk) => roundedOrigins(walk.held)), cells, round === EASINGS)) return polysOf(rounded);
+    if (!ease(walks, rounded, walks.map((walk) => roundedOrigins(walk.held)), cells, round === EASINGS)) return polysOf(fewerCorners(rounded, cells));
     rounded = draw();
   }
   // Held to their cell edges where faults remained; should any be left, the cells' own outline.

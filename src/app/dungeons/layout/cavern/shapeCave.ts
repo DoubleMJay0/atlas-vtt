@@ -6,7 +6,7 @@
 
 import type { PlannedFloor } from '../../floors/planFloors';
 import { cellKey } from '../../geometry';
-import type { CaveFloor, CaveModel, DungeonRoom } from '../../model';
+import type { CaveFloor, CaveModel, CellPoint, DungeonRoom } from '../../model';
 import type { DungeonParams } from '../../params';
 import { floorStream, stream } from '../../rng';
 import { CaveGrid } from './caveGrid';
@@ -18,9 +18,10 @@ import { faultDirections, faultLines } from './faults';
 import { repairGuards } from './guards';
 import { basinCount, caveHeights, hydrology, lowRooms, springByTheMouth } from './hydrology';
 import { caveSites } from './caveSites';
-import { claimLane, laneEnds, mainRoute, wideLane } from './mainPath';
+import { type LaneWay, claimLane, laneEnds, mainRoute, wideLane, windingWay } from './mainPath';
 import { stairWays } from './stairWays';
 import { carveTunnel, shapeDoors, tunnelEnds } from './tunnels';
+import { warpCave } from './caveWarp';
 
 export interface ShapedCaves {
   floors: PlannedFloor[];
@@ -83,6 +84,25 @@ function basinsPerFloor(floors: readonly PlannedFloor[], level: number, dry: boo
   return out;
 }
 
+/**
+ * The floor's grid with its lane claimed and every chamber's core kept: a winding lane where one
+ * fits and leaves every chamber its core, else the plain one the layout made sure of.
+ */
+function laneGrid(seed: number, index: number, floor: PlannedFloor, boss: boolean, count: number): { grid: CaveGrid; lane: CellPoint[] } {
+  const [from, to] = laneEnds(index, count, floor, boss);
+  const route = mainRoute(floor, from, to);
+  const laid = (way?: LaneWay): { grid: CaveGrid; lane: CellPoint[] | null; cores: boolean } => {
+    const grid = new CaveGrid(floor, index);
+    const lane = wideLane(grid, floor, route, from, to, way);
+    if (lane) claimLane(grid, floor, route, lane, way?.swell);
+    return { grid, lane, cores: lane !== null && reserveCores(grid, floor.rooms) };
+  };
+  const winding = laid(windingWay(floorStream(seed, 'cave', index, 'lane')));
+  if (winding.cores) return { grid: winding.grid, lane: winding.lane! };
+  const plain = laid();
+  return { grid: plain.grid, lane: plain.lane ?? [] };
+}
+
 interface FloorShaping {
   seed: number;
   shaping: CaveShaping;
@@ -94,16 +114,12 @@ interface FloorShaping {
 function shapeFloor(how: FloorShaping, floors: readonly PlannedFloor[], index: number): PlannedFloor {
   const { seed, shaping, faults, boss } = how;
   const floor = floors[index]!;
-  const grid = new CaveGrid(floor, index);
-  const [from, to] = laneEnds(index, floors.length, floor, boss);
-  const route = mainRoute(floor, from, to);
-  const lane = wideLane(grid, floor, route, from, to) ?? [];
-  claimLane(grid, floor, route, lane);
-  reserveCores(grid, floor.rooms);
+  const { grid, lane } = laneGrid(seed, index, floor, boss, floors.length);
   const laneKeys = new Set(lane.map((c) => cellKey(c.x, c.y)));
   const fields = shapeChambers(seed, index, shaping, faults, floor, grid, laneKeys);
   shapeTunnels(seed, index, shaping, floor, grid, laneKeys);
   swellRooms(seed, index, floor, grid, fields);
+  warpCave(floorStream(seed, 'cave', index, 'warp'), grid, floor, faults);
   const doors = shapeDoors(floor.doors, laneKeys, grid);
   const left = repairGuards(grid, { ...floor, doors }, lane);
   if (left.length > 0) console.debug(`[Atlas] cave floor ${index} of seed ${seed} keeps ${left.length} token-fit problems`, left.map((p) => p.kind));

@@ -8,6 +8,7 @@
 import type { PlannedFloor } from '../../floors/planFloors';
 import { cellKey, cellsOf, floorRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
+import { mayWiden } from './bulges';
 import { type CaveGrid, NEAR4, ROCK, doorOwner, unkey } from './caveGrid';
 
 export type GuardKind = 'thin' | 'corner' | 'no-block' | 'lane';
@@ -80,6 +81,13 @@ function giveBack(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
   return true;
 }
 
+/** Gives a room a rock cell past its rectangle where it may swell into it. */
+function swellBack(grid: CaveGrid, floor: PlannedFloor, room: DungeonRoom, c: CellPoint): boolean {
+  if (grid.owner(c.x, c.y) !== ROCK || !mayWiden(grid, floor, room, c)) return false;
+  grid.claim(c.x, c.y, room.id);
+  return true;
+}
+
 /** Completes the 3 × 3 block of the room's rectangle that lacks the fewest cells it may take. */
 function completeBlock(grid: CaveGrid, room: DungeonRoom): void {
   const r = floorRect(room);
@@ -93,8 +101,28 @@ function completeBlock(grid: CaveGrid, room: DungeonRoom): void {
   for (const c of best ?? []) grid.claim(c.x, c.y, room.id);
 }
 
+/**
+ * Whether the room's side neighbours of `c` join each other round it, each pair beside one corner
+ * through that corner: then taking `c` parts nothing, wherever the rest of the room lies.
+ */
+function joinedRound(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
+  const own = (dx: number, dy: number): boolean => grid.holds(c.x + dx, c.y + dy, room.id);
+  // The side neighbours in turn round the cell, each with the corner before the next.
+  const ring: readonly (readonly [number, number])[] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const sides = ring.map(([dx, dy]) => own(dx, dy));
+  if (sides.filter(Boolean).length === 0) return false;
+  let gaps = 0;
+  for (let k = 0; k < 4; k++) {
+    const [ax, ay] = ring[k]!;
+    const [bx, by] = ring[(k + 1) % 4]!;
+    if (sides[k] && !(sides[(k + 1) % 4] && own(ax + bx, ay + by))) gaps++;
+  }
+  return gaps <= 1;
+}
+
 /** Whether the room's cells stay one piece without `c`. */
-function wholeWithout(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
+export function wholeWithout(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
+  if (joinedRound(grid, room, c)) return true;
   const cells = grid.cellsOf(room.id).filter((d) => d.x !== c.x || d.y !== c.y);
   if (cells.length === 0) return false;
   const keys = new Set(cells.map((d) => cellKey(d.x, d.y)));
@@ -123,7 +151,8 @@ function repairThin(grid: CaveGrid, floor: PlannedFloor, room: DungeonRoom, at: 
   const isFloor = floorAt(grid, floor);
   const beside = NEAR4.map(([dx, dy]) => ({ x: at.x + dx, y: at.y + dy }));
   const held = (c: CellPoint): boolean => NEAR4.filter(([dx, dy]) => isFloor(c.x + dx, c.y + dy)).length >= 2;
-  const widen = (): boolean => beside.some((c) => held(c) && giveBack(grid, room, c));
+  // Back into its rectangle, else out into rock it may swell into.
+  const widen = (): boolean => beside.some((c) => held(c) && (giveBack(grid, room, c) || swellBack(grid, floor, room, c)));
   if (widen()) return;
   if (!grid.required(room.id).has(cellKey(at.x, at.y))) {
     if (wholeWithout(grid, room, at)) grid.release(at.x, at.y);

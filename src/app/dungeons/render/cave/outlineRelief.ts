@@ -22,7 +22,8 @@ const LEAN = 0.08;
 const SWAY = { period: 3.6, amount: 0.4 };
 /** Each finer scale: its period and how strongly it pushes the wall out or in. */
 const SCALES: readonly { period: number; octaves: number; amount: number }[] = [
-  { period: 1.3, octaves: 1, amount: 0.3 },
+  { period: 2.6, octaves: 1, amount: 0.6 },
+  { period: 1.3, octaves: 1, amount: 0.4 },
   { period: 0.55, octaves: 2, amount: 0.1 },
 ];
 /** Spurs and recesses: one may stand in each square of this side, this often, this far out and this wide. */

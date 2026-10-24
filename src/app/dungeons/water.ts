@@ -27,7 +27,12 @@ export interface WaterRequest {
   dry?: ReadonlySet<string>;
   /** Only these rooms take water from the level (a cave's basins and the rooms its streams run through); unset, every room. */
   rooms?: ReadonlySet<number>;
+  /** The fewest corners a shoreline has, so a pool of one cell is drawn round (a cave's); unset, three. */
+  shoreCorners?: number;
 }
+
+/** Enough corners for a pool of one cell to be drawn round. */
+export const ROUND_SHORE = 8;
 
 /**
  * Water gathers where the floor falls away: in rooms steps lead down into, and in dead ends; only
@@ -91,9 +96,9 @@ function poolIn(room: DungeonRoom, grid: CellGrid, wet: Uint8Array): void {
   }
 }
 
-function shoreline(rng: Rng, loop: readonly CellPoint[]): CellPoint[] {
+function shoreline(rng: Rng, loop: readonly CellPoint[], least?: number): CellPoint[] {
   const rough = resample(jitter(rng, loop, 0.3), 1);
-  return wobble(rng, resample(chaikin(rough, 2), 0.5), 0.3);
+  return wobble(rng, resample(chaikin(rough, 2), 0.5, least), 0.3);
 }
 
 export function placeWater(seed: number, floor: number, rooms: readonly DungeonRoom[], request: WaterRequest): WaterResult {
@@ -118,6 +123,6 @@ export function placeWater(seed: number, floor: number, rooms: readonly DungeonR
   const wet = wetGrid(grid, floorMarks(grid, rooms), wetFloor, keepDry);
   const waterCells = floors.filter((c) => wet[indexOf(grid, c.x, c.y)] === WET);
   if (waterCells.length === 0) return { water: [], waterCells: [] };
-  const water = traceLoops(grid, wet).map((loop) => ({ outline: shoreline(rng, loop) }));
+  const water = traceLoops(grid, wet).map((loop) => ({ outline: shoreline(rng, loop, request.shoreCorners) }));
   return { water, waterCells };
 }

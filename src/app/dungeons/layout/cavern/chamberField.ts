@@ -33,7 +33,7 @@ const NOISE_PERIOD = 3.5;
 const OUTSIDE_FALL = 0.2;
 
 /** The fault the room runs along best: the one nearest its own long side. */
-function roomFault(room: DungeonRoom, faults: readonly number[]): number {
+export function roomFault(room: DungeonRoom, faults: readonly number[]): number {
   const long = room.w >= room.h ? 0 : Math.PI / 2;
   return faults.reduce((best, f) => (Math.abs(Math.cos(f - long)) > Math.abs(Math.cos(best - long)) ? f : best), faults[0] ?? long);
 }
