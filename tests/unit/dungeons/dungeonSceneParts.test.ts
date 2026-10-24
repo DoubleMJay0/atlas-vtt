@@ -312,7 +312,7 @@ describe('cell outlines', () => {
 
 describe('vegetation in the scene', () => {
   it('names undergrowth as difficult terrain and climbers on the cells they hang over, under everything else, and lists what grows in the note', () => {
-    const model = generateDungeon({ seed: 16, theme: 'mansion', tags: ['overgrown', 'ruined'], floors: 1 });
+    const model = generateDungeon({ seed: 3, theme: 'mansion', tags: ['overgrown', 'ruined'], floors: 1 });
     const floor = model.floors[0]!;
     const { parts } = partsOf(model);
     const features = Object.values(parts.scene.mapFeatures ?? {});
