@@ -1,4 +1,4 @@
-import { cellKey, doorCells, floorCellsOf } from '../../../../src/app/dungeons/geometry';
+import { cellKey, doorCells, roomArea } from '../../../../src/app/dungeons/geometry';
 import { floorBelow, levelOf, stackOf } from '../../../../src/app/dungeons/floors/floorStack';
 import type { CellDir, DungeonDoor, DungeonFloor, DungeonModel, DungeonRoom, DungeonWindow } from '../../../../src/app/dungeons/model';
 import { SIDES, houseKeys, owners } from './houseCells';
@@ -14,7 +14,12 @@ const GREAT = new Set(['ballroom', 'portrait-gallery', 'drawing-room', 'saloon',
 const SMALL_AREA = 8;
 
 const keyOf = (w: Pick<DungeonWindow, 'x' | 'y' | 'dir'>): string => `${cellKey(w.x, w.y)}>${w.dir.x},${w.dir.y}`;
-export const area = (room: DungeonRoom): number => floorCellsOf(room).length;
+/** The edge a key names, back from `keyOf`. */
+function edgeOf(key: string): Pick<DungeonWindow, 'x' | 'y' | 'dir'> {
+  const [x, y, dx, dy] = key.split(/[,>]/).map(Number) as [number, number, number, number];
+  return { x, y, dir: { x: dx, y: dy } as CellDir };
+}
+export const area = roomArea;
 const along = (dir: CellDir): CellDir => ({ x: dir.y === 0 ? 0 : 1, y: dir.y === 0 ? 1 : 0 }) as CellDir;
 
 /** Whether a room is too small or too humble for more than one window: a closet, a bathroom, a servery, a room of eight cells and less or two cells wide. */
@@ -22,7 +27,7 @@ export const isSmallRoom = (room: DungeonRoom): boolean => CLOSETS.has(room.type
 export const isStore = (room: DungeonRoom): boolean => STORES.has(room.type ?? '');
 const isStairHall = (room: DungeonRoom): boolean => room.type === 'staircase-hall';
 /** A main room: lived in, lit by right (not a corridor, stair hall, store or closet). */
-export const isMainRoom = (room: DungeonRoom): boolean => room.kind === 'room' && !isStore(room) && !isSmallRoom(room) && !isStairHall(room);
+const isMainRoom = (room: DungeonRoom): boolean => room.kind === 'room' && !isStore(room) && !isSmallRoom(room) && !isStairHall(room);
 
 /** Every edge of a floor where a door stands, from either side. */
 function doorEdgeKeys(doors: readonly DungeonDoor[]): Set<string> {
@@ -61,10 +66,10 @@ function clearOfCorners(outer: ReadonlyMap<string, number>, edge: Pick<DungeonWi
   return null;
 }
 
-const windowsOf = (floor: DungeonFloor): DungeonWindow[] => floor.windows ?? [];
+export const windowsOf = (floor: DungeonFloor): DungeonWindow[] => floor.windows ?? [];
 
 /** The most windows a room may have on one wall `n` cells long: one per two cells beyond the corner cells, three at most (five in a great room). */
-export function windowCap(room: DungeonRoom, n: number): number {
+function windowCap(room: DungeonRoom, n: number): number {
   if (isStore(room)) return 0;
   if (isSmallRoom(room) || isStairHall(room)) return 1;
   return Math.max(1, Math.min(GREAT.has(room.type ?? '') ? 5 : 3, Math.ceil((n - 2) / 2)));
@@ -101,13 +106,7 @@ export const mainRoomsLit: Rule = (model) => {
     const outer = outerEdges(floor);
     return floor.rooms.flatMap((room) => {
       if (!isMainRoom(room) || windowsOf(floor).some((w) => w.room === room.id) || floor.doors.some((d) => d.from === null && d.to === room.id)) return [];
-      const walls = [...outer].filter(([, id]) => id === room.id).map(([key]) => key);
-      const long = walls.some((key) => {
-        const [cell, d] = key.split('>') as [string, string];
-        const [x, y] = cell.split(',').map(Number) as [number, number];
-        const [dx, dy] = d.split(',').map(Number) as [number, number];
-        return runThrough(outer, { x, y, dir: { x: dx, y: dy } as CellDir }, room.id).cells.length >= 3;
-      });
+      const long = [...outer].some(([key, id]) => id === room.id && runThrough(outer, edgeOf(key), id).cells.length >= 3);
       return long ? [`floor ${i}: ${room.type} ${room.id} has an outer wall and no window`] : [];
     });
   });
@@ -145,18 +144,13 @@ export const stairHallTall: Rule = (model) => {
   const stack = stackOf(model);
   return model.floors.flatMap((floor, i) => {
     const outer = outerEdges(floor);
+    const doors = doorEdgeKeys(floor.doors);
     const out: string[] = [];
     for (const w of windowsOf(floor)) if (w.size === 'tall' && !isStairHall(floor.rooms[w.room]!)) out.push(`floor ${i}: a tall window in ${floor.rooms[w.room]!.type}`);
     if (levelOf(stack, i) < 0) return out;
     for (const room of floor.rooms.filter(isStairHall)) {
       const own = windowsOf(floor).filter((w) => w.room === room.id);
-      const free = [...outer].some(([key, id]) => {
-        if (id !== room.id) return false;
-        const [cell, d] = key.split('>') as [string, string];
-        const [x, y] = cell.split(',').map(Number) as [number, number];
-        const [dx, dy] = d.split(',').map(Number) as [number, number];
-        return clearOfCorners(outer, { x, y, dir: { x: dx, y: dy } as CellDir }, id) === null && !doorEdgeKeys(floor.doors).has(key);
-      });
+      const free = [...outer].some(([key, id]) => id === room.id && takesWindow(outer, doors, key, id));
       if (free && (own.length !== 1 || own[0]!.size !== 'tall')) out.push(`floor ${i}: stair hall ${room.id} has ${own.length} windows, ${own.filter((w) => w.size === 'tall').length} tall`);
     }
     return out;
@@ -175,17 +169,17 @@ export const cellarWindows: Rule = (model) => {
       if (room.kind !== 'room' || isStore(room) || isStairHall(room)) out.push(`floor ${i}: cellar window in ${room.type ?? room.kind}`);
     }
     for (const room of floor.rooms) if (windowsOf(floor).filter((w) => w.room === room.id).length > 1) out.push(`floor ${i}: cellar room ${room.id} has more than one window`);
-    const lit = floor.rooms.filter((r) => r.kind === 'room' && !isStore(r) && !isStairHall(r) && [...outerEdges(floor)].some(([key, id]) => id === r.id && clearOf(floor, key, id)));
+    const outer = outerEdges(floor);
+    const doors = doorEdgeKeys(floor.doors);
+    const lit = floor.rooms.filter((r) => r.kind === 'room' && !isStore(r) && !isStairHall(r) && [...outer].some(([key, id]) => id === r.id && takesWindow(outer, doors, key, id)));
     if (lit.length > 0 && windowsOf(floor).length === 0) out.push(`floor ${i}: the cellar has no window`);
     return out;
   });
 };
 
-function clearOf(floor: DungeonFloor, key: string, id: number): boolean {
-  const [cell, d] = key.split('>') as [string, string];
-  const [x, y] = cell.split(',').map(Number) as [number, number];
-  const [dx, dy] = d.split(',').map(Number) as [number, number];
-  return clearOfCorners(outerEdges(floor), { x, y, dir: { x: dx, y: dy } as CellDir }, id) === null && !doorEdgeKeys(floor.doors).has(key);
+/** Whether the outer edge `key` of room `id` could hold a window: clear of corners, cross walls and doors. */
+function takesWindow(outer: ReadonlyMap<string, number>, doors: ReadonlySet<string>, key: string, id: number): boolean {
+  return clearOfCorners(outer, edgeOf(key), id) === null && !doors.has(key);
 }
 
 /** The line of the main front and its axis (twice the mirror's x) from the front door. */
@@ -215,6 +209,7 @@ export const frontMirrors = (isMirrored: (m: DungeonModel) => boolean): Rule => 
   return model.floors.flatMap((floor, i) => {
     if (levelOf(stack, i) < 0 || !floorMirrors(floor, axis2)) return [];
     const outer = outerEdges(floor);
+    const doors = doorEdgeKeys(floor.doors);
     const keys = new Set(windowsOf(floor).map(keyOf));
     return windowsOf(floor)
       .filter((w) => w.dir.x === dir.x && w.dir.y === dir.y && Math.abs(w.y - y) <= 1)
@@ -224,7 +219,7 @@ export const frontMirrors = (isMirrored: (m: DungeonModel) => boolean): Rule => 
         const lone = windowsOf(floor).filter((u) => u.room === w.room).length === 1;
         const id = outer.get(keyOf(twin));
         const room = id === undefined ? null : floor.rooms[id]!;
-        const refused = !room || room.kind !== 'room' || isStore(room) || (isSmallRoom(room) && windowsOf(floor).some((u) => u.room === id)) || clearOfCorners(outer, twin, id!) !== null || doorEdgeKeys(floor.doors).has(keyOf(twin));
+        const refused = !room || room.kind !== 'room' || isStore(room) || (isSmallRoom(room) && windowsOf(floor).some((u) => u.room === id)) || clearOfCorners(outer, twin, id!) !== null || doors.has(keyOf(twin));
         return lone && refused ? [] : [`floor ${i}: front window ${keyOf(w)} has no mirror`];
       });
   });

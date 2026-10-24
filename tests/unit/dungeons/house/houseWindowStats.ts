@@ -1,13 +1,11 @@
 import { levelOf, stackOf } from '../../../../src/app/dungeons/floors/floorStack';
 import type { DungeonModel } from '../../../../src/app/dungeons/model';
-import { area, floorMirrors, isStore, mainFront } from './houseWindowRules';
+import { area, floorMirrors, isStore, mainFront, windowsOf } from './houseWindowRules';
 
 /** The numbers of a house's windows, for the report 2026-10-25-mansion-windows-research (`VITE_WINDOW_STATS=print`). */
 
-const windowsOf = (floor: DungeonModel['floors'][number]): NonNullable<DungeonModel['floors'][number]['windows']> => floor.windows ?? [];
-
 /** The windows of every floor above ground on the main front's line, and how many have their mirror about the front door. */
-export function frontSymmetry(model: DungeonModel): { windows: number; mirrored: number } {
+function frontSymmetry(model: DungeonModel): { windows: number; mirrored: number } {
   const stack = stackOf(model);
   const { y, dir, axis2 } = mainFront(model);
   let windows = 0;

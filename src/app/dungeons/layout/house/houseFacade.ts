@@ -8,24 +8,21 @@
  */
 
 import type { CellDir, DungeonDoor } from '../../model';
-import { doorCells } from '../../geometry';
+import { dir, doorCells } from '../../geometry';
 import { type Rng, chance } from '../../rng';
 import { SIDES } from './houseEdges';
 
-/** Which cells along a wall carry a window: every `period`th on the side and back walls. `phase` is kept for the random stream and unused. */
-export interface FacadeGrid {
-  period: number;
-  phase: number;
-}
-
-/** A house's facade grid: a window every second or third cell. */
-export function facadeGrid(rng: Rng): FacadeGrid {
-  return { period: chance(rng, 0.5) ? 2 : 3, phase: rng() < 0.5 ? 0 : 1 };
+/** How many cells apart a house's side and back walls have their bays: two or three. */
+export function facadePeriod(rng: Rng): number {
+  const period = chance(rng, 0.5) ? 2 : 3;
+  // A draw that once chose the grid's phase, kept so the rest of the house stays the same.
+  rng();
+  return period;
 }
 
 /** The edges of a floor's entrances, from the cell inside, the way out. */
 export function entranceEdges(doors: readonly DungeonDoor[]): Edge[][] {
-  return doors.filter((d) => d.from === null).map((d) => doorCells(d).map((c) => ({ x: c.x + d.dir.x, y: c.y + d.dir.y, dir: { x: (0 - d.dir.x) as CellDir['x'], y: (0 - d.dir.y) as CellDir['y'] } })));
+  return doors.filter((d) => d.from === null).map((d) => doorCells(d).map((c) => ({ x: c.x + d.dir.x, y: c.y + d.dir.y, dir: dir(-d.dir.x, -d.dir.y) })));
 }
 
 /** An edge of a cell: the cell, and the way out of it. */
@@ -37,6 +34,8 @@ export interface Edge {
 
 interface FacadeLine {
   dir: CellDir;
+  /** Whether the line crosses the axis of a symmetric house, so its bays mirror about it. */
+  onAxis: boolean;
   /** The line's place across the wall (`y` of a horizontal wall, `x` of a vertical one), and its first and last cell along it. */
   at: number;
   from: number;
@@ -56,7 +55,7 @@ export interface Facade {
 /** A front that holds an entrance or mirrors about the axis has a bay every two cells, a window to a pier, as a Georgian front has. */
 const FRONT_PERIOD = 2;
 
-export const acrossOf = (e: Edge): number => (e.dir.y !== 0 ? e.y : e.x);
+const acrossOf = (e: Edge): number => (e.dir.y !== 0 ? e.y : e.x);
 export const alongEdge = (e: Edge): number => (e.dir.y !== 0 ? e.x : e.y);
 
 /**
@@ -87,19 +86,22 @@ export interface FacadeInput {
   cells: readonly { x: number; y: number }[];
   /** The ground floor's entrances: their inside cells and the way out. */
   entrances: readonly Edge[][];
-  grid: FacadeGrid;
+  period: number;
 }
 
+const sameDir = (a: CellDir, b: CellDir): boolean => a.x === b.x && a.y === b.y;
+/** Whether an entrance edge stands on `line`. */
+const onLine = (c: Edge, line: Omit<FacadeLine, 'bay'>): boolean => sameDir(c.dir, line.dir) && acrossOf(c) === line.at && alongEdge(c) >= line.from && alongEdge(c) <= line.to;
+
 export function houseFacade(input: FacadeInput): Facade {
-  const { frame, inHouse, grid } = input;
-  const p = grid.period;
+  const { frame, inHouse } = input;
   const axis2 = frame.width - 1;
   const lines: FacadeLine[] = [];
-  for (const dir of SIDES) {
+  for (const side of SIDES) {
     const byLine = new Map<number, number[]>();
     for (const c of input.cells) {
-      if (inHouse(c.x + dir.x, c.y + dir.y)) continue;
-      const e = { ...c, dir };
+      if (inHouse(c.x + side.x, c.y + side.y)) continue;
+      const e = { ...c, dir: side };
       const list = byLine.get(acrossOf(e)) ?? [];
       list.push(alongEdge(e));
       byLine.set(acrossOf(e), list);
@@ -109,45 +111,36 @@ export function houseFacade(input: FacadeInput): Facade {
       let from = sorted[0]!;
       for (let k = 1; k <= sorted.length; k++) {
         if (k < sorted.length && sorted[k] === sorted[k - 1]! + 1) continue;
-        lines.push({ dir, at, from, to: sorted[k - 1]!, bay: () => false });
+        const line = { dir: side, at, from, to: sorted[k - 1]!, onAxis: frame.symmetric && side.y !== 0 && 2 * from <= axis2 && 2 * sorted[k - 1]! >= axis2 };
+        lines.push({ ...line, bay: baysOf(line, input, axis2) });
         from = sorted[k]!;
       }
     }
   }
-  for (const line of lines) line.bay = baysOf(line, input, axis2, p);
   const lineOf = (e: Edge): FacadeLine | undefined => {
     const u = alongEdge(e);
     let best: FacadeLine | undefined;
-    for (const l of lines) if (l.dir.x === e.dir.x && l.dir.y === e.dir.y && u >= l.from && u <= l.to && (!best || Math.abs(l.at - acrossOf(e)) < Math.abs(best.at - acrossOf(e)))) best = l;
+    for (const l of lines) if (sameDir(l.dir, e.dir) && u >= l.from && u <= l.to && (!best || Math.abs(l.at - acrossOf(e)) < Math.abs(best.at - acrossOf(e)))) best = l;
     return best;
   };
   return {
     isBay: (e) => lineOf(e)?.bay(alongEdge(e)) ?? false,
-    overEntrance: (e) => input.entrances.some((cells) => cells.some((c) => c.dir.x === e.dir.x && c.dir.y === e.dir.y && alongEdge(c) === alongEdge(e))),
-    onAxis: (e) => {
-      const l = lineOf(e);
-      return !!l && frame.symmetric && l.dir.y !== 0 && 2 * l.from <= axis2 && 2 * l.to >= axis2;
-    },
+    overEntrance: (e) => input.entrances.some((cells) => cells.some((c) => sameDir(c.dir, e.dir) && alongEdge(c) === alongEdge(e))),
+    onAxis: (e) => lineOf(e)?.onAxis ?? false,
   };
 }
 
-function baysOf(line: FacadeLine, input: FacadeInput, axis2: number, p: number): (u: number) => boolean {
-  const horizontal = line.dir.y !== 0;
-  if (horizontal && input.frame.symmetric) {
-    if (2 * line.from <= axis2 && 2 * line.to >= axis2) return fromCentre(axis2, FRONT_PERIOD, (u) => doorAt(line, input, u));
+function baysOf(line: Omit<FacadeLine, 'bay'>, input: FacadeInput, axis2: number): (u: number) => boolean {
+  const { period } = input;
+  // An axis or entrance between two cells has its pair of bays only where a door stands there.
+  const entrance = (u: number): boolean => input.entrances.some((cells) => cells.some((c) => onLine(c, line) && alongEdge(c) === u));
+  if (line.onAxis) return fromCentre(axis2, FRONT_PERIOD, entrance);
+  if (line.dir.y !== 0 && input.frame.symmetric && 2 * line.from > axis2) {
     // East of the axis a line takes its western twin's bays, mirrored.
-    if (2 * line.from > axis2) {
-      const twin = fromMiddle(axis2 - line.to, axis2 - line.from, p);
-      return (u) => twin(axis2 - u);
-    }
-    return fromMiddle(line.from, line.to, p);
+    const twin = fromMiddle(axis2 - line.to, axis2 - line.from, period);
+    return (u) => twin(axis2 - u);
   }
-  const door = input.entrances.find((cells) => cells.every((c) => c.dir.x === line.dir.x && c.dir.y === line.dir.y && acrossOf(c) === line.at && alongEdge(c) >= line.from && alongEdge(c) <= line.to));
-  if (door) return fromCentre(alongEdge(door[0]!) + alongEdge(door[door.length - 1]!), FRONT_PERIOD, (u) => doorAt(line, input, u));
-  return fromMiddle(line.from, line.to, p);
-}
-
-/** Whether an entrance of the ground floor stands on `line` at `u`. */
-function doorAt(line: FacadeLine, input: FacadeInput, u: number): boolean {
-  return input.entrances.some((cells) => cells.some((c) => c.dir.x === line.dir.x && c.dir.y === line.dir.y && acrossOf(c) === line.at && alongEdge(c) === u));
+  const door = input.frame.symmetric && line.dir.y !== 0 ? undefined : input.entrances.find((cells) => cells.every((c) => onLine(c, line)));
+  if (door) return fromCentre(alongEdge(door[0]!) + alongEdge(door[door.length - 1]!), FRONT_PERIOD, entrance);
+  return fromMiddle(line.from, line.to, period);
 }

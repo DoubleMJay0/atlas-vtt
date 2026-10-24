@@ -9,10 +9,10 @@
  * axis a window whose twin is refused stays blind, so the front mirrors on every floor.
  */
 
-import { cellKey, doorCells } from '../../geometry';
-import type { CellDir, DungeonDoor, DungeonWindow, WindowSize } from '../../model';
+import { cellKey, dir, doorCells } from '../../geometry';
+import type { DungeonDoor, DungeonWindow, WindowSize } from '../../model';
 import type { RoomTypeId } from '../../themes/roomTypes';
-import { type EdgeRun, SIDES, holds, runsOf } from './houseEdges';
+import { type EdgeRun, SIDES, holds, roomCells, runsOf } from './houseEdges';
 import { type Edge, type Facade, alongEdge } from './houseFacade';
 import type { StoreyKind } from './houseStorey';
 import type { TypedRoom } from './houseZones';
@@ -27,16 +27,14 @@ const SMALL_AREA = 8;
 type Lighting = 'none' | 'corridor' | 'stair' | 'one' | 'main';
 
 /** The edge a window stands on, as a key. */
-export const windowKey = (w: Edge): string => `${cellKey(w.x, w.y)}>${w.dir.x},${w.dir.y}`;
-
-const area = (r: TypedRoom): number => r.box.w * r.box.h - (r.notch ? r.notch.w * r.notch.h : 0);
+const windowKey = (w: Edge): string => `${cellKey(w.x, w.y)}>${w.dir.x},${w.dir.y}`;
 
 function lightingOf(room: TypedRoom, kind: StoreyKind): Lighting {
   if (room.type && STORES.has(room.type)) return 'none';
   if (kind === 'cellar') return room.kind === 'room' && room.role !== 'stair-hall' ? 'one' : 'none';
   if (room.kind === 'corridor') return 'corridor';
   if (room.role === 'stair-hall') return 'stair';
-  const small = (room.type !== null && CLOSETS.has(room.type)) || area(room) <= SMALL_AREA || Math.min(room.box.w, room.box.h) <= 2;
+  const small = (room.type !== null && CLOSETS.has(room.type)) || roomCells(room).length <= SMALL_AREA || Math.min(room.box.w, room.box.h) <= 2;
   return small ? 'one' : 'main';
 }
 
@@ -46,7 +44,7 @@ function doorEdges(doors: readonly DungeonDoor[]): Set<string> {
   for (const door of doors) {
     for (const c of doorCells(door)) {
       keys.add(windowKey({ ...c, dir: door.dir }));
-      keys.add(windowKey({ x: c.x + door.dir.x, y: c.y + door.dir.y, dir: { x: (0 - door.dir.x) as CellDir['x'], y: (0 - door.dir.y) as CellDir['y'] } }));
+      keys.add(windowKey({ x: c.x + door.dir.x, y: c.y + door.dir.y, dir: dir(-door.dir.x, -door.dir.y) }));
     }
   }
   return keys;
@@ -84,7 +82,7 @@ export class WindowFloor {
 
   /** Whether `edge` holds a window or a door. */
   lined(edge: Edge): boolean {
-    return this.keys.has(windowKey(edge)) || this.doorKeys.has(windowKey(edge));
+    return this.has(edge) || this.doorKeys.has(windowKey(edge));
   }
 
   /** The room whose outer wall `edge` is, if any. */
@@ -139,7 +137,7 @@ export class WindowFloor {
     for (const n of [-1, 1]) {
       const c = { x: edge.x + t.x * n, y: edge.y + t.y * n };
       if (!inHouse(c.x, c.y) || inHouse(c.x + edge.dir.x, c.y + edge.dir.y)) return false;
-      if (room.kind !== 'corridor' && this.has({ ...c, dir: edge.dir }) && !this.overEntrance(edge)) return false;
+      if (room.kind !== 'corridor' && this.has({ ...c, dir: edge.dir }) && !this.input.facade.overEntrance(edge)) return false;
       if (run.cells.length >= 3 && room.kind !== 'corridor' && !holds(room, c.x, c.y)) return false;
     }
     return true;
@@ -179,7 +177,7 @@ export class WindowFloor {
     const { facade } = this.input;
     // Front and back first, so a corner room's side wall knows it is lit already.
     const runs = this.runsOf(room).sort((p, q) => Math.abs(q.dir.y) - Math.abs(p.dir.y));
-    const cells = (run: EdgeRun): Edge[] => run.cells.map((c) => ({ ...c, dir: run.dir })).filter((e) => this.qualifies(e, room, run));
+    const cells = (run: EdgeRun): Edge[] => this.candidates(room, run);
     const best = (pool: { e: Edge; run: EdgeRun }[]): Edge | undefined => [...pool].sort((p, q) => this.score(p.e, p.run) - this.score(q.e, q.run))[0]?.e;
     const all = runs.flatMap((run) => cells(run).map((e) => ({ e, run })));
     if (lighting === 'corridor') {
@@ -219,9 +217,9 @@ export class WindowFloor {
     }
   }
 
-  /** Whether `edge` lies over one of the ground floor's entrances, where a door two cells wide takes a pair of windows above it. */
-  private overEntrance(edge: Edge): boolean {
-    return this.input.facade.overEntrance(edge);
+  /** The edges of a run a window may stand on. */
+  private candidates(room: TypedRoom, run: EdgeRun): Edge[] {
+    return run.cells.map((c) => ({ ...c, dir: run.dir })).filter((e) => this.qualifies(e, room, run));
   }
 
   private twinOf(edge: Edge): Edge | null {
@@ -240,16 +238,19 @@ export class WindowFloor {
       // A pair on the bays first, else the twins nearest the wall's middle.
       for (const onBays of [true, false]) {
         for (const run of this.runsOf(room)) {
-          const pairs = run.cells
-            .map((c) => ({ ...c, dir: run.dir }))
-            .filter((e) => (!onBays || this.input.facade.isBay(e)) && this.twinOf(e) && Math.abs(this.twinOf(e)!.x - e.x) !== 1 && this.qualifies(e, room, run))
+          const pairs = this.candidates(room, run)
+            .filter((e) => {
+              const twin = this.twinOf(e);
+              // Twins either side of the axis would touch.
+              return (!onBays || this.input.facade.isBay(e)) && twin !== null && Math.abs(twin.x - e.x) !== 1;
+            })
             .sort((p, q) => this.score(p, run) - this.score(q, run));
           if (pairs.some((e) => this.takeFromAbove(e))) return;
         }
       }
       // Where every twin is refused, light comes before the mirror: one window, on a wall off the mirrored front where the room has one.
       const runs = this.runsOf(room);
-      const lone = runs.flatMap((run) => run.cells.map((c) => ({ e: { ...c, dir: run.dir }, run }))).filter(({ e, run }) => this.qualifies(e, room, run));
+      const lone = runs.flatMap((run) => this.candidates(room, run).map((e) => ({ e, run })));
       const rank = ({ e, run }: { e: Edge; run: EdgeRun }): number => (this.twinOf(e) ? 10_000 : 0) + this.score(e, run);
       const e = lone.sort((p, q) => rank(p) - rank(q))[0]?.e;
       if (e) this.add(e, id);
@@ -257,7 +258,11 @@ export class WindowFloor {
   }
 }
 
-const middleOf = (run: EdgeRun): number => (alongEdge({ ...run.cells[0]!, dir: run.dir }) + alongEdge({ ...run.cells[run.cells.length - 1]!, dir: run.dir })) / 2;
+/** The middle of a run along its wall. */
+const middleOf = (run: EdgeRun): number => {
+  const [first, last] = [run.cells[0]!, run.cells[run.cells.length - 1]!];
+  return run.dir.y !== 0 ? (first.x + last.x) / 2 : (first.y + last.y) / 2;
+};
 
 /** `k` of `cells` (in order along their wall) that follow each other: as many over windows below as can be, then about the wall's middle `mid`. */
 function evenly(cells: readonly Edge[], k: number, mid: number, lined: (e: Edge) => boolean): Edge[] {

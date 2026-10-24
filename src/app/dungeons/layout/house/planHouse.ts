@@ -25,7 +25,7 @@ import { houseLot } from './houseLot';
 import { type HouseSize, houseParams, houseSize } from './houseParams';
 import { houseStairs, type HouseStair } from './houseStairs';
 import { buildStorey } from './houseStorey';
-import { type Facade, type FacadeGrid, entranceEdges, facadeGrid, houseFacade } from './houseFacade';
+import { type Facade, entranceEdges, facadePeriod, houseFacade } from './houseFacade';
 import { WindowFloor } from './houseWindows';
 import { type TypedRoom, typeStorey } from './houseZones';
 import { approachCells } from '../../floors/stairSpots';
@@ -113,7 +113,7 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
   const climaxLevel = !boss ? null : cellar && chance(rng, 0.5) ? -1 : storeys - 1;
   const climax = climaxLevel === null ? null : climaxType(rng, frame, climaxLevel);
   const stairs = houseStairs(frame, levels);
-  const grid = facadeGrid(rng);
+  const period = facadePeriod(rng);
   const floors: PlannedFloor[] = [];
   const lit = new Map<number, WindowFloor>();
   let facade: Facade | null = null;
@@ -135,7 +135,7 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
     const inHouse = inBoxes([...rooms.map((r) => r.box), ...storey.stacks]);
     const doors = houseDoors({ frame, rooms, blocked: blockedBy(stairs, level), inHouse, ground: level === 0 });
     const own: DungeonStair[] = stairs.flatMap((s, k) => (s.lower === level || s.upper === level ? [{ ...s.spot, to: indexOf(s.lower === level ? s.upper : s.lower), link: links[k]! }] : []));
-    facade ??= groundFacade(frame, rooms, doors, inHouse, grid);
+    facade ??= groundFacade(frame, rooms, doors, inHouse, period);
     // A floor's windows stand over the windows below; a cellar's under the ground floor's.
     const neighbour = lit.get(level > 0 ? level - 1 : 0);
     const windows = new WindowFloor({ frame, facade, kind: storey.kind, rooms, doors, inHouse, lined: neighbour?.linedKeys() ?? new Set() });
@@ -191,8 +191,8 @@ function settled(seed: number, size: HouseSize, floors: PlannedFloor[], mirror: 
 }
 
 /** The facades of a house, from its ground floor. */
-function groundFacade(frame: Pick<HouseFrame, 'width' | 'symmetric'>, rooms: readonly TypedRoom[], doors: readonly DungeonDoor[], inHouse: (x: number, y: number) => boolean, grid: FacadeGrid): Facade {
-  return houseFacade({ frame, inHouse, cells: rooms.flatMap((r) => roomCells(r)), entrances: entranceEdges(doors), grid });
+function groundFacade(frame: Pick<HouseFrame, 'width' | 'symmetric'>, rooms: readonly TypedRoom[], doors: readonly DungeonDoor[], inHouse: (x: number, y: number) => boolean, period: number): Facade {
+  return houseFacade({ frame, inHouse, cells: rooms.flatMap((r) => roomCells(r)), entrances: entranceEdges(doors), period });
 }
 
 /** A five-room dungeon as a house of one floor (`houseFiveRoom.ts`). */
@@ -200,7 +200,7 @@ function planFiveRoom(seed: number, rng: Rng, size: HouseSize): HousePlan {
   const house = fiveRoomHouse(rng);
   const inHouse = inBoxes(house.rooms.map((r) => r.box));
   const frame = { width: house.width, symmetric: false };
-  const windows = new WindowFloor({ frame, facade: groundFacade(frame, house.rooms, house.doors, inHouse, facadeGrid(rng)), kind: 'ground', rooms: house.rooms, doors: house.doors, inHouse, lined: new Set() });
+  const windows = new WindowFloor({ frame, facade: groundFacade(frame, house.rooms, house.doors, inHouse, facadePeriod(rng)), kind: 'ground', rooms: house.rooms, doors: house.doors, inHouse, lined: new Set() });
   windows.place();
   const floor: PlannedFloor = { rooms: house.rooms.map(toRoom), doors: house.doors, stairs: [], house: { walls: 'edges', windows: windows.windows, stacks: [] } };
   return settled(seed, size, [floor], chance(rng, 0.5) ? house.width : null, 0);
