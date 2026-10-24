@@ -17,6 +17,9 @@ import type { RoomCells } from './roomCells';
 import { standsApart } from './shapes';
 
 /** A room this many cells or fewer is cramped; larger is open. */
+/** Rooms of at least this much floor can hold a fight and get cover unless they are left empty. */
+export const FIGHT_AREA = 12;
+
 export const CRAMPED_AREA = 20;
 
 export interface CoverShape {
@@ -75,7 +78,7 @@ function mirroredPair(floor: FloorTerrain, rc: RoomCells, shape: CoverShape, i: 
 }
 
 /** Pillars in pairs across the room: two cells square where the room is large. */
-function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
+export function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
   const size = rc.width >= 8 && rc.depth >= 7 ? 2 : 1;
   const shape: CoverShape = { kind: 'pillar', di: size, dj: size };
   const rows = shuffled(rng, [Math.floor(rc.depth / 3), Math.floor(rc.depth / 2), Math.floor((rc.depth * 2) / 3) - size + 1]);

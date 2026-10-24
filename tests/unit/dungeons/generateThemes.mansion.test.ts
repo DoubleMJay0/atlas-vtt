@@ -4,6 +4,7 @@ import { MANSION } from '../../../src/app/dungeons/themes/mansion';
 import { normals } from './dungeonInvariants';
 import { apartProblems, branchOf, entranceRoom, floorDepth, nextRooms, type Place, roomsOfType, typeOf, typingProblems } from './themeInvariants';
 import { failuresOf, shareOf, themeRuns } from './themeRuns';
+import { describeThemeTerrain } from './themeTerrainRules';
 
 /** The rules of a Haunted Mansion (report §3.2 Manor), each held over 500 dungeons of one to three floors. */
 describe('generated Haunted Mansions', () => {
@@ -79,4 +80,6 @@ describe('generated Haunted Mansions', () => {
     const ids = new Set<string>(MANSION.rooms.map((spec) => spec.id));
     expect(failuresOf(runs, (m) => typingProblems(m, ids))).toEqual([]);
   });
+
+  describeThemeTerrain(runs, MANSION);
 });

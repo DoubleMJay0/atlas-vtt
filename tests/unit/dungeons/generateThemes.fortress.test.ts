@@ -4,6 +4,7 @@ import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
 import { normals } from './dungeonInvariants';
 import { apartProblems, entranceRoom, floorDepth, nearRooms, nextRooms, onOuterWall, type Place, roomsOfType, typeOf, typingProblems, wayAvoids } from './themeInvariants';
 import { failuresOf, shareOf, themeRuns } from './themeRuns';
+import { describeThemeTerrain } from './themeTerrainRules';
 
 /** The rules of a Fortress (report §3.2), each held over 500 dungeons of one to three floors. */
 describe('generated Fortresses', () => {
@@ -74,4 +75,6 @@ describe('generated Fortresses', () => {
     expect(failuresOf(runs, (m) => typingProblems(m, ids))).toEqual([]);
     expect(runs.every((run) => run.model.theme === 'fortress' && normals(run.model.floors[0]!).length > 0)).toBe(true);
   });
+
+  describeThemeTerrain(runs, FORTRESS);
 });

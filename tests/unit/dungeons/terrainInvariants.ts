@@ -293,9 +293,10 @@ export function blockedCells(floor: DungeonFloor, room: number): number {
   return floor.terrain.filter((p) => p.room === room && BLOCKING.has(p.kind)).flatMap((p) => p.cells).filter((c) => !bridged.has(key(c))).length + furniture;
 }
 
-/** Whether the room holds cover: a piece that gives it, columns standing in it, or a gallery's parapet. */
+/** Whether the room holds cover: a piece of terrain or furniture that gives it, columns standing in it, or a gallery's parapet. */
 export function hasCover(floor: DungeonFloor, room: number): boolean {
   const r = floor.rooms[room];
   const columns = r !== undefined && floor.columns.some((c) => c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h);
-  return columns || floor.terrain.some((p) => p.room === room && (p.traits.cover !== undefined || p.kind === 'gallery'));
+  const furniture = floor.props.some((p) => p.room === room && PROP_SPECS[p.kind].cover !== undefined);
+  return columns || furniture || floor.terrain.some((p) => p.room === room && (p.traits.cover !== undefined || p.kind === 'gallery'));
 }

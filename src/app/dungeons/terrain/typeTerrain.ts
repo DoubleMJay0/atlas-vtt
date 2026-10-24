@@ -13,7 +13,16 @@ import { type RecipeContext, furnishByRecipe } from '../props/recipe';
 import { frameOf } from '../props/roomFrame';
 import { roomSpace } from '../props/space';
 import type { RoomTypeId } from '../themes/roomTypes';
-import type { RoomTypeSpec } from '../themes/themeTypes';
+import type { FurnishRecipe, Piece, RoomTypeSpec } from '../themes/themeTypes';
+import { PROP_SPECS } from '../props/catalogue';
+import { type Rng, chance } from '../rng';
+import { CRAMPED_AREA, FIGHT_AREA, ensureCover, hasCover, pillars } from './cover';
+import { pews } from './difficult';
+import { platformAtFarWall } from './elevation';
+import { placeInterest } from './interest';
+import { againstWall, inCorner } from '../props/cellVerbs';
+import { type FurnishSpace } from '../props/furnishSpace';
+import type { DungeonTag } from '../tags';
 import type { FloorTerrain } from './floorTerrain';
 import { type RoomCells, WALL_SIDES, type WallSide } from './roomCells';
 import { reserveLanes } from './roomLanes';
@@ -41,12 +50,52 @@ function keptClear(floor: FloorTerrain, rc: RoomCells): Set<string> {
   return new Set([...floor.takenCells(), ...[...stairs, ...rc.needed].map((c) => cellKey(c.x, c.y))]);
 }
 
-/** Lanes, then the type's furniture by its recipe. */
-export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, spec: RoomTypeSpec, context: RecipeContext): void {
+/** A recipe as a room that took its hazard keeps it: only the formations nature made. */
+function naturalOnly(recipe: FurnishRecipe): FurnishRecipe {
+  const natural = (piece: Piece | undefined): boolean => piece !== undefined && PROP_SPECS[piece.kind].natural === true;
+  return { ...(natural(recipe.defining) && { defining: recipe.defining }), pieces: recipe.pieces.filter(natural) };
+}
+
+/**
+ * The terrain the type allows beyond its furniture: pews in a chapel, a summoning circle, columns
+ * of pillars in a hall. A platform at the far wall only where nothing of the recipe stands there.
+ */
+function allowedTerrain(work: TerrainWork, k: number, rc: RoomCells, spec: RoomTypeSpec, rng: Rng): void {
+  const floor = work.floors[k];
+  if (!floor) return;
+  if (spec.terrain.allows?.includes('pews') && rc.floorCount >= FIGHT_AREA) pews(floor, rc);
+  if (spec.terrain.allows?.includes('mosaic')) placeInterest(floor, rc, rng, 'mosaic');
+  if (spec.terrain.allows?.includes('pool') && chance(rng, 0.5)) placeInterest(floor, rc, rng, 'pool');
+  if (spec.terrain.allows?.includes('pillar') && rc.floorCount > CRAMPED_AREA && chance(rng, 0.6)) pillars(floor, rc, rng);
+  const atBack = spec.furnish.defining?.verb === 'backWall';
+  if (spec.terrain.allows?.includes('platform') && !atBack && rc.depth >= 6 && chance(rng, 0.4)) platformAtFarWall(floor, rc, 1, rc.width - 2, 1);
+}
+
+/**
+ * Cover in a furnished room that can hold a fight and has none: the first piece of its recipe that
+ * gives cover, else a crate in a corner, else crates as terrain. A room with only pictures on its
+ * walls is not furnished for a fight.
+ */
+export function ensureTypeCover(fs: FurnishSpace, spec: RoomTypeSpec, tags: ReadonlySet<DungeonTag>): void {
+  const { floor, cells: rc } = fs;
+  if (rc.floorCount < FIGHT_AREA || !fs.placed.some((p) => !PROP_SPECS[p.prop.kind].wallPiece)) return;
+  const covered = (): boolean => hasCover(floor, rc) || fs.placed.some((p) => PROP_SPECS[p.prop.kind].cover !== undefined);
+  if (covered()) return;
+  const pieces = [spec.furnish.defining, spec.furnish.with, ...spec.furnish.pieces].filter((p): p is Piece => p !== undefined);
+  const cover = pieces.find((p) => PROP_SPECS[p.kind].cover !== undefined && !PROP_SPECS[p.kind].wallPiece && fs.offered.has(p.kind));
+  if (cover && againstWall(fs, cover.kind, ['back', 'left', 'right', 'near'])) return;
+  if (inCorner(fs, 'crate')) return;
+  ensureCover(floor, rc, tags);
+}
+
+/** Lanes, the terrain the type allows, then its furniture by its recipe (only nature's in a room that took its hazard), then cover. */
+export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, spec: RoomTypeSpec, context: RecipeContext, hazarded = false): void {
   const floor = work.floors[k];
   if (!floor) return;
   const { room } = rc;
+  const rng = work.rng(k, `type:${room.id}`);
   reserveLanes(rc);
+  if (!hazarded) allowedTerrain(work, k, rc, spec, rng);
   const fs = furnishSpace({
     floor,
     cells: rc,
@@ -57,7 +106,8 @@ export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, sp
     placeAllowed: (kind, at) => work.theme.facts.placeAllowed(kind, at, { floor: k, room: room.id }),
     outer: outerSides(rc, floor.plan.rooms),
   });
-  furnishByRecipe(fs, spec.furnish, context);
+  furnishByRecipe(fs, hazarded ? naturalOnly(spec.furnish) : spec.furnish, context);
+  if (!hazarded) ensureTypeCover(fs, spec, work.tags);
 }
 
 /**

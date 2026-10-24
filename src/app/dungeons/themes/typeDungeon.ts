@@ -40,6 +40,8 @@ export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<Dungeon
       const spec = type ? specOf(programme, type) : undefined;
       if (!type || !spec) continue;
       room.type = type;
+      // Only a type that keeps columns keeps the colonnade the layout gave its room.
+      if (!spec.terrain.columns) room.colonnade = false;
       const sheeted = programme.sheeted !== undefined && traitOf(index, room.id)?.band !== 'front' ? programme.sheeted : 0;
       out.set(room.id, { spec, context: { depthRank: ranks[index]?.get(room.id) ?? 0.5, ruined, sheeted, richness: facts.richness({ floor: index, room: room.id }) } });
     }

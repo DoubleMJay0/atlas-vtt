@@ -144,7 +144,7 @@ describe('the holes and bridges of a dungeon of several floors', () => {
     let bridges = 0;
     const area = (ring: { x: number; y: number }[]): number => Math.abs(ring.reduce((sum, p, i) => sum + p.x * ring[(i + 1) % ring.length]!.y - ring[(i + 1) % ring.length]!.x * p.y, 0) / 2);
     for (let seed = 1; seed <= 60 && (holes < 5 || bridges === 0); seed++) {
-      const model = generateDungeon({ seed, tags: ['large'], floors: 3 });
+      const model = generateDungeon({ seed, theme: 'cavern', tags: ['large'], floors: 3 });
       const { parts } = partsOf(model);
       const ids = parts.levelIds!;
       const surfaces = Object.values(parts.scene.levelSurfaces ?? {});
@@ -307,7 +307,7 @@ describe('cell outlines', () => {
 
 describe('vegetation in the scene', () => {
   it('names undergrowth as difficult terrain and climbers on the cells they hang over, under everything else, and lists what grows in the note', () => {
-    const model = generateDungeon({ seed: 16, theme: 'mansion', tags: ['overgrown'], floors: 1 });
+    const model = generateDungeon({ seed: 16, theme: 'mansion', tags: ['overgrown', 'ruined'], floors: 1 });
     const floor = model.floors[0]!;
     const { parts } = partsOf(model);
     const features = Object.values(parts.scene.mapFeatures ?? {});

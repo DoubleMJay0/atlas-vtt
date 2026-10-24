@@ -79,7 +79,8 @@ const HAZARD_SHARE = 0.4;
 const LEFT_FREE = 4;
 
 /** Whether a hazard on `cells` (crossed by `bridge`) leaves the room enough of itself, room for cover among it. */
-function leavesRoom(rc: RoomCells, cells: readonly CellPoint[], bridge: readonly CellPoint[] = []): boolean {
+/** Whether a hazard on `cells` leaves its room enough: off its stairs, at most its share of the floor, free cells and a place for cover. */
+export function leavesRoom(rc: RoomCells, cells: readonly CellPoint[], bridge: readonly CellPoint[] = []): boolean {
   return !cells.some((c) => rc.nearStairs(c)) && cells.length <= rc.floorCount * HAZARD_SHARE && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells, bridge);
 }
 
@@ -122,11 +123,11 @@ function bridgeOver(work: TerrainWork, k: number, rc: RoomCells, band: Band, spa
 }
 
 /** Blobs inside the room, a cell clear of its walls, from large to small, up to `each` places of each size. */
-function blobs(rc: RoomCells, rng: Rng, sizes: readonly (readonly [number, number])[], each = 6): CellPoint[][] {
+function blobs(rc: RoomCells, rng: Rng, sizes: readonly (readonly [number, number])[], each = 6, irregular = false): CellPoint[][] {
   return sizes.flatMap(([di, dj]) => {
     if (rc.depth < di + 2 || rc.width < dj + 2) return [];
     const spots = Array.from({ length: (rc.depth - di - 1) * (rc.width - dj - 1) }, (_, k) => [1 + (k % (rc.depth - di - 1)), 1 + Math.floor(k / (rc.depth - di - 1))] as const);
-    return shuffled(rng, spots).slice(0, each).map(([i, j]) => jaggedBlock(rc, rng, i, j, di, dj));
+    return shuffled(rng, spots).slice(0, each).map(([i, j]) => jaggedBlock(rc, rng, i, j, di, dj, irregular));
   });
 }
 
@@ -149,9 +150,18 @@ function overRoomBelow(work: TerrainWork, k: number, cells: readonly CellPoint[]
   return !below || below.roomHolding(cells)?.room.wing === 'regular';
 }
 
-function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
+/** Whether cells fill their bounding rectangle: a plain rectangle no natural hole is. */
+function plainRectangle(cells: readonly CellPoint[]): boolean {
+  const xs = cells.map((c) => c.x);
+  const ys = cells.map((c) => c.y);
+  return (Math.max(...xs) - Math.min(...xs) + 1) * (Math.max(...ys) - Math.min(...ys) + 1) === cells.length;
+}
+
+/** A chasm across the room or a blob in it; `natural`, as a collapse in a built theme: never a plain rectangle. */
+function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, natural = false): boolean {
   const thickness = rc.depth >= 8 && chance(rng, 0.5) ? 2 : 1;
   const tryBand = (drawn: Band): boolean => {
+    if (natural && plainRectangle(drawn.cells)) return false;
     const band = neededBridge(rc, drawn);
     if (!leavesRoom(rc, band.cells, band.bridge) || !overRoomBelow(work, k, band.cells) || !landsOnFloor(rc, band) || !rc.allows(band.cells, 'block', band.bridge)) return false;
     const drop = dropBelow(work, k, band.cells, rng);
@@ -161,7 +171,8 @@ function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): bool
     return true;
   };
   const rifts = bands(rc, rng, thickness, true).slice(0, 12);
-  const holes = blobs(rc, rng, [[3, 3], [4, 3], [3, 4], [2, 3], [3, 2], [2, 2]], 12).map((cells) => blobBridge(rc, cells));
+  const sizes: readonly (readonly [number, number])[] = natural ? [[3, 3], [4, 3], [3, 4], [4, 4]] : [[3, 3], [4, 3], [3, 4], [2, 3], [3, 2], [2, 2]];
+  const holes = blobs(rc, rng, sizes, 12, natural).map((cells) => blobBridge(rc, cells));
   const order = chance(rng, 0.5) ? [...rifts, ...holes] : [...holes, ...rifts];
   return order.some(tryBand);
 }
@@ -235,6 +246,11 @@ function placePits(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boole
     }
   }
   return blobs(rc, rng, [[size, size]]).some((cells) => leavesRoom(rc, cells) && floor.place(draft('pit', rc.room.id, cells)) !== null);
+}
+
+/** A collapse in a built theme's room: an irregular chasm onto the floor below, never a plain rectangle. */
+export function placeCollapse(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): boolean {
+  return placeChasm(work, k, rc, rng, true);
 }
 
 /** One hazard of `choice` in the room, else of another kind that fits; false where none does. */
