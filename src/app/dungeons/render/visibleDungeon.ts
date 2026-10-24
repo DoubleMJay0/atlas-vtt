@@ -1,9 +1,9 @@
 import type { DungeonDoor, DungeonFloor, DungeonModel, DungeonRoom } from '../model';
 import { secretWingOf } from '../secretWings';
 import type { DungeonView } from '../style';
-import { caveWayOuts, wayExtent } from './cave/mouth/wayOut';
+import { openGroundOf, wayExtent, wayOutsOf, type WayOut } from './cave/mouth/wayOut';
 import { caveFloorShapes } from './cave/visibleCave';
-import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
+import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape, type Vec } from './geometry';
 
 /**
  * What a view shows of one floor of a dungeon: secret wings leave with their doors when secrets
@@ -24,12 +24,16 @@ export interface VisibleFloor {
   /** The floors with every door cell whole: what courses of brick and stone are laid around. */
   outlines: FloorShape[];
   roomShapes: Map<number, FloorShape>;
+  /** A cave's ways out, one before each entrance; none on a built floor. */
+  ways: WayOut[];
   /** Of the floors, and of what a cave's ways out may cover. */
   bounds: Bounds;
 }
 
 export interface VisibleDungeon extends VisibleFloor {
   field: FloorField;
+  /** The open ground before every way in, where no rock stands (`openGroundOf`). */
+  open: Vec[][];
 }
 
 function isWideOpening(door: DungeonDoor, byId: ReadonlyMap<number, DungeonRoom>): boolean {
@@ -56,15 +60,16 @@ export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secre
   const outlines = cave ? floors : [...roomShapes.values(), ...open.map(doorShape)];
   const floorBounds = floors.length ? unionBounds(floors.map(shape => shapeBounds(shape))) : { minX: 0, minY: 0, maxX: 1, maxY: 1 };
   // A cave's ways out fade into the paper before the map's edge: the margin grows where one would reach it.
-  const ways = caveWayOuts({ model, index, floor, doors }).map(way => wayExtent(way, way.length - WAY_INSIDE_MARGIN));
-  const bounds = ways.length ? unionBounds([floorBounds, ...ways]) : floorBounds;
-  return { model, index, floor, rooms, doors, wide, floors, outlines, roomShapes, bounds };
+  const ways = wayOutsOf(floor, doors, model.seed + index * 101);
+  const bounds = unionBounds([floorBounds, ...ways.map(way => wayExtent(way, way.length - WAY_INSIDE_MARGIN))]);
+  return { model, index, floor, rooms, doors, wide, floors, outlines, roomShapes, ways, bounds };
 }
 
 /** One floor as drawn (`visibleFloor`), with the distance field its surroundings are drawn from. */
 export function visibleDungeon(model: DungeonModel, view: Pick<DungeonView, 'secrets'>, index = 0): VisibleDungeon {
   const visible = visibleFloor(model, view, index);
-  return { ...visible, field: new FloorField(visible.floors) };
+  const field = new FloorField(visible.floors);
+  return { ...visible, field, open: openGroundOf({ ...visible, field }) };
 }
 
 /** Of every floor as the view shows it: all floors' images share it, so they lie over each other exactly. */

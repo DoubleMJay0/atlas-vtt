@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../../src/app/dungeons/generate';
 import type { DungeonModel, DungeonRequest } from '../../../../src/app/dungeons/model';
 import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
-import { caveWayOuts, FLOOR_STRENGTH, groundDistance, groundRing, wayCentre, wayExtent, wayFrameOf, wayPoint, wayStrength } from '../../../../src/app/dungeons/render/cave/mouth/wayOut';
+import { FLOOR_STRENGTH, groundDistance, groundRing, wayCentre, wayExtent, wayFrameOf, wayPoint, wayStrength } from '../../../../src/app/dungeons/render/cave/mouth/wayOut';
 import { visibleDungeon } from '../../../../src/app/dungeons/render/visibleDungeon';
 import { pointInPolygon } from '../../../../src/app/dungeons/render/geometry';
 import { dungeonWalls } from '../../../../src/app/dungeons/scene/toWalls';
@@ -27,20 +27,20 @@ describe('a cave\'s ways out', () => {
     for (const model of models) {
       const dungeon = visibleDungeon(model, DEFAULT_VIEW, 0);
       const entrances = dungeon.doors.filter((door) => door.from === null && door.kind !== 'secret');
-      expect(caveWayOuts(dungeon)).toHaveLength(entrances.length);
+      expect(dungeon.ways).toHaveLength(entrances.length);
       ways += entrances.length;
     }
     expect(ways).toBeGreaterThan(20);
     for (const theme of ['fortress', 'mansion'] as const) {
       const built = generateDungeon({ seed: 11, theme, tags: [], floors: 1 });
-      expect(caveWayOuts(visibleDungeon(built, DEFAULT_VIEW, 0))).toEqual([]);
+      expect(visibleDungeon(built, DEFAULT_VIEW, 0).ways).toEqual([]);
     }
   });
 
   it('run on whole from the mouth and fade to nothing at their length, along their middle', () => {
     for (const model of models) {
       const dungeon = visibleDungeon(model, DEFAULT_VIEW, 0);
-      for (const way of caveWayOuts(dungeon)) {
+      for (const way of dungeon.ways) {
         expect(way.length).toBeGreaterThanOrEqual(2);
         expect(way.length).toBeLessThanOrEqual(4);
         const along = (u: number): number => wayStrength(way, wayPoint(way, u, wayCentre(way, u)));
@@ -56,7 +56,7 @@ describe('a cave\'s ways out', () => {
   it('widen as they go: the faintest ground is wider far out than at the mouth', () => {
     for (const model of models) {
       const dungeon = visibleDungeon(model, DEFAULT_VIEW, 0);
-      for (const way of caveWayOuts(dungeon)) {
+      for (const way of dungeon.ways) {
         const widthAt = (u: number): number => {
           let width = 0;
           for (let v = -3; v <= 3; v += 0.02) if (wayStrength(way, wayPoint(way, u, v)) > 0) width += 0.02;
@@ -71,7 +71,7 @@ describe('a cave\'s ways out', () => {
     for (const model of models) {
       const layout = mapLayout(model, PX, DEFAULT_VIEW);
       const dungeon = visibleDungeon(model, DEFAULT_VIEW, 0);
-      for (const way of caveWayOuts(dungeon)) {
+      for (const way of dungeon.ways) {
         const reach = wayExtent(way, way.length);
         expect(reach.minX).toBeGreaterThanOrEqual(layout.originCell.x);
         expect(reach.minY).toBeGreaterThanOrEqual(layout.originCell.y);
@@ -86,9 +86,9 @@ describe('a cave\'s ways out', () => {
       const layout = mapLayout(model, PX, DEFAULT_VIEW);
       const dungeon = visibleDungeon(model, DEFAULT_VIEW, 0);
       const { walls } = dungeonWalls(model, dungeonStyle('parchment'), DEFAULT_VIEW, layout, 0);
-      const distance = groundDistance(dungeon);
-      for (const way of caveWayOuts(dungeon)) {
-        const ring = groundRing(dungeon, way, FLOOR_STRENGTH);
+      const distance = groundDistance(dungeon.field);
+      for (const way of dungeon.ways) {
+        const ring = groundRing(dungeon.field, way, FLOOR_STRENGTH);
         for (const wall of Object.values(walls)) {
           for (let t = 0; t <= 1; t += 0.1) {
             const p = { x: wall.p1.x + (wall.p2.x - wall.p1.x) * t, y: wall.p1.y + (wall.p2.y - wall.p1.y) * t };

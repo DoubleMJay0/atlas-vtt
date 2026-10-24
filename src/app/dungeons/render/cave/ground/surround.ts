@@ -1,7 +1,6 @@
 import { rngFrom } from '../../../rng';
 import { viewBounds, type ArtScene } from '../../art/artScene';
 import { shadeEdges, TO_LIGHT } from '../../art/light';
-import { openGround } from '../mouth/wayOut';
 import { hash2 } from '../../art/noise';
 import { traceRings } from '../../art/outline';
 import { polyPath, runsPath } from '../../art/paths';
@@ -16,7 +15,7 @@ import { stoneHand } from '../../stone/hand';
 
 function clipLanes(scene: ArtScene): void {
   const { ctx, dungeon } = scene.env;
-  const open = openGround(dungeon);
+  const { open } = dungeon;
   if (!open.length) return;
   const b = viewBounds(scene.frame, 10);
   ctx.beginPath();

@@ -2,7 +2,7 @@ import { doorCells } from '../geometry';
 import type { DungeonDoor, DungeonRoom } from '../model';
 import type { Rng } from '../rng';
 import { clipToFloors } from './floors';
-import { caveWayOuts, FLOOR_STRENGTH, groundRing, wayPoint, type WayOut } from './cave/mouth/wayOut';
+import { floorRing, type WayOut } from './cave/mouth/wayOut';
 import { pointsBounds, type Bounds, type Vec } from './geometry';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 
@@ -21,8 +21,8 @@ export function drawGrid(env: RenderEnv): void {
   for (const room of env.dungeon.rooms) lines.push(...roomLines(room, step));
   for (const door of env.dungeon.doors) lines.push(...doorLines(door, env.dungeon.wide));
   // A cave's way out is floor as far as it is drawn as floor: its cells carry the grid there.
-  const ways = caveWayOuts(env.dungeon);
-  const wayRings = ways.map(way => beyondMouth(way, groundRing(env.dungeon, way, FLOOR_STRENGTH)));
+  const { ways } = env.dungeon;
+  const wayRings = ways.map(way => floorRing(env.dungeon.field, way));
   ways.forEach((way, k) => lines.push(...wayLines(way, pointsBounds(wayRings[k]!), step)));
   const rng = env.rng('grid');
   ctx.save();
@@ -47,12 +47,6 @@ export function drawGrid(env: RenderEnv): void {
   }
   ctx.stroke();
   ctx.restore();
-}
-
-/** A way's ring closed on its mouth's edge instead of inside the floor, so it meets the floor's clip without overlapping it. */
-function beyondMouth(way: WayOut, ring: readonly Vec[]): Vec[] {
-  const half = way.mouth.width / 2;
-  return [wayPoint(way, 0, -half), ...ring.slice(1, -1), wayPoint(way, 0, half)];
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel, DungeonRequest } from '../../src/app/dungeons/model';
-import { caveWayOuts, groundDistance, wayCentre, wayPoint, type WayOut } from '../../src/app/dungeons/render/cave/mouth/wayOut';
+import { groundDistance, wayCentre, wayPoint, type WayOut } from '../../src/app/dungeons/render/cave/mouth/wayOut';
 import type { Vec } from '../../src/app/dungeons/render/geometry';
 import { paletteOf, parseHex } from '../../src/app/dungeons/render/palette';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
@@ -68,9 +68,9 @@ describe('a cave\'s way out as drawn', () => {
     it(`runs on from every mouth and fades into the paper: seed ${request.seed} [${request.tags.join(',')}]`, () => {
       const model = generateDungeon(request);
       const dungeon = visibleDungeon(model, DEFAULT_VIEW, 0);
-      const distance = groundDistance(dungeon);
+      const distance = groundDistance(dungeon.field);
       // A way that another floor lies across gives way to it; its tone is that floor's.
-      const ways = caveWayOuts(dungeon).filter((way) => {
+      const ways = dungeon.ways.filter((way) => {
         for (let u = 0.3; u <= way.length + 1; u += 0.1) if (distance(wayPoint(way, u, wayCentre(way, u))) < Math.min(u, 2.5) - 0.3) return false;
         return true;
       });

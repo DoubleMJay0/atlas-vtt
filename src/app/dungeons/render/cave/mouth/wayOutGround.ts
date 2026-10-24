@@ -19,7 +19,7 @@ import { stoneHand } from '../../stone/hand';
 import { cellPattern } from '../../stone/patterns';
 import { ROCK_TILE, rockTile } from '../../stone/textures';
 import { drawMouthScree } from './mouthScree';
-import { caveWayOuts, groundDistance, groundRing, wayCentre, wayHalf, wayPoint, wayStrength, type WayOut } from './wayOut';
+import { groundDistance, groundRing, wayCentre, wayHalf, wayPoint, wayStrength, type WayOut } from './wayOut';
 
 /** The faintest ground drawn: its ring bounds every drawing of the way. */
 const FAINTEST = 0.02;
@@ -35,11 +35,11 @@ interface Ground {
 
 function groundsOf(scene: ArtScene): Ground[] {
   const { dungeon } = scene.env;
-  const distance = groundDistance(dungeon);
-  return caveWayOuts(dungeon).map((way) => ({
+  const distance = groundDistance(dungeon.field);
+  return dungeon.ways.map((way) => ({
     way,
     strength: (p: Vec) => wayStrength(way, p, distance),
-    bounds: grown(pointsBounds(groundRing(dungeon, way, FAINTEST)), 0.05),
+    bounds: grown(pointsBounds(groundRing(dungeon.field, way, FAINTEST)), 0.05),
   }));
 }
 
@@ -47,14 +47,14 @@ function groundsOf(scene: ArtScene): Ground[] {
  * Lays what `painter` draws over the ground's bounds onto the map through the ground's fade: whole
  * at the mouth, gone at its far end. Without pictures, the fade's rings in steps of the colour.
  */
-function throughFade(scene: ArtScene, ground: Ground, colour: string, painter: (layer: Canvas2D) => void): void {
+function throughFade(scene: ArtScene, ground: Ground, colour: string, painter?: (layer: Canvas2D) => void): void {
   const { ctx, dungeon } = scene.env;
   if (!scene.raster) {
     ctx.save();
     ctx.fillStyle = withAlpha(colour, STEP_ALPHA);
     for (const level of STEPS) {
       ctx.beginPath();
-      polyPath(groundRing(dungeon, ground.way, level))(ctx);
+      polyPath(groundRing(dungeon.field, ground.way, level))(ctx);
       ctx.fill();
     }
     ctx.restore();
@@ -66,7 +66,7 @@ function throughFade(scene: ArtScene, ground: Ground, colour: string, painter: (
   paintLayer(layerOf(scene), 'source-over', (layer) => {
     layer.fillStyle = colour;
     layer.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
-    painter(layer);
+    painter?.(layer);
     layer.globalAlpha = 1;
     layer.globalCompositeOperation = 'destination-in';
     drawGridCanvas(layer, g, fade);
@@ -124,6 +124,9 @@ export function stoneWayOut(scene: ArtScene, c: StoneColours): void {
   const grounds = groundsOf(scene);
   if (!grounds.length) return;
   for (const ground of grounds) {
+    // Worked out once: the layer is painted strip by strip.
+    const runs = wornRuns(ground.way);
+    const specks = grit(ground, 0.16, (_, roll) => roll < 0.35);
     throughFade(scene, ground, c.floor, (layer) => {
       layer.globalAlpha = c.mono ? 0.05 : 0.075;
       layer.fillStyle = cellPattern(layer, rockTile(), ROCK_TILE.cells);
@@ -131,14 +134,14 @@ export function stoneWayOut(scene: ArtScene, c: StoneColours): void {
       layer.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
       layer.globalAlpha = 1;
       layer.beginPath();
-      runsPath(wornRuns(ground.way))(layer);
+      runsPath(runs)(layer);
       layer.strokeStyle = withAlpha(c.line, c.dark ? 0.16 : 0.14);
       layer.lineWidth = 0.008;
       layer.lineCap = 'round';
       layer.lineJoin = 'round';
       layer.stroke();
       layer.fillStyle = withAlpha(c.dark ? '#000000' : c.line, 0.22);
-      dots(layer, grit(ground, 0.16, (_, roll) => roll < 0.35), (p) => 0.01 + hash2(Math.round(p.x * 97), Math.round(p.y * 97), 5) * 0.014);
+      dots(layer, specks, (p) => 0.01 + hash2(Math.round(p.x * 97), Math.round(p.y * 97), 5) * 0.014);
     });
   }
   drawMouthScree(stoneHand(scene, c), grounds.map((g) => g.way));
@@ -149,7 +152,7 @@ export function engravedWayOut(scene: ArtScene, pens: Pens): void {
   if (!grounds.length) return;
   const { ctx } = scene.env;
   for (const ground of grounds) {
-    throughFade(scene, ground, pens.floor, () => undefined);
+    throughFade(scene, ground, pens.floor);
     ctx.save();
     ctx.beginPath();
     runsPath(wornRuns(ground.way))(ctx);

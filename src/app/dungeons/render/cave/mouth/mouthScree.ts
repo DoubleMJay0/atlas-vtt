@@ -45,7 +45,7 @@ function screeOf(way: WayOut, distance: (p: Vec) => number): Stone[] {
 }
 
 export function drawMouthScree(hand: Hand, ways: readonly WayOut[]): void {
-  const distance = groundDistance(hand.scene.env.dungeon);
+  const distance = groundDistance(hand.scene.env.dungeon.field);
   const stones = ways.flatMap((way) => screeOf(way, distance));
   if (!stones.length) return;
   const all: PathFn = polysPath(stones.map((s) => s.poly));

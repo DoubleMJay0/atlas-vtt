@@ -1,4 +1,3 @@
-import { openGround } from './cave/mouth/wayOut';
 import { drawBricks } from './bricks';
 import { drawDots } from './dots';
 import { traceShapes, tracePolygon, type Vec } from './geometry';
@@ -16,7 +15,7 @@ import { drawStonework } from './stonework';
 export function drawRock(env: RenderEnv): void {
   const { ctx } = env;
   ctx.save();
-  clipLanes(env, openGround(env.dungeon));
+  clipLanes(env, env.dungeon.open);
   drawRockMode(env);
   ctx.restore();
 }
@@ -73,7 +72,7 @@ function fillPockets(env: RenderEnv): void {
   ctx.restore();
 }
 
-/** Keeps drawing out of the open ground before each entrance (`openGround`). */
+/** Keeps drawing out of the open ground before each entrance (`VisibleDungeon.open`). */
 function clipLanes(env: RenderEnv, open: readonly Vec[][]): void {
   if (open.length === 0) return;
   const { ctx, dungeon } = env;
