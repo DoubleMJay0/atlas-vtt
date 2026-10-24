@@ -21,6 +21,8 @@ import { placeSecretWings } from './secrets';
 import { addSteps } from './steps';
 
 const MAX_ATTEMPTS = 120;
+/** A cave's floor must also fit its chambers' blocks and a lane two cells wide, so it may take more attempts. */
+const MAX_CAVE_ATTEMPTS = 600;
 
 export interface FloorRequest {
   /** 0 is the entry floor. */
@@ -102,7 +104,8 @@ export interface BuiltFloor {
 /** The first attempt that keeps every rule, else the best of them (`better`); null where no attempt found a place for its first room. */
 export function buildFloorLayout(seed: number, request: FloorRequest): BuiltFloor | null {
   let best: Built | null = null;
-  for (let index = 0; index < MAX_ATTEMPTS; index++) {
+  const attempts = request.params.cave ? MAX_CAVE_ATTEMPTS : MAX_ATTEMPTS;
+  for (let index = 0; index < attempts; index++) {
     const built = attempt(seed, request, index);
     if (!built) continue;
     if (sound(built)) return { layout: built.layout, sound: true };

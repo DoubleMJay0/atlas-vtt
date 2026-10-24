@@ -140,6 +140,15 @@ export class CaveGrid {
     return NEAR8.every(([dx, dy]) => this.mayTouch(owner, this.owner(x + dx, y + dy)));
   }
 
+  /**
+   * Whether a tunnel or a narrows may take a cell outside every rectangle: `mayClaim`, and no
+   * rectangle but its own (a narrows: its two rooms') beside it or at its corners, so it never
+   * takes from a room the floor it would grow into.
+   */
+  mayWiden(x: number, y: number, owner: number): boolean {
+    return this.mayClaim(x, y, owner) && NEAR8.every(([dx, dy]) => this.mayTouch(owner, this.envelope(x + dx, y + dy)));
+  }
+
   cellsOf(owner: number): CellPoint[] {
     return [...(this.cells.get(owner) ?? [])].sort((a, b) => a - b).map((i) => ({ x: (i % this.w) + this.x0, y: Math.floor(i / this.w) + this.y0 }));
   }

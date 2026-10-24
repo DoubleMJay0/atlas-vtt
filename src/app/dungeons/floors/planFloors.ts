@@ -13,7 +13,8 @@ import { type FloorRequest, buildFloorLayout } from '../layout/assemble';
 import type { CompactLayout } from '../layout/compact';
 import { dir, floorRect, wallRect } from '../geometry';
 import type { CaveFloorPlan } from '../layout/cavern/caveGrid';
-import { type LaneEnd, clearOfLane, finalEnd, laneFits } from '../layout/cavern/mainPath';
+import { caveFits } from '../layout/cavern/caveFits';
+import { type LaneEnd, clearOfLane, finalEnd } from '../layout/cavern/mainPath';
 import { TWO_CONNECTIONS_FROM, type FloorShape, type PlacedStair, chooseDescent, extraConnection, normalRooms } from './connections';
 import { landingCells, landingRoot } from './landing';
 import type { StairSpot } from './stairSpots';
@@ -89,13 +90,14 @@ function linkFloor(seed: number, above: FloorShape, below: FloorShape, index: nu
 }
 
 /**
- * Whether a cave floor's main path fits two cells wide from where it is entered to its way down
- * (`descent`), or on the last floor to its boss room or farthest room. Always, for any other theme.
+ * Whether a cave floor can be shaped: a 3 × 3 block in every chamber, and its main path two cells
+ * wide from where it is entered to its way down (`descent`), or on the last floor to its boss room
+ * or farthest room. Always, for any other theme.
  */
 function laneHolds(params: DungeonParams, floor: CaveFloorPlan, index: number, from: LaneEnd, descent: PlacedStair | null, boss: boolean): boolean {
   if (!params.cave) return true;
-  if (!descent) return laneFits(floor, from, finalEnd(floor, from, boss), index);
-  return laneFits({ ...floor, stairs: [...floor.stairs, { ...descent.spot, to: index + 1 }] }, from, { kind: 'stair', spot: descent.spot }, index);
+  if (!descent) return caveFits(floor, from, finalEnd(floor, from, boss), index);
+  return caveFits({ ...floor, stairs: [...floor.stairs, { ...descent.spot, to: index + 1 }] }, from, { kind: 'stair', spot: descent.spot }, index);
 }
 
 /**

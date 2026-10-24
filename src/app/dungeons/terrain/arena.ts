@@ -7,16 +7,16 @@
  * open: pieces that cannot be walked never take more than a third of its floor.
  */
 
-import type { CellDir } from '../model';
+import type { CellDir, CellPoint, DungeonRoom } from '../model';
 import { dir } from '../geometry';
 import { type Rng, chance, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
 import { ensureCover, tryShape } from './cover';
-import { platformAtFarWall } from './elevation';
+import { farWallBlock, platformAtFarWall } from './elevation';
 import type { FloorTerrain } from './floorTerrain';
 import { placeHazard } from './hazards';
-import type { RoomCells } from './roomCells';
+import { RoomCells } from './roomCells';
 import type { TerrainWork } from './work';
 
 /** Pieces that cannot be walked take at most this share of the arena's floor. */
@@ -90,12 +90,28 @@ function wideCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, platformDepth: 
   }
 }
 
+/** The arena's platform: rows deep, at most how wide, and how high. */
+function arenaPlatform(rc: Pick<RoomCells, 'depth' | 'width'>): { deep: number; widest: number; elevation: number } {
+  return { deep: rc.depth >= 8 ? 2 : 1, widest: Math.ceil(rc.width * 0.6), elevation: rc.depth >= 9 ? 2 : 1 };
+}
+
+/** The cells the arena's platform takes at its widest, its steps and the cells at their foot: what a cave keeps floor in its boss room. */
+export function arenaSeeds(room: DungeonRoom): CellPoint[] {
+  const { cells: _mask, ...rect } = room;
+  const rc = new RoomCells(rect, [], [], 0, []);
+  const { deep, widest } = arenaPlatform(rc);
+  const w = Math.min(widest, rc.width - 2);
+  if (rc.depth < deep + 3 || w < 3) return [];
+  const { cells, foot } = farWallBlock(rc, deep, w);
+  return [...cells, ...foot];
+}
+
 /** Turns the boss room into an arena. */
 export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): void {
   const floor = work.floors[k];
   if (!floor) return;
-  const deep = rc.depth >= 8 ? 2 : 1;
-  const raised = platformAtFarWall(floor, rc, deep, Math.ceil(rc.width * 0.6), rc.depth >= 9 ? 2 : 1) !== null;
+  const { deep, widest, elevation } = arenaPlatform(rc);
+  const raised = platformAtFarWall(floor, rc, deep, widest, elevation) !== null;
   const platformDepth = raised ? deep : 0;
   const pieces: (readonly [SetPiece, number])[] = [
     ['statues', 3],

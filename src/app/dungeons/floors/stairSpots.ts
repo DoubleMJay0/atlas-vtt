@@ -6,7 +6,7 @@
  */
 
 import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
-import { type CellRect, cellKey, cellsOf, dir, doorCells, floorRect, inRect } from '../geometry';
+import { type CellRect, cellKey, cellsOf, dir, doorCells, floorRect, inRect, intersection } from '../geometry';
 
 /** The upper end is where the treads start down; the lower end is where they arrive. */
 export type StairEnd = 'upper' | 'lower';
@@ -82,6 +82,13 @@ function connected(free: ReadonlySet<string>, cells: readonly CellPoint[]): bool
   return seen.size === free.size;
 }
 
+/** Whether taking `cut` out of `floor` leaves two pieces: it reaches from one wall to the opposite one, wall left on either side. */
+function splits(floor: CellRect, cut: CellRect): boolean {
+  const across = cut.y0 <= floor.y0 && cut.y1 >= floor.y1 && cut.x0 > floor.x0 && cut.x1 < floor.x1;
+  const along = cut.x0 <= floor.x0 && cut.x1 >= floor.x1 && cut.y0 > floor.y0 && cut.y1 < floor.y1;
+  return across || along;
+}
+
 function touchesWall(r: CellRect, floor: CellRect, open: CellDir): boolean {
   const sides: [boolean, CellDir][] = [
     [r.x0 === floor.x0, dir(-1, 0)],
@@ -112,6 +119,8 @@ export function spotFits(room: StairRoom, space: FloorSpace, spot: StairSpot, en
   ];
   if (!approach.every(inFloor) || cells.some((c) => taken.has(cellKey(c.x, c.y)))) return false;
   if (needed.some((c) => own.has(cellKey(c.x, c.y)) || taken.has(cellKey(c.x, c.y)))) return false;
+  // A rectangle less one rectangle stays one piece unless the cut runs wall to wall through its middle.
+  if (!space.stairs.some((s) => intersection(spotRect(s), floor))) return !splits(floor, rect);
   const floorCells = cellsOf(floor);
   const free = new Set(floorCells.map((c) => cellKey(c.x, c.y)).filter((key) => !taken.has(key) && !own.has(key)));
   return connected(free, floorCells);

@@ -73,17 +73,28 @@ function endArea(floor: CaveFloorPlan, end: LaneEnd, side: 'upper' | 'lower'): {
   return { area: keys([...row, ...row.map((c) => ({ x: c.x + door.dir.x, y: c.y + door.dir.y }))]), touch: keys([{ x: door.x, y: door.y }]) };
 }
 
+/** The doors a lane passes: between rooms one after the other on the route, and the entrance into its first. */
+function laneDoorsOf(floor: Pick<CaveFloorPlan, 'doors'>, route: readonly number[]): number[] {
+  const pairs = new Set(route.slice(1).map((id, k) => `${Math.min(id, route[k]!)}:${Math.max(id, route[k]!)}`));
+  return floor.doors.flatMap((door, k) => {
+    if (door.kind === 'secret') return [];
+    if (door.from === null) return door.to === route[0] && k === entranceDoor(floor) ? [k] : [];
+    return door.to !== null && pairs.has(`${Math.min(door.from, door.to)}:${Math.max(door.from, door.to)}`) ? [k] : [];
+  });
+}
+
+/** The lane door the cell stands beside, in the wall it is set in, if one does. */
+function besideDoor(floor: Pick<CaveFloorPlan, 'doors'>, doors: readonly number[], x: number, y: number): number | undefined {
+  return doors.find((k) => {
+    const door = floor.doors[k]!;
+    return Math.abs(x - door.x) + Math.abs(y - door.y) === 1 && (x - door.x) * door.dir.x + (y - door.y) * door.dir.y === 0;
+  });
+}
+
 /** Which cells a lane block may hold. */
 function laneCells(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], ends: readonly Set<string>[]): (x: number, y: number) => boolean {
   const onRoute = new Set(route);
-  const pairs = new Set(route.slice(1).map((id, k) => `${Math.min(id, route[k]!)}:${Math.max(id, route[k]!)}`));
-  const laneDoors = new Set(
-    floor.doors.flatMap((door, k) => {
-      if (door.kind === 'secret') return [];
-      if (door.from === null) return door.to === route[0] && k === entranceDoor(floor) ? [k] : [];
-      return door.to !== null && pairs.has(`${Math.min(door.from, door.to)}:${Math.max(door.from, door.to)}`) ? [k] : [];
-    }),
-  );
+  const laneDoors = laneDoorsOf(floor, route);
   const stairCells = new Set(floor.stairs.flatMap((s) => cellsOf(spotRect(s))).map((c) => cellKey(c.x, c.y)));
   const tunnels = route.map((id) => floor.rooms[id]).filter((room): room is DungeonRoom => room !== undefined && room.kind !== 'room');
   const memo = new Map<string, boolean>();
@@ -93,12 +104,10 @@ function laneCells(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[
     const envelope = grid.envelope(x, y);
     if (envelope !== ROCK) return onRoute.has(envelope);
     const owner = grid.owner(x, y);
-    if (owner !== ROCK) return [...laneDoors].some((k) => owner === doorOwner(k));
-    for (const k of laneDoors) {
-      const door = floor.doors[k]!;
-      if (Math.abs(x - door.x) + Math.abs(y - door.y) === 1 && (x - door.x) * door.dir.x + (y - door.y) * door.dir.y === 0) return grid.mayClaim(x, y, doorOwner(k));
-    }
-    return tunnels.some((room) => inRect(wallRect(room), x, y) && grid.mayClaim(x, y, room.id));
+    if (owner !== ROCK) return laneDoors.some((k) => owner === doorOwner(k));
+    const beside = besideDoor(floor, laneDoors, x, y);
+    if (beside !== undefined) return grid.mayWiden(x, y, doorOwner(beside));
+    return tunnels.some((room) => inRect(wallRect(room), x, y) && grid.mayWiden(x, y, room.id));
   };
   return (x, y) => {
     const key = cellKey(x, y);
@@ -223,4 +232,25 @@ export function clearOfLane(floor: CaveFloorPlan, index: number): (spot: StairSp
       return false;
     });
   };
+}
+
+/**
+ * Gives every lane cell its owner, for good: a room's cell to its room, a door's and the wall cell
+ * beside it to the door, a tunnel's side wall to the tunnel.
+ */
+export function claimLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], lane: readonly CellPoint[]): void {
+  const tunnels = route.map((id) => floor.rooms[id]).filter((room): room is DungeonRoom => room !== undefined && room.kind !== 'room');
+  const doors = laneDoorsOf(floor, route);
+  for (const c of lane) {
+    const envelope = grid.envelope(c.x, c.y);
+    if (envelope !== ROCK) {
+      grid.require(envelope, [c]);
+      continue;
+    }
+    if (grid.owner(c.x, c.y) !== ROCK) continue;
+    const door = besideDoor(floor, doors, c.x, c.y);
+    const tunnel = tunnels.find((room) => inRect(wallRect(room), c.x, c.y));
+    if (door !== undefined) grid.require(doorOwner(door), [c]);
+    else if (tunnel) grid.require(tunnel.id, [c]);
+  }
 }
