@@ -95,7 +95,7 @@ function overlappingPairs(upper: FloorShape, lower: FloorShape): { a: DungeonRoo
  * lie over each other and hold the same rectangle on both, as far from the stairs between them
  * already as both floors allow (at least `MIN_CONNECTION_SPREAD` doors); null where none can stand.
  */
-export function extraConnection(rng: Rng, upper: FloorShape, lower: FloorShape, index: number): StairSpot | null {
+export function extraConnection(rng: Rng, upper: FloorShape, lower: FloorShape, index: number, allowed: (spot: StairSpot) => boolean = () => true): StairSpot | null {
   const upperSpace = spaceOf(upper, index);
   const lowerSpace = spaceOf(lower, index + 1);
   const spots: StairSpot[] = [];
@@ -103,7 +103,7 @@ export function extraConnection(rng: Rng, upper: FloorShape, lower: FloorShape, 
   for (const { a, b, spread } of overlappingPairs(upper, lower)) {
     if (spots.length > 0 && spread < widest * 0.75) break;
     const shared = intersection(floorRect(a), floorRect(b));
-    const fitting = shared ? spotsWithin(shared).filter((spot) => spotFits(a, upperSpace, spot, 'upper') && spotFits(b, lowerSpace, spot, 'lower')) : [];
+    const fitting = shared ? spotsWithin(shared).filter((spot) => spotFits(a, upperSpace, spot, 'upper') && spotFits(b, lowerSpace, spot, 'lower') && allowed(spot)) : [];
     if (fitting.length === 0) continue;
     if (spots.length === 0) widest = spread;
     spots.push(...fitting);
