@@ -25,6 +25,8 @@ export interface RoomTraits {
   /** 0 at the entrance to 1 at the far end of the last floor. */
   depth: number;
   band: DepthBand;
+  /** The depth band within its own floor (all of the entrance floor is the dungeon's front once there are three floors). */
+  floorBand: DepthBand;
   doors: number;
   degree: Degree;
   outerWall: boolean;
@@ -107,6 +109,7 @@ export function roomTraits(floors: readonly PlannedFloor[]): RoomTraits[] {
         rotunda: room.rotunda,
         depth,
         band: bandOf(depth),
+        floorBand: bandOf((Number.isFinite(reach) ? reach : maxHops) / (maxHops + 1)),
         doors,
         degree: degreeOf(doors),
         outerWall: onOuterWall(room, floor.rooms),

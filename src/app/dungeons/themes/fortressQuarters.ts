@@ -6,9 +6,12 @@ export const FORTRESS_QUARTERS: readonly RoomTypeSpec[] = [
   {
     id: 'chapel',
     count: [0, 1],
-    depth: 'middle',
+    depth: ['front', 'middle'],
     degree: 'dead-end',
-    near: ['great-hall', 'solar'],
+    floor: 'entrance',
+    near: ['great-hall', 'lower-hall'],
+    nearRule: true,
+    strict: true,
     apart: ['kitchen'],
     terrain: { allows: ['pews', 'platform'], columns: true },
     furnish: {

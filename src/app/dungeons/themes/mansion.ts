@@ -19,7 +19,7 @@ export const MANSION: RoomProgramme = {
   climax: [
     { type: 'master-bedroom', weight: 0.35, arena: BEDCHAMBER_ARENA },
     { type: 'ritual-room', weight: 0.3, arena: RITUAL_ARENA },
-    { type: 'ballroom', weight: 0.35, arena: BALLROOM_ARENA, onlyOnEntranceFloor: true },
+    { type: 'ballroom', weight: 0.35, arena: BALLROOM_ARENA, onlyOnEntranceFloor: true, onlyInLargest: true },
   ],
   clusters: [
     { id: 'service', core: 'kitchen', members: ['scullery', 'servery', 'servants-hall', 'wine-cellar', 'laundry'], anchor: 'pivot', link: 'near', floor: 'entrance' },

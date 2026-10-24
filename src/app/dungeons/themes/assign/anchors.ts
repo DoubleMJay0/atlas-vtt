@@ -1,6 +1,7 @@
 /**
  * The rooms whose type the layout decides: the entrance room, the boss room (a climax type), the
- * stages of a five-room dungeon and the stair rooms, then the pivot hall the plan hangs on.
+ * stages of a five-room dungeon, the pivot hall the plan hangs on (a stair room may be it), then
+ * the stair rooms left.
  */
 
 import { type Rng, weighted } from '../../rng';
@@ -31,7 +32,7 @@ function fix(a: Assignment, i: number, id: RoomTypeId): void {
   a.fixed[i] = true;
 }
 
-/** Entrance, climax, five-room stages and stair rooms, each marked fixed. */
+/** Entrance, climax and five-room stages, each marked fixed. */
 export function placeAnchors(rng: Rng, a: Assignment): void {
   const entrance = entranceRoom(a);
   if (entrance !== null) {
@@ -41,7 +42,8 @@ export function placeAnchors(rng: Rng, a: Assignment): void {
   const boss = a.traits.find((t) => t.boss && !a.fixed[t.index]);
   if (boss) {
     const onEntranceFloor = boss.floor === 0;
-    const choices = a.programme.climax.map((c): readonly [ClimaxSpec, number] => [c, c.onlyOnEntranceFloor && !onEntranceFloor ? 0 : c.weight]);
+    const largest = boss.size === 'largest';
+    const choices = a.programme.climax.map((c): readonly [ClimaxSpec, number] => [c, (c.onlyOnEntranceFloor && !onEntranceFloor) || (c.onlyInLargest && !largest) ? 0 : c.weight]);
     const climax = draw(rng, a, boss.index, choices, (c) => c.type);
     if (climax) {
       fix(a, boss.index, climax.type);
@@ -53,6 +55,10 @@ export function placeAnchors(rng: Rng, a: Assignment): void {
     const id = a.programme.stages[t.stage].find((type) => !breaksHardRule(a, t.index, type));
     if (id) fix(a, t.index, id);
   }
+}
+
+/** Stair rooms no other anchor took, the pivot included, take the programme's stair type, marked fixed. */
+export function placeStairRooms(a: Assignment): void {
   for (const t of a.traits) if (t.stairs && !a.fixed[t.index] && !breaksHardRule(a, t.index, a.programme.stairs)) fix(a, t.index, a.programme.stairs);
 }
 
@@ -64,13 +70,16 @@ export function placePivot(a: Assignment): void {
     a.pivot = entrance;
     return;
   }
+  // A hall the plan hangs on is a hub in the front two thirds of the entrance floor where one is, the largest of them.
+  const hub = (t: (typeof a.traits)[number]): number => (t.degree === 'hub' ? 1 : 0);
   const room = a.traits
-    .filter((t) => t.floor === 0 && !a.fixed[t.index] && (t.band === 'front' || t.band === 'middle'))
-    .sort((x, y) => y.area - x.area || x.index - y.index)[0];
+    .filter((t) => t.floor === 0 && !a.fixed[t.index] && (t.floorBand === 'front' || t.floorBand === 'middle'))
+    .sort((x, y) => hub(y) - hub(x) || y.area - x.area || x.index - y.index)[0];
   if (!room) return;
+  // The pivot hall keeps to its count and the theme, not to its size: it is the largest front room there is.
   const id = a.programme.pivot.find((type) => {
     const spec = specOf(a.programme, type);
-    return spec !== undefined && heldCount(a, type, room.index) < spec.count[1] && !breaksHardRule(a, room.index, type);
+    return spec !== undefined && heldCount(a, type, room.index) < spec.count[1] && a.facts.allows(type, { floor: room.floor, room: room.room });
   });
   if (!id) return;
   fix(a, room.index, id);

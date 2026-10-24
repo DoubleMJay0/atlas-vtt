@@ -16,10 +16,12 @@ import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './p
 import { floorColumns, placeProps } from './props';
 import { roomRoles, type RoomRoles } from './props/roles';
 import { floorStream } from './rng';
-import { readTags } from './tags';
+import { type DungeonTag, readTags } from './tags';
+import { assignRoomTypes, type RoomTypes } from './themes/assign/assignRoomTypes';
 import type { FloorTerrain } from './terrain/floorTerrain';
 import { addShallowWater, planTerrain } from './terrain/placeTerrain';
-import { pickTheme, themedTags } from './themes/themes';
+import { NO_FACTS, pickTheme, programmeOf, themedTags, themeOf } from './themes/themes';
+import type { ThemeId } from './themes/themeTypes';
 import { chooseWaterLevel, placeWater, poolRooms } from './water';
 
 interface FloorParts {
@@ -43,6 +45,25 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth };
 }
 
+/**
+ * Types every normal room of a theme with a room programme (`DungeonRoom.type`) and returns the
+ * assignment; null for a theme that furnishes by roles.
+ */
+function typeRooms(seed: number, theme: ThemeId, tags: ReadonlySet<DungeonTag>, floors: readonly PlannedFloor[]): RoomTypes | null {
+  const definition = themeOf(theme);
+  const programme = programmeOf(definition, tags);
+  if (!programme) return null;
+  const facts = definition.facts?.({ seed, tags, floors }) ?? NO_FACTS;
+  const typed = assignRoomTypes({ seed, programme, floors, ruined: tags.has('ruined'), facts });
+  floors.forEach((floor, index) => {
+    for (const room of floor.rooms) {
+      const type = typed.byFloor[index]?.get(room.id);
+      if (type) room.type = type;
+    }
+  });
+  return typed;
+}
+
 export function generateDungeon(request: DungeonRequest): DungeonModel {
   const { seed } = request;
   const fiveRoom = request.fiveRoom === true;
@@ -54,12 +75,14 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   const count = requestedFloors(request);
   const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom);
+  const typed = typeRooms(seed, theme, params.tags, planned);
   const parts = planned.map((floor, index): FloorParts => {
     const floorPar = floorParams(params, index);
+    const roles = roomRoles(floorStream(seed, 'props', index, 'roles'), floor);
     return {
       planned: floor,
       params: floorPar,
-      roles: roomRoles(floorStream(seed, 'props', index, 'roles'), floor),
+      roles: typed ? { ...roles, empty: new Set(typed.empty[index]) } : roles,
       columns: floorColumns(seed, index, floor.rooms, floor.stairs, floorPar),
     };
   });

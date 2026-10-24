@@ -153,6 +153,7 @@ export const FORTRESS_ROOMS: readonly RoomTypeSpec[] = [
     depth: 'front',
     floor: 'entrance',
     near: ['gatehouse'],
+    nearRule: true,
     terrain: {},
     furnish: {
       defining: { kind: 'bunk', verb: 'rows', count: [2, 6] },
@@ -172,6 +173,7 @@ export const FORTRESS_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'dead-end',
     floor: 'entrance',
     near: ['gatehouse'],
+    nearRule: true,
     terrain: {},
     furnish: {
       defining: { kind: 'weapon-rack', verb: 'wall', count: [1, 2] },

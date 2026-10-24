@@ -86,6 +86,10 @@ export interface RoomTypeSpec {
   next?: readonly RoomTypeId[];
   /** Makes `next` a rule, not a wish: one of the types next to it (`any`) or every one (`all`, a servery between kitchen and dining room). */
   nextRule?: 'any' | 'all';
+  /** Makes every trait it names (depth, size, degree, shape) a rule, not a wish (a chapel is a dead end off the hall). */
+  strict?: true;
+  /** Makes `near` a rule: one of those types within two rooms (barracks by the gate, a chapel off the hall). */
+  nearRule?: true;
   /** Only the smallest room of its floor (a bathroom). */
   smallest?: true;
   /** Types it should lie within two normal rooms of. */

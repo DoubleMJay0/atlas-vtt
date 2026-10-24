@@ -73,7 +73,9 @@ export function fitScore(spec: RoomTypeSpec, t: RoomTraits, floors: number): num
   let score = 0;
   const bands = listOf(spec.depth);
   if (bands.length) {
-    const off = Math.min(...bands.map((band) => bandDistance(band, t.band)));
+    // A type of the entrance floor is placed by its depth in that floor.
+    const band = spec.floor === 'entrance' ? t.floorBand : t.band;
+    const off = Math.min(...bands.map((wanted) => bandDistance(wanted, band)));
     score += off === 0 ? 2 : -3 * off;
   }
   const sizes = listOf(spec.size);
@@ -112,6 +114,9 @@ function apart(programme: RoomProgramme, a: RoomTypeId, b: RoomTypeId): boolean 
   return Boolean(specOf(programme, a)?.apart?.includes(b) || specOf(programme, b)?.apart?.includes(a));
 }
 
+/** Hazard types want rooms of this much floor: what terrain needs to lay a hazard. */
+const HAZARD_AREA = 9;
+
 /** The one score fills and swaps compare: the room's fit, its neighbours and what the theme knows of it. */
 export function roomScore(a: Assignment, i: number, id: RoomTypeId): number {
   const t = a.traits[i];
@@ -119,7 +124,8 @@ export function roomScore(a: Assignment, i: number, id: RoomTypeId): number {
   if (!t || !spec) return -Infinity;
   const held = a.types[i] ?? null;
   a.types[i] = id;
-  const score = fitScore(spec, t, a.floors) + adjacencyScore(a, i) + a.facts.score(id, { floor: t.floor, room: t.room });
+  const hazardRoom = spec.terrain.hazards?.length && t.area >= HAZARD_AREA ? 2 : 0;
+  const score = fitScore(spec, t, a.floors) + adjacencyScore(a, i) + hazardRoom + a.facts.score(id, { floor: t.floor, room: t.room });
   a.types[i] = held;
   return score;
 }
@@ -130,8 +136,53 @@ export function heldCount(a: Assignment, id: RoomTypeId, i: number, perFloor = f
   return a.types.filter((type, j) => j !== i && type === id && (!perFloor || a.traits[j]?.floor === floor)).length;
 }
 
-/** Whether a type of the theme's programme may not stand in room `i` at all. */
-export function breaksHardRule(a: Assignment, i: number, id: RoomTypeId): boolean {
+/** Whether the room's neighbours hold the types its type needs next to it. */
+function lacksNeighbours(a: Assignment, i: number, spec: RoomTypeSpec): boolean {
+  if (!spec.nextRule || !spec.next?.length) return false;
+  const next = typesAround(a, a.graph.next(i));
+  return spec.nextRule === 'all' ? !spec.next.every((type) => next.has(type)) : !spec.next.some((type) => next.has(type));
+}
+
+/**
+ * Whether a room lies on the branch of the pivot that holds the core of the cluster `id`'s cluster
+ * keeps apart from (the private rooms off the service wing's branch).
+ */
+function onApartBranch(a: Assignment, i: number, id: RoomTypeId): boolean {
+  if (a.pivot === null) return false;
+  const cluster = a.programme.clusters.find((c) => c.apartFrom && (c.core === id || c.members.includes(id)));
+  const other = cluster && a.programme.clusters.find((c) => c.id === cluster.apartFrom);
+  const core = other ? a.types.indexOf(other.core) : -1;
+  if (core < 0) return false;
+  const branch = a.graph.branchOf(a.pivot, core);
+  return branch !== null && a.graph.branchOf(a.pivot, i) === branch;
+}
+
+/** Whether a room is larger than the smallest normal room of its floor. */
+function largerThanSmallest(a: Assignment, t: RoomTraits): boolean {
+  return a.traits.some((other) => other.floor === t.floor && other.area < t.area);
+}
+
+/** Rules a filler may leave aside: how many of it there are, and the branch its cluster keeps off. */
+export interface Relaxed {
+  counts?: boolean;
+  branches?: boolean;
+}
+
+/** Whether a spec names a trait the room lacks, for a type whose traits are rules (`strict`). */
+function missesTrait(spec: RoomTypeSpec, t: RoomTraits): boolean {
+  const band = spec.floor === 'entrance' ? t.floorBand : t.band;
+  const bands = listOf(spec.depth);
+  if (bands.length && !bands.some((wanted) => bandDistance(wanted, band) === 0)) return true;
+  if (spec.size && !listOf(spec.size).includes(t.size)) return true;
+  if (spec.degree && !listOf(spec.degree).includes(t.degree)) return true;
+  return (spec.shape === 'long' && !t.long) || (spec.shape === 'square' && !t.square);
+}
+
+/**
+ * Whether a type of the theme's programme may not stand in room `i` at all. A filler may leave
+ * its count and its cluster's branch aside (`relaxed`): fillers fill every room left over.
+ */
+export function breaksHardRule(a: Assignment, i: number, id: RoomTypeId, relaxed: Relaxed = {}): boolean {
   const t = a.traits[i];
   const spec = specOf(a.programme, id);
   if (!t || !spec) return true;
@@ -141,7 +192,14 @@ export function breaksHardRule(a: Assignment, i: number, id: RoomTypeId): boolea
   if (spec.ruinedOnly && !a.ruined) return true;
   if (spec.climaxOnly && !t.boss) return true;
   if (spec.holdsStairs && !t.stairs) return true;
-  if (heldCount(a, id, i, spec.perFloor) >= spec.count[1]) return true;
+  if (spec.outerWall && !t.outerWall) return true;
+  if (spec.size === 'largest' && t.size !== 'largest') return true;
+  if (spec.smallest && largerThanSmallest(a, t)) return true;
+  if (spec.strict && missesTrait(spec, t)) return true;
+  if (relaxed.counts !== false && heldCount(a, id, i, spec.perFloor) >= spec.count[1]) return true;
+  if (lacksNeighbours(a, i, spec)) return true;
+  if (spec.nearRule && spec.near?.length && !spec.near.some((type) => typesAround(a, a.graph.near(i)).has(type))) return true;
+  if (relaxed.branches !== false && onApartBranch(a, i, id)) return true;
   if (a.graph.next(i).some((j) => a.types[j] && apart(a.programme, id, a.types[j]))) return true;
   return !a.facts.allows(id, { floor: t.floor, room: t.room });
 }

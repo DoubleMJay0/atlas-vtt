@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlannedFloor } from '../../../src/app/dungeons/floors/planFloors';
 import { stream } from '../../../src/app/dungeons/rng';
-import { placeAnchors, placePivot } from '../../../src/app/dungeons/themes/assign/anchors';
+import { placeAnchors, placePivot, placeStairRooms } from '../../../src/app/dungeons/themes/assign/anchors';
 import { placeClusters } from '../../../src/app/dungeons/themes/assign/clusters';
 import { type Assignment, adjacencyScore, breaksHardRule, newAssignment, roomScore } from '../../../src/app/dungeons/themes/assign/score';
 import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
@@ -16,6 +16,7 @@ function anchored(seed: number, floors: readonly PlannedFloor[], programme: Room
   const a = newAssignment(floors, programme, facts, false);
   placeAnchors(stream(seed, 'rooms', 'anchors'), a);
   placePivot(a);
+  placeStairRooms(a);
   placeClusters(stream(seed, 'rooms', 'clusters'), a);
   return a;
 }
@@ -38,7 +39,11 @@ describe('anchors', () => {
     const climaxes = new Set(SEEDS.map((seed) => anchored(seed, keepFloors(2), MANSION).climax?.type));
     expect(climaxes.has('ballroom')).toBe(false);
     expect(climaxes.size).toBe(2);
-    expect(new Set(SEEDS.map((seed) => anchored(seed, [keep()], MANSION).climax?.type)).has('ballroom')).toBe(true);
+    expect(new Set(SEEDS.map((seed) => anchored(seed, [keep()], MANSION).climax?.type)).has('ballroom')).toBe(false);
+    // A ballroom is the largest room of its floor: the boss room must be it.
+    const floor = keep();
+    const grand = { ...floor, rooms: floor.rooms.map((r) => (r.boss ? { ...r, w: 10 } : r)) };
+    expect(new Set(SEEDS.map((seed) => anchored(seed, [grand], MANSION).climax?.type)).has('ballroom')).toBe(true);
   });
 
   it('makes the largest front room the great hall and falls back to the lower hall when the climax took it', () => {
