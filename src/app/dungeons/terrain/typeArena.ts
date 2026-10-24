@@ -22,9 +22,12 @@ import type { TerrainWork } from './work';
 /** What cannot be walked in an arena takes at most this share of its floor, furniture and all. */
 const ARENA_OPEN = 0.4;
 
-/** The arena of a typed boss room: its climax type's. */
-export function arenaOf(work: TerrainWork, typed: TypedRoom): ArenaSpec | undefined {
-  return programmeOf(work.theme.definition, work.tags)?.climax.find((c) => c.type === typed.spec.id)?.arena;
+/** An arena with nothing of its own: for a typed boss room whose type is no climax, which then takes no hazard and no set piece. */
+const PLAIN_ARENA: ArenaSpec = { seat: null, setPieces: [], mirrored: ['pillar', 'wall-fragment'], hazards: [] };
+
+/** The arena of a typed boss room: its climax type's, else a plain one. */
+export function arenaOf(work: TerrainWork, typed: TypedRoom): ArenaSpec {
+  return programmeOf(work.theme.definition, work.tags)?.climax.find((c) => c.type === typed.spec.id)?.arena ?? PLAIN_ARENA;
 }
 
 /** The arena's seat on the middle of its platform, facing down its steps: a cell piece on whole platform cells, a disc on one; none where the arena has no seat or it is not drawn. */
@@ -67,6 +70,6 @@ export function furnishTypedArena(work: TerrainWork, k: number, rc: RoomCells, r
   };
   const fs: FurnishSpace = { ...base, placeAllowed: (kind, at) => open(kind) && (base.placeAllowed?.(kind, at) ?? true) };
   const platform = floor.inRoom(rc.room.id).find((p) => p.kind === 'platform' && p.facing);
-  if (platform && arena) seatOnPlatform(fs, platform, arena);
+  if (platform) seatOnPlatform(fs, platform, arena);
   furnishByRecipe(fs, { pieces: typed.spec.furnish.pieces }, typed.context);
 }

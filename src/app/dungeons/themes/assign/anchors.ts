@@ -11,11 +11,13 @@ import { type Assignment, breaksHardRule, heldCount, specOf } from './score';
 
 /**
  * The room a party enters by: room 0 of the entry floor, or the normal room nearest it where room 0
- * is a corridor.
+ * is a corridor; never the boss room where the floor has another, since the boss room is its climax.
  */
 export function entranceRoom(a: Assignment): number | null {
-  const first = a.traits.filter((t) => t.floor === 0).sort((x, y) => x.depth - y.depth || x.room - y.room)[0];
-  return a.traits.find((t) => t.floor === 0 && t.room === 0)?.index ?? first?.index ?? null;
+  const floor0 = a.traits.filter((t) => t.floor === 0);
+  const open = floor0.some((t) => !t.boss) ? floor0.filter((t) => !t.boss) : floor0;
+  const first = [...open].sort((x, y) => x.depth - y.depth || x.room - y.room)[0];
+  return open.find((t) => t.room === 0)?.index ?? first?.index ?? null;
 }
 
 /** A draw by weight among the choices the theme allows in room `i`; the first listed where it allows none. */
