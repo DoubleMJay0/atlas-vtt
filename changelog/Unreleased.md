@@ -20,6 +20,8 @@
 - Replace map image: put a video, a gridless version or a larger export of the same map in its place, keeping the grid, walls, lights and tokens
 - Map features: hover rubble, a statue or a door to see its name and traits, shown only to you; right-click a feature to rename it or set its terrain
 - Difficult terrain costs double in a token's movement ruler where the game system has that rule (5e, Pathfinder 2e, Draw Steel), with a switch in the collection's grid settings
+- Cavern dungeons are natural caves: chambers and tunnels in the rock with a way two squares wide to the boss, chasms along the faults, lakes in the low chambers, pitches and scree slopes between floors, and lava or acid deep down where the tags ask for them
+- With the Inhabited tag a cavern near water is lived in: a guard post at its mouth, sleeping hollows round their fires, pens and stores, and the chief's den at the end
 
 ## Improved
 
