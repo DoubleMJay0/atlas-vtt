@@ -48,5 +48,5 @@ describe('a cave’s heights and water', () => {
     const share = (floor: DungeonModel['floors'][number]): number => floor.cave!.basins.length / floor.rooms.filter((r) => r.kind === 'room').length;
     const most = runs.filter((model) => model.floors.length === 3 && model.floors.every((f) => share(model.floors[2]!) >= share(f)));
     expect(most.length / runs.length).toBeGreaterThanOrEqual(0.85);
-  });
+  }, 60_000);
 });

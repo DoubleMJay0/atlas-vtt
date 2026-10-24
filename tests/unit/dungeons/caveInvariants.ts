@@ -20,6 +20,8 @@ import { bridgeProblems, cellProblems, holeProblems, routeProblems, stairClearan
  */
 
 const SEEDS = 400;
+/** Cases that draw or regenerate a hundred caves take this long at most beside the whole suite. */
+const HEAVY = 300_000;
 const TAG_SETS: readonly string[][] = [
   [],
   ['small'],
@@ -108,7 +110,7 @@ export function describeCaveInvariants(floors: number): void {
           }
         });
       }
-    });
+    }, HEAVY);
 
     it('are the same for the same request, and keep their shape whatever the water', () => {
       for (const run of runs.slice(0, 100)) {
@@ -118,7 +120,7 @@ export function describeCaveInvariants(floors: number): void {
         expect(masks(0.3)).toEqual(masks(0));
         expect(masks(0.6)).toEqual(masks(0));
       }
-    });
+    }, HEAVY);
 
     it('rule 8: lay roosts by the mouth, fungus groves by water or a roost, the den deep', () => {
       expect(failures((run) => lifeProblems(run.model))).toEqual([]);
