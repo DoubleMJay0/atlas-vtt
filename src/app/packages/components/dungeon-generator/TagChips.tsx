@@ -9,6 +9,8 @@ import { cn } from '../../../../utils/cn';
 interface TagChipsProps {
   /** The tags the shown dungeon is generated with. */
   picked: readonly string[];
+  /** Tags the chosen theme cannot take, each with the reason shown as its tooltip. */
+  refused: ReadonlyMap<DungeonTag, string>;
   onToggle: (tag: DungeonTag) => void;
   onRandom: () => void;
 }
@@ -26,9 +28,10 @@ function tagDescription(tag: DungeonTag): string {
 /**
  * Every tag as a chip that switches it on and off at once, on the same seed, so the map shows
  * what the tag does, grouped under headings (`TAG_GROUPS`); switching one on switches off the
- * tags it rules out. Random takes a new seed.
+ * tags it rules out. A tag the chosen theme refuses keeps its place, shown disabled with the
+ * reason as its tooltip, so the chips never move. Random takes a new seed.
  */
-export function TagChips({ picked, onToggle, onRandom }: TagChipsProps): React.JSX.Element {
+export function TagChips({ picked, refused, onToggle, onRandom }: TagChipsProps): React.JSX.Element {
   const labelId = useId();
   return (
     <div className="atlas-dungeon-tags">
@@ -38,14 +41,18 @@ export function TagChips({ picked, onToggle, onRandom }: TagChipsProps): React.J
           <div className="atlas-dungeon-tags__chips">
             {group.tags.map((tag) => {
               const on = picked.includes(tag);
+              const reason = refused.get(tag);
               return (
-                <LabelTooltip key={tag} label={tagDescription(tag)} describe>
+                <LabelTooltip key={tag} label={reason ?? tagDescription(tag)} describe>
                   <button
                     type="button"
-                    className={cn('atlas-dungeon-tag', on && 'atlas-active')}
+                    className={cn('atlas-dungeon-tag', on && 'atlas-active', reason !== undefined && 'atlas-dungeon-tag--refused')}
                     aria-pressed={on}
+                    aria-disabled={reason !== undefined ? 'true' : undefined}
                     data-tag={tag}
-                    onClick={() => onToggle(tag)}
+                    onClick={() => {
+                      if (reason === undefined) onToggle(tag);
+                    }}
                   >
                     {tagName(tag)}
                   </button>

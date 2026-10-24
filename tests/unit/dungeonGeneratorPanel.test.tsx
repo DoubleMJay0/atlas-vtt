@@ -14,6 +14,7 @@ import { useDungeonState } from '../../src/app/packages/components/dungeon-gener
 import { AssetService } from '../../src/app/services/AssetService';
 import { SettingsService } from '../../src/app/services/SettingsService';
 import { stubLayout } from '../mocks/jsdomLayout';
+import { t } from '../../src/app/i18n';
 
 const worker = vi.hoisted(() => ({ preview: vi.fn(), render: vi.fn(), thumbnail: vi.fn(), dropThumbnails: vi.fn() }));
 vi.mock('../../src/app/dungeons/worker/DungeonWorkerClient', () => ({ DungeonWorkerClient: { forApp: () => worker } }));
@@ -182,6 +183,64 @@ describe('the dungeon generator panel', () => {
     expect(worker.preview.mock.calls.length).toBe(calls);
     expect(lastJob().request).toEqual(request);
     expect(settings.getDungeonGenerator()).toEqual(before);
+  });
+});
+
+describe('the theme', () => {
+  const themeSelect = (): HTMLElement => screen.getByRole('combobox', { name: 'Theme' });
+  const chooseTheme = (label: string): void => {
+    fireEvent.click(themeSelect());
+    fireEvent.click(screen.getByRole('option', { name: label }));
+  };
+  const chips = (): string[] => [...document.querySelectorAll('.atlas-dungeon-tag')].map((chip) => chip.getAttribute('data-tag') ?? '');
+  const refused = (): string[] => [...document.querySelectorAll('.atlas-dungeon-tag[aria-disabled="true"]')].map((chip) => chip.getAttribute('data-tag') ?? '');
+
+  it('offers the theme choice with Any first', () => {
+    renderPanel();
+    fireEvent.click(themeSelect());
+    const labels = screen.getAllByRole('option').map((option) => option.textContent);
+    // Any names the theme it picked once the dungeon is there
+    expect(labels[0]).toMatch(/^Any/);
+    expect(labels.slice(1)).toEqual(['Fortress', 'Haunted Mansion', 'Cavern']);
+  });
+
+  it('shows the chips the Haunted Mansion refuses disabled, in place, with the reason', async () => {
+    renderPanel();
+    const order = chips();
+    chooseTheme('Haunted Mansion');
+    await waitFor(() => expect(lastJob().request.theme).toBe('mansion'));
+    expect(refused().sort()).toEqual(['acid', 'flooded', 'lava']);
+    expect(chips()).toEqual(order);
+    fireEvent.click(tag('lava'));
+    expect(lastJob().request.tags).toEqual([]);
+    const reason = document.getElementById(tag('lava').getAttribute('aria-describedby')!);
+    expect(reason?.textContent).toBe(t('dungeon.theme.refused.noMolten'));
+  });
+
+  it('refuses ruined only for the Cavern', () => {
+    renderPanel();
+    chooseTheme('Cavern');
+    expect(refused()).toEqual(['ruined']);
+  });
+
+  it('refuses nothing for Any', () => {
+    renderPanel();
+    expect(refused()).toEqual([]);
+  });
+
+  it('keeps the seed when the theme changes, and persists the theme', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    const seed = lastJob().request.seed;
+    chooseTheme('Fortress');
+    await waitFor(() => expect(lastJob().request.theme).toBe('fortress'));
+    expect(lastJob().request.seed).toBe(seed);
+    expect(settings.getDungeonGenerator().theme).toBe('fortress');
+  });
+
+  it('names the theme Any picked once the dungeon is there', async () => {
+    renderPanel();
+    await waitFor(() => expect(themeSelect().textContent).toMatch(/^Any \((Fortress|Haunted Mansion|Cavern)\)$/));
   });
 });
 

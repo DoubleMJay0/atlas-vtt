@@ -8,6 +8,7 @@ import { secretWingOf } from '../../../dungeons/secretWings';
 import type { DungeonView } from '../../../dungeons/style';
 import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
 import { withTag, type DungeonTag } from '../../../dungeons/tags';
+import type { ThemeChoice } from '../../../dungeons/themes/themeTypes';
 import { SettingsService } from '../../../services/SettingsService';
 
 /** Everything the generator panel holds and how it changes. */
@@ -29,6 +30,8 @@ export interface DungeonState {
   setFloor: (floor: number) => void;
   /** The floors stepper: another dungeon. */
   setFloors: (floors: number) => void;
+  /** The theme choice: another dungeon on the same seed. */
+  setTheme: (theme: ThemeChoice) => void;
   setBossRoom: (on: boolean) => void;
   setFiveRoom: (on: boolean) => void;
   setGenerated: (request: DungeonRequest, model: DungeonModel) => void;
@@ -63,16 +66,16 @@ function shownFloor(picked: number, request: DungeonRequest, model: DungeonModel
 
 
 /**
- * The generator's state. Style, view, the tags generated with, the floors and the boss room and
- * five-room switches are the GM's preferences and kept in Atlas' settings as they change; the
+ * The generator's state. Style, view, the theme and tags generated with, the floors and the boss
+ * room and five-room switches are the GM's preferences and kept in Atlas' settings as they change; the
  * seed, the name and the edits belong to this one dungeon and go with the panel. A new seed,
- * tags, floor count or switch is another dungeon: edits are dropped. The name only names the
+ * theme, tags, floor count or switch is another dungeon: edits are dropped. The name only names the
  * scene, and the floor shown only which floor the preview and exports draw.
  */
 export function useDungeonState(app: App, initialName = ''): DungeonState {
   const [settings, setSettings] = useState<DungeonGeneratorSettings>(() => readSettings(app));
   const [request, setRequest] = useState<DungeonRequest>(() => ({
-    seed: randomSeed(), tags: settings.tags, floors: settings.floors, bossRoom: settings.bossRoom, fiveRoom: settings.fiveRoom,
+    seed: randomSeed(), theme: settings.theme, tags: settings.tags, floors: settings.floors, bossRoom: settings.bossRoom, fiveRoom: settings.fiveRoom,
   }));
   const [pickedFloor, setPickedFloor] = useState(0);
   const [name, setNameState] = useState(initialName.trim());
@@ -133,6 +136,10 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     setFloors: useCallback((floors) => {
       changeRequest((current) => (current.floors === floors ? current : { ...current, floors: floorCount(floors) }));
       persist({ floors: floorCount(floors) });
+    }, [changeRequest, persist]),
+    setTheme: useCallback((theme) => {
+      changeRequest((current) => (current.theme === theme ? current : { ...current, theme }));
+      persist({ theme });
     }, [changeRequest, persist]),
     setBossRoom: useCallback((on) => {
       changeRequest((current) => (current.bossRoom === on ? current : { ...current, bossRoom: on }));

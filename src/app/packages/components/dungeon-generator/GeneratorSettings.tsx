@@ -1,9 +1,12 @@
 import React, { useId, useState } from 'react';
 import type { CollectionMetadata } from '../../../services/AssetService';
 import { CollectionSelect } from '../asset-manager/token-creator/CollectionSelect';
-import { t } from '../../../i18n';
+import { refusedTags } from '../../../dungeons/themes/themes';
+import { THEME_IDS, type ThemeChoice, type ThemeId } from '../../../dungeons/themes/themeTypes';
+import type { DungeonTag } from '../../../dungeons/tags';
+import { type MessageKey, t } from '../../../i18n';
 import { DungeonIdentity } from './DungeonIdentity';
-import { SettingsSection, SwitchRow } from './fields';
+import { SelectRow, SettingsSection, SwitchRow } from './fields';
 import { StyleSettings } from './StyleSettings';
 import { TagChips } from './TagChips';
 import { useScrollbarGutter } from '../primitives/useScrollbarGutter';
@@ -21,12 +24,27 @@ interface GeneratorSettingsProps {
   thumbnails: ThumbnailRenderer;
 }
 
+const themeName = (theme: ThemeId): string => t(`dungeon.theme.${theme}` as MessageKey);
+
+/** The theme choices, Any first, naming the theme it gave the dungeon shown once there is one. */
+function themeOptions(picked: ThemeId | undefined): { value: ThemeChoice; label: string }[] {
+  const any = picked ? t('dungeon.theme.anyPicked', { theme: themeName(picked) }) : t('dungeon.theme.any');
+  return [{ value: 'any', label: any }, ...THEME_IDS.map((theme) => ({ value: theme, label: themeName(theme) }))];
+}
+
+/** The tags the chosen theme refuses, with the reasons as shown; none for Any, which only picks among themes that take them. */
+function refusedOf(choice: ThemeChoice): ReadonlyMap<DungeonTag, string> {
+  if (choice === 'any') return new Map();
+  return new Map([...refusedTags(choice)].map(([tag, reason]) => [tag, t(reason)]));
+}
+
 /**
  * The sidebar's settings, in the order a dungeon is made: where its scene goes and what it is
- * called, its seed, floors and shape, which tags, how it is drawn, what the map shows.
+ * called, its seed, floors, theme and shape, which tags, how it is drawn, what the map shows.
  */
 export function GeneratorSettings({ state, layer, collection, thumbnails }: GeneratorSettingsProps): React.JSX.Element {
   const { request, settings } = state;
+  const theme = request.theme ?? 'any';
   const collectionId = useId();
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   useScrollbarGutter(scroller);
@@ -49,6 +67,13 @@ export function GeneratorSettings({ state, layer, collection, thumbnails }: Gene
           onFloors={state.setFloors}
           floorsFixed={request.fiveRoom === true}
         />
+        <SelectRow<ThemeChoice>
+          label={t('dungeon.theme.label')}
+          value={theme}
+          options={themeOptions(state.generated?.theme)}
+          onChange={state.setTheme}
+          layer={layer}
+        />
         {/* A five-room dungeon's fourth room is its boss room whatever the switch says */}
         <SwitchRow
           label={t('dungeon.bossRoom')}
@@ -65,7 +90,7 @@ export function GeneratorSettings({ state, layer, collection, thumbnails }: Gene
         />
       </div>
       <SettingsSection title={t('dungeon.tags')}>
-        <TagChips picked={request.tags} onToggle={state.toggleTag} onRandom={state.random} />
+        <TagChips picked={request.tags} refused={refusedOf(theme)} onToggle={state.toggleTag} onRandom={state.random} />
       </SettingsSection>
       <SettingsSection title={t('dungeon.style')}>
         <StyleSettings state={state} renderer={thumbnails} />

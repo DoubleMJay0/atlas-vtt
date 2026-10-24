@@ -237,6 +237,15 @@
     color: var(--text-on-accent);
   }
 
+  // A tag the chosen theme cannot take: in its place, plainly out of use, its tooltip says why.
+  &.atlas-dungeon-tag--refused,
+  &.atlas-dungeon-tag--refused:hover {
+    border-color: var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-faint);
+    cursor: default;
+  }
+
   @include atlas-focus-ring;
 }
 
