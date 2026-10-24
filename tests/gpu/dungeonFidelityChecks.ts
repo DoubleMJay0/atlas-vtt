@@ -1,4 +1,4 @@
-import { doorCells } from '../../src/app/dungeons/geometry';
+import { doorCells, holdsCell } from '../../src/app/dungeons/geometry';
 import type { DungeonFloor } from '../../src/app/dungeons/model';
 import type { DungeonPlacement } from '../../src/app/dungeons/scene/toWalls';
 import type { FloorField } from '../../src/app/dungeons/render/visibleDungeon';
@@ -139,10 +139,15 @@ export function gridAgreement(floor: DungeonFloor, grid: Pick<GridState, 'size' 
     const x1 = (room.x + room.w - 0.3 - originCell.x) * pxPerCell;
     const y0 = (room.y + 0.3 - originCell.y) * pxPerCell;
     const y1 = (room.y + room.h - 0.3 - originCell.y) * pxPerCell;
+    // A cave room's rectangle holds rock beside its cells, which is no floor for a grid line to cross.
+    const onFloor = (x: number, y: number): boolean => holdsCell(room, Math.floor(x / pxPerCell + originCell.x), Math.floor(y / pxPerCell + originCell.y));
     const count = (line: number, along: [number, number], vertical: boolean): number => {
       let n = 0;
       // A line on a pixel boundary inks the pixels on both sides of it
-      for (let t = along[0]; t <= along[1]; t++) if (vertical ? gridLike(line - 1, t) || gridLike(line, t) : gridLike(t, line - 1) || gridLike(t, line)) n++;
+      for (let t = along[0]; t <= along[1]; t++) {
+        if (!(vertical ? onFloor(line, t) : onFloor(t, line))) continue;
+        if (vertical ? gridLike(line - 1, t) || gridLike(line, t) : gridLike(t, line - 1) || gridLike(t, line)) n++;
+      }
       return n;
     };
     for (let x = grid.offsetX + Math.ceil((x0 - grid.offsetX) / grid.size) * grid.size; x <= x1; x += grid.size) {
