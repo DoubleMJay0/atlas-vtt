@@ -5,7 +5,8 @@
  * and vegetation. Architecture only: no story, no text; a dungeon is named by the GM alone.
  */
 
-import { type FloorStack, floorStack, floorWaterLevel, isAbove } from './floors/floorStack';
+import { type FloorStack, floorAbove, floorStack, floorWaterLevel, isAbove } from './floors/floorStack';
+import { cellKey } from './geometry';
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { fiveRoomParams } from './layout/fiveRoom';
 import { floraOf } from './growth/flora';
@@ -35,6 +36,8 @@ interface FloorParts {
   water: ThemeWater | null;
   theme: ThemeId;
   stack: FloorStack;
+  /** The cells under an opening in the floor above, by key. */
+  openAbove: ReadonlySet<string>;
 }
 
 function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, dungeonLevel: number): DungeonFloor {
@@ -49,7 +52,7 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept) });
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
-  const pieces = addUndergrowth(seed, terrain, waterCells, flora, params.tags.has('ruined'), aboveGround);
+  const pieces = addUndergrowth(seed, terrain, waterCells, flora, { ruined: params.tags.has('ruined'), aboveGround, openAbove: parts.openAbove });
   const typedRooms = new Set(rooms.filter((room) => room.type).map((room) => room.id));
   const placed = placeProps({ seed, floor: index, stack: parts.stack, rooms, doors, stairs, columns, terrain: pieces, roles, params, typed: typedRooms, furnished: terrain.propCells() });
   const props = [...terrain.props, ...placed.props];
@@ -73,7 +76,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const { typed } = themed;
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.
   const level = typed && request.waterLevel === undefined && params.waterLevel === null ? 0 : rolled;
-  const parts = planned.map((floor, index): Omit<FloorParts, 'stack'> => {
+  const parts = planned.map((floor, index): Omit<FloorParts, 'stack' | 'openAbove'> => {
     const floorPar = floorParams(params, index);
     const roles = roomRoles(floorStream(seed, 'props', index, 'roles'), floor);
     return {
@@ -93,6 +96,10 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
     themed.theme,
     stack,
   );
-  const floors = parts.map((part, index) => finishFloor(seed, index, { ...part, stack }, terrain[index] as FloorTerrain, level));
+  const openAbove = (index: number): Set<string> => {
+    const holes = terrain[floorAbove(stack, index) ?? -1]?.pieces.filter((piece) => piece.opening) ?? [];
+    return new Set(holes.flatMap((piece) => piece.cells.map((c) => cellKey(c.x, c.y))));
+  };
+  const floors = parts.map((part, index) => finishFloor(seed, index, { ...part, stack, openAbove: openAbove(index) }, terrain[index] as FloorTerrain, level));
   return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors };
 }

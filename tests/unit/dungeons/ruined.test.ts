@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { floorAbove, stackOf } from '../../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { outerWallCells } from '../../../src/app/dungeons/growth/outerWalls';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
@@ -17,6 +18,7 @@ vi.mock('../../../src/app/dungeons/drawnKinds', async (importOriginal) => {
 });
 
 const SEEDS = 300;
+const UNDERGROWTH = new Set(['brambles', 'thicket', 'tangled-roots']);
 
 describe.each(['fortress', 'mansion'] as const)('a ruined %s', (theme) => {
   const runs = (tags: string[]): DungeonModel[] => Array.from({ length: SEEDS }, (_, k) => generateDungeon({ seed: (k + 1) * 3001, theme, tags, floors: 1 + (k % 2) }));
@@ -50,6 +52,22 @@ describe.each(['fortress', 'mansion'] as const)('a ruined %s', (theme) => {
       return !g.cells.every((c) => outer.has(`${c.x},${c.y}`));
     }).map((g) => `${m.seed}: ${g.kind} off an outer wall in a ${f.rooms[g.room]?.type}`)));
     expect(ruined.some((m) => m.floors.some((f) => f.growth.length > 0))).toBe(true);
+    expect(stray.slice(0, 5)).toEqual([]);
+  });
+
+  it('grows undergrowth only where light or water comes in when ruined and overgrown: by outer walls, under openings above, by water', () => {
+    const wild = runs(['ruined', 'overgrown']);
+    const stray = wild.flatMap((m) => m.floors.flatMap((f, k) => {
+      const above = floorAbove(stackOf(m), k);
+      const under = new Set((above === null ? [] : m.floors[above]!.terrain.filter((p) => p.opening)).flatMap((p) => p.cells.map((c) => `${c.x},${c.y}`)));
+      const wet = new Set(f.waterCells.map((c) => `${c.x},${c.y}`));
+      const near = (c: { x: number; y: number }, set: ReadonlySet<string>): boolean => [-2, -1, 0, 1, 2].some((dx) => [-2, -1, 0, 1, 2].some((dy) => set.has(`${c.x + dx},${c.y + dy}`)));
+      return f.terrain.filter((p) => UNDERGROWTH.has(p.kind) && f.rooms[p.room]?.type).filter((p) => {
+        const outer = outerWallCells(f.rooms[p.room]!, f.rooms);
+        return !p.cells.some((c) => near(c, outer) || near(c, under) || near(c, wet));
+      }).map((p) => `${m.seed}: ${p.kind} in a sealed ${f.rooms[p.room]?.type} on floor ${k}`);
+    }));
+    expect(wild.some((m) => m.floors.some((f) => f.terrain.some((p) => UNDERGROWTH.has(p.kind))))).toBe(true);
     expect(stray.slice(0, 5)).toEqual([]);
   });
 
