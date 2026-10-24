@@ -1,8 +1,9 @@
 /**
- * What the tags do to layout, water and props, and how floors further down differ from the one
- * above. Every number a tag or a floor changes lives here, so their effect can be read in one place.
+ * What the tags do to layout, water and props, and how each floor differs from the entrance floor.
+ * Every number a tag or a floor changes lives here, so their effect can be read in one place.
  */
 
+import type { FloorRise } from './floors/floorStack';
 import { chance, stream } from './rng';
 import { readTags, rivalsOf, withTag, type DungeonTag } from './tags';
 
@@ -146,26 +147,27 @@ export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
 
 /** The fewest normal rooms any floor has. */
 export const MIN_FLOOR_ROOMS = 3;
-/** How much smaller each floor is than the one above, as a share of the entry floor. */
+/** How much smaller each floor is than the one before, as a share of the entry floor. */
 const SHRINK_PER_FLOOR = 0.18;
 /** How much of the symmetry, round rooms and colonnades each floor further down loses. */
 const ROUGHEN_PER_FLOOR = 0.35;
 
 /**
- * The params of floor `floor` (0 the entry floor): digging gets harder further down, so deeper
- * floors have fewer rooms (never fewer than three), mirror less and are less often round or
- * colonnaded. Steps grow likelier, as the ground falls away.
+ * The params of floor `floor` (0 the entry floor), whose floors stack the way `rise` says. Every
+ * later floor has fewer rooms (never fewer than three). Digging gets harder further down, so a
+ * floor below the entrance mirrors less, is less often round or colonnaded, and has steps more
+ * often, as the ground falls away; a storey above it is built as the entrance floor is.
  */
-export function floorParams(params: DungeonParams, floor: number): DungeonParams {
+export function floorParams(params: DungeonParams, floor: number, rise: FloorRise): DungeonParams {
   if (floor === 0) return params;
   const size = 1 - SHRINK_PER_FLOOR * floor;
-  const rough = Math.max(0, 1 - ROUGHEN_PER_FLOOR * floor);
   const minRooms = Math.max(MIN_FLOOR_ROOMS, Math.round(params.minRooms * size));
+  const smaller = { ...params, minRooms, maxRooms: Math.max(minRooms, Math.round(params.maxRooms * size)) };
+  if (rise === 'up') return smaller;
+  const rough = Math.max(0, 1 - ROUGHEN_PER_FLOOR * floor);
   const mirrored = params.symmetry.filter(Boolean).length / params.symmetry.length;
   return {
-    ...params,
-    minRooms,
-    maxRooms: Math.max(minRooms, Math.round(params.maxRooms * size)),
+    ...smaller,
     symmetry: symmetryDraws(mirrored * rough),
     rotundaFactor: params.rotundaFactor * rough,
     colonnadeFactor: params.colonnadeFactor * rough,

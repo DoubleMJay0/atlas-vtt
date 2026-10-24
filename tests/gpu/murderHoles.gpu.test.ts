@@ -9,7 +9,7 @@ import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 describe('murder holes in the scene picture', () => {
   for (const px of [100, 150, 280]) {
     it(`open through to the floor below at ${px} px a cell, with stone round them`, () => {
-      const model = generateDungeon({ seed: 10, theme: 'fortress', tags: [], floors: 3 });
+      const model = generateDungeon({ seed: 6, theme: 'fortress', tags: [], floors: 3 });
       let holes = 0;
       model.floors.forEach((floor, index) => {
         const murder = floor.terrain.filter((p) => p.kind === 'murder-hole');

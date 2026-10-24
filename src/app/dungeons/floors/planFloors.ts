@@ -92,7 +92,7 @@ function nextFloor(seed: number, params: DungeonParams, earlier: FloorShape, ind
   const end = stairEnd(stack, index, index - 1);
   const request: FloorRequest = {
     floor: index,
-    params: floorParams(params, index),
+    params: floorParams(params, index, stack.rise),
     rootOf: (rng) => landingRoot(rng, landing, end),
     reserved: null,
     within: footprintOf(earlier),
@@ -115,7 +115,7 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
   const stack = floorStack(rise, count);
   const entry = buildFloorLayout(seed, {
     floor: 0,
-    params: floorParams(params, 0),
+    params: floorParams(params, 0, rise),
     rootOf: (rng) => ({ origin: { x: 0, y: 0 }, axis: pick(rng, AXES), seed: int(rng, 1, MAX_SEED) }),
     reserved: ENTRANCE_BLOCK,
     within: null,

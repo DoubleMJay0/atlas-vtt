@@ -78,7 +78,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.
   const level = typed && request.waterLevel === undefined && params.waterLevel === null ? 0 : rolled;
   const parts = planned.map((floor, index): Omit<FloorParts, 'stack' | 'openAbove'> => {
-    const floorPar = floorParams(params, index);
+    const floorPar = floorParams(params, index, rise);
     const roles = roomRoles(floorStream(seed, 'props', index, 'roles'), floor);
     return {
       planned: floor,

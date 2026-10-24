@@ -213,7 +213,7 @@ describe('a Fortress of several floors, rising from its entrance floor', () => {
 
 describe('murder holes in the scene', () => {
   it('lay floor over each murder hole, so a token stands on it rather than falling through the cut picture', () => {
-    const model = generateDungeon({ seed: 10, theme: 'fortress', tags: [], floors: 3 });
+    const model = generateDungeon({ seed: 6, theme: 'fortress', tags: [], floors: 3 });
     const { parts, placement } = partsOf(model);
     const ids = parts.levelIds!;
     let holes = 0;
