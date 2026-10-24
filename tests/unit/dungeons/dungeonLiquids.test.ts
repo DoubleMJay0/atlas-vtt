@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import type { DungeonModel } from '../../../src/app/dungeons/model';
+import type { DungeonModel, DungeonTerrain, TerrainKind } from '../../../src/app/dungeons/model';
 import { FEATURES } from '../../../src/app/dungeons/themes/features';
 import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
@@ -8,6 +8,7 @@ import { dungeonScene } from '../../../src/app/dungeons/scene/toScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { dungeonStyle, type DungeonStyleId } from '../../../src/app/dungeons/styleCatalog';
 import type { LiquidSurface } from '../../../src/app/types/liquidTypes';
+import { drainCells } from '../../../src/app/dungeons/water';
 
 /** The collection's units: five feet a square. */
 const FEET = { unitType: 'feet', ruleDistance: 5 } as const;
@@ -146,5 +147,20 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
     const small = partsOf(model, 'parchment', { ...DEFAULT_VIEW, smallTiles: true });
     const light = Object.values(small.scene.lights)[0]!;
     expect(light.emission.dim).toBe(40);
+  });
+});
+
+describe('water beside an opening in the floor', () => {
+  const piece = (kind: TerrainKind): DungeonTerrain => ({ id: 0, kind, room: 0, cells: [{ x: 4, y: 7 }], name: `dungeon.terrain.${kind}`, traits: {} });
+
+  it('keeps a cell clear round every hole, pit and shaft, murder holes included, as it would drain away', () => {
+    for (const kind of ['chasm', 'shaft', 'gallery', 'pit', 'murder-hole'] as const) {
+      const kept = drainCells([piece(kind)]);
+      expect([...kept].sort(), kind).toEqual(['3,6', '3,7', '3,8', '4,6', '4,7', '4,8', '5,6', '5,7', '5,8']);
+    }
+  });
+
+  it('lets water lie beside a piece that is no hole', () => {
+    expect(drainCells([piece('rubble-heap')]).size).toBe(0);
   });
 });

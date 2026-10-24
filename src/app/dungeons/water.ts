@@ -6,6 +6,7 @@
 
 import type { CellPoint, DungeonDoor, DungeonRoom, DungeonTerrain, DungeonWater } from './model';
 import { type Rng, chance, floorStream, int, stream } from './rng';
+import { HOLE_KINDS } from './terrain/catalog';
 import { traceLoops } from './water/contour';
 import { fractalNoise } from './water/noise';
 import { chaikin, jitter, resample, wobble } from './water/smooth';
@@ -42,8 +43,8 @@ export function poolRooms(rng: Rng, rooms: readonly DungeonRoom[], doors: readon
   return out;
 }
 
-/** Terrain no liquid lies in or beside: holes (it would drain away), and lava and acid (they never meet water). */
-const NO_WATER_BESIDE: ReadonlySet<string> = new Set(['chasm', 'shaft', 'gallery', 'pit']);
+/** Terrain no liquid lies in or beside, as it would drain away: every hole (murder holes too) and pits; lava and acid besides, as they never meet water. */
+const NO_WATER_BESIDE: ReadonlySet<string> = new Set([...HOLE_KINDS, 'pit']);
 
 /** The cells within a cell of a hole, pit or shaft, or of a lava or acid channel, as `x,y`: water keeps off them. */
 export function drainCells(terrain: readonly DungeonTerrain[]): Set<string> {

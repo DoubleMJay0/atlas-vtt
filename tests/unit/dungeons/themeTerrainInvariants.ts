@@ -13,7 +13,7 @@ import { isHazard } from './terrainInvariants';
 
 const key = (c: CellPoint): string => `${c.x},${c.y}`;
 const LIQUID: ReadonlySet<TerrainKind> = new Set(['deep-water', 'channel', 'pool']);
-const OPENINGS: ReadonlySet<TerrainKind> = new Set(['chasm', 'shaft', 'gallery', 'pit']);
+const OPENINGS: ReadonlySet<TerrainKind> = new Set(['chasm', 'shaft', 'gallery', 'pit', 'murder-hole']);
 /** What decay brings into a ruin, and the cover a fight room is given where its furniture has none. */
 const RUIN: ReadonlySet<TerrainKind> = new Set(['rubble-heap', 'rubble-field', 'broken-floor', 'tangled-roots', 'wall-fragment']);
 const FALLBACK_COVER: ReadonlySet<TerrainKind> = new Set(['crates', 'rubble-heap']);
