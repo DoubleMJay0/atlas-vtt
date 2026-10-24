@@ -3,7 +3,7 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { cellKey } from '../../../src/app/dungeons/geometry';
 import { approachCells, doorApproaches, spotRect } from '../../../src/app/dungeons/floors/stairSpots';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
-import { PROP_REACH } from '../../../src/app/dungeons/props/space';
+import { propReach } from '../../../src/app/dungeons/props/catalogue';
 import { footingOf } from '../../../src/app/dungeons/terrain/catalog';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
@@ -227,7 +227,7 @@ describe('a room\'s pin', () => {
           ]);
           const clearOfThings = (x: number, y: number): boolean =>
             !never.has(cellKey(Math.floor(x), Math.floor(y)))
-            && floor.props.every(prop => Math.hypot(prop.x - x, prop.y - y) >= PROP_REACH[prop.kind] * prop.scale + 0.3)
+            && floor.props.every(prop => Math.hypot(prop.x - x, prop.y - y) >= propReach(prop.kind) * prop.scale + 0.3)
             && floor.columns.every(column => Math.hypot(column.x - x, column.y - y) >= column.radius + 0.4);
           const p = pinCell(visible, room);
           const where = `seed ${seed} floor ${index} room ${room.id} at ${p.x},${p.y}`;

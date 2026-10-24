@@ -4,24 +4,9 @@
  * from). A prop is a disc of its footprint; a tapestry hangs on its wall and needs only that.
  */
 
-import type { CellPoint, DungeonColumn, PropKind } from '../model';
+import type { CellPoint, DungeonColumn } from '../model';
 import type { RoomFrame } from './roomFrame';
 import { onFloor } from './roomFrame';
-
-/** How far each prop reaches from its centre, in cells. */
-export const PROP_REACH: Readonly<Record<PropKind, number>> = {
-  barrel: 0.27,
-  crate: 0.34,
-  chest: 0.42,
-  fountain: 0.52,
-  well: 0.42,
-  statue: 0.35,
-  sarcophagus: 0.45,
-  altar: 0.42,
-  throne: 0.36,
-  dais: 1.5,
-  tapestry: 0.1,
-};
 
 /** A disc that is taken. */
 export interface Taken {

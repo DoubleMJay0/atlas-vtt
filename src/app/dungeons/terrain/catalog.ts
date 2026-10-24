@@ -52,6 +52,9 @@ export const TERRAIN_KINDS: Readonly<Record<TerrainKind, KindInfo>> = {
   'portal-ring': { name: 'dungeon.terrain.portalRing', traits: { interactive: true }, footing: 'block' },
 };
 
+/** Every kind of terrain. */
+export const ALL_TERRAIN_KINDS: ReadonlySet<TerrainKind> = new Set(Object.keys(TERRAIN_KINDS) as TerrainKind[]);
+
 /** Kinds that are holes in a floor when they carry an `opening`. */
 export const HOLE_KINDS: ReadonlySet<TerrainKind> = new Set(['chasm', 'shaft', 'gallery']);
 

@@ -1,5 +1,6 @@
-import { formatList, t } from '../../i18n';
-import type { CellDir, CellPoint, DoorKind, DungeonDoor, DungeonRoom, DungeonTerrain, GrowthKind, PropKind, TerrainKind } from '../model';
+import { formatList, type MessageKey, t } from '../../i18n';
+import type { CellDir, CellPoint, DoorKind, DungeonDoor, DungeonRoom, DungeonTerrain, GrowthKind, TerrainKind } from '../model';
+import { PROP_KINDS, propKey } from '../props/propKinds';
 import { dir } from '../geometry';
 import type { VisibleFloor } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
@@ -74,16 +75,14 @@ function stairSentences(visible: VisibleFloor, room: DungeonRoom): string[] {
     .map(stair => t(stair.to > visible.index ? 'dungeonScene.stairsDown' : 'dungeonScene.stairsUp', { floor: floorLetter(stair.to) }));
 }
 
-const PROP_ORDER: readonly PropKind[] = ['dais', 'throne', 'altar', 'statue', 'fountain', 'well', 'sarcophagus', 'tapestry', 'chest', 'crate', 'barrel'];
-
 function contents(visible: VisibleFloor, room: DungeonRoom, view: Pick<DungeonView, 'props'>): string[] {
   const { floor } = visible;
   const items: string[] = [];
   if (view.props) {
     const props = floor.props.filter(prop => prop.room === room.id);
-    for (const kind of PROP_ORDER) {
+    for (const kind of PROP_KINDS) {
       const count = props.filter(prop => prop.kind === kind).length;
-      if (count) items.push(t(`dungeonScene.prop.${kind}`, { count }));
+      if (count) items.push(t(`dungeonProp.count.${propKey(kind)}` as MessageKey, { count }));
     }
   }
   const columns = floor.columns.filter(column => inRoom(room, column));

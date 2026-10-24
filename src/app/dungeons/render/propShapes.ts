@@ -19,27 +19,33 @@ export interface PropGlyph {
   lift: number;
 }
 
-const GLYPHS: Record<PropKind, PropGlyph> = { ...WOOD_AND_CLOTH, ...STONE_AND_WATER };
+/** The kinds that have a drawing; the generator offers no other (`drawnKinds.ts`). */
+const GLYPHS: Partial<Record<PropKind, PropGlyph>> = { ...WOOD_AND_CLOTH, ...STONE_AND_WATER };
+
+/** Every kind with a drawing. */
+export function drawnPropKinds(): PropKind[] {
+  return Object.keys(GLYPHS) as PropKind[];
+}
 
 /** Draws one prop at the origin; the caller has moved, turned and scaled the context and set the ink and outline width. */
 export function drawPropShape(kind: PropKind, pen: PropPen): void {
-  GLYPHS[kind].draw(pen);
+  GLYPHS[kind]?.draw(pen);
 }
 
-/** Traces the outline that casts a prop's shadow onto the current path; false for a prop that lies flat. */
+/** Traces the outline that casts a prop's shadow onto the current path; false for a prop that lies flat or has no drawing. */
 export function tracePropSilhouette(kind: PropKind, ctx: PropPen['ctx']): boolean {
-  const silhouette = GLYPHS[kind].silhouette;
+  const silhouette = GLYPHS[kind]?.silhouette;
   if (!silhouette) return false;
   silhouette(ctx);
   return true;
 }
 
-/** How tall a prop stands, as a share of a column's shadow. */
+/** How tall a prop stands, as a share of a column's shadow; 0 for a kind without a drawing. */
 export function propLift(kind: PropKind): number {
-  return GLYPHS[kind].lift;
+  return GLYPHS[kind]?.lift ?? 0;
 }
 
-/** The outline that casts a prop's shadow, as a tracer; none for a prop that lies flat. */
+/** The outline that casts a prop's shadow, as a tracer; none for a prop that lies flat or has no drawing. */
 export function propSilhouette(kind: PropKind): ((ctx: PropPen['ctx']) => void) | undefined {
-  return GLYPHS[kind].silhouette;
+  return GLYPHS[kind]?.silhouette;
 }

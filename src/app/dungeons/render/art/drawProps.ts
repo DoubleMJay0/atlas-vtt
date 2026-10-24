@@ -7,7 +7,8 @@ export function drawProps(hand: Hand, water: string, cloth: string): void {
   const { dungeon, view } = hand.scene.env;
   if (!view.props) return;
   for (const prop of dungeon.floor.props) {
-    if (!dungeon.roomShapes.has(prop.room)) continue;
-    drawGlyph(hand, prop, propGlyph(prop.kind), water, cloth);
+    const glyph = propGlyph(prop.kind);
+    if (!glyph || !dungeon.roomShapes.has(prop.room)) continue;
+    drawGlyph(hand, prop, glyph, water, cloth);
   }
 }

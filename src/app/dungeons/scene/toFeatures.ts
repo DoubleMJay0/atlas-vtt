@@ -1,9 +1,10 @@
-import { t } from '../../i18n';
+import { type MessageKey, t } from '../../i18n';
 import { MAX_FEATURE_CORNERS, MAX_MAP_FEATURES } from '../../mapFeatures/mapFeatures';
 import type { FeatureTerrain, MapFeature } from '../../types/mapFeatureTypes';
 import type { CellPoint, DungeonColumn, DungeonGrowth, DungeonProp, DungeonTerrain, GrowthKind, PropKind } from '../model';
 import { GROWTH_KINDS } from '../growthModel';
-import { PROP_REACH } from '../props/space';
+import { PROP_SPECS, isCellPiece, propReach } from '../props/catalogue';
+import { propKey } from '../props/propKinds';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
 import { cellOutlines } from './cellOutline';
@@ -84,21 +85,6 @@ const PROP_BOXES: Partial<Record<PropKind, Box>> = {
   tapestry: { x0: -0.8, x1: 0.8, y0: -0.15, y1: 0.15 },
 };
 
-/** What each piece of furniture does to play: low furniture is half cover, a statue total; a dais and a tapestry none. */
-const PROP_COVER: Readonly<Record<PropKind, FeatureTerrain['cover']>> = {
-  barrel: 'half',
-  crate: 'half',
-  chest: 'half',
-  fountain: 'half',
-  well: 'half',
-  statue: 'total',
-  sarcophagus: 'half',
-  altar: 'half',
-  throne: 'half',
-  dais: undefined,
-  tapestry: undefined,
-};
-
 /** Corners of a disc's polygon. */
 const DISC_CORNERS = 8;
 
@@ -109,9 +95,23 @@ function discCorners(x: number, y: number, radius: number): CellPoint[] {
   });
 }
 
+/** How far a wall piece's box reaches either side of its wall line, in cells. */
+const WALL_PIECE_HALF_DEPTH = 0.15;
+
+/** A piece's box in its own frame: drawn as its kind draws it, or its cells (stretched where it is), or none for a disc. */
+function boxOf(prop: DungeonProp): Box | undefined {
+  const drawn = PROP_BOXES[prop.kind];
+  if (drawn) return drawn;
+  const spec = PROP_SPECS[prop.kind];
+  if (!isCellPiece(spec)) return undefined;
+  const { along, out } = prop.size ?? spec.footprint;
+  const half = spec.wallPiece ? WALL_PIECE_HALF_DEPTH : out / 2;
+  return { x0: -along / 2, x1: along / 2, y0: -half, y1: half };
+}
+
 export function propPolygon(prop: DungeonProp): CellPoint[] {
-  const box = PROP_BOXES[prop.kind];
-  if (!box) return discCorners(prop.x, prop.y, PROP_REACH[prop.kind] * prop.scale);
+  const box = boxOf(prop);
+  if (!box) return discCorners(prop.x, prop.y, propReach(prop.kind) * prop.scale);
   const cos = Math.cos(prop.rotation) * prop.scale;
   const sin = Math.sin(prop.rotation) * prop.scale;
   const corners: [number, number][] = [[box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1]];
@@ -120,8 +120,8 @@ export function propPolygon(prop: DungeonProp): CellPoint[] {
 
 function propDrafts(props: readonly DungeonProp[]): Draft[] {
   return props.map(prop => withTerrain(
-    { polygon: propPolygon(prop), name: t(`dungeonScene.feature.${prop.kind}`) },
-    terrainOf({ cover: PROP_COVER[prop.kind] }),
+    { polygon: propPolygon(prop), name: t(`dungeonProp.name.${propKey(prop.kind)}` as MessageKey) },
+    terrainOf({ cover: PROP_SPECS[prop.kind].cover }),
   ));
 }
 

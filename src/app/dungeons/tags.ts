@@ -3,6 +3,8 @@
  * translated or renamed; what each does is shown through `t('dungeon.tag.<i18nKey>')`.
  */
 
+import { idKey } from './idKey';
+
 export const DUNGEON_TAGS = [
   'chaotic',
   'ordered',
@@ -80,5 +82,5 @@ export function readTags(values: readonly string[]): DungeonTag[] {
 
 /** The i18n key segment of a tag (`no-secrets` → `noSecrets`). */
 export function tagKey(tag: DungeonTag): string {
-  return tag.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
+  return idKey(tag);
 }

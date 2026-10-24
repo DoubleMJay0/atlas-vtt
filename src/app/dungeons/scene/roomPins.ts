@@ -2,7 +2,8 @@ import type { CellPoint, DungeonRoom } from '../model';
 import { cellKey, cellsOf, floorRect } from '../geometry';
 import { approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
 import { frameOf } from '../props/roomFrame';
-import { PROP_REACH, isFree, roomSpace, type RoomSpace } from '../props/space';
+import { propReach } from '../props/catalogue';
+import { isFree, roomSpace, type RoomSpace } from '../props/space';
 import type { VisibleFloor } from '../render/visibleDungeon';
 import { footingOf } from '../terrain/catalog';
 
@@ -48,7 +49,7 @@ export function pinCell(visible: VisibleFloor, room: DungeonRoom): CellPoint {
     .sort((a, b) => Math.hypot(a.x - middle.x, a.y - middle.y) - Math.hypot(b.x - middle.x, b.y - middle.y) || a.y - b.y || a.x - b.x);
   const spaceOf = (clear: readonly CellPoint[], furnished: boolean): RoomSpace => {
     const space = roomSpace(frame, new Set(clear.map(c => cellKey(c.x, c.y))), furnished ? floor.columns : []);
-    if (furnished) for (const prop of floor.props) space.taken.push({ x: prop.x, y: prop.y, radius: PROP_REACH[prop.kind] * prop.scale });
+    if (furnished) for (const prop of floor.props) space.taken.push({ x: prop.x, y: prop.y, radius: propReach(prop.kind) * prop.scale });
     return space;
   };
   for (const space of [spaceOf([...never, ...preferNot], true), spaceOf(never, true), spaceOf(never, false)]) {

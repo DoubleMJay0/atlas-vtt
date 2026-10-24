@@ -4,7 +4,7 @@ import type { GlyphDrawing } from './glyph';
 import type { Material } from './hand';
 
 /** What each prop is made of, and about half its size in cells (how far the light's modelling reaches across it). */
-const PROPS: Record<PropKind, { material: Material; radius: number; dome?: boolean }> = {
+const PROPS: Partial<Record<PropKind, { material: Material; radius: number; dome?: boolean }>> = {
   barrel: { material: 'wood', radius: 0.27, dome: true },
   crate: { material: 'wood', radius: 0.3 },
   chest: { material: 'wood', radius: 0.38 },
@@ -18,9 +18,11 @@ const PROPS: Record<PropKind, { material: Material; radius: number; dome?: boole
   dais: { material: 'dressed', radius: 1.4 },
 };
 
-/** A prop of the glyph family as a drawing a hand can finish. */
-export function propGlyph(kind: PropKind): GlyphDrawing {
+/** A prop of the glyph family as a drawing a hand can finish; null for a kind without a drawing. */
+export function propGlyph(kind: PropKind): GlyphDrawing | null {
+  const look = PROPS[kind];
+  if (!look) return null;
   const silhouette = propSilhouette(kind);
   const tracer = silhouette ? (path: CanvasPath): void => silhouette(path as CanvasRenderingContext2D) : undefined;
-  return { ...PROPS[kind], draw: pen => drawPropShape(kind, pen), ...(tracer && { silhouette: tracer }) };
+  return { ...look, draw: pen => drawPropShape(kind, pen), ...(tracer && { silhouette: tracer }) };
 }

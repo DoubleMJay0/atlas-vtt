@@ -1,5 +1,7 @@
 import type { DungeonTerrain, TerrainKind } from '../../model';
+import { HOLE_KINDS } from '../../terrain/catalog';
 import type { Hand } from '../art/hand';
+import { UNDERGROWTH } from '../growth/growthForms';
 import { drawBridges } from './bridges';
 import { drawAltar, drawCrates, drawLowWall, drawRubbleHeap, drawSarcophagus, drawTable } from './cover';
 import { drawBrokenFloor, drawMosaic, drawPews, drawScatter } from './ground';
@@ -51,6 +53,14 @@ const STANDING: Partial<Record<TerrainKind, Draw>> = {
   pool: drawPool,
   'portal-ring': drawPortalRing,
 };
+
+/** Kinds drawn outside these tables: holes (`holes.ts`), bridges (`bridges.ts`), undergrowth (`growthForms.ts`) and shallow water, which the water draws. */
+const DRAWN_ELSEWHERE: readonly TerrainKind[] = [...HOLE_KINDS, 'bridge', ...UNDERGROWTH, 'shallow-water'];
+
+/** Every terrain kind with a drawing. */
+export function drawnTerrainKinds(): TerrainKind[] {
+  return [...new Set([...Object.keys(GROUND), ...Object.keys(RAISED), ...Object.keys(STANDING), ...DRAWN_ELSEWHERE] as TerrainKind[])];
+}
 
 function drawLayer(hand: Hand, table: Partial<Record<TerrainKind, Draw>>, colours: TerrainColours): void {
   for (const piece of shownPieces(hand.scene.env)) table[piece.kind]?.(hand, piece, colours);

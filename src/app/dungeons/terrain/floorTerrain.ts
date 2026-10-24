@@ -4,7 +4,8 @@
  * pieces decided across floors (a hole and the floor under it) are held first and added as they are.
  */
 
-import type { CellPoint, DungeonColumn, DungeonDoor, DungeonRoom, DungeonStair, DungeonTerrain } from '../model';
+import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
+import type { CellPoint, DungeonColumn, DungeonDoor, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
 import { cellKey, floorRect, inRect } from '../geometry';
 import { type TerrainDraft, footingOf } from './catalog';
 import { RoomCells } from './roomCells';
@@ -14,6 +15,8 @@ export interface FloorPlan {
   doors: readonly DungeonDoor[];
   stairs: readonly DungeonStair[];
   columns: readonly DungeonColumn[];
+  /** The kinds that may be placed; unset, those with a drawing (`DRAWN_TERRAIN_KINDS`). Tests of placement offer every kind. */
+  offeredTerrain?: ReadonlySet<TerrainKind>;
 }
 
 export class FloorTerrain {
@@ -44,10 +47,10 @@ export class FloorTerrain {
     return rc && cells.every((c) => rc.isFloor(c)) ? rc : undefined;
   }
 
-  /** Places `piece` if its room allows it; a bridge's cells on the hole it crosses stay walkable. Its id, or null. */
+  /** Places `piece` if its kind is offered and its room allows it; a bridge's cells on the hole it crosses stay walkable. Its id, or null. */
   place(piece: TerrainDraft, bridges: readonly CellPoint[] = []): number | null {
     const rc = this.cells.get(piece.room);
-    if (!rc || !rc.allows(piece.cells, footingOf(piece.kind), bridges)) return null;
+    if (!rc || !(this.plan.offeredTerrain ?? DRAWN_TERRAIN_KINDS).has(piece.kind) || !rc.allows(piece.cells, footingOf(piece.kind), bridges)) return null;
     rc.take(piece.cells, footingOf(piece.kind));
     return this.push(piece);
   }

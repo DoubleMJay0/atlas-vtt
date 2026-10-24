@@ -8,11 +8,13 @@
  */
 
 import type { DungeonGrowth } from './growthModel';
+import type { PropKind } from './props/propKinds';
 import type { DungeonTerrain, FiveRoomStage } from './terrainModel';
 
 export type { CoverLevel, DungeonTerrain, FiveRoomStage, HazardKind, TerrainKind, TerrainOpening, TerrainTraits } from './terrainModel';
 export { FIVE_ROOM_STAGES } from './terrainModel';
 export type { DungeonGrowth, GrowthKind } from './growthModel';
+export type { PropKind } from './props/propKinds';
 
 /** Bump when the same seed and tags would give another dungeon. */
 export const DUNGEON_GENERATOR_VERSION = 2;
@@ -98,19 +100,6 @@ export interface DungeonStair {
   link: number;
 }
 
-export type PropKind =
-  | 'barrel'
-  | 'crate'
-  | 'chest'
-  | 'fountain'
-  | 'well'
-  | 'statue'
-  | 'sarcophagus'
-  | 'altar'
-  | 'throne'
-  | 'dais'
-  | 'tapestry';
-
 export interface DungeonProp {
   kind: PropKind;
   /** Centre, in cells. */
@@ -121,6 +110,8 @@ export interface DungeonProp {
   /** Scale, 1 = the prop's natural size. */
   scale: number;
   room: number;
+  /** A piece stretched past its footprint (a long table, a rug runner), in cells along and out from its front. */
+  size?: { along: number; out: number };
 }
 
 export interface DungeonColumn {

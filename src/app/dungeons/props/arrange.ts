@@ -7,7 +7,8 @@
 import type { CellPoint, DungeonDoor, DungeonProp, PropKind } from '../model';
 import { type Rng, int, shuffled } from '../rng';
 import { backWallOpen, facingIn, pointIn } from './roomFrame';
-import { PROP_REACH, type RoomSpace, isFree, take } from './space';
+import { propReach } from './catalogue';
+import { type RoomSpace, isFree, take } from './space';
 
 /** Across-the-room slots, middle first. */
 const SLOTS = [0, -1, 1, -2, 2, -3, 3];
@@ -18,7 +19,7 @@ function propAt(space: RoomSpace, kind: PropKind, p: CellPoint, rotation: number
 
 /** One prop at `p` if it is free there. */
 function tryPlace(space: RoomSpace, kind: PropKind, p: CellPoint, rotation: number): DungeonProp[] {
-  const reach = PROP_REACH[kind];
+  const reach = propReach(kind);
   if (!isFree(space, p, reach)) return [];
   take(space, p, reach);
   return [propAt(space, kind, p, rotation)];
@@ -36,8 +37,8 @@ export function beforeBackWall(space: RoomSpace, doors: readonly DungeonDoor[], 
   const out: DungeonProp[] = [];
   let slots = SLOTS;
   for (const kind of kinds) {
-    const u = frame.halfDepth - Math.max(0.5, PROP_REACH[kind] + 0.1);
-    const v = slots.find((slot) => isFree(space, pointIn(frame, u, slot), PROP_REACH[kind]));
+    const u = frame.halfDepth - Math.max(0.5, propReach(kind) + 0.1);
+    const v = slots.find((slot) => isFree(space, pointIn(frame, u, slot), propReach(kind)));
     if (v === undefined) continue;
     out.push(...tryPlace(space, kind, pointIn(frame, u, v), facingIn(frame)));
     slots = slots.filter((slot) => slot !== v);
@@ -94,7 +95,7 @@ export function storage(rng: Rng, space: RoomSpace): DungeonProp[] {
   const stack = kinds.slice(0, int(rng, 1, kinds.length));
   for (const [su, sv] of shuffled(rng, CORNERS)) {
     const spots = STACK.map(([du, dv]) => pointIn(frame, su * (frame.halfDepth - 0.5 - du), sv * (frame.halfWidth - 0.5 - dv)));
-    if (!spots[0] || !isFree(space, spots[0], PROP_REACH[stack[0] ?? 'crate'])) continue;
+    if (!spots[0] || !isFree(space, spots[0], propReach(stack[0] ?? 'crate'))) continue;
     return stack.flatMap((kind, k) => {
       const spot = spots[k];
       return spot ? tryPlace(space, kind, spot, tilt()) : [];

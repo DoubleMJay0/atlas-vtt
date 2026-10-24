@@ -9,7 +9,7 @@
 import type { CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
 import { doorApproaches, stairsAndAround } from '../floors/stairSpots';
 import { cellKey } from '../geometry';
-import { PROP_REACH } from '../props/space';
+import { propReach } from '../props/catalogue';
 
 export interface GrowthFloor {
   rooms: readonly DungeonRoom[];
@@ -52,7 +52,7 @@ export class GrowthSpace {
         if (burns) for (let dx = -SCORCHED; dx <= SCORCHED; dx++) for (let dy = -SCORCHED; dy <= SCORCHED; dy++) this.barred.add(cellKey(c.x + dx, c.y + dy));
       }
     }
-    for (const prop of props) this.occupy(prop.x, prop.y, PROP_REACH[prop.kind] * prop.scale);
+    for (const prop of props) this.occupy(prop.x, prop.y, propReach(prop.kind) * prop.scale);
     for (const column of columns) this.occupy(column.x, column.y, column.radius);
     for (const key of this.wet) this.occupied.add(key);
   }
