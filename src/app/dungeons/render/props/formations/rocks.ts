@@ -17,6 +17,8 @@ import { BOULDERS, CHIPS, CRYSTALS, MATRIX, crack, type Block, type Crystal } fr
 function crystalPiece(pen: GlyphPen, c: Crystal, finish: Finish): void {
   const clear = mixColours(pen.palette.fill, pen.palette.water, 0.45);
   fillOutline(pen, c.body, clear, 'none');
+  splitByLight(pen, c.sides, finish, 0.2);
+  fineRuns(pen, [c.ridge], false, 0.7);
   // The prism's long edges: from the termination's corners back into the rock.
   const facets = c.hex.map((p, k) => {
     const q = c.hex[(k + 1) % 6]!;

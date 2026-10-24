@@ -1,9 +1,9 @@
-import { glyphEdges, glyphSolid, lightInGlyph } from '../../art/glyphLight';
+import { glyphEdges, lightInGlyph } from '../../art/glyphLight';
 import { polyPath } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
 import type { GlyphFit } from '../../propShapes';
-import { calciteGrain, coneShade, facing, fillOutline, fineRuns, outlineRuns, splitByLight, type Finish } from './finish';
+import { calciteGrain, coneShade, facing, modelled, raisedEdges, fillOutline, fineRuns, outlineRuns, splitByLight, type Finish } from './finish';
 import { COLUMN, MOUND_PAD, MOUNDS, SHEET_TOP, curtainFoot, curtainLine, flowLobes, flowSheet, ribbon, type Mound } from './shapes';
 
 /**
@@ -32,11 +32,11 @@ function cone(pen: GlyphPen, m: Mound, finish: Finish): void {
   const foot = polyPath(m.foot);
   fillOutline(pen, m.foot, calcite(pen), 'none');
   calciteGrain(pen, foot, finish);
-  glyphSolid(pen, foot, m.tip, m.r, 0.8);
-  coneShade(pen, foot, m.tip, m.r, 0.75);
+  modelled(pen, foot, m.tip, m.r, 0.8, finish);
+  coneShade(pen, foot, m.tip, m.r, finish.painter === 'stone' ? 0.75 : 0.5, finish);
   fineRuns(pen, m.r < 0.09 ? m.rings.slice(0, 2) : m.rings, true, 0.7);
   finish.sheen(pen, [glint(pen, m.tip, m.r * 0.32, 1.4), glint(pen, m.tip, m.r * 0.62, 0.8)]);
-  glyphEdges(pen, m.foot, true);
+  raisedEdges(pen, m.foot, m.r, finish);
   if (m.r >= 0.12) fineRuns(pen, [glint(pen, m.tip, m.r * 0.09, Math.PI * 2)], true);
 }
 
@@ -52,15 +52,15 @@ export function columnFormation(pen: GlyphPen, _fit: GlyphFit, finish: Finish): 
   const { skirt, drips, shaft, core, foot } = COLUMN;
   fillOutline(pen, skirt, pen.palette.fill, 'none');
   calciteGrain(pen, polyPath(skirt), finish);
-  coneShade(pen, polyPath(skirt), { x: 0, y: 0 }, 0.4, 0.35);
+  coneShade(pen, polyPath(skirt), { x: 0, y: 0 }, 0.4, 0.3, finish);
   glyphEdges(pen, skirt, true);
   fineRuns(pen, drips, true, 0.7);
   for (const m of foot) cone(pen, m, finish);
   const body = polyPath(shaft);
   fillOutline(pen, shaft, calcite(pen), 'none');
   calciteGrain(pen, body, finish);
-  glyphSolid(pen, body, { x: 0, y: 0 }, 0.27, 1.1);
-  coneShade(pen, body, { x: 0, y: 0 }, 0.25, 0.8);
+  modelled(pen, body, { x: 0, y: 0 }, 0.27, 1.1, finish);
+  coneShade(pen, body, { x: 0, y: 0 }, 0.25, finish.painter === 'stone' ? 0.8 : 0.55, finish);
   // Flutes: grooves down the shaft between its swellings, cut deeper on the side away from the light.
   const flutes: Vec[][] = [];
   const deep: Vec[][] = [];
@@ -91,6 +91,9 @@ export function flowstone(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
   const { edge, tips } = flowLobes(fit);
   fillOutline(pen, sheet, calcite(pen), 'none');
   calciteGrain(pen, polyPath(sheet), finish);
+  // Bands of stain follow the lip, as each flood laid its film.
+  const towardWall = (f: number): Vec[] => edge.map(p => ({ x: p.x, y: p.y + (SHEET_TOP - p.y) * f }));
+  for (const [from, to] of [[0.18, 0.34], [0.55, 0.72]] as const) finish.stain(pen, polyPath([...towardWall(from), ...towardWall(to).reverse()]));
   // The sheet faces the room; it catches the light or falls into shade as the room lies to it.
   splitByLight(pen, [{ poly: sheet, out: { x: 0, y: -1 } }], finish, 0.3);
   // Each tongue's lip rolls over: lit where it turns to the light, shaded where it turns away.
@@ -115,7 +118,7 @@ export function curtain(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
   calciteGrain(pen, polyPath(foot), finish);
   pen.hand.line([foot.slice(0, -2)], 'fine');
   const line = curtainLine(fit);
-  const rib = ribbon(line, 0.06);
+  const rib = ribbon(line, 0.072);
   fillOutline(pen, rib, calcite(pen), 'none');
   // Each half fold faces its own way: those towards the light are lit, the others shaded.
   const n = line.length;
@@ -123,6 +126,9 @@ export function curtain(pen: GlyphPen, fit: GlyphFit, finish: Finish): void {
   const inner = rib.slice(n).reverse();
   splitByLight(pen, strip(line, outer), finish, 0.12);
   splitByLight(pen, strip(inner, line), finish, 0.12);
+  // Every other fold carries a band of stain across it, the curtain's growth lines.
+  const n2 = Math.floor((n - 1) / 8);
+  for (let f = 0; f < n2; f += 2) finish.stain(pen, polyPath([...outer.slice(f * 8 + 2, f * 8 + 7), ...inner.slice(f * 8 + 2, f * 8 + 7).reverse()]));
   // Bands of growth along it, and a crease at each fold.
   const creases: Vec[][] = [];
   for (let i = 4; i < n - 1; i += 4) creases.push([outer[i]!, inner[i]!]);

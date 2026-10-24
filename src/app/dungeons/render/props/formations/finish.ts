@@ -1,4 +1,4 @@
-import { glyphTone, lightInGlyph } from '../../art/glyphLight';
+import { glyphEdges, glyphSolid, glyphTone, lightInGlyph } from '../../art/glyphLight';
 import { pathBounds, polyPath, runsPath, type PathFn } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
@@ -19,12 +19,14 @@ export interface Finish {
   sheen(pen: GlyphPen, runs: readonly (readonly Vec[])[]): void;
   /** Whether the painter cuts a heavy shade line on a raised part's far edges (Engraved does, through `glyphEdges`). */
   painter: 'stone' | 'engraved';
+  /** A band of mineral stain in calcite: Stone washes it with the warm tone iron leaves; Engraved leaves it to its lines. */
+  stain(pen: GlyphPen, path: PathFn): void;
 }
 
 /** What a lit wash brightens towards: white, or the light ink of a dark look. */
 function lightOf(pen: GlyphPen): { colour: string; alpha: number } {
   const dark = isDarkColour(pen.palette.floor);
-  return { colour: dark ? pen.palette.ink : '#ffffff', alpha: dark ? 0.2 : 0.5 };
+  return { colour: dark ? pen.palette.ink : '#ffffff', alpha: dark ? 0.28 : 0.5 };
 }
 
 function wash(pen: GlyphPen, path: PathFn, colour: string): void {
@@ -44,6 +46,7 @@ export const STONE_FINISH: Finish = {
     wash(pen, path, withAlpha(light.colour, light.alpha * strength));
   },
   shaded: (pen, path, strength) => wash(pen, path, withAlpha('#000000', 0.32 * strength)),
+  stain: (pen, path) => wash(pen, path, withAlpha(pen.paint('wood').fill, 0.22)),
   sheen: (pen, runs) => {
     const light = lightOf(pen);
     const { ctx } = pen;
@@ -65,6 +68,7 @@ export const ENGRAVED_FINISH: Finish = {
     if (bounds) glyphTone(pen, () => strength, bounds, path, 'shade');
   },
   sheen: () => undefined,
+  stain: () => undefined,
 };
 
 /** How much a face whose outward direction is `out` (in the glyph's frame) faces the light: −1..1. */
@@ -129,12 +133,28 @@ export function outlineRuns(pen: GlyphPen, runs: readonly (readonly Vec[])[]): v
 }
 
 /**
+ * A rounded part modelled by the one light: Stone's soft gradient across it. Engraved models it by
+ * `coneShade` alone, since a second hatch over the first would blacken it.
+ */
+export function modelled(pen: GlyphPen, path: PathFn, centre: Vec, radius: number, strength: number, finish: Finish): void {
+  if (finish.painter === 'stone') glyphSolid(pen, path, centre, radius, strength);
+}
+
+/** A raised outline: Stone's lips, Engraved's shade line, but only a plain outline where Engraved's heavy line would swallow a small part. */
+export function raisedEdges(pen: GlyphPen, poly: readonly Vec[], size: number, finish: Finish): void {
+  if (finish.painter === 'engraved' && size < 0.1) pen.hand.line([poly], 'outline', true);
+  else glyphEdges(pen, poly, true);
+}
+
+/**
  * A cone or a pillar seen from above: the flank turned from the light falls into shade, the more
  * the farther it lies from `apex`, so a stalagmite rises to its tip and a column stands round.
  */
-export function coneShade(pen: GlyphPen, path: PathFn, apex: Vec, reach: number, strength: number): void {
+export function coneShade(pen: GlyphPen, path: PathFn, apex: Vec, reach: number, strength: number, finish: Finish): void {
   const bounds = pathBounds(path);
   if (!bounds) return;
+  // On a dark floor Stone lays shade over, not multiplied: calcite would go black.
+  if (finish.painter === 'stone' && isDarkColour(pen.palette.floor)) strength *= 0.45;
   const light = lightInGlyph(pen);
   glyphTone(pen, (x, y) => {
     const dx = x - apex.x;

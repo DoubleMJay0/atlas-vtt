@@ -131,7 +131,7 @@ export function curtainLine(fit: GlyphFit): Vec[] {
     const t = k / steps;
     const end = Math.min(1, Math.min(t, 1 - t) * folds);
     // Folds of slightly different depth, as a drapery grows.
-    const deep = 0.034 + 0.006 * Math.sin(Math.floor(t * folds) * 1.7);
+    const deep = 0.03 + 0.005 * Math.sin(Math.floor(t * folds) * 1.7);
     return { x: -half + t * half * 2, y: -0.018 - Math.sin(t * folds * Math.PI * 2) * deep * (0.4 + 0.6 * end) };
   });
 }
@@ -168,6 +168,9 @@ export interface Crystal {
   apex: Vec;
   /** Its body from the rock to the termination: the hull of both ends. */
   body: Vec[];
+  /** The body's two long sides either side of its ridge, each with the way it faces. */
+  sides: { poly: Vec[]; out: Vec }[];
+  ridge: Vec[];
   r: number;
 }
 
@@ -194,22 +197,30 @@ function hull(points: readonly Vec[]): Vec[] {
 function crystal(root: Vec, tip: Vec, r: number, turn: number): Crystal {
   const d = { x: tip.x - root.x, y: tip.y - root.y };
   const len = Math.hypot(d.x, d.y) || 1;
+  const n = { x: -d.y / len, y: d.x / len };
   const hex = hexagon(tip, r, turn);
-  return { hex, apex: { x: tip.x + (d.x / len) * r * 0.32, y: tip.y + (d.y / len) * r * 0.32 }, body: hull([...hexagon(root, r * 0.92, turn), ...hex]), r };
+  const sides = [1, -1].map(s => ({
+    poly: [root, tip, { x: tip.x + n.x * r * 0.85 * s, y: tip.y + n.y * r * 0.85 * s }, { x: root.x + n.x * r * 0.8 * s, y: root.y + n.y * r * 0.8 * s }],
+    out: { x: n.x * s, y: n.y * s },
+  }));
+  return { hex, apex: { x: tip.x + (d.x / len) * r * 0.32, y: tip.y + (d.y / len) * r * 0.32 }, body: hull([...hexagon(root, r * 0.92, turn), ...hex]), sides, ridge: [root, tip], r };
 }
 
 /** The rock the crystals grow from, against the wall. */
 export const MATRIX: readonly Vec[] = lobed({ x: 0, y: 0.2 }, 0.2, 4, 0.12, 0.9, 30).map(p => ({ x: p.x * 1.55, y: 0.2 + (p.y - 0.2) * 0.9 }));
 
-/** Seven crystals fanning out of their rock towards the room, drawn from the back. */
+/**
+ * Seven crystals of the rock at the wall: some stand nearly upright and show their ends, others
+ * lean out into the room; the shortest are drawn first, the great one leaning forward last.
+ */
 export const CRYSTALS: readonly Crystal[] = [
-  crystal({ x: 0.2, y: 0.22 }, { x: 0.36, y: 0.04 }, 0.055, 0.2),
-  crystal({ x: -0.2, y: 0.22 }, { x: -0.37, y: 0.06 }, 0.05, 0.5),
-  crystal({ x: 0.08, y: 0.2 }, { x: 0.2, y: -0.12 }, 0.075, 0.1),
-  crystal({ x: -0.1, y: 0.2 }, { x: -0.24, y: -0.12 }, 0.07, 0.35),
-  crystal({ x: 0.02, y: 0.18 }, { x: 0.03, y: -0.28 }, 0.095, 0.0),
-  crystal({ x: -0.04, y: 0.2 }, { x: -0.09, y: -0.03 }, 0.06, 0.3),
-  crystal({ x: 0.1, y: 0.23 }, { x: 0.16, y: 0.08 }, 0.05, 0.15),
+  crystal({ x: -0.22, y: 0.24 }, { x: -0.29, y: 0.16 }, 0.065, 0.4),
+  crystal({ x: 0.24, y: 0.25 }, { x: 0.3, y: 0.17 }, 0.055, 0.1),
+  crystal({ x: 0.15, y: 0.21 }, { x: 0.2, y: 0.07 }, 0.05, 0.45),
+  crystal({ x: -0.04, y: 0.2 }, { x: -0.13, y: 0.01 }, 0.055, 0.3),
+  crystal({ x: 0.12, y: 0.2 }, { x: 0.33, y: -0.07 }, 0.07, 0.2),
+  crystal({ x: -0.08, y: 0.22 }, { x: -0.31, y: -0.1 }, 0.08, 0.5),
+  crystal({ x: 0.0, y: 0.2 }, { x: 0.07, y: -0.27 }, 0.1, 0.05),
 ];
 
 /** A fallen block: its outline of fracture faces, the flat top it broke along, its crack. */
