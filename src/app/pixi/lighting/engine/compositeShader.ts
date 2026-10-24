@@ -21,7 +21,8 @@ import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
  * dim grey map tinted by uExploredTint where explored, uUnexplored elsewhere; both colours are
  * linear. With a fog map (uHasUnexploredImage, uUnexploredImage: an sRGB image over the whole map)
  * never-seen areas show it instead of uUnexplored, which shows through where the image is transparent;
- * it also fills the dark in sight, as memory does, even where no token has vision or memory is off.
+ * it also takes the place of the dark in sight, where no light and no sense shows the map, even where
+ * no token has vision or memory is off.
  * That is what lies out of sight and what lies in sight in the dark, without a sense
  * that shows it: stepping behind a wall must not reveal a remembered room that standing in it hides.
  * uDarkness (read only while uHasDarkness is set) is the darkness map: red is how much of the
@@ -305,10 +306,15 @@ void main() {
   // shows them), all of it in the dark, and at a light's rim the two add up to the memory's
   // brightness, so the light fades into the memory beneath it without a darker ring between.
   float lacking = max(dot(memory - visible, LUMA), 0.0) / max(dot(memory, LUMA), 1e-5);
-  // A fog map fills the dark wherever the players' picture shows less than it, with or without
-  // token vision and memory: lights reveal the map over it, and only where they shine.
-  float fills = max(recalls, uMode > 0.5 && uHasUnexploredImage > 0.5 ? 1.0 : 0.0);
-  vec3 inSight = visible + memory * (fills * lacking);
+  vec3 inSight = visible + memory * (recalls * lacking);
+  // Where a light or a sense shows the players the map (the grid's measure below too).
+  float byLight = max(uAllSeen, sight.r) * smoothstep(0.01, 0.06, level);
+  float bySense = max(sight.g, sight.b) * sensed;
+  // A fog map is not added to the picture but takes the place of the dark, with or without token
+  // vision and memory: the map shows exactly where light or a sense reveals it, the fog map
+  // (or memory) everywhere else, and the two cross-fade over a light's last glow. Its pale parts
+  // never shine through a lit map.
+  if (uMode > 0.5 && uHasUnexploredImage > 0.5) inSight = mix(memory, visible, max(byLight, bySense));
   // The players see the veil only where the darkness takes something from their picture: ambient
   // light, a light's light (blue of the darkness map), or what a sense that does not see in it
   // would show. Over unlit floor and over memory there is none: it would give away where the
@@ -328,8 +334,6 @@ void main() {
   vec3 shown = toSrgb(color);
   if (grid > 0.0) {
     // The players see the grid where a light or a sense shows them the map, or where they remember it; never over what they have not seen.
-    float byLight = max(uAllSeen, sight.r) * smoothstep(0.01, 0.06, level);
-    float bySense = max(sight.g, sight.b) * sensed;
     float gridShown = uMode > 0.5 ? max(max(byLight, bySense), explored) : 1.0;
     // A colour picked to contrast with the map was picked for the map lit: where the ambient light (the scene's, or a zone's)
     // is low, the floor is dark and the grid is white. Lights never change it, or the grid would shade through every light's fade.

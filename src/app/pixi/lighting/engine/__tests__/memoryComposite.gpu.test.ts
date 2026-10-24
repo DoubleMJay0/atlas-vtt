@@ -51,6 +51,8 @@ const UNEXPLORED = [225, 225] as const;
 const SEEN = [195, 75] as const;
 /** Screen point at the centre of light a (world 250, 750). */
 const LIT = [62, 187] as const;
+/** Screen point in light a's dim range (world 250, 850): the map lies darker there than the fog map. */
+const LIT_DIM = [62, 212] as const;
 
 /** FNV-1a over every channel of the render. */
 function hashOf(at: PixelReader): string {
@@ -183,15 +185,16 @@ describe('explored memory in the composite', () => {
   });
 
   it('fills the dark with the fog map where no token has vision, and leaves lit places and the GM view as they were', async () => {
-    const whole = (g: Graphics): Graphics => g.rect(0, 0, MAP / 4, MAP / 4).fill({ color: 0xcc6633 });
+    const whole = (g: Graphics): Graphics => g.rect(0, 0, MAP / 4, MAP / 4).fill({ color: 0xeeeeee });
     const noVision: Partial<EngineScene> = { sight: SEES_ALL, ambient: 0 };
     const fogged = await renderWithFogMap('player', whole, noVision);
     const plain = await render('player', noVision);
     // Far from both lights: pitch dark without the fog map, the fog map with it.
     expectColour(plain(...UNEXPLORED), 0x000000);
-    expectColour(fogged(...UNEXPLORED), 0xcc6633);
-    // At a light's centre the map shows as the light shows it.
+    expectColour(fogged(...UNEXPLORED), 0xeeeeee);
+    // Wherever a light shows the map, it shows as the light shows it: no pale fog shines through.
     expect(fogged(...LIT)).toEqual(plain(...LIT));
+    expect(fogged(...LIT_DIM)).toEqual(plain(...LIT_DIM));
     expect(hashOf(await renderWithFogMap('gm', whole, noVision))).toBe(hashOf(await render('gm', noVision)));
   });
 
