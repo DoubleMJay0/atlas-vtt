@@ -1,7 +1,6 @@
 {
   "props": [
     "hearth",
-    "bust",
     "mushrooms",
     "campfire"
   ],
