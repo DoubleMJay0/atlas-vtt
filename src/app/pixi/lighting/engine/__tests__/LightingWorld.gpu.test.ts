@@ -104,31 +104,14 @@ describe('LightingWorld.animate', () => {
     expect(draw).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps a flickering light steady and builds no bounce where the quality saves them', async () => {
+  it('builds no bounce where the quality saves it', async () => {
     const renderer = await createTestRenderer(256);
     cleanup.push(() => renderer.destroy());
-    const world = new LightingWorld(renderer, { width: 1024, height: 1024 }, { ...LIGHTING_QUALITY.balanced, bounceMaxSide: 0, flickerMs: null });
+    const world = new LightingWorld(renderer, { width: 1024, height: 1024 }, { ...LIGHTING_QUALITY.balanced, bounceMaxSide: 0 });
     cleanup.push(() => world.destroy());
-    const draw = vi.spyOn(world.lightMap, 'draw');
-    world.update([], [torch], Texture.WHITE);
+    world.update([], [{ ...torch, animation: 'none' }], Texture.WHITE);
     expect(world.cascades).toBeNull();
     expect(world.busy()).toBe(false);
-    expect(world.animate(START)).toBe(false);
-    expect(world.animate(START + 10 * FLICKER_INTERVAL_MS)).toBe(false);
-    expect(draw).toHaveBeenCalledTimes(1);
-  });
-
-  it('draws the lights steady at once when flicker is switched off', async () => {
-    const { world } = await setup();
-    world.animate(START + FLICKER_INTERVAL_MS);
-    const draw = vi.spyOn(world.lightMap, 'draw');
-    world.setFlicker(null);
-    expect(draw).toHaveBeenCalledTimes(1);
-    expect((draw.mock.calls[0]![0][0] as DrawnLight).intensity).toBe(torch.intensity);
-    expect(world.busy()).toBe(false);
-    world.setFlicker(66);
-    expect(world.busy()).toBe(true);
-    expect(world.animate(START + 10_000)).toBe(true);
   });
 
   it('holds its textures to the quality\'s texels on large maps, and keeps the finest texel on small ones', async () => {
@@ -161,7 +144,7 @@ describe('a paced LightingWorld', () => {
   it('builds a scene too large for one batch over several frames, to the light map built at once', async () => {
     const renderer = await createTestRenderer(64);
     const bounds = { width: 4096, height: 4096 };
-    const coarse: TracedQuality = { ...LIGHTING_QUALITY.balanced, maxTexels: 1024, bounceMaxSide: 0, flickerMs: null, tileRays: 8 };
+    const coarse: TracedQuality = { ...LIGHTING_QUALITY.balanced, maxTexels: 1024, bounceMaxSide: 0, tileRays: 8 };
     const paced = new LightingWorld(renderer, bounds, coarse, true);
     const atOnce = new LightingWorld(renderer, bounds, coarse);
     try {

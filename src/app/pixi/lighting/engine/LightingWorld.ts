@@ -42,8 +42,8 @@ export class LightingWorld {
   readonly lightMap: LightMap;
   /** The bounce, where the quality lets light bounce on this map. */
   readonly cascades: RadianceCascades | null;
-  /** How often flickering lights are redrawn, or null to keep them steady (`setFlicker`). */
-  private flickerMs: number | null;
+  /** How often flickering lights are redrawn, at most, in milliseconds (`setFlicker`). */
+  private flickerMs: number;
   /** The darkness map and the zone map, each made with the scene's first darkness source or zone. */
   private readonly maps: SceneMaps;
   private readonly tiles: TileCache;
@@ -75,12 +75,9 @@ export class LightingWorld {
     this.pacer = new GpuPacer(gl && 'fenceSync' in gl ? gl : null);
   }
 
-  /** Lights that stop flickering are drawn steady at once; the world's textures stay. */
-  setFlicker(ms: number | null): void {
-    if (ms === this.flickerMs) return;
-    const flickered = this.animated() && this.lastFlicker !== -Infinity;
+  /** Flickering lights are redrawn at most this often from now on; the world's textures stay. */
+  setFlicker(ms: number): void {
     this.flickerMs = ms;
-    if (ms === null && flickered) this.drawSteady();
   }
 
   /** Whether this world was made as `quality` makes one for its map and cell (a traced picture, texel, bounce, tile rays): else it is built anew. */
@@ -231,9 +228,9 @@ export class LightingWorld {
     return true;
   }
 
-  /** Lights that flicker, while the quality lets them. */
+  /** Lights that flicker. */
   private animated(): boolean {
-    return this.flickerMs !== null && this.flickers().animated.length > 0;
+    return this.flickers().animated.length > 0;
   }
 
   private flickers(): NonNullable<LightingWorld['flickering']> {
@@ -252,12 +249,10 @@ export class LightingWorld {
    * view takes its flicker on the next slot.
    */
   private flickerDue(now: number, view: Box | undefined): boolean {
-    const ms = this.flickerMs;
-    if (ms === null) return false;
     const { animated, slots } = this.flickers();
     if (animated.length === 0) return false;
     const last = this.lastFlicker === -Infinity ? null : this.lastFlicker;
-    if (!animationFrameDue(now, last, Math.max(slotsOf(ms), slots))) return false;
+    if (!animationFrameDue(now, last, Math.max(slotsOf(this.flickerMs), slots))) return false;
     return !view || animated.some((light) => lightsWithin(light, view));
   }
 

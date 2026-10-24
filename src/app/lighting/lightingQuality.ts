@@ -35,8 +35,8 @@ export interface TracedQuality extends QualityBase {
   picture?: 'traced';
   /** Light bounces off walls and floors on maps whose longer side is at most this many pixels; 0 never. */
   bounceMaxSide: number;
-  /** Flickering lights are redrawn at most this often, in milliseconds; null keeps every light steady. */
-  flickerMs: number | null;
+  /** Flickering lights are redrawn at most this often, in milliseconds. */
+  flickerMs: number;
   /**
    * Rays a light's tile traces across its flame where a texel sees only part of it (at most
    * `TILE_RAYS`): fewer make soft shadow edges coarser and a light's tile that much cheaper to

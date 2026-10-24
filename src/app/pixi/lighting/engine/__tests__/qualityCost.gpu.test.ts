@@ -148,7 +148,7 @@ async function measure(renderer: WebGLRenderer, ext: TimerExt | null, level: Lig
     const texel = Math.max(2, Math.max(bounds.width, bounds.height) / LIGHTING_QUALITY[level].maxTexels);
     return {
       level, map: `${bounds.width}x${bounds.height}`, texel: Math.round(texel * 100) / 100, worldMb: Math.round(worldBytes / 1e5) / 10, memoryMb: Math.round(bytes / 1e5) / 10,
-      build: median([build]), bounce: median([bounce]), frameFit: median(fits), frameClose: median(closes), flicker: quality.picture === 'polygons' || quality.flickerMs === null ? 0 : median(flickers),
+      build: median([build]), bounce: median([bounce]), frameFit: median(fits), frameClose: median(closes), flicker: quality.picture === 'polygons' ? 0 : median(flickers),
       retinaClose: median(reduced)!, retinaCloseEveryPixel: median(every),
     };
   } finally {
