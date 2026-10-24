@@ -35,11 +35,12 @@ function shrinks(r: CellRect): CellRect[] {
 
 /** A railed hole in a room of the floor above the arena, over the arena's floor: a gallery looking down into it. */
 export function galleryOverArena(work: TerrainWork, rng: Rng): void {
-  const deepest = work.floors.length - 1;
-  const arena = work.floors[deepest]?.plan.rooms.find((room) => room.boss);
-  const top = floorAbove(work.stack, deepest);
+  // The boss room lies on the floor farthest from the entrance, the last one planned.
+  const farthest = work.floors.length - 1;
+  const arena = work.floors[farthest]?.plan.rooms.find((room) => room.boss);
+  const top = floorAbove(work.stack, farthest);
   const above = work.floors[top ?? -1];
-  if (top === null || !arena || !above || !openingAbove(work, deepest, arena.id, 'gallery') || !chance(rng, GALLERY_CHANCE)) return;
+  if (top === null || !arena || !above || !openingAbove(work, farthest, arena.id, 'gallery') || !chance(rng, GALLERY_CHANCE)) return;
   // The gallery is cut in a room above that may take it: untyped, or a type with a reason for it.
   const cuttable = (id: number): boolean => holeAllowed(work, top, id, 'gallery');
   const candidates = above.plan.rooms
@@ -54,7 +55,7 @@ export function galleryOverArena(work: TerrainWork, rng: Rng): void {
     for (const rect of shrinks(over)) {
       const cells = cellsOf(rect);
       if (cells.length > rc.floorCount * (1 - GALLERY_FLOOR) || !rc.allows(cells, 'block')) continue;
-      above.place({ ...draft('gallery', rc.room.id, cells), opening: { bottom: deepest, link: work.nextLink() } });
+      above.place({ ...draft('gallery', rc.room.id, cells), opening: { bottom: farthest, link: work.nextLink() } });
       return;
     }
   }

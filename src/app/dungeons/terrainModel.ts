@@ -71,7 +71,7 @@ export interface TerrainTraits {
  * into it falls to `bottom`. The map image of a floor with a floor below is transparent there.
  */
 export interface TerrainOpening {
-  /** The floor a fall ends on, or null for a bottomless void (it reaches below the deepest floor). */
+  /** The floor a fall ends on, or null for a bottomless void (it reaches below the lowest floor). */
   bottom: number | null;
   /** Shared by the holes of one shaft or abyss on every floor it passes and by the piece at its bottom. */
   link: number;

@@ -1,6 +1,6 @@
 /**
  * Grows a floor's room tree breadth first from its first room: the room behind the entrance, or
- * on a floor further down the room around the landing of the stairs from above. Every queued room
+ * on every later floor the room around the landing of the stairs from the floor before. Every queued room
  * draws from a stream of its own seed, so two rooms queued with one seed grow the same subtree.
  */
 

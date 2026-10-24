@@ -46,7 +46,7 @@ export interface WorkLayout {
   doors: WorkDoor[];
   /** Cells no room but the first may cover: the ground before the entrance. */
   reserved: CellRect | null;
-  /** Where every room must lie, walls included: under the floor above, for a floor further down. */
+  /** Where every room must lie, walls included: over or under the floor before, for every floor after the entrance floor. */
   within: CellRect | null;
   /** Floor cells no door may open onto: a stairwell's, and the cells it is reached from. */
   blocked: ReadonlySet<string>;

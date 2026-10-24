@@ -2,8 +2,9 @@
  * A floor's vegetation, after its water and furniture: climbers along stretches of its walls and
  * round temple columns, plants in patches on its floor and by its water, weeds in its cracks.
  * Green growth follows the light: on the entry floor it is richest in the rooms by the entrances
- * and thins with every door further in; upstairs it has the entry floor's dusk; below it is scarce, while moss, fungi, roots and dead
- * creepers grow anywhere. Every room draws from a stream of its own.
+ * and thins with every door further in; upstairs it has the entry floor's dusk; below ground it is
+ * scarce, while moss, fungi, roots and dead creepers grow anywhere. Every room draws from a stream
+ * of its own.
  */
 
 import type { CellPoint, DungeonCrack, DungeonRoom } from '../model';
