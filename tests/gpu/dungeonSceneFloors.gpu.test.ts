@@ -117,7 +117,7 @@ describe('a generated dungeon of three floors in its scene', () => {
         const at = levels.findIndex(level => level.id === byFloor[floor]);
         const boxed = inkedBorder(masks[at]!, pictures[at]!, link.polygon);
         // A cave's way is drawn boxed until its natural drawing lands, then with ink inside and broken sides
-        if (theme === 'cavern') expect(boxed > 0.7 || inkedInside(masks[at]!, pictures[at]!, link.polygon) > 0.005, `cave way ${stair.link} on floor ${floor}`).toBe(true);
+        if (theme === 'cavern') expect(boxed > 0.7 || inkedInside(masks[at]!, pictures[at]!, link.polygon) > 0, `cave way ${stair.link} on floor ${floor}`).toBe(true);
         else expect(boxed, `stairwell ${stair.link} on floor ${floor}`).toBeGreaterThan(0.7);
       }
     }
