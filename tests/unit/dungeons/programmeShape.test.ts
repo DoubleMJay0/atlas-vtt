@@ -3,6 +3,7 @@ import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
 import { FEATURES } from '../../../src/app/dungeons/themes/features';
 import { ALL_PROP_KINDS, type PropKind } from '../../../src/app/dungeons/props/propKinds';
 import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
+import { CAVERN_PROGRAMME } from '../../../src/app/dungeons/themes/cavern';
 import { MANSION } from '../../../src/app/dungeons/themes/mansion';
 import type { Piece, RoomProgramme, RoomTypeSpec } from '../../../src/app/dungeons/themes/themeTypes';
 
@@ -14,6 +15,7 @@ const FURNISHED_WITHOUT_HAZARD = ['cistern', 'gaol'];
 const PROGRAMMES: [string, RoomProgramme, readonly (readonly [string, string])[]][] = [
   ['fortress', FORTRESS, [['kitchen', 'chapel'], ['kitchen', 'solar'], ['gaol', 'solar'], ['garderobe', 'kitchen']]],
   ['mansion', MANSION, [['kitchen', 'drawing-room'], ['kitchen', 'master-bedroom']]],
+  ['cavern', CAVERN_PROGRAMME, []],
 ];
 
 function piecesOf(spec: RoomTypeSpec): Piece[] {

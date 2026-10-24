@@ -5,7 +5,7 @@
  * props, water, rubble, cracks) live in that continuous space, so a cell's centre is (x + .5, y + .5).
  */
 
-import type { CellDir, CellPoint, DungeonDoor, DungeonRoom } from './model';
+import type { CellDir, CellPoint, DungeonDoor, DungeonRoom, DungeonStair } from './model';
 
 /** An inclusive rectangle of cells. */
 export interface CellRect {
@@ -103,4 +103,14 @@ export function holdsCell(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells
 export function doorCells(door: Pick<DungeonDoor, 'x' | 'y' | 'wide'>): CellPoint[] {
   const own = { x: door.x, y: door.y };
   return door.wide ? [own, { x: door.x + door.wide.x, y: door.y + door.wide.y }] : [own];
+}
+
+/** A room's floor in cells: its cave cells where it has them, else its rectangle. */
+export function roomArea(room: Pick<DungeonRoom, 'w' | 'h' | 'cells'>): number {
+  return room.cells?.length ?? room.w * room.h;
+}
+
+/** Whether a stairwell lies in the room's floor. */
+export function holdsStairs(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>, stairs: readonly Pick<DungeonStair, 'x' | 'y' | 'w' | 'h'>[]): boolean {
+  return stairs.some((s) => cellsOf({ x0: s.x, y0: s.y, x1: s.x + s.w - 1, y1: s.y + s.h - 1 }).every((c) => holdsCell(room, c.x, c.y)));
 }

@@ -1,26 +1,18 @@
 /**
  * Every floor's terrain, placed together so holes line up between floors. First the gallery over
  * the boss arena (it opens the floor above it), then each floor from the top down: the arena and
- * the five-room stages, a shaft now and then, hazards (about one per six rooms, counting holes from
- * above), then each room by its size (Terrain principle 1): open rooms take height and strong
- * features, cramped rooms low clutter, every fight-sized room some cover, the quieter ones a point
- * of interest. The empty third stays empty but for what passes through it (a hole, the floor under one).
+ * the five-room stages, a shaft now and then, the hazards of rooms whose type has a reason for one,
+ * then each room by its type's recipe. The rooms that stand empty stay empty but for what passes
+ * through them (a hole, the floor under one).
  */
 
 import type { CellPoint, DungeonRoom, DungeonTerrain } from '../model';
 import { cellKey } from '../geometry';
-import type { RoomRole } from '../props/roles';
-import { type Rng, chance, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import type { ThemeContext } from '../themes/themes';
 import { furnishArena } from './arena';
 import { draft } from './catalog';
-import { CRAMPED_AREA, FIGHT_AREA, crampedCover, ensureCover, openRoomCover } from './cover';
-import { difficultGround } from './difficult';
-import { ledgeAlongWall, platformAtFarWall } from './elevation';
 import { type FloorPlan, FloorTerrain } from './floorTerrain';
-import { hazardWeights, placeChasmOver, placeHazard } from './hazards';
-import { anyInterest } from './interest';
 import { furnishStage } from './stages';
 import { furnishTypedArena } from './typeArena';
 import { placeTypeHazard } from './typeHazards';
@@ -28,52 +20,11 @@ import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import { galleryOverArena, shaftDown } from './vertical';
 import { type TerrainWork, terrainWork } from './work';
 
-/** One hazard per this many normal rooms. */
-const ROOMS_PER_HAZARD = 6;
-/** How often a floor's first hazard is an abyss onto the floor below, where a room lies under it. */
-const CHASM_OVER_CHANCE = 0.6;
-/** How likely a quiet room of each role holds a point of interest. */
-const INTEREST_CHANCE: Readonly<Record<RoomRole, number>> = { boss: 0, hall: 0.3, deepest: 0.6, stairs: 0.15, hub: 0.25, 'dead-end': 0.45, plain: 0.2 };
-
 export interface TerrainFloorInput extends FloorPlan {
-  roles: ReadonlyMap<number, RoomRole>;
   /** Normal rooms left without furniture. */
   empty: ReadonlySet<number>;
-  /** The rooms the theme typed, furnished by their recipes; the rest by their roles. */
+  /** The rooms the theme typed, furnished by their recipes. */
   types?: ReadonlyMap<number, TypedRoom>;
-}
-
-function hazardCount(floor: FloorTerrain): number {
-  return floor.pieces.filter((p) => p.traits.hazard !== undefined).length;
-}
-
-/** Hazards up to about one per six rooms, in the larger regular rooms that hold nothing else yet. */
-function hazards(work: TerrainWork, k: number, rooms: readonly DungeonRoom[], rng: Rng): void {
-  const floor = work.floors[k];
-  if (!floor) return;
-  const target = rooms.length / ROOMS_PER_HAZARD;
-  const wanted = Math.floor(target) + (chance(rng, target % 1) ? 1 : 0) - hazardCount(floor);
-  // Typed rooms take a hazard only for a reason of their type (`placeTypeHazards`).
-  let pool = rooms.filter((room) => !work.typed(k, room.id) && room.wing === 'regular' && !room.boss && room.stage === undefined && !(room.rotunda && room.w < 7) && (floor.room(room.id)?.floorCount ?? 0) >= 9 && floor.inRoom(room.id).length === 0);
-  const weights = hazardWeights(work.tags).filter(([, w]) => w > 0);
-  let placed = 0;
-  // A floor with a floor below opens onto it where it can: an abyss over a room down there.
-  if (wanted > 0 && k + 1 < work.floors.length && chance(rng, CHASM_OVER_CHANCE)) {
-    const opened = shuffled(rng, pool).find((room) => {
-      const rc = floor.room(room.id);
-      return rc !== undefined && placeChasmOver(work, k, rc, rng);
-    });
-    if (opened) {
-      placed++;
-      pool = pool.filter((r) => r !== opened);
-    }
-  }
-  while (placed < wanted && pool.length > 0) {
-    const room = weighted(rng, pool.map((r) => [r, r.w * r.h] as const));
-    pool = pool.filter((r) => r !== room);
-    const rc = floor.room(room.id);
-    if (rc && placeHazard(work, k, rc, rng, weighted(rng, weights))) placed++;
-  }
 }
 
 /** The hazards of typed rooms whose types have a reason for one; the rooms that took one. */
@@ -86,25 +37,6 @@ function placeTypeHazards(work: TerrainWork, k: number, rooms: readonly DungeonR
     if (placeTypeHazard(work, k, rc, typed.spec, work.rng(k, `hazard:${room.id}`))) out.add(room.id);
   }
   return out;
-}
-
-/** Height, cover, difficult ground and a point of interest for an ordinary room. */
-function furnishRoom(work: TerrainWork, k: number, room: DungeonRoom, role: RoomRole): void {
-  const floor = work.floors[k];
-  const rc = floor?.room(room.id);
-  if (!floor || !rc) return;
-  const rng = work.rng(k, `room:${room.id}`);
-  const area = rc.floorCount;
-  if (area > CRAMPED_AREA) {
-    if (chance(rng, 0.35)) {
-      if (chance(rng, 0.5) && rc.depth >= 6) platformAtFarWall(floor, rc, 1, rc.width - 2, 1);
-      else ledgeAlongWall(floor, rc, rng);
-    }
-    openRoomCover(floor, rc, rng, work.tags);
-  } else if (area >= FIGHT_AREA) crampedCover(floor, rc, rng, work.tags);
-  difficultGround(floor, rc, rng, work.tags);
-  if (chance(rng, INTEREST_CHANCE[role])) anyInterest(floor, rc, rng, work.tags);
-  if (area >= FIGHT_AREA) ensureCover(floor, rc, work.tags);
 }
 
 function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): void {
@@ -120,14 +52,12 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
     else if (arena) furnishArena(work, k, rc, rng, work.tags);
   }
   shaftDown(work, k, work.rng(k, 'shaft'));
-  hazards(work, k, rooms, work.rng(k, 'hazards'));
   const hazarded = placeTypeHazards(work, k, rooms);
   for (const room of rooms) {
     if (room.boss || room.stage || input.empty.has(room.id)) continue;
     const typed = input.types?.get(room.id);
     const rc = work.floors[k]?.room(room.id);
     if (typed && rc) furnishTypedRoom(work, k, rc, typed.spec, typed.context, hazarded.has(room.id));
-    else furnishRoom(work, k, room, input.roles.get(room.id) ?? 'plain');
   }
 }
 

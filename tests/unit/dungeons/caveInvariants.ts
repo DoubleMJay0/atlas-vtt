@@ -5,6 +5,7 @@ import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { shapeDistance } from '../../../src/app/dungeons/render/geometry';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { caveFloorCells, columnProblems, faultStretch, guardProblems, laneNarrowsProblems, maskProblems, narrowsProblems } from './caveChecks';
+import { hazardFurnishProblems, lifeProblems, liquidProblems } from './caveRules';
 import { doorProblems, floorProblems, loopProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, stairProblems } from './floorsInvariants';
 import { bridgeProblems, cellProblems, holeProblems, routeProblems, stairClearanceProblems } from './terrainInvariants';
@@ -112,6 +113,14 @@ export function describeCaveInvariants(floors: number): void {
         expect(masks(0.3)).toEqual(masks(0));
         expect(masks(0.6)).toEqual(masks(0));
       }
+    });
+
+    it('rule 8: lay roosts by the mouth, fungus groves by water or a roost, the den deep', () => {
+      expect(failures((run) => lifeProblems(run.model))).toEqual([]);
+    });
+
+    it('make a room a hazard room or a furnished room, never both, nature\'s formations aside, and hold one liquid at most in a room', () => {
+      expect(failures(eachFloor((run, i) => [...hazardFurnishProblems(run.model.floors[i]!), ...liquidProblems(run.model.floors[i]!)]))).toEqual([]);
     });
 
     it('keep every rule of the layout and the terrain', () => {

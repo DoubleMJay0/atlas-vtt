@@ -54,7 +54,15 @@
     "broken-furniture",
     "alembic-table",
     "telescope",
-    "star-chart"
+    "star-chart",
+    "stalagmites",
+    "column-formation",
+    "flowstone",
+    "curtain",
+    "crystals",
+    "mushrooms",
+    "boulder",
+    "nest"
   ],
   "terrain": [],
   "cave": []

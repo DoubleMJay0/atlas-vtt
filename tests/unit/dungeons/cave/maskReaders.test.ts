@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { doorApproaches } from '../../../../src/app/dungeons/floors/stairSpots';
 import { generateDungeon } from '../../../../src/app/dungeons/generate';
-import { cellKey, cellsOf, floorRect, holdsCell, wallRect } from '../../../../src/app/dungeons/geometry';
+import { cellKey, cellsOf, floorRect, holdsCell, roomArea, wallRect } from '../../../../src/app/dungeons/geometry';
 import { GrowthSpace } from '../../../../src/app/dungeons/growth/growthSpace';
 import { RUN_STEP, wallRuns } from '../../../../src/app/dungeons/growth/wallRuns';
 import type { CellPoint, DungeonDoor, DungeonFloor, DungeonModel, DungeonRoom } from '../../../../src/app/dungeons/model';
-import { roomArea } from '../../../../src/app/dungeons/props/roles';
 import { frameOf } from '../../../../src/app/dungeons/props/roomFrame';
 import { edgeSpots, isFree, roomSpace } from '../../../../src/app/dungeons/props/space';
 import { RoomCells } from '../../../../src/app/dungeons/terrain/roomCells';

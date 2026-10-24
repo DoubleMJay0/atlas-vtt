@@ -2,7 +2,7 @@
  * A dungeon's theme put to work on its planned floors: for a theme with a room programme every
  * normal room gets its type (`DungeonRoom.type`), and each typed room what its recipe reads there
  * (its rank by depth among rooms of its type, dust sheets past the front third, the theme's
- * richness). A theme without a programme types nothing.
+ * richness).
  */
 
 import type { PlannedFloor } from '../floors/planFloors';
@@ -16,8 +16,7 @@ import type { ThemeId } from './themeTypes';
 
 export interface ThemedFloors {
   theme: ThemeContext;
-  /** The assignment; null for a theme that furnishes by roles. */
-  typed: RoomTypes | null;
+  typed: RoomTypes;
   /** Each floor's typed rooms and how their recipes read them. */
   rooms: ReadonlyMap<number, TypedRoom>[];
 }
@@ -28,7 +27,6 @@ export function typeDungeon(seed: number, id: ThemeId, tags: ReadonlySet<Dungeon
   const facts = definition.facts?.({ seed, tags, floors }) ?? NO_FACTS;
   const theme: ThemeContext = { definition, ruined, facts };
   const programme = programmeOf(definition, tags);
-  if (!programme) return { theme, typed: null, rooms: floors.map(() => new Map()) };
   const typed = assignRoomTypes({ seed, programme, floors, ruined, facts });
   const traits = roomTraits(floors);
   const traitOf = (floor: number, room: number): (typeof traits)[number] | undefined => traits.find((t) => t.floor === floor && t.room === room);

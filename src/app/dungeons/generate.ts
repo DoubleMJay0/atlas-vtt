@@ -15,8 +15,7 @@ import { addUndergrowth } from './growth/undergrowth';
 import { stairsAndAround } from './floors/stairSpots';
 import { DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, requestedFloors } from './model';
 import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './params';
-import { floorColumns, placeProps } from './props';
-import { roomRoles, type RoomRoles } from './props/roles';
+import { floorColumns, placeScatter } from './props';
 import { floorStream } from './rng';
 import { readTags } from './tags';
 import type { FloorTerrain } from './terrain/floorTerrain';
@@ -30,7 +29,8 @@ import { chooseWaterLevel, drainCells, placeWater, poolRooms } from './water';
 interface FloorParts {
   planned: PlannedFloor;
   params: DungeonParams;
-  roles: RoomRoles;
+  /** Normal rooms left without furniture. */
+  empty: ReadonlySet<number>;
   columns: DungeonFloor['columns'];
   /** Where a built theme lets water stand; null where the layout's low points decide. */
   water: ThemeWater | null;
@@ -38,7 +38,7 @@ interface FloorParts {
 }
 
 function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, level: number): DungeonFloor {
-  const { planned, params, roles, columns } = parts;
+  const { planned, params, columns } = parts;
   const { rooms, doors, stairs, cave } = planned;
   const dry = level <= 0 && params.tags.has('dry');
   const mayPool = (id: number): boolean => parts.water?.pools.has(id) ?? true;
@@ -47,11 +47,10 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept) });
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
-  const pieces = addUndergrowth(seed, terrain, waterCells, flora, params.tags.has('ruined'));
-  const typedRooms = new Set(rooms.filter((room) => room.type).map((room) => room.id));
-  const placed = placeProps({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, roles, params, typed: typedRooms, furnished: terrain.propCells() });
-  const props = [...terrain.props, ...placed.props];
-  const { rubble, cracks } = placed;
+  // A built theme (one whose water its rooms decide) keeps its typed rooms clear of thickets, unless it lies in ruins.
+  const pieces = addUndergrowth(seed, terrain, waterCells, flora, parts.water !== null && !params.tags.has('ruined'));
+  const { props } = terrain;
+  const { rubble, cracks } = placeScatter({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, params, furnished: terrain.propCells() });
   const growth = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
   return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth, ...(cave && { cave }) };
 }
@@ -74,22 +73,22 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const themed = typeDungeon(seed, theme, params.tags, planned);
   const { typed } = themed;
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.
-  const level = typed && request.waterLevel === undefined && params.waterLevel === null ? 0 : rolled;
+  const { built } = themed.theme.definition;
+  const level = built && request.waterLevel === undefined && params.waterLevel === null ? 0 : rolled;
   const parts = planned.map((floor, index): FloorParts => {
     const floorPar = floorParams(params, index);
-    const roles = roomRoles(floorStream(seed, 'props', index, 'roles'), floor);
     return {
       planned: floor,
       params: floorPar,
-      roles: typed ? { ...roles, empty: new Set(typed.empty[index]) } : roles,
+      empty: new Set(typed.empty[index]),
       columns: floorColumns(seed, index, floor.rooms, floor.stairs, floorPar),
       theme,
-      water: typed ? themeWater(floor.rooms, themed.rooms[index] ?? new Map(), params.tags.has('ruined')) : null,
+      water: built ? themeWater(floor.rooms, themed.rooms[index] ?? new Map(), params.tags.has('ruined')) : null,
     };
   });
   const terrain = planTerrain(
     seed,
-    parts.map(({ planned: floor, roles, columns }, index) => ({ ...floor, columns, roles: roles.roles, empty: roles.empty, types: themed.rooms[index] ?? new Map() })),
+    parts.map(({ planned: floor, empty, columns }, index) => ({ ...floor, columns, empty, types: themed.rooms[index] ?? new Map() })),
     params.tags,
     themed.theme,
   );

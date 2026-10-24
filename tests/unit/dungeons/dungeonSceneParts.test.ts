@@ -98,7 +98,8 @@ describe('a dungeon of several floors as one scene', () => {
 
   it('writes a note with the GM\'s name and a heading per room its pin links', () => {
     const note = dungeonNote('The Deep Halls', parts.rooms);
-    expect(note.startsWith('# The Deep Halls\n\n## A1\n\n')).toBe(true);
+    // Every typed room is labelled with its type: a cave's first with its mouth.
+    expect(note.startsWith('# The Deep Halls\n\n## A1 · ')).toBe(true);
     const headings = [...note.matchAll(/^## (.+)$/gm)].map(match => match[1]);
     expect(headings).toEqual(parts.rooms.map(room => room.heading));
     for (const pin of Object.values(roomPins(parts.rooms, 'n.md'))) expect(headings).toContain(pin.notePath.slice('n.md#'.length));

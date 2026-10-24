@@ -6,7 +6,7 @@
  */
 
 import type { PlannedFloor } from '../../floors/planFloors';
-import { holdsStairs } from '../../props/roles';
+import { holdsStairs } from '../../geometry';
 import { neighbours } from '../../roomGraph';
 import type { RoomTraits } from './roomTraits';
 

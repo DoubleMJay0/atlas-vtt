@@ -1,10 +1,9 @@
 /** Rubble on the floors and cracks running from the walls. */
 
-import { cellKey, doorCells } from '../geometry';
+import { cellKey, doorCells, roomArea } from '../geometry';
 import type { CellPoint, DungeonCrack, DungeonDoor, DungeonRubble } from '../model';
 import { type Rng, chance, int } from '../rng';
 import { chaikin } from '../water/smooth';
-import { roomArea } from './roles';
 import type { Taken } from './space';
 import { type RoomFrame, onFloor, pointIn, rotundaRadius } from './roomFrame';
 

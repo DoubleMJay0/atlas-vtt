@@ -188,10 +188,9 @@ export interface ThemeFactsInput {
 }
 
 /**
- * `programme: null` furnishes by the rooms' architectural roles, as before themes (Cavern until
- * its programme lands). `programmeFor` gives a variant of the programme by the tags (Cavern's lava
- * tube and Underdark); without it, `programme`. `facts` is built once per dungeon, after the
- * layout; without it, nothing beyond the traits counts.
+ * `programmeFor` gives a variant of the programme by the tags (Cavern's lava tube and Underdark);
+ * without it, `programme`. `facts` is built once per dungeon, after the layout; without it,
+ * nothing beyond the traits counts.
  */
 export interface ThemeDefinition {
   id: ThemeId;
@@ -199,7 +198,7 @@ export interface ThemeDefinition {
   built: boolean;
   /** Tags the theme cannot take, each with the reason the panel shows. */
   refuses: readonly { tag: DungeonTag; reason: MessageKey }[];
-  programme: RoomProgramme | null;
+  programme: RoomProgramme;
   programmeFor?: (tags: ReadonlySet<DungeonTag>) => RoomProgramme;
   facts?: (input: ThemeFactsInput) => ThemeFacts;
 }

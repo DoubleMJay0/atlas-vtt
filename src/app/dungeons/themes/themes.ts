@@ -52,8 +52,8 @@ export function readThemeChoice(value: unknown): ThemeChoice {
   return value === 'any' || (THEME_IDS as readonly unknown[]).includes(value) ? (value as ThemeChoice) : 'any';
 }
 
-/** The programme a theme types its rooms by for these tags; null for a theme that furnishes by roles. */
-export function programmeOf(definition: ThemeDefinition, tags: ReadonlySet<DungeonTag>): RoomProgramme | null {
+/** The programme a theme types its rooms by for these tags. */
+export function programmeOf(definition: ThemeDefinition, tags: ReadonlySet<DungeonTag>): RoomProgramme {
   return definition.programmeFor?.(tags) ?? definition.programme;
 }
 

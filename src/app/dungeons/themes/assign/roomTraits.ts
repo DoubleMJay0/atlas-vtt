@@ -6,9 +6,8 @@
  */
 
 import type { PlannedFloor } from '../../floors/planFloors';
-import { type CellRect, rectsTouch, wallRect } from '../../geometry';
+import { type CellRect, holdsStairs, rectsTouch, roomArea, wallRect } from '../../geometry';
 import type { DungeonRoom, FiveRoomStage } from '../../model';
-import { holdsStairs, roomArea } from '../../props/roles';
 import { hops, neighbours } from '../../roomGraph';
 import type { Degree, DepthBand, SizeClass } from '../themeTypes';
 
