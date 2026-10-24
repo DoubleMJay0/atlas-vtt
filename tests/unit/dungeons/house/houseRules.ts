@@ -2,10 +2,10 @@ import { cellKey, cellsOf, doorCells, floorCellsOf } from '../../../../src/app/d
 import { floorBelow, levelOf, stackOf } from '../../../../src/app/dungeons/floors/floorStack';
 import { spotRect } from '../../../../src/app/dungeons/floors/stairSpots';
 import type { DungeonDoor, DungeonModel } from '../../../../src/app/dungeons/model';
-import { SIDES, doorSides, houseKeys, owners, reached, stackCells, stairKeys, touching, wallEdges } from './houseCells';
+import { doorSides, houseKeys, owners, reached, stackCells, stairKeys, touching, wallEdges } from './houseCells';
 
 /**
- * The layout rules of a house (research §5.10, rules 1–4, 6, 8–10, 15–18), checked on a generated
+ * The layout rules of a house (research §5.10, rules 1–4, 6, 8–10, 16–18; 15 in `houseWindowRules.ts`), checked on a generated
  * model alone: each returns the problems it finds.
  */
 
@@ -114,35 +114,6 @@ export function onCorridors(model: DungeonModel, stages = false): string[] {
     const hallWay = floor.doors.find((d) => d.kind === 'opening' && (d.from === 0 || d.to === 0));
     const corridor = hallWay && floor.rooms[(hallWay.from === 0 ? hallWay.to : hallWay.from)!];
     if (i === 0 && corridor && Math.min(corridor.w, corridor.h) < 2) out.push('the hall opens on a corridor narrower than two cells');
-  });
-  return out;
-}
-
-/** 15. Every room with an outer wall has a window (a cellar none), and windows stand over windows. */
-export function windowsEverywhere(model: DungeonModel): string[] {
-  const stack = stackOf(model);
-  const out: string[] = [];
-  model.floors.forEach((floor, i) => {
-    if (levelOf(stack, i) < 0) return;
-    const house = houseKeys(floor);
-    const windows = new Set((floor.windows ?? []).map((w) => `${cellKey(w.x, w.y)}>${w.dir.x},${w.dir.y}`));
-    for (const room of floor.rooms) {
-      const outer = floorCellsOf(room).some((c) => SIDES.some((s) => !house.has(cellKey(c.x + s.x, c.y + s.y))));
-      if (outer && !(floor.windows ?? []).some((w) => w.room === room.id)) out.push(`floor ${i}: room ${room.id} has an outer wall and no window`);
-    }
-    const below = floorBelow(stack, i);
-    if (below === null || levelOf(stack, i) <= 0) return;
-    const under = model.floors[below]!;
-    const underHouse = houseKeys(under);
-    const underWindows = new Set((under.windows ?? []).map((w) => `${cellKey(w.x, w.y)}>${w.dir.x},${w.dir.y}`));
-    const doorEdges = new Set(under.doors.flatMap((d) => doorCells(d).flatMap((c) => [`${cellKey(c.x, c.y)}>${d.dir.x},${d.dir.y}`, `${cellKey(c.x + d.dir.x, c.y + d.dir.y)}>${-d.dir.x},${-d.dir.y}`])));
-    for (const key of windows) {
-      const [cell, dir] = key.split('>') as [string, string];
-      const [x, y] = cell.split(',').map(Number) as [number, number];
-      const [dx, dy] = dir.split(',').map(Number) as [number, number];
-      const outerBelow = underHouse.has(cell) && !underHouse.has(cellKey(x + dx, y + dy));
-      if (outerBelow && !underWindows.has(key) && !doorEdges.has(key)) out.push(`floor ${i}: window ${key} over a blank wall`);
-    }
   });
   return out;
 }

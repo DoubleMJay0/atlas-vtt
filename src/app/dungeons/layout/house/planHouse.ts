@@ -25,7 +25,8 @@ import { houseLot } from './houseLot';
 import { type HouseSize, houseParams, houseSize } from './houseParams';
 import { houseStairs, type HouseStair } from './houseStairs';
 import { buildStorey } from './houseStorey';
-import { facadeGrid, houseWindows, windowKey, windowUnder } from './houseWindows';
+import { type Facade, type FacadeGrid, entranceEdges, facadeGrid, houseFacade } from './houseFacade';
+import { WindowFloor } from './houseWindows';
 import { type TypedRoom, typeStorey } from './houseZones';
 import { approachCells } from '../../floors/stairSpots';
 
@@ -114,7 +115,8 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
   const stairs = houseStairs(frame, levels);
   const grid = facadeGrid(rng);
   const floors: PlannedFloor[] = [];
-  const windowKeys: Set<string>[] = [];
+  const lit = new Map<number, WindowFloor>();
+  let facade: Facade | null = null;
   let link = 0;
   const links = stairs.map(() => link++);
   for (const level of levels) {
@@ -133,18 +135,19 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
     const inHouse = inBoxes([...rooms.map((r) => r.box), ...storey.stacks]);
     const doors = houseDoors({ frame, rooms, blocked: blockedBy(stairs, level), inHouse, ground: level === 0 });
     const own: DungeonStair[] = stairs.flatMap((s, k) => (s.lower === level || s.upper === level ? [{ ...s.spot, to: indexOf(s.lower === level ? s.upper : s.lower), link: links[k]! }] : []));
-    const windows = level < 0 ? [] : houseWindows(frame, rooms, doors, inHouse, grid, level > 0 ? windowKeys[indexOf(level - 1)]! : new Set());
-    floors[indexOf(level)] = { rooms: rooms.map(toRoom), doors, stairs: own, house: { walls: 'edges', windows, stacks: storey.stacks.map((s) => ({ ...s })) } };
-    windowKeys[indexOf(level)] = new Set(windows.map(windowKey));
-    // A window the facade grid did not give stands over windows down the house, as far as the wall runs.
-    for (const window of windows) {
+    facade ??= groundFacade(frame, rooms, doors, inHouse, grid);
+    // A floor's windows stand over the windows below; a cellar's under the ground floor's.
+    const neighbour = lit.get(level > 0 ? level - 1 : 0);
+    const windows = new WindowFloor({ frame, facade, kind: storey.kind, rooms, doors, inHouse, lined: neighbour?.linedKeys() ?? new Set() });
+    windows.place();
+    lit.set(level, windows);
+    floors[indexOf(level)] = { rooms: rooms.map(toRoom), doors, stairs: own, house: { walls: 'edges', windows: windows.windows, stacks: storey.stacks.map((s) => ({ ...s })) } };
+    // A window the floor below lacks stands over a window there too, down the house, where the room below takes it.
+    for (const window of windows.windows) {
+      if (window.size === 'tall') continue;
       for (let under = level - 1; under >= 0; under--) {
-        const keys = windowKeys[indexOf(under)]!;
-        if (keys.has(windowKey(window))) break;
-        const added = windowUnder(window, floors[indexOf(under)]!);
-        if (!added) break;
-        floors[indexOf(under)]!.house!.windows.push(added);
-        keys.add(windowKey(added));
+        const below = lit.get(under)!;
+        if (below.lined(window) || !below.takeFromAbove(window)) break;
       }
     }
   }
@@ -187,11 +190,18 @@ function settled(seed: number, size: HouseSize, floors: PlannedFloor[], mirror: 
   return { floors: floors.map((floor) => moveFloor({ mirror, shift }, floor)), below };
 }
 
+/** The facades of a house, from its ground floor. */
+function groundFacade(frame: Pick<HouseFrame, 'width' | 'symmetric'>, rooms: readonly TypedRoom[], doors: readonly DungeonDoor[], inHouse: (x: number, y: number) => boolean, grid: FacadeGrid): Facade {
+  return houseFacade({ frame, inHouse, cells: rooms.flatMap((r) => roomCells(r)), entrances: entranceEdges(doors), grid });
+}
+
 /** A five-room dungeon as a house of one floor (`houseFiveRoom.ts`). */
 function planFiveRoom(seed: number, rng: Rng, size: HouseSize): HousePlan {
   const house = fiveRoomHouse(rng);
   const inHouse = inBoxes(house.rooms.map((r) => r.box));
-  const windows = houseWindows({ width: house.width, symmetric: false }, house.rooms, house.doors, inHouse, facadeGrid(rng), new Set());
-  const floor: PlannedFloor = { rooms: house.rooms.map(toRoom), doors: house.doors, stairs: [], house: { walls: 'edges', windows, stacks: [] } };
+  const frame = { width: house.width, symmetric: false };
+  const windows = new WindowFloor({ frame, facade: groundFacade(frame, house.rooms, house.doors, inHouse, facadeGrid(rng)), kind: 'ground', rooms: house.rooms, doors: house.doors, inHouse, lined: new Set() });
+  windows.place();
+  const floor: PlannedFloor = { rooms: house.rooms.map(toRoom), doors: house.doors, stairs: [], house: { walls: 'edges', windows: windows.windows, stacks: [] } };
   return settled(seed, size, [floor], chance(rng, 0.5) ? house.width : null, 0);
 }

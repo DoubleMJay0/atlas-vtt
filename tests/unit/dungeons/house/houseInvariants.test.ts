@@ -12,7 +12,8 @@ import { holeProblems } from '../holeInvariants';
 import { physicsProblems } from '../themeTerrainInvariants';
 import { bridgeProblems, cellProblems, clearanceProblems, routeProblems, stairClearanceProblems } from '../terrainInvariants';
 import { groundsRules } from './groundsRules';
-import { allReached, doorsOnEdges, hallAtTheFront, nestedFloors, onCorridors, oneBackStair, stacksRise, stairsLineUp, wallsAlign, windowsEverywhere } from './houseRules';
+import { allReached, doorsOnEdges, hallAtTheFront, nestedFloors, onCorridors, oneBackStair, stacksRise, stairsLineUp, wallsAlign } from './houseRules';
+import { mainRoomsLit, windowsOverWindows } from './houseWindowRules';
 import { baizeDoor, mirrored, receptionApart, roomSizes, stacksWarm, structureOnly, zones } from './houseZoneRules';
 
 /**
@@ -55,7 +56,7 @@ const RULES: Record<string, (m: DungeonModel) => string[]> = {
   '12 the baize door parts the service side': baizeDoor,
   '13 service below stairs, bedrooms above': zones,
   '14 room sizes': roomSizes,
-  '15 windows in every outer room, over each other': windowsEverywhere,
+  '15 main rooms are lit, windows stand over windows (the rest in houseWindows.test.ts)': (m) => [...mainRoomsLit(m), ...windowsOverWindows(mirrored)(m)],
   '16 walls stand on walls below': wallsAlign,
   '17–18 doors on edges, clear of corners and stairs': doorsOnEdges,
   '20 outbuildings on the lot, each by a path': groundsRules.outbuildings,

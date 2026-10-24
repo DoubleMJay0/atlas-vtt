@@ -19,7 +19,11 @@ export interface DungeonWindow {
   y: number;
   dir: CellDir;
   room: number;
+  /** Unset, a window of the facade; `tall`, a stair hall's window rising past its landing; `small`, a closet's or a cellar's, set high in the wall. Still one cell long. */
+  size?: WindowSize;
 }
+
+export type WindowSize = 'tall' | 'small';
 
 /** A chimney stack: masonry cells inside the house that are no room's floor, the same cells on every floor it rises through. */
 export interface DungeonStack {

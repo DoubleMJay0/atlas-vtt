@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../../src/app/dungeons/model';
-import { allReached, doorsOnEdges, hallAtTheFront, nestedFloors, onCorridors, oneBackStair, stacksRise, stairsLineUp, wallsAlign, windowsEverywhere } from './houseRules';
+import { allReached, doorsOnEdges, hallAtTheFront, nestedFloors, onCorridors, oneBackStair, stacksRise, stairsLineUp, wallsAlign } from './houseRules';
+import { mainRoomsLit } from './houseWindowRules';
 
 /** Houses of every size and floor count: the planner's rules (research §5.10, 1–4, 6, 8–10, 15–18). */
 const RUNS: { label: string; model: DungeonModel }[] = [];
@@ -11,7 +12,7 @@ for (let k = 1; k <= 60; k++) {
   }
 }
 
-const RULES = { nestedFloors, stairsLineUp, oneBackStair, stacksRise, hallAtTheFront, allReached, onCorridors, windowsEverywhere, wallsAlign, doorsOnEdges };
+const RULES = { nestedFloors, stairsLineUp, oneBackStair, stacksRise, hallAtTheFront, allReached, onCorridors, mainRoomsLit, wallsAlign, doorsOnEdges };
 
 describe('a house as the planner lays it out', () => {
   for (const [name, rule] of Object.entries(RULES)) {

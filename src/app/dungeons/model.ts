@@ -19,7 +19,7 @@ export type { CoverLevel, DungeonTerrain, FiveRoomStage, HazardKind, TerrainKind
 export { FIVE_ROOM_STAGES } from './terrainModel';
 export type { DungeonGrowth, GrowthKind } from './growthModel';
 export type { CaveFault, CaveFloor, CaveModel, CaveVariant, StairWay } from './caveModel';
-export type { DungeonStack, DungeonWindow, FloorWalls, GroundsKind, GroundsPiece, HouseGrounds, OutbuildingUse } from './houseModel';
+export type { DungeonStack, DungeonWindow, FloorWalls, GroundsKind, GroundsPiece, HouseGrounds, OutbuildingUse, WindowSize } from './houseModel';
 export type { PropKind } from './props/propKinds';
 
 /** Bump when the same seed and tags would give another dungeon. */
