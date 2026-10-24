@@ -82,8 +82,8 @@ const NO_LIGHTS: readonly LightSource[] = [];
 
 /**
  * A wall: none without two ends that are numbers; a door is locked only where its `locked` is
- * `true`, a wall blocks one thing only where `blocks` names sight or light (anything else
- * reads as a wall for both), and it is limited only where `limited` is `true` and limited
+ * `true`, a wall blocks one thing only where `blocks` names sight or light, and is a window that
+ * stops a token alone where it names `movement` (anything else reads as a wall for both), and it is limited only where `limited` is `true` and limited
  * walls are switched on (`LIMITED_WALLS`): this is the one place that decides it, for sight,
  * light, the sealing, the engine's fields and masks, the wall editor's look and its menu.
  */
@@ -100,6 +100,7 @@ function wallOf(value: Record<string, unknown>): WallSegment | null {
   const flag = (it: unknown): boolean => it === undefined || it === true;
   // With limited walls switched off, a wall that says it is limited reads as a wall like any other: it blocks.
   const isLimited = LIMITED_WALLS && limited === true;
-  if (flag(locked) && (limited === undefined || isLimited) && (blocks === undefined || blocks === 'sight' || blocks === 'light')) return value as unknown as WallSegment;
-  return { ...rest, ...(locked === true && { locked }), ...(isLimited ? { limited: true } : {}), ...((blocks === 'sight' || blocks === 'light') && { blocks }) } as unknown as WallSegment;
+  const known = blocks === 'sight' || blocks === 'light' || blocks === 'movement';
+  if (flag(locked) && (limited === undefined || isLimited) && (blocks === undefined || known)) return value as unknown as WallSegment;
+  return { ...rest, ...(locked === true && { locked }), ...(isLimited ? { limited: true } : {}), ...(known && { blocks }) } as unknown as WallSegment;
 }

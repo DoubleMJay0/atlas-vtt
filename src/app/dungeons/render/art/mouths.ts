@@ -1,4 +1,5 @@
-import { doorCells } from '../../geometry';
+import { doorCells, doorMiddle } from '../../geometry';
+import { OUTER_WALL } from '../houseShapes';
 import type { DungeonDoor } from '../../model';
 import type { Vec } from '../geometry';
 import type { VisibleDungeon } from '../visibleDungeon';
@@ -24,9 +25,10 @@ export function mouthsOf(dungeon: VisibleDungeon): Mouth[] {
     .filter(door => door.from === null && door.kind !== 'secret')
     .map(door => {
       const cells = doorCells(door);
-      const cx = cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length;
-      const cy = cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length;
-      return { door, out: { x: -door.dir.x, y: -door.dir.y }, at: { x: cx - door.dir.x * 0.5, y: cy - door.dir.y * 0.5 }, width: cells.length };
+      // A cell door's mouth is its cell's outer edge; a door on an edge stands on the house's outer wall.
+      const m = doorMiddle(door);
+      const back = door.edge ? OUTER_WALL / 2 : 0.5;
+      return { door, out: { x: -door.dir.x, y: -door.dir.y }, at: { x: m.x - door.dir.x * back, y: m.y - door.dir.y * back }, width: cells.length };
     });
 }
 

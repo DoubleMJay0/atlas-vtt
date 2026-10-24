@@ -1,4 +1,5 @@
 import { doorCells } from '../geometry';
+import { doorEdge } from './houseShapes';
 import type { DungeonDoor, DungeonRoom } from '../model';
 import type { Rng } from '../rng';
 import { clipToFloors } from './floors';
@@ -70,6 +71,8 @@ function roomLines(room: DungeonRoom, step: number): Line[] {
 /** A wide opening is floor: the lines where it meets its rooms are drawn as grid. */
 function doorLines(door: DungeonDoor, wide: ReadonlySet<DungeonDoor>): Line[] {
   if (!wide.has(door)) return [];
+  // An opening on an edge is no cell: the grid runs along its edge.
+  if (door.edge) return [doorEdge(door)];
   const across = doorCells(door).flatMap(cell => {
     if (door.dir.x !== 0) return [cell.x, cell.x + 1].map(x => [{ x, y: cell.y }, { x, y: cell.y + 1 }] as Line);
     return [cell.y, cell.y + 1].map(y => [{ x: cell.x, y }, { x: cell.x + 1, y }] as Line);

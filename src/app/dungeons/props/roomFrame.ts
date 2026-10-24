@@ -4,7 +4,7 @@
  */
 
 import type { CellDir, CellPoint, DungeonDoor, DungeonRoom } from '../model';
-import { dir, holdsCell, perpendicular } from '../geometry';
+import { dir, doorMiddle, holdsCell, perpendicular } from '../geometry';
 
 export interface RoomFrame {
   room: DungeonRoom;
@@ -61,7 +61,9 @@ export function onFloor(frame: RoomFrame, p: CellPoint, margin: number): boolean
 export function backWallOpen(frame: RoomFrame, doors: readonly DungeonDoor[]): boolean {
   return doors.some((door) => {
     if (door.kind === 'secret' || (door.from !== frame.room.id && door.to !== frame.room.id)) return false;
-    const u = (door.x + 0.5 - frame.centre.x) * frame.axis.x + (door.y + 0.5 - frame.centre.y) * frame.axis.y;
-    return Math.abs(u - (frame.halfDepth + 0.5)) < 0.01;
+    // A door on an edge stands on the room's own boundary; a cell door half a cell beyond it, in the wall.
+    const at = door.edge ? doorMiddle(door) : { x: door.x + 0.5, y: door.y + 0.5 };
+    const u = (at.x - frame.centre.x) * frame.axis.x + (at.y - frame.centre.y) * frame.axis.y;
+    return Math.abs(u - (frame.halfDepth + (door.edge ? 0 : 0.5))) < 0.01;
   });
 }

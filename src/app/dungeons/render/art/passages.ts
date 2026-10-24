@@ -6,6 +6,7 @@ import type { VisibleFloor } from '../visibleDungeon';
 import { drawFlight } from '../terrain/raised';
 import type { Hand } from './hand';
 import { polyPath } from './paths';
+import { drawWindows } from './windows';
 import { type CaveWayDraw, type CaveWayPart, caveWay } from '../cave/caveArt';
 
 /**
@@ -16,9 +17,12 @@ import { type CaveWayDraw, type CaveWayPart, caveWay } from '../cave/caveArt';
  * door is wall.
  */
 
-/** Maps a point of a door cell's own frame (u across the way, v along it, −0.5..0.5) into cells. */
-function cellFrame(door: Pick<DungeonDoor, 'x' | 'y' | 'dir'>): (u: number, v: number) => Vec {
-  const { x, y, dir } = door;
+/** Maps a point of a door's own frame (u across the way, v along it, −0.5..0.5) into cells: round its cell's middle, or its edge's. */
+function cellFrame(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'edge'>): (u: number, v: number) => Vec {
+  const { dir } = door;
+  const shift = door.edge ? 0.5 : 0;
+  const x = door.x + dir.x * shift;
+  const y = door.y + dir.y * shift;
   return (u, v) => ({ x: x + 0.5 + -dir.y * u + dir.x * v, y: y + 0.5 + dir.x * u + dir.y * v });
 }
 
@@ -32,6 +36,7 @@ export function drawPassages(hand: Hand): void {
     if (door.kind === 'door' && !drawn('narrows')) drawDoor(hand, door);
     else if (door.kind === 'steps' && !drawn('scree')) drawFlight(hand, { x: door.x, y: door.y, w: 1, h: 1 }, door.descends ? door.dir : flip(door.dir), 0, 0.22);
   }
+  drawWindows(hand);
   for (const stair of env.dungeon.floor.stairs) {
     const end = stairwellEnd(env.dungeon, stair);
     const part = stairPart(stair, end);

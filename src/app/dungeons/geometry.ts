@@ -117,6 +117,34 @@ export function doorCells(door: Pick<DungeonDoor, 'x' | 'y' | 'wide'>): CellPoin
   return door.wide ? [own, { x: door.x + door.wide.x, y: door.y + door.wide.y }] : [own];
 }
 
+/** The cells a door stands in, which no room's floor holds: a cell door's (`doorCells`), none for a door on an edge between two floors. */
+export function doorwayCells(door: Pick<DungeonDoor, 'x' | 'y' | 'wide' | 'edge'>): CellPoint[] {
+  return door.edge ? [] : doorCells(door);
+}
+
+/**
+ * The floor cells of `room` beside a doorway, one per cell of a wide door: just inside a cell
+ * door's wall, or the cell on the room's side of a door on an edge. None where the door does not
+ * open into the room.
+ */
+export function doorSide(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide' | 'from' | 'to' | 'edge'>, room: number): CellPoint[] {
+  const step = door.from === room ? -1 : door.to === room ? 1 : 0;
+  if (step === 0) return [];
+  // An edge door's own cell lies on its `from` side, so the room it leads from steps nowhere.
+  const by = door.edge ? (step < 0 ? 0 : 1) : step;
+  return doorCells(door).map((c) => ({ x: c.x + door.dir.x * by, y: c.y + door.dir.y * by }));
+}
+
+/** The middle of a doorway, in cells: of its cells, or of the edge a door on an edge stands on. */
+export function doorMiddle(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide' | 'edge'>): CellPoint {
+  const cells = doorCells(door);
+  const shift = door.edge ? 0.5 : 0;
+  return {
+    x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length + door.dir.x * shift,
+    y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length + door.dir.y * shift,
+  };
+}
+
 /** A room's floor in cells: its cave cells where it has them, else its rectangle. */
 export function roomArea(room: Pick<DungeonRoom, 'w' | 'h' | 'cells'>): number {
   return room.cells?.length ?? room.w * room.h;

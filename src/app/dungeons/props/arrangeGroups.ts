@@ -4,7 +4,7 @@
  * pieces on the shore of the room's liquid.
  */
 
-import { cellKey, dir, perpendicular } from '../geometry';
+import { cellKey, dir, doorSide, perpendicular } from '../geometry';
 import type { CellDir, CellPoint, DungeonProp, PropKind } from '../model';
 import { shuffled } from '../rng';
 import { PROP_SPECS, isCellPiece, propReach } from './catalogue';
@@ -43,7 +43,8 @@ function pairAxis(fs: FurnishSpace, of: PlacedPiece | 'door' | null): { at: Cell
     const door = fs.doors.find((d) => d.to === rc.room.id && d.kind !== 'secret') ?? fs.doors.find((d) => (d.from === rc.room.id || d.to === rc.room.id) && d.kind !== 'secret');
     if (!door) return null;
     const inward = door.to === rc.room.id ? door.dir : opposite(door.dir);
-    return { at: { x: door.x + 0.5 + inward.x, y: door.y + 0.5 + inward.y }, facing: inward, half: 1 };
+    const [first] = doorSide(door, rc.room.id);
+    return first ? { at: { x: first.x + 0.5, y: first.y + 0.5 }, facing: inward, half: 1 } : null;
   }
   return { at: fs.space.frame.centre, facing: opposite(rc.axis), half: 1 };
 }

@@ -1,3 +1,4 @@
+import { doorMiddle } from '../geometry';
 import type { CellDir, DungeonDoor } from '../model';
 import { unionRings } from '../render/clipShapes';
 import { doorShape, shapePolygon, shapeRings, type FloorShape, type Vec } from '../render/geometry';
@@ -58,10 +59,12 @@ export interface DoorLine {
  * The line across a door cell `v` cells from its middle along the door's direction (towards the
  * child room), snapped to the grid like the rings.
  */
-export function doorLine(door: Pick<DungeonDoor, 'x' | 'y'> & { dir: CellDir }, v: number): DoorLine {
+export function doorLine(door: Pick<DungeonDoor, 'x' | 'y' | 'wide' | 'edge'> & { dir: CellDir }, v: number): DoorLine {
   const s = snap(v);
+  // A door on an edge stands across its edge's middle, which lies on the snapping grid.
+  const base = door.edge ? doorMiddle(door) : { x: door.x + 0.5, y: door.y + 0.5 };
   return {
-    at: { x: door.x + 0.5 + door.dir.x * s, y: door.y + 0.5 + door.dir.y * s },
+    at: { x: base.x + door.dir.x * s, y: base.y + door.dir.y * s },
     across: { x: -door.dir.y, y: door.dir.x },
   };
 }

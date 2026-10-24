@@ -4,6 +4,7 @@
  * barred (a doorway's approach, a stairwell, a hole) and at every doorway, a little clear of its jambs.
  */
 
+import { doorCells, doorMiddle } from '../geometry';
 import type { CellPoint, DungeonDoor, DungeonRoom } from '../model';
 import { traceLoops } from '../water/contour';
 import { cellMask } from '../water/wetGrid';
@@ -70,8 +71,14 @@ function edgeOf(room: DungeonRoom): EdgePoint[] {
   return out;
 }
 
-/** Distance from a point to a door's cell. */
+/** Distance from a point to a door's cell, or to the edge a door on an edge stands on. */
 function toDoor(p: CellPoint, door: DungeonDoor): number {
+  if (door.edge) {
+    const m = doorMiddle(door);
+    const along = Math.abs((p.x - m.x) * door.dir.y + (p.y - m.y) * door.dir.x);
+    const across = Math.abs((p.x - m.x) * door.dir.x + (p.y - m.y) * door.dir.y);
+    return Math.hypot(Math.max(along - doorCells(door).length / 2, 0), across);
+  }
   const dx = Math.max(door.x - p.x, 0, p.x - (door.x + 1));
   const dy = Math.max(door.y - p.y, 0, p.y - (door.y + 1));
   return Math.hypot(dx, dy);
