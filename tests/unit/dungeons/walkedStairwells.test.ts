@@ -17,11 +17,12 @@ const SEEDS = 100;
  * end; the sides closed on both floors. Held by moving across cells, as a player's token moves.
  */
 describe('a generated dungeon\'s stairwells are walked', () => {
-  for (const floors of [2, 3, 4]) {
-    it(`from the end at each floor's ground to the far row, over ${SEEDS} dungeons of ${floors} floors`, () => {
+  const cases: [number, 'cavern' | undefined][] = [[2, undefined], [3, undefined], [4, undefined], [2, 'cavern'], [3, 'cavern']];
+  for (const [floors, theme] of cases) {
+    it(`from the end at each floor's ground to the far row, over ${SEEDS} ${theme ?? 'any'} dungeons of ${floors} floors`, () => {
       let stairwells = 0;
       for (let seed = 1; seed <= SEEDS; seed++) {
-        const model = generateDungeon({ seed: seed * 7919 + floors, tags: ['medium'], floors });
+        const model = generateDungeon({ seed: seed * 7919 + floors, tags: ['medium'], floors, ...(theme && { theme }) });
         const ids = model.floors.map((_, index) => `floor-${index}`);
         // The scene lists its levels bottom first; floor 0 is the top.
         const levels: SceneLevel[] = [...ids].reverse().map((id) => ({ id, elevation: { bottom: 0, top: 10 }, background: null }));

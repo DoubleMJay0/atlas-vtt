@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyDungeonEdits, NO_EDITS, withWingHidden } from '../../../src/app/dungeons/edits';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import { cellKey, floorCellsOf } from '../../../src/app/dungeons/geometry';
+import { cellKey, floorCellsOf, holdsCell } from '../../../src/app/dungeons/geometry';
 import { approachCells, doorApproaches, spotRect } from '../../../src/app/dungeons/floors/stairSpots';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { propReach } from '../../../src/app/dungeons/props/catalogue';
@@ -10,6 +10,7 @@ import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { cellOutlines } from '../../../src/app/dungeons/scene/cellOutline';
 import { roomFacts } from '../../../src/app/dungeons/scene/roomFacts';
+import { wallRings } from '../../../src/app/dungeons/scene/wallOutline';
 import { keyedRooms } from '../../../src/app/dungeons/scene/roomKeys';
 import { pinCell } from '../../../src/app/dungeons/scene/roomPins';
 import { roomDrafts } from '../../../src/app/dungeons/scene/toFeatures';
@@ -103,8 +104,9 @@ describe('a dungeon of several floors as one scene', () => {
     const headings = [...note.matchAll(/^## (.+)$/gm)].map(match => match[1]);
     expect(headings).toEqual(parts.rooms.map(room => room.heading));
     for (const pin of Object.values(roomPins(parts.rooms, 'n.md'))) expect(headings).toContain(pin.notePath.slice('n.md#'.length));
-    expect(note).toContain('Stairs lead down to floor B.');
-    expect(note).toContain('Stairs lead up to floor A.');
+    // A cave's ways between floors are pitches and scree slopes.
+    expect(note).toMatch(/(A pitch drops|A scree slope leads down) to floor B\./);
+    expect(note).toMatch(/(An aven rises|A scree slope leads up) to floor A\./);
   });
 
   it('names every terrain piece, piece of furniture and column a map feature on its floor\'s level', () => {
@@ -251,6 +253,7 @@ describe('a room\'s pin', () => {
           const where = `seed ${seed} floor ${index} room ${room.id} at ${p.x},${p.y}`;
           rooms++;
           expect(p.x > room.x && p.x < room.x + room.w && p.y > room.y && p.y < room.y + room.h, where).toBe(true);
+          expect(holdsCell(room, Math.floor(p.x), Math.floor(p.y)), `${where}: on the room's own cells`).toBe(true);
           const roomCells = floorCellsOf(room);
           const anyIdeal = roomCells.some(c => !room.rotunda && clearOfThings(c.x + 0.5, c.y + 0.5) && !preferNot.has(cellKey(c.x, c.y)));
           const ideal = clearOfThings(p.x, p.y) && !preferNot.has(cellKey(Math.floor(p.x), Math.floor(p.y)));
@@ -396,3 +399,67 @@ describe('room labels', () => {
     }
   });
 });
+
+describe('a cavern\'s note', () => {
+  const caves = Array.from({ length: 30 }, (_, k) => generateDungeon({ seed: 3 + k * 613, theme: 'cavern', tags: k % 2 ? ['secret'] : [], floors: 2 + (k % 2) }));
+
+  it('speaks of narrows, crawls and scree, never of a door, and of pitches, avens and scree slopes between floors', () => {
+    let pitches = 0;
+    let avens = 0;
+    for (const model of caves) {
+      model.floors.forEach((floor, index) => {
+        const visible = visibleFloor(model, DEFAULT_VIEW, index);
+        for (const room of floor.rooms) {
+          const facts = roomFacts(visible, room, DEFAULT_VIEW);
+          expect(facts, `seed ${model.seed}`).not.toMatch(/\bdoors?\b|\bopenings?\b|\bsteps\b|\bstairs\b/i);
+          if (/A pitch drops to floor/.test(facts)) pitches++;
+          if (/An aven rises to floor/.test(facts)) avens++;
+        }
+        for (const stair of floor.stairs.filter((s) => s.way === 'pitch')) {
+          const room = floor.rooms.find((r) => r.kind === 'room' && cellsOfStair(stair).every((c) => holdsCell(r, c.x, c.y)));
+          if (room) expect(roomFacts(visible, room, DEFAULT_VIEW)).toMatch(stair.to > index ? /A pitch drops to floor/ : /An aven rises to floor/);
+        }
+      });
+    }
+    expect(pitches).toBeGreaterThan(0);
+    expect(avens).toBeGreaterThan(0);
+  });
+
+  it('keeps its liquids inside the cave', () => {
+    for (const model of caves.filter((_, k) => k % 3 === 0).map((m) => generateDungeon({ seed: m.seed, theme: 'cavern', tags: ['flooded'], floors: 2 }))) {
+      const { parts, placement } = partsOf(model);
+      const ids = parts.levelIds!;
+      for (const liquid of Object.values(parts.scene.liquids ?? {})) {
+        const index = ids.indexOf(liquid.level!);
+        const rings = wallRings(visibleFloor(model, DEFAULT_VIEW, index).floors, [], 0);
+        for (const p of liquid.polygon) {
+          const c = { x: p.x / placement.pxPerCell + placement.originCell.x, y: p.y / placement.pxPerCell + placement.originCell.y };
+          // A surface with more corners than a liquid holds is simplified by a hundredth of a cell (toLiquids' FIRST_TOLERANCE).
+          expect(insideRings(rings, c) || nearRings(rings, c, WALL_SNAP), `seed ${model.seed} ${liquid.liquid} at ${c.x},${c.y}`).toBe(true);
+        }
+      }
+    }
+  });
+});
+
+/** How far a simplified liquid's corner may lie past the cave's walls: twice the first simplification. */
+const WALL_SNAP = 0.02;
+
+function insideRings(rings: readonly { x: number; y: number }[][], p: { x: number; y: number }): boolean {
+  let hit = false;
+  for (const ring of rings) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i]!;
+    const b = ring[j]!;
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) hit = !hit;
+  }
+  return hit;
+}
+
+function nearRings(rings: readonly { x: number; y: number }[][], p: { x: number; y: number }, d: number): boolean {
+  return rings.some((ring) => ring.some((a, i) => {
+    const b = ring[(i + 1) % ring.length]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / (len * len)));
+    return Math.hypot(a.x + t * (b.x - a.x) - p.x, a.y + t * (b.y - a.y) - p.y) <= d;
+  }));
+}
