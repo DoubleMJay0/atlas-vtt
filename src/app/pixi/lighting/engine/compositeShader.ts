@@ -197,11 +197,13 @@ vec3 litAsBright(vec3 albedo, vec4 lamps, vec3 bounce, vec3 ambient) {
 // What the players see where they perceive and remember nothing: the fog map where the scene has
 // one (over the unexplored colour where it is transparent), the unexplored colour otherwise. Linear.
 vec3 unexploredAt(vec2 w) {
-  if (uHasUnexploredImage < 0.5) return uUnexplored;
+  vec2 uv = w / uMapSize;
+  // Beyond the map the image would repeat its edge pixels outwards: the colour lies there, as without one.
+  if (uHasUnexploredImage < 0.5 || any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return uUnexplored;
   // Its mip level from the size of a screen pixel on the image: sharp up close, unaliased zoomed out.
   vec2 size = vec2(textureSize(uUnexploredImage, 0));
   float lod = max(log2(max(uPixelWorld * max(size.x / uMapSize.x, size.y / uMapSize.y), 1e-6)), 0.0);
-  vec4 fog = textureLod(uUnexploredImage, clamp(w / uMapSize, 0.0, 1.0), lod);
+  vec4 fog = textureLod(uUnexploredImage, uv, lod);
   vec3 straight = fog.a > 0.0 ? fog.rgb / fog.a : vec3(0.0);
   return mix(uUnexplored, toLinear(straight), fog.a);
 }

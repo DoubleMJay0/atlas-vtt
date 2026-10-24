@@ -198,6 +198,30 @@ describe('explored memory in the composite', () => {
     expect(hashOf(await renderWithFogMap('gm', whole, noVision))).toBe(hashOf(await render('gm', noVision)));
   });
 
+  it('shows the unexplored colour, not the edge of the fog map drawn out, beyond the map', async () => {
+    const whole = (g: Graphics): Graphics => g.rect(0, 0, MAP / 4, MAP / 4).fill({ color: 0xeeeeee });
+    // The camera shows the map's right half and as much again beyond its edge.
+    const beyond = { ...camera, x: -MAP / 2 * camera.scale };
+    const renderer = await createTestRenderer(SIZE);
+    cleanup.push(() => renderer.destroy());
+    const fog = RenderTexture.create({ width: MAP / 4, height: MAP / 4 });
+    const g = whole(new Graphics());
+    renderer.render({ container: g, target: fog, clear: true, clearColor: [0, 0, 0, 0] });
+    g.destroy();
+    cleanup.push(() => fog.destroy(true));
+    const engine = new LightingEngine(renderer);
+    cleanup.push(() => engine.destroy());
+    engine.setEnabled(true);
+    engine.setMode('player');
+    engine.update(scene({ exploredMemory: false, unexploredColor: '#336699', unexploredTexture: fog, sight: SEES_ALL, ambient: 0, lights: [] }));
+    engine.flush();
+    const at = await renderThroughEngine(engine, renderer, beyond);
+    expectColour(at(SIZE / 4, SIZE / 2), 0xeeeeee);
+    // Where the composite reaches past the map (its sight layers may), never the fog map's edge.
+    const [r, g2, b] = at(SIZE * 3 / 4, SIZE / 2);
+    expect(r + g2 + b).toBeLessThan(3 * 0xee - 60);
+  });
+
   it('fades the map a light reveals into the fog map inside its edge, and leaves its centre as it was', async () => {
     const whole = (g: Graphics): Graphics => g.rect(0, 0, MAP / 4, MAP / 4).fill({ color: 0xeeeeee });
     const noVision: Partial<EngineScene> = { sight: SEES_ALL, ambient: 0 };
