@@ -34,18 +34,20 @@ export interface Mound {
 function mound(x: number, y: number, r: number, lean: Vec, phase: number): Mound {
   const c = { x, y };
   // Rings climb the cone and crowd towards its lean, as drip-fed calcite does.
-  const rings = [0.72, 0.48, 0.27].map((s, i) => lobed({ x: x + lean.x * r * (1 - s), y: y + lean.y * r * (1 - s) }, r * s, 5, 0.06 - i * 0.012, phase + i * 0.9, 20));
-  return { c, r, lean, foot: lobed(c, r, 5, 0.07, phase), rings, tip: { x: x + lean.x * r * 0.86, y: y + lean.y * r * 0.86 } };
+  // A small cone swells in fewer lobes and is traced through fewer points: it is drawn small.
+  const lobes = r < 0.1 ? 3 : 5;
+  const points = (radius: number): number => Math.max(lobes * 4, Math.round(radius * 85));
+  const rings = [0.72, 0.48, 0.27].map((s, i) => lobed({ x: x + lean.x * r * (1 - s), y: y + lean.y * r * (1 - s) }, r * s, lobes, 0.06 - i * 0.012, phase + i * 0.9, points(r * s)));
+  return { c, r, lean, foot: lobed(c, r, lobes, 0.07, phase, points(r)), rings, tip: { x: x + lean.x * r * 0.86, y: y + lean.y * r * 0.86 } };
 }
 
-/** A clump of stalagmites, the tallest in its middle, the smallest at its edges, each leaning a little its own way. */
+/** A clump of stalagmites, the tallest in its middle, the smallest at its edges, each leaning a little its own way; no two feet overlap, so the clump is drawn as one. */
 export const MOUNDS: readonly Mound[] = [
-  mound(0.27, 0.25, 0.075, { x: 0.25, y: 0.2 }, 2.4),
+  mound(0.36, 0.32, 0.07, { x: 0.25, y: 0.2 }, 2.4),
   mound(-0.29, 0.24, 0.085, { x: -0.2, y: 0.25 }, 0.7),
-  mound(0.31, -0.03, 0.07, { x: 0.3, y: -0.05 }, 4.1),
   mound(-0.26, -0.22, 0.095, { x: -0.22, y: -0.2 }, 1.3),
   mound(0.07, -0.29, 0.08, { x: 0.05, y: -0.3 }, 5.2),
-  mound(0.2, 0.13, 0.135, { x: 0.18, y: 0.08 }, 3.3),
+  mound(0.26, 0.15, 0.13, { x: 0.18, y: 0.08 }, 3.3),
   mound(-0.06, 0.03, 0.22, { x: -0.08, y: 0.05 }, 0.2),
 ];
 
@@ -53,7 +55,7 @@ export const MOUNDS: readonly Mound[] = [
  * The calcite a cluster stands on: round the centre, as far as the farthest foot grown by `grow`,
  * so it hugs every stalagmite and dips between them.
  */
-function padAround(mounds: readonly { c: Vec; r: number }[], grow: number, n = 40): Vec[] {
+function padAround(mounds: readonly { c: Vec; r: number }[], grow: number, n = 32): Vec[] {
   const out: Vec[] = [];
   for (let k = 0; k < n; k++) {
     const a = (k / n) * Math.PI * 2;
@@ -80,11 +82,11 @@ export const MOUND_PAD: readonly Vec[] = padAround(MOUNDS, 0.05);
 
 /** A column where a stalactite met its stalagmite: a flared, rippled skirt, a fluted shaft and the small cones at its foot. */
 export const COLUMN = {
-  skirt: lobed({ x: 0, y: 0 }, 0.4, 6, 0.045, 0.6, 44),
-  drips: [lobed({ x: 0.01, y: 0.01 }, 0.355, 7, 0.035, 1.9, 36), lobed({ x: 0.005, y: 0.005 }, 0.315, 8, 0.03, 3.1, 36)],
-  shaft: lobed({ x: 0, y: 0 }, 0.255, 11, 0.055, 0.3, 66),
-  core: lobed({ x: -0.02, y: -0.02 }, 0.13, 7, 0.06, 2.2, 28),
-  foot: [mound(0.27, 0.27, 0.065, { x: 0.3, y: 0.3 }, 1.1), mound(-0.33, 0.1, 0.055, { x: -0.3, y: 0.1 }, 2.6), mound(0.12, -0.36, 0.05, { x: 0.1, y: -0.3 }, 4.4)],
+  skirt: lobed({ x: 0, y: 0 }, 0.4, 6, 0.045, 0.6, 36),
+  drips: [lobed({ x: 0.01, y: 0.01 }, 0.34, 7, 0.035, 1.9, 32)],
+  shaft: lobed({ x: 0, y: 0 }, 0.255, 11, 0.055, 0.3, 55),
+  core: lobed({ x: -0.02, y: -0.02 }, 0.13, 7, 0.06, 2.2, 21),
+  foot: [mound(0.27, 0.27, 0.065, { x: 0.3, y: 0.3 }, 1.1), mound(-0.33, 0.1, 0.055, { x: -0.3, y: 0.1 }, 2.6)],
 };
 
 /** How far the column's fluted shaft certainly reaches: its outline lighting takes as a wall. */
@@ -218,17 +220,17 @@ function crystal(root: Vec, tip: Vec, r: number, turn: number): Crystal {
 export const MATRIX: readonly Vec[] = lobed({ x: 0, y: 0.2 }, 0.2, 4, 0.12, 0.9, 30).map(p => ({ x: p.x * 1.55, y: 0.2 + (p.y - 0.2) * 0.9 }));
 
 /**
- * Seven crystals of the rock at the wall: some stand nearly upright and show their ends, others
- * lean out into the room; the shortest are drawn first, the great one leaning forward last.
+ * Seven crystals of the rock at the wall: three long ones leaning out into the room, four short ones
+ * standing nearly upright between them and showing their ends; no two overlap, so they are drawn together.
  */
 export const CRYSTALS: readonly Crystal[] = [
-  crystal({ x: -0.22, y: 0.24 }, { x: -0.29, y: 0.16 }, 0.065, 0.4),
-  crystal({ x: 0.24, y: 0.25 }, { x: 0.3, y: 0.17 }, 0.055, 0.1),
-  crystal({ x: 0.15, y: 0.21 }, { x: 0.2, y: 0.07 }, 0.05, 0.45),
-  crystal({ x: -0.04, y: 0.2 }, { x: -0.13, y: 0.01 }, 0.055, 0.3),
-  crystal({ x: 0.12, y: 0.2 }, { x: 0.33, y: -0.07 }, 0.07, 0.2),
-  crystal({ x: -0.08, y: 0.22 }, { x: -0.31, y: -0.1 }, 0.08, 0.5),
-  crystal({ x: 0.0, y: 0.2 }, { x: 0.07, y: -0.27 }, 0.1, 0.05),
+  crystal({ x: -0.3, y: 0.27 }, { x: -0.36, y: 0.2 }, 0.055, 0.4),
+  crystal({ x: 0.3, y: 0.27 }, { x: 0.36, y: 0.21 }, 0.05, 0.1),
+  crystal({ x: 0.175, y: 0.04 }, { x: 0.18, y: -0.02 }, 0.045, 0.45),
+  crystal({ x: -0.12, y: 0.05 }, { x: -0.125, y: -0.02 }, 0.05, 0.3),
+  crystal({ x: 0.18, y: 0.2 }, { x: 0.34, y: -0.07 }, 0.07, 0.2),
+  crystal({ x: -0.16, y: 0.21 }, { x: -0.32, y: -0.1 }, 0.08, 0.5),
+  crystal({ x: 0.01, y: 0.19 }, { x: 0.07, y: -0.27 }, 0.09, 0.05),
 ];
 
 /** A fallen block: its outline of fracture faces, the flat top it broke along, its crack. */
@@ -267,8 +269,11 @@ export function crack(b: Block): Vec[][] {
 }
 
 /** The silhouettes, which cast each piece's shadow and hold its texture. */
-export const moundsSilhouette: PathFn = polyPath(MOUND_PAD);
-export const columnSilhouette: PathFn = polyPath(COLUMN.skirt);
+// What stands is the cones and the column's shaft; the calcite round them lies flat and casts nothing.
+export const moundsSilhouette: PathFn = path => {
+  for (const m of MOUNDS) polyPath(m.foot)(path);
+};
+export const columnSilhouette: PathFn = polyPath(COLUMN.shaft);
 export const crystalsSilhouette: PathFn = path => {
   polyPath(MATRIX)(path);
   for (const c of CRYSTALS) polyPath(c.body)(path);

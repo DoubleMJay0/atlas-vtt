@@ -1,10 +1,10 @@
-import { glyphEdges, glyphSolid } from '../../art/glyphLight';
-import { centroid, polyPath } from '../../art/paths';
+import { glyphEdges, lightInGlyph } from '../../art/glyphLight';
+import { polysPath } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
 import { mixColours } from '../../palette';
 import type { GlyphFit } from '../../propShapes';
-import { fillOutline, fineRuns, outlineRuns, splitByLight, type Finish } from './finish';
+import { facing, fillOutline, fineRuns, outlineRuns, splitByLight, type Finish } from './finish';
 import { BOULDERS, CHIPS, CRYSTALS, MATRIX, crack, type Block, type Crystal } from './shapes';
 
 /**
@@ -13,62 +13,88 @@ import { BOULDERS, CHIPS, CRYSTALS, MATRIX, crack, type Block, type Crystal } fr
  * fracture faces read in every look and at every turn.
  */
 
-/** A crystal: its body leaning out of the rock, its pointed end of six facets, its clear, water-tinted heart. */
-function crystalPiece(pen: GlyphPen, c: Crystal, finish: Finish): void {
-  const clear = mixColours(pen.palette.fill, pen.palette.water, 0.45);
-  fillOutline(pen, c.body, clear, 'none');
-  splitByLight(pen, c.sides, finish, 0.2);
-  fineRuns(pen, [c.ridge], false, 0.7);
-  // The prism's long edges: from the termination's corners back into the rock.
-  const facets = c.hex.map((p, k) => {
+/** A crystal's six facets, those the light falls on alike joined into one face. */
+function facets(pen: GlyphPen, c: Crystal): { poly: Vec[]; out: Vec }[] {
+  const out = (k: number): Vec => {
+    const p = c.hex[k % 6]!;
     const q = c.hex[(k + 1) % 6]!;
-    return { poly: [c.apex, p, q], out: { x: (p.x + q.x) / 2 - c.apex.x, y: (p.y + q.y) / 2 - c.apex.y } };
-  });
-  fillOutline(pen, c.hex, pen.palette.fill, 'none');
-  splitByLight(pen, facets, finish, 0.1);
-  const core = c.hex.map(p => ({ x: c.apex.x + (p.x - c.apex.x) * 0.38, y: c.apex.y + (p.y - c.apex.y) * 0.38 }));
-  fillOutline(pen, core, pen.palette.water, 'none');
-  fineRuns(pen, c.hex.map(p => [c.apex, p]));
-  fineRuns(pen, [c.hex], true);
-  finish.sheen(pen, [[c.hex[3]!, c.apex]]);
-  // Engraved cuts shade lines only on the larger crystals, where they do not swallow the facets.
-  if (finish.painter === 'stone' || c.r > 0.06) glyphEdges(pen, c.body, true);
-  else pen.hand.line([c.body], 'outline', true);
+    return { x: (p.x + q.x) / 2 - c.apex.x, y: (p.y + q.y) / 2 - c.apex.y };
+  };
+  const kind = (k: number): number => Math.sign(Math.round(facing(pen, out(k)) * 1.6));
+  // Start where the kind changes, so a run never wraps round the end of the list.
+  const start = [0, 1, 2, 3, 4, 5].find(k => kind(k) !== kind(k + 5)) ?? 0;
+  const faces: { poly: Vec[]; out: Vec }[] = [];
+  for (let k = start; k < start + 6;) {
+    let j = k + 1;
+    while (j < start + 6 && kind(j) === kind(k)) j++;
+    faces.push({ poly: [c.apex, ...Array.from({ length: j - k + 1 }, (_, i) => c.hex[(k + i) % 6]!)], out: out(Math.floor((k + j - 1) / 2)) });
+    k = j;
+  }
+  return faces;
 }
 
-/** A cluster of crystals fanning out of a lump of rock at the wall. */
+/**
+ * Crystals that do not overlap, drawn together: their bodies leaning out of the rock with a lit and
+ * a shaded side either side of the ridge, their pointed ends of six facets, their clear,
+ * water-tinted hearts. Each part of all of them is one path.
+ */
+function crystalGroup(pen: GlyphPen, group: readonly Crystal[], finish: Finish): void {
+  const { ctx } = pen;
+  const fill = (polys: readonly (readonly Vec[])[], colour: string): void => {
+    ctx.beginPath();
+    polysPath(polys)(ctx);
+    ctx.fillStyle = colour;
+    ctx.fill();
+  };
+  fill(group.map(c => c.body), mixColours(pen.palette.fill, pen.palette.water, 0.45));
+  // The body's sides either side of its ridge and the six facets of its point, each lit or shaded as it turns to the light.
+  splitByLight(pen, group.flatMap(c => [...c.sides, ...facets(pen, c)]), finish, 0.15);
+  // The long crystals show a clear heart and the edges of their point; the short ones are too small to.
+  const long = group.filter(c => c.r >= 0.06);
+  fill(long.map(c => c.hex.map(p => ({ x: c.apex.x + (p.x - c.apex.x) * 0.38, y: c.apex.y + (p.y - c.apex.y) * 0.38 }))), pen.palette.water);
+  // The ridge down each body, the facets' edges meeting at its point, and its end's rim.
+  fineRuns(pen, [...group.flatMap(c => [c.ridge, [...c.hex, c.hex[0]!]]), ...long.flatMap(c => c.hex.map(p => [c.apex, p]))], false, 0.85);
+  pen.hand.line(group.map(c => c.body), 'outline', true);
+}
+
+/** A cluster of crystals growing out of a lump of rock at the wall. */
 export function crystals(pen: GlyphPen, _fit: GlyphFit, finish: Finish): void {
-  const rock = pen.paint('rock');
-  fillOutline(pen, MATRIX, rock.fill, 'none');
-  pen.hand.grain(polyPath(MATRIX), 'rock');
-  glyphSolid(pen, polyPath(MATRIX), centroid(MATRIX), 0.3, 0.9);
-  glyphEdges(pen, MATRIX, true);
-  for (const c of CRYSTALS) crystalPiece(pen, c, finish);
+  fillOutline(pen, MATRIX, pen.paint('rock').fill, 'none');
+  pen.hand.line([MATRIX], 'outline', true);
+  crystalGroup(pen, CRYSTALS, finish);
+  // Engraved's shade line on the great crystal's far side, which carries its height.
+  if (finish.painter === 'engraved') glyphEdges(pen, CRYSTALS[CRYSTALS.length - 1]!.body, true);
 }
 
 /** A fallen block: modelled whole, its fracture faces lit or shaded round the flat top it broke along. */
-function blockPiece(pen: GlyphPen, b: Block, finish: Finish, cracked: boolean): void {
+function blockPiece(pen: GlyphPen, b: Block, finish: Finish, great: boolean): void {
   const { outline, top } = b;
   fillOutline(pen, outline, pen.palette.fill, 'none');
-  glyphSolid(pen, polyPath(outline), b.c, b.r, 0.9);
   const n = outline.length;
   const faces = outline.map((p, i) => {
     const q = outline[(i + 1) % n]!;
     const mid = { x: (p.x + q.x) / 2 - b.c.x, y: (p.y + q.y) / 2 - b.c.y };
     return { poly: [p, q, top[(i + 1) % n]!, top[i]!], out: mid };
   });
-  splitByLight(pen, faces, finish, 0.2);
-  finish.lit(pen, polyPath(top), 0.25);
-  // The arrises between faces run from the top's corners down to the outline's.
-  fineRuns(pen, [top], true, 0.85);
-  fineRuns(pen, outline.map((p, i) => [top[i]!, p]).filter((_, i) => i % 2 === 0 || n < 9), false, 0.7);
-  if (cracked) outlineRuns(pen, crack(b).slice(0, 1));
-  if (cracked) fineRuns(pen, crack(b).slice(1));
+  // The flat top faces the sky and catches the light like the faces turned to it.
+  splitByLight(pen, great ? [...faces, { poly: top, out: lightInGlyph(pen) }] : faces, finish, 0.2);
+  // The flat top it broke along, and the arrises running from its corners down to the outline's.
+  const arrises = outline.map((p, i) => [top[i]!, p]).filter((_, i) => i % 2 === 0 || n < 9);
+  fineRuns(pen, [[...top, top[0]!], ...arrises, ...(great ? crack(b).slice(1) : [])], false, 0.8);
+  if (!great) {
+    pen.hand.line([outline], 'outline', true);
+    return;
+  }
+  outlineRuns(pen, crack(b).slice(0, 1));
   glyphEdges(pen, outline, true);
 }
 
 /** One or two blocks fallen from the roof, with the chips they broke off at their foot. */
 export function boulder(pen: GlyphPen, _fit: GlyphFit, finish: Finish): void {
-  for (const chip of CHIPS) fillOutline(pen, chip, pen.palette.fill, 'fine');
+  pen.ctx.beginPath();
+  polysPath(CHIPS)(pen.ctx);
+  pen.ctx.fillStyle = pen.palette.fill;
+  pen.ctx.fill();
+  pen.hand.line(CHIPS, 'fine', true);
   for (const [i, b] of BOULDERS.entries()) blockPiece(pen, b, finish, i === BOULDERS.length - 1);
 }

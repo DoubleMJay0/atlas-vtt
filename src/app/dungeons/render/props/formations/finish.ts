@@ -1,4 +1,4 @@
-import { glyphEdges, glyphSolid, glyphTone, lightInGlyph } from '../../art/glyphLight';
+import { glyphTone, lightInGlyph } from '../../art/glyphLight';
 import { pathBounds, polyPath, runsPath, type PathFn } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import type { GlyphPen } from '../../glyphPen';
@@ -137,40 +137,6 @@ export function outlineRuns(pen: GlyphPen, runs: readonly (readonly Vec[])[]): v
   ctx.beginPath();
   runsPath(runs)(ctx);
   ctx.stroke();
-}
-
-/**
- * A rounded part modelled by the one light: Stone's soft gradient across it. Engraved models it by
- * `coneShade` alone, since a second hatch over the first would blacken it.
- */
-export function modelled(pen: GlyphPen, path: PathFn, centre: Vec, radius: number, strength: number, finish: Finish): void {
-  if (finish.painter === 'stone') glyphSolid(pen, path, centre, radius, strength);
-}
-
-/** A raised outline: Stone's lips, Engraved's shade line, but only a plain outline where Engraved's heavy line would swallow a small part. */
-export function raisedEdges(pen: GlyphPen, poly: readonly Vec[], size: number, finish: Finish): void {
-  if (finish.painter === 'engraved' && size < 0.1) pen.hand.line([poly], 'outline', true);
-  else glyphEdges(pen, poly, true);
-}
-
-/**
- * A cone or a pillar seen from above: the flank turned from the light falls into shade, the more
- * the farther it lies from `apex`, so a stalagmite rises to its tip and a column stands round.
- */
-export function coneShade(pen: GlyphPen, path: PathFn, apex: Vec, reach: number, strength: number, finish: Finish): void {
-  const bounds = pathBounds(path);
-  if (!bounds) return;
-  // On a dark floor Stone lays shade over, not multiplied: calcite would go black.
-  if (finish.painter === 'stone' && isDarkColour(pen.palette.floor)) strength *= 0.45;
-  const light = lightInGlyph(pen);
-  glyphTone(pen, (x, y) => {
-    const dx = x - apex.x;
-    const dy = y - apex.y;
-    const d = Math.hypot(dx, dy);
-    if (d < 1e-6) return 0;
-    const away = -(dx * light.x + dy * light.y) / d;
-    return strength * Math.max(0, away + 0.15) ** 0.9 * Math.min(1, d / (reach * 0.45));
-  }, bounds, path, 'shade');
 }
 
 /** Stone's rock texture laid thinly over pale calcite, so it reads as wet stone, not as the dark rock round it; Engraved leaves calcite paper. */
