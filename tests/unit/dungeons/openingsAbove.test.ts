@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { floorBelow, stackOf } from '../../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonTerrain } from '../../../src/app/dungeons/model';
+import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonStair, DungeonTerrain } from '../../../src/app/dungeons/model';
 import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
 import { FEATURES, type FeatureSpec } from '../../../src/app/dungeons/themes/features';
 import { THEMES } from '../../../src/app/dungeons/themes/themes';
@@ -55,6 +55,17 @@ function sidesOnWalls(cells: readonly CellPoint[], room: DungeonRoom): number {
   return [Math.min(...xs) === room.x, Math.max(...xs) === room.x + room.w - 1, Math.min(...ys) === room.y, Math.max(...ys) === room.y + room.h - 1].filter(Boolean).length;
 }
 
+const inRect = (r: { x: number; y: number; w: number; h: number }, c: CellPoint): boolean => c.x >= r.x && c.x < r.x + r.w && c.y >= r.y && c.y < r.y + r.h;
+const stairCells = (s: DungeonStair): CellPoint[] => Array.from({ length: s.w * s.h }, (_, i) => ({ x: s.x + (i % s.w), y: s.y + Math.floor(i / s.w) }));
+
+/** Whether `cells` lie beside the stairwell `s`, along its run: next to one of its long sides, as long as it is. */
+function besideStairs(cells: readonly CellPoint[], s: DungeonStair): boolean {
+  const along = s.down.x !== 0 ? (c: CellPoint) => c.x >= s.x && c.x < s.x + s.w : (c: CellPoint) => c.y >= s.y && c.y < s.y + s.h;
+  const across = s.down.x !== 0 ? (c: CellPoint) => c.y === s.y - 1 || c.y === s.y + s.h : (c: CellPoint) => c.x === s.x - 1 || c.x === s.x + s.w;
+  const near = s.down.x !== 0 ? (c: CellPoint) => c.y >= s.y - 2 && c.y <= s.y + s.h + 1 : (c: CellPoint) => c.x >= s.x - 2 && c.x <= s.x + s.w + 1;
+  return cells.every((c) => along(c) && near(c)) && cells.some(across);
+}
+
 describe('openings above a room, for its reason', () => {
   const fortresses = runs('fortress');
   const mansions = runs('mansion');
@@ -62,14 +73,18 @@ describe('openings above a room, for its reason', () => {
 
   it('cut galleries and stair wells straight, inside the hall below, along its walls or the walls of their own room', () => {
     const problems = all.flatMap((m) =>
-      openings(m, 'gallery').flatMap(({ k, piece, hall }) => {
+      openings(m, 'gallery').flatMap(({ k, piece, hall, below }) => {
         const own = m.floors[k]!.rooms[piece.room]!;
         const where = `seed ${m.seed} floor ${k} gallery ${piece.id}`;
+        // A light well opens for its own room's reason (below), whatever lies under it.
+        if (piece.name === 'dungeon.terrain.lightWell') return [];
         if (!opensAbove(m, hall, 'gallery')) return [`${where} over a ${hall.type}, which has no reason for it`];
         const reason = galleryReason(m, hall);
         if (!(reason?.cutIn ?? []).includes(own.type!)) return [`${where} cut in a ${own.type}, which does not overlook a hall`];
         if (!isRectangle(piece.cells)) return [`${where} is not straight-edged`];
-        return sidesOnWalls(piece.cells, hall) + sidesOnWalls(piece.cells, own) > 0 ? [] : [`${where} follows no wall`];
+        // A stair well follows the stairs it opens round; a gallery the walls.
+        const stairs = below.stairs.some((s) => s.to === k && besideStairs(piece.cells, s));
+        return stairs || sidesOnWalls(piece.cells, hall) + sidesOnWalls(piece.cells, own) > 0 ? [] : [`${where} follows no wall`];
       }),
     );
     expect(problems.slice(0, 10)).toEqual([]);
@@ -122,5 +137,61 @@ describe('openings above a room, for its reason', () => {
 
   it('cut murder holes in Fortresses only', () => {
     expect(mansions.every((m) => m.floors.every((f) => f.terrain.every((p) => p.kind !== 'murder-hole')))).toBe(true);
+  });
+});
+
+describe("a Haunted Mansion's stair well and light wells", () => {
+  const mansions = runs('mansion');
+
+  it('raises the stairs up from the entrance hall, and opens its stair well beside them in the room they arrive in', () => {
+    let halls = 0;
+    let holding = 0;
+    let wells = 0;
+    const problems = mansions.flatMap((m) => {
+      const [entry, upper] = [m.floors[0]!, m.floors[1]!];
+      const hall = entry.rooms.find((r) => r.type === 'entrance-hall');
+      if (!hall) return [];
+      const up = entry.stairs.filter((s) => s.to === 1 && stairCells(s).every((c) => inRect(hall, c)));
+      if (hall.id === 0) halls += 1;
+      if (hall.id === 0 && up.length > 0) holding += 1;
+      return upper.terrain.filter((p) => p.name === 'dungeon.terrain.stairWell').flatMap((piece) => {
+        wells += 1;
+        const own = upper.rooms[piece.room]!;
+        const stair = up.find((s) => stairCells(s).every((c) => inRect(own, c)));
+        const where = `seed ${m.seed} stair well ${piece.id}`;
+        if (!stair) return [`${where} in a room no stairs from the entrance hall arrive in`];
+        if (!piece.cells.every((c) => inRect(hall, c))) return [`${where} not over the entrance hall`];
+        return besideStairs(piece.cells, stair) ? [] : [`${where} not beside the stairs`];
+      });
+    });
+    expect(problems.slice(0, 10)).toEqual([]);
+    // Measured 219 of 259 entrance halls holding the stairs up (room 0 cannot always hold them), 96 of 259 with a stair well (the landing above must keep half its floor).
+    expect(holding / halls).toBeGreaterThan(0.8);
+    expect(wells / halls).toBeGreaterThan(0.3);
+  });
+
+  it("cuts light wells straight in a landing's floor, a cell from its walls, over the floor of a room below, with floor round them", () => {
+    let landings = 0;
+    let wells = 0;
+    const problems = mansions.flatMap((m) =>
+      m.floors.flatMap((floor, k) => {
+        const under = floorBelow(stackOf(m), k);
+        landings += under === null ? 0 : floor.rooms.filter((r) => r.type === 'landing').length;
+        return floor.terrain.filter((p) => p.name === 'dungeon.terrain.lightWell').flatMap((piece) => {
+          wells += 1;
+          const own = floor.rooms[piece.room]!;
+          const where = `seed ${m.seed} floor ${k} light well ${piece.id}`;
+          const below = m.floors[under ?? -1];
+          if (own.type !== 'landing' || piece.kind !== 'gallery') return [`${where} is a ${piece.kind} in a ${own.type}`];
+          if (!isRectangle(piece.cells) || piece.cells.length < 2) return [`${where} is not a straight opening`];
+          if (piece.cells.some((c) => c.x === own.x || c.y === own.y || c.x === own.x + own.w - 1 || c.y === own.y + own.h - 1)) return [`${where} against the landing's wall`];
+          if (piece.opening?.bottom !== under || !below?.rooms.some((r) => r.kind === 'room' && piece.cells.every((c) => inRect(r, c)))) return [`${where} not over a room below`];
+          return [];
+        });
+      }),
+    );
+    expect(problems.slice(0, 10)).toEqual([]);
+    // Measured 0.084: most landings are too small to leave a cell round a well.
+    expect(wells / landings).toBeGreaterThan(0.05);
   });
 });

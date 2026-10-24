@@ -1,7 +1,7 @@
 /**
  * Every floor's terrain, placed together so holes line up between floors. First the galleries over
- * the boss arena and over the halls whose type looks up into one and the murder holes over a gate
- * passage (they open the floor above), then
+ * the boss arena and over the halls whose type looks up into one, the stair wells, the murder holes
+ * over a gate passage (they open the floor above) and the light wells of landings, then
  * each floor from the top of the stack down: the arena and
  * the five-room stages, a shaft now and then, hazards (about one per six rooms, counting holes from
  * above), then each room by its size (Terrain principle 1): open rooms take height and strong
@@ -30,6 +30,7 @@ import { placeTypeHazard } from './typeHazards';
 import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import { murderHoles } from './murderHoles';
 import { galleriesOverHalls, galleryOverArena, shaftDown } from './vertical';
+import { lightWells } from './wells';
 import { type TerrainWork, terrainWork } from './work';
 
 /** One hazard per this many normal rooms. */
@@ -146,6 +147,7 @@ export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], 
   galleryOverArena(work, work.rng(builders.length - 1, 'gallery'));
   galleriesOverHalls(work);
   murderHoles(work);
+  lightWells(work);
   for (const k of topDown(stack)) furnishFloor(work, k, floors[k] as TerrainFloorInput);
   return builders;
 }

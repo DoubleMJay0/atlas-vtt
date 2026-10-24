@@ -1,7 +1,8 @@
 /**
  * Checks of holes through floors, written apart from the generator. A hole lies over the floor of a
  * room on every floor physically below it down to where its fall ends; a gallery (or another
- * opening cut for the room below) opens into that room right below and lets nothing fall.
+ * opening cut for the room below) opens into that room right below and lets nothing fall; a light
+ * well opens for its own room's reason into whatever room lies below it.
  */
 
 import { floorBelow, stackOf } from '../../../src/app/dungeons/floors/floorStack';
@@ -33,11 +34,21 @@ function roomUnder(model: DungeonModel, j: number, cells: readonly CellPoint[]):
   return model.floors[j]?.rooms.find((r) => r.kind === 'room' && cells.every((c) => inFloor(r, c)));
 }
 
-/** An opening cut for the room right below: a gallery over the boss room, or one its type has a reason for. */
+/** Whether the room an opening is cut in has a reason of its own to open its floor (a landing's light well). */
+function opensHere(model: DungeonModel, k: number, hole: DungeonTerrain): boolean {
+  const room = model.floors[k]?.rooms[hole.room];
+  const spec = room?.type ? THEMES[model.theme].programme?.rooms.find((s) => s.id === room.type) : undefined;
+  return (spec?.terrain.features ?? []).some((reason) => FEATURES[reason].at === 'here' && FEATURES[reason].upperFloor === true && FEATURES[reason].kinds.includes(hole.kind));
+}
+
+/** An opening cut for the room right below (a gallery over the boss room, or one its type has a reason for), or for its own room's reason over a room below, never its stairs. */
 function openingProblems(model: DungeonModel, k: number, hole: DungeonTerrain, where: string): string[] {
   const below = floorsBelow(model, k)[0];
   const room = below === undefined ? undefined : roomUnder(model, below, hole.cells);
-  if (hole.opening?.bottom !== below || !room || !(room.boss || opensAbove(model, room, hole.kind))) return [`${where} does not open into a room below that has a reason for it`];
+  const own = opensHere(model, k, hole);
+  if (hole.opening?.bottom !== below || !room || !(room.boss || opensAbove(model, room, hole.kind) || own)) return [`${where} does not open into a room below that has a reason for it`];
+  const stairs = new Set(stairCells(model.floors[below]!).map(key));
+  if (own && hole.cells.some((c) => stairs.has(key(c)))) return [`${where} opens over a stairwell`];
   return model.floors[below]!.terrain.some((p) => p.under === hole.opening?.link) ? [`${where} lets something fall into the room below`] : [];
 }
 

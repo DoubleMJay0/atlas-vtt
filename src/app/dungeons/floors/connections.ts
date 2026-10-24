@@ -60,10 +60,19 @@ function holdsStairs(room: DungeonRoom): boolean {
   return room.kind === 'room' && !room.rotunda && !room.boss && room.wing === 'regular';
 }
 
-/** Where the first stairwell on from floor `index` to the next stands: a room the farther from its entry and other stairs, the likelier. */
-export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: FloorStack): PlacedStair | null {
+/**
+ * Where the first stairwell on from floor `index` to the next stands: in room `first` where it can
+ * hold one (a grand staircase in the entrance room), else a room the farther from its entry and
+ * other stairs, the likelier.
+ */
+export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: FloorStack, first: number | null = null): PlacedStair | null {
   const space = spaceOf(floor, index, stack);
   const end = stairEnd(stack, index, index + 1);
+  const firstRoom = first === null ? undefined : floor.rooms[first];
+  if (firstRoom && holdsStairs(firstRoom)) {
+    const spots = spotsWithin(floorRect(firstRoom)).filter((spot) => spotFits(firstRoom, space, spot, end));
+    if (spots.length > 0) return { room: firstRoom.id, spot: pick(rng, spots) };
+  }
   const distance = distanceFrom(floor, anchors(floor));
   let options = floor.rooms.filter(holdsStairs).map((room) => [room, ((distance[room.id] ?? 0) + 1) ** 2] as const);
   while (options.length > 0) {

@@ -200,6 +200,8 @@ export interface ThemeDefinition {
   built: boolean;
   /** Where each floor past the entrance floor lies: above it in a building, below it in a cave. */
   rise: FloorRise;
+  /** The stairs up rise from the room the dungeon is entered by, where it can hold them: a Mansion's grand staircase in its entrance hall. */
+  grandStair?: true;
   /** Tags the theme cannot take, each with the reason the panel shows. */
   refuses: readonly { tag: DungeonTag; reason: MessageKey }[];
   programme: RoomProgramme | null;

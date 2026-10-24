@@ -14,7 +14,8 @@ import { type FloorRequest, buildFloorLayout } from '../layout/assemble';
 import type { CompactLayout } from '../layout/compact';
 import { dir, floorRect, wallRect } from '../geometry';
 import { TWO_CONNECTIONS_FROM, type FloorShape, chooseOnward, extraConnection, normalRooms } from './connections';
-import { type FloorRise, type FloorStack, floorStack, isAbove, stairEnd } from './floorStack';
+import { type FloorStack, floorStack, isAbove, stairEnd } from './floorStack';
+import type { ThemeDefinition } from '../themes/themeTypes';
 import { landingCells, landingRoot } from './landing';
 import type { StairSpot } from './stairSpots';
 
@@ -107,12 +108,18 @@ function nextFloor(seed: number, params: DungeonParams, earlier: FloorShape, ind
   return (buildFloorLayout(seed, { ...request, within: null }) ?? within)?.layout ?? null;
 }
 
+/** What a theme says of how its floors are planned: which way they stack, and whether the stairs up rise from the entrance room. */
+export type FloorPlanning = Pick<ThemeDefinition, 'rise' | 'grandStair'>;
+
 /**
- * Every floor, in order from the entrance floor, each next one lying the way `rise` says; a
- * five-room dungeon (`fiveRoom`) is one floor of five main rooms.
+ * Every floor, in order from the entrance floor, each next one lying the way `planning.rise` says;
+ * a five-room dungeon (`fiveRoom`) is one floor of five main rooms.
  */
-export function planFloors(seed: number, params: DungeonParams, count: number, boss: boolean, fiveRoom = false, rise: FloorRise = 'down'): PlannedFloor[] {
+export function planFloors(seed: number, params: DungeonParams, count: number, boss: boolean, fiveRoom = false, planning: FloorPlanning = { rise: 'down' }): PlannedFloor[] {
+  const { rise } = planning;
   const stack = floorStack(rise, count);
+  // A grand staircase rises from the room the dungeon is entered by.
+  const grand = planning.grandStair === true ? 0 : null;
   const entry = buildFloorLayout(seed, {
     floor: 0,
     params: floorParams(params, 0, rise),
@@ -122,14 +129,14 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
     boss: boss && count === 1,
     fiveRoom: fiveRoom && count === 1,
     blocked: new Set(),
-    accept: (layout) => count === 1 || chooseOnward(stairsRng(seed, 0, 'descent'), { ...layout, stairs: [] }, 0, stack) !== null,
+    accept: (layout) => count === 1 || chooseOnward(stairsRng(seed, 0, 'descent'), { ...layout, stairs: [] }, 0, stack, grand) !== null,
   });
   if (!entry) throw new Error('no dungeon layout');
   const floors: PlannedFloor[] = [withStairs(entry.layout, [])];
   let link = 0;
   for (let index = 1; index < count; index++) {
     const earlier = floors[index - 1] as PlannedFloor;
-    const onward = chooseOnward(stairsRng(seed, index - 1, 'descent'), earlier, index - 1, stack);
+    const onward = chooseOnward(stairsRng(seed, index - 1, 'descent'), earlier, index - 1, stack, index === 1 ? grand : null);
     if (!onward) break;
     const [from, landing] = stairPair(onward.spot, index - 1, link++);
     const earlierWithStairs = { ...earlier, stairs: [...earlier.stairs, from] };

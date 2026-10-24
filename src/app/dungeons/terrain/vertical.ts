@@ -16,12 +16,11 @@ import { cutHole, dropBelow } from './holes';
 import type { RoomCells } from './roomCells';
 import { holeAllowed, openingAbove, reasonsOf } from './typeReasons';
 import type { FeatureSpec } from '../themes/features';
+import { GALLERY_FLOOR, cutStairWell, mayOpen } from './wells';
 import type { TerrainWork } from './work';
 
 /** How often the arena is two floors high, where a room lies over it. */
 const GALLERY_CHANCE = 0.85;
-/** A gallery's hole leaves at least this share of its room's floor to stand on. */
-const GALLERY_FLOOR = 0.5;
 /** How often a floor has a shaft down to the next. */
 const SHAFT_CHANCE = 0.35;
 
@@ -82,7 +81,8 @@ export function galleriesOverHalls(work: TerrainWork): void {
       const typed = work.typed(k, hall.id);
       const reason = typed && !hall.boss ? reasonsOf(typed.spec, work.theme.ruined).find((r) => r.at === 'above' && r.kinds.includes('gallery')) : undefined;
       if (!reason || hall.wing !== 'regular' || hall.rotunda || !chance(work.rng(top, `gallery:${hall.id}`), GALLERY_CHANCE)) continue;
-      cutGalleryOver(work, above, k, floorRect(hall), reason);
+      if (reason.besideStairs) cutStairWell(work, above, k, hall, reason);
+      else cutGalleryOver(work, above, k, floorRect(hall), reason);
     }
   });
 }
@@ -95,7 +95,7 @@ function cutGalleryOver(work: TerrainWork, above: FloorTerrain, k: number, hall:
     return !reason.cutIn || type === undefined || reason.cutIn.includes(type);
   };
   const places = above.plan.rooms
-    .filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda && !room.boss && room.stage === undefined && overlooks(room.id))
+    .filter((room) => mayOpen(room) && overlooks(room.id))
     .flatMap((room) => {
       const rc = above.room(room.id);
       const over = intersection(floorRect(room), hall);

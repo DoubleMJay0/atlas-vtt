@@ -38,6 +38,8 @@ export interface FeatureSpec {
   name?: MessageKey;
   /** For an opening cut in the floor above: the types of room up there that may hold it (one built to overlook the room below). Unset: any. */
   cutIn?: readonly RoomTypeId[];
+  /** Cut beside the stairs that rise from the room through the floor above, in the room they arrive in: a stair well. */
+  besideStairs?: true;
 }
 
 export const FEATURES: Readonly<Record<FeatureReason, FeatureSpec>> = {
@@ -50,9 +52,10 @@ export const FEATURES: Readonly<Record<FeatureReason, FeatureSpec>> = {
   cistern: { kinds: ['deep-water'], water: 'pool', shape: 'built', at: 'here' },
   collapse: { kinds: ['chasm', 'rubble-heap', 'rubble-field', 'broken-floor'], shape: 'natural', at: 'here', ruinedOnly: true },
   // The entrance hall's open stair well.
-  'stair-well': { kinds: ['gallery'], shape: 'built', at: 'above', name: 'dungeon.terrain.stairWell', cutIn: ['landing', 'portrait-gallery'] },
+  'stair-well': { kinds: ['gallery'], shape: 'built', at: 'above', name: 'dungeon.terrain.stairWell', cutIn: ['landing', 'portrait-gallery'], besideStairs: true },
   'ballroom-gallery': { kinds: ['gallery'], shape: 'built', at: 'above', cutIn: ['landing', 'portrait-gallery'] },
-  'light-well': { kinds: ['gallery'], shape: 'built', at: 'here', upperFloor: true },
+  // An opening in an upper floor that lets the light from above down to the room below.
+  'light-well': { kinds: ['gallery'], shape: 'built', at: 'here', upperFloor: true, name: 'dungeon.terrain.lightWell' },
   'rotted-floor': { kinds: ['broken-floor', 'chasm'], shape: 'natural', at: 'here', ruinedOnly: true },
   'conservatory-pool': { kinds: ['pool'], water: 'pool', shape: 'built', at: 'here' },
   'flooded-cellar': { kinds: [], water: 'shallow', shape: 'natural', at: 'here', ruinedOnly: true },
