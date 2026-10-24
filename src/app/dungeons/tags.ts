@@ -31,6 +31,7 @@ export const DUNGEON_TAGS = [
   'acid',
   'overgrown',
   'ruined',
+  'inhabited',
 ] as const;
 
 export type DungeonTag = (typeof DUNGEON_TAGS)[number];
@@ -38,7 +39,7 @@ export type DungeonTag = (typeof DUNGEON_TAGS)[number];
 /** How the panel groups the tags, each group under its own heading, in this order. Every tag is in one group. */
 export const TAG_GROUPS: readonly { id: string; tags: readonly DungeonTag[] }[] = [
   { id: 'liquids', tags: ['dry', 'wet', 'flooded', 'lava', 'acid'] },
-  { id: 'nature', tags: ['overgrown', 'crumbling', 'ruined'] },
+  { id: 'nature', tags: ['overgrown', 'crumbling', 'ruined', 'inhabited'] },
   { id: 'size', tags: ['small', 'medium', 'large'] },
   { id: 'layout', tags: ['compact', 'winding', 'cramped', 'spacious', 'chaotic', 'ordered', 'string', 'colonnades', 'round', 'square', 'deep', 'flat'] },
   { id: 'secrets', tags: ['secret', 'no-secrets'] },

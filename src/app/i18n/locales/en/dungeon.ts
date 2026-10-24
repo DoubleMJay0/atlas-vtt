@@ -112,6 +112,7 @@ export const dungeon = {
   'dungeon.tagName.acid': 'acid',
   'dungeon.tagName.overgrown': 'overgrown',
   'dungeon.tagName.ruined': 'ruined',
+  'dungeon.tagName.inhabited': 'inhabited',
   'dungeon.tagGroup.liquids': 'Water and fire',
   'dungeon.tagGroup.nature': 'Age and growth',
   'dungeon.tagGroup.size': 'Size',
@@ -143,6 +144,7 @@ export const dungeon = {
   'dungeon.tag.acid': 'Channels of bubbling acid',
   'dungeon.tag.overgrown': 'Ivy on the walls, moss and plants on the floor',
   'dungeon.tag.ruined': 'Long abandoned: rubble, broken floors and half the furniture gone',
+  'dungeon.tag.inhabited': 'Someone lives here: a few fires and candles burn',
 
   // Terrain: what the GM's hover label and the room's note name a piece (`DungeonTerrain.name`).
   'dungeon.terrain.lowWall': 'Low wall',

@@ -32,6 +32,13 @@ describe('themes', () => {
     }
   });
 
+  it('lets every theme take the inhabited tag, ruined too', () => {
+    for (const theme of ['fortress', 'mansion', 'cavern'] as const) expect(themedTags(theme, ['inhabited'])).toEqual(['inhabited']);
+    expect(readTags(['inhabited', 'ruined']).sort()).toEqual(['inhabited', 'ruined']);
+    expect(themedTags('fortress', ['ruined', 'inhabited'])).toEqual(['ruined', 'inhabited']);
+    expect(generateDungeon({ seed: 4, tags: ['inhabited'], floors: 1, theme: 'cavern' }).tags).toContain('inhabited');
+  });
+
   it('ignores the tags a theme refuses', () => {
     expect(themedTags('mansion', ['lava', 'wet', 'flooded'])).toEqual(['wet']);
   });
