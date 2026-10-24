@@ -12,19 +12,17 @@ import { dir } from '../geometry';
 import { type Rng, chance, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
 import type { ArenaSetPiece, ArenaSpec } from '../themes/themeTypes';
-import { placeInterest } from './interest';
 import { draft } from './catalog';
 import { type CoverShape, ensureCover, tryShape } from './cover';
 import { platformAtFarWall } from './elevation';
 import type { FloorTerrain } from './floorTerrain';
 import { placeHazard } from './hazards';
+import { placeInterest } from './interest';
 import type { RoomCells } from './roomCells';
 import type { TerrainWork } from './work';
 
 /** Pieces that cannot be walked take at most this share of the arena's floor. */
 const OPEN_SHARE = 1 / 3;
-
-type SetPiece = ArenaSetPiece;
 
 function negate(d: CellDir): CellDir {
   return dir(-d.x, -d.y);
@@ -35,7 +33,7 @@ function roomy(rc: RoomCells, cells: number): boolean {
 }
 
 /** The objective in the arena's open middle, between the door and the platform. */
-function setPiece(floor: FloorTerrain, rc: RoomCells, rng: Rng, choice: SetPiece, platformDepth: number): boolean {
+function setPiece(floor: FloorTerrain, rc: RoomCells, rng: Rng, choice: ArenaSetPiece, platformDepth: number): boolean {
   const room = rc.room.id;
   const facing = negate(rc.axis);
   const open = rc.depth - platformDepth;
@@ -109,12 +107,19 @@ function wideCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, platformDepth: 
   }
 }
 
-const DEFAULT_SET_PIECES: readonly (readonly [SetPiece, number])[] = [
+const DEFAULT_SET_PIECES: readonly (readonly [ArenaSetPiece, number])[] = [
   ['statues', 3],
   ['altar', 1.5],
   ['ring', 2],
   ['pillars', 2],
 ];
+
+/** The set piece drawn by weight, else the first of the others that fits; whether one was placed. */
+function placeSetPiece(floor: FloorTerrain, rc: RoomCells, rng: Rng, pieces: readonly (readonly [ArenaSetPiece, number])[], platformDepth: number): boolean {
+  if (pieces.length === 0) return false;
+  const first = weighted(rng, pieces);
+  return [first, ...pieces.map(([p]) => p).filter((p) => p !== first)].some((p) => setPiece(floor, rc, rng, p, platformDepth));
+}
 
 /**
  * Turns the boss room into an arena: by its climax type's `arena` where it has one (its set
@@ -126,11 +131,7 @@ export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: R
   const deep = rc.depth >= 8 ? 2 : 1;
   const raised = platformAtFarWall(floor, rc, deep, Math.ceil(rc.width * 0.6), rc.depth >= 9 ? 2 : 1) !== null;
   const platformDepth = raised ? deep : 0;
-  const pieces = arena ? arena.setPieces : DEFAULT_SET_PIECES;
-  const placed = pieces.length > 0 && (() => {
-    const first = weighted(rng, pieces);
-    return [first, ...pieces.map(([p]) => p).filter((p) => p !== first)].some((p) => setPiece(floor, rc, rng, p, platformDepth));
-  })();
+  const placed = placeSetPiece(floor, rc, rng, arena ? arena.setPieces : DEFAULT_SET_PIECES, platformDepth);
   wideCover(floor, rc, rng, platformDepth, arena?.mirrored);
   ensureCover(floor, rc, tags);
   if (arena) {

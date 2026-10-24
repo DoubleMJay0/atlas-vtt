@@ -194,10 +194,15 @@ export class RoomCells {
     }
   }
 
+  /** The way along the wall of `side`, the order its wall cells come in. */
+  alongWall(side: WallSide): CellDir {
+    return side === 'back' || side === 'near' ? this.across : this.axis;
+  }
+
   /** Every floor cell whose neighbour beyond `side` is no floor of the room, along the wall in order. */
   wallCells(side: WallSide): CellPoint[] {
     const d = this.beyond(side);
-    const along = side === 'back' || side === 'near' ? this.across : this.axis;
+    const along = this.alongWall(side);
     return [...this.floor]
       .map((key) => key.split(',').map(Number) as [number, number])
       .filter(([x, y]) => !this.floor.has(cellKey(x + d.x, y + d.y)))

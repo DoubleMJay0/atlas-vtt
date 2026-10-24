@@ -3,11 +3,11 @@
  * (a throne only in a Fortress throne room), then the climax type's other pieces by its recipe.
  */
 
-import { dir } from '../geometry';
-import type { CellPoint, DungeonProp, DungeonTerrain, PropKind } from '../model';
+import { cellKey, perpendicular } from '../geometry';
+import type { DungeonProp, DungeonTerrain, PropKind } from '../model';
 import { PROP_SPECS, isCellPiece } from '../props/catalogue';
 import { arenaSeat } from '../props/furnish';
-import { type FurnishSpace, record } from '../props/furnishSpace';
+import { type FurnishSpace, centreOf, record } from '../props/furnishSpace';
 import { furnishByRecipe } from '../props/recipe';
 import { facing } from '../props/roomFrame';
 import { occupyCells } from '../props/space';
@@ -27,11 +27,6 @@ export function arenaOf(work: TerrainWork, typed: TypedRoom): ArenaSpec | undefi
   return programmeOf(work.theme.definition, work.tags)?.climax.find((c) => c.type === typed.spec.id)?.arena;
 }
 
-const centreOf = (cells: readonly CellPoint[]): CellPoint => ({
-  x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length,
-  y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length,
-});
-
 /** The arena's seat on the middle of its platform, facing down its steps: a cell piece on whole platform cells, a disc on one; none where the arena has no seat or it is not drawn. */
 export function seatOnPlatform(fs: FurnishSpace, platform: DungeonTerrain, arena: ArenaSpec): DungeonProp | null {
   const kind = arenaSeat(arena);
@@ -39,13 +34,13 @@ export function seatOnPlatform(fs: FurnishSpace, platform: DungeonTerrain, arena
   if (!kind || !towards || !fs.offered.has(kind)) return null;
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
-  const own = new Set(platform.cells.map((c) => `${c.x},${c.y}`));
+  const own = new Set(platform.cells.map((c) => cellKey(c.x, c.y)));
   const middle = centreOf(platform.cells);
-  const along = dir(-towards.y, towards.x);
+  const along = perpendicular(towards);
   const footprint = isCellPiece(spec) ? spec.footprint : { along: 1, out: 1 };
   const places = platform.cells
     .map((start) => Array.from({ length: footprint.along * footprint.out }, (_, k) => ({ x: start.x + along.x * (k % footprint.along) - towards.x * Math.floor(k / footprint.along), y: start.y + along.y * (k % footprint.along) - towards.y * Math.floor(k / footprint.along) })))
-    .filter((cells) => cells.every((c) => own.has(`${c.x},${c.y}`)))
+    .filter((cells) => cells.every((c) => own.has(cellKey(c.x, c.y))))
     .sort((a, b) => Math.hypot(centreOf(a).x - middle.x, centreOf(a).y - middle.y) - Math.hypot(centreOf(b).x - middle.x, centreOf(b).y - middle.y));
   const blocks = spec.footing !== 'walk';
   const cells = places.find((c) => c.every((cell) => fs.placeAllowed?.(kind, cell) ?? true) && (!blocks || rc.allowsOnWalked(c)));
@@ -67,7 +62,7 @@ export function furnishTypedArena(work: TerrainWork, k: number, rc: RoomCells, r
   // The arena stays open: what cannot be walked never takes more than this share of it.
   const open = (kind: PropKind): boolean => {
     const spec = PROP_SPECS[kind];
-    const cells = spec.footing === 'block' ? ('along' in spec.footprint ? spec.footprint.along * spec.footprint.out : 1) : 0;
+    const cells = spec.footing === 'block' ? (isCellPiece(spec) ? spec.footprint.along * spec.footprint.out : 1) : 0;
     return rc.blockedCount() + cells <= rc.floorCount * ARENA_OPEN;
   };
   const fs: FurnishSpace = { ...base, placeAllowed: (kind, at) => open(kind) && (base.placeAllowed?.(kind, at) ?? true) };

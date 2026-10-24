@@ -6,8 +6,7 @@
  */
 
 import { type Rng, shuffled } from '../../rng';
-import type { Assignment } from './score';
-import { specOf } from './score';
+import { type Assignment, specOf } from './score';
 
 /** The share of normal rooms left empty lies between these. */
 const EMPTY_SHARE: readonly [number, number] = [0.24, 0.36];

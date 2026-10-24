@@ -16,8 +16,6 @@ import type { ThemeContext } from '../themes/themes';
 import { furnishArena } from './arena';
 import { draft } from './catalog';
 import { CRAMPED_AREA, FIGHT_AREA, crampedCover, ensureCover, openRoomCover } from './cover';
-
-export { FIGHT_AREA } from './cover';
 import { difficultGround } from './difficult';
 import { ledgeAlongWall, platformAtFarWall } from './elevation';
 import { type FloorPlan, FloorTerrain } from './floorTerrain';
@@ -116,10 +114,10 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
     const rng = work.rng(k, `main:${room.id}`);
     if (!rc) continue;
     const typed = input.types?.get(room.id);
+    const arena = room.boss || room.stage === 'climax';
     if (room.stage && room.stage !== 'climax') furnishStage(work, k, rc, rng, room.stage, work.tags, typed);
-    else if (typed && (room.boss || room.stage === 'climax')) furnishTypedArena(work, k, rc, rng, typed);
-    else if (room.stage) furnishStage(work, k, rc, rng, room.stage, work.tags);
-    else if (room.boss) furnishArena(work, k, rc, rng, work.tags);
+    else if (arena && typed) furnishTypedArena(work, k, rc, rng, typed);
+    else if (arena) furnishArena(work, k, rc, rng, work.tags);
   }
   shaftDown(work, k, work.rng(k, 'shaft'));
   hazards(work, k, rooms, work.rng(k, 'hazards'));

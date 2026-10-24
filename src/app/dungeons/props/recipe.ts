@@ -9,6 +9,7 @@
 import { dir } from '../geometry';
 import type { CellPoint, DungeonProp, PropKind } from '../model';
 import { chance, int } from '../rng';
+import { WALL_SIDES } from '../terrain/roomCells';
 import type { FurnishRecipe, Piece } from '../themes/themeTypes';
 import { dais } from './arrange';
 import { aroundParent, flanking, inGrid, onShore } from './arrangeGroups';
@@ -87,7 +88,7 @@ function placeByVerb(fs: FurnishSpace, piece: Piece, kind: PropKind, count: numb
       return repeat(() => atBackWall(fs, kind));
     case 'wall':
       if (PROP_SPECS[kind].wallPiece) return onWall(fs, kind, count);
-      return repeat(() => againstWall(fs, kind, ['back', 'left', 'right', 'near']));
+      return repeat(() => againstWall(fs, kind, WALL_SIDES));
     case 'rows':
       return inRows(fs, kind, count);
     case 'centre':

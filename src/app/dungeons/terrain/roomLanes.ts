@@ -4,9 +4,9 @@
  * side names.
  */
 
-import { cellKey, dir } from '../geometry';
+import { cellKey, dir, perpendicular } from '../geometry';
 import type { CellDir, CellPoint } from '../model';
-import type { PropSpec } from '../props/catalogue';
+import { type PropSpec, isCellPiece } from '../props/catalogue';
 import type { RoomCells } from './roomCells';
 
 const STEPS: readonly CellDir[] = [dir(0, -1), dir(1, 0), dir(0, 1), dir(-1, 0)];
@@ -59,12 +59,12 @@ export function clearCells(rc: RoomCells, cells: readonly CellPoint[], spec: Pro
     }
     return [...out.values()];
   };
-  const side = dir(-facing.y, facing.x);
+  const side = perpendicular(facing);
   switch (spec.clear) {
     case 'front':
       return around([facing]);
     case 'sides': {
-      const footprint = 'along' in spec.footprint ? spec.footprint : { along: 1, out: 1 };
+      const footprint = isCellPiece(spec) ? spec.footprint : { along: 1, out: 1 };
       // The long sides run along the piece's longer dimension.
       return around(footprint.out > footprint.along ? [side, dir(-side.x, -side.y)] : [facing, dir(-facing.x, -facing.y)]);
     }

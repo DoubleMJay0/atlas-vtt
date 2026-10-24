@@ -46,7 +46,8 @@ export function furnishSpace(base: Omit<FurnishSpace, 'placed' | 'hung'>): Furni
   return { ...base, placed: [], hung: new Set() };
 }
 
-const centreOf = (cells: readonly CellPoint[]): CellPoint => ({
+/** The middle of a set of cells. */
+export const centreOf = (cells: readonly CellPoint[]): CellPoint => ({
   x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length,
   y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length,
 });

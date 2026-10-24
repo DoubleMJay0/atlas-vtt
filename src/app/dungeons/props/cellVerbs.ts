@@ -9,7 +9,7 @@
 import { cellKey, dir } from '../geometry';
 import type { CellDir, CellPoint, DungeonProp, PropKind } from '../model';
 import { shuffled } from '../rng';
-import type { WallSide } from '../terrain/roomCells';
+import { WALL_SIDES, type WallSide } from '../terrain/roomCells';
 import { PROP_SPECS, isCellPiece, propReach } from './catalogue';
 import { type FurnishSpace, hangPiece, placeDisc, placePiece } from './furnishSpace';
 import { facing } from './roomFrame';
@@ -27,7 +27,7 @@ export function wallRuns(fs: FurnishSpace, side: WallSide, length: number, middl
   if (rc.room.rotunda) return [];
   const wall = rc.wallCells(side);
   const keys = new Set(wall.map((c) => cellKey(c.x, c.y)));
-  const alongDir = side === 'back' || side === 'near' ? rc.across : rc.axis;
+  const alongDir = rc.alongWall(side);
   const runs = wall.flatMap((start) => {
     const run = Array.from({ length }, (_, k) => ({ x: start.x + alongDir.x * k, y: start.y + alongDir.y * k }));
     return run.every((c) => keys.has(cellKey(c.x, c.y)) && !rc.doorOn(side, c)) ? [run] : [];
@@ -37,21 +37,23 @@ export function wallRuns(fs: FurnishSpace, side: WallSide, length: number, middl
   return runs.map((run, k) => ({ run, k })).sort((a, b) => Math.abs(a.k - mid) - Math.abs(b.k - mid)).map(({ run }) => run);
 }
 
-const opposite = (d: CellDir): CellDir => dir(-d.x, -d.y);
+/** The way opposite `d`. */
+export const opposite = (d: CellDir): CellDir => dir(-d.x, -d.y);
 
 /** A piece against one of `sides` (its back, or its head for a bed), the first place that takes it; a disc stands just before the wall. */
 function onSides(fs: FurnishSpace, kind: PropKind, sides: readonly WallSide[], middleFirst: boolean): DungeonProp | null {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
   const length = isCellPiece(spec) ? spec.footprint.along : 1;
+  const inset = 0.45 - propReach(kind);
   for (const side of sides) {
     const into = opposite(rc.beyond(side));
-    const alongDir = side === 'back' || side === 'near' ? rc.across : rc.axis;
+    const alongDir = rc.alongWall(side);
     for (const run of wallRuns(fs, side, length, middleFirst)) {
       const start = run[0] as CellPoint;
       const placed = isCellPiece(spec)
         ? placePiece(fs, kind, footprintAt(start, alongDir, into, spec.footprint.along, spec.footprint.out), into)
-        : placeDisc(fs, kind, { x: start.x + 0.5 - into.x * (0.45 - propReach(kind)), y: start.y + 0.5 - into.y * (0.45 - propReach(kind)) }, facing(into));
+        : placeDisc(fs, kind, { x: start.x + 0.5 - into.x * inset, y: start.y + 0.5 - into.y * inset }, facing(into));
       if (placed) return placed;
     }
   }
@@ -95,6 +97,7 @@ export function inCorner(fs: FurnishSpace, kind: PropKind): DungeonProp | null {
   const spec = PROP_SPECS[kind];
   const { cells: rc } = fs;
   if (rc.room.rotunda) return null;
+  const inset = 0.45 - propReach(kind);
   const corners = shuffled(fs.rng, (['back', 'near'] as const).flatMap((end) => (['left', 'right'] as const).map((side) => [end, side] as const)));
   for (const [end, side] of corners) {
     const sideKeys = new Set(rc.wallCells(side).map((c) => cellKey(c.x, c.y)));
@@ -104,7 +107,7 @@ export function inCorner(fs: FurnishSpace, kind: PropKind): DungeonProp | null {
     const inward = opposite(rc.beyond(side));
     const placed = isCellPiece(spec)
       ? placePiece(fs, kind, footprintAt(corner, inward, into, spec.footprint.along, spec.footprint.out), into)
-      : placeDisc(fs, kind, { x: corner.x + 0.5 - (into.x + inward.x) * (0.45 - propReach(kind)), y: corner.y + 0.5 - (into.y + inward.y) * (0.45 - propReach(kind)) }, facing(into) + (fs.rng() - 0.5) * 0.4);
+      : placeDisc(fs, kind, { x: corner.x + 0.5 - (into.x + inward.x) * inset, y: corner.y + 0.5 - (into.y + inward.y) * inset }, facing(into) + (fs.rng() - 0.5) * 0.4);
     if (placed) return placed;
   }
   return null;
@@ -155,7 +158,7 @@ export function inRows(fs: FurnishSpace, kind: PropKind, count: number): Dungeon
     const i = Math.min(rc.depth - 1, Math.floor(0.5 + step * (k + 0.5)));
     for (const j of rowColumns(rc.width)) {
       const c = rc.cell(i, j);
-      const placed = placeDisc(fs, kind, { x: c.x + 0.5, y: c.y + 0.5 }, facing(dir(-rc.axis.x, -rc.axis.y)));
+      const placed = placeDisc(fs, kind, { x: c.x + 0.5, y: c.y + 0.5 }, facing(opposite(rc.axis)));
       if (placed) {
         out.push(placed);
         break;
@@ -179,7 +182,7 @@ export function onWall(fs: FurnishSpace, kind: PropKind, count: number): Dungeon
     const across = hangPiece(fs, kind, run, 'across');
     return across ? [across] : [];
   }
-  const sides = spec.wall === 'outer' && fs.outer ? (['back', 'left', 'right', 'near'] as const).filter((side) => fs.outer?.has(side)) : (['back', 'left', 'right', 'near'] as const);
+  const sides = spec.wall === 'outer' && fs.outer ? WALL_SIDES.filter((side) => fs.outer?.has(side)) : WALL_SIDES;
   const runs = sides.flatMap((side) => wallRuns(fs, side, spec.footprint.along, false).map((run) => ({ side, run })));
   const out: DungeonProp[] = [];
   for (const { side, run } of shuffled(fs.rng, runs)) {

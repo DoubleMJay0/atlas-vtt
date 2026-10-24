@@ -5,24 +5,24 @@
  */
 
 import { DRAWN_PROP_KINDS } from '../drawnKinds';
-import { cellsOf, cellKey, inRect, wallRect } from '../geometry';
-import type { DungeonRoom } from '../model';
 import { spotRect } from '../floors/stairSpots';
+import { cellKey, cellsOf, inRect, wallRect } from '../geometry';
+import type { DungeonRoom, TerrainKind } from '../model';
+import { PROP_SPECS } from '../props/catalogue';
+import { againstWall, inCorner } from '../props/cellVerbs';
 import { type FurnishSpace, furnishSpace } from '../props/furnishSpace';
 import { type RecipeContext, furnishByRecipe } from '../props/recipe';
 import { frameOf } from '../props/roomFrame';
 import { roomSpace } from '../props/space';
+import { type Rng, chance } from '../rng';
+import type { DungeonTag } from '../tags';
 import type { RoomTypeId } from '../themes/roomTypes';
 import type { FurnishRecipe, Piece, RoomTypeSpec } from '../themes/themeTypes';
-import { PROP_SPECS } from '../props/catalogue';
-import { type Rng, chance } from '../rng';
 import { CRAMPED_AREA, FIGHT_AREA, ensureCover, hasCover, pillars } from './cover';
 import { pews, ruinedGround } from './difficult';
 import { platformAtFarWall } from './elevation';
-import { placeInterest } from './interest';
-import { againstWall, inCorner } from '../props/cellVerbs';
-import type { DungeonTag } from '../tags';
 import type { FloorTerrain } from './floorTerrain';
+import { placeInterest } from './interest';
 import { type RoomCells, WALL_SIDES, type WallSide } from './roomCells';
 import { reserveLanes } from './roomLanes';
 import type { TerrainWork } from './work';
@@ -80,12 +80,13 @@ function naturalOnly(recipe: FurnishRecipe): FurnishRecipe {
 function allowedTerrain(work: TerrainWork, k: number, rc: RoomCells, spec: RoomTypeSpec, rng: Rng): void {
   const floor = work.floors[k];
   if (!floor) return;
-  if (spec.terrain.allows?.includes('pews') && rc.floorCount >= FIGHT_AREA) pews(floor, rc);
-  if (spec.terrain.allows?.includes('mosaic')) placeInterest(floor, rc, rng, 'mosaic');
-  if (spec.terrain.allows?.includes('pool') && chance(rng, 0.5)) placeInterest(floor, rc, rng, 'pool');
-  if (spec.terrain.allows?.includes('pillar') && rc.floorCount > CRAMPED_AREA && chance(rng, 0.6)) pillars(floor, rc, rng);
+  const allows = (kind: TerrainKind): boolean => spec.terrain.allows?.includes(kind) === true;
+  if (allows('pews') && rc.floorCount >= FIGHT_AREA) pews(floor, rc);
+  if (allows('mosaic')) placeInterest(floor, rc, rng, 'mosaic');
+  if (allows('pool') && chance(rng, 0.5)) placeInterest(floor, rc, rng, 'pool');
+  if (allows('pillar') && rc.floorCount > CRAMPED_AREA && chance(rng, 0.6)) pillars(floor, rc, rng);
   const atBack = spec.furnish.defining?.verb === 'backWall';
-  if (spec.terrain.allows?.includes('platform') && !atBack && rc.depth >= 6 && chance(rng, 0.4)) platformAtFarWall(floor, rc, 1, rc.width - 2, 1);
+  if (allows('platform') && !atBack && rc.depth >= 6 && chance(rng, 0.4)) platformAtFarWall(floor, rc, 1, rc.width - 2, 1);
 }
 
 /**
@@ -100,7 +101,7 @@ export function ensureTypeCover(fs: FurnishSpace, spec: RoomTypeSpec, tags: Read
   if (covered()) return;
   const pieces = [spec.furnish.defining, spec.furnish.with, ...spec.furnish.pieces].filter((p): p is Piece => p !== undefined);
   const cover = pieces.find((p) => PROP_SPECS[p.kind].cover !== undefined && !PROP_SPECS[p.kind].wallPiece && fs.offered.has(p.kind));
-  if (cover && againstWall(fs, cover.kind, ['back', 'left', 'right', 'near'])) return;
+  if (cover && againstWall(fs, cover.kind, WALL_SIDES)) return;
   if (inCorner(fs, 'crate')) return;
   ensureCover(floor, rc, tags);
 }

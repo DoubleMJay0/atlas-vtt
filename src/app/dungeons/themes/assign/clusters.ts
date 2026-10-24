@@ -8,12 +8,10 @@ import { type Rng, chance } from '../../rng';
 import type { RoomTypeId } from '../roomTypes';
 import type { ClusterId, ClusterSpec, FloorRule } from '../themeTypes';
 import { entranceRoom } from './anchors';
-import { type Assignment, breaksHardRule, heldCount, roomScore, specOf } from './score';
+import { type Assignment, breaksHardRule, heldCount, isFree, isNeeded, roomScore, specOf } from './score';
 
 /** The chance an optional member is placed while free rooms remain for the required types. */
 const OPTIONAL_MEMBER = 0.6;
-
-const free = (a: Assignment, i: number): boolean => a.types[i] === null && !a.fixed[i];
 
 function keepsClusterFloor(a: Assignment, i: number, rule: FloorRule | undefined): boolean {
   const floor = a.traits[i]?.floor ?? 0;
@@ -27,7 +25,7 @@ function bestRoom(a: Assignment, rooms: readonly number[], id: RoomTypeId): numb
   let best: number | null = null;
   let bestScore = -Infinity;
   for (const i of rooms) {
-    if (!free(a, i) || breaksHardRule(a, i, id)) continue;
+    if (!isFree(a, i) || breaksHardRule(a, i, id)) continue;
     const score = roomScore(a, i, id);
     if (score > bestScore) {
       best = i;
@@ -39,7 +37,7 @@ function bestRoom(a: Assignment, rooms: readonly number[], id: RoomTypeId): numb
 
 /** How many required types are still unplaced: the rooms clusters must leave for them. */
 function stillRequired(a: Assignment): number {
-  return a.programme.rooms.filter((spec) => (spec.required || spec.count[0] > 0) && !a.types.includes(spec.id)).length;
+  return a.programme.rooms.filter((spec) => isNeeded(spec) && !a.types.includes(spec.id)).length;
 }
 
 /**
@@ -78,7 +76,7 @@ export function placeClusters(rng: Rng, a: Assignment): void {
       const spec = specOf(a.programme, member);
       if (!spec || heldCount(a, member, -1) >= spec.count[1]) continue;
       const optional = !spec.required && spec.count[0] === 0;
-      const freeRooms = a.types.filter((type, i) => type === null && !a.fixed[i]).length;
+      const freeRooms = a.types.filter((_, i) => isFree(a, i)).length;
       if (optional && (freeRooms <= stillRequired(a) || !chance(rng, OPTIONAL_MEMBER))) continue;
       const near = a.graph.near(core).filter((i) => keepsClusterFloor(a, i, cluster.floor));
       const room = bestRoom(a, a.graph.next(core), member) ?? bestRoom(a, near, member);
