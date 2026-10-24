@@ -6,7 +6,7 @@
  * the same planned floors the rest of the pipeline reads, its walls on cell edges.
  */
 
-import { cellKey, doorCells, houseCells } from '../../geometry';
+import { cellKey, cellsBox, doorCells, houseCells } from '../../geometry';
 import { DRAWN_GROUNDS_KINDS } from '../../drawnKinds';
 import type { CellDir, FiveRoomStage, DungeonDoor, DungeonRoom, DungeonStair, HouseGrounds } from '../../model';
 import type { PlannedFloor } from '../../floors/planFloors';
@@ -17,7 +17,7 @@ import { cutBands } from './houseBands';
 import { houseDoors } from './houseDoors';
 import { roomCells } from './houseEdges';
 import { type HouseFrame, type WingId, houseFrame } from './houseFrame';
-import { boxCells, keysOf } from './houseGrid';
+import { boxCells, inBoxes } from './houseGrid';
 import { moveFloor } from './houseMove';
 import { fiveRoomHouse } from './houseFiveRoom';
 import { houseGrounds } from './houseGrounds';
@@ -25,7 +25,7 @@ import { houseLot } from './houseLot';
 import { type HouseSize, houseParams, houseSize } from './houseParams';
 import { houseStairs, type HouseStair } from './houseStairs';
 import { buildStorey } from './houseStorey';
-import { houseWindows, windowKey, windowUnder } from './houseWindows';
+import { facadeGrid, houseWindows, windowKey, windowUnder } from './houseWindows';
 import { type TypedRoom, typeStorey } from './houseZones';
 import { approachCells } from '../../floors/stairSpots';
 
@@ -112,8 +112,9 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
   const climaxLevel = !boss ? null : cellar && chance(rng, 0.5) ? -1 : storeys - 1;
   const climax = climaxLevel === null ? null : climaxType(rng, frame, climaxLevel);
   const stairs = houseStairs(frame, levels);
-  const grid = { period: chance(rng, 0.5) ? 2 : 3, phase: rng() < 0.5 ? 0 : 1 };
+  const grid = facadeGrid(rng);
   const floors: PlannedFloor[] = [];
+  const windowKeys: Set<string>[] = [];
   let link = 0;
   const links = stairs.map(() => link++);
   for (const level of levels) {
@@ -129,21 +130,21 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
       ruined,
     });
     const rooms = entryFirst(typed, level);
-    const masks = keysOf(rooms.flatMap((r) => [r.box]).concat(storey.stacks));
-    const inHouse = (x: number, y: number): boolean => masks.has(cellKey(x, y));
+    const inHouse = inBoxes([...rooms.map((r) => r.box), ...storey.stacks]);
     const doors = houseDoors({ frame, rooms, blocked: blockedBy(stairs, level), inHouse, ground: level === 0 });
     const own: DungeonStair[] = stairs.flatMap((s, k) => (s.lower === level || s.upper === level ? [{ ...s.spot, to: indexOf(s.lower === level ? s.upper : s.lower), link: links[k]! }] : []));
-    const windows = level < 0 ? [] : houseWindows(frame, rooms, doors, inHouse, grid, new Set((level > 0 ? (floors[indexOf(level - 1)]?.house?.windows ?? []) : []).map(windowKey)));
+    const windows = level < 0 ? [] : houseWindows(frame, rooms, doors, inHouse, grid, level > 0 ? windowKeys[indexOf(level - 1)]! : new Set());
     floors[indexOf(level)] = { rooms: rooms.map(toRoom), doors, stairs: own, house: { walls: 'edges', windows, stacks: storey.stacks.map((s) => ({ ...s })) } };
+    windowKeys[indexOf(level)] = new Set(windows.map(windowKey));
     // A window the facade grid did not give stands over windows down the house, as far as the wall runs.
     for (const window of windows) {
       for (let under = level - 1; under >= 0; under--) {
-        const below = floors[indexOf(under)]!;
-        const keys = new Set(below.house!.windows.map(windowKey));
+        const keys = windowKeys[indexOf(under)]!;
         if (keys.has(windowKey(window))) break;
-        const added = windowUnder(window, below);
+        const added = windowUnder(window, floors[indexOf(under)]!);
         if (!added) break;
-        below.house!.windows.push(added);
+        floors[indexOf(under)]!.house!.windows.push(added);
+        keys.add(windowKey(added));
       }
     }
   }
@@ -156,10 +157,8 @@ export function planHouse(seed: number, tags: ReadonlySet<DungeonTag>, count: nu
  */
 function groundsOf(seed: number, size: HouseSize, ground: PlannedFloor, front: DungeonDoor): HouseGrounds {
   const keys = houseCells({ rooms: ground.rooms, stacks: ground.house?.stacks });
-  const cells = [...keys].map((k) => k.split(',').map(Number) as [number, number]);
-  const xs = cells.map(([x]) => x);
-  const ys = cells.map(([, y]) => y);
-  const around = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs) + 1, h: Math.max(...ys) - Math.min(...ys) + 1 };
+  // Stacks stand inside the house: its rooms alone reach its edges.
+  const around = cellsBox(ground.rooms.flatMap((r) => [{ x: r.x, y: r.y }, { x: r.x + r.w - 1, y: r.y + r.h - 1 }]));
   const rng = stream(seed, 'layout', 'house:grounds');
   const lot = houseLot(rng, size, around, doorCells(front));
   // The garden door leads out of the back of the house, towards −y.
@@ -191,10 +190,8 @@ function settled(seed: number, size: HouseSize, floors: PlannedFloor[], mirror: 
 /** A five-room dungeon as a house of one floor (`houseFiveRoom.ts`). */
 function planFiveRoom(seed: number, rng: Rng, size: HouseSize): HousePlan {
   const house = fiveRoomHouse(rng);
-  const masks = keysOf(house.rooms.map((r) => r.box));
-  const inHouse = (x: number, y: number): boolean => masks.has(cellKey(x, y));
-  const grid = { period: chance(rng, 0.5) ? 2 : 3, phase: rng() < 0.5 ? 0 : 1 };
-  const windows = houseWindows({ width: house.width, symmetric: false }, house.rooms, house.doors, inHouse, grid, new Set());
+  const inHouse = inBoxes(house.rooms.map((r) => r.box));
+  const windows = houseWindows({ width: house.width, symmetric: false }, house.rooms, house.doors, inHouse, facadeGrid(rng), new Set());
   const floor: PlannedFloor = { rooms: house.rooms.map(toRoom), doors: house.doors, stairs: [], house: { walls: 'edges', windows, stacks: [] } };
   return settled(seed, size, [floor], chance(rng, 0.5) ? house.width : null, 0);
 }

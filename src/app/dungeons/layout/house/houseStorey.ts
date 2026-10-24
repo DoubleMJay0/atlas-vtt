@@ -43,7 +43,7 @@ function clip(b: Box, within: Box): Box | null {
   return x0 < x1 && y0 < y1 ? box(x0, y0, x1 - x0, y1 - y0) : null;
 }
 
-export function storeyKind(frame: HouseFrame, level: number): StoreyKind {
+function storeyKind(frame: HouseFrame, level: number): StoreyKind {
   if (level < 0) return 'cellar';
   if (level === 0) return 'ground';
   return frame.attic && level === frame.storeys - 1 ? 'attic' : 'upper';

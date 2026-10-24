@@ -4,11 +4,11 @@
  * (research §5.7), so every hearth has its reason.
  */
 
-import { cellKey } from '../geometry';
+import { cellKey, cellsOf, floorRect } from '../geometry';
 import type { ThemeFacts, ThemeFactsInput } from './themeTypes';
 
 export function houseFacts({ floors }: ThemeFactsInput): ThemeFacts {
-  const stacks = floors.map((floor) => new Set((floor.house?.stacks ?? []).flatMap((s) => Array.from({ length: s.w * s.h }, (_, k) => cellKey(s.x + (k % s.w), s.y + Math.floor(k / s.w))))));
+  const stacks = floors.map((floor) => new Set((floor.house?.stacks ?? []).flatMap((s) => cellsOf(floorRect(s)).map((c) => cellKey(c.x, c.y)))));
   return {
     allows: () => true,
     score: () => 0,

@@ -19,6 +19,11 @@ function cell(m: HouseMove, c: CellPoint): CellPoint {
   return { x: (m.mirror === null ? c.x : m.mirror - 1 - c.x) + m.shift.x, y: c.y + m.shift.y };
 }
 
+/** A point in continuous cells (a trunk, a column): mirrored about the line itself, not about a cell. */
+function point(m: HouseMove, p: CellPoint): CellPoint {
+  return { x: (m.mirror === null ? p.x : m.mirror - p.x) + m.shift.x, y: p.y + m.shift.y };
+}
+
 function rect<T extends { x: number; y: number; w: number }>(m: HouseMove, r: T): T {
   return { ...r, x: (m.mirror === null ? r.x : m.mirror - r.x - r.w) + m.shift.x, y: r.y + m.shift.y };
 }
@@ -58,8 +63,8 @@ export function moveFloor(m: HouseMove, floor: PlannedFloor): PlannedFloor {
               ...p,
               cells: p.cells.map((c) => cell(m, c)),
               ...(p.dir && { dir: dirOf(m, p.dir) }),
-              ...(p.at && { at: m.mirror === null ? { x: p.at.x + m.shift.x, y: p.at.y + m.shift.y } : { x: m.mirror - p.at.x + m.shift.x, y: p.at.y + m.shift.y } }),
-              ...(p.columns && { columns: p.columns.map((c) => (m.mirror === null ? { x: c.x + m.shift.x, y: c.y + m.shift.y } : { x: m.mirror - c.x + m.shift.x, y: c.y + m.shift.y })) }),
+              ...(p.at && { at: point(m, p.at) }),
+              ...(p.columns && { columns: p.columns.map((c) => point(m, c)) }),
               ...(p.door && { door: { ...cell(m, p.door), dir: dirOf(m, p.door.dir) } }),
             })),
           },

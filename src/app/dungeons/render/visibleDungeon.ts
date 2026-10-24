@@ -3,8 +3,7 @@ import { secretWingOf } from '../secretWings';
 import type { DungeonView } from '../style';
 import { caveFloorShapes } from './cave/visibleCave';
 import { doorShape, doorShapes, roomShape, shapeBounds, shapeDistance, unionBounds, type Bounds, type FloorShape } from './geometry';
-import { houseCells } from '../geometry';
-import { doorwayShape, houseRoomShape } from './houseShapes';
+import { type HouseLayout, houseLayout } from './houseShapes';
 
 /**
  * What a view shows of one floor of a dungeon: secret wings leave with their doors when secrets
@@ -25,6 +24,8 @@ export interface VisibleFloor {
   /** The floors with every door cell whole: what courses of brick and stone are laid around. */
   outlines: FloorShape[];
   roomShapes: Map<number, FloorShape>;
+  /** A house's cells and doorways (`DungeonFloor.walls === 'edges'`), as its floors were drawn from them. */
+  house?: HouseLayout;
   /** Of the floors. */
   bounds: Bounds;
 }
@@ -47,7 +48,7 @@ export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secre
   const doors = floor.doors.filter(door => (door.from === null || shown.has(door.from)) && (door.to === null || shown.has(door.to)));
   const cave = floor.cave !== undefined;
   const open = doors.filter(door => door.kind !== 'secret');
-  if (floor.walls === 'edges') return withBounds({ model, index, floor, rooms, doors, ...houseFloors(floor, shown, open) });
+  if (floor.walls === 'edges') return withBounds({ model, index, floor, rooms, doors, ...houseFloors(houseLayout(floor, shown, doors), open) });
   const wide = new Set(cave ? [] : doors.filter(door => isWideOpening(door, shown)));
   const roomShapes = new Map(rooms.map(room => [room.id, roomShape(room)] as const));
   // A cave's narrows are drawn at their full width, as part of its traced floor.
@@ -57,11 +58,9 @@ export function visibleFloor(model: DungeonModel, view: Pick<DungeonView, 'secre
 }
 
 /** A house's floors (`houseShapes.ts`): every doorway's floor whole, and every opening drawn as wide as it is, its grid lines across. */
-function houseFloors(floor: DungeonFloor, shown: ReadonlyMap<number, DungeonRoom>, open: readonly DungeonDoor[]): Pick<VisibleFloor, 'wide' | 'floors' | 'outlines' | 'roomShapes'> {
-  const house = houseCells(floor);
-  const roomShapes = new Map<number, FloorShape>([...shown.values()].map(room => [room.id, houseRoomShape(room, house)] as const));
-  const floors = [...roomShapes.values(), ...open.map(door => doorwayShape(door, shown, house))];
-  return { wide: new Set(open.filter(door => door.kind === 'opening')), floors, outlines: floors, roomShapes };
+function houseFloors(house: HouseLayout, open: readonly DungeonDoor[]): Pick<VisibleFloor, 'wide' | 'floors' | 'outlines' | 'roomShapes' | 'house'> {
+  const floors = [...house.roomShapes.values(), ...open.map(door => house.doorways.get(door)!)];
+  return { wide: new Set(open.filter(door => door.kind === 'opening')), floors, outlines: floors, roomShapes: house.roomShapes, house };
 }
 
 function withBounds(visible: Omit<VisibleFloor, 'bounds'>): VisibleFloor {

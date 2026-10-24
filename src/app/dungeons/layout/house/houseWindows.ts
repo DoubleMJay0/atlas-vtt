@@ -5,10 +5,11 @@
  * cellar has none.
  */
 
-import { cellKey, holdsCell } from '../../geometry';
+import { cellKey, holdsCell, houseCells } from '../../geometry';
 import type { PlannedFloor } from '../../floors/planFloors';
-import type { DungeonDoor, DungeonWindow } from '../../model';
+import type { CellDir, DungeonDoor, DungeonWindow } from '../../model';
 import { doorCells } from '../../geometry';
+import { type Rng, chance } from '../../rng';
 import { SIDES, runsOf } from './houseEdges';
 import type { HouseFrame } from './houseFrame';
 import type { TypedRoom } from './houseZones';
@@ -19,6 +20,11 @@ export interface FacadeGrid {
   phase: number;
 }
 
+/** A house's facade grid: a window every second or third cell. */
+export function facadeGrid(rng: Rng): FacadeGrid {
+  return { period: chance(rng, 0.5) ? 2 : 3, phase: rng() < 0.5 ? 0 : 1 };
+}
+
 function onGrid(grid: FacadeGrid, frame: Pick<HouseFrame, 'width' | 'symmetric'>, at: number, horizontal: boolean): boolean {
   const hit = (u: number): boolean => (((u - grid.phase) % grid.period) + grid.period) % grid.period === 0;
   if (!horizontal || !frame.symmetric) return hit(at);
@@ -27,20 +33,21 @@ function onGrid(grid: FacadeGrid, frame: Pick<HouseFrame, 'width' | 'symmetric'>
   return at * 2 < frame.width ? hit(at) : hit(mirror);
 }
 
+/** The edge a window stands on, as a key. */
+export const windowKey = (w: Pick<DungeonWindow, 'x' | 'y' | 'dir'>): string => `${cellKey(w.x, w.y)}>${w.dir.x},${w.dir.y}`;
+
 /** The edges doors stand on, as `x,y>dx,dy` of the cell inside and the way out. */
 function doorEdges(doors: readonly DungeonDoor[]): Set<string> {
   const keys = new Set<string>();
   for (const door of doors) {
     for (const c of doorCells(door)) {
-      keys.add(`${cellKey(c.x, c.y)}>${door.dir.x},${door.dir.y}`);
-      keys.add(`${cellKey(c.x + door.dir.x, c.y + door.dir.y)}>${-door.dir.x},${-door.dir.y}`);
+      keys.add(windowKey({ ...c, dir: door.dir }));
+      keys.add(windowKey({ x: c.x + door.dir.x, y: c.y + door.dir.y, dir: { x: (0 - door.dir.x) as CellDir['x'], y: (0 - door.dir.y) as CellDir['y'] } }));
     }
   }
   return keys;
 }
 
-/** The edge a window stands on, as a key. */
-export const windowKey = (w: Pick<DungeonWindow, 'x' | 'y' | 'dir'>): string => `${cellKey(w.x, w.y)}>${w.dir.x},${w.dir.y}`;
 
 /** `below`: the windows of the floor underneath, which a room the grid misses stands its window over. */
 export function houseWindows(frame: Pick<HouseFrame, 'width' | 'symmetric'>, rooms: readonly TypedRoom[], doors: readonly DungeonDoor[], inHouse: (x: number, y: number) => boolean, grid: FacadeGrid, below: ReadonlySet<string>): DungeonWindow[] {
@@ -48,7 +55,7 @@ export function houseWindows(frame: Pick<HouseFrame, 'width' | 'symmetric'>, roo
   const windows: DungeonWindow[] = [];
   rooms.forEach((room, id) => {
     const runs = SIDES.flatMap((side) => runsOf(room, side, (x, y) => !inHouse(x, y)));
-    const free = runs.flatMap((run) => run.cells.map((c) => ({ c, dir: run.dir }))).filter(({ c, dir }) => !taken.has(`${cellKey(c.x, c.y)}>${dir.x},${dir.y}`));
+    const free = runs.flatMap((run) => run.cells.map((c) => ({ c, dir: run.dir }))).filter(({ c, dir }) => !taken.has(windowKey({ ...c, dir })));
     const placed = free.filter(({ c, dir }) => onGrid(grid, frame, dir.y !== 0 ? c.x : c.y, dir.y !== 0));
     // A room the grid misses still has a window: over one below where it can, else in the middle of its outer walls.
     const over = free.filter(({ c, dir }) => below.has(windowKey({ ...c, dir })));
@@ -65,7 +72,6 @@ export function houseWindows(frame: Pick<HouseFrame, 'width' | 'symmetric'>, roo
 export function windowUnder(window: DungeonWindow, floor: PlannedFloor): DungeonWindow | null {
   const holder = floor.rooms.find((r) => holdsCell(r, window.x, window.y));
   const across = { x: window.x + window.dir.x, y: window.y + window.dir.y };
-  const inHouse = (x: number, y: number): boolean => floor.rooms.some((r) => holdsCell(r, x, y)) || (floor.house?.stacks ?? []).some((s) => x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h);
-  if (!holder || inHouse(across.x, across.y) || doorEdges(floor.doors).has(windowKey(window))) return null;
+  if (!holder || houseCells({ rooms: floor.rooms, stacks: floor.house?.stacks }).has(cellKey(across.x, across.y)) || doorEdges(floor.doors).has(windowKey(window))) return null;
   return { ...window, room: holder.id };
 }

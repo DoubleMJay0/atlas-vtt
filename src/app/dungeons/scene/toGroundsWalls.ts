@@ -6,7 +6,9 @@
  */
 
 import type { WallSegment } from '../../types/wallTypes';
+import { cellsBox } from '../geometry';
 import { cellsShapes } from '../render/geometry';
+import { doorEdge } from '../render/houseShapes';
 import type { GroundsPiece, HouseGrounds } from '../model';
 import type { DungeonPlacement, WallsOf } from './toWalls';
 
@@ -36,9 +38,8 @@ export function groundsWalls(grounds: HouseGrounds | undefined, placement: Dunge
     if (piece.kind === 'boundary-wall') outline(piece, {});
     else if (piece.kind === 'hedge') outline(piece, { blocks: 'sight' });
     else if (piece.kind === 'gate' && piece.dir) {
-      const xs = piece.cells.map((c) => c.x);
-      const ys = piece.cells.map((c) => c.y);
-      const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs) + 1, Math.min(...ys), Math.max(...ys) + 1];
+      const b = cellsBox(piece.cells);
+      const [x0, x1, y0, y1] = [b.x, b.x + b.w, b.y, b.y + b.h];
       const across = piece.dir.y !== 0 ? [{ x: x0, y: (y0 + y1) / 2 }, { x: x1, y: (y0 + y1) / 2 }] : [{ x: (x0 + x1) / 2, y: y0 }, { x: (x0 + x1) / 2, y: y1 }];
       add(across[0]!, across[1]!, { type: 'door', closed: true });
     } else if (piece.kind === 'outbuilding' && piece.door) {
@@ -50,14 +51,11 @@ export function groundsWalls(grounds: HouseGrounds | undefined, placement: Dunge
 
 /** An outbuilding's walls round its cells, the side its door is on broken by the door: `[from, to, wall or door]`. */
 function outbuildingSides(cells: readonly Point[], door: NonNullable<GroundsPiece['door']>): [Point, Point, 'wall' | 'door'][] {
-  const xs = cells.map((c) => c.x);
-  const ys = cells.map((c) => c.y);
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs) + 1, Math.min(...ys), Math.max(...ys) + 1];
+  const b = cellsBox(cells);
+  const [x0, x1, y0, y1] = [b.x, b.x + b.w, b.y, b.y + b.h];
   const corners = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
   // The door's edge lies between its outside cell and the building, across `dir`.
-  const ex = door.x + (door.dir.x < 0 ? 0 : door.dir.x > 0 ? 1 : 0);
-  const ey = door.y + (door.dir.y < 0 ? 0 : door.dir.y > 0 ? 1 : 0);
-  const gap: [Point, Point] = door.dir.y !== 0 ? [{ x: door.x, y: ey }, { x: door.x + 1, y: ey }] : [{ x: ex, y: door.y }, { x: ex, y: door.y + 1 }];
+  const gap = doorEdge(door);
   const out: [Point, Point, 'wall' | 'door'][] = [];
   corners.forEach((a, i) => {
     const b = corners[(i + 1) % 4]!;

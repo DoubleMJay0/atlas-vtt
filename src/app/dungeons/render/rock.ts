@@ -2,7 +2,7 @@ import { mouthLane, mouthsOf, type Mouth } from './art/mouths';
 import { drawBricks } from './bricks';
 import { drawDots } from './dots';
 import { cellsShapes, traceShapes, tracePolygon } from './geometry';
-import { houseCells } from '../geometry';
+import { cellsOf, floorCellsOf, floorRect } from '../geometry';
 import { OUTER_WALL, windowClearing } from './houseShapes';
 import { shownWindows } from './art/windows';
 import { drawHatching } from './hatching';
@@ -92,10 +92,7 @@ function clipLanes(env: RenderEnv, mouths: readonly Mouth[]): void {
 function clipToHouse(env: RenderEnv): void {
   const { floor } = env.dungeon;
   if (floor.walls !== 'edges') return;
-  const cells = [...houseCells(floor)].map((key) => {
-    const [x, y] = key.split(',').map(Number) as [number, number];
-    return { x, y };
-  });
+  const cells = [...floor.rooms.flatMap(floorCellsOf), ...(floor.stacks ?? []).flatMap((s) => cellsOf(floorRect(s)))];
   const { ctx } = env;
   ctx.beginPath();
   for (const shape of cellsShapes(cells)) for (const ring of shape.rings) tracePolygon(ctx, ring);

@@ -18,7 +18,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'hub',
     floor: 'entrance',
     terrain: { features: ['stair-well'], columns: true },
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.5 }] },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.5 }] },
   },
   {
     id: 'drawing-room',
@@ -30,7 +30,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     near: ['entrance-hall'],
     apart: ['kitchen'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.8 }] },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.8 }] },
   },
   {
     id: 'dining-room',
@@ -43,7 +43,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     next: ['servery'],
     near: ['kitchen'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.5 }] },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.5 }] },
   },
   {
     id: 'servery',
@@ -63,7 +63,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     apart: ['drawing-room', 'master-bedroom'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall' }] },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true }] },
   },
   {
     id: 'scullery',
@@ -108,7 +108,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     size: 'medium',
     depth: 'middle',
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', chance: 0.8 }] },
+    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.8 }] },
   },
   {
     id: 'ballroom',
@@ -121,7 +121,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     furnish: {
       pieces: [
         { kind: 'bust', verb: 'wall', count: [2, 6] },
-        { kind: 'hearth', verb: 'wall', chance: 0.6 },
+        { kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.6 },
       ],
     },
   },

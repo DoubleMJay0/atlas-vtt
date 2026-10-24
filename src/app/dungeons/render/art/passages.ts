@@ -7,8 +7,7 @@ import { drawFlight } from '../terrain/raised';
 import type { Hand } from './hand';
 import { polyPath } from './paths';
 import { drawWindows } from './windows';
-import { doorMiddle, houseCells } from '../../geometry';
-import { doorwayShape } from '../houseShapes';
+import { doorAnchor, doorMiddle } from '../../geometry';
 import { type CaveWayDraw, type CaveWayPart, caveWay } from '../cave/caveArt';
 
 /**
@@ -22,7 +21,7 @@ import { type CaveWayDraw, type CaveWayPart, caveWay } from '../cave/caveArt';
 /** Maps a point of a door's own frame (u across the way, v along it, −0.5..0.5) into cells: round its cell's middle, or its edge's. */
 function cellFrame(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'edge' | 'wide'>): (u: number, v: number) => Vec {
   const { dir } = door;
-  const o = door.edge ? doorMiddle(door) : { x: door.x + 0.5, y: door.y + 0.5 };
+  const o = doorAnchor(door);
   return (u, v) => ({ x: o.x + -dir.y * u + dir.x * v, y: o.y + dir.x * u + dir.y * v });
 }
 
@@ -31,8 +30,8 @@ function cellFrame(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'edge' | 'wide'>)
  * doorway as the floors either side reach it, so jambs never lie over the ink of a wall it meets.
  */
 function doorSpan(door: DungeonDoor, dungeon: VisibleFloor): [number, number] {
-  if (!door.edge) return [-0.5, 0.5];
-  const shape = doorwayShape(door, new Map(dungeon.rooms.map((r) => [r.id, r])), houseCells(dungeon.floor));
+  const shape = door.edge ? dungeon.house?.doorways.get(door) : undefined;
+  if (!shape) return [-0.5, 0.5];
   const mid = doorMiddle(door);
   const ends = door.dir.y !== 0 ? [shape.x, shape.x + shape.w].map((x) => (x - mid.x) * -door.dir.y) : [shape.y, shape.y + shape.h].map((y) => (y - mid.y) * door.dir.x);
   return [Math.min(...ends), Math.max(...ends)];

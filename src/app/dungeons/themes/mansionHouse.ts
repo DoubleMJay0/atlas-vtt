@@ -8,7 +8,7 @@
 import type { RoomTypeSpec } from './themeTypes';
 
 /** A fireplace on the wall a chimney stack stands behind (the Mansion's facts keep it there). */
-const HEARTH = { kind: 'hearth', verb: 'wall', chance: 0.8 } as const;
+const HEARTH = { kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.8 } as const;
 
 export const MANSION_HOUSE_ROOMS: readonly RoomTypeSpec[] = [
   { id: 'saloon', count: [0, 1], size: 'large', floor: 'entrance', terrain: {}, furnish: { pieces: [HEARTH] } },

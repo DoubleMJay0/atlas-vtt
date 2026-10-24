@@ -37,12 +37,22 @@ const free = (g: Ground, c: CellPoint): boolean => inBox(g.lot, c.x, c.y) && !g.
 
 /** A box of `w` × `h` with a cell of free ground all round it, nearest `target`. */
 function siteFor(g: Ground, w: number, h: number, target: CellPoint): Box | null {
+  // Taken cells counted over the lot once (a summed-area table), so each place is checked in four reads.
+  const { x: lx, y: ly, w: lw, h: lh } = g.lot;
+  const sums = new Int32Array((lw + 1) * (lh + 1));
+  for (let j = 0; j < lh; j++) {
+    for (let i = 0; i < lw; i++) {
+      const taken = free(g, { x: lx + i, y: ly + j }) ? 0 : 1;
+      sums[(j + 1) * (lw + 1) + i + 1] = taken + sums[j * (lw + 1) + i + 1]! + sums[(j + 1) * (lw + 1) + i]! - sums[j * (lw + 1) + i]!;
+    }
+  }
+  const takenIn = (i0: number, j0: number, i1: number, j1: number): number => sums[j1 * (lw + 1) + i1]! - sums[j0 * (lw + 1) + i1]! - sums[j1 * (lw + 1) + i0]! + sums[j0 * (lw + 1) + i0]!;
   let best: Box | null = null;
   let bestDistance = Infinity;
   for (let y = g.lot.y + 1; y + h < g.lot.y + g.lot.h; y++) {
     for (let x = g.lot.x + 1; x + w < g.lot.x + g.lot.w; x++) {
       const site = box(x, y, w, h);
-      if (!boxCells(box(x - 1, y - 1, w + 2, h + 2)).every((c) => free(g, c))) continue;
+      if (takenIn(x - 1 - lx, y - 1 - ly, x + w + 1 - lx, y + h + 1 - ly) > 0) continue;
       const d = Math.hypot(x + w / 2 - target.x, y + h / 2 - target.y);
       if (d < bestDistance) [best, bestDistance] = [site, d];
     }
@@ -86,12 +96,12 @@ function take(g: Ground, cells: readonly CellPoint[]): void {
  */
 export function houseGrounds(rng: Rng, size: HouseSize, lot: Lot, house: ReadonlySet<string>, around: Box, east: boolean, garden: CellPoint | null): HouseGrounds {
   const g: Ground = { lot: lot.box, taken: new Set([...lot.taken, ...house]), pieces: [...lot.pieces] };
+  const paths = new Set(lot.way.map((c) => cellKey(c.x, c.y)));
   // A cell of ground stays clear round the house, so nothing leans on its walls.
   for (const key of house) {
     const [x, y] = key.split(',').map(Number) as [number, number];
-    for (const s of STEPS) if (!house.has(cellKey(x + s.x, y + s.y)) && !lot.way.some((c) => c.x === x + s.x && c.y === y + s.y)) g.taken.add(cellKey(x + s.x, y + s.y));
+    for (const s of STEPS) if (!house.has(cellKey(x + s.x, y + s.y)) && !paths.has(cellKey(x + s.x, y + s.y))) g.taken.add(cellKey(x + s.x, y + s.y));
   }
-  const paths = new Set(lot.way.map((c) => cellKey(c.x, c.y)));
   const serviceX = east ? around.x + around.w + 2 : around.x - 3;
   let yard: Box | null = null;
   for (const use of OUTBUILDINGS[size]) {

@@ -63,3 +63,9 @@ export function spanOf(b: Box, along: CellDir): [number, number] {
 export function sliceOf(b: Box, along: CellDir, from: number, length: number): Box {
   return along.x !== 0 ? { ...b, x: from, w: length } : { ...b, y: from, h: length };
 }
+
+/** Whether a cell lies in any of `boxes`, by a set of their cells built once. */
+export function inBoxes(boxes: readonly Box[]): (x: number, y: number) => boolean {
+  const keys = keysOf(boxes);
+  return (x, y) => keys.has(cellKey(x, y));
+}

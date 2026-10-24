@@ -6,9 +6,9 @@
  * floors as it always does, so an inner wall comes out a thin line and an outer wall a full course.
  */
 
-import { cellKey, doorCells } from '../geometry';
-import type { CellDir, DungeonDoor, DungeonRoom, DungeonWindow } from '../model';
-import { cellsShapes, shapeBounds, type PolyShape, type RectShape, type Vec } from './geometry';
+import { cellKey, cellsBox, doorCells, houseCells } from '../geometry';
+import type { CellDir, DungeonDoor, DungeonFloor, DungeonRoom, DungeonWindow } from '../model';
+import { cellsShapes, shapeBounds, type FloorShape, type PolyShape, type RectShape, type Vec } from './geometry';
 
 /** An inner wall's thickness, in cells: wider than the widest wall ink (0.073), so the wall rings of two rooms never meet. */
 export const INNER_WALL = 0.1;
@@ -17,7 +17,7 @@ export const OUTER_WALL = 0.16;
 /** How far a doorway's floor reaches past the floors it joins, so the two become one. */
 const OVERLAP = 0.01;
 /** A window's span along its edge: wall stays at each end, so neighbouring windows never run together. */
-export const WINDOW_INSET = 0.18;
+const WINDOW_INSET = 0.18;
 
 const SIDES: readonly CellDir[] = [
   { x: 0, y: -1 },
@@ -37,7 +37,7 @@ function beyond(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>, side: CellDir): 
 }
 
 /** How far a room's floor stands back from its side towards `side`: half an outer wall where any of it faces the outside. */
-export function sideInset(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>, side: CellDir, house: ReadonlySet<string>): number {
+function sideInset(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>, side: CellDir, house: ReadonlySet<string>): number {
   return beyond(room, side).every((c) => house.has(cellKey(c.x, c.y))) ? INNER_WALL / 2 : OUTER_WALL / 2;
 }
 
@@ -94,12 +94,23 @@ function insetRing(ring: readonly Vec[], house: ReadonlySet<string>): Vec[] {
   return out;
 }
 
+/** A house floor's shapes, worked out once: its cells, each room's floor, and every doorway's (a secret door's too). */
+export interface HouseLayout {
+  cells: ReadonlySet<string>;
+  roomShapes: Map<number, FloorShape>;
+  doorways: ReadonlyMap<DungeonDoor, RectShape>;
+}
+
+export function houseLayout(floor: Pick<DungeonFloor, 'rooms' | 'stacks'>, shown: ReadonlyMap<number, DungeonRoom>, doors: readonly DungeonDoor[]): HouseLayout {
+  const cells = houseCells(floor);
+  const roomShapes = new Map<number, FloorShape>([...shown.values()].map((room) => [room.id, houseRoomShape(room, cells)] as const));
+  return { cells, roomShapes, doorways: new Map(doors.map((door) => [door, doorwayShape(door, shown, cells, roomShapes)] as const)) };
+}
+
 /** The line a door on an edge stands on: its two ends, from the first cell's side. */
 export function doorEdge(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide'>): [Vec, Vec] {
-  const cells = doorCells(door);
-  const xs = cells.map((c) => c.x);
-  const ys = cells.map((c) => c.y);
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs) + 1, Math.min(...ys), Math.max(...ys) + 1];
+  const b = cellsBox(doorCells(door));
+  const [x0, x1, y0, y1] = [b.x, b.x + b.w, b.y, b.y + b.h];
   const { dir } = door;
   if (dir.y !== 0) {
     const y = dir.y > 0 ? y1 : y0;
@@ -115,12 +126,12 @@ export function doorEdge(door: Pick<DungeonDoor, 'x' | 'y' | 'dir' | 'wide'>): [
  * along its edge never past either room's floor, so one as long as the side it is in leaves the
  * walls round the corners whole.
  */
-export function doorwayShape(door: DungeonDoor, rooms: ReadonlyMap<number, DungeonRoom>, house: ReadonlySet<string>): RectShape {
+export function doorwayShape(door: DungeonDoor, rooms: ReadonlyMap<number, DungeonRoom>, house: ReadonlySet<string>, roomShapes?: ReadonlyMap<number, FloorShape>): RectShape {
   const [a, b] = doorEdge(door);
   const vertical = door.dir.y !== 0;
   const shapes = [door.from, door.to].flatMap((id) => {
     const room = id === null ? undefined : rooms.get(id);
-    return room ? [shapeBounds(houseRoomShape(room, house))] : [];
+    return room ? [shapeBounds(roomShapes?.get(room.id) ?? houseRoomShape(room, house))] : [];
   });
   const lo = Math.max(vertical ? a.x : a.y, ...shapes.map((s) => (vertical ? s.minX : s.minY)));
   const hi = Math.min(vertical ? b.x : b.y, ...shapes.map((s) => (vertical ? s.maxX : s.maxY)));
@@ -136,6 +147,11 @@ export function doorwayShape(door: DungeonDoor, rooms: ReadonlyMap<number, Dunge
   }
   const left = door.dir.x > 0 ? a.x - back : a.x - on;
   return { kind: 'rect', x: left, y: lo, w: back + on, h: hi - lo };
+}
+
+/** How far a door's outer face lies from its middle: half its cell, or a house's outer wall. */
+export function mouthDepth(door: Pick<DungeonDoor, 'edge'>): number {
+  return door.edge ? OUTER_WALL / 2 : 0.5;
 }
 
 /** A window's edge: where the glass stands, inset from the cell's corners, from one end to the other. */

@@ -7,7 +7,7 @@
  * only into their bedroom, the climax room off its corridor alone, and a kitchen court door.
  */
 
-import type { CellPoint, DoorKind, DungeonDoor } from '../../model';
+import type { CellDir, CellPoint, DoorKind, DungeonDoor } from '../../model';
 import type { RoomTypeId } from '../../themes/roomTypes';
 import { type EdgeRun, type Placement, SIDES, doorPlace, holds, runsOf, sharedRun } from './houseEdges';
 import type { HouseFrame } from './houseFrame';
@@ -39,8 +39,8 @@ export function houseDoors(input: DoorInput): DungeonDoor[] {
     doors.push(edgeDoor(cells, run, kind, id(from), id(to)));
     return true;
   };
-  const outer = (room: TypedRoom, side: CellPoint, kind: DoorKind, place: Placement, width = 1): void => {
-    const run = runsOf(room, { x: side.x as -1 | 0 | 1, y: side.y as -1 | 0 | 1 }, (x, y) => !input.inHouse(x, y)).sort((p, q) => q.cells.length - p.cells.length)[0];
+  const outer = (room: TypedRoom, side: CellDir, kind: DoorKind, place: Placement, width = 1): void => {
+    const run = runsOf(room, side, (x, y) => !input.inHouse(x, y)).sort((p, q) => q.cells.length - p.cells.length)[0];
     const cells = run && doorPlace(run, place, width, blocked);
     if (!run || !cells) return;
     // An entrance's cell is the one outside, its way pointing in.
@@ -64,7 +64,7 @@ export function houseDoors(input: DoorInput): DungeonDoor[] {
     const corridor = corridorOf(room, corridors);
     if (!corridor) continue;
     const width = room.role === 'saloon' ? axisWidth : 1;
-    between(corridor, room, 'door', room.role === 'saloon' ? 'centre' : 'corner', width, corridor && sharedRun(corridor, room));
+    between(corridor, room, 'door', room.role === 'saloon' ? 'centre' : 'corner', width);
   }
   if (input.ground) enfilade(rooms, between);
   for (const room of rooms) if (room.servedBy !== null) between(rooms[room.servedBy]!, room, 'door', 'far');
