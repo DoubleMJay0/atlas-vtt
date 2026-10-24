@@ -7,7 +7,8 @@
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { caveParams } from './layout/cavern/caveParams';
-import { caveSites } from './layout/cavern/caveSites';
+import { type CaveSites, caveSites } from './layout/cavern/caveSites';
+import { caveLife } from './themes/cavern/caveLife';
 import { shapeCaves } from './layout/cavern/shapeCave';
 import { fiveRoomParams } from './layout/fiveRoom';
 import { floraOf } from './growth/flora';
@@ -52,7 +53,7 @@ function caveWater(cave: CaveFloor, rooms: readonly DungeonRoom[], pieces: reado
   return { pools: new Set(pools), rooms: new Set([...pools, ...cave.streams.flat().filter(dry)]) };
 }
 
-function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, level: number): DungeonFloor {
+function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, level: number, site: CaveSites | undefined): DungeonFloor {
   const { planned, params, columns } = parts;
   const { rooms, doors, stairs, cave } = planned;
   const dry = level <= 0 && params.tags.has('dry');
@@ -64,10 +65,13 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const flora = floraOf(params.tags, parts.theme);
   addShallowWater(terrain, waterCells);
   // A built theme (one whose water its rooms decide) keeps its typed rooms clear of thickets, unless it lies in ruins.
-  const pieces = addUndergrowth(seed, terrain, waterCells, flora, parts.water !== null && !params.tags.has('ruined'));
+  // A cave's life keeps to its zones: daylight by the mouth, fungi by water and roosts, nothing where lava runs.
+  const life = site && caveLife(site, { rooms, doors, terrain: terrain.pieces });
+  const pieces = addUndergrowth(seed, terrain, waterCells, flora, parts.water !== null && !params.tags.has('ruined'), life ?? undefined);
   const { props } = terrain;
   const { rubble, cracks } = placeScatter({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, params, furnished: terrain.propCells() });
-  const growth = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
+  const grown = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
+  const growth = life ? grown.filter((g) => life(g.room, g.kind)) : grown;
   return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth, ...(cave && { cave }) };
 }
 
@@ -86,6 +90,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   // A Cavern shapes its rooms into chambers and tunnels before anything reads them.
   const shaped = params.cave ? shapeCaves(seed, params, laid, boss, rolled) : null;
   const planned = shaped?.floors ?? laid;
+  const sites = shaped ? caveSites(planned) : null;
   const themed = typeDungeon(seed, theme, params.tags, planned);
   const { typed } = themed;
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.
@@ -107,10 +112,10 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
     parts.map(({ planned: floor, empty, columns }, index) => ({ ...floor, columns, empty, types: themed.rooms[index] ?? new Map() })),
     params.tags,
     themed.theme,
-    shaped ? { sites: caveSites(planned), variant: shaped.cave.variant } : undefined,
+    shaped && sites ? { sites, variant: shaped.cave.variant } : undefined,
   );
   // A cave's water drains down: each floor above the deepest stands lower.
   const levelOf = (index: number): number => (shaped ? level * (CAVE_UPPER_WATER + ((1 - CAVE_UPPER_WATER) * (index + 1)) / parts.length) : level);
-  const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, levelOf(index)));
+  const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, levelOf(index), sites?.[index]));
   return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors, ...(shaped && { cave: shaped.cave }) };
 }

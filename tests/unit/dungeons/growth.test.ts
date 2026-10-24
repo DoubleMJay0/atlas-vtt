@@ -114,11 +114,12 @@ describe('dungeon vegetation', () => {
   it('grows richly in an overgrown dungeon, a little by the water of a wet one, weeds in a crumbling one', () => {
     const rich = growthOf(overgrown) / 2;
     expect(rich).toBeGreaterThan(25);
-    expect(growthOf(wet)).toBeGreaterThan(1);
+    // A cave grows by its water and in its cracks only where daylight reaches (its zones, caveLife.ts).
+    expect(growthOf(wet)).toBeGreaterThan(0.5);
     expect(growthOf(wet)).toBeLessThan(rich / 2);
-    expect(growthOf(crumbling)).toBeGreaterThan(0.5);
+    expect(growthOf(crumbling)).toBeGreaterThan(0.15);
     expect(growthOf(crumbling)).toBeLessThan(rich / 3);
-    expect(undergrowthOf(overgrown)).toBeGreaterThan(1);
+    expect(undergrowthOf(overgrown)).toBeGreaterThan(0.15);
     expect(undergrowthOf(wet) + undergrowthOf(crumbling)).toBe(0);
     for (const k of kinds(wet)) expect(['moss', 'fern']).toContain(k);
     expect([...kinds(crumbling)]).toEqual(['grass']);
@@ -130,7 +131,8 @@ describe('dungeon vegetation', () => {
       expect(growthOf(models), tags.join(',')).toBe(0);
       expect(undergrowthOf(models), tags.join(',')).toBe(0);
     }
-    expect(growthOf(lava)).toBeGreaterThan(10);
+    // A lava cave grows by its mouth and its water alone, never where the lava runs.
+    expect(growthOf(lava)).toBeGreaterThan(5);
   }, 120_000);
 
   it('picks what grows by the theme', () => {

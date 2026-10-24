@@ -234,8 +234,76 @@ export function livedInProblems(model: DungeonModel): string[] {
       if (!HOLLOWS.has(room.type ?? '')) continue;
       if ((site.hopsFromMouth[room.id] ?? Infinity) > 2 || !site.nearWater(room.id, 1)) out.push(`floor ${f}: a ${room.type} far from the mouth or from water`);
       const fireIn = (id: number): boolean => floor.props.some((p) => p.room === id && p.kind === 'campfire');
-      if (room.type === 'lived-in-hollow' && !fireIn(room.id) && !(near[room.id] ?? []).some(fireIn)) out.push(`floor ${f}: a sleeping hollow without a fire near it`);
+      const sleepers = floor.props.some((p) => p.room === room.id && p.kind === 'bedroll');
+      if (room.type === 'lived-in-hollow' && sleepers && !fireIn(room.id) && !(near[room.id] ?? []).some(fireIn)) out.push(`floor ${f}: a sleeping hollow without a fire near it`);
     }
   });
   return out;
+}
+
+const CALCITE = new Set(['stalagmites', 'column-formation', 'flowstone', 'curtain', 'crystals']);
+const DRIPSTONE = new Set(['stalagmites', 'column-formation']);
+
+/** Rule 5: formations where drips, flow and air make them. */
+export function formationProblems(model: DungeonModel): string[] {
+  return model.floors.flatMap((floor, f) => {
+    const out: string[] = [];
+    const cave = floor.cave;
+    const streams = new Set((cave?.streams ?? []).flat());
+    const basins = new Set(cave?.basins ?? []);
+    const lava = new Set(floor.terrain.filter((p) => p.traits.hazard === 'lava').map((p) => p.room));
+    const acid = floor.terrain.filter((p) => p.traits.hazard === 'acid').flatMap((p) => p.cells);
+    const water = [...floor.waterCells, ...floor.terrain.filter((p) => p.traits.hazard === 'deep-water' || p.kind === 'pool').flatMap((p) => p.cells)];
+    const cellOf = (p: { x: number; y: number }): CellPoint => ({ x: Math.floor(p.x), y: Math.floor(p.y) });
+    const stalagmites = floor.props.filter((p) => p.kind === 'stalagmites');
+    for (const prop of floor.props) {
+      if (!CALCITE.has(prop.kind)) continue;
+      const type = floor.rooms[prop.room]?.type;
+      if (DRIPSTONE.has(prop.kind) && (streams.has(prop.room) || basins.has(prop.room))) out.push(`floor ${f}: ${prop.kind} in a ${streams.has(prop.room) ? 'stream' : 'flooded'} room`);
+      if (prop.kind === 'column-formation' && !stalagmites.some((s) => s.room === prop.room && Math.hypot(s.x - prop.x, s.y - prop.y) <= 2.5)) out.push(`floor ${f}: a column outside a stalagmite cluster`);
+      if (prop.kind === 'crystals' && type !== 'crystal-grotto' && !within(cellOf(prop), water, 1)) out.push(`floor ${f}: crystals in a ${type} away from water`);
+      if (lava.has(prop.room)) out.push(`floor ${f}: ${prop.kind} where lava runs`);
+      if (prop.kind === 'stalagmites' && within(cellOf(prop), acid, 3)) out.push(`floor ${f}: stalagmites by acid`);
+    }
+    return out;
+  });
+}
+
+/** Formations per ten floor cells in each room, with what the room is: the mouth, an upper-floor dry dead end, a wet room of the deepest floor. */
+export function formationDensity(model: DungeonModel): { mouth: number[]; dryDeadEnds: number[]; wetDeep: number[]; others: number[] } {
+  const sites = caveSites(model.floors);
+  const out = { mouth: [] as number[], dryDeadEnds: [] as number[], wetDeep: [] as number[], others: [] as number[] };
+  model.floors.forEach((floor, f) => {
+    const site = sites[f]!;
+    const wet = new Set([...(floor.cave?.basins ?? []), ...(floor.cave?.streams ?? []).flat()]);
+    for (const room of floor.rooms.filter((r) => r.kind === 'room' && !r.boss)) {
+      const density = (10 * floor.props.filter((p) => p.room === room.id && CALCITE.has(p.kind)).length) / roomArea(room);
+      const deadEnd = floor.doors.filter((d) => d.from === room.id || d.to === room.id).length <= 1;
+      if (f === 0 && site.hopsFromMouth[room.id] === 0) out.mouth.push(density);
+      else if (!site.deepest && deadEnd && !wet.has(room.id)) out.dryDeadEnds.push(density);
+      else if (site.deepest && wet.has(room.id)) out.wetDeep.push(density);
+      else out.others.push(density);
+    }
+  });
+  return out;
+}
+
+const UNDERGROWTH = new Set(['brambles', 'thicket', 'tangled-roots']);
+
+/** Rule 8: green growth only by the mouth, fungi only by water or a roost, nothing where lava runs. */
+export function lifeZoneProblems(model: DungeonModel): string[] {
+  const sites = caveSites(model.floors);
+  return model.floors.flatMap((floor, f) => {
+    const site = sites[f]!;
+    const near = neighbours(floor.rooms.length, floor.doors);
+    const lava = new Set(floor.terrain.filter((p) => p.traits.hazard === 'lava').map((p) => p.room));
+    const roost = (id: number): boolean => floor.rooms[id]?.type === 'roost';
+    const daylight = (id: number): boolean => f === 0 && (site.hopsFromMouth[id] ?? Infinity) <= 1;
+    const living = [...floor.growth.map((g) => ({ kind: g.kind as string, room: g.room })), ...floor.terrain.filter((p) => UNDERGROWTH.has(p.kind)).map((p) => ({ kind: p.kind as string, room: p.room }))];
+    return living.flatMap(({ kind, room }) => {
+      if (lava.has(room)) return [`floor ${f}: ${kind} where lava runs`];
+      if (kind === 'fungi') return site.nearWater(room, 1) || roost(room) || (near[room] ?? []).some(roost) ? [] : [`floor ${f}: fungi far from water and roosts`];
+      return daylight(room) ? [] : [`floor ${f}: ${kind} in room ${room}, out of the daylight`];
+    });
+  });
 }

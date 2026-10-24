@@ -32,8 +32,8 @@ function clump(rng: Rng, rc: RoomCells, start: CellPoint, size: number, fits: (c
   return cells;
 }
 
-/** Adds the floor's undergrowth to its terrain, in typed rooms only where `keepTyped` is off; returns every piece. */
-export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: readonly CellPoint[], flora: Flora | null, keepTyped: boolean): DungeonTerrain[] {
+/** Adds the floor's undergrowth to its terrain, in typed rooms only where `keepTyped` is off, of the kinds `mayGrow` lets grow in a room; returns every piece. */
+export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: readonly CellPoint[], flora: Flora | null, keepTyped: boolean, mayGrow: (room: number, kind: UndergrowthKind) => boolean = () => true): DungeonTerrain[] {
   if (!flora?.rich) return floor.pieces;
   const { plan } = floor;
   const space = new GrowthSpace({ ...plan, props: [], terrain: floor.pieces, waterCells });
@@ -48,6 +48,7 @@ export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: re
     const clumps = rc.floorCount > 30 && chance(rng, 0.4) ? 2 : 1;
     for (let k = 0; k < clumps; k++) {
       const kind = weighted(rng, flora.undergrowth.map(([kind, w]) => [kind, GREEN[kind] ? w * l : w] as const));
+      if (!mayGrow(room.id, kind)) continue;
       const fits = (c: CellPoint): boolean => !rc.nearStairs(c) && space.forPlant(c);
       const starts: CellPoint[] = [];
       for (let i = 0; i < rc.depth; i++) for (let j = 0; j < rc.width; j++) {

@@ -5,7 +5,7 @@ import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { shapeDistance } from '../../../src/app/dungeons/render/geometry';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { caveFloorCells, columnProblems, faultStretch, guardProblems, laneNarrowsProblems, maskProblems, narrowsProblems } from './caveChecks';
-import { breakdownProblems, geologyProblems, livedInProblems, waterProblems, waterShare, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
+import { breakdownProblems, formationDensity, formationProblems, geologyProblems, lifeZoneProblems, livedInProblems, waterProblems, waterShare, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
 import { mirrorProblems, physicsProblems, shapeProblems } from './themeTerrainInvariants';
 import { cavernProgramme } from '../../../src/app/dungeons/themes/cavern';
 import { readTags } from '../../../src/app/dungeons/tags';
@@ -30,6 +30,7 @@ const TAG_SETS: readonly string[][] = [
   ['cramped', 'compact', 'dry'],
   ['string', 'no-secrets'],
   ['acid', 'overgrown'],
+  ['overgrown', 'wet'],
   ['inhabited', 'wet'],
 ];
 
@@ -161,6 +162,24 @@ export function describeCaveInvariants(floors: number): void {
         });
         expect(deepest.length / wet.length).toBeGreaterThanOrEqual(0.85);
       }
+    });
+
+    it('rule 5: form stalagmites, columns, flowstone and crystals where drips, flow and air make them', () => {
+      expect(failures((run) => formationProblems(run.model))).toEqual([]);
+      const all = runs.map((run) => formationDensity(run.model));
+      const mean = (pick: (d: ReturnType<typeof formationDensity>) => number[]): number => {
+        const xs = all.flatMap(pick);
+        return xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+      };
+      expect(mean((d) => d.mouth)).toBeLessThan(mean((d) => d.others));
+      if (floors > 1) {
+        expect(mean((d) => d.mouth)).toBeLessThan(mean((d) => d.dryDeadEnds));
+        expect(mean((d) => d.dryDeadEnds)).toBeGreaterThan(mean((d) => d.wetDeep));
+      }
+    });
+
+    it('rule 8: grow green things only by the mouth, fungi by water or a roost, nothing where lava runs', () => {
+      expect(failures((run) => lifeZoneProblems(run.model))).toEqual([]);
     });
 
     it('keep every rule of the layout and the terrain', () => {
