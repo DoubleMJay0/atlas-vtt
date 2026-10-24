@@ -6,6 +6,7 @@
  */
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
+import { caveParams } from './layout/cavern/caveParams';
 import { fiveRoomParams } from './layout/fiveRoom';
 import { floraOf } from './growth/flora';
 import { placeGrowth } from './growth/placeGrowth';
@@ -70,7 +71,7 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const asked = readTags(request.tags);
   const theme = pickTheme(seed, request.theme ?? 'any', asked);
   const tags = dungeonTags(seed, themedTags(theme, asked));
-  const base = dungeonParams(tags);
+  const base = theme === 'cavern' ? caveParams(dungeonParams(tags)) : dungeonParams(tags);
   const params = fiveRoom ? fiveRoomParams(base) : base;
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   const count = requestedFloors(request);

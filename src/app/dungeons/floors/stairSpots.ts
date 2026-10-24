@@ -117,11 +117,12 @@ export function spotFits(room: StairRoom, space: FloorSpace, spot: StairSpot, en
   return connected(free, floorCells);
 }
 
-/** Every stairwell rectangle that lies inside `rect`, in every direction and shape. */
-export function spotsWithin(rect: CellRect): StairSpot[] {
+/** Every stairwell rectangle that lies inside `rect`, in every direction and shape at least `least` cells across. */
+export function spotsWithin(rect: CellRect, least = 1): StairSpot[] {
   const out: StairSpot[] = [];
   for (const down of STAIR_DIRS) {
     for (const [along, across] of SHAPES) {
+      if (across < least) continue;
       const w = down.x !== 0 ? along : across;
       const h = down.x !== 0 ? across : along;
       for (let y = rect.y0; y + h - 1 <= rect.y1; y++) for (let x = rect.x0; x + w - 1 <= rect.x1; x++) out.push({ x, y, w, h, down });

@@ -43,9 +43,9 @@ function placements(spot: StairSpot, w: number, h: number): CellRect[] {
 }
 
 /** The landing's first room for an attempt, or null where no room drawn fits it. */
-export function landingRoot(rng: Rng, spot: StairSpot): FloorRoot | null {
+export function landingRoot(rng: Rng, spot: StairSpot, minFloor = 0): FloorRoot | null {
   for (let tries = 0; tries < SIZE_TRIES; tries++) {
-    const size = drawRoomSize(rng);
+    const size = drawRoomSize(rng, minFloor);
     const options = shuffled(rng, STAIR_DIRS).flatMap((axis) => {
       const { w, h } = floorDims(axis, size.width, size.depth);
       return placements(spot, w, h).map((f) => ({ f, axis }));

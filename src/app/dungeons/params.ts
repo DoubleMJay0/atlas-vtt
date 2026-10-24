@@ -3,6 +3,7 @@
  * above. Every number a tag or a floor changes lives here, so their effect can be read in one place.
  */
 
+import type { CaveShaping } from './layout/cavern/caveParams';
 import { chance, stream } from './rng';
 import { readTags, rivalsOf, withTag, type DungeonTag } from './tags';
 
@@ -44,6 +45,12 @@ export interface DungeonParams {
   shatteredChance: number;
   /** Floor cells per expected stone. */
   rubbleArea: number;
+  /** The narrowest floor a normal room has either way; unset, any. */
+  minRoomFloor?: number;
+  /** The narrowest a stairwell is across; unset, 1. */
+  stairAcross?: number;
+  /** How a Cavern shapes its rooms; set only in a Cavern's params. */
+  cave?: CaveShaping;
 }
 
 /** Tags a dungeon gets by chance, each unless a tag it holds rules it out. */
@@ -66,12 +73,14 @@ export function dungeonTags(seed: number, requested: readonly string[]): Dungeon
 }
 
 const DEFAULT_SIZES: readonly SizeStyle[] = [0, 0, 0, 1, 2, 3, 3];
+/** More large rooms: what `spacious` gives, and the Underdark. */
+export const SPACIOUS_SIZES: readonly SizeStyle[] = [0, 0, 1, 1, 2, 3];
 
 function sizeStyles(has: (tag: DungeonTag) => boolean): readonly SizeStyle[] {
   if (has('compact')) return [0, 0, 0, 1];
   if (has('winding')) return [0, 0, 1, 2, 2, 3, 3, 3, 3];
   if (has('cramped')) return [0, 0, 0, 2, 3, 3];
-  if (has('spacious')) return [0, 0, 1, 1, 2, 3];
+  if (has('spacious')) return SPACIOUS_SIZES;
   return DEFAULT_SIZES;
 }
 

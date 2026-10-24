@@ -68,7 +68,7 @@ function stairPair(spot: StairSpot, upper: number, link: number): [DungeonStair,
  * a second stairwell where both are large enough, then whether a way leads on down. Null where
  * what is needed cannot stand.
  */
-function linkFloor(seed: number, above: FloorShape, below: FloorShape, index: number, last: boolean): Link | null {
+function linkFloor(seed: number, above: FloorShape, below: FloorShape, index: number, last: boolean, across: number): Link | null {
   const extra: StairSpot[] = [];
   let upper = above;
   let lower = below;
@@ -79,7 +79,7 @@ function linkFloor(seed: number, above: FloorShape, below: FloorShape, index: nu
     upper = { ...upper, stairs: [...upper.stairs, { ...spot, to: index }] };
     lower = { ...lower, stairs: [...lower.stairs, { ...spot, to: index - 1 }] };
   }
-  if (!last && !chooseDescent(stairsRng(seed, index, 'descent'), lower, index)) return null;
+  if (!last && !chooseDescent(stairsRng(seed, index, 'descent'), lower, index, across)) return null;
   return { extra };
 }
 
@@ -91,13 +91,13 @@ function floorBelow(seed: number, params: DungeonParams, above: FloorShape, inde
   const request: FloorRequest = {
     floor: index,
     params: floorParams(params, index),
-    rootOf: (rng) => landingRoot(rng, landing),
+    rootOf: (rng) => landingRoot(rng, landing, params.minRoomFloor),
     reserved: null,
     within: underneath(above),
     boss: boss && last,
     galleries: above.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda).map(floorRect),
     blocked: landingCells(landing),
-    accept: (built) => linkFloor(seed, above, { ...built, stairs: [landing] }, index, last) !== null,
+    accept: (built) => linkFloor(seed, above, { ...built, stairs: [landing] }, index, last, params.stairAcross ?? 1) !== null,
   };
   const under = buildFloorLayout(seed, request);
   if (under?.sound) return under.layout;
@@ -115,21 +115,21 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
     boss: boss && count === 1,
     fiveRoom: fiveRoom && count === 1,
     blocked: new Set(),
-    accept: (layout) => count === 1 || chooseDescent(stairsRng(seed, 0, 'descent'), { ...layout, stairs: [] }, 0) !== null,
+    accept: (layout) => count === 1 || chooseDescent(stairsRng(seed, 0, 'descent'), { ...layout, stairs: [] }, 0, params.stairAcross) !== null,
   });
   if (!entry) throw new Error('no dungeon layout');
   const floors: PlannedFloor[] = [withStairs(entry.layout, [])];
   let link = 0;
   for (let index = 1; index < count; index++) {
     const above = floors[index - 1] as PlannedFloor;
-    const descent = chooseDescent(stairsRng(seed, index - 1, 'descent'), above, index - 1);
+    const descent = chooseDescent(stairsRng(seed, index - 1, 'descent'), above, index - 1, params.stairAcross);
     if (!descent) break;
     const [down, up] = stairPair(descent.spot, index - 1, link++);
     const aboveWithStairs = { ...above, stairs: [...above.stairs, down] };
     const last = index === count - 1;
     const layout = floorBelow(seed, params, aboveWithStairs, index, last, up, boss);
     if (!layout) break;
-    const extra = linkFloor(seed, aboveWithStairs, { ...layout, stairs: [up] }, index, last)?.extra ?? [];
+    const extra = linkFloor(seed, aboveWithStairs, { ...layout, stairs: [up] }, index, last, params.stairAcross ?? 1)?.extra ?? [];
     const pairs = extra.map((spot) => stairPair(spot, index - 1, link++));
     floors[index - 1] = { ...above, stairs: [...aboveWithStairs.stairs, ...pairs.map(([u]) => u)] };
     floors.push(withStairs(layout, [up, ...pairs.map(([, l]) => l)]));

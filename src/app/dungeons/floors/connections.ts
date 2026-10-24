@@ -63,13 +63,13 @@ function holdsStairs(room: DungeonRoom): boolean {
 }
 
 /** Where the first stairwell down from floor `index` stands: a room the farther from its entry and other stairs, the likelier. */
-export function chooseDescent(rng: Rng, floor: FloorShape, index: number): PlacedStair | null {
+export function chooseDescent(rng: Rng, floor: FloorShape, index: number, across = 1): PlacedStair | null {
   const space = spaceOf(floor, index);
   const distance = distanceFrom(floor, anchors(floor));
   let options = floor.rooms.filter(holdsStairs).map((room) => [room, ((distance[room.id] ?? 0) + 1) ** 2] as const);
   while (options.length > 0) {
     const room = weighted(rng, options);
-    const spots = spotsWithin(floorRect(room)).filter((spot) => spotFits(room, space, spot, 'upper'));
+    const spots = spotsWithin(floorRect(room), across).filter((spot) => spotFits(room, space, spot, 'upper'));
     if (spots.length > 0) return { room: room.id, spot: pick(rng, spots) };
     options = options.filter(([other]) => other !== room);
   }

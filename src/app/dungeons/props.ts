@@ -59,6 +59,8 @@ function inStairs(column: DungeonColumn, stairs: readonly DungeonStair[]): boole
 
 /** A floor's columns: colonnades in the rooms that have them, off its stairwells. */
 export function floorColumns(seed: number, floor: number, rooms: readonly DungeonRoom[], stairs: readonly DungeonStair[], params: DungeonParams): DungeonColumn[] {
+  // A cave has no columns: its stalagmite columns are furniture.
+  if (params.cave) return [];
   const style = columnStyle(stream(seed, 'props', 'style'), params.shatteredChance);
   return rooms.flatMap((room) => colonnadeOf(floorStream(seed, 'props', floor, `columns:${room.id}`), room, style).filter((c) => !inStairs(c, stairs)));
 }

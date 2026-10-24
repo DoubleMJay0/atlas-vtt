@@ -59,6 +59,8 @@ function shapeGroup(rng: Rng, layout: WorkLayout, members: WorkRoom[], params: D
 }
 
 export function shapeRooms(rngOf: KeyedRng, layout: WorkLayout, params: DungeonParams): void {
+  // A cave's rooms are shaped by the cave (`layout/cavern/`): never round, never colonnaded.
+  if (params.cave) return;
   const rng = rngOf('shapes');
   mirrorGroups(layout).forEach((members) => shapeGroup(rng, layout, members, params));
 }

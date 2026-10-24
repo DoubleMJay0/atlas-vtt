@@ -22,17 +22,27 @@ function sizeOfStyle(rng: Rng, style: SizeStyle): RoomSize {
   }
 }
 
-/** A new room's size; with `round`, half of the rooms come out square so they may be round. */
+/** A normal room's size grown to a floor of `minFloor` cells each way; the walls count twice. */
+function atLeast(size: RoomSize, minFloor: number): RoomSize {
+  const least = minFloor + 2;
+  return size.width >= least && size.depth >= least ? size : { width: Math.max(size.width, least + ((least + 1) % 2)), depth: Math.max(size.depth, least) };
+}
+
+/**
+ * A new room's size; with `round`, half of the rooms come out square so they may be round. A
+ * normal room grows to `minRoomFloor` after the draw, so the rolls stay as they were.
+ */
 export function drawSize(rng: Rng, params: DungeonParams): RoomSize {
   const style = pick(rng, params.sizeStyles);
-  const size = sizeOfStyle(rng, style);
-  if (params.squareRooms && style <= 1 && chance(rng, 0.5)) return { width: size.width, depth: size.width };
-  return size;
+  const drawn = sizeOfStyle(rng, style);
+  const size = params.squareRooms && style <= 1 && chance(rng, 0.5) ? { width: drawn.width, depth: drawn.width } : drawn;
+  return style <= 1 && params.minRoomFloor ? atLeast(size, params.minRoomFloor) : size;
 }
 
 /** A normal room's size, small or large but never a corridor: the room around a landing. */
-export function drawRoomSize(rng: Rng): RoomSize {
-  return sizeOfStyle(rng, pick<SizeStyle>(rng, [0, 0, 1]));
+export function drawRoomSize(rng: Rng, minFloor = 0): RoomSize {
+  const size = sizeOfStyle(rng, pick<SizeStyle>(rng, [0, 0, 1]));
+  return minFloor ? atLeast(size, minFloor) : size;
 }
 
 /** Ordinary doors: a door about three times in five, else an opening. */
