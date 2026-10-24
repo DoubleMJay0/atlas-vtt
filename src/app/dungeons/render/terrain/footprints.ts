@@ -88,7 +88,7 @@ export function ringRadius(piece: DungeonTerrain): number {
   return Math.min(box.w, box.h) / 2 - 0.24;
 }
 
-const rectPath = (box: Box, r = 0.03): PathFn => path => roundedRect(path as CanvasRenderingContext2D, box.cx, box.cy, box.w, box.h, r);
+const rectPath = (box: Box, r = 0.03): PathFn => path => roundedRect(path, box.cx, box.cy, box.w, box.h, r);
 
 /** The shape a standing piece fills, for its shadow; none for what lies on the ground. */
 export function footprint(piece: DungeonTerrain, axis: CellDir): PathFn | null {
