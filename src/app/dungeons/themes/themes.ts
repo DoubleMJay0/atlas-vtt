@@ -19,7 +19,7 @@ const NO_MOLTEN: readonly { tag: DungeonTag; reason: MessageKey }[] = [
 export const THEMES: Readonly<Record<ThemeId, ThemeDefinition>> = {
   // A gate passage three cells long holds two murder holes a cell apart.
   fortress: { id: 'fortress', built: true, rise: 'up', stairsFromEntrance: true, entranceDepth: 5, refuses: NO_MOLTEN, programme: FORTRESS },
-  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, refuses: [...NO_MOLTEN, { tag: 'flooded', reason: 'dungeon.theme.refused.noFlooding' }], programme: MANSION },
+  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, architectureOnly: true, refuses: [...NO_MOLTEN, { tag: 'flooded', reason: 'dungeon.theme.refused.noFlooding' }], programme: MANSION },
   cavern: CAVERN,
 };
 

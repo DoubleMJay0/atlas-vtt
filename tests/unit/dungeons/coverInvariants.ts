@@ -4,14 +4,18 @@
  * no stairwell and some free floor off the ways between its doors and stairs, is no boss arena (which
  * keeps its own cover) and holds no hazard (a chasm hall, a lake, a ruin's collapsed floor: what
  * lies there is the fight).
- * Empty rooms count too: cover is structure, not furnishing.
+ * Empty rooms count too: cover is structure, not furnishing. A theme that shows architecture alone
+ * (`ThemeDefinition.architectureOnly`, the Haunted Mansion) keeps the opposite rule: no cover but
+ * what its rooms' types place.
  */
 
 import { stackOf, stairEnd } from '../../../src/app/dungeons/floors/floorStack';
 import { cellKey, cellsOf, floorCellsOf } from '../../../src/app/dungeons/geometry';
 import { spotRect } from '../../../src/app/dungeons/floors/stairSpots';
-import type { DungeonModel, DungeonRoom } from '../../../src/app/dungeons/model';
+import type { DungeonModel, DungeonRoom, TerrainKind } from '../../../src/app/dungeons/model';
 import { FIGHT_AREA } from '../../../src/app/dungeons/terrain/cover';
+import { programmeOf, themeOf } from '../../../src/app/dungeons/themes/themes';
+import type { DungeonTag } from '../../../src/app/dungeons/tags';
 import { RoomCells } from '../../../src/app/dungeons/terrain/roomCells';
 import { reserveLanes } from '../../../src/app/dungeons/terrain/roomLanes';
 import { normals } from './dungeonInvariants';
@@ -50,4 +54,28 @@ export function uncoveredFightRooms(model: DungeonModel): string[] {
     })
     .filter((room) => !hasCover(floor, room.id))
     .map((room) => `floor ${f}: ${room.type ?? 'room'} ${room.id} (${room.w}×${room.h}) has no cover`));
+}
+
+/** The pieces the rule of cover places where a room has none: fallen stone, low walls, pillars and statues. */
+const COVER_PIECES: ReadonlySet<TerrainKind> = new Set<TerrainKind>(['rubble-heap', 'low-wall', 'pillar', 'statue']);
+
+/**
+ * The cover pieces of a theme that shows architecture alone and that no reason of the room placed,
+ * one line each: a boss arena and a five-room stage keep their own, a type that allows a kind may
+ * have it, and a ruin may have fallen stone.
+ */
+function unreasonedCover(model: DungeonModel): string[] {
+  const programme = programmeOf(themeOf(model.theme), new Set(model.tags as DungeonTag[]));
+  const allowed = new Map(programme.rooms.map((spec) => [spec.id as string, new Set<string>(spec.terrain.allows ?? [])]));
+  const ruined = model.tags.includes('ruined');
+  return model.floors.flatMap((floor, f) => floor.terrain.flatMap((p) => {
+    const room = floor.rooms[p.room];
+    if (!COVER_PIECES.has(p.kind) || !room || room.boss || room.stage || (ruined && p.kind === 'rubble-heap')) return [];
+    return allowed.get(room.type ?? '')?.has(p.kind) ? [] : [`floor ${f}: ${p.kind} in ${room.type ?? 'room'} ${p.room}`];
+  }));
+}
+
+/** The rule of cover the dungeon's theme keeps: cover in every room that can hold a fight, or, where the theme shows architecture alone, none its rooms do not place. */
+export function coverProblems(model: DungeonModel): string[] {
+  return themeOf(model.theme).architectureOnly ? unreasonedCover(model) : uncoveredFightRooms(model);
 }

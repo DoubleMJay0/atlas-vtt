@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import type { RoomProgramme } from '../../../src/app/dungeons/themes/themeTypes';
 import { normals } from './dungeonInvariants';
-import { uncoveredFightRooms } from './coverInvariants';
+import { coverProblems } from './coverInvariants';
 import { isHazard } from './terrainInvariants';
 import { type ThemeRun, failuresOf } from './themeRuns';
 import { hazardFurnitureProblems, mirrorProblems, physicsProblems, reasonProblems, shapeProblems } from './themeTerrainInvariants';
@@ -14,8 +14,8 @@ export function describeThemeTerrain(runs: readonly ThemeRun[], programme: RoomP
     expect(failuresOf(runs, hazardFurnitureProblems)).toEqual([]);
   });
 
-  it('gives every room that can hold a fight some cover', () => {
-    expect(failuresOf(runs, uncoveredFightRooms)).toEqual([]);
+  it('keeps its theme\'s rule of cover: in every room that can hold a fight, or only where a room\'s type places it', () => {
+    expect(failuresOf(runs, coverProblems)).toEqual([]);
   });
 
   it('places hazards within the theme\'s band', () => {

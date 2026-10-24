@@ -8,7 +8,7 @@ import { connectionProblems, entranceProblems, riseProblems, stairProblems, stor
 import { physicsProblems } from './themeTerrainInvariants';
 import { holeProblems } from './holeInvariants';
 import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
-import { uncoveredFightRooms } from './coverInvariants';
+import { coverProblems } from './coverInvariants';
 
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
@@ -247,8 +247,8 @@ export function describeInvariants(floors: number): void {
       expect(share).toBeGreaterThan(0.01);
     });
 
-    it('give every room that can hold a fight some cover', () => {
-      expect(failures((run) => uncoveredFightRooms(run.model))).toEqual([]);
+    it('keep their theme\'s rule of cover', () => {
+      expect(failures((run) => coverProblems(run.model))).toEqual([]);
     });
 
     it('generate within the time budget', () => {

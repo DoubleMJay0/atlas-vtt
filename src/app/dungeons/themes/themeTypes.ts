@@ -207,6 +207,12 @@ export interface ThemeDefinition {
    * floor above then stands over the front of the building, its gate and its hall.
    */
   stairsFromEntrance?: true;
+  /**
+   * A room shows its architecture alone: it gets no cover beyond what its type places for a reason
+   * of its own (columns, a fountain, a gallery's busts), and fallen stone only where the dungeon is
+   * ruined. A Haunted Mansion is a house, which statues in every room made a museum of.
+   */
+  architectureOnly?: true;
   /** The least depth of the room the dungeon is entered by, walls included, where it is a normal room: a Fortress's gate passage holds a row of murder holes. */
   entranceDepth?: number;
   /** Tags the theme cannot take, each with the reason the panel shows; one with `with` only beside that tag. */

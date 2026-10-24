@@ -84,8 +84,8 @@ export function furnishTypedRoom(work: TerrainWork, k: number, rc: RoomCells, ty
   const { hazarded = false, empty = false } = options;
   const rng = work.rng(k, `type:${rc.room.id}`);
   reserveLanes(rc);
-  // A room whose hazard (or the collapse of its floor) is the fight takes no cover.
-  const covered = !hazarded && holdsFight(floor, rc);
+  // A room whose hazard (or the collapse of its floor) is the fight takes no cover, nor one of a theme that shows architecture alone.
+  const covered = !hazarded && !work.theme.definition.architectureOnly && holdsFight(floor, rc);
   const own = !hazarded && !empty;
   if (own) allowedTerrain(work, k, rc, spec, rng);
   // Cover before a ruin's decay, which would take its place.
