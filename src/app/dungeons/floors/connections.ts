@@ -79,14 +79,15 @@ export function entranceRoom(floor: Pick<FloorShape, 'rooms' | 'doors'>): Dungeo
 /**
  * Where the first stairwell on from floor `index` to the next stands: in the room the floor is
  * entered by where `fromEntrance` and it can hold one (a gate tower's stair, a grand staircase),
- * else a room the farther from its entry and other stairs, the likelier.
+ * else a room the farther from its entry and other stairs, the likelier; only where the next
+ * floor's landing can stand round it (`lands`).
  */
-export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: FloorStack, fromEntrance = false): PlacedStair | null {
+export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: FloorStack, fromEntrance = false, lands: (spot: StairSpot) => boolean = () => true): PlacedStair | null {
   const space = spaceOf(floor, index, stack);
   const end = stairEnd(stack, index, index + 1);
   const firstRoom = fromEntrance ? entranceRoom(floor) : undefined;
   if (firstRoom && holdsStairs(firstRoom)) {
-    const spots = spotsWithin(floorRect(firstRoom)).filter((spot) => spotFits(firstRoom, space, spot, end));
+    const spots = spotsWithin(floorRect(firstRoom)).filter((spot) => spotFits(firstRoom, space, spot, end) && lands(spot));
     // The stairs stand beside the way in, never across it, on either floor.
     const way = new Set(wayIn(firstRoom, floor.doors).map((c) => cellKey(c.x, c.y)));
     const off = spots.filter((spot) => ![...cellsOf(spotRect(spot)), ...approachCells(spot, 'upper'), ...approachCells(spot, 'lower')].some((c) => way.has(cellKey(c.x, c.y))));
@@ -97,7 +98,7 @@ export function chooseOnward(rng: Rng, floor: FloorShape, index: number, stack: 
   let options = floor.rooms.filter(holdsStairs).map((room) => [room, ((distance[room.id] ?? 0) + 1) ** 2] as const);
   while (options.length > 0) {
     const room = weighted(rng, options);
-    const spots = spotsWithin(floorRect(room)).filter((spot) => spotFits(room, space, spot, end));
+    const spots = spotsWithin(floorRect(room)).filter((spot) => spotFits(room, space, spot, end) && lands(spot));
     if (spots.length > 0) return { room: room.id, spot: pick(rng, spots) };
     options = options.filter(([other]) => other !== room);
   }

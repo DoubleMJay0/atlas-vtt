@@ -35,6 +35,11 @@ export function drawRoomSize(rng: Rng): RoomSize {
   return sizeOfStyle(rng, pick<SizeStyle>(rng, [0, 0, 1]));
 }
 
+/** A small room's size: a storey's stair landing. */
+export function drawSmallRoomSize(rng: Rng): RoomSize {
+  return sizeOfStyle(rng, 0);
+}
+
 /** Ordinary doors: a door about three times in five, else an opening. */
 const DOOR_WEIGHTS: readonly (readonly [DoorKind, number])[] = [
   ['door', 0.6],

@@ -55,7 +55,7 @@ export function seatOnPlatform(fs: FurnishSpace, platform: DungeonTerrain, arena
   return record(fs, { prop, cells, clear: [], facing: towards });
 }
 
-/** The arena of its climax type, its seat, then the type's pieces besides what it is defined by (a throne room's tapestries, statues and rug). */
+/** The arena of its climax type, its seat (on its platform, else at its back wall), then the type's pieces besides what it is defined by (a throne room's tapestries, statues and rug). */
 export function furnishTypedArena(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, typed: TypedRoom): void {
   const floor = work.floors[k];
   if (!floor) return;
@@ -70,6 +70,10 @@ export function furnishTypedArena(work: TerrainWork, k: number, rc: RoomCells, r
   };
   const fs: FurnishSpace = { ...base, placeAllowed: (kind, at) => open(kind) && (base.placeAllowed?.(kind, at) ?? true) };
   const platform = floor.inRoom(rc.room.id).find((p) => p.kind === 'platform' && p.facing);
-  if (platform) seatOnPlatform(fs, platform, arena);
-  furnishByRecipe(fs, { pieces: typed.spec.furnish.pieces }, typed.context);
+  const seat = platform ? seatOnPlatform(fs, platform, arena) : null;
+  const { pieces } = typed.spec.furnish;
+  const kind = arenaSeat(arena);
+  // An arena too small for a platform has its seat at its back wall: a chapel's altar, a throne.
+  if (!seat && kind && fs.offered.has(kind) && furnishByRecipe(fs, { defining: { kind, verb: 'backWall' }, pieces }, typed.context).length > 0) return;
+  furnishByRecipe(fs, { pieces }, typed.context);
 }

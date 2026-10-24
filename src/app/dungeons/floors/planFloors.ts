@@ -3,21 +3,24 @@
  * grows from its entrance at (0, 0); each next floor (below it in a Cavern, above it in a building:
  * the stack) grows from the end of the stairs that lead to it, and is grown anew until the stairs
  * between it and the floor before can stand (two where both have six rooms or more) and, unless it
- * is the last, a stairwell can lead on.
+ * is the last, a stairwell can lead on. A storey stands within the outer walls of the floor below
+ * (`ground.ts`); where it cannot keep every rule there, its stairs are placed elsewhere and then the
+ * floors under it are grown anew.
  */
 
 import type { CellRect } from '../geometry';
 import type { CellDir, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
 import { type DungeonParams, floorParams } from '../params';
 import { MAX_SEED, floorStream, int, pick } from '../rng';
-import { type FloorRequest, buildFloorLayout } from '../layout/assemble';
+import { type BuiltFloor, type FloorRequest, buildFloorLayout } from '../layout/assemble';
 import type { CompactLayout } from '../layout/compact';
-import { dir, floorRect, inRect, wallRect } from '../geometry';
-import { TWO_CONNECTIONS_FROM, type FloorShape, chooseOnward, extraConnection, normalRooms } from './connections';
+import { dir, floorRect } from '../geometry';
+import { TWO_CONNECTIONS_FROM, type FloorShape, type PlacedStair, chooseOnward, extraConnection, normalRooms } from './connections';
 import { type FloorStack, floorStack, isAbove, stairEnd } from './floorStack';
 import type { ThemeDefinition } from '../themes/themeTypes';
-import { landingCells, landingRoot } from './landing';
-import { type StairSpot, spotRect } from './stairSpots';
+import { type StoreyLanding, landingCells, landingFits, landingRoot } from './landing';
+import { extentOf, footprintOf, isStorey, stairRoomFloor } from './ground';
+import type { StairSpot } from './stairSpots';
 
 /** Nothing but the first room may cover the ground before the entrance. */
 const ENTRANCE_BLOCK: CellRect = { x0: -1, y0: -1, x1: 1, y1: 1 };
@@ -34,29 +37,28 @@ interface Link {
   extra: StairSpot[];
 }
 
-/** How far a floor may reach past the one before it, in cells: digging follows what was dug, a storey what it stands on. */
-const REACH_PAST_EARLIER = 2;
-
-/** The ground a later floor may take: over or under the floor before, a little past it. */
-function footprintOf(earlier: Pick<FloorShape, 'rooms'>): CellRect {
-  const walls = earlier.rooms.map(wallRect);
-  return {
-    x0: Math.min(...walls.map((r) => r.x0)) - REACH_PAST_EARLIER,
-    y0: Math.min(...walls.map((r) => r.y0)) - REACH_PAST_EARLIER,
-    x1: Math.max(...walls.map((r) => r.x1)) + REACH_PAST_EARLIER,
-    y1: Math.max(...walls.map((r) => r.y1)) + REACH_PAST_EARLIER,
-  };
-}
-
-/** The floor of the room on `floor` that holds the stairwell `spot`, if one does. */
-function stairRoomFloor(floor: Pick<FloorShape, 'rooms'>, spot: StairSpot): CellRect | null {
-  const r = spotRect(spot);
-  const room = floor.rooms.find((candidate) => candidate.kind === 'room' && inRect(floorRect(candidate), r.x0, r.y0) && inRect(floorRect(candidate), r.x1, r.y1));
-  return room ? floorRect(room) : null;
-}
+/** Places tried for the stairs up to a storey, until one lets it keep every rule. */
+const STOREY_STAIR_TRIES = 4;
+/** How often a dungeon's floors may be grown anew so that the storey above can stand on them. */
+const MOST_REGROWN = 6;
+/** How often one storey has the floor below it grown anew before the floor under that one is. */
+const REGROWN_PER_FLOOR = 2;
 
 function stairsRng(seed: number, floor: number, key: string): () => number {
   return floorStream(seed, 'stairs', floor, key);
+}
+
+/**
+ * The first stairwell on from floor `index` to the next, its `attempt`th place: from the entrance
+ * room first where `fromEntrance`; where the next floor is a storey, only where its landing can
+ * stand within this floor's outer walls.
+ */
+function onwardFrom(seed: number, floor: FloorShape, index: number, stack: FloorStack, fromEntrance: boolean, attempt = 0): PlacedStair | null {
+  const rng = stairsRng(seed, index, attempt === 0 ? 'descent' : `descent:${attempt}`);
+  if (!isStorey(stack, index + 1)) return chooseOnward(rng, floor, index, stack, fromEntrance);
+  const end = stairEnd(stack, index + 1, index);
+  const ground = extentOf(floor, 0);
+  return chooseOnward(rng, floor, index, stack, fromEntrance, (spot) => landingFits(spot, end, ground));
 }
 
 function withStairs(floor: { rooms: DungeonRoom[]; doors: DungeonDoor[] }, stairs: DungeonStair[]): PlannedFloor {
@@ -88,31 +90,63 @@ function linkFloor(seed: number, earlier: FloorShape, later: FloorShape, index: 
     before = { ...before, stairs: [...before.stairs, { ...spot, to: index }] };
     after = { ...after, stairs: [...after.stairs, { ...spot, to: index - 1 }] };
   }
-  if (!last && !chooseOnward(stairsRng(seed, index, 'descent'), after, index, stack)) return null;
+  if (!last && !onwardFrom(seed, after, index, stack, false)) return null;
   return { extra };
 }
 
 /**
- * Floor `index`, grown from the `landing` end of the stairs from the floor before: within that
- * floor's footprint where it can keep every rule there, else wherever it can.
+ * Floor `index`, grown from the `landing` end of the stairs from the floor before (the `passOver`th
+ * that keeps every rule, for a floor grown anew): a storey within the floor below's outer walls
+ * always, over the room the stairs rise from; a dug floor within its footprint where it can keep
+ * every rule there, else wherever it can.
  */
-function nextFloor(seed: number, params: DungeonParams, earlier: FloorShape, index: number, last: boolean, landing: DungeonStair, boss: boolean, stack: FloorStack): CompactLayout | null {
+function nextFloor(seed: number, params: DungeonParams, earlier: FloorShape, index: number, last: boolean, landing: DungeonStair, boss: boolean, stack: FloorStack, passOver: number): BuiltFloor | null {
   const end = stairEnd(stack, index, index - 1);
+  const within = footprintOf(earlier, index, stack);
+  const storey: StoreyLanding | null = isStorey(stack, index) ? { over: stairRoomFloor(earlier, landing), ground: within, small: index > 1 } : null;
   const request: FloorRequest = {
     floor: index,
     params: floorParams(params, index, stack.rise),
-    rootOf: (rng) => landingRoot(rng, landing, end, isAbove(stack, index, index - 1) ? stairRoomFloor(earlier, landing) : null),
+    rootOf: (rng) => landingRoot(rng, landing, end, storey),
     reserved: null,
-    within: footprintOf(earlier),
+    within,
     boss: boss && last,
     // A boss room that lies under a room of the floor above counts larger, so a gallery can look into it.
     galleries: isAbove(stack, index - 1, index) ? earlier.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda).map(floorRect) : [],
     blocked: landingCells(landing, end),
     accept: (built) => linkFloor(seed, earlier, { ...built, stairs: [landing] }, index, last, stack) !== null,
+    passOver,
   };
-  const within = buildFloorLayout(seed, request);
-  if (within?.sound) return within.layout;
-  return (buildFloorLayout(seed, { ...request, within: null }) ?? within)?.layout ?? null;
+  const inside = buildFloorLayout(seed, request);
+  if (inside?.sound || storey) return inside;
+  return buildFloorLayout(seed, { ...request, within: null }) ?? inside;
+}
+
+interface NextFloor {
+  layout: CompactLayout;
+  sound: boolean;
+  /** The stairwell's end on the floor before, and on this one. */
+  from: DungeonStair;
+  landing: DungeonStair;
+}
+
+/**
+ * Floor `index` and stairwell `link` to it from the floor before. A storey tries other places for
+ * its stairs until one lets it keep every rule, else takes the first it found.
+ */
+function nextAcross(seed: number, params: DungeonParams, earlier: PlannedFloor, index: number, last: boolean, boss: boolean, stack: FloorStack, link: number, fromEntrance: boolean, passOver: number): NextFloor | null {
+  let first: NextFloor | null = null;
+  const tries = isStorey(stack, index) ? STOREY_STAIR_TRIES : 1;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const onward = onwardFrom(seed, earlier, index - 1, stack, fromEntrance, attempt);
+    if (!onward) break;
+    const [from, landing] = stairPair(onward.spot, index - 1, link);
+    const built = nextFloor(seed, params, { ...earlier, stairs: [...earlier.stairs, from] }, index, last, landing, boss, stack, passOver);
+    const next = built && { layout: built.layout, sound: built.sound, from, landing };
+    if (next?.sound) return next;
+    first ??= next;
+  }
+  return first;
 }
 
 /** What a theme says of how its floors are planned: which way they stack, whether the stairs up rise from the entrance room, and how deep that room is at least. */
@@ -126,29 +160,49 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
   const { rise } = planning;
   const stack = floorStack(rise, count);
   const fromEntrance = planning.stairsFromEntrance === true;
-  const entry = buildFloorLayout(seed, {
-    floor: 0,
-    params: floorParams(params, 0, rise),
-    rootOf: (rng) => ({ origin: { x: 0, y: 0 }, axis: pick(rng, AXES), seed: int(rng, 1, MAX_SEED), ...(planning.entranceDepth !== undefined && { minDepth: planning.entranceDepth }) }),
-    reserved: ENTRANCE_BLOCK,
-    within: null,
-    boss: boss && count === 1,
-    fiveRoom: fiveRoom && count === 1,
-    blocked: new Set(),
-    accept: (layout) => count === 1 || chooseOnward(stairsRng(seed, 0, 'descent'), { ...layout, stairs: [] }, 0, stack, fromEntrance) !== null,
-  });
-  if (!entry) throw new Error('no dungeon layout');
-  const floors: PlannedFloor[] = [withStairs(entry.layout, [])];
+  const entryFloor = (passOver: number): PlannedFloor => {
+    const entry = buildFloorLayout(seed, {
+      floor: 0,
+      params: floorParams(params, 0, rise),
+      rootOf: (rng) => ({ origin: { x: 0, y: 0 }, axis: pick(rng, AXES), seed: int(rng, 1, MAX_SEED), ...(planning.entranceDepth !== undefined && { minDepth: planning.entranceDepth }) }),
+      reserved: ENTRANCE_BLOCK,
+      within: null,
+      boss: boss && count === 1,
+      fiveRoom: fiveRoom && count === 1,
+      blocked: new Set(),
+      accept: (layout) => count === 1 || onwardFrom(seed, { ...layout, stairs: [] }, 0, stack, fromEntrance) !== null,
+      passOver,
+    });
+    if (!entry) throw new Error('no dungeon layout');
+    return withStairs(entry.layout, []);
+  };
+  let floors: PlannedFloor[] = [entryFloor(0)];
   let link = 0;
+  // The floors and links as they stood before each floor was added, and how many sound layouts each floor passes over.
+  const before: { floors: PlannedFloor[]; link: number }[] = [];
+  const passOver = new Map<number, number>();
+  let regrown = 0;
+  const failsAt = new Map<number, number>();
   for (let index = 1; index < count; index++) {
+    before[index] = { floors: [...floors], link };
     const earlier = floors[index - 1] as PlannedFloor;
-    const onward = chooseOnward(stairsRng(seed, index - 1, 'descent'), earlier, index - 1, stack, index === 1 && fromEntrance);
-    if (!onward) break;
-    const [from, landing] = stairPair(onward.spot, index - 1, link++);
-    const earlierWithStairs = { ...earlier, stairs: [...earlier.stairs, from] };
     const last = index === count - 1;
-    const layout = nextFloor(seed, params, earlierWithStairs, index, last, landing, boss, stack);
-    if (!layout) break;
+    const next = nextAcross(seed, params, earlier, index, last, boss, stack, link++, index === 1 && fromEntrance, passOver.get(index) ?? 0);
+    if (!next) break;
+    if (!next.sound && isStorey(stack, index) && regrown < MOST_REGROWN) {
+      // A storey that cannot keep every rule on the floor below has that floor grown anew, and then the one under it.
+      regrown += 1;
+      const fails = (failsAt.get(index) ?? 0) + 1;
+      failsAt.set(index, fails);
+      const below = Math.max(0, index - 1 - Math.floor((fails - 1) / REGROWN_PER_FLOOR));
+      passOver.set(below, (passOver.get(below) ?? 0) + 1);
+      for (const later of [...passOver.keys()]) if (later > below) passOver.delete(later);
+      ({ floors, link } = below === 0 ? { floors: [entryFloor(passOver.get(0) ?? 0)], link: 0 } : (before[below] as { floors: PlannedFloor[]; link: number }));
+      index = Math.max(below, 1) - 1;
+      continue;
+    }
+    const { layout, from, landing } = next;
+    const earlierWithStairs = { ...earlier, stairs: [...earlier.stairs, from] };
     const extra = linkFloor(seed, earlierWithStairs, { ...layout, stairs: [landing] }, index, last, stack)?.extra ?? [];
     const pairs = extra.map((spot) => stairPair(spot, index - 1, link++));
     floors[index - 1] = { ...earlier, stairs: [...earlierWithStairs.stairs, ...pairs.map(([e]) => e)] };

@@ -9,7 +9,7 @@ import type { CellDir, CellPoint } from '../model';
 import { type CellRect, cellKey, cellsOf } from '../geometry';
 import { MAX_SEED, type Rng, int, pick, shuffled } from '../rng';
 import type { FloorRoot } from '../layout/grow';
-import { drawRoomSize } from '../layout/sizes';
+import { type RoomSize, drawRoomSize, drawSmallRoomSize } from '../layout/sizes';
 import { STAIR_DIRS, type StairEnd, type StairSpot, approachCells, spotFits, spotRect } from './stairSpots';
 
 /** Sizes tried before an attempt gives up on its landing. */
@@ -50,25 +50,52 @@ function overlap(f: CellRect, below: CellRect): number {
   return w > 0 && h > 0 ? w * h : 0;
 }
 
-/**
- * The landing's first room for an attempt, or null where no room drawn fits it. Over `below` (the
- * floor of the room the stairs rise from, for a storey) it stands where it covers most of that
- * room, as an upper room of a tower stands over the room below it.
- */
-export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd, below: CellRect | null = null): FloorRoot | null {
+/** Whether `inner` lies within `outer`. */
+function within(outer: CellRect, inner: CellRect): boolean {
+  return inner.x0 >= outer.x0 && inner.y0 >= outer.y0 && inner.x1 <= outer.x1 && inner.y1 <= outer.y1;
+}
+
+/** Every place a landing room of this size may stand along `axes`, its walls within `ground` where given. */
+function landingPlaces(spot: StairSpot, end: StairEnd, size: RoomSize, axes: readonly CellDir[], ground: CellRect | null): { f: CellRect; axis: CellDir }[] {
+  const options = axes.flatMap((axis) => {
+    const { w, h } = floorDims(axis, size.width, size.depth);
+    return placements(spot, end, w, h).map((f) => ({ f, axis }));
+  });
+  return options.filter(({ f }) => {
+    if (ground && !within(ground, { x0: f.x0 - 1, y0: f.y0 - 1, x1: f.x1 + 1, y1: f.y1 + 1 })) return false;
+    const room = { id: 0, x: f.x0, y: f.y0, w: f.x1 - f.x0 + 1, h: f.y1 - f.y0 + 1, kind: 'room' as const, rotunda: false };
+    return spotFits(room, { doors: [], stairs: [], ends: [] }, spot, end);
+  });
+}
+
+/** The small rooms a landing is drawn as most often: where none of them stands on `ground`, no landing does. */
+const SMALL_LANDINGS: readonly RoomSize[] = [5, 7].flatMap((width) => [4, 5, 6].map((depth) => ({ width, depth })));
+
+/** Whether a landing room can stand round this end of a stairwell, its walls within `ground`. */
+export function landingFits(spot: StairSpot, end: StairEnd, ground: CellRect): boolean {
+  return SMALL_LANDINGS.some((size) => landingPlaces(spot, end, size, STAIR_DIRS, ground).length > 0);
+}
+
+/** Where a storey's landing stands: over the room the stairs rise from, and within the floor below's outer walls. */
+export interface StoreyLanding {
+  /** The floor of the room the stairs rise from: the landing covers as much of it as it can, as an upper room of a tower stands over the room below it. */
+  over: CellRect | null;
+  /** The floor below's outer walls, which the landing's walls never pass. */
+  ground: CellRect;
+  /** A small room: a stair landing, not the room built over the entrance room (a gate chamber, a grand staircase's landing). */
+  small: boolean;
+}
+
+/** The landing's first room for an attempt, standing as a storey's does where `storey` is given; null where no room drawn fits it. */
+export function landingRoot(rng: Rng, spot: StairSpot, end: StairEnd, storey: StoreyLanding | null = null): FloorRoot | null {
   for (let tries = 0; tries < SIZE_TRIES; tries++) {
-    const size = drawRoomSize(rng);
-    const options = shuffled(rng, STAIR_DIRS).flatMap((axis) => {
-      const { w, h } = floorDims(axis, size.width, size.depth);
-      return placements(spot, end, w, h).map((f) => ({ f, axis }));
-    });
-    const fitting = options.filter(({ f }) => {
-      const room = { id: 0, x: f.x0, y: f.y0, w: f.x1 - f.x0 + 1, h: f.y1 - f.y0 + 1, kind: 'room' as const, rotunda: false };
-      return spotFits(room, { doors: [], stairs: [], ends: [] }, spot, end);
-    });
+    // A storey's landing is a small room, as a stair landing is, leaving the floor below's ground to the rooms round it.
+    const size = storey?.small ? drawSmallRoomSize(rng) : drawRoomSize(rng);
+    const fitting = landingPlaces(spot, end, size, shuffled(rng, STAIR_DIRS), storey?.ground ?? null);
     if (fitting.length === 0) continue;
-    const most = below ? Math.max(...fitting.map(({ f }) => overlap(f, below))) : 0;
-    const { f, axis } = pick(rng, below ? fitting.filter(({ f }) => overlap(f, below) === most) : fitting);
+    const over = storey?.over;
+    const most = over ? Math.max(...fitting.map(({ f }) => overlap(f, over))) : 0;
+    const { f, axis } = pick(rng, over ? fitting.filter(({ f }) => overlap(f, over) === most) : fitting);
     return { origin: originOf(f, axis), axis, seed: int(rng, 1, MAX_SEED), landing: size };
   }
   return null;

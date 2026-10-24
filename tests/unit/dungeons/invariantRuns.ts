@@ -4,7 +4,7 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
 import { doorProblems, emptyRooms, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
-import { connectionProblems, entranceProblems, riseProblems, stairProblems, withinShare } from './floorsInvariants';
+import { connectionProblems, entranceProblems, riseProblems, stairProblems, storeyProblems, withinShare } from './floorsInvariants';
 import { physicsProblems } from './themeTerrainInvariants';
 import { holeProblems } from './holeInvariants';
 import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
@@ -115,6 +115,10 @@ export function describeInvariants(floors: number): void {
 
     it('stack Fortress and Mansion floors upward', () => {
       expect(failures((run) => riseProblems(run.model))).toEqual([]);
+    });
+
+    it('stand every storey of a Fortress or Mansion within the outer walls of the floor below', () => {
+      expect(failures((run) => storeyProblems(run.model))).toEqual([]);
     });
 
     it("keep every later floor within the earlier floor's walls plus two cells where it can", () => {

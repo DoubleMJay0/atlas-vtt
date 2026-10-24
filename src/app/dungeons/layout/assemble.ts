@@ -43,6 +43,8 @@ export interface FloorRequest {
   galleries?: readonly CellRect[];
   /** A five-room dungeon: no loops or secret wings, a reward room beyond the boss room, stages named. */
   fiveRoom?: boolean;
+  /** Floors that keep every rule passed over before one is taken, the last found where fewer come: a floor grown anew. */
+  passOver?: number;
   /** What else the finished floor must allow: the stairwells it needs to and from the floors beside it. */
   accept: (layout: CompactLayout) => boolean;
 }
@@ -99,14 +101,20 @@ export interface BuiltFloor {
   sound: boolean;
 }
 
-/** The first attempt that keeps every rule, else the best of them (`better`); null where no attempt found a place for its first room. */
+/** The first attempt that keeps every rule (after `passOver` such), else the best of them (`better`); null where no attempt found a place for its first room. */
 export function buildFloorLayout(seed: number, request: FloorRequest): BuiltFloor | null {
   let best: Built | null = null;
+  let lastSound: Built | null = null;
+  let passed = 0;
   for (let index = 0; index < MAX_ATTEMPTS; index++) {
     const built = attempt(seed, request, index);
     if (!built) continue;
-    if (sound(built)) return { layout: built.layout, sound: true };
+    if (sound(built)) {
+      if (passed++ === (request.passOver ?? 0)) return { layout: built.layout, sound: true };
+      lastSound = built;
+    }
     if (!best || better(built, best)) best = built;
   }
+  if (lastSound) return { layout: lastSound.layout, sound: true };
   return best ? { layout: best.layout, sound: false } : null;
 }

@@ -112,6 +112,27 @@ export function riseProblems(model: DungeonModel): string[] {
   );
 }
 
+/** The outer walls of a floor: the box round every room's walls. */
+function extentOf(floor: DungeonFloor): { x0: number; y0: number; x1: number; y1: number } {
+  const walls = floor.rooms.map(wallRect);
+  return { x0: Math.min(...walls.map((r) => r.x0)), y0: Math.min(...walls.map((r) => r.y0)), x1: Math.max(...walls.map((r) => r.x1)), y1: Math.max(...walls.map((r) => r.y1)) };
+}
+
+/** A building's storeys stand on the floor below: no room of one, walls included, reaches past the outer walls of the floor under it. */
+export function storeyProblems(model: DungeonModel): string[] {
+  const stack = stackOf(model);
+  if (stack.rise !== 'up') return [];
+  return model.floors.flatMap((floor, k) => {
+    const below = model.floors[k - 1];
+    if (!below) return [];
+    const box = extentOf(below);
+    return floor.rooms.filter((room) => {
+      const r = wallRect(room);
+      return r.x0 < box.x0 || r.y0 < box.y0 || r.x1 > box.x1 || r.y1 > box.y1;
+    }).map((room) => `floor ${k} room ${room.id} overhangs the floor below`);
+  });
+}
+
 /** Of the floors past the entrance floor, the share that lies within the walls of the floor before it, plus two cells either way. */
 export function withinShare(models: readonly DungeonModel[]): number {
   const later = models.flatMap((model) => model.floors.slice(1).map((floor, k) => ({ floor, earlier: model.floors[k] as DungeonFloor })));
