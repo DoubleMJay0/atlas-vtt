@@ -13,6 +13,7 @@ import { drawShade } from './shade';
 import { drawWalls } from './walls';
 import { drawPools } from './water';
 import { engravedGrowth } from './growth';
+import { type CaveGroundPainting, type CaveGroundPart, builtSurround, caveGround } from '../cave/caveArt';
 
 /**
  * Engraved, the copperplate, bottom to top: the rock, the floor and its faint joints,
@@ -25,15 +26,18 @@ export function paintEngraved(scene: ArtScene): void {
   const hand = engravedHand(scene, pens);
   const colours = { water: pens.water, cloth: pens.floor };
   const growth = engravedGrowth(scene, hand, pens);
-  drawRock(scene.env);
-  drawFloor(scene, pens);
+  const cave = (part: CaveGroundPart): CaveGroundPainting | undefined => caveGround(part, scene.env);
+  const surround = builtSurround(scene.env) ? cave('surround') : undefined;
+  if (surround) surround.engraved(scene, pens);
+  else drawRock(scene.env);
+  (cave('floor')?.engraved ?? drawFloor)(scene, pens);
   drawPools(scene, pens);
   drawTerrainGround(hand, colours);
   growth.ground();
   drawShade(scene, pens);
   drawGrid(scene.env);
   growth.climbers();
-  drawWalls(scene, pens);
+  (cave('edge')?.engraved ?? drawWalls)(scene, pens);
   growth.overWalls();
   drawDebris(hand);
   drawProps(hand, pens.water, pens.floor);

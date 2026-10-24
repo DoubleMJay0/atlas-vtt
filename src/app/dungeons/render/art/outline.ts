@@ -41,3 +41,21 @@ export function clipFloors(scene: ArtScene, ctx: CanvasRenderingContext2D | Offs
 }
 
 export type { PathFn };
+
+/**
+ * Traces the line a wall's ink `ink` wide is stroked along and sets the stroke: the floor's edge,
+ * twice as wide with mitred corners (the caller's clip keeps its outer half); in a cave the walls'
+ * own line, `ink` wide with round corners, so where rock thins to a point the ink ends where the
+ * scene's walls do (`scene/toWalls.ts` lays them on this line).
+ */
+export function traceWallInk(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, scene: ArtScene, ink: number): void {
+  if (scene.env.dungeon.floor.cave) {
+    traceRings(ctx, grownRings(scene, ink / 2));
+    ctx.lineWidth = ink;
+    ctx.lineJoin = 'round';
+    return;
+  }
+  traceRings(ctx, scene.floorRings);
+  ctx.lineWidth = ink * 2;
+  ctx.lineJoin = 'miter';
+}

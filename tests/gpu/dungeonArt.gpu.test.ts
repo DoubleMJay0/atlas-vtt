@@ -33,7 +33,8 @@ describe.skipIf(!asked)('dungeon looks, for judging by eye', () => {
   for (const { id } of DUNGEON_STYLES) {
     if (looks && !looks.includes(id)) continue;
     for (const { name } of ART_DUNGEONS) {
-      if (dungeons && !dungeons.includes(name)) continue;
+      // A family names every dungeon of it: `cavern` draws `cavern-lava` and its kin.
+      if (dungeons && !dungeons.some((d) => name === d || name.startsWith(`${d}-`))) continue;
       it(`${id} ${name}`, async () => {
         const model = artModel(name);
         const views: [string, DungeonView][] = [['', DEFAULT_VIEW]];
@@ -70,7 +71,8 @@ describe.skipIf(!asked)('dungeon looks, for judging by eye', () => {
       it(`${id} vegetation at a scene's resolution`, async () => {
         // As a created scene draws it: 400 px a cell, whole (written reduced) and a window with tokens.
         for (const name of ['overgrown-fortress', 'overgrown-cavern', 'overgrown-mansion', 'overgrown-halls']) {
-          if (dungeons && !dungeons.includes(name)) continue;
+          // A family names every dungeon of it: `cavern` draws `cavern-lava` and its kin.
+      if (dungeons && !dungeons.some((d) => name === d || name.startsWith(`${d}-`))) continue;
           const model = artModel(name);
           const pxPerCell = suggestedPxPerCell(model);
           const layout = mapLayout(model, pxPerCell, DEFAULT_VIEW);

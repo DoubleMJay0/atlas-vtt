@@ -125,6 +125,15 @@ export class RoomCells {
     return this.floor.has(cellKey(c.x, c.y));
   }
 
+  /**
+   * Whether the cell and the eight round it are this room's floor: a cave's drawn outline may wander
+   * a fifth of a cell into any cell beside its rock, so a hole cut there would open under its wall.
+   */
+  clearOfRock(c: CellPoint): boolean {
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (!this.floor.has(cellKey(c.x + dx, c.y + dy))) return false;
+    return true;
+  }
+
   /** Whether the cell holds a piece that cannot be walked. */
   isBlocked(c: CellPoint): boolean {
     return this.taken.get(cellKey(c.x, c.y)) === 'block';

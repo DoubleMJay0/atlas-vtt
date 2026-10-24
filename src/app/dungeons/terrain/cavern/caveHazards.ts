@@ -116,7 +116,7 @@ export function faultChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng
     const rooms = under?.plan.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && intersection(floorRect(room), floorRect(rc.room)) !== null) ?? [];
     const overs = under ? rooms.map((room) => (c: CellPoint): boolean => under.room(room.id)?.isFloor(c) === true) : [() => true];
     for (const over of overs) for (const line of besideLine(fault, rng, 2)) {
-      const cells = faultBand(rc, rng, line, thickness, (c) => over(c) && !wet(c));
+      const cells = faultBand(rc, rng, line, thickness, (c) => over(c) && !wet(c) && rc.clearOfRock(c));
       if (!cells || !leavesRoom(rc, cells) || !overRoomBelow(work, k, cells)) continue;
       const drop = dropBelow(work, k, cells, rng);
       if (!drop || (below && drop.bottom === null && drop.through.length === 0)) continue;
@@ -137,7 +137,7 @@ function pitchShaft(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): bool
   }
   const wet = besideWater(floor);
   return shuffled(rng, shapes).slice(0, 24).some((cells) => {
-    if (!rc.allows(cells, 'block') || cells.some((c) => rc.nearStairs(c) || wet(c))) return false;
+    if (!rc.allows(cells, 'block') || cells.some((c) => rc.nearStairs(c) || wet(c) || !rc.clearOfRock(c))) return false;
     const drop = dropBelow(work, k, cells, rng, false);
     return drop?.bottom?.floor === k + 1 && cutHole(work, k, rc, 'shaft', cells, drop) !== null;
   });

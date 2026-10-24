@@ -24,7 +24,7 @@ const HAZARD_CHANCE: Readonly<Partial<Record<FeatureReason, number>>> = {
   'rotted-floor': 1,
   'fault-chasm': 0.9,
   sinkhole: 0.7,
-  pitch: 0.6,
+  pitch: 0.8,
   'cave-lake': 1,
   'cave-stream': 1,
   sump: 1,

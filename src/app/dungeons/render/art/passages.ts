@@ -3,6 +3,7 @@ import type { Vec } from '../geometry';
 import { drawFlight } from '../terrain/raised';
 import type { Hand } from './hand';
 import { polyPath } from './paths';
+import { type CaveWayDraw, type CaveWayPart, caveWay } from '../cave/caveArt';
 
 /**
  * Passages and stairs, drawn once through a hand. An opening is the gap the walls leave (nothing
@@ -19,12 +20,21 @@ function cellFrame(door: Pick<DungeonDoor, 'x' | 'y' | 'dir'>): (u: number, v: n
 }
 
 export function drawPassages(hand: Hand): void {
-  for (const door of hand.scene.env.dungeon.doors) {
-    if (door.kind === 'door') drawDoor(hand, door);
-    else if (door.kind === 'steps') drawFlight(hand, { x: door.x, y: door.y, w: 1, h: 1 }, door.descends ? door.dir : flip(door.dir), 0, 0.22);
+  const { env } = hand.scene;
+  // A cave's ways each by its registered drawing (`cave/caveArt.ts`); a part not drawn yet as below.
+  const way = (part: CaveWayPart): CaveWayDraw | undefined => caveWay(part, env);
+  const drawn = (part: CaveWayPart): boolean => way(part) !== undefined;
+  for (const part of ['narrows', 'crawl', 'scree', 'pitch', 'aven'] as const) way(part)?.(hand);
+  for (const door of env.dungeon.doors) {
+    if (door.kind === 'door' && !drawn('narrows')) drawDoor(hand, door);
+    else if (door.kind === 'steps' && !drawn('scree')) drawFlight(hand, { x: door.x, y: door.y, w: 1, h: 1 }, door.descends ? door.dir : flip(door.dir), 0, 0.22);
   }
-  const index = hand.scene.env.dungeon.index;
-  for (const stair of hand.scene.env.dungeon.floor.stairs) drawStairwell(hand, stair, stair.to > index ? 'upper' : 'lower');
+  const index = env.dungeon.index;
+  for (const stair of env.dungeon.floor.stairs) {
+    const end = stair.to > index ? 'upper' : 'lower';
+    const part: CaveWayPart | null = stair.way === 'scree' ? 'scree' : stair.way === 'pitch' ? (end === 'upper' ? 'pitch' : 'aven') : null;
+    if (!part || !drawn(part)) drawStairwell(hand, stair, end);
+  }
 }
 
 const flip = (d: CellDir): CellDir => ({ x: -d.x as CellDir['x'], y: -d.y as CellDir['y'] });

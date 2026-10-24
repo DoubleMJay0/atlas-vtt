@@ -6,6 +6,7 @@ import { THEMES, programmeOf } from '../../../src/app/dungeons/themes/themes';
 import type { RoomProgramme } from '../../../src/app/dungeons/themes/themeTypes';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import awaiting from './awaitingDrawings.json';
+import { CAVE_PARTS, drawnCaveParts } from '../../../src/app/dungeons/render/cave/caveArt';
 
 /**
  * What still waits for its drawing (`awaitingDrawings.json`), kept exact both ways: `npm run
@@ -19,6 +20,10 @@ describe('drawings still awaited', () => {
       expect(DRAWN_PROP_KINDS.has(kind as PropKind), kind).toBe(false);
     }
     expect([...awaiting.terrain].sort()).toEqual([...ALL_TERRAIN_KINDS].filter((kind) => !DRAWN_TERRAIN_KINDS.has(kind)).sort());
+  });
+
+  it('lists every cave drawing still missing', () => {
+    expect([...awaiting.cave].sort()).toEqual(CAVE_PARTS.filter((part) => !drawnCaveParts().includes(part)).sort());
   });
 
   it('names every programme kind without a drawing in awaitingDrawings.json', () => {

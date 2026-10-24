@@ -18,6 +18,9 @@ function stone(rng: Rng, at: CellPoint): DungeonRubble {
   return { points: chaikin(quad, 1) };
 }
 
+/** A cave's outline may wander a fifth of a cell into a floor cell (`holdToCells.ts`): its stones keep that and their own size off a cell's edge. */
+const CAVE_STONE_MARGIN = 0.4;
+
 /** About one stone per `areaPerStone` floor cells, at random; `extra` more where the plan marks rubble. */
 export function rubbleIn(rng: Rng, frame: RoomFrame, areaPerStone: number, extra: number, obstacles: readonly Taken[]): DungeonRubble[] {
   const area = roomArea(frame.room);
@@ -25,7 +28,7 @@ export function rubbleIn(rng: Rng, frame: RoomFrame, areaPerStone: number, extra
   const out: DungeonRubble[] = [];
   for (let tries = 0; out.length < count && tries < count * 6; tries++) {
     const at = pointIn(frame, (rng() * 2 - 1) * frame.halfDepth, (rng() * 2 - 1) * frame.halfWidth);
-    if (!onFloor(frame, at, 0.15) || obstacles.some((o) => Math.hypot(o.x - at.x, o.y - at.y) < o.radius)) continue;
+    if (!onFloor(frame, at, frame.room.cells ? CAVE_STONE_MARGIN : 0.15) || obstacles.some((o) => Math.hypot(o.x - at.x, o.y - at.y) < o.radius)) continue;
     out.push(stone(rng, at));
   }
   return out;

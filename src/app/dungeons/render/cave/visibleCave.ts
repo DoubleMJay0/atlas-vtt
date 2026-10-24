@@ -2,11 +2,13 @@
  * A Cavern floor as the view shows it: the traced, smoothed outline of the shown rooms' cells and
  * the cells of every shown narrows. A crawl (a secret door) is rock in the drawing; its two mouths
  * stay straight on its cell's edges, as an entrance's outer mouth does, so the walls the scene
- * puts round the crawl meet the cave's exactly.
+ * puts round the crawl meet the cave's exactly. A scree slope's sides and a stairwell's edges
+ * stay straight too: their treads are drawn across their whole cells.
  */
 
-import { cellKey, doorCells, floorCellsOf } from '../../geometry';
-import type { CellDir, CellPoint, DungeonDoor, DungeonModel, DungeonRoom } from '../../model';
+import { spotRect } from '../../floors/stairSpots';
+import { cellKey, cellsOf, doorCells, floorCellsOf } from '../../geometry';
+import type { CellDir, CellPoint, DungeonDoor, DungeonModel, DungeonRoom, DungeonStair } from '../../model';
 import { gridOver } from '../../water/wetGrid';
 import type { FloorShape } from '../geometry';
 import { caveOutline, type PinnedEdge } from './caveOutline';
@@ -23,14 +25,28 @@ function edgeOn(c: CellPoint, side: CellDir): PinnedEdge {
   return { a: { x, y: c.y }, b: { x, y: c.y + 1 } };
 }
 
-/** The edges that stay straight: an entrance's outer mouth, and both mouths of a crawl. */
+/** The edges that stay straight: an entrance's outer mouth, both mouths of a crawl, and the sides of a scree slope, whose treads span its cell. */
 function pinnedEdges(doors: readonly DungeonDoor[]): PinnedEdge[] {
   const back = (d: DungeonDoor): CellDir => ({ x: -d.dir.x as CellDir['x'], y: -d.dir.y as CellDir['y'] });
+  const sides = (d: DungeonDoor): CellDir[] => [{ x: d.dir.y, y: d.dir.x }, { x: -d.dir.y as CellDir['x'], y: -d.dir.x as CellDir['y'] }];
   return doors.flatMap((door) => {
     const cells = doorCells(door);
     if (door.kind === 'secret') return cells.flatMap((c) => [edgeOn(c, back(door)), edgeOn(c, door.dir)]);
-    return door.from === null ? cells.map((c) => edgeOn(c, back(door))) : [];
+    const ends = door.from === null ? cells.map((c) => edgeOn(c, back(door))) : [];
+    return door.kind === 'steps' ? [...ends, ...cells.flatMap((c) => sides(door).map((side) => edgeOn(c, side)))] : ends;
   });
+}
+
+const SIDES: readonly CellDir[] = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
+
+/** Every edge of a stairwell's cells: where its well meets the rock, the outline keeps to it, so its walls stand where it is drawn. */
+function stairEdges(stairs: readonly DungeonStair[]): PinnedEdge[] {
+  return stairs.flatMap((stair) => cellsOf(spotRect(stair)).flatMap((c) => SIDES.map((side) => edgeOn(c, side))));
 }
 
 /**
@@ -45,7 +61,7 @@ export function caveFloorShapes(model: DungeonModel, index: number, rooms: reado
   if (shapes) return shapes;
   const cells = [...rooms.flatMap((room) => floorCellsOf(room)), ...doors.filter((door) => door.kind !== 'secret').flatMap(doorCells)];
   const own = new Set(cells.map((c) => cellKey(c.x, c.y)));
-  shapes = cells.length ? caveOutline(model.seed, index, (x, y) => own.has(cellKey(x, y)), gridOver(cells, 1), pinnedEdges(doors)) : [];
+  shapes = cells.length ? caveOutline(model.seed, index, (x, y) => own.has(cellKey(x, y)), gridOver(cells, 1), [...pinnedEdges(doors), ...stairEdges(floor?.stairs ?? [])]) : [];
   const byRooms = memo.get(owner) ?? new Map<string, FloorShape[]>();
   byRooms.set(key, shapes);
   memo.set(owner, byRooms);

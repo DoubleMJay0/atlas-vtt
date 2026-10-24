@@ -29,12 +29,21 @@ export function drawHoles(hand: Hand): void {
   const holes = shownPieces(env).filter(isHole);
   if (!holes.length) return;
   const cut = cutsHoles(env);
+  // A cave's wall may wander into a hole's cells: the hole opens only the floor, never the wall drawn round it.
+  const cave = env.dungeon.floor.cave !== undefined;
+  if (cave) {
+    env.ctx.save();
+    env.ctx.beginPath();
+    polysPath(hand.scene.floorRings)(env.ctx);
+    env.ctx.clip();
+  }
   for (const hole of holes) {
     if (hole.kind === 'gallery') balustrade(hand, edgesFacing(hole.cells, c => !cellSet(hole.cells).has(`${c.x},${c.y}`) && onFloor(env, c)));
     const rings = holeRings(hole);
     if (cut) cutHole(hand, rings, hole.kind === 'gallery');
     else drawDrop(hand, rings, hole.opening?.bottom === null || env.dungeon.index === env.dungeon.model.floors.length - 1 ? 'void' : 'floor', hole.kind === 'gallery');
   }
+  if (cave) env.ctx.restore();
 }
 
 /** A hole over a floor below: its lip and a narrow face, then nothing, so the level below shows. */

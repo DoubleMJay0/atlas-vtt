@@ -37,7 +37,8 @@ export function dropBelow(work: TerrainWork, k: number, cells: readonly CellPoin
     if (!rc || rc.room.wing !== 'regular' || !takesFall(work, floor, rc.room.id)) return null;
     const last = floor === work.floors.length - 1;
     const roomy = rc.depth >= 4 && rc.width >= 4 && cells.length <= rc.floorCount * (1 - MOST_OF_ROOM) && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells);
-    const canOpen = mayOpenOn && roomy && rc.allows(cells, 'block') && !cells.some((c) => rc.nearStairs(c));
+    // A cave's hole opens on only where its wall cannot wander over it (`RoomCells.clearOfRock`).
+    const canOpen = mayOpenOn && roomy && rc.allows(cells, 'block') && !cells.some((c) => rc.nearStairs(c) || (work.cave !== undefined && !rc.clearOfRock(c)));
     const canEnd = rc.fits(cells) && rc.freeCount() - cells.length >= LEFT_UNDER;
     if (canOpen && (!canEnd || chance(rng, OPEN_ON))) {
       through.push({ floor, rc });

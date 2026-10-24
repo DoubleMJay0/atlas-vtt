@@ -1,3 +1,4 @@
+import { doorCells } from '../../src/app/dungeons/geometry';
 import type { DungeonFloor } from '../../src/app/dungeons/model';
 import type { DungeonPlacement } from '../../src/app/dungeons/scene/toWalls';
 import type { FloorField } from '../../src/app/dungeons/render/visibleDungeon';
@@ -94,7 +95,7 @@ export function inkEdgesFromWalls(
   const inRect = (c: Point, x: number, y: number, w: number, h: number, grow: number): boolean =>
     c.x >= x - grow && c.x <= x + w + grow && c.y >= y - grow && c.y <= y + h + grow;
   const excluded = (c: Point): boolean =>
-    floor.doors.some(d => inRect(c, d.x, d.y, 1, 1, 0.05)) || floor.stairs.some(s => inRect(c, s.x, s.y, s.w, s.h, 0.1));
+    floor.doors.some(d => doorCells(d).some(cell => inRect(c, cell.x, cell.y, 1, 1, 0.05))) || floor.stairs.some(s => inRect(c, s.x, s.y, s.w, s.h, 0.1));
   const nearest = wallIndex(walls);
   const out: { distance: number; at: Point }[] = [];
   const { width, height } = picture;

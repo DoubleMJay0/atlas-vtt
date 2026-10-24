@@ -24,6 +24,12 @@ export const ART_DUNGEONS: readonly { name: string; request: DungeonRequest }[] 
   { name: 'overgrown-mansion', request: { seed: 16, theme: 'mansion', tags: ['overgrown', 'ruined'], floors: 1 } },
   { name: 'overgrown-halls', request: { seed: 202, tags: ['crumbling', 'medium', 'overgrown'], floors: 1 } },
   { name: 'wet-moss', request: { seed: 909, tags: ['wet'], floors: 1, waterLevel: 0.45 } },
+  // Caverns, each variant: `VITE_ART_DUNGEON=cavern` draws them all.
+  { name: 'cavern-limestone', request: { seed: 606, theme: 'cavern', tags: ['medium', 'wet'], floors: 2 } },
+  { name: 'cavern-lava', request: { seed: 707, theme: 'cavern', tags: ['large', 'lava'], floors: 3 } },
+  { name: 'cavern-underdark', request: { seed: 5, theme: 'cavern', tags: ['deep', 'spacious', 'flooded'], floors: 3 } },
+  { name: 'cavern-inhabited', request: { seed: 808, theme: 'cavern', tags: ['inhabited', 'wet', 'secret'], floors: 2 } },
+  { name: 'cavern-five-room', request: { seed: 909, theme: 'cavern', tags: [], floors: 1, fiveRoom: true } },
 ];
 
 const models = new Map<string, DungeonModel>();
