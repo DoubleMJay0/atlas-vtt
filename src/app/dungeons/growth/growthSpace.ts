@@ -94,8 +94,9 @@ export class GrowthSpace {
   }
 }
 
-/** The cells of a room's floor: its rectangle, or of a round room the cells whose middle lies well inside the circle. */
+/** The cells of a room's floor: a cave's cells, its rectangle, or of a round room the cells whose middle lies well inside the circle. */
 export function roomFloorCells(room: DungeonRoom): CellPoint[] {
+  if (room.cells) return room.cells;
   const out: CellPoint[] = [];
   const cx = room.x + room.w / 2;
   const cy = room.y + room.h / 2;

@@ -10,7 +10,7 @@
  */
 
 import type { CellDir, CellPoint, DungeonColumn, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
-import { cellKey, cellsOf, dir, floorRect, inRect } from '../geometry';
+import { cellKey, cellsOf, dir, floorCellsOf, holdsCell } from '../geometry';
 import { approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
 import type { Footing } from './catalog';
 
@@ -39,6 +39,8 @@ export class RoomCells {
   private readonly byStairs = new Set<string>();
   /** The cells of the room's doors other than secret ones, which keep the wall whole, by key. */
   private readonly doorCells: Set<string>;
+  /** The main path's way through a cave, by key: nothing that blocks stands on it. */
+  private readonly lane: ReadonlySet<string>;
 
   constructor(
     readonly room: DungeonRoom,
@@ -46,20 +48,22 @@ export class RoomCells {
     stairs: readonly DungeonStair[],
     floorIndex: number,
     columns: readonly DungeonColumn[],
+    lane: ReadonlySet<string> = new Set(),
   ) {
     const horizontal = room.axis.x !== 0;
     this.depth = horizontal ? room.w : room.h;
     this.width = horizontal ? room.h : room.w;
-    const rect = floorRect(room);
-    const inside = stairs.filter((s) => cellsOf(spotRect(s)).every((c) => inRect(rect, c.x, c.y)));
+    this.lane = lane;
+    const own = (c: CellPoint): boolean => holdsCell(room, c.x, c.y);
+    const inside = stairs.filter((s) => cellsOf(spotRect(s)).every(own));
     const stairCells = inside.flatMap((s) => cellsOf(spotRect(s)));
     const approaches = inside.flatMap((s) => approachCells(s, s.to > floorIndex ? 'upper' : 'lower'));
-    this.needed = [...doorApproaches(room, doors), ...approaches].filter((c) => inRect(rect, c.x, c.y));
+    this.needed = [...doorApproaches(room, doors), ...approaches].filter(own);
     this.doorCells = new Set(doors.filter((d) => d.kind !== 'secret' && (d.from === room.id || d.to === room.id)).map((d) => cellKey(d.x, d.y)));
     for (const c of [...stairCells, ...this.needed]) this.clear.add(cellKey(c.x, c.y));
     const stairway = [...stairCells, ...approaches];
     for (const c of stairway) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) this.byStairs.add(cellKey(c.x + dx, c.y + dy));
-    for (const c of cellsOf(rect)) {
+    for (const c of floorCellsOf(room)) {
       if (!this.inside(c, [0.5], 0)) continue;
       const key = cellKey(c.x, c.y);
       this.floor.add(key);
@@ -111,6 +115,11 @@ export class RoomCells {
     return this.byStairs.has(cellKey(c.x, c.y));
   }
 
+  /** Whether the cell lies on a cave's main path. */
+  inLane(c: CellPoint): boolean {
+    return this.lane.has(cellKey(c.x, c.y));
+  }
+
   /** Whether the cell is floor of this room, taken or not. */
   isFloor(c: CellPoint): boolean {
     return this.floor.has(cellKey(c.x, c.y));
@@ -125,6 +134,7 @@ export class RoomCells {
   allows(cells: readonly CellPoint[], footing: Footing, over: readonly CellPoint[] = []): boolean {
     if (!this.fits(cells)) return false;
     if (footing === 'walk') return true;
+    if (cells.some((c) => this.inLane(c))) return false;
     const extra = new Set(cells.map((c) => cellKey(c.x, c.y)));
     for (const c of over) extra.delete(cellKey(c.x, c.y));
     return this.whole(extra);

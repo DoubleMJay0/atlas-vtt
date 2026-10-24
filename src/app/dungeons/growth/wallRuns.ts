@@ -5,6 +5,8 @@
  */
 
 import type { CellPoint, DungeonDoor, DungeonRoom } from '../model';
+import { traceLoops } from '../water/contour';
+import { cellMask } from '../water/wetGrid';
 import type { GrowthSpace } from './growthSpace';
 
 /** Between two points of a run, in cells. */
@@ -14,10 +16,34 @@ export const HANG = 0.3;
 /** How far a run keeps from a doorway's cell, in cells. */
 const DOOR_CLEARANCE = 0.2;
 
-/** The floor's edge round a room, closed, with its inward normal at every point. */
-function edgeOf(room: DungeonRoom): { at: CellPoint; inward: CellPoint }[] {
+type EdgePoint = { at: CellPoint; inward: CellPoint };
+
+/** Along a closed ring of corners, clockwise on screen, every `RUN_STEP`, the room to the right of the way round. */
+function alongRing(corners: readonly CellPoint[]): EdgePoint[] {
+  const out: EdgePoint[] = [];
+  corners.forEach((a, i) => {
+    const b = corners[(i + 1) % corners.length]!;
+    const prev = corners[(i - 1 + corners.length) % corners.length]!;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const steps = Math.round(len / RUN_STEP);
+    const t = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    const n = { x: -t.y, y: t.x };
+    // At a corner the climber hangs into the corner's cell, along both walls.
+    const before = { x: -(a.y - prev.y) / Math.hypot(a.x - prev.x, a.y - prev.y), y: (a.x - prev.x) / Math.hypot(a.x - prev.x, a.y - prev.y) };
+    const corner = { x: (n.x + before.x) * Math.SQRT1_2, y: (n.y + before.y) * Math.SQRT1_2 };
+    for (let k = 0; k < steps; k++) out.push({ at: { x: a.x + t.x * k * RUN_STEP, y: a.y + t.y * k * RUN_STEP }, inward: k === 0 ? corner : n });
+  });
+  return out;
+}
+
+/** The floor's edge round a room, closed, with its inward normal at every point; of a cave's room, every ring its cells have. */
+function edgeOf(room: DungeonRoom): EdgePoint[] {
   const cx = room.x + room.w / 2;
   const cy = room.y + room.h / 2;
+  if (room.cells) {
+    const { grid, marks } = cellMask(room.cells);
+    return traceLoops(grid, marks).flatMap(alongRing);
+  }
   if (room.rotunda) {
     const r = Math.sqrt(room.w * room.w + 1) / 2;
     const n = Math.max(8, Math.round((Math.PI * 2 * r) / RUN_STEP));

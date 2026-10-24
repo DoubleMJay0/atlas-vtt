@@ -6,7 +6,7 @@
  */
 
 import type { DungeonDoor, DungeonRoom, DungeonStair } from '../model';
-import { floorRect } from '../geometry';
+import { cellsOf, holdsCell } from '../geometry';
 import { type Rng, weighted } from '../rng';
 import { hops, neighbours } from '../roomGraph';
 
@@ -29,14 +29,16 @@ export interface RoomRoles {
   empty: Set<number>;
 }
 
-function area(room: DungeonRoom): number {
-  return room.w * room.h;
+/** A room's floor in cells: its cave cells where it has them, else its rectangle. */
+export function roomArea(room: Pick<DungeonRoom, 'w' | 'h' | 'cells'>): number {
+  return room.cells?.length ?? room.w * room.h;
 }
 
+const area = roomArea;
+
 /** Whether a stairwell lies in the room's floor. */
-export function holdsStairs(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h'>, stairs: readonly Pick<DungeonStair, 'x' | 'y' | 'w' | 'h'>[]): boolean {
-  const f = floorRect(room);
-  return stairs.some((s) => s.x >= f.x0 && s.x + s.w - 1 <= f.x1 && s.y >= f.y0 && s.y + s.h - 1 <= f.y1);
+export function holdsStairs(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>, stairs: readonly Pick<DungeonStair, 'x' | 'y' | 'w' | 'h'>[]): boolean {
+  return stairs.some((s) => cellsOf({ x0: s.x, y0: s.y, x1: s.x + s.w - 1, y1: s.y + s.h - 1 }).every((c) => holdsCell(room, c.x, c.y)));
 }
 
 function roleOf(room: DungeonRoom, doors: number, stairs: readonly DungeonStair[]): RoomRole {

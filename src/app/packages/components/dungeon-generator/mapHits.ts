@@ -1,4 +1,5 @@
-import type { DungeonModel } from '../../../dungeons/model';
+import { holdsCell } from '../../../dungeons/geometry';
+import type { DungeonModel, DungeonRoom } from '../../../dungeons/model';
 import { roomShape, shapeDistance } from '../../../dungeons/render/geometry';
 import type { MapLayout } from '../../../dungeons/render/layoutSize';
 import { visibleFloor } from '../../../dungeons/render/visibleDungeon';
@@ -20,6 +21,11 @@ export function mapPointOf(client: MapPoint, frame: Pick<DOMRect, 'left' | 'top'
 export function roomAt(model: DungeonModel, view: Pick<DungeonView, 'secrets'>, map: MapLayout, p: MapPoint, floor = 0): number | null {
   const x = p.x / map.pxPerCell + map.originCell.x;
   const y = p.y / map.pxPerCell + map.originCell.y;
-  const room = visibleFloor(model, view, floor).rooms.find((entry) => shapeDistance(roomShape(entry), x, y) <= 0);
+  const room = visibleFloor(model, view, floor).rooms.find((entry) => under(entry, x, y));
   return room?.id ?? null;
+}
+
+/** Whether the point lies on the room's floor: in a cave, on one of its cells. */
+function under(room: DungeonRoom, x: number, y: number): boolean {
+  return room.cells ? holdsCell(room, Math.floor(x), Math.floor(y)) : shapeDistance(roomShape(room), x, y) <= 0;
 }

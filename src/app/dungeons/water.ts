@@ -9,7 +9,8 @@ import { type Rng, chance, floorStream, int, stream } from './rng';
 import { traceLoops } from './water/contour';
 import { fractalNoise } from './water/noise';
 import { chaikin, jitter, resample, wobble } from './water/smooth';
-import { type CellGrid, DRY, WET, floorCells, gridAround, indexOf, wetGrid } from './water/wetGrid';
+import { holdsCell } from './geometry';
+import { type CellGrid, DRY, WET, floorCells, floorMarks, gridAround, indexOf, wetGrid } from './water/wetGrid';
 
 export interface WaterResult {
   water: DungeonWater[];
@@ -65,7 +66,7 @@ function poolIn(room: DungeonRoom, grid: CellGrid, wet: Uint8Array): void {
   const ry = Math.max(0.8, room.h * 0.35);
   for (let y = room.y; y < room.y + room.h; y++) {
     for (let x = room.x; x < room.x + room.w; x++) {
-      if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) wet[indexOf(grid, x, y)] = WET;
+      if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1 && holdsCell(room, x, y)) wet[indexOf(grid, x, y)] = WET;
     }
   }
 }
@@ -91,7 +92,7 @@ export function placeWater(seed: number, floor: number, rooms: readonly DungeonR
     wetFloor[i] = DRY;
     keepDry[i] = 1;
   }
-  const wet = wetGrid(grid, rooms, wetFloor, keepDry);
+  const wet = wetGrid(grid, floorMarks(grid, rooms), wetFloor, keepDry);
   const waterCells = floors.filter((c) => wet[indexOf(grid, c.x, c.y)] === WET);
   if (waterCells.length === 0) return { water: [], waterCells: [] };
   const water = traceLoops(grid, wet).map((loop) => ({ outline: shoreline(rng, loop) }));

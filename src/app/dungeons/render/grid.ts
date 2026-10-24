@@ -47,11 +47,22 @@ function traceLine(ctx: CanvasPath, a: Vec, b: Vec): void {
   ctx.lineTo(b.x, b.y);
 }
 
-/** Interior lines of a room's rectangle; the floor clip turns them into chords in a rotunda. */
+/** A room's box: its rectangle, or round a cave room's cells. */
+function boxOf(room: DungeonRoom): { x: number; y: number; w: number; h: number } {
+  if (!room.cells?.length) return room;
+  const xs = room.cells.map((c) => c.x);
+  const ys = room.cells.map((c) => c.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) + 1 - x, h: Math.max(...ys) + 1 - y };
+}
+
+/** Interior lines of a room's box; the floor clip turns them into chords in a rotunda and keeps a cave's to its cells. */
 function roomLines(room: DungeonRoom, step: number): Line[] {
+  const box = boxOf(room);
   const lines: Line[] = [];
-  for (let x = room.x + step; x < room.x + room.w - 1e-9; x += step) lines.push([{ x, y: room.y }, { x, y: room.y + room.h }]);
-  for (let y = room.y + step; y < room.y + room.h - 1e-9; y += step) lines.push([{ x: room.x, y }, { x: room.x + room.w, y }]);
+  for (let x = box.x + step; x < box.x + box.w - 1e-9; x += step) lines.push([{ x, y: box.y }, { x, y: box.y + box.h }]);
+  for (let y = box.y + step; y < box.y + box.h - 1e-9; y += step) lines.push([{ x: box.x, y }, { x: box.x + box.w, y }]);
   return lines;
 }
 

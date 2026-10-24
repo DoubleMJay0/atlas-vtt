@@ -89,6 +89,11 @@ function keysOf(cells: readonly CellPoint[]): ReadonlySet<string> {
   return keys;
 }
 
+/** A cave room's cells as keys (`x,y`), the same set for the same mask; unset for a room that is its rectangle. */
+export function maskOf(room: Pick<DungeonRoom, 'cells'>): ReadonlySet<string> | undefined {
+  return room.cells && keysOf(room.cells);
+}
+
 /** Whether the cell is floor of the room: in its mask, else in its rectangle. */
 export function holdsCell(room: Pick<DungeonRoom, 'x' | 'y' | 'w' | 'h' | 'cells'>, x: number, y: number): boolean {
   return room.cells ? keysOf(room.cells).has(cellKey(x, y)) : inRect(floorRect(room), x, y);

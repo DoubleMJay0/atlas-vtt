@@ -6,7 +6,7 @@
 
 import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
 import type { CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
-import { cellKey, floorRect, inRect } from '../geometry';
+import { cellKey } from '../geometry';
 import { type TerrainDraft, footingOf } from './catalog';
 import { RoomCells } from './roomCells';
 
@@ -44,7 +44,7 @@ export class FloorTerrain {
   roomHolding(cells: readonly CellPoint[]): RoomCells | undefined {
     const first = cells[0];
     if (!first) return undefined;
-    const room = this.plan.rooms.find((r) => r.kind === 'room' && inRect(floorRect(r), first.x, first.y));
+    const room = this.plan.rooms.find((r) => r.kind === 'room' && this.cells.get(r.id)?.isFloor(first));
     const rc = room && this.cells.get(room.id);
     return rc && cells.every((c) => rc.isFloor(c)) ? rc : undefined;
   }

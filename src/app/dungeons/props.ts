@@ -8,7 +8,7 @@
 
 import type { DungeonColumn, DungeonCrack, DungeonDoor, DungeonProp, DungeonRoom, DungeonRubble, DungeonStair, DungeonTerrain } from './model';
 import type { DungeonParams } from './params';
-import { cellKey, cellsOf } from './geometry';
+import { cellKey, cellsOf, maskOf } from './geometry';
 import { approachCells, doorApproaches, spotRect } from './floors/stairSpots';
 import { columnStyle, colonnadeOf } from './props/columns';
 import { type FloorFurnishing, arenaSeat, furnishRoom } from './props/furnish';
@@ -87,7 +87,7 @@ export function placeProps(input: PropsInput): PropsResult {
   for (const room of rooms) {
     const rng = floorStream(seed, 'props', floor, room.id);
     const frame = frameOf(room);
-    const space = roomSpace(frame, clear, columns);
+    const space = roomSpace(frame, clear, columns, maskOf(room));
     const role = roles.get(room.id);
     const platform = platformOf(input, room);
     const props = platform ? seatOnPlatform(platform, room) : role && !empty.has(room.id) ? furnishRoom(rng, space, role, doors, furnishing) : [];

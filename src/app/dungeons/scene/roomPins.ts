@@ -1,5 +1,5 @@
 import type { CellPoint, DungeonRoom } from '../model';
-import { cellKey, cellsOf, floorRect } from '../geometry';
+import { cellKey, cellsOf, floorCellsOf, maskOf } from '../geometry';
 import { approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
 import { frameOf } from '../props/roomFrame';
 import { propReach } from '../props/catalogue';
@@ -44,11 +44,11 @@ export function pinCell(visible: VisibleFloor, room: DungeonRoom): CellPoint {
   const { never, preferNot } = clearancesOf(visible, room);
   const frame = frameOf(room);
   const middle = frame.centre;
-  const centres = cellsOf(floorRect(room))
+  const centres = floorCellsOf(room)
     .map(c => ({ x: c.x + 0.5, y: c.y + 0.5 }))
     .sort((a, b) => Math.hypot(a.x - middle.x, a.y - middle.y) - Math.hypot(b.x - middle.x, b.y - middle.y) || a.y - b.y || a.x - b.x);
   const spaceOf = (clear: readonly CellPoint[], furnished: boolean): RoomSpace => {
-    const space = roomSpace(frame, new Set(clear.map(c => cellKey(c.x, c.y))), furnished ? floor.columns : []);
+    const space = roomSpace(frame, new Set(clear.map(c => cellKey(c.x, c.y))), furnished ? floor.columns : [], maskOf(room));
     if (furnished) for (const prop of floor.props) space.taken.push({ x: prop.x, y: prop.y, radius: propReach(prop.kind) * prop.scale });
     return space;
   };

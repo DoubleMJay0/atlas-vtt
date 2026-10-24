@@ -5,7 +5,7 @@
  */
 
 import type { CellPoint, DungeonRoom } from '../model';
-import { type CellRect, wallRect } from '../geometry';
+import { floorCellsOf } from '../geometry';
 
 export interface CellGrid {
   /** Cell coordinates of index 0. */
@@ -18,14 +18,32 @@ export interface CellGrid {
 export const DRY = 0;
 export const WET = 1;
 
+/** The cells' extent grown by `pad` cells all round. */
+export function gridOver(cells: readonly CellPoint[], pad: number): CellGrid {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const c of cells) {
+    x0 = Math.min(x0, c.x);
+    y0 = Math.min(y0, c.y);
+    x1 = Math.max(x1, c.x);
+    y1 = Math.max(y1, c.y);
+  }
+  return { x0: x0 - pad, y0: y0 - pad, w: x1 - x0 + 1 + 2 * pad, h: y1 - y0 + 1 + 2 * pad };
+}
+
 /** The rooms' walled extent with one free cell all round. */
 export function gridAround(rooms: readonly DungeonRoom[]): CellGrid {
-  const rects = rooms.map(wallRect);
-  const x0 = Math.min(...rects.map((r) => r.x0)) - 1;
-  const y0 = Math.min(...rects.map((r) => r.y0)) - 1;
-  const x1 = Math.max(...rects.map((r) => r.x1)) + 1;
-  const y1 = Math.max(...rects.map((r) => r.y1)) + 1;
-  return { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  return gridOver(floorCells(rooms), 2);
+}
+
+/** Cells marked on a grid round them (`pad` free cells all round), for tracing. */
+export function cellMask(cells: readonly CellPoint[], pad = 1): { grid: CellGrid; marks: Uint8Array } {
+  const grid = gridOver(cells, pad);
+  const marks = new Uint8Array(grid.w * grid.h);
+  for (const c of cells) marks[indexOf(grid, c.x, c.y)] = WET;
+  return { grid, marks };
 }
 
 export function indexOf(grid: CellGrid, x: number, y: number): number {
@@ -35,14 +53,13 @@ export function indexOf(grid: CellGrid, x: number, y: number): number {
 }
 
 export function floorCells(rooms: readonly DungeonRoom[]): CellPoint[] {
-  const cells: CellPoint[] = [];
-  for (const room of rooms) for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) cells.push({ x, y });
-  return cells;
+  return rooms.flatMap((room) => floorCellsOf(room));
 }
 
-function markRects(grid: CellGrid, rects: readonly CellRect[]): Uint8Array {
+/** The rooms' floor cells marked on the grid. */
+export function floorMarks(grid: CellGrid, rooms: readonly DungeonRoom[]): Uint8Array {
   const marks = new Uint8Array(grid.w * grid.h);
-  for (const r of rects) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) marks[indexOf(grid, x, y)] = 1;
+  for (const c of floorCells(rooms)) marks[indexOf(grid, c.x, c.y)] = 1;
   return marks;
 }
 
@@ -53,6 +70,23 @@ const NEAR4: readonly (readonly [number, number])[] = [
   [0, -1],
 ];
 const NEAR8: readonly (readonly [number, number])[] = [...NEAR4, [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+/** The floor and the walls round it: every cell a floor cell is among the eight neighbours of, or is. */
+export function wallMarks(grid: CellGrid, floor: Uint8Array): Uint8Array {
+  const walled = new Uint8Array(floor.length);
+  for (let y = 0; y < grid.h; y++) {
+    for (let x = 0; x < grid.w; x++) {
+      if (!floor[y * grid.w + x]) continue;
+      walled[y * grid.w + x] = 1;
+      for (const [dx, dy] of NEAR8) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < grid.w && ny < grid.h) walled[ny * grid.w + nx] = 1;
+      }
+    }
+  }
+  return walled;
+}
 
 function fillPockets(grid: CellGrid, wet: Uint8Array, keepDry?: Uint8Array): void {
   const outside = new Uint8Array(wet.length);
@@ -77,13 +111,12 @@ function fillPockets(grid: CellGrid, wet: Uint8Array, keepDry?: Uint8Array): voi
   });
 }
 
-/** The wet cells: `wetFloor` holds wet floor cells by grid index; cells set in `keepDry` stay dry, an island where water surrounds them. */
-export function wetGrid(grid: CellGrid, rooms: readonly DungeonRoom[], wetFloor: Uint8Array, keepDry?: Uint8Array): Uint8Array {
-  const floor = markRects(
-    grid,
-    rooms.map((r) => ({ x0: r.x, y0: r.y, x1: r.x + r.w - 1, y1: r.y + r.h - 1 })),
-  );
-  const walled = markRects(grid, rooms.map(wallRect));
+/**
+ * The wet cells: `floor` marks the floor cells (`floorMarks`), `wetFloor` the wet ones by grid
+ * index; cells set in `keepDry` stay dry, an island where water surrounds them.
+ */
+export function wetGrid(grid: CellGrid, floor: Uint8Array, wetFloor: Uint8Array, keepDry?: Uint8Array): Uint8Array {
+  const walled = wallMarks(grid, floor);
   const wet = new Uint8Array(wetFloor);
   const at = (x: number, y: number, marks: Uint8Array): number => (x < 0 || y < 0 || x >= grid.w || y >= grid.h ? 0 : (marks[y * grid.w + x] ?? 0));
   for (let y = 0; y < grid.h; y++) {
