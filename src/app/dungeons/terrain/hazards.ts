@@ -6,6 +6,7 @@
  * below opens onto them (`holes.ts`).
  */
 
+import { floorBelow } from '../floors/floorStack';
 import type { CellPoint } from '../model';
 import { type CellRect, cellsOf, floorRect, intersection } from '../geometry';
 import { type Rng, chance, int, pick, shuffled, weighted } from '../rng';
@@ -146,7 +147,7 @@ function blobBridge(rc: RoomCells, cells: readonly CellPoint[]): Band {
 
 /** Whether cells may open onto the floor below: every one over the floor of one regular room there. */
 function overRoomBelow(work: TerrainWork, k: number, cells: readonly CellPoint[]): boolean {
-  const below = work.floors[k + 1];
+  const below = work.floors[floorBelow(work.stack, k) ?? -1];
   return !below || below.roomHolding(cells)?.room.wing === 'regular';
 }
 
@@ -181,7 +182,7 @@ function placeChasm(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, natur
 
 /** Rectangles of the room's floor that lie over the floor of a regular room on the floor below, at least 2 × 2. */
 function overlapsBelow(work: TerrainWork, k: number, rc: RoomCells): CellRect[] {
-  const below = work.floors[k + 1];
+  const below = work.floors[floorBelow(work.stack, k) ?? -1];
   if (!below) return [];
   return below.plan.rooms.flatMap((room) => {
     if (room.kind !== 'room' || room.wing !== 'regular') return [];

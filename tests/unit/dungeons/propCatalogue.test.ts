@@ -8,6 +8,7 @@ import { draft } from '../../../src/app/dungeons/terrain/catalog';
 import { FloorTerrain } from '../../../src/app/dungeons/terrain/floorTerrain';
 import type { DungeonRoom } from '../../../src/app/dungeons/model';
 import { type MessageKey, t } from '../../../src/app/i18n';
+import { floorStack } from '../../../src/app/dungeons/floors/floorStack';
 
 const NATURAL = ['stalagmites', 'column-formation', 'flowstone', 'curtain', 'crystals', 'mushrooms', 'boulder'];
 
@@ -66,7 +67,7 @@ describe('drawn kinds', () => {
 
   it('places no terrain kind it is not offered', () => {
     const room: DungeonRoom = { id: 0, x: 0, y: 0, w: 6, h: 6, kind: 'room', rotunda: false, wing: 'regular', group: 0, parent: null, axis: { x: 0, y: 1 }, colonnade: false, boss: false };
-    const floor = new FloorTerrain(0, { rooms: [room], doors: [], stairs: [], columns: [], offeredTerrain: new Set(['crates']) });
+    const floor = new FloorTerrain(0, { rooms: [room], doors: [], stairs: [], columns: [], offeredTerrain: new Set(['crates']) }, floorStack('down', 1));
     expect(floor.place(draft('rubble-field', 0, [{ x: 2, y: 2 }]))).toBeNull();
     expect(floor.place(draft('crates', 0, [{ x: 3, y: 3 }]))).toBeTypeOf('number');
   });

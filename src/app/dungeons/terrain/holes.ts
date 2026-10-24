@@ -1,13 +1,14 @@
 /**
  * Holes through floors (Verticality): a chasm, a shaft or a gallery on floor `k` opens onto the
- * floors below. A hole only lies over the floor of a regular room on the floor below, never over
+ * floors physically below it (the stack's). A hole only lies over the floor of a regular room on the floor below, never over
  * rock, a wall, a stairwell or the cells before a door: there it either opens on (an abyss through
  * several floors, never cutting that room in two) or ends, and its fall ends on loose rubble
- * (`chasm-floor`, difficult). Below the deepest floor there is nothing: a bottomless void.
+ * (`chasm-floor`, difficult). Below the lowest floor there is nothing: a bottomless void.
  */
 
 import type { CellPoint, TerrainKind } from '../model';
 import { type Rng, chance } from '../rng';
+import { floorBelow } from '../floors/floorStack';
 import { draft } from './catalog';
 import type { RoomCells } from './roomCells';
 import { takesFall } from './typeReasons';
@@ -31,11 +32,11 @@ export interface Drop {
 /** The way down from a hole over `cells` on floor `k`; null where no floor below can take it. */
 export function dropBelow(work: TerrainWork, k: number, cells: readonly CellPoint[], rng: Rng, mayOpenOn = true): Drop | null {
   const through: Drop['through'] = [];
-  for (let floor = k + 1; floor < work.floors.length; floor++) {
+  for (let floor = floorBelow(work.stack, k); floor !== null; floor = floorBelow(work.stack, floor)) {
     const rc = work.floors[floor]?.roomHolding(cells);
     // Only a room that may take a fall from above: never a furnished room of a built theme.
     if (!rc || rc.room.wing !== 'regular' || !takesFall(work, floor, rc.room.id)) return null;
-    const last = floor === work.floors.length - 1;
+    const last = floorBelow(work.stack, floor) === null;
     const roomy = rc.depth >= 4 && rc.width >= 4 && cells.length <= rc.floorCount * (1 - MOST_OF_ROOM) && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells);
     const canOpen = mayOpenOn && roomy && rc.allows(cells, 'block') && !cells.some((c) => rc.nearStairs(c));
     const canEnd = rc.fits(cells) && rc.freeCount() - cells.length >= LEFT_UNDER;

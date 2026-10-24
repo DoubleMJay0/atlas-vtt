@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { stackOf } from '../../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
 import { doorProblems, emptyRooms, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, riseProblems, stairProblems, withinShare } from './floorsInvariants';
 import { physicsProblems } from './themeTerrainInvariants';
-import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
+import { holeProblems } from './holeInvariants';
+import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
@@ -223,7 +225,7 @@ export function describeInvariants(floors: number): void {
     });
 
     it('lay terrain on whole cells of one room each, never on doors, stairwells or the cells they are reached from', () => {
-      expect(failures(eachFloor((run, i) => [...cellProblems(run.model.floors[i]!), ...clearanceProblems(run.model.floors[i]!, i)]))).toEqual([]);
+      expect(failures(eachFloor((run, i) => [...cellProblems(run.model.floors[i]!), ...clearanceProblems(run.model.floors[i]!, i, stackOf(run.model))]))).toEqual([]);
     });
 
     it('keep holes and molten channels clear of standing water', () => {
@@ -231,7 +233,7 @@ export function describeInvariants(floors: number): void {
     });
 
     it('keep stairwells clear of hazards, bridges and water, on them and beside them', () => {
-      expect(failures(eachFloor((run, i) => stairClearanceProblems(run.model.floors[i]!, i)))).toEqual([]);
+      expect(failures(eachFloor((run, i) => stairClearanceProblems(run.model.floors[i]!, i, stackOf(run.model))))).toEqual([]);
     });
 
     it('keep a way through every floor that steps into no hazard, cover or hole, and bridge what they lay across a room', () => {
@@ -248,6 +250,14 @@ export function describeInvariants(floors: number): void {
         expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'gallery')))).toBeGreaterThan(0.08);
         expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'shaft')))).toBeGreaterThan(0.15);
       }
+    });
+
+    it('look down from a gallery into the great hall or entrance hall below', () => {
+      if (floors === 1) return;
+      // Measured 0.07 of Fortresses and 0.12–0.14 of Mansions over 400 seeds; pinned at half.
+      const rising = runs.filter((run) => run.model.theme !== 'cavern');
+      const share = rising.filter((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'gallery'))).length / rising.length;
+      expect(share).toBeGreaterThan(0.05);
     });
 
     it('give every furnished room of a Cavern that can hold a fight some cover', () => {

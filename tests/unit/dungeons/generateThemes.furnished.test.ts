@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { stackOf } from '../../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { blockedCells, clearanceProblems, hasCover, routeProblems, stairClearanceProblems } from './terrainInvariants';
@@ -32,7 +33,7 @@ describe.each(['fortress', 'mansion'] as const)('furnished %s dungeons', (theme)
   });
 
   it('keeps every way through, every door and stair approach clear of its furniture', () => {
-    expect(failures((m) => m.floors.flatMap((floor, i) => [...routeProblems(floor), ...clearanceProblems(floor, i), ...stairClearanceProblems(floor, i)].map((p) => `floor ${i}: ${p}`)))).toEqual([]);
+    expect(failures((m) => m.floors.flatMap((floor, i) => [...routeProblems(floor), ...clearanceProblems(floor, i, stackOf(m)), ...stairClearanceProblems(floor, i, stackOf(m))].map((p) => `floor ${i}: ${p}`)))).toEqual([]);
   });
 
   const arenas = runs.map((run) => run.model.floors.at(-1)!).flatMap((floor) => {

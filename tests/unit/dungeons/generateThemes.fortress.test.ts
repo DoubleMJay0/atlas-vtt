@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { FORTRESS } from '../../../src/app/dungeons/themes/fortress';
 import { normals } from './dungeonInvariants';
@@ -74,6 +75,19 @@ describe('generated Fortresses', () => {
     const ids = new Set<string>(FORTRESS.rooms.map((spec) => spec.id));
     expect(failuresOf(runs, (m) => typingProblems(m, ids))).toEqual([]);
     expect(runs.every((run) => run.model.theme === 'fortress' && normals(run.model.floors[0]!).length > 0)).toBe(true);
+  });
+
+  it('opens a chasm on the entrance floor of a Fortress as a bottomless void', () => {
+    const ruins = Array.from({ length: 300 }, (_, k) => generateDungeon({ seed: (k + 1) * 3307, theme: 'fortress', tags: ['ruined'], floors: 2 + (k % 2) }));
+    const problems = ruins.flatMap((m) => [
+      ...m.floors[0]!.terrain.filter((p) => p.opening && p.opening.bottom !== null).map((p) => `seed ${m.seed}: a ${p.kind} on the entrance floor falls to floor ${p.opening!.bottom}`),
+      ...m.floors[1]!.terrain
+        .filter((p) => p.kind === 'chasm' && p.opening)
+        .filter((p) => p.opening!.bottom !== 0 || !m.floors[0]!.terrain.some((q) => q.kind === 'chasm-floor' && q.under === p.opening!.link))
+        .map((p) => `seed ${m.seed}: a chasm on floor 1 falls to ${p.opening!.bottom}`),
+    ]);
+    // A collapse opens a floor only over a room that takes the fall, which few do (about one ruin in 300).
+    expect(problems.slice(0, 10)).toEqual([]);
   });
 
   describeThemeTerrain(runs, FORTRESS);

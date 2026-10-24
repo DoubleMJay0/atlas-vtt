@@ -7,6 +7,7 @@ import { roomSpace } from '../../../src/app/dungeons/props/space';
 import { rngFrom } from '../../../src/app/dungeons/rng';
 import { FloorTerrain } from '../../../src/app/dungeons/terrain/floorTerrain';
 import { room } from './plannedFloorFixtures';
+import { floorStack } from '../../../src/app/dungeons/floors/floorStack';
 
 /** A room of `w` × `h` cells entered from the south (axis up), with a door in the middle of its south wall and, if asked, one in its north wall. */
 export function furnished(w: number, h: number, options: { seed?: number; rotunda?: boolean; north?: boolean; offered?: ReadonlySet<PropKind>; placeAllowed?: (kind: PropKind, at: CellPoint) => boolean } = {}): FurnishSpace {
@@ -14,7 +15,7 @@ export function furnished(w: number, h: number, options: { seed?: number; rotund
   const mid = Math.floor(w / 2);
   const doors: DungeonDoor[] = [{ x: mid, y: h, dir: { x: 0, y: -1 }, kind: 'door', from: null, to: 0 }];
   if (options.north) doors.push({ x: mid, y: -1, dir: { x: 0, y: -1 }, kind: 'door', from: 0, to: 1 });
-  const floor = new FloorTerrain(0, { rooms: [r], doors, stairs: [], columns: [] });
+  const floor = new FloorTerrain(0, { rooms: [r], doors, stairs: [], columns: [] }, floorStack('down', 1));
   const rc = floor.room(0)!;
   const clear = new Set(rc.needed.map((c) => cellKey(c.x, c.y)));
   return furnishSpace({

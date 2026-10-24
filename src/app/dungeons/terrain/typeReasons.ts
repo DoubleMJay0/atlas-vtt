@@ -6,6 +6,7 @@
  */
 
 import type { TerrainKind } from '../model';
+import { floorBelow } from '../floors/floorStack';
 import { FEATURES, type FeatureSpec } from '../themes/features';
 import type { RoomTypeSpec } from '../themes/themeTypes';
 import type { TerrainWork } from './work';
@@ -30,7 +31,7 @@ export function typeAllows(spec: RoomTypeSpec | undefined, kind: TerrainKind, ru
 export function holeAllowed(work: TerrainWork, k: number, room: number, kind: TerrainKind): boolean {
   const typed = work.typed(k, room);
   if (!typed) return true;
-  const below = k + 1 < work.floors.length;
+  const below = floorBelow(work.stack, k) !== null;
   return reasonsOf(typed.spec, work.theme.ruined).some((reason) => reason.at === 'here' && reason.kinds.includes(kind) && (!reason.upperFloor || below));
 }
 

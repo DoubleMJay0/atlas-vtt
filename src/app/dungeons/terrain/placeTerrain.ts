@@ -1,6 +1,7 @@
 /**
- * Every floor's terrain, placed together so holes line up between floors. First the gallery over
- * the boss arena (it opens the floor above it), then each floor from the top down: the arena and
+ * Every floor's terrain, placed together so holes line up between floors. First the galleries over
+ * the boss arena and over the halls whose type looks up into one (they open the floor above), then
+ * each floor from the top of the stack down: the arena and
  * the five-room stages, a shaft now and then, hazards (about one per six rooms, counting holes from
  * above), then each room by its size (Terrain principle 1): open rooms take height and strong
  * features, cramped rooms low clutter, every fight-sized room some cover, the quieter ones a point
@@ -8,6 +9,7 @@
  */
 
 import type { CellPoint, DungeonRoom, DungeonTerrain } from '../model';
+import { type FloorStack, floorBelow, topDown } from '../floors/floorStack';
 import { cellKey } from '../geometry';
 import type { RoomRole } from '../props/roles';
 import { type Rng, chance, shuffled, weighted } from '../rng';
@@ -25,7 +27,7 @@ import { furnishStage } from './stages';
 import { furnishTypedArena } from './typeArena';
 import { placeTypeHazard } from './typeHazards';
 import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
-import { galleryOverArena, shaftDown } from './vertical';
+import { galleriesOverHalls, galleryOverArena, shaftDown } from './vertical';
 import { type TerrainWork, terrainWork } from './work';
 
 /** One hazard per this many normal rooms. */
@@ -58,7 +60,7 @@ function hazards(work: TerrainWork, k: number, rooms: readonly DungeonRoom[], rn
   const weights = hazardWeights(work.tags).filter(([, w]) => w > 0);
   let placed = 0;
   // A floor with a floor below opens onto it where it can: an abyss over a room down there.
-  if (wanted > 0 && k + 1 < work.floors.length && chance(rng, CHASM_OVER_CHANCE)) {
+  if (wanted > 0 && floorBelow(work.stack, k) !== null && chance(rng, CHASM_OVER_CHANCE)) {
     const opened = shuffled(rng, pool).find((room) => {
       const rc = floor.room(room.id);
       return rc !== undefined && placeChasmOver(work, k, rc, rng);
@@ -131,12 +133,17 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
   }
 }
 
-/** The terrain of every floor, as builders that still take the shallow water once it is known (`addShallowWater`). */
-export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext): FloorTerrain[] {
-  const builders = floors.map((floor, index) => new FloorTerrain(index, floor));
-  const work = terrainWork(seed, builders, tags, theme, { types: floors.map((floor) => floor.types), empty: floors.map((floor) => floor.empty) });
+/**
+ * The terrain of every floor, as builders that still take the shallow water once it is known
+ * (`addShallowWater`). Floors are furnished from the top of the stack down, so what a hole drops
+ * onto a floor is held there before that floor is furnished.
+ */
+export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext, stack: FloorStack): FloorTerrain[] {
+  const builders = floors.map((floor, index) => new FloorTerrain(index, floor, stack));
+  const work = terrainWork(seed, builders, stack, tags, theme, { types: floors.map((floor) => floor.types), empty: floors.map((floor) => floor.empty) });
   galleryOverArena(work, work.rng(builders.length - 1, 'gallery'));
-  floors.forEach((floor, k) => furnishFloor(work, k, floor));
+  galleriesOverHalls(work);
+  for (const k of topDown(stack)) furnishFloor(work, k, floors[k] as TerrainFloorInput);
   return builders;
 }
 

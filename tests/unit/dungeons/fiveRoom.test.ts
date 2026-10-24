@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { floorStack } from '../../../src/app/dungeons/floors/floorStack';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { FIVE_ROOM_STAGES, type DungeonFloor, type DungeonModel, type FiveRoomStage } from '../../../src/app/dungeons/model';
 import type { ThemeChoice } from '../../../src/app/dungeons/themes/themeTypes';
 import { distances, doorProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
-import { bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, routeProblems, stairClearanceProblems } from './terrainInvariants';
+import { holeProblems } from './holeInvariants';
+import { bridgeProblems, cellProblems, clearanceProblems, hasCover, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
 /**
  * Five-room dungeons (Johnn Four's structure) over 1,000 seeds: one floor whatever was asked, five
@@ -11,6 +13,7 @@ import { bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems
  * stage built as architecture, and every terrain rule kept.
  */
 
+const ONE_FLOOR = floorStack('down', 1);
 const SEEDS = 1000;
 const TAG_SETS: readonly string[][] = [[], ['colonnades'], ['crumbling'], ['wet'], ['dry'], ['large'], ['small'], ['round']];
 /** The theme each tag set is asked with: what the retired temple, tomb and dwelling tags stood for, else Any. */
@@ -106,7 +109,7 @@ describe('five-room dungeons', () => {
 
   it('keep every rule of the layout and the terrain', () => {
     expect(failures((floor) => [...doorProblems(floor, true), ...unreachableRooms(floor).map((id) => `room ${id} unreachable`), ...secretProblems(floor)])).toEqual([]);
-    expect(failures((floor) => [...cellProblems(floor), ...clearanceProblems(floor, 0), ...routeProblems(floor), ...bridgeProblems(floor), ...stairClearanceProblems(floor, 0)])).toEqual([]);
+    expect(failures((floor) => [...cellProblems(floor), ...clearanceProblems(floor, 0, ONE_FLOOR), ...routeProblems(floor), ...bridgeProblems(floor), ...stairClearanceProblems(floor, 0, ONE_FLOOR)])).toEqual([]);
     expect(failures((_, model) => holeProblems(model))).toEqual([]);
   });
 

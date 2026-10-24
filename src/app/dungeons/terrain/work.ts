@@ -1,5 +1,6 @@
 /** What every terrain pass shares: the floors being placed, the tags, the theme, the links of holes, the streams. */
 
+import type { FloorStack } from '../floors/floorStack';
 import { type Rng, floorStream } from '../rng';
 import type { DungeonTag } from '../tags';
 import type { ThemeContext } from '../themes/themes';
@@ -8,6 +9,8 @@ import type { TypedRoom } from './typeTerrain';
 
 export interface TerrainWork {
   floors: readonly FloorTerrain[];
+  /** Which floor lies over which: holes fall to the floor physically below. */
+  stack: FloorStack;
   tags: ReadonlySet<DungeonTag>;
   theme: ThemeContext;
   /** A room's type and its recipe's reading, where the theme typed it. */
@@ -26,10 +29,11 @@ export interface TerrainTypes {
   empty: readonly ReadonlySet<number>[];
 }
 
-export function terrainWork(seed: number, floors: readonly FloorTerrain[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext, typed: TerrainTypes): TerrainWork {
+export function terrainWork(seed: number, floors: readonly FloorTerrain[], stack: FloorStack, tags: ReadonlySet<DungeonTag>, theme: ThemeContext, typed: TerrainTypes): TerrainWork {
   let link = 0;
   return {
     floors,
+    stack,
     tags,
     theme,
     typed: (floor, room) => typed.types[floor]?.get(room),

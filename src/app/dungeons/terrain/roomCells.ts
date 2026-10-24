@@ -11,7 +11,7 @@
 
 import type { CellDir, CellPoint, DungeonColumn, DungeonDoor, DungeonRoom, DungeonStair } from '../model';
 import { cellKey, cellsOf, dir, floorRect, inRect } from '../geometry';
-import { approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
+import { type StairEnd, approachCells, doorApproaches, spotRect } from '../floors/stairSpots';
 import type { Footing } from './catalog';
 
 const STEPS: readonly CellDir[] = [dir(1, 0), dir(-1, 0), dir(0, 1), dir(0, -1)];
@@ -44,7 +44,7 @@ export class RoomCells {
     readonly room: DungeonRoom,
     doors: readonly DungeonDoor[],
     stairs: readonly DungeonStair[],
-    floorIndex: number,
+    endOf: (stair: DungeonStair) => StairEnd,
     columns: readonly DungeonColumn[],
   ) {
     const horizontal = room.axis.x !== 0;
@@ -53,7 +53,7 @@ export class RoomCells {
     const rect = floorRect(room);
     const inside = stairs.filter((s) => cellsOf(spotRect(s)).every((c) => inRect(rect, c.x, c.y)));
     const stairCells = inside.flatMap((s) => cellsOf(spotRect(s)));
-    const approaches = inside.flatMap((s) => approachCells(s, s.to > floorIndex ? 'upper' : 'lower'));
+    const approaches = inside.flatMap((s) => approachCells(s, endOf(s)));
     this.needed = [...doorApproaches(room, doors), ...approaches].filter((c) => inRect(rect, c.x, c.y));
     this.doorCells = new Set(doors.filter((d) => d.kind !== 'secret' && (d.from === room.id || d.to === room.id)).map((d) => cellKey(d.x, d.y)));
     for (const c of [...stairCells, ...this.needed]) this.clear.add(cellKey(c.x, c.y));

@@ -2,6 +2,7 @@ import type { CellPoint, DungeonFloor, DungeonModel, DungeonTerrain, TerrainKind
 import { PROP_SPECS } from '../../../src/app/dungeons/props/catalogue';
 import { FEATURES } from '../../../src/app/dungeons/themes/features';
 import type { ArenaSetPiece, ArenaSpec, RoomProgramme, RoomTypeSpec } from '../../../src/app/dungeons/themes/themeTypes';
+import { floorsBelow, opensAbove } from './holeInvariants';
 import { isHazard } from './terrainInvariants';
 
 /**
@@ -49,7 +50,10 @@ export function reasonProblems(model: DungeonModel, programme: RoomProgramme): s
     for (const piece of floor.terrain) {
       if (!checked(floor, piece.room) || piece.kind === 'bridge') continue;
       const spec = specIn(programme, floor, piece.room)!;
-      const fromAbove = piece.opening !== undefined && model.floors.slice(0, f).some((above) => above.terrain.some((p) => p.opening?.link === piece.opening?.link));
+      const fromAbove = piece.opening !== undefined && model.floors.some((above, a) => floorsBelow(model, a).includes(f) && above.terrain.some((p) => p.opening?.link === piece.opening?.link));
+      // An opening cut for the room below stands for that room's reason.
+      const under = piece.opening?.bottom === floorsBelow(model, f)[0] ? model.floors[piece.opening?.bottom ?? -1]?.rooms.find((r) => r.kind === 'room' && piece.cells.every((c) => c.x >= r.x && c.x < r.x + r.w && c.y >= r.y && c.y < r.y + r.h)) : undefined;
+      if (under && opensAbove(model, under, piece.kind)) continue;
       if (piece.kind === 'chasm-floor' || fromAbove) {
         if (!(spec.terrain.hazards?.length || spec.id === 'collapsed-room' || !floor.props.some((p) => p.room === piece.room))) out.push(`floor ${f}: a fall into a furnished ${spec.id}`);
         continue;

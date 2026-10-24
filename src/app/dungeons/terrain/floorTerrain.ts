@@ -7,6 +7,8 @@
 import { DRAWN_TERRAIN_KINDS } from '../drawnKinds';
 import type { CellPoint, DungeonColumn, DungeonDoor, DungeonProp, DungeonRoom, DungeonStair, DungeonTerrain, TerrainKind } from '../model';
 import { cellKey, floorRect, inRect } from '../geometry';
+import { type FloorStack, stairEnd } from '../floors/floorStack';
+import type { StairEnd } from '../floors/stairSpots';
 import { type TerrainDraft, footingOf } from './catalog';
 import { RoomCells } from './roomCells';
 
@@ -30,10 +32,12 @@ export class FloorTerrain {
   constructor(
     readonly index: number,
     readonly plan: FloorPlan,
+    stack: FloorStack,
   ) {
+    const endOf = (stair: DungeonStair): StairEnd => stairEnd(stack, index, stair.to);
     for (const room of plan.rooms) {
       if (room.kind !== 'room') continue;
-      this.cells.set(room.id, new RoomCells(room, plan.doors, plan.stairs, index, plan.columns));
+      this.cells.set(room.id, new RoomCells(room, plan.doors, plan.stairs, endOf, plan.columns));
     }
   }
 

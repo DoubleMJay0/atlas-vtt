@@ -6,6 +6,7 @@
  * its own, so one room's things never move another's.
  */
 
+import { type FloorStack, stairEnd } from './floors/floorStack';
 import type { DungeonColumn, DungeonCrack, DungeonDoor, DungeonProp, DungeonRoom, DungeonRubble, DungeonStair, DungeonTerrain } from './model';
 import type { DungeonParams } from './params';
 import { cellKey, cellsOf } from './geometry';
@@ -28,6 +29,8 @@ export interface PropsInput {
   seed: number;
   /** The floor's index. */
   floor: number;
+  /** Which floor lies over which, for the end of each stairwell on this floor. */
+  stack: FloorStack;
   rooms: readonly DungeonRoom[];
   doors: readonly DungeonDoor[];
   stairs: readonly DungeonStair[];
@@ -49,7 +52,7 @@ const CRUMBLED_RUBBLE = 3;
 function clearCells(input: PropsInput): Set<string> {
   const { floor, rooms, doors, stairs, terrain } = input;
   const cells = [
-    ...stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, s.to > floor ? 'upper' : 'lower')]),
+    ...stairs.flatMap((s) => [...cellsOf(spotRect(s)), ...approachCells(s, stairEnd(input.stack, floor, s.to))]),
     ...rooms.flatMap((room) => doorApproaches(room, doors)),
     ...terrain.flatMap((piece) => piece.cells),
   ];

@@ -1,11 +1,12 @@
 /**
  * Checks of a generated dungeon's terrain, written apart from the generator: each returns a list of
  * problems, empty when sound. Map-Fu's whole cells, nothing on doors, stairs or the cells they are
- * reached from, a way through every floor that steps into no hazard, bridges that span what they
- * cross, and holes that line up over the floors below.
+ * reached from, a way through every floor that steps into no hazard and bridges that span what they
+ * cross. Holes through floors are `holeInvariants.ts`'.
  */
 
-import type { CellPoint, DungeonFloor, DungeonModel, DungeonProp, DungeonRoom, DungeonTerrain, TerrainKind } from '../../../src/app/dungeons/model';
+import { type FloorStack, stairEnd } from '../../../src/app/dungeons/floors/floorStack';
+import type { CellPoint, DungeonFloor, DungeonProp, DungeonRoom, DungeonTerrain, TerrainKind } from '../../../src/app/dungeons/model';
 import { PROP_SPECS, isCellPiece } from '../../../src/app/dungeons/props/catalogue';
 
 const key = (c: CellPoint): string => `${c.x},${c.y}`;
@@ -42,7 +43,7 @@ export function isHazard(piece: DungeonTerrain): boolean {
   return piece.traits.hazard !== undefined;
 }
 
-function stairCells(floor: DungeonFloor): CellPoint[] {
+export function stairCells(floor: DungeonFloor): CellPoint[] {
   return floor.stairs.flatMap((s) => {
     const out: CellPoint[] = [];
     for (let y = s.y; y < s.y + s.h; y++) for (let x = s.x; x < s.x + s.w; x++) out.push({ x, y });
@@ -54,18 +55,18 @@ function stairCells(floor: DungeonFloor): CellPoint[] {
  * Stairwells stand clear: no hazard (lava, acid, water, a chasm or pit) and no bridge lies on a
  * stairwell, the row it is reached from or any cell beside them, and no pool reaches them.
  */
-export function stairClearanceProblems(floor: DungeonFloor, index: number): string[] {
+export function stairClearanceProblems(floor: DungeonFloor, index: number, stack: FloorStack): string[] {
   const near = new Set<string>();
-  for (const c of [...stairCells(floor), ...stairApproaches(floor, index)]) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.add(key({ x: c.x + dx, y: c.y + dy }));
+  for (const c of [...stairCells(floor), ...stairApproaches(floor, index, stack)]) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.add(key({ x: c.x + dx, y: c.y + dy }));
   const pieces = floor.terrain.filter((p) => (isHazard(p) || p.kind === 'bridge') && p.kind !== 'chasm-floor' && p.cells.some((c) => near.has(key(c)))).map((p) => `${p.kind} ${p.id} beside a stairwell`);
   const water = floor.waterCells.some((c) => near.has(key(c))) ? ['water beside a stairwell'] : [];
   return [...pieces, ...water];
 }
 
 /** The row each stair end on this floor is reached from: before its high end above, past its low end below. */
-function stairApproaches(floor: DungeonFloor, index: number): CellPoint[] {
+function stairApproaches(floor: DungeonFloor, index: number, stack: FloorStack): CellPoint[] {
   return floor.stairs.flatMap((s) => {
-    const upper = s.to > index;
+    const upper = stairEnd(stack, index, s.to) === 'upper';
     const d = upper ? { x: -s.down.x, y: -s.down.y } : s.down;
     const own = new Set(stairCells({ ...floor, stairs: [s] }).map(key));
     return [...own].map((k) => k.split(',').map(Number) as [number, number]).map(([x, y]) => ({ x: x + d.x, y: y + d.y })).filter((c) => !own.has(key(c)));
@@ -79,7 +80,7 @@ function doorApproaches(floor: DungeonFloor): CellPoint[] {
   ]);
 }
 
-function inFloor(room: DungeonRoom, c: CellPoint): boolean {
+export function inFloor(room: DungeonRoom, c: CellPoint): boolean {
   return c.x >= room.x && c.x < room.x + room.w && c.y >= room.y && c.y < room.y + room.h;
 }
 
@@ -116,8 +117,8 @@ export function cellProblems(floor: DungeonFloor): string[] {
 }
 
 /** No piece on a door cell, before a door, on a stairwell or the row it is reached from. */
-export function clearanceProblems(floor: DungeonFloor, index: number): string[] {
-  const keep = new Set([...floor.doors.map(key), ...doorApproaches(floor), ...stairCells(floor), ...stairApproaches(floor, index)].map(key));
+export function clearanceProblems(floor: DungeonFloor, index: number, stack: FloorStack): string[] {
+  const keep = new Set([...floor.doors.map(key), ...doorApproaches(floor), ...stairCells(floor), ...stairApproaches(floor, index, stack)].map(key));
   return floor.terrain.flatMap((piece) => piece.cells.filter((c) => keep.has(key(c))).map((c) => `${piece.kind} ${piece.id} on ${key(c)}, which stays clear`));
 }
 
@@ -245,44 +246,6 @@ function linked(from: CellPoint, to: CellPoint, may: (c: CellPoint) => boolean):
     }
   }
   return false;
-}
-
-/**
- * Holes line up: a hole lies over the floor of a room on every floor below it down to where its fall
- * ends, never over a stairwell there; each floor it opens through holds a hole of the same link
- * over the same cells, and the floor it ends on the rubble under it. A gallery opens into the boss room right below.
- */
-export function holeProblems(model: DungeonModel): string[] {
-  const out: string[] = [];
-  const deepest = model.floors.length - 1;
-  model.floors.forEach((floor, k) => {
-    for (const hole of floor.terrain.filter((p) => p.opening)) {
-      const { bottom, link } = hole.opening!;
-      const where = `floor ${k} ${hole.kind} ${hole.id}`;
-      const cells = new Set(hole.cells.map(key));
-      const same = (p: DungeonTerrain): boolean => p.cells.length === cells.size && p.cells.every((c) => cells.has(key(c)));
-      if (bottom !== null && (bottom <= k || bottom > deepest)) out.push(`${where} falls to floor ${bottom}`);
-      const last = bottom ?? deepest;
-      if (hole.kind === 'gallery') {
-        const below = model.floors[k + 1];
-        const boss = below?.rooms.find((r) => r.boss);
-        if (bottom !== k + 1 || !boss || !hole.cells.every((c) => inFloor(boss, c))) out.push(`${where} does not open into the boss room below`);
-        continue;
-      }
-      for (let j = k + 1; j <= last; j++) {
-        const below = model.floors[j]!;
-        const room = below.rooms.find((r) => r.kind === 'room' && hole.cells.every((c) => inFloor(r, c)));
-        if (!room) out.push(`${where} lies over no room of floor ${j}`);
-        const stairs = new Set(stairCells(below).map(key));
-        if (hole.cells.some((c) => stairs.has(key(c)))) out.push(`${where} lies over a stairwell of floor ${j}`);
-        const ending = j === bottom;
-        const match = below.terrain.find((p) => (ending ? p.kind === 'chasm-floor' && p.under === link : p.opening?.link === link) && same(p));
-        if (!match) out.push(`${where}: floor ${j} has no ${ending ? 'rubble under it' : 'hole of the same link'}`);
-      }
-      if (bottom === null && k < deepest && !model.floors[deepest]!.terrain.some((p) => p.opening?.link === link)) out.push(`${where} is bottomless but the deepest floor is not open under it`);
-    }
-  });
-  return out;
 }
 
 /** How many cells of the room a party cannot walk. */

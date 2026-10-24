@@ -183,6 +183,8 @@ export const dungeon = {
   'dungeon.terrain.oubliette': 'Oubliette',
   'dungeon.terrain.pit': 'Pit',
   'dungeon.terrain.gallery': 'Gallery',
+  'dungeon.terrain.minstrelsGallery': "Minstrels' gallery",
+  'dungeon.terrain.stairWell': 'Stair well',
   'dungeon.terrain.parapet': 'Parapet',
   'dungeon.terrain.bridge': 'Bridge',
   'dungeon.terrain.ropeBridge': 'Rope bridge',
