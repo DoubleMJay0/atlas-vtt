@@ -7,10 +7,13 @@
  */
 
 import { type StairSpot, approachCells, spotRect } from '../../floors/stairSpots';
-import { cellKey, cellsOf, floorRect, inRect, wallRect } from '../../geometry';
+import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import { hops, neighbours, openDoor } from '../../roomGraph';
-import { CaveGrid, type CaveFloorPlan, ROCK, doorOwner } from './caveGrid';
+import { CaveGrid, type CaveFloorPlan } from './caveGrid';
+import { type LaneOwner, entranceDoor, laneConflict, laneOwners } from './laneCells';
+
+export { claimLane } from './laneCells';
 
 export type LaneEnd = { kind: 'entrance' } | { kind: 'stair'; spot: StairSpot } | { kind: 'room'; id: number };
 
@@ -21,10 +24,6 @@ const STEPS: readonly (readonly [number, number])[] = [
   [0, -1],
 ];
 
-/** The entrance door's index, the first that leads in from outside and is no secret one. */
-function entranceDoor(floor: Pick<CaveFloorPlan, 'doors'>): number {
-  return floor.doors.findIndex((door) => door.from === null && door.kind !== 'secret');
-}
 
 function roomOfEnd(floor: Pick<CaveFloorPlan, 'rooms' | 'doors'>, end: LaneEnd): number {
   if (end.kind === 'room') return end.id;
@@ -73,53 +72,6 @@ function endArea(floor: CaveFloorPlan, end: LaneEnd, side: 'upper' | 'lower'): {
   return { area: keys([...row, ...row.map((c) => ({ x: c.x + door.dir.x, y: c.y + door.dir.y }))]), touch: keys([{ x: door.x, y: door.y }]) };
 }
 
-/** The doors a lane passes: between rooms one after the other on the route, and the entrance into its first. */
-function laneDoorsOf(floor: Pick<CaveFloorPlan, 'doors'>, route: readonly number[]): number[] {
-  const pairs = new Set(route.slice(1).map((id, k) => `${Math.min(id, route[k]!)}:${Math.max(id, route[k]!)}`));
-  return floor.doors.flatMap((door, k) => {
-    if (door.kind === 'secret') return [];
-    if (door.from === null) return door.to === route[0] && k === entranceDoor(floor) ? [k] : [];
-    return door.to !== null && pairs.has(`${Math.min(door.from, door.to)}:${Math.max(door.from, door.to)}`) ? [k] : [];
-  });
-}
-
-/** The lane door the cell stands beside, in the wall it is set in, if one does. */
-function besideDoor(floor: Pick<CaveFloorPlan, 'doors'>, doors: readonly number[], x: number, y: number): number | undefined {
-  return doors.find((k) => {
-    const door = floor.doors[k]!;
-    return Math.abs(x - door.x) + Math.abs(y - door.y) === 1 && (x - door.x) * door.dir.x + (y - door.y) * door.dir.y === 0;
-  });
-}
-
-/** Which cells a lane block may hold. */
-function laneCells(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], ends: readonly Set<string>[]): (x: number, y: number) => boolean {
-  const onRoute = new Set(route);
-  const laneDoors = laneDoorsOf(floor, route);
-  const stairCells = new Set(floor.stairs.flatMap((s) => cellsOf(spotRect(s))).map((c) => cellKey(c.x, c.y)));
-  const tunnels = route.map((id) => floor.rooms[id]).filter((room): room is DungeonRoom => room !== undefined && room.kind !== 'room');
-  const memo = new Map<string, boolean>();
-  const allowed = (x: number, y: number): boolean => {
-    const key = cellKey(x, y);
-    if (stairCells.has(key) && !ends.some((end) => end.has(key))) return false;
-    const envelope = grid.envelope(x, y);
-    if (envelope !== ROCK) return onRoute.has(envelope);
-    const owner = grid.owner(x, y);
-    if (owner !== ROCK) return laneDoors.some((k) => owner === doorOwner(k));
-    const beside = besideDoor(floor, laneDoors, x, y);
-    if (beside !== undefined) return grid.mayWiden(x, y, doorOwner(beside));
-    return tunnels.some((room) => inRect(wallRect(room), x, y) && grid.mayWiden(x, y, room.id));
-  };
-  return (x, y) => {
-    const key = cellKey(x, y);
-    let ok = memo.get(key);
-    if (ok === undefined) {
-      ok = allowed(x, y);
-      memo.set(key, ok);
-    }
-    return ok;
-  };
-}
-
 const blockCells = (ax: number, ay: number): CellPoint[] => [
   { x: ax, y: ay },
   { x: ax + 1, y: ay },
@@ -140,15 +92,9 @@ function endBlocks(end: { area: Set<string>; touch: Set<string> }, ok: (x: numbe
   return [...out];
 }
 
-/**
- * The lane's cells, two wide all the way, from `from` to `to` along `route`; null where no such
- * way fits. A stairwell is left from the row past its low end, the way down reached by the row before its high end.
- */
-export function wideLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], from: LaneEnd, to: LaneEnd): CellPoint[] | null {
-  if (route.length === 0) return null;
-  const start = endArea(floor, from, 'lower');
-  const goal = endArea(floor, to, 'upper');
-  const ok = laneCells(grid, floor, route, [start.area, goal.area]);
+/** A walk of 2 × 2 blocks from the start's blocks to the goal's over cells `owners` allow; its cells, or null. */
+function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { area: Set<string>; touch: Set<string> }, owners: LaneOwner): CellPoint[] | null {
+  const ok = (x: number, y: number): boolean => owners(x, y) !== null;
   const goals = new Set(endBlocks(goal, ok));
   const fits = (ax: number, ay: number): boolean => blockCells(ax, ay).every((c) => ok(c.x, c.y));
   const back = new Map<string, string>(endBlocks(start, ok).map((key) => [key, key]));
@@ -173,6 +119,30 @@ export function wideLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly n
     if (back.get(key) === key) break;
   }
   return [...lane.values()].reverse();
+}
+
+/** How many times a lane whose owners would touch is given up at that cell and found anew. */
+const LANE_RETRIES = 24;
+
+/**
+ * The lane's cells, two wide all the way, from `from` to `to` along `route`; null where no such
+ * way fits. A stairwell is left from the row past its low end, the way down reached by the row
+ * before its high end. Two rooms' cells of the lane never touch but round the narrows joining them.
+ */
+export function wideLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], from: LaneEnd, to: LaneEnd): CellPoint[] | null {
+  if (route.length === 0) return null;
+  const start = endArea(floor, from, 'lower');
+  const goal = endArea(floor, to, 'upper');
+  const banned = new Set<string>();
+  for (let tries = 0; tries <= LANE_RETRIES; tries++) {
+    const owners = laneOwners(grid, floor, route, [start.area, goal.area], banned);
+    const lane = blockWalk(start, goal, owners);
+    if (!lane) return null;
+    const conflict = laneConflict(grid, lane, owners);
+    if (conflict === null) return lane;
+    banned.add(conflict);
+  }
+  return null;
 }
 
 /** Whether a two-cell lane fits from `from` to `to` on floor `index`: what a cave floor's layout must allow. */
@@ -232,25 +202,4 @@ export function clearOfLane(floor: CaveFloorPlan, index: number): (spot: StairSp
       return false;
     });
   };
-}
-
-/**
- * Gives every lane cell its owner, for good: a room's cell to its room, a door's and the wall cell
- * beside it to the door, a tunnel's side wall to the tunnel.
- */
-export function claimLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], lane: readonly CellPoint[]): void {
-  const tunnels = route.map((id) => floor.rooms[id]).filter((room): room is DungeonRoom => room !== undefined && room.kind !== 'room');
-  const doors = laneDoorsOf(floor, route);
-  for (const c of lane) {
-    const envelope = grid.envelope(c.x, c.y);
-    if (envelope !== ROCK) {
-      grid.require(envelope, [c]);
-      continue;
-    }
-    if (grid.owner(c.x, c.y) !== ROCK) continue;
-    const door = besideDoor(floor, doors, c.x, c.y);
-    const tunnel = tunnels.find((room) => inRect(wallRect(room), c.x, c.y));
-    if (door !== undefined) grid.require(doorOwner(door), [c]);
-    else if (tunnel) grid.require(tunnel.id, [c]);
-  }
 }

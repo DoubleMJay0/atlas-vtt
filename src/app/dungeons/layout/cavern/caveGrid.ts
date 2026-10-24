@@ -123,21 +123,38 @@ export class CaveGrid {
     this.owners[i] = ROCK;
   }
 
-  /** Whether two owners may touch: a room only its own doors, a door only its two rooms. */
+  /** Whether two owners may touch: a room only its own doors, a door only its two rooms and the doors of either (a junction's). */
   private mayTouch(owner: number, other: number): boolean {
     if (other === ROCK || other === owner) return true;
     const ownerIsDoor = isDoor(owner);
+    if (ownerIsDoor && isDoor(other)) {
+      const a = this.doors[doorIndex(owner)];
+      const b = this.doors[doorIndex(other)];
+      return a !== undefined && b !== undefined && [a.from, a.to].some((room) => room !== null && (room === b.from || room === b.to));
+    }
     if (ownerIsDoor === isDoor(other)) return false;
     const door = this.doors[doorIndex(ownerIsDoor ? owner : other)];
     const room = ownerIsDoor ? other : owner;
     return door !== undefined && (door.from === room || door.to === room);
   }
 
+  /**
+   * Whether `owner` at (x, y) may touch `other` at (nx, ny), with owners read through `ownerAt`:
+   * a room its own doors, a door its two rooms, and two rooms only round the narrows that joins
+   * them, both beside its cells (two tunnels turning through one narrows).
+   */
+  mayTouchAt(owner: number, other: number, x: number, y: number, nx: number, ny: number, ownerAt: (x: number, y: number) => number = (cx, cy) => this.owner(cx, cy)): boolean {
+    if (this.mayTouch(owner, other)) return true;
+    if (isDoor(owner) || isDoor(other) || owner === ROCK || other === ROCK) return false;
+    const byDoor = (k: number, cx: number, cy: number): boolean => NEAR8.some(([dx, dy]) => ownerAt(cx + dx, cy + dy) === doorOwner(k));
+    return this.doors.some((door, k) => ((door.from === owner && door.to === other) || (door.from === other && door.to === owner)) && byDoor(k, x, y) && byDoor(k, nx, ny));
+  }
+
   /** Whether `owner` may take the rock cell: nothing it may not touch lies beside it or at its corners. */
   mayClaim(x: number, y: number, owner: number): boolean {
     const i = this.index(x, y);
     if (i < 0 || (this.owners[i] !== ROCK && this.owners[i] !== owner)) return false;
-    return NEAR8.every(([dx, dy]) => this.mayTouch(owner, this.owner(x + dx, y + dy)));
+    return NEAR8.every(([dx, dy]) => this.mayTouchAt(owner, this.owner(x + dx, y + dy), x, y, x + dx, y + dy));
   }
 
   /**

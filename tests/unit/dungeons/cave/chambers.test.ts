@@ -1,17 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { planFloors } from '../../../../src/app/dungeons/floors/planFloors';
 import { cellKey, floorRect, inRect } from '../../../../src/app/dungeons/geometry';
-import { CaveGrid } from '../../../../src/app/dungeons/layout/cavern/caveGrid';
-import { caveParams } from '../../../../src/app/dungeons/layout/cavern/caveParams';
-import { chamberSeeds, growChamber, smoothChamber } from '../../../../src/app/dungeons/layout/cavern/chambers';
-import { faultDirections, nearFault } from '../../../../src/app/dungeons/layout/cavern/faults';
-import { claimLane, laneEnds, mainRoute, wideLane } from '../../../../src/app/dungeons/layout/cavern/mainPath';
+import { nearFault } from '../../../../src/app/dungeons/layout/cavern/faults';
 import type { CellPoint, DungeonRoom } from '../../../../src/app/dungeons/model';
-import { dungeonParams, dungeonTags } from '../../../../src/app/dungeons/params';
-import { rngFrom, stream } from '../../../../src/app/dungeons/rng';
 import { arenaSeeds } from '../../../../src/app/dungeons/terrain/arena';
-
-const SETS: string[][] = [[], ['large'], ['lava'], ['deep'], ['small'], ['spacious', 'wet']];
+import { shapedFloors } from './caveHarness';
 
 interface Shaped {
   room: DungeonRoom;
@@ -25,36 +17,10 @@ interface Shaped {
 
 function shapedChambers(): Shaped[] {
   const out: Shaped[] = [];
-  let floors = 0;
-  for (let k = 1; floors < 400; k++) {
-    const seed = k * 4_391;
-    const params = caveParams(dungeonParams(dungeonTags(seed, SETS[k % SETS.length]!)));
-    const shaping = params.cave!;
-    const planned = planFloors(seed, params, 1 + (k % 2), true);
-    const faults = faultDirections(stream(seed, 'cave', 'faults'), planned[0]!.rooms);
-    planned.forEach((floor, index) => {
-      floors++;
-      const grid = new CaveGrid(floor, index);
-      const [from, to] = laneEnds(index, planned.length, floor, true);
-      const route = mainRoute(floor, from, to);
-      const lane = wideLane(grid, floor, route, from, to) ?? [];
-      claimLane(grid, floor, route, lane);
-      const laneKeys = new Set(lane.map((c) => cellKey(c.x, c.y)));
-      floor.rooms
-        .filter((room) => room.kind === 'room')
-        .forEach((room, n) => {
-          const seeds = chamberSeeds(grid, room, laneKeys);
-          const rng = rngFrom(seed + room.id);
-          const fill = shaping.fill[0] + rng() * (shaping.fill[1] - shaping.fill[0]);
-          const gamma = shaping.gamma[0] + rng() * (shaping.gamma[1] - shaping.gamma[0]);
-          growChamber(rng, grid, room, seeds, { gamma, stretch: shaping.stretch, fill, faults });
-          const grown = grid.cellsOf(room.id).length;
-          smoothChamber(grid, room, new Set(seeds.map((c) => cellKey(c.x, c.y))), n % 2 === 0 ? 2 : 1);
-          const target = Math.min(room.w * room.h, Math.max(Math.round(fill * room.w * room.h), seeds.length + 9));
-          out.push({ room, seeds, grown, mask: grid.cellsOf(room.id), fill: shaping.fill, target, faults });
-        });
-    });
-  }
+  shapedFloors(400, ({ grid, shaping, faults }, { room, seeds, grown, fill }) => {
+    const target = Math.min(room.w * room.h, Math.max(Math.round(fill * room.w * room.h), seeds.length + 9));
+    out.push({ room, seeds, grown, mask: grid.cellsOf(room.id), fill: shaping.fill, target, faults });
+  });
   return out;
 }
 
