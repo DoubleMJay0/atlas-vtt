@@ -67,7 +67,7 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   // A built theme (one whose water its rooms decide) keeps its typed rooms clear of thickets, unless it lies in ruins.
   // A cave's life keeps to its zones: daylight by the mouth, fungi by water and roosts, nothing where lava runs.
   const life = site && caveLife(site, { rooms, doors, terrain: terrain.pieces });
-  const pieces = addUndergrowth(seed, terrain, waterCells, flora, parts.water !== null && !params.tags.has('ruined'), life ?? undefined);
+  const pieces = addUndergrowth(seed, terrain, waterCells, flora, parts.water !== null && !params.tags.has('ruined'), life);
   const { props } = terrain;
   const { rubble, cracks } = placeScatter({ seed, floor: index, rooms, doors, stairs, columns, terrain: pieces, params, furnished: terrain.propCells() });
   const grown = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);

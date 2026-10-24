@@ -10,20 +10,12 @@ import { type StairSpot, approachCells, spotRect } from '../../floors/stairSpots
 import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import { hops, neighbours, openDoor } from '../../roomGraph';
-import { CaveGrid, type CaveFloorPlan } from './caveGrid';
+import { CaveGrid, type CaveFloorPlan, NEAR4, NEAR8, unkey } from './caveGrid';
 import { type LaneOwner, crossingConflict, entranceDoor, laneConflict, laneOwners } from './laneCells';
 
 export { claimLane } from './laneCells';
 
 export type LaneEnd = { kind: 'entrance' } | { kind: 'stair'; spot: StairSpot } | { kind: 'room'; id: number };
-
-const STEPS: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-];
-
 
 function roomOfEnd(floor: Pick<CaveFloorPlan, 'rooms' | 'doors'>, end: LaneEnd): number {
   if (end.kind === 'room') return end.id;
@@ -83,7 +75,7 @@ const blockCells = (ax: number, ay: number): CellPoint[] => [
 function endBlocks(end: { area: Set<string>; touch: Set<string> }, ok: (x: number, y: number) => boolean): string[] {
   const out = new Set<string>();
   for (const key of end.touch) {
-    const [x, y] = key.split(',').map(Number) as [number, number];
+    const { x, y } = unkey(key);
     for (const [ax, ay] of [[x - 1, y - 1], [x, y - 1], [x - 1, y], [x, y]] as const) {
       const cells = blockCells(ax, ay);
       if (cells.every((c) => end.area.has(cellKey(c.x, c.y)) && ok(c.x, c.y))) out.add(cellKey(ax, ay));
@@ -103,8 +95,8 @@ function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { are
   for (let head = 0; head < queue.length && found === null; head++) {
     const at = queue[head]!;
     if (goals.has(at)) found = at;
-    const [ax, ay] = at.split(',').map(Number) as [number, number];
-    for (const [dx, dy] of STEPS) {
+    const { x: ax, y: ay } = unkey(at);
+    for (const [dx, dy] of NEAR4) {
       const key = cellKey(ax + dx, ay + dy);
       if (back.has(key) || !fits(ax + dx, ay + dy)) continue;
       back.set(key, at);
@@ -114,7 +106,7 @@ function blockWalk(start: { area: Set<string>; touch: Set<string> }, goal: { are
   if (found === null) return null;
   const lane = new Map<string, CellPoint>();
   for (let key = found; ; key = back.get(key)!) {
-    const [ax, ay] = key.split(',').map(Number) as [number, number];
+    const { x: ax, y: ay } = unkey(key);
     for (const c of blockCells(ax, ay)) lane.set(cellKey(c.x, c.y), c);
     if (back.get(key) === key) break;
   }
@@ -191,15 +183,13 @@ export function clearOfLane(floor: CaveFloorPlan, index: number): (spot: StairSp
     const home = floor.rooms.find((room) => inRect(floorRect(room), r.x0, r.y0));
     const kept = [...cellsOf(r), ...approachCells(spot, 'upper'), ...approachCells(spot, 'lower')];
     // Its cells may not be lane, nor lie beside lane outside its own room, which a tunnel would then touch.
-    return !kept.some((c) => {
-      if (keys.has(cellKey(c.x, c.y))) return true;
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
+    return !kept.some(
+      (c) =>
+        keys.has(cellKey(c.x, c.y)) ||
+        NEAR8.some(([dx, dy]) => {
           const n = { x: c.x + dx, y: c.y + dy };
-          if (keys.has(cellKey(n.x, n.y)) && !(home && inRect(floorRect(home), n.x, n.y))) return true;
-        }
-      }
-      return false;
-    });
+          return keys.has(cellKey(n.x, n.y)) && !(home && inRect(floorRect(home), n.x, n.y));
+        }),
+    );
   };
 }

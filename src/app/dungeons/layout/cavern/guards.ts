@@ -8,7 +8,7 @@
 import type { PlannedFloor } from '../../floors/planFloors';
 import { cellKey, cellsOf, floorRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
-import { type CaveGrid, ROCK, doorOwner } from './caveGrid';
+import { type CaveGrid, NEAR4, ROCK, doorOwner, unkey } from './caveGrid';
 
 export type GuardKind = 'thin' | 'corner' | 'no-block' | 'lane';
 
@@ -17,13 +17,6 @@ export interface GuardProblem {
   at: CellPoint;
   room?: number;
 }
-
-const NEAR4: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-];
 
 /** Whether the cell is floor as the cave is drawn: a room's or a narrows', not a crawl's. */
 function floorAt(grid: CaveGrid, floor: PlannedFloor): (x: number, y: number) => boolean {
@@ -47,7 +40,7 @@ function wideWay(isFloor: (x: number, y: number) => boolean, from: CellPoint, to
   const queue = [...seen];
   for (let head = 0; head < queue.length; head++) {
     if (goals.has(queue[head]!)) return true;
-    const [ax, ay] = queue[head]!.split(',').map(Number) as [number, number];
+    const { x: ax, y: ay } = unkey(queue[head]!);
     for (const [dx, dy] of NEAR4) {
       const k = cellKey(ax + dx, ay + dy);
       if (seen.has(k) || !fits(ax + dx, ay + dy)) continue;

@@ -10,7 +10,7 @@ import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
 import { arenaSeeds } from '../../terrain/arena';
-import type { CaveGrid } from './caveGrid';
+import { type CaveGrid, NEAR4, NEAR8, unkey } from './caveGrid';
 
 export interface ChamberShape {
   gamma: number;
@@ -19,21 +19,10 @@ export interface ChamberShape {
   faults: readonly number[];
 }
 
-const NEAR4: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-];
-const NEAR8: readonly (readonly [number, number])[] = [...NEAR4, [1, 1], [1, -1], [-1, 1], [-1, -1]];
 /** A chamber never fills less than its seeds and this many cells more. */
 const FLOOR_EXTRA = 9;
 
 const key = (c: CellPoint): string => cellKey(c.x, c.y);
-const unkey = (k: string): CellPoint => {
-  const [x, y] = k.split(',').map(Number) as [number, number];
-  return { x, y };
-};
 
 function mayTake(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean {
   return inRect(floorRect(room), c.x, c.y) && (grid.holds(c.x, c.y, room.id) || grid.mayClaim(c.x, c.y, room.id));

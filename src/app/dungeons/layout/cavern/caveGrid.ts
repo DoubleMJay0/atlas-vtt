@@ -29,16 +29,20 @@ const doorIndex = (owner: number): number => -2 - owner;
 /** How far past a room's walls a cave may reach: a tunnel one cell beyond its side walls. */
 const MARGIN = 3;
 
-const NEAR8: readonly (readonly [number, number])[] = [
+/** The steps to a cell's four side neighbours, and with them to its eight. */
+export const NEAR4: readonly (readonly [number, number])[] = [
   [1, 0],
   [-1, 0],
   [0, 1],
   [0, -1],
-  [1, 1],
-  [1, -1],
-  [-1, 1],
-  [-1, -1],
 ];
+export const NEAR8: readonly (readonly [number, number])[] = [...NEAR4, [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+/** The cell a `cellKey` names. */
+export function unkey(key: string): CellPoint {
+  const [x, y] = key.split(',').map(Number) as [number, number];
+  return { x, y };
+}
 
 /** The rows a stairwell is reached from on this floor. */
 function stairRows(stair: StairSpot & { to?: number }, index: number): CellPoint[] {

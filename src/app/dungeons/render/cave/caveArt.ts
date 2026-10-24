@@ -13,13 +13,12 @@ import type { StoneColours } from '../stone/colours';
 import { CAVE_GROUND } from './ground';
 import { CAVE_WAYS } from './ways';
 
-export const CAVE_PARTS = ['floor', 'edge', 'surround', 'narrows', 'crawl', 'pitch', 'aven', 'scree'] as const;
+const GROUND_PARTS = ['floor', 'edge', 'surround'] as const;
+const WAY_PARTS = ['narrows', 'crawl', 'pitch', 'aven', 'scree'] as const;
+export const CAVE_PARTS = [...GROUND_PARTS, ...WAY_PARTS] as const;
 export type CavePart = (typeof CAVE_PARTS)[number];
-export type CaveGroundPart = 'floor' | 'edge' | 'surround';
-export type CaveWayPart = 'narrows' | 'crawl' | 'pitch' | 'aven' | 'scree';
-
-const GROUND_PARTS: readonly CaveGroundPart[] = ['floor', 'edge', 'surround'];
-const WAY_PARTS: readonly CaveWayPart[] = ['narrows', 'crawl', 'pitch', 'aven', 'scree'];
+export type CaveGroundPart = (typeof GROUND_PARTS)[number];
+export type CaveWayPart = (typeof WAY_PARTS)[number];
 
 /** A painter-level drawing of a cave: one per painter, as `drawFloor` and the walls are. */
 export interface CaveGroundPainting {

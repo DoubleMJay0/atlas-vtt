@@ -57,7 +57,7 @@ function lineGap(a: number, b: number): number {
 }
 
 /** Whether the cells fill their bounding rectangle: what no natural feature does. */
-function rectangular(cells: readonly CellPoint[]): boolean {
+export function rectangular(cells: readonly CellPoint[]): boolean {
   const xs = cells.map((c) => c.x);
   const ys = cells.map((c) => c.y);
   return (Math.max(...xs) - Math.min(...xs) + 1) * (Math.max(...ys) - Math.min(...ys) + 1) === cells.length;
@@ -95,7 +95,7 @@ export function faultBand(rc: RoomCells, rng: Rng, line: CaveFault, thickness: 1
   });
   if (cells.length < LEAST_CELLS) return null;
   if (!rc.allows(cells, 'block')) {
-    const middle = [...cells.map((c) => frame(line, c).along)].sort((a, b) => a - b)[Math.floor(cells.length / 2)]!;
+    const middle = cells.map((c) => frame(line, c).along).sort((a, b) => a - b)[Math.floor(cells.length / 2)]!;
     cells = cells.filter((c) => Math.abs(frame(line, c).along - middle) >= ROCK_BRIDGE);
     if (cells.length < LEAST_CELLS || !rc.allows(cells, 'block')) return null;
   }

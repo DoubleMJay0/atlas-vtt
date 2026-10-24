@@ -57,7 +57,7 @@ export function polysOf(rings: readonly Vec[][]): PolyShape[] {
   const shapes: PolyShape[] = outers.map((ring) => ({ kind: 'poly', rings: [ring] }));
   for (const hole of rings.filter((ring) => signedArea2(ring) < 0)) {
     const first = hole[0]!;
-    const owner = shapes.find((shape, k) => pointInPolygon(outers[k]!, first.x, first.y) && shape);
+    const owner = shapes.find((_, k) => pointInPolygon(outers[k]!, first.x, first.y));
     owner?.rings.push(hole);
   }
   return shapes;

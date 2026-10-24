@@ -10,6 +10,7 @@ import type { Rng } from '../../rng';
 import { leavesRoom } from '../hazards';
 import type { FloorTerrain } from '../floorTerrain';
 import type { RoomCells } from '../roomCells';
+import { rectangular } from './faultBand';
 
 const HOLES: ReadonlySet<string> = new Set(['chasm', 'shaft', 'pit', 'gallery']);
 
@@ -39,13 +40,6 @@ const STEPS = [
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ] as const;
-
-/** Whether the cells fill their bounding rectangle. */
-function rectangular(cells: readonly CellPoint[]): boolean {
-  const xs = cells.map((c) => c.x);
-  const ys = cells.map((c) => c.y);
-  return (Math.max(...xs) - Math.min(...xs) + 1) * (Math.max(...ys) - Math.min(...ys) + 1) === cells.length;
-}
 
 /**
  * A pool of about `share` of the room's floor, grown cell by cell from the free cell farthest from

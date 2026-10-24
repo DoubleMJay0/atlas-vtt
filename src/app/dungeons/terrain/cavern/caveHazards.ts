@@ -15,10 +15,10 @@ import { type HazardChoice, type Substance, leavesRoom, overRoomBelow } from '..
 import { cutHole, dropBelow } from '../holes';
 import type { RoomCells } from '../roomCells';
 import type { TerrainWork } from '../work';
-import { crustAround } from './caveTextures';
 import { bankLedge } from './caveLedge';
-import { faultBand } from './faultBand';
 import { besideHole, besideWater, naturalPool } from './cavePools';
+import { crustAround } from './caveTextures';
+import { faultBand } from './faultBand';
 
 const LAVA: Substance = { hazard: 'lava', name: 'dungeon.terrain.lavaFlow' };
 const ACID: Substance = { hazard: 'acid', name: 'dungeon.terrain.acidPool' };
@@ -246,7 +246,9 @@ export function placeCaveHazard(work: TerrainWork, k: number, rc: RoomCells, rng
         return standingWater(work, k, rc, rng, LAKE_SHARE, 'dungeon.terrain.caveLake');
       case 'channel': {
         const what = caveSubstance(work, k, rc.room.id, rng);
-        return what === LAVA ? lavaFlow(work, k, rc, rng) : what === ACID ? sulphurSpring(work, k, rc, rng) : what === STREAM && stream(work, k, rc, rng);
+        if (what === LAVA) return lavaFlow(work, k, rc, rng);
+        if (what === ACID) return sulphurSpring(work, k, rc, rng);
+        return what === STREAM && stream(work, k, rc, rng);
       }
       case 'pit':
         return false;

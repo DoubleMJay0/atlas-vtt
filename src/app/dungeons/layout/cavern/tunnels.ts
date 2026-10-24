@@ -10,23 +10,12 @@ import { doorApproaches } from '../../floors/stairSpots';
 import { cellKey, cellsOf, dir, floorRect, inRect, wallRect } from '../../geometry';
 import type { CellPoint, DungeonDoor, DungeonRoom } from '../../model';
 import type { Rng } from '../../rng';
-import { type CaveGrid, ROCK, doorOwner } from './caveGrid';
+import { type CaveGrid, NEAR4, ROCK, doorOwner, unkey } from './caveGrid';
 
 /** How strongly the cells near the straight way go first, so what is left winds. */
 const WIGGLE = 1.5;
 
-const NEAR4: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-];
-
 const key = (c: CellPoint): string => cellKey(c.x, c.y);
-const unkey = (k: string): CellPoint => {
-  const [x, y] = k.split(',').map(Number) as [number, number];
-  return { x, y };
-};
 
 /** The cells inside a tunnel's doors: where its way must reach. */
 export function tunnelEnds(grid: CaveGrid, room: DungeonRoom, doors: readonly DungeonDoor[]): CellPoint[] {
@@ -78,12 +67,12 @@ function nearness(c: CellPoint, ends: readonly CellPoint[]): number {
 
 /** Grows a one-cell way to two where the cells allow: each cell joins a 2 × 2 block of the way. */
 function widen(alive: Set<string>, may: ReadonlySet<string>): void {
-  const inBlock = (ax: number, ay: number): boolean => [0, 1].every((dx) => [0, 1].every((dy) => alive.has(cellKey(ax + dx, ay + dy))));
+  const block = (cells: ReadonlySet<string>, ax: number, ay: number): boolean => [0, 1].every((dx) => [0, 1].every((dy) => cells.has(cellKey(ax + dx, ay + dy))));
   for (const k of [...alive].sort()) {
     const c = unkey(k);
     const anchors = [[c.x - 1, c.y - 1], [c.x, c.y - 1], [c.x - 1, c.y], [c.x, c.y]] as const;
-    if (anchors.some(([ax, ay]) => inBlock(ax, ay))) continue;
-    const fits = anchors.find(([ax, ay]) => [0, 1].every((dx) => [0, 1].every((dy) => may.has(cellKey(ax + dx, ay + dy)))));
+    if (anchors.some(([ax, ay]) => block(alive, ax, ay))) continue;
+    const fits = anchors.find(([ax, ay]) => block(may, ax, ay));
     if (fits) for (const dx of [0, 1]) for (const dy of [0, 1]) alive.add(cellKey(fits[0] + dx, fits[1] + dy));
   }
 }
@@ -98,7 +87,7 @@ export function carveTunnel(rng: Rng, grid: CaveGrid, room: DungeonRoom, ends: r
       .filter((c) => grid.holds(c.x, c.y, room.id) || grid.mayClaim(c.x, c.y, room.id))
       .map(key),
   );
-  const keep = [...new Set([...ends.map(key), ...grid.required(room.id), ...[...lane].filter((k) => may.has(k))])].filter((k) => may.has(k));
+  const keep = [...new Set([...ends.map(key), ...grid.required(room.id), ...lane])].filter((k) => may.has(k));
   const kept = new Set(keep);
   const alive = new Set(may);
   let way = witness(alive, keep);

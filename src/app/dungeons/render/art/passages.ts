@@ -32,12 +32,19 @@ export function drawPassages(hand: Hand): void {
   const index = env.dungeon.index;
   for (const stair of env.dungeon.floor.stairs) {
     const end = stair.to > index ? 'upper' : 'lower';
-    const part: CaveWayPart | null = stair.way === 'scree' ? 'scree' : stair.way === 'pitch' ? (end === 'upper' ? 'pitch' : 'aven') : null;
+    const part = stairPart(stair, end);
     if (!part || !drawn(part)) drawStairwell(hand, stair, end);
   }
 }
 
 const flip = (d: CellDir): CellDir => ({ x: -d.x as CellDir['x'], y: -d.y as CellDir['y'] });
+
+/** The cave drawing a stairwell's end takes: a scree slope, a pitch from above or an aven from below; none for stairs. */
+function stairPart(stair: Pick<DungeonStair, 'way'>, end: 'upper' | 'lower'): CaveWayPart | null {
+  if (stair.way === 'scree') return 'scree';
+  if (stair.way === 'pitch') return end === 'upper' ? 'pitch' : 'aven';
+  return null;
+}
 
 /** A door: a leaf of planks bound with iron, hung between two dressed jambs set into the walls. */
 function drawDoor(hand: Hand, door: DungeonDoor): void {

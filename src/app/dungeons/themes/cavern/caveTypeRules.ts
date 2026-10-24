@@ -7,13 +7,13 @@
 import { floorRect, intersection, roomArea } from '../../geometry';
 import type { CaveSites } from '../../layout/cavern/caveSites';
 import { caveVariant } from '../../layout/cavern/caveParams';
-import { hollowSite, isInhabited } from './inhabited';
 import { nearFault } from '../../layout/cavern/faults';
 import type { CaveVariant, DungeonFloor } from '../../model';
 import { neighbours } from '../../roomGraph';
 import type { DungeonTag } from '../../tags';
 import type { RoomTypeId } from '../roomTypes';
 import type { RoomRef, ThemeFactsInput } from '../themeTypes';
+import { hollowSite, isInhabited } from './inhabited';
 
 export interface CaveFacts {
   sites: CaveSites[];

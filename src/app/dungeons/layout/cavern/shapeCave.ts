@@ -13,10 +13,10 @@ import { CaveGrid } from './caveGrid';
 import type { CaveShaping } from './caveParams';
 import { chamberSeeds, growChamber, reserveCores, smoothChamber } from './chambers';
 import { faultDirections, faultLines } from './faults';
-import { basinCount, caveHeights, hydrology, lowRooms } from './hydrology';
-import { stairWays } from './stairWays';
 import { repairGuards } from './guards';
+import { basinCount, caveHeights, hydrology, lowRooms } from './hydrology';
 import { claimLane, laneEnds, mainRoute, wideLane } from './mainPath';
+import { stairWays } from './stairWays';
 import { carveTunnel, shapeDoors, tunnelEnds } from './tunnels';
 
 export interface ShapedCaves {
@@ -82,7 +82,7 @@ function shapeFloor(how: FloorShaping, floors: readonly PlannedFloor[], index: n
   const grid = new CaveGrid(floor, index);
   const [from, to] = laneEnds(index, floors.length, floor, boss);
   const route = mainRoute(floor, from, to);
-  const lane = (route.length > 0 && wideLane(grid, floor, route, from, to)) || [];
+  const lane = wideLane(grid, floor, route, from, to) ?? [];
   claimLane(grid, floor, route, lane);
   reserveCores(grid, floor.rooms);
   const laneKeys = new Set(lane.map((c) => cellKey(c.x, c.y)));

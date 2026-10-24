@@ -11,7 +11,7 @@ import { type LaneEnd, claimLane, mainRoute, wideLane } from './mainPath';
 export function caveFits(floor: CaveFloorPlan, from: LaneEnd, to: LaneEnd, index: number): boolean {
   const grid = new CaveGrid(floor, index);
   const route = mainRoute(floor, from, to);
-  const lane = route.length > 0 ? wideLane(grid, floor, route, from, to) : null;
+  const lane = wideLane(grid, floor, route, from, to);
   if (!lane) return false;
   claimLane(grid, floor, route, lane);
   return reserveCores(grid, floor.rooms);
