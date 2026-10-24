@@ -1,7 +1,7 @@
 import { Graphics, RenderTexture, type WebGLRenderer } from 'pixi.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { WallSegment } from '../../../../types/wallTypes';
-import { computeSight } from '../../../../vision/sight';
+import { computeSight, SEES_ALL } from '../../../../vision/sight';
 import { LightingEngine } from '../LightingEngine';
 import type { LightingMode } from '../compositeFilter';
 import type { EngineLight, EngineScene } from '../types';
@@ -49,6 +49,8 @@ const DEFAULTS: MemoryOptions = { exploredMemory: true, exploredColor: '#ffffff'
 const REMEMBERED = [25, 25] as const;
 const UNEXPLORED = [225, 225] as const;
 const SEEN = [195, 75] as const;
+/** Screen point at the centre of light a (world 250, 750). */
+const LIT = [62, 187] as const;
 
 /** FNV-1a over every channel of the render. */
 function hashOf(at: PixelReader): string {
@@ -180,12 +182,17 @@ describe('explored memory in the composite', () => {
     expectColour(at(...REMEMBERED), 0x336699);
   });
 
-  it('draws a fog map of one colour exactly as that unexplored colour, in both views', async () => {
-    // Memory, what tokens see and how the light's rim fades into the never-seen dark all stay as they are.
+  it('fills the dark with the fog map where no token has vision, and leaves lit places and the GM view as they were', async () => {
     const whole = (g: Graphics): Graphics => g.rect(0, 0, MAP / 4, MAP / 4).fill({ color: 0xcc6633 });
-    // The image reaches the shader as 8-bit sRGB, the colour as a float: a channel may round one level apart.
-    expect(largestDifference(await renderWithFogMap('player', whole), await render('player', { unexploredColor: '#cc6633' }))).toBeLessThanOrEqual(1);
-    expect(hashOf(await renderWithFogMap('gm', whole))).toBe(hashOf(await render('gm')));
+    const noVision: Partial<EngineScene> = { sight: SEES_ALL, ambient: 0 };
+    const fogged = await renderWithFogMap('player', whole, noVision);
+    const plain = await render('player', noVision);
+    // Far from both lights: pitch dark without the fog map, the fog map with it.
+    expectColour(plain(...UNEXPLORED), 0x000000);
+    expectColour(fogged(...UNEXPLORED), 0xcc6633);
+    // At a light's centre the map shows as the light shows it.
+    expect(fogged(...LIT)).toEqual(plain(...LIT));
+    expect(hashOf(await renderWithFogMap('gm', whole, noVision))).toBe(hashOf(await render('gm', noVision)));
   });
 
   it('leaves what tokens see and the GM view as they were', async () => {

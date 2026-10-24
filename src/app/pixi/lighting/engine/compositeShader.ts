@@ -20,7 +20,8 @@ import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
  * In the player view, what the party does not perceive now shows its memory (uMemory 1): the
  * dim grey map tinted by uExploredTint where explored, uUnexplored elsewhere; both colours are
  * linear. With a fog map (uHasUnexploredImage, uUnexploredImage: an sRGB image over the whole map)
- * never-seen areas show it instead of uUnexplored, which shows through where the image is transparent.
+ * never-seen areas show it instead of uUnexplored, which shows through where the image is transparent;
+ * it also fills the dark in sight, as memory does, even where no token has vision or memory is off.
  * That is what lies out of sight and what lies in sight in the dark, without a sense
  * that shows it: stepping behind a wall must not reveal a remembered room that standing in it hides.
  * uDarkness (read only while uHasDarkness is set) is the darkness map: red is how much of the
@@ -304,7 +305,10 @@ void main() {
   // shows them), all of it in the dark, and at a light's rim the two add up to the memory's
   // brightness, so the light fades into the memory beneath it without a darker ring between.
   float lacking = max(dot(memory - visible, LUMA), 0.0) / max(dot(memory, LUMA), 1e-5);
-  vec3 inSight = visible + memory * (recalls * lacking);
+  // A fog map fills the dark wherever the players' picture shows less than it, with or without
+  // token vision and memory: lights reveal the map over it, and only where they shine.
+  float fills = max(recalls, uMode > 0.5 && uHasUnexploredImage > 0.5 ? 1.0 : 0.0);
+  vec3 inSight = visible + memory * (fills * lacking);
   // The players see the veil only where the darkness takes something from their picture: ambient
   // light, a light's light (blue of the darkness map), or what a sense that does not see in it
   // would show. Over unlit floor and over memory there is none: it would give away where the
