@@ -115,19 +115,31 @@ function wholeWithout(grid: CaveGrid, room: DungeonRoom, c: CellPoint): boolean 
 
 /**
  * A spur one cell thin: widened where its room may take a cell beside it that is not left thin in
- * turn (else the next round gives it back and the spur is thin again), else given back to the rock
- * where nothing needs it.
+ * turn (else the next round gives it back and the spur is thin again); else given back to the rock
+ * where nothing needs it; else, where it must stay (a stairwell, a door's approach), widened once
+ * another room's swing that crowds the cell beside it is given back.
  */
-function repairThin(grid: CaveGrid, isFloor: (x: number, y: number) => boolean, room: DungeonRoom, at: CellPoint): void {
+function repairThin(grid: CaveGrid, floor: PlannedFloor, room: DungeonRoom, at: CellPoint): void {
+  const isFloor = floorAt(grid, floor);
+  const beside = NEAR4.map(([dx, dy]) => ({ x: at.x + dx, y: at.y + dy }));
   const held = (c: CellPoint): boolean => NEAR4.filter(([dx, dy]) => isFloor(c.x + dx, c.y + dy)).length >= 2;
-  if (NEAR4.some(([dx, dy]) => held({ x: at.x + dx, y: at.y + dy }) && giveBack(grid, room, { x: at.x + dx, y: at.y + dy }))) return;
-  if (!grid.required(room.id).has(cellKey(at.x, at.y)) && wholeWithout(grid, room, at)) grid.release(at.x, at.y);
+  const widen = (): boolean => beside.some((c) => held(c) && giveBack(grid, room, c));
+  if (widen()) return;
+  if (!grid.required(room.id).has(cellKey(at.x, at.y))) {
+    if (wholeWithout(grid, room, at)) grid.release(at.x, at.y);
+    return;
+  }
+  for (const c of beside) {
+    if (grid.owner(c.x, c.y) !== ROCK || grid.envelope(c.x, c.y) !== room.id) continue;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (grid.owner(c.x + dx, c.y + dy) !== room.id) releaseSwung(grid, floor, { x: c.x + dx, y: c.y + dy });
+  }
+  widen();
 }
 
 function repairOne(grid: CaveGrid, floor: PlannedFloor, problem: GuardProblem): void {
   const room = problem.room === undefined ? undefined : floor.rooms[problem.room];
   if (problem.kind === 'no-block' && room) completeBlock(grid, room);
-  if (problem.kind === 'thin' && room) repairThin(grid, floorAt(grid, floor), room, problem.at);
+  if (problem.kind === 'thin' && room) repairThin(grid, floor, room, problem.at);
   if (problem.kind === 'corner') {
     const { x, y } = problem.at;
     const square = [{ x: x + 1, y }, { x, y: y + 1 }, { x, y }, { x: x + 1, y: y + 1 }];

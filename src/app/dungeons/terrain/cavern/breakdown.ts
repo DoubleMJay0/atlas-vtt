@@ -111,8 +111,17 @@ export function placeBreakdown(work: TerrainWork, k: number, rc: RoomCells, rng:
     const has = floor.inRoom(room.id).some((p) => BREAKDOWN.has(p.kind) && p.cells.some((c) => keys.has(cellKey(c.x, c.y))));
     if (!has) fallen(floor, rc, rng, middle);
   }
-  const avens = floor.plan.stairs.filter((s) => s.way === 'pitch' && s.to < k).map((s) => cellsOf(spotRect(s))).filter((cells) => cells.every((c) => rc.isFloor(c)));
-  const shaftFeet = floor.inRoom(room.id).filter((p) => p.kind === 'chasm-floor' && p.name === 'dungeon.terrain.shaftFloor').map((p) => p.cells);
-  if (avens.length + shaftFeet.length > 0) rubbleRound(floor, rc, rng, [...avens, ...shaftFeet]);
   if (work.typed(k, room.id)?.spec.id === 'collapse-chamber') choke(work, k, rc, rng);
+}
+
+/**
+ * Rubble round the feet of the room's pitches and of the shafts dropped onto it from above, laid
+ * before anything else stands in the room, so no furniture takes the ground round a foot first.
+ */
+export function rubbleAtFeet(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
+  const floor = work.floors[k];
+  if (!floor) return;
+  const avens = floor.plan.stairs.filter((s) => s.way === 'pitch' && s.to < k).map((s) => cellsOf(spotRect(s))).filter((cells) => cells.every((c) => rc.isFloor(c)));
+  const shaftFeet = floor.inRoom(rc.room.id).filter((p) => p.kind === 'chasm-floor' && p.name === 'dungeon.terrain.shaftFloor').map((p) => p.cells);
+  if (avens.length + shaftFeet.length > 0) rubbleRound(floor, rc, rng, [...avens, ...shaftFeet]);
 }
