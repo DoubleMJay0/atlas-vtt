@@ -9,7 +9,7 @@ import type { CellPoint, DungeonTerrain } from '../model';
 import { cellKey } from '../geometry';
 import { chance, floorStream, int, type Rng, weighted } from '../rng';
 import { draft } from '../terrain/catalog';
-import { FIGHT_AREA } from '../terrain/placeTerrain';
+import { FIGHT_AREA } from '../terrain/cover';
 import type { FloorTerrain } from '../terrain/floorTerrain';
 import type { RoomCells } from '../terrain/roomCells';
 import type { Flora, UndergrowthKind } from './flora';
@@ -33,7 +33,7 @@ function clump(rng: Rng, rc: RoomCells, start: CellPoint, size: number, fits: (c
 }
 
 /** Adds the floor's undergrowth to its terrain; returns every piece. */
-export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: readonly CellPoint[], flora: Flora | null): DungeonTerrain[] {
+export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: readonly CellPoint[], flora: Flora | null, ruined = false): DungeonTerrain[] {
   if (!flora?.rich) return floor.pieces;
   const { plan } = floor;
   const space = new GrowthSpace({ ...plan, props: [], terrain: floor.pieces, waterCells });
@@ -41,6 +41,8 @@ export function addUndergrowth(seed: number, floor: FloorTerrain, waterCells: re
   for (const room of plan.rooms) {
     const rc = floor.room(room.id);
     if (!rc || rc.floorCount < FIGHT_AREA || room.stage !== undefined) continue;
+    // A built theme's rooms are kept: only a ruin lets thickets in.
+    if (room.type && !ruined) continue;
     const rng = floorStream(seed, 'growth', floor.index, `undergrowth:${room.id}`);
     const l = light[room.id] ?? 0;
     if (!chance(rng, 0.2 + 0.4 * l)) continue;

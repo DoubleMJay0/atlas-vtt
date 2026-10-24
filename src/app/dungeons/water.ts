@@ -4,7 +4,7 @@
  * into shorelines. The renderer clips them to the floors.
  */
 
-import type { CellPoint, DungeonDoor, DungeonRoom, DungeonWater } from './model';
+import type { CellPoint, DungeonDoor, DungeonRoom, DungeonTerrain, DungeonWater } from './model';
 import { type Rng, chance, floorStream, int, stream } from './rng';
 import { traceLoops } from './water/contour';
 import { fractalNoise } from './water/noise';
@@ -26,16 +26,33 @@ export interface WaterRequest {
   dry?: ReadonlySet<string>;
 }
 
-/** Water gathers where the floor falls away: in rooms steps lead down into, and in dead ends. */
-export function poolRooms(rng: Rng, rooms: readonly DungeonRoom[], doors: readonly DungeonDoor[], poolChance: number): Set<number> {
+/**
+ * Water gathers where the floor falls away: in rooms steps lead down into, and in dead ends; only
+ * in the rooms `mayPool` allows (a built theme's pools are its rooms' reasons).
+ */
+export function poolRooms(rng: Rng, rooms: readonly DungeonRoom[], doors: readonly DungeonDoor[], poolChance: number, mayPool: (id: number) => boolean = () => true): Set<number> {
   const out = new Set<number>();
   if (poolChance <= 0) return out;
   for (const room of rooms) {
-    if (room.kind !== 'room') continue;
+    if (room.kind !== 'room' || !mayPool(room.id)) continue;
     const own = doors.filter((door) => door.from === room.id || door.to === room.id);
     const below = own.some((door) => door.kind === 'steps' && (door.descends ? door.to : door.from) === room.id);
     const p = poolChance * (below ? 2 : 1) * (own.length <= 1 ? 1.5 : 1);
     if (chance(rng, Math.min(0.9, p))) out.add(room.id);
+  }
+  return out;
+}
+
+/** Terrain no liquid lies in or beside: holes (it would drain away), and lava and acid (they never meet water). */
+const NO_WATER_BESIDE: ReadonlySet<string> = new Set(['chasm', 'shaft', 'gallery', 'pit']);
+
+/** The cells within a cell of a hole, pit or shaft, or of a lava or acid channel, as `x,y`: water keeps off them. */
+export function drainCells(terrain: readonly DungeonTerrain[]): Set<string> {
+  const out = new Set<string>();
+  for (const piece of terrain) {
+    const molten = piece.traits.hazard === 'lava' || piece.traits.hazard === 'acid';
+    if (!NO_WATER_BESIDE.has(piece.kind) && !molten) continue;
+    for (const c of piece.cells) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) out.add(`${c.x + dx},${c.y + dy}`);
   }
   return out;
 }

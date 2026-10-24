@@ -48,6 +48,16 @@ const BANDS: readonly DepthBand[] = ['front', 'middle', 'deep', 'deepest'];
 
 const listOf = <T>(value: T | readonly T[] | undefined): readonly T[] => (value === undefined ? [] : Array.isArray(value) ? value : [value as T]);
 
+/** Whether room `i` is still untyped and not anchored. */
+export function isFree(a: Assignment, i: number): boolean {
+  return a.types[i] === null && !a.fixed[i];
+}
+
+/** Whether a programme needs at least one room of the type. */
+export function isNeeded(spec: RoomTypeSpec): boolean {
+  return spec.required === true || spec.count[0] > 0;
+}
+
 /** A type's spec in a programme. */
 export function specOf(programme: RoomProgramme, id: RoomTypeId): RoomTypeSpec | undefined {
   return programme.rooms.find((spec) => spec.id === id);
@@ -167,6 +177,9 @@ export interface Relaxed {
   counts?: boolean;
   branches?: boolean;
 }
+
+/** What a filler may leave aside where nothing else fits. */
+export const FILLER_RELAXED: Relaxed = { counts: false, branches: false };
 
 /** Whether a spec names a trait the room lacks, for a type whose traits are rules (`strict`). */
 function missesTrait(spec: RoomTypeSpec, t: RoomTraits): boolean {

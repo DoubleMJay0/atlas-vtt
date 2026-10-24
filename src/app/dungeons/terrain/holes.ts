@@ -10,6 +10,7 @@ import type { CellPoint, TerrainKind } from '../model';
 import { type Rng, chance } from '../rng';
 import { draft } from './catalog';
 import type { RoomCells } from './roomCells';
+import { takesFall } from './typeReasons';
 import type { TerrainWork } from './work';
 
 /** How likely an abyss opens on through the floor below where it could. */
@@ -32,7 +33,8 @@ export function dropBelow(work: TerrainWork, k: number, cells: readonly CellPoin
   const through: Drop['through'] = [];
   for (let floor = k + 1; floor < work.floors.length; floor++) {
     const rc = work.floors[floor]?.roomHolding(cells);
-    if (!rc || rc.room.wing !== 'regular') return null;
+    // Only a room that may take a fall from above: never a furnished room of a built theme.
+    if (!rc || rc.room.wing !== 'regular' || !takesFall(work, floor, rc.room.id)) return null;
     const last = floor === work.floors.length - 1;
     const roomy = rc.depth >= 4 && rc.width >= 4 && cells.length <= rc.floorCount * (1 - MOST_OF_ROOM) && rc.freeCount() - cells.length >= LEFT_FREE && rc.keepsCover(cells);
     const canOpen = mayOpenOn && roomy && rc.allows(cells, 'block') && !cells.some((c) => rc.nearStairs(c));

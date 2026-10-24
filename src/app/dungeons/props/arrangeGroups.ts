@@ -4,11 +4,11 @@
  * bed's foot); pieces on a grid; pieces on the shore of the room's liquid.
  */
 
-import { cellKey, dir } from '../geometry';
+import { cellKey, dir, perpendicular } from '../geometry';
 import type { CellDir, CellPoint, DungeonProp, PropKind } from '../model';
 import { shuffled } from '../rng';
 import { PROP_SPECS, isCellPiece, propReach } from './catalogue';
-import { footprintAt } from './cellVerbs';
+import { footprintAt, opposite } from './cellVerbs';
 import { type FurnishSpace, type PlacedPiece, placeDisc, placePiece } from './furnishSpace';
 import { facing } from './roomFrame';
 import { isFree } from './space';
@@ -22,7 +22,7 @@ function single(fs: FurnishSpace, kind: PropKind, at: CellPoint, towards: CellDi
   const spec = PROP_SPECS[kind];
   if (!isCellPiece(spec)) return placeDisc(fs, kind, at, facing(towards));
   const cell = { x: Math.floor(at.x), y: Math.floor(at.y) };
-  return placePiece(fs, kind, footprintAt(cell, dir(-towards.y, towards.x), towards, spec.footprint.along, spec.footprint.out), towards);
+  return placePiece(fs, kind, footprintAt(cell, perpendicular(towards), towards, spec.footprint.along, spec.footprint.out), towards);
 }
 
 /** Whether a piece of `kind` could stand at `at`: on the room's floor, free there. */
@@ -42,17 +42,17 @@ function pairAxis(fs: FurnishSpace, of: PlacedPiece | 'door' | null): { at: Cell
   if (of === 'door') {
     const door = fs.doors.find((d) => d.to === rc.room.id && d.kind !== 'secret') ?? fs.doors.find((d) => (d.from === rc.room.id || d.to === rc.room.id) && d.kind !== 'secret');
     if (!door) return null;
-    const inward = door.to === rc.room.id ? door.dir : dir(-door.dir.x, -door.dir.y);
+    const inward = door.to === rc.room.id ? door.dir : opposite(door.dir);
     return { at: { x: door.x + 0.5 + inward.x, y: door.y + 0.5 + inward.y }, facing: inward, half: 1 };
   }
-  return { at: fs.space.frame.centre, facing: dir(-rc.axis.x, -rc.axis.y), half: 1 };
+  return { at: fs.space.frame.centre, facing: opposite(rc.axis), half: 1 };
 }
 
 /** A mirrored pair of `kind` either side of `of` (a placed piece, the inner door, or with null the room's middle); both or none. */
 export function flanking(fs: FurnishSpace, kind: PropKind, of: PlacedPiece | 'door' | null): DungeonProp[] {
   const axis = pairAxis(fs, of);
   if (!axis) return [];
-  const side = dir(-axis.facing.y, axis.facing.x);
+  const side = perpendicular(axis.facing);
   const spots = [1, -1].map((sign) => ({ x: axis.at.x + side.x * axis.half * sign, y: axis.at.y + side.y * axis.half * sign }));
   if (!spots.every((p) => couldStand(fs, kind, p))) return [];
   const first = single(fs, kind, spots[0] as CellPoint, axis.facing);
@@ -73,8 +73,10 @@ export function aroundParent(fs: FurnishSpace, kind: PropKind, parent: PlacedPie
     if (out.length >= count) break;
     const towards = STEPS.find((d) => own.has(cellKey(cell.x + d.x, cell.y + d.y))) ?? parent.facing;
     fs.cells.release([cell]);
-    const centre = { x: cell.x + 0.5 + towards.x * 0.15, y: cell.y + 0.5 + towards.y * 0.15 };
-    const placed = single(fs, kind, centre, dir(-towards.x, -towards.y));
+    // A disc leans towards its parent as far as it can without touching the parent's cells.
+    const lean = isCellPiece(PROP_SPECS[kind]) ? 0 : Math.max(0, Math.min(0.15, 0.45 - propReach(kind)));
+    const centre = { x: cell.x + 0.5 + towards.x * lean, y: cell.y + 0.5 + towards.y * lean };
+    const placed = single(fs, kind, centre, opposite(towards));
     if (placed) out.push(placed);
     else fs.cells.keepClear([cell]);
   }
@@ -89,7 +91,7 @@ export function inGrid(fs: FurnishSpace, kind: PropKind, count: number): Dungeon
   const out: DungeonProp[] = [];
   for (const c of spots) {
     if (out.length >= count) break;
-    const placed = single(fs, kind, { x: c.x + 0.5, y: c.y + 0.5 }, dir(-rc.axis.x, -rc.axis.y));
+    const placed = single(fs, kind, { x: c.x + 0.5, y: c.y + 0.5 }, opposite(rc.axis));
     if (placed) out.push(placed);
   }
   return out;
@@ -104,7 +106,7 @@ export function onShore(fs: FurnishSpace, kind: PropKind, count: number): Dungeo
     for (const d of STEPS) {
       const next = { x: c.x - d.x, y: c.y - d.y };
       // A shore piece backs onto the water's edge, as a wall piece backs onto its wall.
-      if (!wet.has(cellKey(next.x, next.y)) && fs.cells.isFree(next)) shore.set(cellKey(next.x, next.y), { cell: next, towards: dir(-d.x, -d.y) });
+      if (!wet.has(cellKey(next.x, next.y)) && fs.cells.isFree(next)) shore.set(cellKey(next.x, next.y), { cell: next, towards: opposite(d) });
     }
   }
   const out: DungeonProp[] = [];

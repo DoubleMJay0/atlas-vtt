@@ -13,6 +13,7 @@ import { hops, neighbours } from '../roomGraph';
 import { chance, floorStream, int, type Rng, weighted } from '../rng';
 import type { Flora, Weights } from './flora';
 import { type GrowthFloor, GrowthSpace, roomFloorCells } from './growthSpace';
+import { outerWallCells } from './outerWalls';
 import { wallRuns, type WallRun } from './wallRuns';
 
 export interface GrowthInput extends GrowthFloor {
@@ -69,12 +70,15 @@ function uniqueCells(cells: readonly CellPoint[]): CellPoint[] {
 
 function climbersOf(rng: Rng, input: GrowthInput, room: DungeonRoom, space: GrowthSpace, flora: Flora, light: number): DungeonGrowth[] {
   const out: DungeonGrowth[] = [];
+  const outer = flora.ruins ? outerWallCells(room, input.rooms) : new Set<string>();
   for (const run of wallRuns(room, input.doors, space)) {
     const wet = run.cells.some((c) => space.byWater(c));
-    const p = flora.rich ? 0.72 : flora.damp && wet ? 0.6 : 0;
+    // A ruin's growth climbs its outer walls, where light and rain come in.
+    const ruinWall = flora.ruins && run.cells.length > 0 && run.cells.every((c) => outer.has(cellKey(c.x, c.y)));
+    const p = flora.rich ? 0.72 : flora.damp && wet ? 0.6 : ruinWall ? 0.6 : 0;
     if (!chance(rng, p)) continue;
     for (const stretch of stretchesOf(rng, run, flora.rich)) {
-      const picked: GrowthKind = flora.rich ? pickKind(rng, flora.climbers, light) : 'moss';
+      const picked: GrowthKind = flora.rich || ruinWall ? pickKind(rng, flora.climbers, light) : 'moss';
       // Roots and weeds lie on the floor at the wall's foot: never in water, where moss grows instead.
       const kind = (picked === 'roots' || picked === 'grass') && stretch.cells.some((c) => space.isWet(c)) ? 'moss' : picked;
       out.push({ kind, room: room.id, cells: uniqueCells(stretch.cells), wall: stretch.points, density: flora.rich ? 0.5 + 0.5 * rng() : 0.35 + 0.3 * rng() });

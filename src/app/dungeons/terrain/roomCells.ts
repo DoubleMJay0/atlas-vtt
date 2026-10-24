@@ -140,6 +140,11 @@ export class RoomCells {
     return this.whole(extra);
   }
 
+  /** Whether a piece that cannot be walked could stand on cells already taken walkable (a seat on a platform), the room staying whole. */
+  allowsOnWalked(cells: readonly CellPoint[]): boolean {
+    return cells.length > 0 && cells.every((c) => this.taken.get(cellKey(c.x, c.y)) === 'walk') && this.whole(new Set(cells.map((c) => cellKey(c.x, c.y))));
+  }
+
   /**
    * Whether, with `cells` blocked (but `over`), one more free cell could still take cover and
    * leave the room whole: a hazard never takes the last place for cover.
@@ -199,10 +204,15 @@ export class RoomCells {
     }
   }
 
+  /** The way along the wall of `side`, the order its wall cells come in. */
+  alongWall(side: WallSide): CellDir {
+    return side === 'back' || side === 'near' ? this.across : this.axis;
+  }
+
   /** Every floor cell whose neighbour beyond `side` is no floor of the room, along the wall in order. */
   wallCells(side: WallSide): CellPoint[] {
     const d = this.beyond(side);
-    const along = side === 'back' || side === 'near' ? this.across : this.axis;
+    const along = this.alongWall(side);
     return [...this.floor]
       .map((key) => key.split(',').map(Number) as [number, number])
       .filter(([x, y]) => !this.floor.has(cellKey(x + d.x, y + d.y)))
@@ -214,6 +224,11 @@ export class RoomCells {
   doorOn(side: WallSide, c: CellPoint): boolean {
     const d = this.beyond(side);
     return this.doorCells.has(cellKey(c.x + d.x, c.y + d.y));
+  }
+
+  /** Whether the cell is one every way through the room keeps: a stairwell, the row it is reached from, the cell before a door. */
+  isKeptClear(c: CellPoint): boolean {
+    return this.clear.has(cellKey(c.x, c.y));
   }
 
   /** Whether a piece already stands on the cell, walkable or not. */

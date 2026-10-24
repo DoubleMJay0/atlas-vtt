@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ThemeChoice } from '../../src/app/dungeons/themes/themeTypes';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
@@ -26,10 +27,10 @@ const FEET = { unitType: 'feet', ruleDistance: 5 } as const;
 
 const PX_PER_CELL = 200;
 
-const CASES: readonly { seed: number; tags: string[]; floors: number; look: DungeonStyleId; view: Partial<DungeonView>; fiveRoom?: boolean }[] = [
+const CASES: readonly { seed: number; theme?: ThemeChoice; tags: string[]; floors: number; look: DungeonStyleId; view: Partial<DungeonView>; fiveRoom?: boolean }[] = [
   { seed: 101, tags: ['medium'], floors: 1, look: 'parchment', view: {} },
   { seed: 202, tags: ['small', 'round'], floors: 2, look: 'night', view: { smallTiles: true } },
-  { seed: 303, tags: ['small', 'secret', 'temple'], floors: 2, look: 'masonry', view: { monochrome: true } },
+  { seed: 303, theme: 'fortress', tags: ['small', 'secret', 'colonnades'], floors: 2, look: 'masonry', view: { monochrome: true } },
   { seed: 404, tags: ['small', 'winding'], floors: 3, look: 'stipple', view: { smallTiles: true, grid: 'solid' } },
   { seed: 505, tags: ['medium', 'colonnades'], floors: 1, look: 'blueprint', view: {} },
   // Terrain: a gallery over the arena and a bridged chasm onto the floor below, and a five-room dungeon.
@@ -37,8 +38,8 @@ const CASES: readonly { seed: number; tags: string[]; floors: number; look: Dung
   { seed: 375, tags: ['small', 'crumbling', 'dry'], floors: 2, look: 'sepia', view: { smallTiles: true } },
   { seed: 42, tags: [], floors: 1, look: 'masonry', view: {}, fiveRoom: true },
   // Ivy and moss lie over the walls' foot: the walls must still be found on the ink.
-  { seed: 16, tags: ['dwelling', 'overgrown'], floors: 1, look: 'parchment', view: {} },
-  { seed: 404, tags: ['temple', 'overgrown', 'colonnades', 'wet'], floors: 2, look: 'print', view: {} },
+  { seed: 16, theme: 'mansion', tags: ['overgrown'], floors: 1, look: 'parchment', view: {} },
+  { seed: 404, theme: 'fortress', tags: ['overgrown', 'colonnades', 'wet'], floors: 2, look: 'print', view: {} },
 ];
 
 const TALL_TERRAIN = new Set(['pillar', 'obelisk', 'statue', 'wall-fragment']);
@@ -81,11 +82,11 @@ const share = (values: readonly number[], limit: number): number => values.filte
 let outlined = 0;
 
 describe('a dungeon scene and its map image', () => {
-  for (const { seed, tags, floors, look, view: change, fiveRoom } of CASES) {
+  for (const { seed, theme, tags, floors, look, view: change, fiveRoom } of CASES) {
     const view: DungeonView = { ...DEFAULT_VIEW, ...change };
     const label = `seed ${seed} [${tags.join(',')}], ${floors} floors, ${look}${view.monochrome ? ' monochrome' : ''}${view.smallTiles ? ', small tiles' : ''}`;
     it(`agree on walls, doors and grid: ${label}`, () => {
-      const model = generateDungeon({ seed, tags, floors, ...(fiveRoom && { fiveRoom }) });
+      const model = generateDungeon({ seed, theme, tags, floors, ...(fiveRoom && { fiveRoom }) });
       const style = dungeonStyle(look);
       const palette = paletteOf(style, view);
       const layout = mapLayout(model, PX_PER_CELL, view);

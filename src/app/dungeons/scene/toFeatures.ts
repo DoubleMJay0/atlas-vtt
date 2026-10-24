@@ -1,13 +1,15 @@
 import { type MessageKey, t } from '../../i18n';
 import { MAX_FEATURE_CORNERS, MAX_MAP_FEATURES } from '../../mapFeatures/mapFeatures';
 import type { FeatureTerrain, MapFeature } from '../../types/mapFeatureTypes';
-import type { CellPoint, DungeonColumn, DungeonGrowth, DungeonProp, DungeonTerrain, GrowthKind, PropKind } from '../model';
+import type { CellPoint, DungeonColumn, DungeonGrowth, DungeonProp, DungeonRoom, DungeonTerrain, GrowthKind, PropKind } from '../model';
 import { GROWTH_KINDS } from '../growthModel';
 import { PROP_SPECS, isCellPiece, propReach } from '../props/catalogue';
 import { propKey } from '../props/propKinds';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
+import { rotundaRadius } from '../props/roomFrame';
 import { cellOutlines } from './cellOutline';
+import { roomTypeName } from './roomKeys';
 import { terrainName } from './terrainName';
 import type { DungeonPlacement } from './toWalls';
 
@@ -135,6 +137,20 @@ function columnDrafts(columns: readonly DungeonColumn[]): Draft[] {
   });
 }
 
+/** Corners of a round room's outline. */
+const ROTUNDA_CORNERS = 16;
+
+/** What each typed room shown was built for, on its floor's outline, for the GM to read on hover; it changes nothing in play. */
+export function roomDrafts(rooms: readonly DungeonRoom[], shown: { has(id: number): boolean }): Draft[] {
+  return rooms.filter((room) => room.kind === 'room' && room.type && shown.has(room.id)).map((room): Draft => {
+    const name = roomTypeName(room) ?? '';
+    if (!room.rotunda) return { polygon: [{ x: room.x, y: room.y }, { x: room.x + room.w, y: room.y }, { x: room.x + room.w, y: room.y + room.h }, { x: room.x, y: room.y + room.h }], name };
+    const c = { x: room.x + room.w / 2, y: room.y + room.h / 2 };
+    const r = rotundaRadius(room);
+    return { polygon: Array.from({ length: ROTUNDA_CORNERS }, (_, k) => ({ x: c.x + Math.cos((k * Math.PI * 2) / ROTUNDA_CORNERS) * r, y: c.y + Math.sin((k * Math.PI * 2) / ROTUNDA_CORNERS) * r })), name };
+  });
+}
+
 /**
  * The map features of one floor as shown, in world px on `level` (unset in a scene of one floor),
  * with ids beginning `id`: the first `MAX_MAP_FEATURES` of its terrain, furniture (where the view
@@ -150,9 +166,10 @@ export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, '
     ...(view.props ? propDrafts(floor.props.filter(prop => roomShapes.has(prop.room))) : []),
     ...columnDrafts(floor.columns.filter(column => field.distance(column.x, column.y) < 0)),
   ].slice(0, MAX_MAP_FEATURES);
-  // Vegetation lies under everything else and takes what room the rest leaves.
-  const growth = growthDrafts(floor.growth.filter(g => roomShapes.has(g.room))).slice(0, MAX_MAP_FEATURES - solid.length);
-  const drafts = [...growth, ...solid];
+  // Rooms lie under everything, then vegetation; each takes what room the rest leaves.
+  const rooms = roomDrafts(floor.rooms, roomShapes).slice(0, MAX_MAP_FEATURES - solid.length);
+  const growth = growthDrafts(floor.growth.filter(g => roomShapes.has(g.room))).slice(0, MAX_MAP_FEATURES - solid.length - rooms.length);
+  const drafts = [...rooms, ...growth, ...solid];
   const { originCell, pxPerCell } = placement;
   const world = (p: CellPoint): CellPoint => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   return Object.fromEntries(drafts.map((draft, index): [string, MapFeature] => {

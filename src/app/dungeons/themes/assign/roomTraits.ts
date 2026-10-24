@@ -6,7 +6,7 @@
  */
 
 import type { PlannedFloor } from '../../floors/planFloors';
-import { type CellRect, wallRect } from '../../geometry';
+import { type CellRect, rectsTouch, wallRect } from '../../geometry';
 import type { DungeonRoom, FiveRoomStage } from '../../model';
 import { holdsStairs, roomArea } from '../../props/roles';
 import { hops, neighbours } from '../../roomGraph';
@@ -57,10 +57,6 @@ function sizesOf(rooms: readonly DungeonRoom[]): Map<number, SizeClass> {
   }));
 }
 
-function overlaps(a: CellRect, b: CellRect): boolean {
-  return a.x0 <= b.x1 && b.x0 <= a.x1 && a.y0 <= b.y1 && b.y0 <= a.y1;
-}
-
 /** Whether a side of the room's walls has no other room's walls on it or within a cell beyond it. */
 function onOuterWall(room: DungeonRoom, rooms: readonly DungeonRoom[]): boolean {
   const w = wallRect(room);
@@ -71,7 +67,7 @@ function onOuterWall(room: DungeonRoom, rooms: readonly DungeonRoom[]): boolean 
     { x0: w.x1, x1: w.x1 + 1, y0: w.y0 + 1, y1: w.y1 - 1 },
   ];
   const others = rooms.filter((other) => other.id !== room.id).map(wallRect);
-  return bands.some((band) => others.every((other) => !overlaps(band, other)));
+  return bands.some((band) => others.every((other) => !rectsTouch(band, other)));
 }
 
 function degreeOf(doors: number): Degree {
@@ -95,7 +91,8 @@ export function roomTraits(floors: readonly PlannedFloor[]): RoomTraits[] {
     for (const room of normal) {
       const doors = floor.doors.filter((door) => door.from === room.id || door.to === room.id).length;
       const reach = distance[room.id] ?? Infinity;
-      const depth = (index + (Number.isFinite(reach) ? reach : maxHops) / (maxHops + 1)) / floors.length;
+      const floorDepth = (Number.isFinite(reach) ? reach : maxHops) / (maxHops + 1);
+      const depth = (index + floorDepth) / floors.length;
       const longSide = Math.max(room.w, room.h);
       const shortSide = Math.min(room.w, room.h);
       out.push({
@@ -109,7 +106,7 @@ export function roomTraits(floors: readonly PlannedFloor[]): RoomTraits[] {
         rotunda: room.rotunda,
         depth,
         band: bandOf(depth),
-        floorBand: bandOf((Number.isFinite(reach) ? reach : maxHops) / (maxHops + 1)),
+        floorBand: bandOf(floorDepth),
         doors,
         degree: degreeOf(doors),
         outerWall: onOuterWall(room, floor.rooms),

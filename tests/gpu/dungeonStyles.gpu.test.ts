@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ThemeChoice } from '../../src/app/dungeons/themes/themeTypes';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
@@ -15,10 +16,10 @@ import { pixelStats, savePng, withoutText } from './dungeonRenderHarness';
  * monochrome and the stretch with a solid grid, written to `out/dungeon-render/styles/` for a person to judge side by side.
  */
 
-const DUNGEONS: readonly { name: string; seed: number; tags: string[] }[] = [
+const DUNGEONS: readonly { name: string; seed: number; theme?: ThemeChoice; tags: string[] }[] = [
   { name: 'halls', seed: 16, tags: ['dry'] },
-  { name: 'flooded', seed: 2024, tags: ['flooded', 'tomb', 'winding'] },
-  { name: 'temple', seed: 404, tags: ['round', 'colonnades', 'temple', 'crumbling'] },
+  { name: 'flooded', seed: 2024, theme: 'cavern', tags: ['flooded', 'winding'] },
+  { name: 'fortress', seed: 404, theme: 'fortress', tags: ['round', 'colonnades', 'crumbling'] },
 ];
 
 /** The gallery's card at a device pixel ratio of 2. */
@@ -31,7 +32,7 @@ function modelOf(name: string): DungeonModel {
   let model = models.get(name);
   if (!model) {
     const spec = DUNGEONS.find(d => d.name === name)!;
-    model = generateDungeon({ seed: spec.seed, tags: spec.tags, floors: 1 });
+    model = generateDungeon({ seed: spec.seed, theme: spec.theme, tags: spec.tags, floors: 1 });
     models.set(name, model);
   }
   return model;
@@ -79,7 +80,7 @@ describe('the dungeon styles', () => {
         const mono = thumbnail(model, style, { ...DEFAULT_VIEW, monochrome: true }, CARD);
         expectInked(mono, style);
         await savePng(mono, `styles/${name}-${id}-mono`);
-        const solid = thumbnail(model, style, { ...DEFAULT_VIEW, grid: 'solid', smallTiles: name === 'temple' }, TABLE);
+        const solid = thumbnail(model, style, { ...DEFAULT_VIEW, grid: 'solid', smallTiles: name === 'fortress' }, TABLE);
         expectInked(solid, style);
         await savePng(solid, `styles/${name}-${id}-solid`);
       });

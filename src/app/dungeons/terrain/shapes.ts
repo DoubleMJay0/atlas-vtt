@@ -39,10 +39,14 @@ export function bandAcross(rc: RoomCells, rng: Rng, i0: number, thickness: numbe
 }
 
 /** A rectangle of `di` × `dj` cells at (i, j) with each corner cell dropped half the time where both sides are at least three. */
-export function jaggedBlock(rc: RoomCells, rng: Rng, i: number, j: number, di: number, dj: number): CellPoint[] {
+export function jaggedBlock(rc: RoomCells, rng: Rng, i: number, j: number, di: number, dj: number, irregular = false): CellPoint[] {
   const cells = rc.block(i, j, di, dj);
   if (di < 3 || dj < 3) return cells;
-  const corners = new Set([rc.cell(i, j), rc.cell(i, j + dj - 1), rc.cell(i + di - 1, j), rc.cell(i + di - 1, j + dj - 1)].filter(() => chance(rng, 0.5)).map((c) => cellKey(c.x, c.y)));
+  const all = [rc.cell(i, j), rc.cell(i, j + dj - 1), rc.cell(i + di - 1, j), rc.cell(i + di - 1, j + dj - 1)];
+  const dropped = all.filter(() => chance(rng, 0.5));
+  // A natural hole is never a plain rectangle: it loses a corner at least.
+  if (irregular && dropped.length === 0) dropped.push(all[Math.floor(rng() * all.length)] as CellPoint);
+  const corners = new Set(dropped.map((c) => cellKey(c.x, c.y)));
   return cells.filter((c) => !corners.has(cellKey(c.x, c.y)));
 }
 

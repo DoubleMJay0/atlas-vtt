@@ -12,15 +12,16 @@ import { withoutText } from './dungeonRenderHarness';
 
 export const ART_DUNGEONS: readonly { name: string; request: DungeonRequest }[] = [
   { name: 'halls', request: { seed: 16, tags: ['dry'], floors: 1 } },
-  { name: 'temple', request: { seed: 404, tags: ['round', 'colonnades', 'temple', 'crumbling'], floors: 1 } },
-  { name: 'flooded', request: { seed: 909, tags: ['wet', 'tomb'], floors: 1, waterLevel: 0.6 } },
+  { name: 'fortress', request: { seed: 404, theme: 'fortress', tags: ['round', 'colonnades', 'crumbling'], floors: 1 } },
+  { name: 'mansion', request: { seed: 16, theme: 'mansion', tags: [], floors: 2 } },
+  { name: 'flooded', request: { seed: 909, theme: 'cavern', tags: ['wet'], floors: 1, waterLevel: 0.6 } },
   { name: 'five-room', request: { seed: 42, tags: [], floors: 1, fiveRoom: true } },
   { name: 'crumbling', request: { seed: 202, tags: ['crumbling', 'medium'], floors: 1 } },
   { name: 'two-floors', request: { seed: 282, tags: ['small'], floors: 2 } },
   { name: 'three-floors', request: { seed: 404, tags: ['deep'], floors: 3 } },
-  { name: 'overgrown-temple', request: { seed: 404, tags: ['round', 'colonnades', 'temple', 'overgrown'], floors: 1 } },
-  { name: 'overgrown-tomb', request: { seed: 909, tags: ['wet', 'tomb', 'overgrown'], floors: 1, waterLevel: 0.4 } },
-  { name: 'overgrown-dwelling', request: { seed: 16, tags: ['dwelling', 'overgrown'], floors: 1 } },
+  { name: 'overgrown-fortress', request: { seed: 404, theme: 'fortress', tags: ['round', 'colonnades', 'overgrown'], floors: 1 } },
+  { name: 'overgrown-cavern', request: { seed: 909, theme: 'cavern', tags: ['wet', 'overgrown'], floors: 1, waterLevel: 0.4 } },
+  { name: 'overgrown-mansion', request: { seed: 16, theme: 'mansion', tags: ['overgrown', 'ruined'], floors: 1 } },
   { name: 'overgrown-halls', request: { seed: 202, tags: ['crumbling', 'medium', 'overgrown'], floors: 1 } },
   { name: 'wet-moss', request: { seed: 909, tags: ['wet'], floors: 1, waterLevel: 0.45 } },
 ];
@@ -113,15 +114,15 @@ export const ART_SPOTS: readonly { name: string; dungeon: string; floor: number;
 
 /** Close-ups of vegetation, one kind each: climbers on walls and columns, plants, undergrowth. */
 export const GROWTH_SPOTS: readonly { name: string; dungeon: string; centre: { x: number; y: number } }[] = [
-  { name: 'brambles', dungeon: 'overgrown-dwelling', centre: { x: 8.5, y: -11.5 } },
+  { name: 'brambles', dungeon: 'overgrown-mansion', centre: { x: 8.5, y: -11.5 } },
   { name: 'thicket', dungeon: 'overgrown-halls', centre: { x: -17.5, y: 4 } },
-  { name: 'tangled-roots', dungeon: 'overgrown-tomb', centre: { x: -6.5, y: 12 } },
-  { name: 'roots', dungeon: 'overgrown-tomb', centre: { x: -9.5, y: 9 } },
-  { name: 'creeper', dungeon: 'overgrown-tomb', centre: { x: 2, y: 6.5 } },
-  { name: 'fungi', dungeon: 'overgrown-tomb', centre: { x: 1, y: 5 } },
+  { name: 'tangled-roots', dungeon: 'overgrown-cavern', centre: { x: -6.5, y: 12 } },
+  { name: 'roots', dungeon: 'overgrown-cavern', centre: { x: -9.5, y: 9 } },
+  { name: 'creeper', dungeon: 'overgrown-cavern', centre: { x: 2, y: 6.5 } },
+  { name: 'fungi', dungeon: 'overgrown-cavern', centre: { x: 1, y: 5 } },
   { name: 'column', dungeon: 'overgrown-halls', centre: { x: 5, y: 11 } },
-  { name: 'ferns', dungeon: 'overgrown-dwelling', centre: { x: -3, y: -4 } },
-  { name: 'vine', dungeon: 'overgrown-temple', centre: { x: 0.5, y: -6 } },
-  { name: 'weeds', dungeon: 'overgrown-dwelling', centre: { x: -3.5, y: -8 } },
+  { name: 'ferns', dungeon: 'overgrown-mansion', centre: { x: -3, y: -4 } },
+  { name: 'vine', dungeon: 'overgrown-fortress', centre: { x: 0.5, y: -6 } },
+  { name: 'weeds', dungeon: 'overgrown-mansion', centre: { x: -3.5, y: -8 } },
   { name: 'wet-moss', dungeon: 'wet-moss', centre: { x: -1.5, y: 3 } },
 ];

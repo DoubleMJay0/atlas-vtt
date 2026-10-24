@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ThemeChoice } from '../../src/app/dungeons/themes/themeTypes';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../src/app/dungeons/model';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
@@ -22,19 +23,19 @@ const STYLES = ['parchment', 'masonry', 'stipple', 'drafting', 'slate', 'night']
 /** A large dungeon at 100 px per cell must render in this long. */
 const MAP_BUDGET_MS = 1500;
 
-const CASES: readonly { name: string; seed: number; tags: string[] }[] = [
+const CASES: readonly { name: string; seed: number; theme?: ThemeChoice; tags: string[] }[] = [
   { name: 'default', seed: 16, tags: [] },
   { name: 'small', seed: 31337, tags: ['small'] },
   { name: 'large', seed: 777, tags: ['large'] },
   { name: 'ordered', seed: 101, tags: ['ordered'] },
   { name: 'chaotic', seed: 102, tags: ['chaotic'] },
-  { name: 'round', seed: 404, tags: ['round', 'colonnades', 'temple'] },
+  { name: 'round', seed: 404, theme: 'fortress', tags: ['round', 'colonnades'] },
   { name: 'colonnades', seed: 405, tags: ['colonnades', 'large'] },
-  { name: 'flooded', seed: 2024, tags: ['flooded', 'tomb', 'winding'] },
+  { name: 'flooded', seed: 2024, theme: 'cavern', tags: ['flooded', 'winding'] },
   { name: 'crumbling', seed: 202, tags: ['crumbling'] },
-  { name: 'temple', seed: 777, tags: ['temple'] },
-  { name: 'tomb', seed: 909, tags: ['tomb'] },
-  { name: 'dwelling', seed: 303, tags: ['dwelling', 'deep'] },
+  { name: 'fortress', seed: 777, theme: 'fortress', tags: ['colonnades'] },
+  { name: 'cavern', seed: 909, theme: 'cavern', tags: [] },
+  { name: 'mansion', seed: 303, theme: 'mansion', tags: ['deep'] },
   { name: 'secret', seed: 515, tags: ['secret'] },
   { name: 'string', seed: 616, tags: ['string'] },
   { name: 'compact', seed: 717, tags: ['compact'] },
@@ -49,7 +50,7 @@ function modelOf(name: string): DungeonModel {
   let model = models.get(name);
   if (!model) {
     const spec = CASES.find(c => c.name === name)!;
-    model = generateDungeon({ seed: spec.seed, tags: spec.tags, floors: 1 });
+    model = generateDungeon({ seed: spec.seed, theme: spec.theme, tags: spec.tags, floors: 1 });
     models.set(name, model);
   }
   return model;

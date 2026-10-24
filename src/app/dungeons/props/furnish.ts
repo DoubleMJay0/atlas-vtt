@@ -1,6 +1,6 @@
 /**
  * Furniture from what a room is in the architecture (`roles.ts`), for the rooms of a theme without
- * a room programme (the Cavern until its own plan): the boss room and the largest hall get a dais
+ * a room programme (the Cavern until its own plan; typed rooms follow their recipes, `recipe.ts`): the boss room and the largest hall get a dais
  * at the far wall or a centrepiece, the deepest room a statue or a tapestry over a chest, hubs a
  * fountain, well or statue, dead ends storage, other rooms a little of everything. Nothing implies
  * treasure.

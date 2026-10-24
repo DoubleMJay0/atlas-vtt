@@ -68,9 +68,10 @@ export function placeInterest(floor: FloorTerrain, rc: RoomCells, rng: Rng, kind
   }
 }
 
-/** One point of interest the dungeon's tags favour, else any that fits. */
-export function anyInterest(floor: FloorTerrain, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): boolean {
-  const weights = weightsOf(tags).filter(([, w]) => w > 0);
+/** One point of interest the dungeon's tags favour, else any that fits; of the kinds `allows` lets in where given (a typed room's). */
+export function anyInterest(floor: FloorTerrain, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>, allows?: (kind: InterestKind) => boolean): boolean {
+  const weights = weightsOf(tags).filter(([kind, w]) => w > 0 && (allows?.(kind) ?? true));
+  if (weights.length === 0) return false;
   const first = weighted(rng, weights);
   return [first, ...weights.map(([k]) => k).filter((k) => k !== first)].some((kind) => placeInterest(floor, rc, rng, kind));
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ThemeChoice } from '../../src/app/dungeons/themes/themeTypes';
 import { generateDungeon } from '../../src/app/dungeons/generate';
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { renderMap, renderMapSvg } from '../../src/app/dungeons/render/renderMap';
@@ -49,18 +50,18 @@ function difference(a: OffscreenCanvas, b: OffscreenCanvas): { share: number; pi
   return { share: differ / (da.length / 4), picture };
 }
 
-const CASES: readonly { name: string; seed: number; tags: string[]; styleId: DungeonStyleId }[] = [
+const CASES: readonly { name: string; seed: number; theme?: ThemeChoice; tags: string[]; styleId: DungeonStyleId }[] = [
   { name: 'default', seed: 458782179, tags: [], styleId: 'parchment' },
-  { name: 'round', seed: 404, tags: ['round', 'colonnades', 'temple'], styleId: 'masonry' },
-  { name: 'flooded', seed: 2024, tags: ['flooded', 'tomb', 'winding'], styleId: 'slate' },
+  { name: 'round', seed: 404, theme: 'fortress', tags: ['round', 'colonnades'], styleId: 'masonry' },
+  { name: 'flooded', seed: 2024, theme: 'cavern', tags: ['flooded', 'winding'], styleId: 'slate' },
   { name: 'secret', seed: 515, tags: ['secret'], styleId: 'drafting' },
   { name: 'crumbling', seed: 202, tags: ['crumbling'], styleId: 'stipple' },
 ];
 
 describe('the map as SVG', () => {
-  for (const { name, seed, tags, styleId } of CASES) {
+  for (const { name, seed, theme, tags, styleId } of CASES) {
     it(`draws the ${name} map in ${styleId} as the canvas does`, async () => {
-      const model = generateDungeon({ seed, tags, floors: 1 });
+      const model = generateDungeon({ seed, theme, tags, floors: 1 });
       const style = dungeonStyle(styleId);
       const size = mapLayout(model, PX_PER_CELL, DEFAULT_VIEW);
       const canvas = new OffscreenCanvas(size.widthPx, size.heightPx);

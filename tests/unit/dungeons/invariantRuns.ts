@@ -4,6 +4,7 @@ import type { DungeonModel } from '../../../src/app/dungeons/model';
 import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
 import { doorProblems, emptyRooms, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, stairProblems } from './floorsInvariants';
+import { physicsProblems } from './themeTerrainInvariants';
 import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
 /**
@@ -40,7 +41,8 @@ function runsOf(floors: number): Run[] {
     const seed = k * 7919 + floors;
     for (const offset of [0, 4]) {
       const tags = TAG_SETS[(k + offset) % TAG_SETS.length] ?? [];
-      const theme = THEMES[(k + offset) % THEMES.length];
+      // The theme turns once per round of tag sets, so every theme meets every set.
+      const theme = THEMES[Math.floor((k + offset) / TAG_SETS.length) % THEMES.length];
       const start = performance.now();
       const model = generateDungeon({ seed, tags, floors, theme });
       out.push({ seed, tags, model, ms: performance.now() - start });
@@ -56,6 +58,8 @@ export function describeInvariants(floors: number): void {
   const eachFloor = (check: (run: Run, index: number) => string[]) => (run: Run): string[] =>
     run.model.floors.flatMap((_, index) => check(run, index).map((problem) => `floor ${index}: ${problem}`));
   const has = (run: Run, tag: string): boolean => run.model.tags.includes(tag);
+  // Typed rooms are held by their recipes (generateThemes.*.test.ts); the rules of rooms furnished by role hold in Caverns.
+  const caverns = runs.filter((run) => run.model.theme === 'cavern');
 
   describe(`generated dungeons of ${floors} floor${floors > 1 ? 's' : ''}`, () => {
     it('have as many floors as asked for, the deeper the fewer rooms, never fewer than three', () => {
@@ -94,8 +98,9 @@ export function describeInvariants(floors: number): void {
       expect(failures(eachFloor((run, i) => secretProblems(run.model.floors[i]!)))).toEqual([]);
     });
 
-    it('leave about a third of the rooms empty', () => {
-      const counts = runs.flatMap((run) => run.model.floors.map(emptyRooms));
+    // Typed rooms stand empty by their assignment (assignRoomTypes.test.ts) and are bare while their furniture waits for its drawings.
+    it('leave about a third of the rooms of a Cavern empty', () => {
+      const counts = caverns.flatMap((run) => run.model.floors.map(emptyRooms));
       const share = counts.reduce((sum, c) => sum + c.empty, 0) / counts.reduce((sum, c) => sum + c.rooms, 0);
       expect(share).toBeGreaterThanOrEqual(0.25);
       expect(share).toBeLessThanOrEqual(0.42);
@@ -166,6 +171,10 @@ export function describeInvariants(floors: number): void {
     });
 
     it('let the tags show', () => {
+      const shareIn = (among: readonly Run[], tag: string, check: (model: DungeonModel) => boolean): number => {
+        const tagged = among.filter((run) => has(run, tag));
+        return tagged.filter((run) => check(run.model)).length / tagged.length;
+      };
       const share = (tag: string, check: (model: DungeonModel) => boolean): number => {
         const tagged = runs.filter((run) => has(run, tag));
         return tagged.filter((run) => check(run.model)).length / tagged.length;
@@ -173,12 +182,21 @@ export function describeInvariants(floors: number): void {
       const anyFloor = (model: DungeonModel, check: (floor: DungeonModel['floors'][number]) => boolean): boolean => model.floors.some(check);
       expect(share('secret', (m) => anyFloor(m, (f) => f.doors.some((d) => d.kind === 'secret')))).toBeGreaterThan(0.7);
       expect(share('round', (m) => anyFloor(m, (f) => f.rooms.some((r) => r.rotunda)))).toBeGreaterThan(0.5);
-      expect(share('flooded', (m) => anyFloor(m, (f) => f.waterCells.length > 0))).toBeGreaterThan(0.9);
+      // A built theme's water stands only in the rooms that hold it.
+      expect(shareIn(caverns, 'flooded', (m) => anyFloor(m, (f) => f.waterCells.length > 0))).toBeGreaterThan(0.9);
       expect(share('deep', (m) => anyFloor(m, (f) => f.doors.some((d) => d.kind === 'steps')))).toBeGreaterThan(0.5);
     });
 
-    it('furnish the largest hall with a centrepiece, a dais or a set piece of terrain, and set every dais against a wall', () => {
-      const halls = runs.flatMap((run) => run.model.floors.map((floor) => ({ floor, hall: [...normals(floor)].sort((a, b) => b.w * b.h - a.w * a.h)[0] }))).filter(({ hall }) => hall && hall.w * hall.h >= 12);
+    it('let the theme show: a throne only in a Fortress, an altar in most Fortresses with a chapel', () => {
+      const thrones = runs.filter((run) => run.model.theme !== 'fortress' && run.model.floors.some((f) => f.props.some((p) => p.kind === 'throne')));
+      expect(thrones.map((run) => run.seed)).toEqual([]);
+      const chapels = runs.filter((run) => run.model.theme === 'fortress' && run.model.floors.some((f) => f.rooms.some((r) => r.type === 'chapel' && !f.terrain.some((p) => p.room === r.id && p.traits.hazard))));
+      const altars = chapels.filter((run) => run.model.floors.some((f) => f.props.some((p) => p.kind === 'altar') || f.terrain.some((p) => p.kind === 'altar')));
+      expect(altars.length / chapels.length).toBeGreaterThan(0.5);
+    });
+
+    it('furnish the largest hall of a Cavern with a centrepiece, a dais or a set piece of terrain, and set every dais against a wall', () => {
+      const halls = caverns.flatMap((run) => run.model.floors.map((floor) => ({ floor, hall: [...normals(floor)].sort((a, b) => b.w * b.h - a.w * a.h)[0] }))).filter(({ hall }) => hall && hall.w * hall.h >= 12);
       const setPieces = ['platform', 'ledge', 'statue', 'obelisk', 'portal-ring', 'altar', 'pool', 'mosaic', 'pillar', 'wall-fragment', 'pews', 'chasm', 'channel'];
       const centred = halls.filter(({ floor, hall }) => floor.props.some((p) => p.room === hall!.id && ['dais', 'fountain', 'statue', 'well'].includes(p.kind)) || floor.terrain.some((t) => t.room === hall!.id && setPieces.includes(t.kind)));
       expect(centred.length / halls.length).toBeGreaterThan(0.6);
@@ -198,6 +216,10 @@ export function describeInvariants(floors: number): void {
       expect(failures(eachFloor((run, i) => [...cellProblems(run.model.floors[i]!), ...clearanceProblems(run.model.floors[i]!, i)]))).toEqual([]);
     });
 
+    it('keep holes and molten channels clear of standing water', () => {
+      expect(failures((run) => physicsProblems(run.model))).toEqual([]);
+    });
+
     it('keep stairwells clear of hazards, bridges and water, on them and beside them', () => {
       expect(failures(eachFloor((run, i) => stairClearanceProblems(run.model.floors[i]!, i)))).toEqual([]);
     });
@@ -210,16 +232,18 @@ export function describeInvariants(floors: number): void {
       expect(failures((run) => holeProblems(run.model))).toEqual([]);
       if (floors === 1) expect(runs.every((run) => run.model.floors[0]!.terrain.every((p) => !p.opening || p.opening.bottom === null))).toBe(true);
       else {
-        const share = (check: (run: Run) => boolean): number => runs.filter(check).length / runs.length;
+        // Typed rooms open holes only for a reason of their type; the shares of chance openings are a Cavern's.
+        const share = (check: (run: Run) => boolean): number => caverns.filter(check).length / caverns.length;
         expect(share((run) => run.model.floors.some((f, k) => k < floors - 1 && f.terrain.some((p) => p.opening && p.kind === 'chasm')))).toBeGreaterThan(0.1);
         expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'gallery')))).toBeGreaterThan(0.08);
         expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'shaft')))).toBeGreaterThan(0.15);
       }
     });
 
-    it('give every furnished room that can hold a fight some cover', () => {
+    it('give every furnished room of a Cavern that can hold a fight some cover', () => {
       expect(
         failures(eachFloor((run, i) => {
+          if (run.model.theme !== 'cavern') return [];
           const floor = run.model.floors[i]!;
           return normals(floor)
             .filter((room) => room.w * room.h >= 12 && floor.props.some((p) => p.room === room.id) && !hasCover(floor, room.id))
@@ -228,16 +252,17 @@ export function describeInvariants(floors: number): void {
       ).toEqual([]);
     });
 
-    it('place about one hazard per six rooms', () => {
-      const floorsOf = runs.flatMap((run) => run.model.floors);
+    it('place about one hazard per six rooms of a Cavern', () => {
+      const floorsOf = caverns.flatMap((run) => run.model.floors);
       const hazards = floorsOf.reduce((sum, floor) => sum + floor.terrain.filter(isHazard).length, 0);
       const rooms = floorsOf.reduce((sum, floor) => sum + normals(floor).length, 0);
       expect(hazards / rooms).toBeGreaterThan(0.12);
       expect(hazards / rooms).toBeLessThan(0.26);
     });
 
-    it('furnish the boss room as an open arena: high ground, a set piece, cover, two thirds of it free', () => {
-      const arenas = runs.map((run) => run.model.floors.at(-1)!).map((floor) => ({ floor, boss: floor.rooms.find((room) => room.boss)! }));
+    // The arenas of typed boss rooms follow their climax types (generateThemes.furnished.test.ts).
+    it('furnish the boss room of a Cavern as an open arena: high ground, a set piece, cover, two thirds of it free', () => {
+      const arenas = caverns.map((run) => run.model.floors.at(-1)!).map((floor) => ({ floor, boss: floor.rooms.find((room) => room.boss)! }));
       const share = (check: (a: (typeof arenas)[number]) => boolean): number => arenas.filter(check).length / arenas.length;
       const pieces = ({ floor, boss }: (typeof arenas)[number]): DungeonModel['floors'][number]['terrain'] => floor.terrain.filter((p) => p.room === boss.id);
       expect(share((a) => pieces(a).some((p) => p.kind === 'platform'))).toBeGreaterThan(0.6);

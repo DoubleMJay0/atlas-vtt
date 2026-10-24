@@ -1,19 +1,40 @@
-/** What every terrain pass shares: the floors being placed, the tags, the links of holes, the streams. */
+/** What every terrain pass shares: the floors being placed, the tags, the theme, the links of holes, the streams. */
 
 import { type Rng, floorStream } from '../rng';
 import type { DungeonTag } from '../tags';
+import type { ThemeContext } from '../themes/themes';
 import type { FloorTerrain } from './floorTerrain';
+import type { TypedRoom } from './typeTerrain';
 
 export interface TerrainWork {
   floors: readonly FloorTerrain[];
   tags: ReadonlySet<DungeonTag>;
+  theme: ThemeContext;
+  /** A room's type and its recipe's reading, where the theme typed it. */
+  typed: (floor: number, room: number) => TypedRoom | undefined;
+  /** Whether a typed room stands empty. */
+  empty: (floor: number, room: number) => boolean;
   /** A new id shared by the holes of one shaft or abyss and the floor under it. */
   nextLink: () => number;
   /** The terrain stream of a floor, split by `key`. */
   rng: (floor: number, key: string) => Rng;
 }
 
-export function terrainWork(seed: number, floors: readonly FloorTerrain[], tags: ReadonlySet<DungeonTag>): TerrainWork {
+/** What the theme typed: each floor's typed rooms and the rooms that stand empty. */
+export interface TerrainTypes {
+  types: readonly (ReadonlyMap<number, TypedRoom> | undefined)[];
+  empty: readonly ReadonlySet<number>[];
+}
+
+export function terrainWork(seed: number, floors: readonly FloorTerrain[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext, typed: TerrainTypes): TerrainWork {
   let link = 0;
-  return { floors, tags, nextLink: () => link++, rng: (floor, key) => floorStream(seed, 'terrain', floor, key) };
+  return {
+    floors,
+    tags,
+    theme,
+    typed: (floor, room) => typed.types[floor]?.get(room),
+    empty: (floor, room) => typed.empty[floor]?.has(room) === true,
+    nextLink: () => link++,
+    rng: (floor, key) => floorStream(seed, 'terrain', floor, key),
+  };
 }

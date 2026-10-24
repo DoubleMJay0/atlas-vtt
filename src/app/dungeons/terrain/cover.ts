@@ -17,6 +17,9 @@ import type { RoomCells } from './roomCells';
 import { standsApart } from './shapes';
 
 /** A room this many cells or fewer is cramped; larger is open. */
+/** Rooms of at least this much floor can hold a fight and get cover unless they are left empty. */
+export const FIGHT_AREA = 12;
+
 export const CRAMPED_AREA = 20;
 
 export interface CoverShape {
@@ -49,9 +52,10 @@ export function tryShape(floor: FloorTerrain, rc: RoomCells, shape: CoverShape, 
   return floor.place(draft(shape.kind, rc.room.id, cells, { facing: negate(rc.axis) })) !== null;
 }
 
-/** Up to `count` pieces drawn from `shapes`, each at a random free place. */
-export function scatterCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, count: number, tags: ReadonlySet<DungeonTag>): number {
-  const shapes = halfCover(tags).filter(([, w]) => w > 0);
+/** Up to `count` pieces drawn from `shapes` (of the kinds `allows` lets in, where given), each at a random free place. */
+export function scatterCover(floor: FloorTerrain, rc: RoomCells, rng: Rng, count: number, tags: ReadonlySet<DungeonTag>, allows: (kind: TerrainKind) => boolean = () => true): number {
+  const shapes = halfCover(tags).filter(([shape, w]) => w > 0 && allows(shape.kind));
+  if (shapes.length === 0) return 0;
   let placed = 0;
   for (let tries = 0; placed < count && tries < count * 10; tries++) {
     const shape = weighted(rng, shapes);
@@ -75,7 +79,7 @@ function mirroredPair(floor: FloorTerrain, rc: RoomCells, shape: CoverShape, i: 
 }
 
 /** Pillars in pairs across the room: two cells square where the room is large. */
-function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
+export function pillars(floor: FloorTerrain, rc: RoomCells, rng: Rng): boolean {
   const size = rc.width >= 8 && rc.depth >= 7 ? 2 : 1;
   const shape: CoverShape = { kind: 'pillar', di: size, dj: size };
   const rows = shuffled(rng, [Math.floor(rc.depth / 3), Math.floor(rc.depth / 2), Math.floor((rc.depth * 2) / 3) - size + 1]);

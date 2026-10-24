@@ -164,7 +164,8 @@ describe('creating a dungeon scene', () => {
 
     const notePath = `atlas-vtt/collections/${COLLECTION}/notes/${TITLE}.md`;
     const note = b.vault.files.get(notePath)!;
-    expect(note.startsWith(`# ${TITLE}\n\n## A1\n`)).toBe(true);
+    // A room's heading names its key, then what it was built for where its theme typed it.
+    expect(note).toMatch(new RegExp(`^# ${TITLE}\\n\\n## A1( · [^\\n]+)?\\n`));
     const pins = Object.values(objects.pins ?? {});
     expect(pins.length).toBeGreaterThan(5);
     for (const pin of pins) {

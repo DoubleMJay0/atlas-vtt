@@ -10,6 +10,7 @@ import { type Rng, chance, int, shuffled } from '../rng';
 import { draft } from './catalog';
 import { cutHole, dropBelow } from './holes';
 import type { RoomCells } from './roomCells';
+import { holeAllowed, openingAbove } from './typeReasons';
 import type { TerrainWork } from './work';
 
 /** How often the arena is two floors high, where a room lies over it. */
@@ -32,9 +33,11 @@ export function galleryOverArena(work: TerrainWork, rng: Rng): void {
   const deepest = work.floors.length - 1;
   const arena = work.floors[deepest]?.plan.rooms.find((room) => room.boss);
   const above = work.floors[deepest - 1];
-  if (!arena || !above || !chance(rng, GALLERY_CHANCE)) return;
+  if (!arena || !above || !openingAbove(work, deepest, arena.id, 'gallery') || !chance(rng, GALLERY_CHANCE)) return;
+  // The gallery is cut in a room above that may take it: untyped, or a type with a reason for it.
+  const cuttable = (id: number): boolean => holeAllowed(work, deepest - 1, id, 'gallery');
   const candidates = above.plan.rooms
-    .filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda)
+    .filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.rotunda && cuttable(room.id))
     .flatMap((room) => {
       const rc = above.room(room.id);
       const over = intersection(floorRect(room), floorRect(arena));
@@ -61,7 +64,7 @@ function shaftSpots(rc: RoomCells, rng: Rng, size: number): CellPoint[][] {
 export function shaftDown(work: TerrainWork, k: number, rng: Rng): void {
   const floor = work.floors[k];
   if (!floor || k + 1 >= work.floors.length || !chance(rng, SHAFT_CHANCE)) return;
-  const rooms = shuffled(rng, floor.plan.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.boss && room.stage === undefined));
+  const rooms = shuffled(rng, floor.plan.rooms.filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.boss && room.stage === undefined && holeAllowed(work, k, room.id, 'shaft')));
   for (const room of rooms) {
     const rc = floor.room(room.id);
     if (!rc) continue;

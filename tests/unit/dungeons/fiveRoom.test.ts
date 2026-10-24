@@ -63,7 +63,10 @@ describe('five-room dungeons', () => {
     ).toEqual([]);
   });
 
-  it('build each stage as architecture, in more than one way, and without mechanisms', () => {
+  // Stages built by role in a Cavern; a built theme's stages take its types (below).
+  it('build each stage of a Cavern as architecture, in more than one way, and without mechanisms', () => {
+    const caverns = runs.filter(({ model }) => model.theme === 'cavern');
+    const share = (check: (floor: DungeonFloor) => boolean): number => caverns.filter(({ model }) => check(model.floors[0]!)).length / caverns.length;
     const pieces = (floor: DungeonFloor, stage: FiveRoomStage) => floor.terrain.filter((p) => p.room === stageRoom(floor, stage)?.id);
     const way = (floor: DungeonFloor, stage: FiveRoomStage): string => [...new Set(pieces(floor, stage).map((p) => p.kind))].sort().join('+');
     expect(share((f) => pieces(f, 'entrance').some((p) => p.kind === 'low-wall'))).toBeGreaterThan(0.2);
@@ -77,8 +80,8 @@ describe('five-room dungeons', () => {
     // No stage is built the same way in most dungeons.
     for (const stage of ['entrance', 'puzzle', 'setback', 'reward'] as const) {
       const counts = new Map<string, number>();
-      for (const { model } of runs) counts.set(way(model.floors[0]!, stage), (counts.get(way(model.floors[0]!, stage)) ?? 0) + 1);
-      expect(Math.max(...counts.values()) / runs.length, stage).toBeLessThan(0.5);
+      for (const { model } of caverns) counts.set(way(model.floors[0]!, stage), (counts.get(way(model.floors[0]!, stage)) ?? 0) + 1);
+      expect(Math.max(...counts.values()) / caverns.length, stage).toBeLessThan(0.5);
     }
   });
 
@@ -92,13 +95,15 @@ describe('five-room dungeons', () => {
     expect(secretShare(['no-secrets'])).toBe(0);
     const differs = (tag: string): number => {
       let changed = 0;
-      for (let seed = 1; seed <= 20; seed++) {
-        const rooms = (tags: string[]) => JSON.stringify(generateDungeon({ seed, tags, floors: 1, fiveRoom: true }).floors[0]!.rooms.map((r) => [r.x, r.y, r.w, r.h, r.colonnade, r.rotunda]));
+      for (let seed = 1; seed <= 40; seed++) {
+        // A Cavern builds no colonnades whatever its tags say, so the tags are held on the built themes.
+        const theme = seed % 2 === 0 ? 'fortress' : 'mansion';
+        const rooms = (tags: string[]) => JSON.stringify(generateDungeon({ seed, theme, tags, floors: 1, fiveRoom: true }).floors[0]!.rooms.map((r) => [r.x, r.y, r.w, r.h, r.colonnade, r.rotunda]));
         if (rooms([]) !== rooms([tag])) changed++;
       }
       return changed;
     };
-    for (const tag of ['compact', 'winding', 'small', 'ordered', 'chaotic', 'colonnades']) expect(differs(tag), tag).toBeGreaterThan(5);
+    for (const tag of ['compact', 'winding', 'small', 'ordered', 'chaotic', 'colonnades']) expect(differs(tag), tag).toBeGreaterThan(7);
   });
 
   it('keep every rule of the layout and the terrain', () => {
@@ -109,5 +114,34 @@ describe('five-room dungeons', () => {
 
   it('give the same dungeon for the same request', () => {
     for (const { seed, theme, tags, model } of runs.slice(0, 200)) expect(generateDungeon({ seed, theme, tags, floors: 1, fiveRoom: true })).toEqual(model);
+  });
+});
+
+describe.each([
+  ['fortress', { entrance: ['gatehouse'], puzzle: ['gallery', 'library'], reward: ['solar'] }],
+  ['mansion', { entrance: ['entrance-hall'], puzzle: ['portrait-gallery', 'library'], reward: ['study', 'master-bedroom'] }],
+] as const)('five-room %s dungeons', (theme, types) => {
+  const themed = Array.from({ length: 300 }, (_, k) => generateDungeon({ seed: (k + 1) * 4447, theme, tags: [], floors: 1, fiveRoom: true }));
+
+  it('take the theme\'s types for their stages', () => {
+    const problems = themed.flatMap((model) => {
+      const floor = model.floors[0]!;
+      const out: string[] = [];
+      for (const stage of ['entrance', 'puzzle', 'reward'] as const) {
+        const room = stageRoom(floor, stage);
+        if (room && !(types[stage] as readonly string[]).includes(room.type ?? '')) out.push(`seed ${model.seed}: the ${stage} is a ${room.type}`);
+      }
+      const setback = stageRoom(floor, 'setback');
+      if (setback && floor.terrain.some((p) => p.room === setback.id && p.traits.hazard !== undefined)) out.push(`seed ${model.seed}: a hazard in the setback`);
+      return out;
+    });
+    expect(problems.slice(0, 10)).toEqual([]);
+  });
+
+  it('keep their stages in order and stay the same for the same seed', () => {
+    for (const model of themed.slice(0, 50)) {
+      expect(FIVE_ROOM_STAGES.every((stage) => stageRoom(model.floors[0]!, stage))).toBe(true);
+      expect(generateDungeon({ seed: model.seed, theme, tags: [], floors: 1, fiveRoom: true })).toEqual(model);
+    }
   });
 });

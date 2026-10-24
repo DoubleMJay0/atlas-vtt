@@ -12,20 +12,22 @@ import { cellKey } from '../geometry';
 import type { RoomRole } from '../props/roles';
 import { type Rng, chance, shuffled, weighted } from '../rng';
 import type { DungeonTag } from '../tags';
+import type { ThemeContext } from '../themes/themes';
 import { furnishArena } from './arena';
 import { draft } from './catalog';
-import { CRAMPED_AREA, crampedCover, ensureCover, openRoomCover } from './cover';
+import { CRAMPED_AREA, FIGHT_AREA, crampedCover, ensureCover, openRoomCover } from './cover';
 import { difficultGround } from './difficult';
 import { ledgeAlongWall, platformAtFarWall } from './elevation';
 import { type FloorPlan, FloorTerrain } from './floorTerrain';
 import { hazardWeights, placeChasmOver, placeHazard } from './hazards';
 import { anyInterest } from './interest';
 import { furnishStage } from './stages';
+import { furnishTypedArena } from './typeArena';
+import { placeTypeHazard } from './typeHazards';
+import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import { galleryOverArena, shaftDown } from './vertical';
 import { type TerrainWork, terrainWork } from './work';
 
-/** Rooms of at least this much floor can hold a fight and get cover unless they are left empty. */
-export const FIGHT_AREA = 12;
 /** One hazard per this many normal rooms. */
 const ROOMS_PER_HAZARD = 6;
 /** How often a floor's first hazard is an abyss onto the floor below, where a room lies under it. */
@@ -37,6 +39,8 @@ export interface TerrainFloorInput extends FloorPlan {
   roles: ReadonlyMap<number, RoomRole>;
   /** Normal rooms left without furniture. */
   empty: ReadonlySet<number>;
+  /** The rooms the theme typed, furnished by their recipes; the rest by their roles. */
+  types?: ReadonlyMap<number, TypedRoom>;
 }
 
 function hazardCount(floor: FloorTerrain): number {
@@ -49,7 +53,8 @@ function hazards(work: TerrainWork, k: number, rooms: readonly DungeonRoom[], rn
   if (!floor) return;
   const target = rooms.length / ROOMS_PER_HAZARD;
   const wanted = Math.floor(target) + (chance(rng, target % 1) ? 1 : 0) - hazardCount(floor);
-  let pool = rooms.filter((room) => room.wing === 'regular' && !room.boss && room.stage === undefined && !(room.rotunda && room.w < 7) && (floor.room(room.id)?.floorCount ?? 0) >= 9 && floor.inRoom(room.id).length === 0);
+  // Typed rooms take a hazard only for a reason of their type (`placeTypeHazards`).
+  let pool = rooms.filter((room) => !work.typed(k, room.id) && room.wing === 'regular' && !room.boss && room.stage === undefined && !(room.rotunda && room.w < 7) && (floor.room(room.id)?.floorCount ?? 0) >= 9 && floor.inRoom(room.id).length === 0);
   const weights = hazardWeights(work.tags).filter(([, w]) => w > 0);
   let placed = 0;
   // A floor with a floor below opens onto it where it can: an abyss over a room down there.
@@ -69,6 +74,18 @@ function hazards(work: TerrainWork, k: number, rooms: readonly DungeonRoom[], rn
     const rc = floor.room(room.id);
     if (rc && placeHazard(work, k, rc, rng, weighted(rng, weights))) placed++;
   }
+}
+
+/** The hazards of typed rooms whose types have a reason for one; the rooms that took one. */
+function placeTypeHazards(work: TerrainWork, k: number, rooms: readonly DungeonRoom[]): Set<number> {
+  const out = new Set<number>();
+  for (const room of rooms) {
+    const typed = work.typed(k, room.id);
+    const rc = work.floors[k]?.room(room.id);
+    if (!typed || !rc || room.boss || room.stage || room.wing !== 'regular' || work.floors[k]?.inRoom(room.id).length) continue;
+    if (placeTypeHazard(work, k, rc, typed.spec, work.rng(k, `hazard:${room.id}`))) out.add(room.id);
+  }
+  return out;
 }
 
 /** Height, cover, difficult ground and a point of interest for an ordinary room. */
@@ -96,21 +113,28 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
     const rc = work.floors[k]?.room(room.id);
     const rng = work.rng(k, `main:${room.id}`);
     if (!rc) continue;
-    if (room.stage) furnishStage(work, k, rc, rng, room.stage, work.tags);
-    else if (room.boss) furnishArena(work, k, rc, rng, work.tags);
+    const typed = input.types?.get(room.id);
+    const arena = room.boss || room.stage === 'climax';
+    if (room.stage && room.stage !== 'climax') furnishStage(work, k, rc, rng, room.stage, work.tags, typed);
+    else if (arena && typed) furnishTypedArena(work, k, rc, rng, typed);
+    else if (arena) furnishArena(work, k, rc, rng, work.tags);
   }
   shaftDown(work, k, work.rng(k, 'shaft'));
   hazards(work, k, rooms, work.rng(k, 'hazards'));
+  const hazarded = placeTypeHazards(work, k, rooms);
   for (const room of rooms) {
     if (room.boss || room.stage || input.empty.has(room.id)) continue;
-    furnishRoom(work, k, room, input.roles.get(room.id) ?? 'plain');
+    const typed = input.types?.get(room.id);
+    const rc = work.floors[k]?.room(room.id);
+    if (typed && rc) furnishTypedRoom(work, k, rc, typed.spec, typed.context, hazarded.has(room.id));
+    else furnishRoom(work, k, room, input.roles.get(room.id) ?? 'plain');
   }
 }
 
 /** The terrain of every floor, as builders that still take the shallow water once it is known (`addShallowWater`). */
-export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>): FloorTerrain[] {
+export function planTerrain(seed: number, floors: readonly TerrainFloorInput[], tags: ReadonlySet<DungeonTag>, theme: ThemeContext): FloorTerrain[] {
   const builders = floors.map((floor, index) => new FloorTerrain(index, floor));
-  const work = terrainWork(seed, builders, tags);
+  const work = terrainWork(seed, builders, tags, theme, { types: floors.map((floor) => floor.types), empty: floors.map((floor) => floor.empty) });
   galleryOverArena(work, work.rng(builders.length - 1, 'gallery'));
   floors.forEach((floor, k) => furnishFloor(work, k, floor));
   return builders;

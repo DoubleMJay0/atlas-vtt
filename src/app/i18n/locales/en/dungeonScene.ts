@@ -5,6 +5,7 @@ export const dungeonScene = {
   'dungeonScene.floor': 'Floor {letter}',
   'dungeonScene.mapName': '{scene}, {floor}',
   'dungeonScene.heading': '{key} · {role}',
+  'dungeonScene.headingWithRole': '{key} · {type}, {role}',
   'dungeonScene.bossRoom': 'Boss room',
   'dungeonScene.stage.entrance': 'Entrance and guardian',
   'dungeonScene.stage.puzzle': 'Puzzle or roleplay',

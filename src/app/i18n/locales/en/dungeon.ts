@@ -180,6 +180,7 @@ export const dungeon = {
   'dungeon.terrain.acidChannel': 'Acid channel',
   'dungeon.terrain.waterChannel': 'Water channel',
   'dungeon.terrain.deepWater': 'Deep water',
+  'dungeon.terrain.oubliette': 'Oubliette',
   'dungeon.terrain.pit': 'Pit',
   'dungeon.terrain.gallery': 'Gallery',
   'dungeon.terrain.parapet': 'Parapet',

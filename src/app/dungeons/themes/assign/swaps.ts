@@ -4,7 +4,7 @@
  */
 
 import { type Rng, pick } from '../../rng';
-import { type Assignment, breaksHardRule, roomScore } from './score';
+import { type Assignment, FILLER_RELAXED, breaksHardRule, roomScore } from './score';
 
 export const SWAPS = 300;
 
@@ -25,7 +25,7 @@ function keepsRules(a: Assignment, rooms: readonly number[]): boolean {
   return rooms.every((k) => {
     const type = a.types[k];
     const filler = a.programme.filler.some(([id]) => id === type);
-    return !type || a.fixed[k] || !breaksHardRule(a, k, type, filler ? { counts: false, branches: false } : {});
+    return !type || a.fixed[k] || !breaksHardRule(a, k, type, filler ? FILLER_RELAXED : {});
   });
 }
 

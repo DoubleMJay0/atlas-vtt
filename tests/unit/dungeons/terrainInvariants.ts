@@ -5,7 +5,8 @@
  * cross, and holes that line up over the floors below.
  */
 
-import type { CellPoint, DungeonFloor, DungeonModel, DungeonRoom, DungeonTerrain, TerrainKind } from '../../../src/app/dungeons/model';
+import type { CellPoint, DungeonFloor, DungeonModel, DungeonProp, DungeonRoom, DungeonTerrain, TerrainKind } from '../../../src/app/dungeons/model';
+import { PROP_SPECS, isCellPiece } from '../../../src/app/dungeons/props/catalogue';
 
 const key = (c: CellPoint): string => `${c.x},${c.y}`;
 const STEPS = [
@@ -121,6 +122,31 @@ export function clearanceProblems(floor: DungeonFloor, index: number): string[] 
 }
 
 /** Cells of the floor a party can stand on: room floors, door cells and stairwells, less what blocks, bridges walkable again. */
+/** The cells a piece of furniture on whole cells stands on: those whose middles lie inside its box. */
+export function propCells(floor: DungeonFloor, prop: DungeonProp): CellPoint[] {
+  const spec = PROP_SPECS[prop.kind];
+  if (!isCellPiece(spec) || spec.wallPiece) return [];
+  const room = floor.rooms[prop.room];
+  if (!room) return [];
+  const along = prop.size?.along ?? spec.footprint.along;
+  const { out } = spec.footprint;
+  const front = { x: Math.sin(prop.rotation), y: -Math.cos(prop.rotation) };
+  const cells: CellPoint[] = [];
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      const dx = x + 0.5 - prop.x;
+      const dy = y + 0.5 - prop.y;
+      if (Math.abs(dx * front.y - dy * front.x) < along / 2 && Math.abs(dx * front.x + dy * front.y) < out / 2) cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+/** The cells furniture blocks: those of every cell piece that cannot be walked. */
+export function blockingPropCells(floor: DungeonFloor): CellPoint[] {
+  return floor.props.filter((p) => PROP_SPECS[p.kind].footing === 'block').flatMap((p) => propCells(floor, p));
+}
+
 function walkable(floor: DungeonFloor): Set<string> {
   const cells = new Set<string>();
   for (const room of floor.rooms) {
@@ -135,6 +161,7 @@ function walkable(floor: DungeonFloor): Set<string> {
   for (const door of floor.doors) cells.add(key(door));
   for (const piece of floor.terrain) if (BLOCKING.has(piece.kind)) for (const c of piece.cells) cells.delete(key(c));
   for (const piece of floor.terrain) if (piece.kind === 'bridge') for (const c of piece.cells) cells.add(key(c));
+  for (const c of blockingPropCells(floor)) cells.delete(key(c));
   return cells;
 }
 
@@ -261,12 +288,15 @@ export function holeProblems(model: DungeonModel): string[] {
 /** How many cells of the room a party cannot walk. */
 export function blockedCells(floor: DungeonFloor, room: number): number {
   const bridged = new Set(floor.terrain.filter((p) => p.kind === 'bridge').flatMap((p) => p.cells.map(key)));
-  return floor.terrain.filter((p) => p.room === room && BLOCKING.has(p.kind)).flatMap((p) => p.cells).filter((c) => !bridged.has(key(c))).length;
+  const r = floor.rooms[room];
+  const furniture = r ? blockingPropCells(floor).filter((c) => inFloor(r, c)).length : 0;
+  return floor.terrain.filter((p) => p.room === room && BLOCKING.has(p.kind)).flatMap((p) => p.cells).filter((c) => !bridged.has(key(c))).length + furniture;
 }
 
-/** Whether the room holds cover: a piece that gives it, columns standing in it, or a gallery's parapet. */
+/** Whether the room holds cover: a piece of terrain or furniture that gives it, columns standing in it, or a gallery's parapet. */
 export function hasCover(floor: DungeonFloor, room: number): boolean {
   const r = floor.rooms[room];
   const columns = r !== undefined && floor.columns.some((c) => c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h);
-  return columns || floor.terrain.some((p) => p.room === room && (p.traits.cover !== undefined || p.kind === 'gallery'));
+  const furniture = floor.props.some((p) => p.room === room && PROP_SPECS[p.kind].cover !== undefined);
+  return columns || furniture || floor.terrain.some((p) => p.room === room && (p.traits.cover !== undefined || p.kind === 'gallery'));
 }
