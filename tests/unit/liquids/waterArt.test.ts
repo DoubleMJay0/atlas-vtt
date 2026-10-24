@@ -21,7 +21,7 @@ describe('water keeps the map drawing language', () => {
     expect(read[2]).toEqual({ ...pool, id: 'future' });
   });
 
-  const model = generateDungeon({ seed: 909, tags: ['small', 'wet', 'tomb'], floors: 1 });
+  const model = generateDungeon({ seed: 909, theme: 'cavern', tags: ['small', 'wet'], floors: 1 });
   for (const { id, style } of DUNGEON_STYLES) for (const monochrome of [false, true]) {
     it(`carries ${id}${monochrome ? ' monochrome' : ''} water in the art's own pigments`, () => {
       const view = { ...DEFAULT_VIEW, monochrome };

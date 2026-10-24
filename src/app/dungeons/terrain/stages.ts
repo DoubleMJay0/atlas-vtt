@@ -87,8 +87,8 @@ function setPiece(work: TerrainWork, k: number, rc: RoomCells, rng: Rng): void {
     ['statues', 2],
     ['basin', tags.has('dry') ? 0 : tags.has('wet') || tags.has('flooded') ? 3 : 1.5],
     ['obelisk', 1.5],
-    ['pews', tags.has('temple') ? 3 : 0.5],
-    ['tombs', tags.has('tomb') ? 3 : 0.5],
+    ['pews', 0.5],
+    ['tombs', 0.5],
     ['plain', 1],
   ];
   firstThatFits(rng, ways, (way) => {

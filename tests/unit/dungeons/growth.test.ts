@@ -94,15 +94,15 @@ const kinds = (models: readonly DungeonModel[]): Set<string> => new Set(models.f
 
 describe('dungeon vegetation', () => {
   const overgrown = runs(['overgrown'], 2);
-  const temple = runs(['overgrown', 'temple', 'colonnades']);
-  const tomb = runs(['overgrown', 'tomb', 'wet']);
-  const dwelling = runs(['overgrown', 'dwelling', 'crumbling']);
+  const fortress = runs(['overgrown', 'colonnades'], 1, { theme: 'fortress' });
+  const cavern = runs(['overgrown', 'wet'], 1, { theme: 'cavern' });
+  const mansion = runs(['overgrown', 'crumbling'], 1, { theme: 'mansion' });
   const lava = runs(['overgrown', 'lava'], 2);
   const wet = runs(['wet']);
   const crumbling = runs(['crumbling']);
 
   it('grows only where it may: off doorways, door approaches, stairwells, holes, water and lava', () => {
-    const problems = [...overgrown, ...temple, ...tomb, ...dwelling, ...lava, ...wet, ...crumbling]
+    const problems = [...overgrown, ...fortress, ...cavern, ...mansion, ...lava, ...wet, ...crumbling]
       .flatMap(m => m.floors.flatMap((f, i) => growthProblems(f).map(p => `seed ${m.seed} [${m.tags.join(',')}] floor ${i}: ${p}`)))
       .slice(0, 10);
     expect(problems).toEqual([]);
@@ -122,24 +122,12 @@ describe('dungeon vegetation', () => {
   }, 120_000);
 
   it('grows nothing in a dry, lava, acid or untagged dungeon unless it is overgrown', () => {
-    for (const tags of [[], ['dry'], ['dry', 'crumbling'], ['lava'], ['lava', 'wet'], ['acid', 'crumbling'], ['temple', 'colonnades'], ['tomb']]) {
+    for (const tags of [[], ['dry'], ['dry', 'crumbling'], ['lava'], ['lava', 'wet'], ['acid', 'crumbling'], ['colonnades']]) {
       const models = Array.from({ length: 60 }, (_, k) => generate(k * 104_729 + 3, tags, 2));
       expect(growthOf(models), tags.join(',')).toBe(0);
       expect(undergrowthOf(models), tags.join(',')).toBe(0);
     }
     expect(growthOf(lava)).toBeGreaterThan(10);
-  }, 120_000);
-
-  it('picks what grows by the theme', () => {
-    const t = kinds(temple);
-    expect(t.has('vine')).toBe(true);
-    expect(temple.some(m => m.floors[0]!.growth.some(g => g.column !== undefined))).toBe(true);
-    const b = kinds(tomb);
-    for (const k of ['fungi', 'roots', 'creeper']) expect(b.has(k), k).toBe(true);
-    expect(tomb.some(m => m.floors[0]!.terrain.some(p => p.kind === 'tangled-roots'))).toBe(true);
-    expect(kinds(dwelling).has('grass')).toBe(true);
-    expect(dwelling.some(m => m.floors[0]!.terrain.some(p => p.kind === 'brambles'))).toBe(true);
-    for (const models of [overgrown, tomb, dwelling]) expect(kinds(models).has('vine')).toBe(false);
   }, 120_000);
 
   it('grows green where the light comes in: the entry floor more than the floor below it', () => {
@@ -151,7 +139,7 @@ describe('dungeon vegetation', () => {
 
   it('is the same for the same request', () => {
     for (let seed = 1; seed <= 60; seed++) {
-      const request = { seed: seed * 31, tags: ['overgrown', seed % 2 ? 'tomb' : 'wet'], floors: 1 + (seed % 3) };
+      const request = { seed: seed * 31, theme: seed % 2 ? ('cavern' as const) : undefined, tags: ['overgrown', 'wet'], floors: 1 + (seed % 3) };
       expect(generateDungeon(request)).toEqual(generateDungeon(request));
     }
   });

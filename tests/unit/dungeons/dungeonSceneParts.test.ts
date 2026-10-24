@@ -259,7 +259,7 @@ describe('the outlines of tall objects', () => {
   it('stand on columns, statues and wells, block sight and light, and sealing never bridges one to a wall or another', () => {
     let outlines = 0;
     for (let seed = 1; seed <= 40; seed++) {
-      const model = generateDungeon({ seed, tags: seed % 2 ? ['colonnades', 'temple'] : ['large'], floors: 1 + (seed % 2) });
+      const model = generateDungeon({ seed, theme: seed % 2 ? 'fortress' : undefined, tags: seed % 2 ? ['colonnades'] : ['large'], floors: 1 + (seed % 2) });
       const { parts, image } = partsOf(model);
       const tolerance = sealTolerance(worldTexel(image));
       for (const level of parts.levelIds ?? [undefined]) {
@@ -307,7 +307,7 @@ describe('cell outlines', () => {
 
 describe('vegetation in the scene', () => {
   it('names undergrowth as difficult terrain and climbers on the cells they hang over, under everything else, and lists what grows in the note', () => {
-    const model = generateDungeon({ seed: 16, tags: ['dwelling', 'overgrown'], floors: 1 });
+    const model = generateDungeon({ seed: 16, theme: 'mansion', tags: ['overgrown'], floors: 1 });
     const floor = model.floors[0]!;
     const { parts } = partsOf(model);
     const features = Object.values(parts.scene.mapFeatures ?? {});

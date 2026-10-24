@@ -99,7 +99,7 @@ export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: R
   const platformDepth = raised ? deep : 0;
   const pieces: (readonly [SetPiece, number])[] = [
     ['statues', 3],
-    ['altar', tags.has('temple') ? 3 : 1.5],
+    ['altar', 1.5],
     ['ring', 2],
     ['pillars', 2],
   ];

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { FIVE_ROOM_STAGES, type DungeonFloor, type DungeonModel, type FiveRoomStage } from '../../../src/app/dungeons/model';
+import type { ThemeChoice } from '../../../src/app/dungeons/themes/themeTypes';
 import { distances, doorProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
@@ -11,12 +12,15 @@ import { bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems
  */
 
 const SEEDS = 1000;
-const TAG_SETS: readonly string[][] = [[], ['temple'], ['crumbling'], ['wet', 'tomb'], ['dry', 'dwelling'], ['large'], ['small'], ['round']];
+const TAG_SETS: readonly string[][] = [[], ['colonnades'], ['crumbling'], ['wet'], ['dry'], ['large'], ['small'], ['round']];
+/** The theme each tag set is asked with: what the retired temple, tomb and dwelling tags stood for, else Any. */
+const THEMES: readonly (ThemeChoice | undefined)[] = [undefined, 'fortress', undefined, 'cavern', 'mansion', undefined, undefined, undefined];
 
-const runs: { seed: number; tags: string[]; model: DungeonModel }[] = Array.from({ length: SEEDS }, (_, k) => {
+const runs: { seed: number; theme: ThemeChoice | undefined; tags: string[]; model: DungeonModel }[] = Array.from({ length: SEEDS }, (_, k) => {
   const seed = (k + 1) * 6271;
   const tags = TAG_SETS[k % TAG_SETS.length] ?? [];
-  return { seed, tags, model: generateDungeon({ seed, tags, floors: 1 + (k % 4), fiveRoom: true, bossRoom: k % 3 === 0 ? false : undefined }) };
+  const theme = THEMES[k % THEMES.length];
+  return { seed, theme, tags, model: generateDungeon({ seed, theme, tags, floors: 1 + (k % 4), fiveRoom: true, bossRoom: k % 3 === 0 ? false : undefined }) };
 });
 
 function failures(check: (floor: DungeonFloor, model: DungeonModel) => string[]): string[] {
@@ -104,6 +108,6 @@ describe('five-room dungeons', () => {
   });
 
   it('give the same dungeon for the same request', () => {
-    for (const { seed, tags, model } of runs.slice(0, 200)) expect(generateDungeon({ seed, tags, floors: 1, fiveRoom: true })).toEqual(model);
+    for (const { seed, theme, tags, model } of runs.slice(0, 200)) expect(generateDungeon({ seed, theme, tags, floors: 1, fiveRoom: true })).toEqual(model);
   });
 });

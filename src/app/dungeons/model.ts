@@ -9,6 +9,8 @@
 
 import type { DungeonGrowth } from './growthModel';
 import type { PropKind } from './props/propKinds';
+import type { RoomTypeId } from './themes/roomTypes';
+import type { ThemeChoice, ThemeId } from './themes/themeTypes';
 import type { DungeonTerrain, FiveRoomStage } from './terrainModel';
 
 export type { CoverLevel, DungeonTerrain, FiveRoomStage, HazardKind, TerrainKind, TerrainOpening, TerrainTraits } from './terrainModel';
@@ -17,7 +19,7 @@ export type { DungeonGrowth, GrowthKind } from './growthModel';
 export type { PropKind } from './props/propKinds';
 
 /** Bump when the same seed and tags would give another dungeon. */
-export const DUNGEON_GENERATOR_VERSION = 2;
+export const DUNGEON_GENERATOR_VERSION = 3;
 
 export interface CellPoint {
   x: number;
@@ -61,6 +63,8 @@ export interface DungeonRoom {
   boss: boolean;
   /** In a five-room dungeon, which of the five main rooms this is; unset in every other room. */
   stage?: FiveRoomStage;
+  /** What a normal room was built for, in a theme with a room programme; unset otherwise. */
+  type?: RoomTypeId;
 }
 
 /**
@@ -165,7 +169,9 @@ export interface DungeonFloor {
 export interface DungeonModel {
   version: number;
   seed: number;
-  /** The tags the dungeon was built with: the GM's and those added by chance (`dungeonTags`). */
+  /** Fortress, Haunted Mansion or Cavern: one per dungeon. */
+  theme: ThemeId;
+  /** The tags the dungeon was built with: the GM's that its theme takes, and those added by chance (`dungeonTags`). */
   tags: string[];
   /** Index 0 is the entry floor (A), each next one below the last. */
   floors: DungeonFloor[];
@@ -174,6 +180,8 @@ export interface DungeonModel {
 /** What a GM asks for: everything else follows from it. */
 export interface DungeonRequest {
   seed: number;
+  /** The theme asked for; unset is Any, which the seed decides (`pickTheme`). */
+  theme?: ThemeChoice;
   tags: string[];
   /** How many floors, 1 to `MAX_FLOORS`. */
   floors: number;

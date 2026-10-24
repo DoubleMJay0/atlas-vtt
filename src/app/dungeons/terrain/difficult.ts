@@ -5,7 +5,7 @@
  */
 
 import type { CellPoint } from '../model';
-import { type Rng, chance, int } from '../rng';
+import { type Rng, int } from '../rng';
 import type { DungeonTag } from '../tags';
 import { draft } from './catalog';
 import type { FloorTerrain } from './floorTerrain';
@@ -37,9 +37,8 @@ export function roughGround(floor: FloorTerrain, rc: RoomCells, rng: Rng, kind: 
   return false;
 }
 
-/** Difficult ground for a room by the dungeon's tags; the hall of a temple fills with pews. */
-export function difficultGround(floor: FloorTerrain, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>, hall: boolean): void {
-  if (tags.has('temple') && rc.floorCount >= 25 && chance(rng, hall ? 0.8 : 0.35) && pews(floor, rc)) return;
+/** Difficult ground for a room by the dungeon's tags. */
+export function difficultGround(floor: FloorTerrain, rc: RoomCells, rng: Rng, tags: ReadonlySet<DungeonTag>): void {
   const rubble = tags.has('crumbling') ? 0.4 : 0.1;
   const broken = tags.has('crumbling') || tags.has('deep') ? 0.18 : 0.06;
   const roll = rng();

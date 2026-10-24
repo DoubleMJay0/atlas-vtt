@@ -85,7 +85,7 @@ function furnishRoom(work: TerrainWork, k: number, room: DungeonRoom, role: Room
     }
     openRoomCover(floor, rc, rng, work.tags);
   } else if (area >= FIGHT_AREA) crampedCover(floor, rc, rng, work.tags);
-  difficultGround(floor, rc, rng, work.tags, role === 'hall');
+  difficultGround(floor, rc, rng, work.tags);
   if (chance(rng, INTEREST_CHANCE[role])) anyInterest(floor, rc, rng, work.tags);
   if (area >= FIGHT_AREA) ensureCover(floor, rc, work.tags);
 }

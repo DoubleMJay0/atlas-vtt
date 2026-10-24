@@ -124,7 +124,7 @@ describe('dungeon walls', () => {
   });
 
   it('seals generated dungeons of every shape', () => {
-    const combos: string[][] = [[], ['round', 'secret'], ['chaotic', 'winding', 'large'], ['ordered', 'temple', 'colonnades']];
+    const combos: string[][] = [[], ['round', 'secret'], ['chaotic', 'winding', 'large'], ['ordered', 'colonnades']];
     for (let seed = 1; seed <= 24; seed++) {
       const model = generateDungeon({ seed, tags: combos[seed % combos.length]!, floors: 1 + (seed % 3) });
       checkSealed(model);

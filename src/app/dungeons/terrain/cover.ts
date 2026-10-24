@@ -26,17 +26,15 @@ export interface CoverShape {
   dj: number;
 }
 
-/** The low pieces a cramped room scatters, by the dungeon's theme. */
+/** The low pieces a cramped room scatters, by the dungeon's tags. */
 function halfCover(tags: ReadonlySet<DungeonTag>): (readonly [CoverShape, number])[] {
   return [
     [{ kind: 'crates', di: 1, dj: 1 }, 3],
-    [{ kind: 'table', di: 1, dj: 2 }, tags.has('dwelling') ? 3 : 1],
-    [{ kind: 'table', di: 2, dj: 1 }, tags.has('dwelling') ? 2 : 0.5],
+    [{ kind: 'table', di: 1, dj: 2 }, 1],
+    [{ kind: 'table', di: 2, dj: 1 }, 0.5],
     [{ kind: 'rubble-heap', di: 1, dj: 1 }, tags.has('crumbling') ? 4 : 1],
     [{ kind: 'rubble-heap', di: 1, dj: 2 }, tags.has('crumbling') ? 2 : 0.3],
     [{ kind: 'low-wall', di: 1, dj: 2 }, 1.5],
-    [{ kind: 'altar', di: 1, dj: 2 }, tags.has('temple') ? 2 : 0],
-    [{ kind: 'sarcophagus', di: 2, dj: 1 }, tags.has('tomb') ? 3 : 0],
   ];
 }
 

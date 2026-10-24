@@ -63,14 +63,18 @@ export function floorColumns(seed: number, floor: number, rooms: readonly Dungeo
   return rooms.flatMap((room) => colonnadeOf(floorStream(seed, 'props', floor, `columns:${room.id}`), room, style).filter((c) => !inStairs(c, stairs)));
 }
 
-/** The seat on the boss arena's platform, at its middle, facing down its steps. */
-function seatOnPlatform(input: PropsInput, room: DungeonRoom): DungeonProp | null {
-  const platform = input.terrain.find((p) => p.room === room.id && p.kind === 'platform');
-  if (!platform?.facing) return null;
+/** The boss arena's platform in `room`, if its terrain gave it one. */
+function platformOf(input: PropsInput, room: DungeonRoom): DungeonTerrain | undefined {
+  return room.boss ? input.terrain.find((p) => p.room === room.id && p.kind === 'platform' && p.facing) : undefined;
+}
+
+/** The seat on the boss arena's platform, at its middle, facing down its steps; none where the arena has no seat. */
+function seatOnPlatform(platform: DungeonTerrain, room: DungeonRoom): DungeonProp[] {
+  const kind = arenaSeat();
+  if (!kind || !platform.facing) return [];
   const x = platform.cells.reduce((sum, c) => sum + c.x + 0.5, 0) / platform.cells.length;
   const y = platform.cells.reduce((sum, c) => sum + c.y + 0.5, 0) / platform.cells.length;
-  const kind = arenaSeat(floorStream(input.seed, 'props', input.floor, `seat:${room.id}`), input.params.tags);
-  return { kind, x, y, rotation: facing(platform.facing), scale: 1, room: room.id };
+  return [{ kind, x, y, rotation: facing(platform.facing), scale: 1, room: room.id }];
 }
 
 export function placeProps(input: PropsInput): PropsResult {
@@ -85,9 +89,8 @@ export function placeProps(input: PropsInput): PropsResult {
     const frame = frameOf(room);
     const space = roomSpace(frame, clear, columns);
     const role = roles.get(room.id);
-    const seat = room.boss ? seatOnPlatform(input, room) : null;
-    const furnished = role && !empty.has(room.id) ? furnishRoom(rng, space, role, doors, furnishing) : [];
-    const props = seat ? [seat] : furnished;
+    const platform = platformOf(input, room);
+    const props = platform ? seatOnPlatform(platform, room) : role && !empty.has(room.id) ? furnishRoom(rng, space, role, doors, furnishing) : [];
     const extra = params.tags.has('crumbling') && chance(rng, CRUMBLED_SHARE) ? CRUMBLED_RUBBLE : 0;
     result.props.push(...props);
     result.rubble.push(...rubbleIn(rng, frame, params.rubbleArea, extra, [...space.taken, ...keepOff]));

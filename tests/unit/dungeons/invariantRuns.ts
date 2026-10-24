@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
+import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
 import { doorProblems, emptyRooms, floorProblems, independentLoops, loopProblems, normals, rotundaProblems, secretProblems, unreachableRooms } from './dungeonInvariants';
 import { connectionProblems, entranceProblems, stairProblems } from './floorsInvariants';
 import { blockedCells, bridgeProblems, cellProblems, clearanceProblems, hasCover, holeProblems, isHazard, routeProblems, stairClearanceProblems } from './terrainInvariants';
 
 /**
  * Every rule of the generator, held over many dungeons of one floor count: 1,000 seeds, each with
- * two of the tag sets below, so each floor count meets every set over two hundred seeds.
+ * two of the tag sets below, so each floor count meets every set over two hundred seeds. Runs
+ * rotate the theme over Fortress, Haunted Mansion and Cavern.
  */
 
 const SEEDS = 1000;
@@ -15,13 +17,14 @@ const TAG_SETS: readonly string[][] = [
   [],
   ['small'],
   ['large'],
-  ['medium', 'ordered', 'temple', 'colonnades', 'overgrown'],
-  ['chaotic', 'winding', 'wet', 'tomb'],
+  ['medium', 'ordered', 'colonnades', 'overgrown'],
+  ['chaotic', 'winding', 'wet'],
   ['string', 'deep', 'flooded'],
-  ['secret', 'round', 'dwelling', 'overgrown'],
+  ['secret', 'round', 'overgrown'],
   ['no-secrets', 'square', 'flat', 'dry', 'compact'],
   ['cramped', 'crumbling', 'large'],
 ];
+const THEMES: readonly ThemeId[] = ['fortress', 'mansion', 'cavern'];
 const RANGES: Record<string, [number, number]> = { small: [3, 6], medium: [6, 12], large: [12, 25], '': [6, 15] };
 
 export interface Run {
@@ -37,8 +40,9 @@ function runsOf(floors: number): Run[] {
     const seed = k * 7919 + floors;
     for (const offset of [0, 4]) {
       const tags = TAG_SETS[(k + offset) % TAG_SETS.length] ?? [];
+      const theme = THEMES[(k + offset) % THEMES.length];
       const start = performance.now();
-      const model = generateDungeon({ seed, tags, floors });
+      const model = generateDungeon({ seed, tags, floors, theme });
       out.push({ seed, tags, model, ms: performance.now() - start });
     }
   }
@@ -171,9 +175,6 @@ export function describeInvariants(floors: number): void {
       expect(share('round', (m) => anyFloor(m, (f) => f.rooms.some((r) => r.rotunda)))).toBeGreaterThan(0.5);
       expect(share('flooded', (m) => anyFloor(m, (f) => f.waterCells.length > 0))).toBeGreaterThan(0.9);
       expect(share('deep', (m) => anyFloor(m, (f) => f.doors.some((d) => d.kind === 'steps')))).toBeGreaterThan(0.5);
-      expect(share('temple', (m) => anyFloor(m, (f) => f.props.some((p) => p.kind === 'altar')))).toBeGreaterThan(0.5);
-      expect(share('tomb', (m) => anyFloor(m, (f) => f.props.some((p) => p.kind === 'sarcophagus')))).toBeGreaterThan(0.5);
-      expect(share('dwelling', (m) => anyFloor(m, (f) => f.props.some((p) => p.kind === 'throne' || p.kind === 'tapestry' || p.kind === 'well')))).toBeGreaterThan(0.6);
     });
 
     it('furnish the largest hall with a centrepiece, a dais or a set piece of terrain, and set every dais against a wall', () => {

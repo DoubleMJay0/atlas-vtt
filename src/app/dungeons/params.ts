@@ -118,7 +118,7 @@ export function dungeonParams(tags: readonly DungeonTag[]): DungeonParams {
   const has = (tag: DungeonTag): boolean => set.has(tag);
   const [minRooms, maxRooms] = roomRange(has);
   const crumbling = has('crumbling');
-  let tapestryChance = has('dwelling') ? 1 : 1 / 3;
+  let tapestryChance = 1 / 3;
   if (crumbling || has('flooded')) tapestryChance /= 3;
   return {
     tags: set,

@@ -22,10 +22,10 @@ export type InterestKind = Extract<TerrainKind, 'mosaic' | 'obelisk' | 'pool' | 
 
 function weightsOf(tags: ReadonlySet<DungeonTag>): (readonly [InterestKind, number])[] {
   return [
-    ['mosaic', tags.has('temple') ? 3 : 1.5],
+    ['mosaic', 1.5],
     ['obelisk', 1],
     ['pool', tags.has('dry') ? 0 : tags.has('wet') || tags.has('flooded') ? 2.5 : 1],
-    ['statue', tags.has('tomb') || tags.has('temple') ? 2 : 1],
+    ['statue', 1],
   ];
 }
 

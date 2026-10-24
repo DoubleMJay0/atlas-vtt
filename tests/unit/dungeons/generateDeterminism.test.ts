@@ -3,7 +3,7 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 
 describe('generateDungeon', () => {
   it('gives the same dungeon for the same request, over many seeds and every floor count', () => {
-    const sets = [[], ['large', 'ordered', 'wet'], ['small', 'string'], ['secret', 'round', 'temple']];
+    const sets = [[], ['large', 'ordered', 'wet'], ['small', 'string'], ['secret', 'round', 'colonnades']];
     for (let seed = 1; seed <= 1000; seed++) {
       const request = { seed: seed * 104_729, tags: sets[seed % sets.length]!, floors: 1 + (seed % 4) };
       expect(generateDungeon(request)).toEqual(generateDungeon(request));
@@ -11,8 +11,8 @@ describe('generateDungeon', () => {
   }, 120_000);
 
   it('holds no text and no story: a dungeon is named by the GM alone', () => {
-    const model = generateDungeon({ seed: 77, tags: ['temple'], floors: 2 });
-    expect(Object.keys(model).sort()).toEqual(['floors', 'seed', 'tags', 'version']);
+    const model = generateDungeon({ seed: 77, theme: 'fortress', tags: ['colonnades'], floors: 2 });
+    expect(Object.keys(model).sort()).toEqual(['floors', 'seed', 'tags', 'theme', 'version']);
     for (const floor of model.floors) {
       expect(Object.keys(floor).sort()).toEqual(['columns', 'cracks', 'doors', 'growth', 'props', 'rooms', 'rubble', 'stairs', 'terrain', 'water', 'waterCells']);
       for (const room of floor.rooms) expect(['regular', 'secret']).toContain(room.wing);

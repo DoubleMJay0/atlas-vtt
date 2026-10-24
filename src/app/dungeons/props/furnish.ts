@@ -1,18 +1,18 @@
 /**
- * Furniture from what a room is (`roles.ts`) and the dungeon's theme: the boss room and the largest
- * hall get a dais at the far wall or a centrepiece, the deepest room a shrine, a tomb or a seat,
- * hubs a fountain, well or statue, dead ends storage, shrines or tombs, other rooms a little of
- * everything. Temple, tomb and dwelling decide what stands where; nothing implies treasure.
+ * Furniture from what a room is in the architecture (`roles.ts`), for the rooms of a theme without
+ * a room programme (the Cavern until its own plan): the boss room and the largest hall get a dais
+ * at the far wall or a centrepiece, the deepest room a statue or a tapestry over a chest, hubs a
+ * fountain, well or statue, dead ends storage, other rooms a little of everything. Nothing implies
+ * treasure.
  */
 
 import type { DungeonDoor, DungeonProp, PropKind } from '../model';
 import type { DungeonTag } from '../tags';
-import { type Rng, chance, int, pick, weighted } from '../rng';
-import { beforeBackWall, centrepiece, dais, row, storage, tapestry } from './arrange';
+import type { ArenaSpec } from '../themes/themeTypes';
+import { type Rng, chance, weighted } from '../rng';
+import { beforeBackWall, centrepiece, dais, storage, tapestry } from './arrange';
 import type { RoomRole } from './roles';
 import type { RoomSpace } from './space';
-
-type Theme = 'temple' | 'tomb' | 'dwelling' | null;
 
 /** Shared across a floor: one well at most, and each fountain halves the next one's chance. */
 export interface FloorFurnishing {
@@ -22,77 +22,38 @@ export interface FloorFurnishing {
   wellPlaced: boolean;
 }
 
-const THEMES: readonly Exclude<Theme, null>[] = ['temple', 'tomb', 'dwelling'];
-
-function themeOf(rng: Rng, tags: ReadonlySet<DungeonTag>): Theme {
-  const held = THEMES.filter((theme) => tags.has(theme));
-  return held.length > 0 && chance(rng, 0.75) ? pick(rng, held) : null;
+/** What stands on the boss arena's platform: its climax type's seat; none without one, so no arena has a throne by default. */
+export function arenaSeat(arena?: ArenaSpec): PropKind | null {
+  return arena?.seat ?? null;
 }
 
-const SEAT_OF: Readonly<Record<Exclude<Theme, null>, PropKind>> = { temple: 'altar', tomb: 'sarcophagus', dwelling: 'throne' };
-
-function seat(theme: Theme): PropKind {
-  return theme ? SEAT_OF[theme] : 'statue';
-}
-
-/** What stands on the boss arena's platform: the theme's seat, else a throne. */
-export function arenaSeat(rng: Rng, tags: ReadonlySet<DungeonTag>): PropKind {
-  const theme = themeOf(rng, tags);
-  return theme ? SEAT_OF[theme] : 'throne';
-}
-
-function centreKind(rng: Rng, theme: Theme, floor: FloorFurnishing): PropKind {
-  const well = floor.wellPlaced ? 0 : theme === 'dwelling' ? 3 : 0.5;
-  const fountain = (theme === 'tomb' ? 0.3 : 2) * floor.fountainWeight;
+function centreKind(rng: Rng, floor: FloorFurnishing): PropKind {
   const kind = weighted<PropKind>(rng, [
-    ['statue', theme === 'temple' || theme === 'tomb' ? 3 : 1.5],
-    ['fountain', fountain],
-    ['well', well],
+    ['statue', 1.5],
+    ['fountain', 2 * floor.fountainWeight],
+    ['well', floor.wellPlaced ? 0 : 0.5],
   ]);
   if (kind === 'well') floor.wellPlaced = true;
   if (kind === 'fountain') floor.fountainWeight /= 2;
   return kind;
 }
 
-function hall(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], theme: Theme, floor: FloorFurnishing): DungeonProp[] {
-  const onDais = chance(rng, 0.6) ? dais(space, doors, seat(theme)) : [];
-  const props = onDais.length > 0 ? onDais : centrepiece(space, centreKind(rng, theme, floor));
-  if (theme === 'dwelling' || chance(rng, floor.tapestryChance / 2)) props.push(...tapestry(space, doors));
+function hall(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], floor: FloorFurnishing): DungeonProp[] {
+  const onDais = chance(rng, 0.6) ? dais(space, doors, 'statue') : [];
+  const props = onDais.length > 0 ? onDais : centrepiece(space, centreKind(rng, floor));
+  if (chance(rng, floor.tapestryChance / 2)) props.push(...tapestry(space, doors));
   return props;
 }
 
-function deepest(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], theme: Theme): DungeonProp[] {
-  switch (theme) {
-    case 'temple':
-      return beforeBackWall(space, doors, chance(rng, 0.5) ? ['altar', 'statue', 'statue'] : ['altar']);
-    case 'tomb':
-      return row(space, 'sarcophagus', int(rng, 1, 2));
-    case 'dwelling':
-      return [...beforeBackWall(space, doors, ['throne']), ...tapestry(space, doors)];
-    default:
-      return chance(rng, 0.5) ? beforeBackWall(space, doors, ['statue']) : [...tapestry(space, doors), ...beforeBackWall(space, doors, ['chest'])];
-  }
+function deepest(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[]): DungeonProp[] {
+  return chance(rng, 0.5) ? beforeBackWall(space, doors, ['statue']) : [...tapestry(space, doors), ...beforeBackWall(space, doors, ['chest'])];
 }
 
-function deadEnd(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], theme: Theme): DungeonProp[] {
-  switch (theme) {
-    case 'temple':
-      return beforeBackWall(space, doors, chance(rng, 0.5) ? ['altar'] : ['statue']);
-    case 'tomb':
-      return row(space, 'sarcophagus', int(rng, 1, 2));
-    case 'dwelling':
-      return [...storage(rng, space), ...(chance(rng, 0.5) ? tapestry(space, doors) : [])];
-    default:
-      return storage(rng, space);
-  }
-}
-
-function plain(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], theme: Theme, floor: FloorFurnishing): DungeonProp[] {
+function plain(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], floor: FloorFurnishing): DungeonProp[] {
   const choice = weighted(rng, [
     ['storage', 3],
     ['tapestry', floor.tapestryChance * 3],
-    ['statue', theme === 'temple' ? 2 : 0.7],
-    ['sarcophagus', theme === 'tomb' ? 2 : 0],
+    ['statue', 0.7],
     ['chest', 0.7],
   ] as const);
   switch (choice) {
@@ -100,8 +61,6 @@ function plain(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], theme:
       return storage(rng, space);
     case 'tapestry':
       return tapestry(space, doors);
-    case 'sarcophagus':
-      return row(space, 'sarcophagus', 1);
     default:
       return beforeBackWall(space, doors, [choice]);
   }
@@ -109,22 +68,20 @@ function plain(rng: Rng, space: RoomSpace, doors: readonly DungeonDoor[], theme:
 
 /** A room's furniture for its role; a room left without any by its choice gets storage where it can. */
 export function furnishRoom(rng: Rng, space: RoomSpace, role: RoomRole, doors: readonly DungeonDoor[], floor: FloorFurnishing): DungeonProp[] {
-  const theme = themeOf(rng, floor.tags);
   const props = ((): DungeonProp[] => {
     switch (role) {
       case 'boss':
       case 'hall':
-        return hall(rng, space, doors, theme, floor);
+        return hall(rng, space, doors, floor);
       case 'deepest':
-        return deepest(rng, space, doors, theme);
+        return deepest(rng, space, doors);
       case 'hub':
-        return centrepiece(space, centreKind(rng, theme, floor));
+        return centrepiece(space, centreKind(rng, floor));
       case 'dead-end':
-        return deadEnd(rng, space, doors, theme);
       case 'stairs':
         return storage(rng, space);
       case 'plain':
-        return plain(rng, space, doors, theme, floor);
+        return plain(rng, space, doors, floor);
     }
   })();
   return props.length > 0 ? props : storage(rng, space);

@@ -41,8 +41,14 @@ describe('reading the generator settings', () => {
 
   it('keeps what the GM chose in Atlas settings', () => {
     const settings = new SettingsService({} as App);
-    settings.setDungeonGenerator({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint', floors: 3, bossRoom: false, fiveRoom: true });
-    expect(settings.getDungeonGenerator()).toEqual({ view: { ...DEFAULT_VIEW, monochrome: true }, tags: ['tomb'], style: 'blueprint', floors: 3, bossRoom: false, fiveRoom: true });
+    settings.setDungeonGenerator({ view: { ...DEFAULT_VIEW, monochrome: true }, theme: 'cavern', tags: ['wet'], style: 'blueprint', floors: 3, bossRoom: false, fiveRoom: true });
+    expect(settings.getDungeonGenerator()).toEqual({ view: { ...DEFAULT_VIEW, monochrome: true }, theme: 'cavern', tags: ['wet'], style: 'blueprint', floors: 3, bossRoom: false, fiveRoom: true });
+  });
+
+  it('reads retired theme tags and an unknown theme as Any', () => {
+    expect(readDungeonGeneratorSettings({ tags: ['tomb', 'wet'], theme: 'temple' })).toMatchObject({ theme: 'any', tags: ['wet'] });
+    expect(readDungeonGeneratorSettings({ theme: 'fortress' }).theme).toBe('fortress');
+    expect(readDungeonGeneratorSettings({}).theme).toBe('any');
   });
 
   it('reads floors and the switches from stored data, defaults where they are missing or broken', () => {

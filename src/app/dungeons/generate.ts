@@ -1,8 +1,8 @@
 /**
- * Seed, tags and floors in, a whole dungeon out: the tags it is built with, every floor's rooms,
- * doors and stairwells planned together, every floor's terrain placed together (holes line up
- * between floors), then each floor's water, undergrowth, furniture and vegetation. Architecture only: no story, no text;
- * a dungeon is named by the GM alone.
+ * Seed, theme, tags and floors in, a whole dungeon out: its theme (one per dungeon), the tags it
+ * is built with, every floor's rooms, doors and stairwells planned together, every floor's terrain
+ * placed together (holes line up between floors), then each floor's water, undergrowth, furniture
+ * and vegetation. Architecture only: no story, no text; a dungeon is named by the GM alone.
  */
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
@@ -16,8 +16,10 @@ import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './p
 import { floorColumns, placeProps } from './props';
 import { roomRoles, type RoomRoles } from './props/roles';
 import { floorStream } from './rng';
+import { readTags } from './tags';
 import type { FloorTerrain } from './terrain/floorTerrain';
 import { addShallowWater, planTerrain } from './terrain/placeTerrain';
+import { pickTheme, themedTags } from './themes/themes';
 import { chooseWaterLevel, placeWater, poolRooms } from './water';
 
 interface FloorParts {
@@ -44,7 +46,9 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
 export function generateDungeon(request: DungeonRequest): DungeonModel {
   const { seed } = request;
   const fiveRoom = request.fiveRoom === true;
-  const tags = dungeonTags(seed, request.tags);
+  const asked = readTags(request.tags);
+  const theme = pickTheme(seed, request.theme ?? 'any', asked);
+  const tags = dungeonTags(seed, themedTags(theme, asked));
   const base = dungeonParams(tags);
   const params = fiveRoom ? fiveRoomParams(base) : base;
   const level = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
@@ -65,5 +69,5 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
     params.tags,
   );
   const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, level));
-  return { version: DUNGEON_GENERATOR_VERSION, seed, tags, floors };
+  return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors };
 }

@@ -19,7 +19,7 @@ import { wallList } from '../../../src/app/vision/wallList';
  */
 describe('the outline of a tall object, as sight and light see it', () => {
   it.each(['sight', 'light'] as const)('shows the top of every column a %s source reaches the faces of, and hides what lies behind it', (channel) => {
-    const model = generateDungeon({ seed: 3, tags: ['colonnades', 'temple', 'large'], floors: 1 });
+    const model = generateDungeon({ seed: 3, theme: 'fortress', tags: ['colonnades', 'large'], floors: 1 });
     const pxPerCell = DEFAULT_PX_PER_CELL;
     const layout = mapLayout(model, pxPerCell, DEFAULT_VIEW);
     const image = { width: layout.widthPx, height: layout.heightPx };

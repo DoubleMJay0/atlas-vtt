@@ -215,8 +215,8 @@ export function secretProblems(floor: DungeonFloor): string[] {
   return out;
 }
 
-/** About a third of normal rooms hold no props: the share on this floor. */
+/** About a third of normal rooms hold no props: the share on this floor. The boss room is never empty: its arena is furnished by terrain, with a seat only where its climax type has one. */
 export function emptyRooms(floor: DungeonFloor): { empty: number; rooms: number } {
   const rooms = normals(floor);
-  return { empty: rooms.filter((room) => !floor.props.some((p) => p.room === room.id)).length, rooms: rooms.length };
+  return { empty: rooms.filter((room) => !room.boss && !floor.props.some((p) => p.room === room.id)).length, rooms: rooms.length };
 }

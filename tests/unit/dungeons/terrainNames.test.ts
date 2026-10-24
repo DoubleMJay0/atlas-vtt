@@ -14,7 +14,7 @@ describe('terrain names', () => {
   it('name every piece the generator places', () => {
     const names = new Set<string>();
     for (let seed = 1; seed <= 300; seed++) {
-      const model = generateDungeon({ seed: seed * 911, tags: seed % 2 ? ['wet', 'temple'] : ['crumbling', 'tomb'], floors: 1 + (seed % 4), fiveRoom: seed % 5 === 0 });
+      const model = generateDungeon({ seed: seed * 911, theme: seed % 2 ? 'fortress' : 'cavern', tags: seed % 2 ? ['wet', 'colonnades'] : ['crumbling'], floors: 1 + (seed % 4), fiveRoom: seed % 5 === 0 });
       for (const floor of model.floors) for (const piece of floor.terrain) names.add(piece.name);
     }
     expect([...names].filter((name) => typeof messages[name] !== 'string')).toEqual([]);
