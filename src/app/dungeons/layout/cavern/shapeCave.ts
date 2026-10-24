@@ -14,7 +14,8 @@ import type { CaveShaping } from './caveParams';
 import { chamberSeeds, growChamber, reserveCores, smoothChamber } from './chambers';
 import { faultDirections, faultLines } from './faults';
 import { repairGuards } from './guards';
-import { basinCount, caveHeights, hydrology, lowRooms } from './hydrology';
+import { basinCount, caveHeights, hydrology, lowRooms, springByTheMouth } from './hydrology';
+import { caveSites } from './caveSites';
 import { claimLane, laneEnds, mainRoute, wideLane } from './mainPath';
 import { stairWays } from './stairWays';
 import { carveTunnel, shapeDoors, tunnelEnds } from './tunnels';
@@ -113,5 +114,6 @@ export function shapeCaves(seed: number, params: DungeonParams, floors: readonly
     Object.assign(cave, hydrology(floorStream(seed, 'cave', index, 'water'), floor, cave.heights, level, how.dry, takes[index], index === shaped.length - 1));
   });
   stairWays(stream(seed, 'cave', 'ways'), shaped);
+  if (params.tags.has('inhabited') && !how.dry && shaped[0]) springByTheMouth(shaped[0], caveSites(shaped)[0]!);
   return { floors: shaped, cave: { variant: shaping.variant, faults } };
 }

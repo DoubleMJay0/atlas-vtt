@@ -39,6 +39,9 @@ interface FloorParts {
   theme: ThemeId;
 }
 
+/** The least water level of a lived-in cave the GM gave none. */
+const LIVED_IN_WATER = 0.1;
+
 /** The share of a cave's water level the floor nearest the surface keeps; the deepest keeps it whole. */
 const CAVE_UPPER_WATER = 0.3;
 
@@ -83,7 +86,9 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const tags = dungeonTags(seed, themedTags(theme, asked));
   const base = theme === 'cavern' ? caveParams(dungeonParams(tags)) : dungeonParams(tags);
   const params = fiveRoom ? fiveRoomParams(base) : base;
-  const rolled = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
+  const chosen = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
+  // A lived-in cave has water to live by, unless the GM asked for none.
+  const rolled = params.cave && params.tags.has('inhabited') && request.waterLevel === undefined ? Math.max(chosen, LIVED_IN_WATER) : chosen;
   const count = requestedFloors(request);
   const boss = fiveRoom || request.bossRoom !== false;
   const laid = planFloors(seed, params, count, boss, fiveRoom);

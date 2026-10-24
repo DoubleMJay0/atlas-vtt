@@ -243,6 +243,8 @@ export function livedInProblems(model: DungeonModel): string[] {
 
 const CALCITE = new Set(['stalagmites', 'column-formation', 'flowstone', 'curtain', 'crystals']);
 const DRIPSTONE = new Set(['stalagmites', 'column-formation']);
+/** What dripping and flowing water builds where there is air: crystals grow under water and are left out. */
+const DRIPPED = new Set(['stalagmites', 'column-formation', 'flowstone', 'curtain']);
 
 /** Rule 5: formations where drips, flow and air make them. */
 export function formationProblems(model: DungeonModel): string[] {
@@ -269,7 +271,7 @@ export function formationProblems(model: DungeonModel): string[] {
   });
 }
 
-/** Formations per ten floor cells in each room, with what the room is: the mouth, an upper-floor dry dead end, a wet room of the deepest floor. */
+/** Dripped formations per ten floor cells in each room, with what the room is: the mouth, an upper-floor dry dead end, a wet room of the deepest floor. */
 export function formationDensity(model: DungeonModel): { mouth: number[]; dryDeadEnds: number[]; wetDeep: number[]; others: number[] } {
   const sites = caveSites(model.floors);
   const out = { mouth: [] as number[], dryDeadEnds: [] as number[], wetDeep: [] as number[], others: [] as number[] };
@@ -277,7 +279,7 @@ export function formationDensity(model: DungeonModel): { mouth: number[]; dryDea
     const site = sites[f]!;
     const wet = new Set([...(floor.cave?.basins ?? []), ...(floor.cave?.streams ?? []).flat()]);
     for (const room of floor.rooms.filter((r) => r.kind === 'room' && !r.boss)) {
-      const density = (10 * floor.props.filter((p) => p.room === room.id && CALCITE.has(p.kind)).length) / roomArea(room);
+      const density = (10 * floor.props.filter((p) => p.room === room.id && DRIPPED.has(p.kind)).length) / roomArea(room);
       const deadEnd = floor.doors.filter((d) => d.from === room.id || d.to === room.id).length <= 1;
       if (f === 0 && site.hopsFromMouth[room.id] === 0) out.mouth.push(density);
       else if (!site.deepest && deadEnd && !wet.has(room.id)) out.dryDeadEnds.push(density);
@@ -306,4 +308,25 @@ export function lifeZoneProblems(model: DungeonModel): string[] {
       return daylight(room) ? [] : [`floor ${f}: ${kind} in room ${room}, out of the daylight`];
     });
   });
+}
+
+/** The reasons whose hazard a room type is named for: a chasm hall without its chasm is no chasm hall. */
+const NAMED_FOR: Readonly<Record<string, (p: DungeonFloor['terrain'][number]) => boolean>> = {
+  'chasm-hall': (p) => p.kind === 'chasm',
+  'stream-passage': (p) => p.kind === 'channel' && p.traits.hazard === 'deep-water',
+  sump: (p) => p.traits.hazard === 'deep-water',
+  'lava-tube': (p) => p.traits.hazard === 'lava',
+  'sulphur-spring': (p) => p.traits.hazard === 'acid',
+};
+
+/** Every room named for its hazard holds it; a cave's boss room is no built dais. */
+export function namedHazardProblems(model: DungeonModel): string[] {
+  return model.floors.flatMap((floor, f) => floor.rooms.flatMap((room) => {
+    const out: string[] = [];
+    const holds = NAMED_FOR[room.type ?? ''];
+    if (holds && !floor.terrain.some((p) => p.room === room.id && holds(p))) out.push(`floor ${f}: a ${room.type} without its hazard`);
+    if (room.type === 'lake-cavern' && !room.boss && !floor.terrain.some((p) => p.room === room.id && p.traits.hazard === 'deep-water')) out.push(`floor ${f}: a lake cavern without its lake`);
+    if (room.boss && floor.terrain.some((p) => p.room === room.id && p.kind === 'platform')) out.push(`floor ${f}: a dais in the ${room.type}`);
+    return out;
+  }));
 }

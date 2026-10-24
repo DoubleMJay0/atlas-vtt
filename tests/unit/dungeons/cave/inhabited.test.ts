@@ -21,6 +21,13 @@ describe('a lived-in cavern', () => {
     expect(inhabited).toBeGreaterThan(20);
   });
 
+  it('is always lived in where the tag asks and water rises', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const model = generateDungeon({ seed: seed * 811, theme: 'cavern', tags: ['inhabited'], floors: 1 + (seed % 3) });
+      expect(livedIn(model), `seed ${seed * 811}, ${model.floors.length} floors`).toBe(true);
+    }
+  });
+
   it('never is without the tag', () => {
     for (let seed = 1; seed <= 60; seed++) {
       const model = cave(seed * 811, ['wet'], 1 + (seed % 2));

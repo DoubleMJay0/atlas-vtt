@@ -14,7 +14,7 @@ import type { DungeonTag } from '../tags';
 import type { ArenaSetPiece, ArenaSpec } from '../themes/themeTypes';
 import { draft } from './catalog';
 import { type CoverShape, ensureCover, tryShape } from './cover';
-import { farWallBlock, platformAtFarWall } from './elevation';
+import { farWallBlock, ledgeAlongWall, platformAtFarWall } from './elevation';
 import type { FloorTerrain } from './floorTerrain';
 import { placeCaveHazard } from './cavern/caveHazards';
 import { placeHazard } from './hazards';
@@ -146,7 +146,9 @@ export function furnishArena(work: TerrainWork, k: number, rc: RoomCells, rng: R
   const floor = work.floors[k];
   if (!floor) return;
   const { deep, widest, elevation } = arenaPlatform(rc);
-  const raised = platformAtFarWall(floor, rc, deep, widest, elevation) !== null;
+  // A cave's high ground is a ledge of rock along a wall, never a dais built at its far end.
+  if (work.cave) ledgeAlongWall(floor, rc, rng);
+  const raised = !work.cave && platformAtFarWall(floor, rc, deep, widest, elevation) !== null;
   const platformDepth = raised ? deep : 0;
   const placed = placeSetPiece(floor, rc, rng, arena ? arena.setPieces : DEFAULT_SET_PIECES, platformDepth);
   wideCover(floor, rc, rng, platformDepth, arena?.mirrored);

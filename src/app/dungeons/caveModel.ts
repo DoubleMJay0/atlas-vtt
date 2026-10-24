@@ -34,7 +34,7 @@ export interface CaveFloor {
   faults: CaveFault[];
   /** Rooms that hold standing water. */
   basins: number[];
-  /** Chains of rooms, uphill first, each ending in a basin. */
+  /** Chains of rooms, uphill first, each ending in a basin; a lived-in cave's spring by its mouth is a chain of one. */
   streams: number[][];
   /** Basins whose water a dam holds (perched). */
   dams: number[];

@@ -8,6 +8,7 @@
 import type { CaveFloor, DungeonFloor, DungeonRoom } from '../../model';
 import { type Rng, floorStream, int } from '../../rng';
 import { neighbours } from '../../roomGraph';
+import type { CaveSites } from './caveSites';
 import { fractalNoise } from '../../water/noise';
 
 /** The height step between floors, against noise in [0, 1). */
@@ -88,4 +89,23 @@ export function hydrology(rng: Rng, floor: Pick<DungeonFloor, 'rooms' | 'doors'>
   }
   const boss = floor.rooms.find((room) => room.boss);
   return { basins, streams, dams: boss ? [boss.id] : [] };
+}
+
+/** Hops from the mouth a lived-in cave's water lies at most: its hollows lie within two, a hop from it. */
+const SPRING_REACH = 2;
+
+/**
+ * For a lived-in cave: a spring in the lowest chamber within two hops of the mouth, where no water
+ * lies near enough to live by. It runs, a stream of its own that gathers nowhere, so it brings the
+ * entry floor no lake and the deepest floor keeps the most water.
+ */
+export function springByTheMouth(floor: Pick<DungeonFloor, 'rooms' | 'cave'>, site: CaveSites): void {
+  const cave = floor.cave;
+  if (!cave) return;
+  const near = (room: number): boolean => (site.hopsFromMouth[room] ?? Infinity) <= SPRING_REACH;
+  if (floor.rooms.some((room) => near(room.id) && site.nearWater(room.id, 1))) return;
+  const spring = floor.rooms
+    .filter((room) => room.kind === 'room' && room.wing === 'regular' && !room.boss && near(room.id))
+    .sort((a, b) => (cave.heights[a.id] ?? 0) - (cave.heights[b.id] ?? 0) || a.id - b.id)[0];
+  if (spring) cave.streams.push([spring.id]);
 }

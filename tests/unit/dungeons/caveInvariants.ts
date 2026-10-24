@@ -5,7 +5,7 @@ import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { shapeDistance } from '../../../src/app/dungeons/render/geometry';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { caveFloorCells, columnProblems, faultStretch, guardProblems, laneNarrowsProblems, maskProblems, narrowsProblems } from './caveChecks';
-import { breakdownProblems, formationDensity, formationProblems, geologyProblems, lifeZoneProblems, livedInProblems, waterProblems, waterShare, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
+import { breakdownProblems, namedHazardProblems, formationDensity, formationProblems, geologyProblems, lifeZoneProblems, livedInProblems, waterProblems, waterShare, hazardFurnishProblems, laneProblems, lifeProblems, liquidProblems, rimstoneProblems } from './caveRules';
 import { mirrorProblems, physicsProblems, shapeProblems } from './themeTerrainInvariants';
 import { cavernProgramme } from '../../../src/app/dungeons/themes/cavern';
 import { readTags } from '../../../src/app/dungeons/tags';
@@ -157,7 +157,8 @@ export function describeCaveInvariants(floors: number): void {
     it('rule 1: stand water only where it gathers, run it downhill, never on raised rock; a dry cave none', () => {
       expect(failures((run) => waterProblems(run.model))).toEqual([]);
       if (floors > 1) {
-        const wet = runs.filter((run) => !run.tags.includes('dry') && run.model.floors.some((f) => waterShare(f) > 0));
+        // A lived-in cave's spring by its mouth lies on the entry floor by design.
+        const wet = runs.filter((run) => !run.tags.includes('dry') && !run.tags.includes('inhabited') && run.model.floors.some((f) => waterShare(f) > 0));
         const deepest = wet.filter((run) => {
           const shares = run.model.floors.map(waterShare);
           return shares.at(-1)! >= Math.max(...shares);
@@ -182,6 +183,10 @@ export function describeCaveInvariants(floors: number): void {
 
     it('rule 8: grow green things only by the mouth, fungi by water or a roost, nothing where lava runs', () => {
       expect(failures((run) => lifeZoneProblems(run.model))).toEqual([]);
+    });
+
+    it('hold in every room named for a hazard its hazard, and stand no built dais in a cave\'s boss room', () => {
+      expect(failures((run) => namedHazardProblems(run.model))).toEqual([]);
     });
 
     it('keep every rule of the layout and the terrain', () => {

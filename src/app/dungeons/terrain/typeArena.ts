@@ -71,5 +71,8 @@ export function furnishTypedArena(work: TerrainWork, k: number, rc: RoomCells, r
   const fs: FurnishSpace = { ...base, placeAllowed: (kind, at) => open(kind) && (base.placeAllowed?.(kind, at) ?? true) };
   const platform = floor.inRoom(rc.room.id).find((p) => p.kind === 'platform' && p.facing);
   if (platform) seatOnPlatform(fs, platform, arena);
+  // A cave's arena has no dais: its seat lies in the middle of the floor, a beast's nest or a chief's bedding.
+  const seat = work.cave && !platform ? arenaSeat(arena) : null;
+  if (seat) furnishByRecipe(fs, { defining: { kind: seat, verb: 'centre' }, pieces: [] }, typed.context);
   furnishByRecipe(fs, { pieces: typed.spec.furnish.pieces }, typed.context);
 }

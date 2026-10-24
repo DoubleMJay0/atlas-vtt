@@ -12,6 +12,7 @@ import type { DungeonTag } from '../tags';
 import type { ThemeContext } from '../themes/themes';
 import { furnishArena } from './arena';
 import { placeBreakdown } from './cavern/breakdown';
+import { withoutItsHazard } from './cavern/unnamedRoom';
 import { floorTextures } from './cavern/caveTextures';
 import { draft } from './catalog';
 import { type FloorPlan, FloorTerrain } from './floorTerrain';
@@ -55,10 +56,15 @@ function furnishFloor(work: TerrainWork, k: number, input: TerrainFloorInput): v
   }
   shaftDown(work, k, work.rng(k, 'shaft'));
   const hazarded = placeTypeHazards(work, k, rooms);
+  const types = new Map(input.types);
+  for (const room of rooms) {
+    const typed = types.get(room.id);
+    if (typed && !room.stage && !hazarded.has(room.id)) types.set(room.id, withoutItsHazard(work, room, typed));
+  }
   if (work.cave) for (const room of rooms) caveGround(work, k, room.id, 'breakdown');
   for (const room of rooms) {
     if (room.boss || room.stage || input.empty.has(room.id)) continue;
-    const typed = input.types?.get(room.id);
+    const typed = types.get(room.id);
     const rc = work.floors[k]?.room(room.id);
     if (typed && rc) furnishTypedRoom(work, k, rc, typed.spec, typed.context, hazarded.has(room.id));
   }

@@ -20,6 +20,7 @@ import { hazardWeights, placeHazard } from './hazards';
 import { anyInterest, placeInterest } from './interest';
 import type { RoomCells } from './roomCells';
 import { typeAllows } from './typeReasons';
+import { withoutItsHazard } from './cavern/unnamedRoom';
 import { placeTypeHazard } from './typeHazards';
 import { type TypedRoom, furnishTypedRoom } from './typeTerrain';
 import type { TerrainWork } from './work';
@@ -170,14 +171,15 @@ const ANY: StageRules = { allows: () => true, hazards: true };
  * Terrain for a main room of a five-room dungeon; a typed one builds only what its type allows,
  * without a hazard, and is then furnished by its type's recipe.
  */
-export function furnishStage(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, stage: FiveRoomStage, tags: ReadonlySet<DungeonTag>, typed?: TypedRoom): void {
-  const rules = typed ? { allows: (kind: TerrainKind) => typeAllows(typed.spec, kind, work.theme.ruined), hazards: false } : ANY;
+export function furnishStage(work: TerrainWork, k: number, rc: RoomCells, rng: Rng, stage: FiveRoomStage, tags: ReadonlySet<DungeonTag>, named?: TypedRoom): void {
   // A cave's stage is its room: a chasm hall keeps its chasm, a lake cavern its lake.
-  const hazarded = typed !== undefined && work.cave !== undefined && placeTypeHazard(work, k, rc, typed.spec, work.rng(k, `hazard:${rc.room.id}`));
+  const hazarded = named !== undefined && work.cave !== undefined && placeTypeHazard(work, k, rc, named.spec, work.rng(k, `hazard:${rc.room.id}`));
   if (hazarded) {
-    furnishTypedRoom(work, k, rc, typed.spec, typed.context, true);
+    furnishTypedRoom(work, k, rc, named.spec, named.context, true);
     return;
   }
+  const typed = named && withoutItsHazard(work, rc.room, named);
+  const rules = typed ? { allows: (kind: TerrainKind) => typeAllows(typed.spec, kind, work.theme.ruined), hazards: false } : ANY;
   switch (stage) {
     case 'entrance':
       entrance(work, k, rc, rng, rules);

@@ -44,7 +44,8 @@ export class SvgCanvas extends SvgPathBuilder {
   };
   private readonly stack: State[] = [];
   private readonly defs: string[] = [];
-  private readonly body: string[] = [];
+  /** Each path with the clip in force when it was drawn. */
+  private readonly body: Drawn[] = [];
   private ids = 0;
 
   constructor(readonly width: number, readonly height: number) {
@@ -151,7 +152,7 @@ export class SvgCanvas extends SvgPathBuilder {
     return [
       `<svg xmlns="http://www.w3.org/2000/svg" width="${this.width}" height="${this.height}" viewBox="0 0 ${this.width} ${this.height}">`,
       defs ? `<defs>${defs}</defs>` : '',
-      ...this.body,
+      ...clipGroups(this.body),
       '</svg>\n',
     ].join('');
   }
@@ -173,13 +174,12 @@ export class SvgCanvas extends SvgPathBuilder {
 
   /** One path in device pixels, with the clip, shadow and blending in force. */
   private emit(attributes: string): void {
-    this.body.push(`<path ${attributes}${this.effects()}/>`);
+    this.body.push({ clip: this.state.clip, attributes: `${attributes}${this.effects()}`, blends: this.state.globalCompositeOperation === 'multiply' });
   }
 
   private effects(): string {
-    const { clip, globalCompositeOperation } = this.state;
+    const { globalCompositeOperation } = this.state;
     let extra = '';
-    if (clip) extra += ` clip-path="url(#${clip})"`;
     const filter = this.shadowFilter();
     if (filter) extra += ` filter="url(#${filter})"`;
     if (globalCompositeOperation === 'multiply') extra += ' style="mix-blend-mode: multiply"';
@@ -202,4 +202,41 @@ export class SvgCanvas extends SvgPathBuilder {
     );
     return id;
   }
+}
+
+/** A path as drawn: its attributes, the clip in force, and whether it blends with what lies under it. */
+interface Drawn {
+  clip: string | null;
+  attributes: string;
+  blends: boolean;
+}
+
+/**
+ * The paths with each run under one clip in a group that clips them together: a browser clips a
+ * group once, where a clip on every path of a cave's thousand strokes of water and growth made it
+ * give up and show nothing. A path that blends keeps its own clip, since a clipped group would
+ * blend it with nothing but the group.
+ */
+function clipGroups(body: readonly Drawn[]): string[] {
+  const out: string[] = [];
+  let open: string | null = null;
+  const close = (): void => {
+    if (open) out.push('</g>');
+    open = null;
+  };
+  for (const { clip, attributes, blends } of body) {
+    if (blends) {
+      close();
+      out.push(`<path ${attributes}${clip ? ` clip-path="url(#${clip})"` : ''}/>`);
+      continue;
+    }
+    if (clip !== open) {
+      close();
+      if (clip) out.push(`<g clip-path="url(#${clip})">`);
+      open = clip;
+    }
+    out.push(`<path ${attributes}/>`);
+  }
+  close();
+  return out;
 }
