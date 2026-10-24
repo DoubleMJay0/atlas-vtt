@@ -9,6 +9,8 @@ import { type Rng, chance } from '../../rng';
 
 const TURN = (20 * Math.PI) / 180;
 const SECOND_CHANCE = 0.7;
+/** The share of the rooms longer the other way from which a cave always has a second fault. */
+const BOTH_WAYS = 0.25;
 const SECOND_FROM = (60 * Math.PI) / 180;
 const SECOND_TO = (90 * Math.PI) / 180;
 /** One fault line per floor, and one more for every this many normal rooms. */
@@ -20,16 +22,27 @@ function axial(angle: number): number {
   return a < 0 ? a + Math.PI : a;
 }
 
-/** The first along the axis most normal rooms are longer on, turned by up to 20°; a second 70 % of the time, 60–90° from it. */
+/**
+ * The first along the axis most normal rooms are longer on, turned by up to 20°; a second, 60–90°
+ * from it on the side that brings it nearer the other axis, where a quarter of the rooms are
+ * longer that way, else 70 % of the time.
+ */
 export function faultDirections(rng: Rng, rooms: readonly DungeonRoom[]): number[] {
   const normal = rooms.filter((room) => room.kind === 'room');
   const wide = normal.filter((room) => room.w > room.h).length;
   const tall = normal.filter((room) => room.h > room.w).length;
-  const first = axial((tall > wide ? Math.PI / 2 : 0) + (rng() * 2 - 1) * TURN);
-  const second = chance(rng, SECOND_CHANCE);
+  const axis = tall > wide ? Math.PI / 2 : 0;
+  const first = axial(axis + (rng() * 2 - 1) * TURN);
+  // Rooms that run both ways follow two faults; else a second one 70 % of the time.
+  const second = chance(rng, SECOND_CHANCE) || Math.min(wide, tall) >= BOTH_WAYS * (wide + tall);
   const apart = SECOND_FROM + rng() * (SECOND_TO - SECOND_FROM);
-  const side = rng() < 0.5 ? -1 : 1;
-  return second ? [first, axial(first + side * apart)] : [first];
+  const other = axis + Math.PI / 2;
+  const off = (a: number): number => {
+    const d = Math.abs(axial(a) - axial(other));
+    return Math.min(d, Math.PI - d);
+  };
+  const toward = off(first + apart) <= off(first - apart) ? 1 : -1;
+  return second ? [first, axial(first + toward * apart)] : [first];
 }
 
 /** A floor's fault lines, each through a random normal room's middle, the directions in turn. */

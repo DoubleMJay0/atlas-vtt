@@ -235,7 +235,8 @@ export function describeInvariants(floors: number): void {
         // Typed rooms open holes only for a reason of their type; the shares of chance openings are a Cavern's.
         const share = (check: (run: Run) => boolean): number => caverns.filter(check).length / caverns.length;
         expect(share((run) => run.model.floors.some((f, k) => k < floors - 1 && f.terrain.some((p) => p.opening && p.kind === 'chasm')))).toBeGreaterThan(0.1);
-        expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'gallery')))).toBeGreaterThan(0.08);
+        // A cave's arena may lie under a fault's chasm, never under a builder's gallery.
+        expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'gallery')))).toBe(0);
         expect(share((run) => run.model.floors.some((f) => f.terrain.some((p) => p.kind === 'shaft')))).toBeGreaterThan(0.15);
       }
     });
@@ -276,8 +277,13 @@ export function describeInvariants(floors: number): void {
     });
 
     it('generate within the time budget', () => {
-      const times = runs.map((run) => run.ms).sort((a, b) => a - b);
-      expect(times[Math.floor(times.length * 0.95)]).toBeLessThan(25 * floors);
+      const p95 = (list: readonly Run[]): number => {
+        const times = list.map((run) => run.ms).sort((a, b) => a - b);
+        return times[Math.floor(times.length * 0.95)] ?? 0;
+      };
+      expect(p95(runs.filter((run) => run.model.theme !== 'cavern'))).toBeLessThan(25 * floors);
+      // A cave also shapes its chambers and tunnels, and grows a floor anew until its main path fits two cells wide.
+      expect(p95(caverns)).toBeLessThan(75 * floors);
     });
   });
 }

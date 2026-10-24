@@ -93,10 +93,9 @@ function widen(alive: Set<string>, may: ReadonlySet<string>): void {
  * the walls round it, keeping the lane cells it holds and widening to `width`.
  */
 export function carveTunnel(rng: Rng, grid: CaveGrid, room: DungeonRoom, ends: readonly CellPoint[], width: 1 | 2, lane: ReadonlySet<string>): void {
-  const rect = floorRect(room);
   const may = new Set(
     cellsOf(wallRect(room))
-      .filter((c) => grid.holds(c.x, c.y, room.id) || (inRect(rect, c.x, c.y) ? grid.mayClaim(c.x, c.y, room.id) : grid.mayWiden(c.x, c.y, room.id)))
+      .filter((c) => grid.holds(c.x, c.y, room.id) || grid.mayClaim(c.x, c.y, room.id))
       .map(key),
   );
   const keep = [...new Set([...ends.map(key), ...grid.required(room.id), ...[...lane].filter((k) => may.has(k))])].filter((k) => may.has(k));

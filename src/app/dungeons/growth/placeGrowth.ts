@@ -8,7 +8,7 @@
 
 import type { CellPoint, DungeonCrack, DungeonRoom } from '../model';
 import { GROWTH_KINDS, type DungeonGrowth, type GrowthKind } from '../growthModel';
-import { cellKey } from '../geometry';
+import { cellKey, holdsCell } from '../geometry';
 import { hops, neighbours } from '../roomGraph';
 import { chance, floorStream, int, type Rng, weighted } from '../rng';
 import type { Flora, Weights } from './flora';
@@ -157,7 +157,7 @@ function crackGrowth(rng: Rng, crack: DungeonCrack, rooms: readonly DungeonRoom[
   const line: CellPoint[] = [];
   for (const p of crack.points) {
     const c = { x: Math.floor(p.x), y: Math.floor(p.y) };
-    if (c.x < room.x || c.y < room.y || c.x >= room.x + room.w || c.y >= room.y + room.h || !space.forPlant(c)) break;
+    if (!holdsCell(room, c.x, c.y) || !space.forPlant(c)) break;
     line.push(p);
   }
   if (line.length < 2) return [];

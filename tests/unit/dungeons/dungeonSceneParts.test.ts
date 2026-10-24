@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { applyDungeonEdits, NO_EDITS, withWingHidden } from '../../../src/app/dungeons/edits';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import { cellKey } from '../../../src/app/dungeons/geometry';
+import { cellKey, floorCellsOf } from '../../../src/app/dungeons/geometry';
 import { approachCells, doorApproaches, spotRect } from '../../../src/app/dungeons/floors/stairSpots';
 import type { DungeonModel } from '../../../src/app/dungeons/model';
 import { propReach } from '../../../src/app/dungeons/props/catalogue';
-import { footingOf } from '../../../src/app/dungeons/terrain/catalog';
+import { draft, footingOf } from '../../../src/app/dungeons/terrain/catalog';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { cellOutlines } from '../../../src/app/dungeons/scene/cellOutline';
@@ -122,10 +122,15 @@ describe('a dungeon of several floors as one scene', () => {
 describe('the parapet round a gallery', () => {
   it('is half cover on the floor cells beside the hole, never on the hole', () => {
     let galleries = 0;
-    for (let seed = 1; seed <= 200 && galleries < 3; seed++) {
-      const model = generateDungeon({ seed, tags: [], floors: 2 });
-      const gallery = model.floors[0]!.terrain.find(piece => piece.kind === 'gallery');
-      if (!gallery) continue;
+    // The generator cuts galleries only for a room type's reason; one is laid here by hand over a room of the floor below.
+    for (let seed = 1; seed <= 60 && galleries < 3; seed++) {
+      const model = generateDungeon({ seed, theme: 'fortress', tags: [], floors: 2 });
+      const upper = model.floors[0]!;
+      const room = upper.rooms.find(r => r.kind === 'room' && r.w >= 5 && r.h >= 5 && !upper.terrain.some(p => p.room === r.id));
+      if (!room) continue;
+      const cells = [0, 1].flatMap(dx => [0, 1].map(dy => ({ x: room.x + 2 + dx, y: room.y + 2 + dy })));
+      const gallery = { ...draft('gallery', room.id, cells), id: upper.terrain.length, opening: { bottom: 1, link: 900 + seed } };
+      upper.terrain.push(gallery);
       galleries++;
       const { parts, placement } = partsOf(model);
       const parapets = Object.values(parts.scene.mapFeatures ?? {}).filter(feature => feature.name === 'Parapet' && feature.level === parts.levelIds![0]);
@@ -238,7 +243,7 @@ describe('a room\'s pin', () => {
           const where = `seed ${seed} floor ${index} room ${room.id} at ${p.x},${p.y}`;
           rooms++;
           expect(p.x > room.x && p.x < room.x + room.w && p.y > room.y && p.y < room.y + room.h, where).toBe(true);
-          const roomCells = cellsOfStair({ x: room.x, y: room.y, w: room.w, h: room.h, down: { x: 0, y: 1 } });
+          const roomCells = floorCellsOf(room);
           const anyIdeal = roomCells.some(c => !room.rotunda && clearOfThings(c.x + 0.5, c.y + 0.5) && !preferNot.has(cellKey(c.x, c.y)));
           const ideal = clearOfThings(p.x, p.y) && !preferNot.has(cellKey(Math.floor(p.x), Math.floor(p.y)));
           if (anyIdeal) expect(ideal, where).toBe(true);

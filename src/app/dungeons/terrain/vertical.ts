@@ -33,6 +33,8 @@ export function galleryOverArena(work: TerrainWork, rng: Rng): void {
   const deepest = work.floors.length - 1;
   const arena = work.floors[deepest]?.plan.rooms.find((room) => room.boss);
   const above = work.floors[deepest - 1];
+  // A cave's arena may lie under a fault's chasm, never under a builder's gallery.
+  if (work.theme.definition.id === 'cavern') return;
   if (!arena || !above || !openingAbove(work, deepest, arena.id, 'gallery') || !chance(rng, GALLERY_CHANCE)) return;
   // The gallery is cut in a room above that may take it: untyped, or a type with a reason for it.
   const cuttable = (id: number): boolean => holeAllowed(work, deepest - 1, id, 'gallery');

@@ -90,6 +90,11 @@ export class CaveGrid {
     return gx < 0 || gy < 0 || gx >= this.w || gy >= this.h ? -1 : gy * this.w + gx;
   }
 
+  /** The cells the grid covers: every room's walls and three cells beyond. */
+  box(): { x0: number; y0: number; w: number; h: number } {
+    return { x0: this.x0, y0: this.y0, w: this.w, h: this.h };
+  }
+
   /** Room id, `doorOwner(i)`, or `ROCK`. */
   owner(x: number, y: number): number {
     const i = this.index(x, y);
@@ -147,7 +152,8 @@ export class CaveGrid {
     if (this.mayTouch(owner, other)) return true;
     if (isDoor(owner) || isDoor(other) || owner === ROCK || other === ROCK) return false;
     const byDoor = (k: number, cx: number, cy: number): boolean => NEAR8.some(([dx, dy]) => ownerAt(cx + dx, cy + dy) === doorOwner(k));
-    return this.doors.some((door, k) => ((door.from === owner && door.to === other) || (door.from === other && door.to === owner)) && byDoor(k, x, y) && byDoor(k, nx, ny));
+    // A crawl is rock as drawn, so nothing meets round it.
+    return this.doors.some((door, k) => door.kind !== 'secret' && ((door.from === owner && door.to === other) || (door.from === other && door.to === owner)) && byDoor(k, x, y) && byDoor(k, nx, ny));
   }
 
   /** Whether `owner` may take the rock cell: nothing it may not touch lies beside it or at its corners. */
@@ -155,15 +161,6 @@ export class CaveGrid {
     const i = this.index(x, y);
     if (i < 0 || (this.owners[i] !== ROCK && this.owners[i] !== owner)) return false;
     return NEAR8.every(([dx, dy]) => this.mayTouchAt(owner, this.owner(x + dx, y + dy), x, y, x + dx, y + dy));
-  }
-
-  /**
-   * Whether a tunnel or a narrows may take a cell outside every rectangle: `mayClaim`, and no
-   * rectangle but its own (a narrows: its two rooms') beside it or at its corners, so it never
-   * takes from a room the floor it would grow into.
-   */
-  mayWiden(x: number, y: number, owner: number): boolean {
-    return this.mayClaim(x, y, owner) && NEAR8.every(([dx, dy]) => this.mayTouch(owner, this.envelope(x + dx, y + dy)));
   }
 
   cellsOf(owner: number): CellPoint[] {

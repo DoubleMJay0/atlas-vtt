@@ -6,6 +6,7 @@
  */
 
 import type { CellPoint, DungeonFloor, DungeonModel, DungeonProp, DungeonRoom, DungeonTerrain, TerrainKind } from '../../../src/app/dungeons/model';
+import { doorCells, floorCellsOf, holdsCell } from '../../../src/app/dungeons/geometry';
 import { PROP_SPECS, isCellPiece } from '../../../src/app/dungeons/props/catalogue';
 
 const key = (c: CellPoint): string => `${c.x},${c.y}`;
@@ -73,14 +74,17 @@ function stairApproaches(floor: DungeonFloor, index: number): CellPoint[] {
 }
 
 function doorApproaches(floor: DungeonFloor): CellPoint[] {
-  return floor.doors.flatMap((d) => [
-    ...(d.from !== null ? [{ x: d.x - d.dir.x, y: d.y - d.dir.y }] : []),
-    ...(d.to !== null ? [{ x: d.x + d.dir.x, y: d.y + d.dir.y }] : []),
-  ]);
+  return floor.doors.flatMap((d) =>
+    doorCells(d).flatMap((c) => [
+      ...(d.from !== null ? [{ x: c.x - d.dir.x, y: c.y - d.dir.y }] : []),
+      ...(d.to !== null ? [{ x: c.x + d.dir.x, y: c.y + d.dir.y }] : []),
+    ]),
+  );
 }
 
+/** Whether the cell is the room's floor: its rectangle, or a cave room's own cells. */
 function inFloor(room: DungeonRoom, c: CellPoint): boolean {
-  return c.x >= room.x && c.x < room.x + room.w && c.y >= room.y && c.y < room.y + room.h;
+  return holdsCell(room, c.x, c.y);
 }
 
 /** Whether the whole cell lies on the room's floor: inside the circle of a round room. */
@@ -132,12 +136,10 @@ export function propCells(floor: DungeonFloor, prop: DungeonProp): CellPoint[] {
   const { out } = spec.footprint;
   const front = { x: Math.sin(prop.rotation), y: -Math.cos(prop.rotation) };
   const cells: CellPoint[] = [];
-  for (let y = room.y; y < room.y + room.h; y++) {
-    for (let x = room.x; x < room.x + room.w; x++) {
-      const dx = x + 0.5 - prop.x;
-      const dy = y + 0.5 - prop.y;
-      if (Math.abs(dx * front.y - dy * front.x) < along / 2 && Math.abs(dx * front.x + dy * front.y) < out / 2) cells.push({ x, y });
-    }
+  for (const { x, y } of floorCellsOf(room)) {
+    const dx = x + 0.5 - prop.x;
+    const dy = y + 0.5 - prop.y;
+    if (Math.abs(dx * front.y - dy * front.x) < along / 2 && Math.abs(dx * front.x + dy * front.y) < out / 2) cells.push({ x, y });
   }
   return cells;
 }
@@ -150,15 +152,12 @@ export function blockingPropCells(floor: DungeonFloor): CellPoint[] {
 function walkable(floor: DungeonFloor): Set<string> {
   const cells = new Set<string>();
   for (const room of floor.rooms) {
-    for (let y = room.y; y < room.y + room.h; y++) {
-      for (let x = room.x; x < room.x + room.w; x++) {
-        const c = { x, y };
-        const centreIn = !room.rotunda || Math.hypot(x + 0.5 - (room.x + room.w / 2), y + 0.5 - (room.y + room.h / 2)) <= Math.sqrt(room.w * room.w + 1) / 2;
-        if (centreIn) cells.add(key(c));
-      }
+    for (const c of floorCellsOf(room)) {
+      const centreIn = !room.rotunda || Math.hypot(c.x + 0.5 - (room.x + room.w / 2), c.y + 0.5 - (room.y + room.h / 2)) <= Math.sqrt(room.w * room.w + 1) / 2;
+      if (centreIn) cells.add(key(c));
     }
   }
-  for (const door of floor.doors) cells.add(key(door));
+  for (const door of floor.doors) for (const c of doorCells(door)) cells.add(key(c));
   for (const piece of floor.terrain) if (BLOCKING.has(piece.kind)) for (const c of piece.cells) cells.delete(key(c));
   for (const piece of floor.terrain) if (piece.kind === 'bridge') for (const c of piece.cells) cells.add(key(c));
   for (const c of blockingPropCells(floor)) cells.delete(key(c));

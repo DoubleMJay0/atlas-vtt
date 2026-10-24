@@ -24,18 +24,19 @@ function laneDoorsOf(floor: Pick<CaveFloorPlan, 'doors'>, route: readonly number
   });
 }
 
-/** The lane door the cell stands beside, in the wall it is set in, if one does. */
-function besideDoor(floor: Pick<CaveFloorPlan, 'doors'>, doors: readonly number[], x: number, y: number): number | undefined {
-  return doors.find((k) => {
+/** The lane door the cell stands beside, in the wall it is set in, if one does: of two, one whose own cell is lane (`inLane`). */
+function besideDoor(floor: Pick<CaveFloorPlan, 'doors'>, doors: readonly number[], x: number, y: number, inLane: (k: number) => boolean = () => true): number | undefined {
+  const beside = doors.filter((k) => {
     const door = floor.doors[k]!;
     return Math.abs(x - door.x) + Math.abs(y - door.y) === 1 && (x - door.x) * door.dir.x + (y - door.y) * door.dir.y === 0;
   });
+  return beside.find(inLane) ?? beside[0];
 }
 
 /** Whose a lane cell would be, or null where the lane may not go: off the route, on a stairwell other than `ends`', or `banned`. */
 export type LaneOwner = (x: number, y: number) => number | null;
 
-export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], ends: readonly ReadonlySet<string>[], banned: ReadonlySet<string> = new Set()): LaneOwner {
+export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], ends: readonly ReadonlySet<string>[], banned: ReadonlySet<string> = new Set(), lane?: ReadonlySet<string>): LaneOwner {
   const onRoute = new Set(route);
   const laneDoors = laneDoorsOf(floor, route);
   const stairCells = new Set(floor.stairs.flatMap((s: StairSpot) => cellsOf(spotRect(s))).map((c) => cellKey(c.x, c.y)));
@@ -47,9 +48,9 @@ export function laneOwners(grid: CaveGrid, floor: CaveFloorPlan, route: readonly
     if (envelope !== ROCK) return onRoute.has(envelope) ? envelope : null;
     const owner = grid.owner(x, y);
     if (owner !== ROCK) return laneDoors.some((k) => owner === doorOwner(k)) ? owner : null;
-    const beside = besideDoor(floor, laneDoors, x, y);
-    if (beside !== undefined) return grid.mayWiden(x, y, doorOwner(beside)) ? doorOwner(beside) : null;
-    return tunnels.find((room) => inRect(wallRect(room), x, y) && grid.mayWiden(x, y, room.id))?.id ?? null;
+    const beside = besideDoor(floor, laneDoors, x, y, (k) => lane?.has(cellKey(floor.doors[k]!.x, floor.doors[k]!.y)) ?? true);
+    if (beside !== undefined) return grid.mayClaim(x, y, doorOwner(beside)) ? doorOwner(beside) : null;
+    return tunnels.find((room) => inRect(wallRect(room), x, y) && grid.mayClaim(x, y, room.id))?.id ?? null;
   };
   return (x, y) => {
     const key = cellKey(x, y);
@@ -82,10 +83,40 @@ export function laneConflict(grid: CaveGrid, lane: readonly CellPoint[], owners:
   return null;
 }
 
+/**
+ * A wall cell beside a lane door that the lane may not keep: it crosses the wall straight, through
+ * the door cell and one cell beside it, each with the lane on both sides (inside only, at an
+ * entrance), and never so that the narrows runs into another door's cell.
+ */
+export function crossingConflict(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], lane: readonly CellPoint[]): string | null {
+  const keys = new Set(lane.map((c) => cellKey(c.x, c.y)));
+  const doors = laneDoorsOf(floor, route);
+  const passed = doors.filter((k) => keys.has(cellKey(floor.doors[k]!.x, floor.doors[k]!.y)));
+  for (const k of doors) {
+    const door = floor.doors[k]!;
+    const beside = [-1, 1].map((s) => ({ x: door.x + s * door.dir.y, y: door.y + s * door.dir.x })).filter((c) => keys.has(cellKey(c.x, c.y)));
+    if (!passed.includes(k)) {
+      // The lane takes the wall beside a door only through a door it passes.
+      const stray = beside.find((c) => besideDoor(floor, passed, c.x, c.y) === undefined);
+      if (stray) return cellKey(stray.x, stray.y);
+      continue;
+    }
+    if (beside.length > 1) return cellKey(beside[1]!.x, beside[1]!.y);
+    for (const c of beside) {
+      const across = [{ x: c.x + door.dir.x, y: c.y + door.dir.y }, ...(door.from === null ? [] : [{ x: c.x - door.dir.x, y: c.y - door.dir.y }])];
+      if (!across.every((a) => keys.has(cellKey(a.x, a.y)))) return cellKey(c.x, c.y);
+      const along = { x: c.x * 2 - door.x, y: c.y * 2 - door.y };
+      const next = grid.owner(along.x, along.y);
+      if (next <= -2 && next !== doorOwner(k)) return cellKey(c.x, c.y);
+    }
+  }
+  return null;
+}
+
 /** Gives every lane cell its owner for good, as `laneOwners` read them before anything was claimed. */
 export function claimLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly number[], lane: readonly CellPoint[]): void {
   const keys = new Set(lane.map((c) => cellKey(c.x, c.y)));
-  const owners = laneOwners(grid, floor, route, [keys]);
+  const owners = laneOwners(grid, floor, route, [keys], new Set(), keys);
   const given = lane.map((c) => [c, owners(c.x, c.y)] as const);
   for (const [c, owner] of given) if (owner !== null) grid.require(owner, [c]);
 }

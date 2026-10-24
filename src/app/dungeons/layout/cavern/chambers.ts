@@ -59,6 +59,19 @@ export function coreBlock(grid: CaveGrid, room: DungeonRoom): CellPoint[] {
   return best;
 }
 
+/**
+ * Keeps a 3 × 3 block in every chamber before anything else is shaped, so no tunnel or narrows
+ * takes the cells it needs; whether every chamber has one.
+ */
+export function reserveCores(grid: CaveGrid, rooms: readonly DungeonRoom[]): boolean {
+  return rooms.every((room) => {
+    if (room.kind !== 'room') return true;
+    const core = coreBlock(grid, room);
+    grid.require(room.id, core);
+    return core.length > 0;
+  });
+}
+
 /** The fewest cells the room may take that join `cells` to `reached`, or none where no way leads. */
 function joinPath(grid: CaveGrid, room: DungeonRoom, from: CellPoint, reached: ReadonlySet<string>): CellPoint[] {
   const back = new Map<string, string>([[key(from), key(from)]]);

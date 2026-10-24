@@ -7,6 +7,7 @@
 
 import { planFloors, type PlannedFloor } from './floors/planFloors';
 import { caveParams } from './layout/cavern/caveParams';
+import { shapeCaves } from './layout/cavern/shapeCave';
 import { fiveRoomParams } from './layout/fiveRoom';
 import { floraOf } from './growth/flora';
 import { placeGrowth } from './growth/placeGrowth';
@@ -38,7 +39,7 @@ interface FloorParts {
 
 function finishFloor(seed: number, index: number, parts: FloorParts, terrain: FloorTerrain, level: number): DungeonFloor {
   const { planned, params, roles, columns } = parts;
-  const { rooms, doors, stairs } = planned;
+  const { rooms, doors, stairs, cave } = planned;
   const dry = level <= 0 && params.tags.has('dry');
   const mayPool = (id: number): boolean => parts.water?.pools.has(id) ?? true;
   const pools = dry ? new Set<number>() : poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool);
@@ -52,7 +53,7 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const props = [...terrain.props, ...placed.props];
   const { rubble, cracks } = placed;
   const growth = placeGrowth({ seed, floor: index, rooms, doors, stairs, columns, props, terrain: pieces, waterCells, cracks }, flora);
-  return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth };
+  return { rooms, doors, columns, props, rubble, cracks, water, waterCells, stairs, terrain: pieces, growth, ...(cave && { cave }) };
 }
 
 export function generateDungeon(request: DungeonRequest): DungeonModel {
@@ -65,7 +66,11 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
   const params = fiveRoom ? fiveRoomParams(base) : base;
   const rolled = chooseWaterLevel(seed, request.waterLevel, params.waterLevel);
   const count = requestedFloors(request);
-  const planned = planFloors(seed, params, count, fiveRoom || request.bossRoom !== false, fiveRoom);
+  const boss = fiveRoom || request.bossRoom !== false;
+  const laid = planFloors(seed, params, count, boss, fiveRoom);
+  // A Cavern shapes its rooms into chambers and tunnels before anything reads them.
+  const shaped = params.cave ? shapeCaves(seed, params, laid, boss) : null;
+  const planned = shaped?.floors ?? laid;
   const themed = typeDungeon(seed, theme, params.tags, planned);
   const { typed } = themed;
   // A built theme's floors are dry unless the GM or the tags ask for water; then it stands only where its rooms have it.
@@ -89,5 +94,5 @@ export function generateDungeon(request: DungeonRequest): DungeonModel {
     themed.theme,
   );
   const floors = parts.map((part, index) => finishFloor(seed, index, part, terrain[index] as FloorTerrain, level));
-  return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors };
+  return { version: DUNGEON_GENERATOR_VERSION, seed, theme, tags, floors, ...(shaped && { cave: shaped.cave }) };
 }

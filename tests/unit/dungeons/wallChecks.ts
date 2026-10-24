@@ -32,7 +32,10 @@ export const wallsCrossed = (walls: readonly WallSegment[], a: Point, b: Point):
 
 /** Directions of rays from a room's middle that reach `far` pixels without meeting a wall: none, for an enclosed room. */
 export function escapingRays(walls: readonly WallSegment[], room: DungeonRoom, placement: DungeonPlacement, far: number, rays = 72): number[] {
-  const centre = toWorld({ x: room.x + room.w / 2, y: room.y + room.h / 2 }, placement);
+  // A cave's room is its cells: the rays leave from the middle of the one nearest its rectangle's middle.
+  const mid = { x: room.x + room.w / 2, y: room.y + room.h / 2 };
+  const near = room.cells?.reduce((best, c) => (Math.hypot(c.x + 0.5 - mid.x, c.y + 0.5 - mid.y) < Math.hypot(best.x + 0.5 - mid.x, best.y + 0.5 - mid.y) ? c : best));
+  const centre = toWorld(near ? { x: near.x + 0.5 + 0.013, y: near.y + 0.5 + 0.007 } : mid, placement);
   const out: number[] = [];
   for (let i = 0; i < rays; i++) {
     // Off the grid's directions, so no ray runs exactly along a wall

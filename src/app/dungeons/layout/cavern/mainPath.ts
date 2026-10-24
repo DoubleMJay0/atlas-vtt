@@ -11,7 +11,7 @@ import { cellKey, cellsOf, floorRect, inRect } from '../../geometry';
 import type { CellPoint, DungeonRoom } from '../../model';
 import { hops, neighbours, openDoor } from '../../roomGraph';
 import { CaveGrid, type CaveFloorPlan } from './caveGrid';
-import { type LaneOwner, entranceDoor, laneConflict, laneOwners } from './laneCells';
+import { type LaneOwner, crossingConflict, entranceDoor, laneConflict, laneOwners } from './laneCells';
 
 export { claimLane } from './laneCells';
 
@@ -138,7 +138,7 @@ export function wideLane(grid: CaveGrid, floor: CaveFloorPlan, route: readonly n
     const owners = laneOwners(grid, floor, route, [start.area, goal.area], banned);
     const lane = blockWalk(start, goal, owners);
     if (!lane) return null;
-    const conflict = laneConflict(grid, lane, owners);
+    const conflict = crossingConflict(grid, floor, route, lane) ?? laneConflict(grid, lane, owners);
     if (conflict === null) return lane;
     banned.add(conflict);
   }

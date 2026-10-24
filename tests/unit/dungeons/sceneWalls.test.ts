@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import { cellsOf } from '../../../src/app/dungeons/geometry';
+import { cellsOf, doorCells } from '../../../src/app/dungeons/geometry';
 import type { DoorKind, DungeonDoor, DungeonModel, DungeonRoom } from '../../../src/app/dungeons/model';
 import { pointSegmentDistance } from '../../../src/app/dungeons/render/geometry';
 import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
@@ -38,15 +38,14 @@ function wayThrough(door: DungeonDoor, placement: DungeonPlacement): [{ x: numbe
   ];
 }
 
-/** Walls across every entrance's open mouth, where the outline of its cell would close it, so a check can find the rest sealed. */
-function mouthsClosed(model: DungeonModel, floor: number, placement: DungeonPlacement): WallSegment[] {
-  const half = wallInkWidth(STYLE) / 2;
-  const snap = (v: number): number => Math.round(v * 1024) / 1024;
-  return model.floors[floor]!.doors.filter(door => door.from === null).map((door, k): WallSegment => {
-    const out = 0.5 + half;
-    const at = (u: number): { x: number; y: number } =>
-      toWorld({ x: snap(door.x + 0.5 - door.dir.x * out - door.dir.y * u), y: snap(door.y + 0.5 - door.dir.y * out + door.dir.x * u) }, placement);
-    return { id: `mouth_${k}`, kind: 'wall', type: 'solid', p1: at(-out), p2: at(out) };
+/** Walls across every entrance's open mouth, between the two wall ends it leaves loose, so a check can find the rest sealed. */
+function mouthsClosed(model: DungeonModel, floor: number, placement: DungeonPlacement, walls: readonly WallSegment[]): WallSegment[] {
+  const loose = looseEnds(walls);
+  return model.floors[floor]!.doors.filter(door => door.from === null).flatMap((door, k): WallSegment[] => {
+    const cells = doorCells(door);
+    const mouth = toWorld({ x: cells.reduce((sum, c) => sum + c.x + 0.5, 0) / cells.length - door.dir.x * 0.5, y: cells.reduce((sum, c) => sum + c.y + 0.5, 0) / cells.length - door.dir.y * 0.5 }, placement);
+    const ends = loose.filter(p => Math.hypot(p.x - mouth.x, p.y - mouth.y) <= (cells.length / 2 + 0.5) * placement.pxPerCell);
+    return ends.length === 2 ? [{ id: `mouth_${k}`, kind: 'wall', type: 'solid', p1: ends[0]!, p2: ends[1]! }] : [];
   });
 }
 
@@ -54,7 +53,8 @@ function checkSealed(model: DungeonModel): void {
   const placement = placementOf(model);
   const far = farReach(model, placement);
   model.floors.forEach((floor, index) => {
-    const walls = [...wallsOf(model, placement, index), ...mouthsClosed(model, index, placement)];
+    const own = wallsOf(model, placement, index);
+    const walls = [...own, ...mouthsClosed(model, index, placement, own)];
     for (const room of floor.rooms) expect(escapingRays(walls, room, placement, far), `room ${room.id} of floor ${index}, seed ${model.seed}`).toEqual([]);
     expect(looseEnds(walls)).toEqual([]);
     expect(duplicateWalls(walls)).toBe(0);

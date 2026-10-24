@@ -2,7 +2,7 @@ import { type PlannedFloor, planFloors } from '../../../../src/app/dungeons/floo
 import { cellKey } from '../../../../src/app/dungeons/geometry';
 import { CaveGrid } from '../../../../src/app/dungeons/layout/cavern/caveGrid';
 import { type CaveShaping, caveParams } from '../../../../src/app/dungeons/layout/cavern/caveParams';
-import { chamberSeeds, growChamber, smoothChamber } from '../../../../src/app/dungeons/layout/cavern/chambers';
+import { chamberSeeds, growChamber, reserveCores, smoothChamber } from '../../../../src/app/dungeons/layout/cavern/chambers';
 import { faultDirections } from '../../../../src/app/dungeons/layout/cavern/faults';
 import { claimLane, laneEnds, mainRoute, wideLane } from '../../../../src/app/dungeons/layout/cavern/mainPath';
 import type { CellPoint, DungeonRoom } from '../../../../src/app/dungeons/model';
@@ -45,6 +45,7 @@ export function shapedFloors(wanted: number, onChamber: (floor: ShapedFloor, cha
       const route = mainRoute(floor, from, to);
       const lane = wideLane(grid, floor, route, from, to) ?? [];
       claimLane(grid, floor, route, lane);
+      reserveCores(grid, floor.rooms);
       const laneKeys = new Set(lane.map((c) => cellKey(c.x, c.y)));
       const shaped = { seed, index, floor, grid, lane, laneKeys, shaping, faults };
       floor.rooms

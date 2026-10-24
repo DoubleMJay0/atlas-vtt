@@ -82,7 +82,7 @@ describe('cave tunnels', () => {
               const ok =
                 other <= -2
                   ? floor.doors[-2 - other]!.from === id || floor.doors[-2 - other]!.to === id
-                  : floor.doors.some((d, k) => ((d.from === id && d.to === other) || (d.from === other && d.to === id)) && byDoor(k, c.x, c.y) && byDoor(k, c.x + dx, c.y + dy));
+                  : floor.doors.some((d, k) => d.kind !== 'secret' && ((d.from === id && d.to === other) || (d.from === other && d.to === id)) && byDoor(k, c.x, c.y) && byDoor(k, c.x + dx, c.y + dy));
               expect(ok, `seed ${shaped.seed} floor ${shaped.index} room ${id} at ${c.x},${c.y} other ${other} at ${dx},${dy} rooms ${JSON.stringify([floor.rooms[id], floor.rooms[other]])} doors ${JSON.stringify(floor.doors.filter((d) => [d.from, d.to].some((r) => r === id || r === other)))} lane ${shaped.lane.filter((l) => Math.abs(l.x - c.x) <= 2 && Math.abs(l.y - c.y) <= 2).map((l) => l.x + "," + l.y).join(" ")}`).toBe(true);
             }
           }
