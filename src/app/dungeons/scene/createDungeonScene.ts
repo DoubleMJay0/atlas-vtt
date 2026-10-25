@@ -16,6 +16,8 @@ import { DEFAULT_PX_PER_CELL, SCENE_MAP_PIXELS, SCENE_MAP_QUALITY, type MapLayou
 import type { DungeonStyle, DungeonView } from '../style';
 import { DungeonWorkerClient } from '../worker/DungeonWorkerClient';
 import type { DungeonJob, DungeonRendered } from '../worker/dungeonJob';
+import { holdReveal, SINGLE_LEVEL, type PendingReveal } from '../reveal/pendingReveals';
+import { revealPlan } from '../reveal/revealPlan';
 import { floorName } from './roomKeys';
 import { dungeonNote, roomPins } from './toNote';
 import { dungeonSceneThumbnail } from './sceneThumbnail';
@@ -75,6 +77,13 @@ export function floorLevels(levelIds: readonly string[], backgrounds: readonly s
     elevation: levelElevation(stack, floor, LEVEL_HEIGHT),
     background: backgrounds[floor] ?? null,
   }));
+}
+
+/** How each floor's map grows into being the first time the scene is shown, on the saved image. */
+function revealOf(model: DungeonModel, view: DungeonView, layout: MapLayout, placement: DungeonPlacement, saved: { width: number; height: number }, levelIds: readonly string[] | null): PendingReveal {
+  const map = { ...layout, ...placement };
+  const levels = Object.fromEntries(model.floors.map((_, floor) => [levelIds?.[floor] ?? SINGLE_LEVEL, revealPlan(model, view, map, floor, saved)]));
+  return { width: saved.width, height: saved.height, levels };
 }
 
 interface DrawnFloors {
@@ -165,6 +174,7 @@ async function create(deps: DungeonSceneDeps, options: DungeonSceneOptions): Pro
     console.error('[Atlas] Saving a dungeon scene failed:', written.problem);
     return refused(t('dungeon.createFailed'));
   }
+  holdReveal(deps.app, written.scenePath, revealOf(model, view, layout, placement, saved, levelIds));
   return { ok: true, name: written.name, scenePath: written.scenePath, ...(levelIds?.[0] && { entryLevel: levelIds[0] }) };
 }
 

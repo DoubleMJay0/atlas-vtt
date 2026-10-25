@@ -17,8 +17,6 @@ export interface MapPicture {
   model: DungeonModel;
   /** The floor it shows, by index. */
   floor: number;
-  /** A dungeon generated for it, not one shown before in another look, floor or with edits: it grows into being. */
-  fresh: boolean;
 }
 
 export interface MapPreviewInput {
@@ -91,7 +89,7 @@ export function useMapPreview(renderer: PreviewRenderer, input: MapPreviewInput,
       const bitmap = result.image.bitmap;
       setPicture((old) => {
         old?.bitmap.close();
-        return { bitmap, map: result.map, model: result.model, floor, fresh: !generated };
+        return { bitmap, map: result.map, model: result.model, floor };
       });
       setFailed(false);
       setDrawing(false);

@@ -1,7 +1,7 @@
-import type { DungeonModel, DungeonRoom } from '../../../../dungeons/model';
-import type { MapLayout } from '../../../../dungeons/render/layoutSize';
-import { visibleFloor } from '../../../../dungeons/render/visibleDungeon';
-import type { DungeonView } from '../../../../dungeons/style';
+import type { DungeonModel, DungeonRoom } from '../model';
+import type { MapLayout } from '../render/layoutSize';
+import { visibleFloor } from '../render/visibleDungeon';
+import type { DungeonView } from '../style';
 
 /** One blot of ink the map grows from: a room's floor, or the last wave that settles the rest. */
 export interface RevealSeed {
@@ -127,4 +127,11 @@ function easeInOutCubic(t: number): number {
 export function grownAt(seed: RevealSeed, t: number, wave = false): number {
   const local = Math.min(1, Math.max(0, (t - seed.start) / seed.grow));
   return wave ? easeInOutCubic(local) : easeOutCubic(local);
+}
+
+/** `plan` for a bitmap `sx` times as wide and `sy` times as tall as the one it was made for. */
+export function scaledPlan(plan: RevealPlan, sx: number, sy: number): RevealPlan {
+  const reach = Math.max(sx, sy);
+  const scale = (seed: RevealSeed): RevealSeed => ({ ...seed, x: seed.x * sx, y: seed.y * sy, radius: seed.radius * reach });
+  return { ...plan, seeds: plan.seeds.map(scale), wave: scale(plan.wave), feather: plan.feather * reach };
 }
