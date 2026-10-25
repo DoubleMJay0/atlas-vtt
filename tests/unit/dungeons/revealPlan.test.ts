@@ -3,7 +3,7 @@ import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { visibleFloor } from '../../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
-import { grownAt, revealPlan } from '../../../src/app/packages/components/dungeon-generator/reveal/revealPlan';
+import { grownAt, revealPlan } from '../../../src/app/dungeons/reveal/revealPlan';
 
 const PX = 12;
 

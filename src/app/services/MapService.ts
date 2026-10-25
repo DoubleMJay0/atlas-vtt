@@ -6,6 +6,7 @@ import type { ViewAtlasStore } from '../storeFactory';
 import type { MapFile } from './MapPersistence';
 import { getHistoryStore } from '../stores/history';
 import { detectGridOfNewScene } from './firstGridDetection';
+import { revealNewDungeon } from './dungeonSceneReveal';
 import { describeError } from '../utils/errors';
 import { sceneNameOf } from '../utils/sceneName';
 import { settledWithin } from '../utils/settledWithin';
@@ -28,6 +29,8 @@ export class MapService {
   private readonly loads = new LatestRequestQueue();
   /** Ends the grid detection of a new scene that is shown and not yet done with. */
   private endGridDetection: (() => void) | null = null;
+  /** Ends a new dungeon growing into being on the map shown. */
+  private endReveal: (() => void) | null = null;
 
   constructor(private app: App, eventBus: EventEmitter, private store: ViewAtlasStore) {
     this.eventBus = eventBus;
@@ -72,6 +75,8 @@ export class MapService {
       // A detection still running on the scene being left ends with it.
       this.endGridDetection?.();
       this.endGridDetection = null;
+      this.endReveal?.();
+      this.endReveal = null;
 
       // Services save what belongs to the map being left while its state is still loaded
       if (this.store.getState().mapLoaded) this.eventBus.emit('map-unloading');
@@ -218,7 +223,15 @@ export class MapService {
         }
       };
       const hideLoadingScreen = (): void => {
-        if (imageReady) void imageReady.then(revealMap);
+        // A dungeon made on this device and never shown grows into being: the loading screen waits for its first frame
+        const { isPlayerView, viewedLevel } = this.store.getState();
+        const reveal = isPlayerView ? null : revealNewDungeon(this.app, renderer, filePath, viewedLevel ?? null);
+        const revealed = reveal?.then((end) => {
+          if (isSuperseded()) end?.();
+          else this.endReveal = end;
+        });
+        const shown = revealed && imageReady ? Promise.all([imageReady, revealed]) : revealed ?? imageReady;
+        if (shown) void shown.then(revealMap);
         else revealMap();
       };
       this.eventBus.emit('wait-for-tokens-loaded', hideLoadingScreen);
@@ -281,6 +294,8 @@ export class MapService {
     this.loads.cancel();
     this.endGridDetection?.();
     this.endGridDetection = null;
+    this.endReveal?.();
+    this.endReveal = null;
   }
 
   /** `loadMap` for a file of the vault. */

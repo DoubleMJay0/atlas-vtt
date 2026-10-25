@@ -4,8 +4,8 @@ import type { App } from 'obsidian';
 import { DEFAULT_DUNGEON_GENERATOR_SETTINGS } from '../../src/app/dungeons/generatorSettings';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { DungeonWorkerClient } from '../../src/app/dungeons/worker/DungeonWorkerClient';
-import { revealPlan } from '../../src/app/packages/components/dungeon-generator/reveal/revealPlan';
-import { playReveal } from '../../src/app/packages/components/dungeon-generator/reveal/revealPlayer';
+import { revealPlan } from '../../src/app/dungeons/reveal/revealPlan';
+import { playReveal } from '../../src/app/dungeons/reveal/revealPlayer';
 
 const app = {} as App;
 const { view, style } = DEFAULT_DUNGEON_GENERATOR_SETTINGS;
