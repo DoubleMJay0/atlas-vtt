@@ -1,123 +1,119 @@
 import { stackOf, stairEnd } from '../../../floors/floorStack';
 import type { StairEnd } from '../../../floors/stairSpots';
 import type { DungeonStair } from '../../../model';
+import { rngFrom } from '../../../rng';
 import type { Hand } from '../../art/hand';
-import { polyPath } from '../../art/paths';
-import { pointsBounds, type Vec } from '../../geometry';
+import { hash2 } from '../../art/noise';
+import { polyPath, polysPath } from '../../art/paths';
+import type { Vec } from '../../geometry';
+import { stoneOutline } from '../../terrain/stones';
 import { wayFrame, type WayFrame } from './narrows';
+import { rope } from './rope';
+import { approachLength, dashes, shaftMouth, type ShaftMouth } from './shaftMouth';
+import { layRubbleShadow } from './slopeShading';
+import { layDark, layDepth, ledge, rimSurface } from './shaftShading';
+import { layAvenLight, poolOf } from './avenLight';
 
-/** Broken rock shoulders mark the well's sides, leaving its ground end open. */
-export function shaftSides(hand: Hand, frame: WayFrame, end: StairEnd): void {
-  const { at, across, along } = frame;
-  const u = across / 2;
-  const v = along / 2;
-  const far = end === 'upper' ? v : -v;
-  const sign = end === 'upper' ? 1 : -1;
-  const sides = [-1, 1].flatMap(side => [
-    [at(side * (u - 0.08), -far + sign * 0.12), at(side * u, -far * 0.55), at(side * (u - 0.06), -sign * 0.12)],
-    [at(side * (u - 0.05), sign * 0.14), at(side * (u - 0.025), far * 0.65), at(side * (u - 0.16), far - sign * 0.05)],
+/**
+ * A pitch is a shaft in the floor: its rim breaks off, ledges step down into the dark, and a rope
+ * tied round a boulder on the approach goes over the near lip and is lost below. An aven is the same
+ * shaft seen from beneath: its opening overhead is dashed, its walls rising inside it as dashed
+ * contours, and light falls down it onto the floor with the rubble that came down with it.
+ */
+
+function seedOf(hand: Hand, frame: WayFrame): number {
+  return Math.floor(hash2(frame.bounds.minX, frame.bounds.minY, hand.scene.env.dungeon.model.seed) * 0x7fffffff);
+}
+
+/** Short ticks inside the rim pointing down into the shaft, as surveyors mark a pitch; none where the rope goes over. */
+function rimTicks(rim: readonly Vec[], centre: Vec, keepClear: Vec): Vec[][] {
+  const ticks: Vec[][] = [];
+  let since = 0.11;
+  for (let i = 0; i < rim.length; i++) {
+    const a = rim[i]!;
+    const b = rim[(i + 1) % rim.length]!;
+    since += Math.hypot(b.x - a.x, b.y - a.y);
+    if (since < 0.11 || Math.hypot(a.x - keepClear.x, a.y - keepClear.y) < 0.14) continue;
+    since = 0;
+    const dx = centre.x - a.x;
+    const dy = centre.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const reach = Math.min(0.075, len * 0.2);
+    ticks.push([a, { x: a.x + dx / len * reach, y: a.y + dy / len * reach }]);
+  }
+  return ticks;
+}
+
+function pitch(hand: Hand, frame: WayFrame, mouth: ShaftMouth): void {
+  const { at, along } = frame;
+  const { rings, near } = mouth;
+  const rim = rings[0]!;
+  rimSurface(hand, rim);
+  layDepth(hand, mouth, 0, 2);
+  ledge(hand, rings[1]!);
+  // The rope is tied on the approach, goes over the near lip and down the lit ledges into the dark.
+  const k = Math.min(1, approachLength(along) / 0.85);
+  const tie = near - approachLength(along) * 0.52;
+  const anchor = [at(-0.2 * k, tie - 0.13 * k), at(0.1 * k, tie - 0.11 * k), at(0.18 * k, tie + 0.04 * k), at(-0.03 * k, tie + 0.13 * k), at(-0.23 * k, tie + 0.03 * k)];
+  hand.fill(polyPath(anchor), 'rock');
+  hand.line([anchor], 'outline', true);
+  const lip = at(0.03, near + 0.03);
+  const bottom = rings[3]!;
+  const shelf = rings[2]!.reduce((s, p) => ({ x: s.x + p.x / rings[2]!.length, y: s.y + p.y / rings[2]!.length }), { x: 0, y: 0 });
+  rope(hand, [
+    at(-0.15 * k, tie - 0.04 * k), at(-0.08 * k, tie + 0.08 * k), at(0.08 * k, tie + 0.06 * k), at(0.09 * k, tie - 0.06 * k), at(-0.1 * k, tie - 0.07 * k),
+    // It ends inside the lowest ledge, whose dark is laid over it: lost below.
+    at(-0.05 * k, tie + 0.16 * k), lip, { x: lip.x * 0.2 + shelf.x * 0.8, y: lip.y * 0.2 + shelf.y * 0.8 },
   ]);
-  hand.line(sides, 'outline');
-  hand.line([-1, 1].map(side => [at(side * (u - 0.16), far - sign * 0.05), at(side * u * 0.70, far - sign * 0.13), at(side * u * 0.40, far - sign * 0.09)]), 'fine');
+  ledge(hand, rings[2]!);
+  layDepth(hand, mouth, 2, 4);
+  layDark(hand, mouth);
+  hand.line([bottom], 'fine', true);
+  // Stone's depth already says which way is down; Engraved, with no tone to spare, marks it as surveyors do.
+  if (hand.scene.env.style.direction !== 'stone') hand.line(rimTicks(rim, mouth.centre, lip), 'fine');
+  hand.edges(rim, false);
 }
 
-/** Broken shoulders, with their corners pulled off the rectangular placement envelope. */
-function throat(frame: WayFrame, end: StairEnd): Vec[] {
-  const { at, across, along } = frame;
-  const u = Math.min(0.42, across / 2 - 0.10);
-  const v = Math.min(0.42, along / 2 - 0.10);
-  const centre = (end === 'upper' ? 1 : -1) * (along / 2 - v - 0.12);
-  return [[-0.65, -1], [0.40, -0.98], [0.91, -0.77], [1, -0.22], [0.84, 0.13], [0.97, 0.68], [0.49, 0.98], [-0.31, 1], [-0.87, 0.79], [-1, 0.34], [-0.90, -0.28], [-0.97, -0.73]].map(([x, y]) => at(x! * u, centre + y! * v));
-}
-
-/** A laid rope as a narrow ribbon: its fill and diagonal fibre are the painter's own. */
-function rope(hand: Hand, run: Vec[]): void {
-  const half = 0.018;
-  const sides = [-1, 1].map(side => run.map((p, i) => {
-    const a = run[Math.max(0, i - 1)]!;
-    const b = run[Math.min(run.length - 1, i + 1)]!;
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    return { x: p.x - (b.y - a.y) / len * half * side, y: p.y + (b.x - a.x) / len * half * side };
-  }));
-  const band = [...sides[0]!, ...sides[1]!.slice().reverse()];
-  hand.surface(polyPath(band), 'rope');
-  hand.line(sides, 'fine');
-  const strands: Vec[][] = [];
-  let next = 0.04;
-  for (let i = 1; i < run.length; i++) {
-    const a = run[i - 1]!;
-    const b = run[i]!;
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length === 0) continue;
-    const tx = (b.x - a.x) / length;
-    const ty = (b.y - a.y) / length;
-    for (; next < length; next += 0.08) {
-      const x = a.x + tx * next;
-      const y = a.y + ty * next;
-      strands.push([-1, 1].map(side => ({ x: x + side * (tx * 0.012 - ty * half * 0.7), y: y + side * (ty * 0.012 + tx * half * 0.7) })));
-    }
-    next -= length;
+function aven(hand: Hand, frame: WayFrame, mouth: ShaftMouth): void {
+  const { rings, half } = mouth;
+  layAvenLight(hand, frame, mouth);
+  // What came down the chimney lies where its light lands: a heap in the middle, stones thrown wider.
+  const at = poolOf(mouth).centre;
+  const rng = rngFrom(seedOf(hand, frame) + 3);
+  const [hx, hy] = frame.down.x ? [half.v, half.u] : [half.u, half.v];
+  const stones: { poly: Vec[]; c: Vec; r: number }[] = [];
+  for (let i = 0; i < 16; i++) {
+    const a = rng() * Math.PI * 2;
+    const d = i < 3 ? 0.14 * rng() : 0.12 + Math.sqrt(rng()) * 0.62;
+    const c = { x: at.x + Math.cos(a) * d * hx, y: at.y + Math.sin(a) * d * hy };
+    const r = i < 3 ? 0.085 + 0.04 * rng() : 0.025 + 0.05 * (1 - d) * rng();
+    stones.push({ poly: stoneOutline(rng, c, r), c, r });
   }
-  hand.line(strands, 'fine');
-}
-
-function shaft(hand: Hand, stair: DungeonStair, end: StairEnd): void {
-  const frame = wayFrame(stair, stair.down);
-  const { at, along, across } = frame;
-  const rim = throat(frame, end);
-  const top = -along / 2;
-  if (end === 'upper') {
-    hand.surface(polyPath(rim), 'rock');
-    const bounds = pointsBounds(rim);
-    const mouth = wayFrame({ x: bounds.minX, y: bounds.minY, w: bounds.maxX - bounds.minX, h: bounds.maxY - bounds.minY }, stair.down);
-    // This one-dimensional depth needs no sampled field or compositing layer in Stone.
-    // The direct gradient keeps the rope shaft inside the family's drawing-time budget.
-    const { ctx, style } = hand.scene.env;
-    if (style.direction === 'stone' && hand.scene.raster) {
-      const a = mouth.at(0, -mouth.along / 2);
-      const b = mouth.at(0, mouth.along / 2);
-      const depth = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-      depth.addColorStop(0, 'rgba(0,0,0,0.14)');
-      depth.addColorStop(0.5, 'rgba(0,0,0,0.62)');
-      depth.addColorStop(1, 'rgba(0,0,0,0.97)');
-      ctx.save();
-      ctx.beginPath();
-      polyPath(rim)(ctx);
-      ctx.fillStyle = depth;
-      ctx.fill();
-      ctx.restore();
-    } else hand.tone((x, y) => 0.14 + 0.83 * mouth.progress(x, y) ** 0.8, bounds, polyPath(rim), 'depth');
-    hand.edges(rim, false);
-    const lip = along / 2 - 1.10;
-    hand.line([[at(-0.34, lip + 0.19), at(-0.26, lip + 0.36), at(-0.29, lip + 0.48)], [at(0.31, lip + 0.30), at(0.23, lip + 0.46)]], 'fine');
-    const anchor = [at(-0.20, lip - 0.27), at(0.10, lip - 0.24), at(0.18, lip - 0.08), at(-0.03, lip + 0.01), at(-0.23, lip - 0.10)];
-    hand.surface(polyPath(anchor), 'rock');
-    hand.edges(anchor, true);
-    rope(hand, [at(-0.18, lip - 0.17), at(-0.11, lip - 0.05), at(0.09, lip - 0.07), at(0.10, lip - 0.19), at(-0.11, lip - 0.20), at(-0.07, lip + 0.08), at(0.02, lip + 0.40), at(0.05, lip + 0.70)]);
-  } else {
-    const cut = top + along * 0.38;
-    const u = across / 2 - 0.10;
-    hand.line([[at(-u, cut + 0.05), at(-0.17, cut + 0.02), at(-0.06, cut - 0.08), at(0.04, cut + 0.11), at(0.16, cut - 0.02), at(u, cut - 0.04)]], 'outline');
-    // Only short broken contours mark the ceiling: the floor beneath remains visible.
-    hand.line([[rim[10]!, rim[11]!, rim[0]!], [rim[1]!, rim[2]!, rim[3]!]], 'fine');
-    const coil = along / 2 - 0.40;
-    const run = [at(0.03, cut - 0.12), at(0.01, cut + 0.22), at(-0.06, coil - 0.34)];
-    for (let k = 0; k <= 42; k++) {
-      const t = k / 42;
-      const a = -Math.PI / 2 + t * Math.PI * 4.5;
-      const r = 0.24 - t * 0.17;
-      run.push(at(Math.cos(a) * r, coil + Math.sin(a) * r * 0.65));
-    }
-    rope(hand, run);
-  }
-  shaftSides(hand, frame, end);
+  layRubbleShadow(hand, stones.map(s => s.poly), 0.02);
+  hand.fill(polysPath(stones.map(s => s.poly)), 'rock');
+  hand.solid(polyPath(stones[0]!.poly), stones[0]!.c, stones[0]!.r);
+  hand.line(stones.map(s => s.poly), 'fine', true);
+  // Overhead, so dashed: the opening's lip, and inside it the chimney's walls rising, as contours;
+  // ink, which has no light to show the chimney by, draws one contour more.
+  if (hand.scene.env.style.direction !== 'stone') hand.line(dashes(rings[2]!, 0.07, 0.05), 'fine');
+  hand.line(dashes(rings[1]!, 0.12, 0.06), 'fine');
+  hand.line(dashes(rings[0]!, 0.16, 0.06), 'outline');
 }
 
 function drawEnds(hand: Hand, end: StairEnd): void {
   const { dungeon } = hand.scene.env;
   for (const stair of dungeon.floor.stairs) {
-    if (stair.way === 'pitch' && stairEnd(stackOf(dungeon.model), dungeon.index, stair.to) === end) shaft(hand, stair, end);
+    if (stair.way !== 'pitch' || stairEnd(stackOf(dungeon.model), dungeon.index, stair.to) !== end) continue;
+    const frame = wayFrame(stair, stair.down);
+    const mouth = shaftMouth(frame, mouthSeed(hand, stair));
+    if (end === 'upper') pitch(hand, frame, mouth);
+    else aven(hand, frame, mouth);
   }
+}
+
+/** One seed for both ends of a stairwell, so the aven's opening is the pitch's mouth. */
+function mouthSeed(hand: Hand, stair: DungeonStair): number {
+  return Math.floor(hash2(stair.link, 0, hand.scene.env.dungeon.model.seed) * 0x7fffffff);
 }
 
 export function drawPitches(hand: Hand): void { drawEnds(hand, 'upper'); }

@@ -12,6 +12,8 @@ export interface WayFrame {
   along: number;
   across: number;
   bounds: Bounds;
+  /** The way down, along `v`. */
+  down: CellDir;
   progress: (x: number, y: number) => number;
 }
 
@@ -24,6 +26,7 @@ export function wayFrame(box: { x: number; y: number; w: number; h: number }, do
     along,
     across: down.x ? box.h : box.w,
     bounds: { minX: box.x, minY: box.y, maxX: box.x + box.w, maxY: box.y + box.h },
+    down,
     progress: (x, y) => Math.max(0, Math.min(1, 0.5 + ((x - cx) * down.x + (y - cy) * down.y) / along)),
   };
 }
