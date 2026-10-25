@@ -31,5 +31,9 @@ export const SPECIMEN: GlyphSpecimen = {
     { kind: 'boulder', rotation: 0, at: { x: 0, y: 0 } },
     { kind: 'boulder', rotation: 0, at: { x: 2, y: 0 } },
   ],
-  scenes: [{ name: 'camp', model: camp, floor: 0, window: { x: -1, y: -1, cells: 12, rows: 10 } }],
+  scenes: [
+    { name: 'camp', model: camp, floor: 0, window: { x: -1, y: -1, cells: 12, rows: 10 } },
+    // The same camp where people live: its fire burns.
+    { name: 'camp-lit', model: () => ({ ...camp(), tags: ['inhabited'] }), floor: 0, window: { x: 2, y: 1, cells: 5, rows: 5 } },
+  ],
 };

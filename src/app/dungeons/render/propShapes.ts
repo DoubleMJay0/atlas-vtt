@@ -41,6 +41,8 @@ export interface PropGlyph {
   tall?: { halfW: number; halfH: number; round: boolean; x?: number; y?: number };
   /** How it is drawn on a house's floor, where it stands before a chimney stack; unset, as anywhere else. */
   inHouse?: PropGlyph;
+  /** How it is drawn with its fire burning, in a lived-in dungeon (`firesLit`); unset, as when cold. Only its drawings differ. */
+  lit?: PropGlyph;
 }
 
 /** A family's drawings by kind. */
@@ -53,10 +55,14 @@ export function glyphFit(prop: Pick<DungeonProp, 'kind' | 'size' | 'scale'>): Gl
   return 'reach' in footprint ? { along: footprint.reach * 2, out: footprint.reach * 2 } : { along: footprint.along, out: footprint.out };
 }
 
-/** A kind's drawing, on a house's floor (`DungeonFloor.walls === 'edges'`) or elsewhere; none for a kind not drawn yet. */
-export function propGlyph(kind: PropKind, inHouse = false): PropGlyph | undefined {
+/**
+ * A kind's drawing, on a house's floor (`DungeonFloor.walls === 'edges'`) or elsewhere, its fire
+ * burning where it has one and is `lit`; none for a kind not drawn yet.
+ */
+export function propGlyph(kind: PropKind, inHouse = false, lit = false): PropGlyph | undefined {
   const glyph = PROP_GLYPHS[kind];
-  return (inHouse && glyph?.inHouse) || glyph;
+  const placed = (inHouse && glyph?.inHouse) || glyph;
+  return (lit && placed?.lit) || placed;
 }
 
 /** Every kind with a drawing. */

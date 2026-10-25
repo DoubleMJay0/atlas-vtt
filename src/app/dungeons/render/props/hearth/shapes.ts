@@ -21,6 +21,8 @@ export const STACK_FIREBOX_OUTLINE: readonly Vec[] = [
   { x: -0.42, y: STACK_FACE }, { x: 0.42, y: STACK_FACE },
   { x: 0.27, y: STACK_FACE + 0.3 }, { x: -0.27, y: STACK_FACE + 0.3 },
 ];
+/** Where a lit fire's logs lie in a house's firebox: clear of its splayed cheeks, the fire-back behind them. */
+export const STACK_FUEL: Part = { x: 0, y: STACK_FIREBOX.y + 0.01, w: 0.5, h: 0.22 };
 /** The mantel shelf across the opening's front, standing out from the face over the hearth stone. */
 export const MANTEL: Part = { x: 0, y: STACK_FACE - 0.055, w: 1.36, h: 0.13 };
 /** The hearth stone on the floor before the opening. */
