@@ -1,5 +1,7 @@
 import type { EmbedContext, TFile } from 'obsidian';
-import { AssetService } from '../services/AssetService';
+import { AssetService, type EncounterTokenRef } from '../services/AssetService';
+import { refsRange } from '../encounters/encounterQuantity';
+import { formatRange } from '../creatures/creatureValues';
 import { addArtIcon, AtlasLinkEmbed, type EmbedCardContent } from './AtlasLinkEmbed';
 import { encounterOfFile } from './atlasLinkAssets';
 import { placeEncounterFile } from './openAtlasLink';
@@ -30,6 +32,14 @@ function addTokenRow(artEl: HTMLElement, previews: readonly EncounterTokenPrevie
   if (overflow > 0) row.createDiv({ cls: 'atlas-link-embed__overflow', text: `+${overflow}` });
 }
 
+/** How many tokens the encounter places, a span where some are rolled. */
+function tokenCountText(refs: readonly EncounterTokenRef[]): string {
+  const range = refsRange(refs);
+  return range.min === range.max
+    ? t('atlasLinks.tokenCount', { count: range.max })
+    : t('atlasLinks.tokenRange', { count: range.max, range: formatRange(range) });
+}
+
 /** An embedded encounter (`![[…/encounters/encounter-….json|Goblin ambush]]`). */
 export class EncounterEmbed extends AtlasLinkEmbed {
   constructor(ctx: EmbedContext, file: TFile, subpath: string) {
@@ -49,7 +59,7 @@ export class EncounterEmbed extends AtlasLinkEmbed {
     return {
       title: encounter?.name ?? this.file.basename,
       meta: encounter
-        ? `${t('atlasLinks.tokenCount', { count: tokenCount })} · ${encounter.collection}`
+        ? `${tokenCountText(encounter.tokens)} · ${encounter.collection}`
         : t('atlasLinks.encounterMissing'),
       art: (artEl) => addTokenRow(artEl, tokens?.tokenPreviews ?? [], tokenCount),
       action: {
