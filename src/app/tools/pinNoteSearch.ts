@@ -8,6 +8,7 @@ import type { PinCreateEntry, PinLinkTarget } from './pinCreateEntries';
 import { encounterFoldersOf, type EncounterFolder } from '../encounters/encounterFolders';
 
 const RESULT_LIMIT = 30;
+const BY_NAME = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 export interface PinNoteSearchOptions {
   app: App;
@@ -246,20 +247,28 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
     });
   };
 
-  /** Folders of encounters first, as they are few and only this search offers them, then notes and scenes. */
+  /** Notes, scenes and folders of encounters in one list, by name. */
   const renderFiles = (query: string): void => {
     const needle = query.toLowerCase();
     const name = query.trim();
     if (name !== '' && !files.some((f) => f.basename.toLowerCase() === name.toLowerCase())) renderCreateEntries(name);
-    const folders = encounterFolders.filter((folder) => `${folder.trail} ${folder.name}`.toLowerCase().includes(needle));
-    const matching = files.filter((f) => f.basename.toLowerCase().includes(needle));
-    if (folders.length + matching.length === 0) {
+    const matching: Array<{ name: string; add: () => void }> = [
+      ...encounterFolders
+        .filter((folder) => `${folder.trail} ${folder.name}`.toLowerCase().includes(needle))
+        .map((folder) => ({ name: folder.name, add: () => addEncounterFolderEntry(folder) })),
+      ...files
+        .filter((f) => f.basename.toLowerCase().includes(needle))
+        .map((file) => ({ name: file.basename, add: () => addFileEntry(file) })),
+    ];
+    if (matching.length === 0) {
       if (results.childElementCount > 0) return;
       results.createDiv({ cls: 'pin-empty-state', text: t('pin.search.noNotes') });
       return;
     }
-    folders.forEach(addEncounterFolderEntry);
-    matching.slice(0, RESULT_LIMIT).forEach((file) => addFileEntry(file));
+    matching
+      .sort((a, b) => BY_NAME.compare(a.name, b.name))
+      .slice(0, RESULT_LIMIT)
+      .forEach((result) => result.add());
   };
 
   function render(): void {

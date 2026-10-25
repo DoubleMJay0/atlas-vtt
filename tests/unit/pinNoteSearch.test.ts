@@ -179,16 +179,16 @@ describe('pin note search', () => {
       paths: ['Tavern.md', 'atlas-vtt/collections/Realm/scenes/Keep.atlasmap', 'atlas-vtt/collections/Other/scenes/Crypt.atlasmap'],
     });
     const names = [...container.querySelectorAll('.pin-result-name')].map((element) => element.textContent);
-    expect(names).toEqual(['Tavern', 'Keep']);
+    expect(names).toEqual(['Keep', 'Tavern']);
   });
 
-  it('offers the map\'s folders of encounters first, with how many each holds', () => {
+  it('lists the map\'s folders of encounters among the notes by name, with how many each holds', () => {
     const folder = (path: string, children: Array<TFile | TFolder>): TFolder => Object.assign(new TFolder(path), { children });
     const root = 'atlas-vtt/collections/Realm/encounters';
     const forest = folder(`${root}/Forest`, [new TFile(`${root}/Forest/wolves.json`), new TFile(`${root}/Forest/bandits.json`)]);
-    const { onPick } = setup({ mapPath: 'atlas-vtt/collections/Realm/scenes/Town.atlasmap', paths: ['Forest notes.md'], folders: { [root]: folder(root, [forest]) } });
+    const { onPick } = setup({ mapPath: 'atlas-vtt/collections/Realm/scenes/Town.atlasmap', paths: ['Zoo.md', 'Forest notes.md', 'Bandit camp.md'], folders: { [root]: folder(root, [forest]) } });
     const names = [...container.querySelectorAll('.pin-result-name')].map((element) => element.textContent);
-    expect(names).toEqual(['All encounters', 'Forest', 'Forest notes']);
+    expect(names).toEqual(['All encounters', 'Bandit camp', 'Forest', 'Forest notes', 'Zoo']);
     type('forest');
     expect(activeName()).toBe('Forest');
     expect(container.querySelector('.pin-result-item.is-active .pin-result-badge')?.textContent).toBe('2 encounters');
