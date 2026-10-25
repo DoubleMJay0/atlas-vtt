@@ -50,6 +50,8 @@ export const BOUNDARIES = {
       "src/app/pixi/lighting/lightFlicker.ts",
       "src/app/pixi/lighting/wallEdits.ts",
       "src/app/pixi/token-renderer/tokenSizing.ts",
+      "src/app/pixi/token-renderer/tokenRingMetrics.ts",
+      "src/app/pixi/token-renderer/tokenRingTexture.ts",
       "src/app/resources/resourceDefinitions.ts",
       "src/app/resources/resourceFileFormat.ts",
       "src/app/resources/resourceSlots.ts",
