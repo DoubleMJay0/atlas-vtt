@@ -5,11 +5,13 @@ import { DUNGEON_STYLES, type DungeonStyleId } from '../../../dungeons/styleCata
 import type { DungeonJob, DungeonRendered } from '../../../dungeons/worker/dungeonJob';
 import { ThumbnailCache } from './thumbnailCache';
 
-/** Draws thumbnails off the main thread: the dungeon worker, which drops them on request. */
+/** Draws thumbnails off the main thread: the dungeon worker, which drops a group of them on request. */
 export interface ThumbnailRenderer {
-  thumbnail: (job: DungeonJob) => Promise<DungeonRendered | null>;
-  dropThumbnails: () => void;
+  thumbnail: (job: DungeonJob, group?: string) => Promise<DungeonRendered | null>;
+  dropThumbnails: (group?: string) => void;
 }
+
+const GROUP = 'styles';
 
 /** A card's art, in device pixels, and the device pixels per CSS pixel. */
 export interface ThumbnailSize {
@@ -48,8 +50,8 @@ const NONE: ReadonlyMap<DungeonStyleId, ImageBitmap> = new Map();
  * for; those already drawn are kept for the last pictures, so returning to one draws nothing.
  */
 export function useStyleThumbnails(renderer: ThumbnailRenderer, input: ThumbnailInput): ReadonlyMap<DungeonStyleId, ImageBitmap> {
-  const cache = useRef<ThumbnailCache | null>(null);
-  cache.current ??= new ThumbnailCache();
+  const cache = useRef<ThumbnailCache<DungeonStyleId> | null>(null);
+  cache.current ??= new ThumbnailCache<DungeonStyleId>();
   const [, redraw] = useState(0);
   const { request, model, view, size, first } = input;
   const firstRef = useRef(first);
@@ -67,7 +69,7 @@ export function useStyleThumbnails(renderer: ThumbnailRenderer, input: Thumbnail
     let live = true;
     for (const { id, style } of missing) {
       const job: DungeonJob = { request, model, style, view, output: { kind: 'thumbnail', width: size.width, height: size.height, legibleAt: size.ratio } };
-      renderer.thumbnail(job).then((result) => {
+      renderer.thumbnail(job, GROUP).then((result) => {
         if (!result || result.image.type !== 'bitmap') return;
         if (cache.current!.put(picture, id, result.image.bitmap) && live) redraw(n => n + 1);
       }, (error: unknown) => {
@@ -76,7 +78,7 @@ export function useStyleThumbnails(renderer: ThumbnailRenderer, input: Thumbnail
     }
     return () => {
       live = false;
-      renderer.dropThumbnails();
+      renderer.dropThumbnails(GROUP);
     };
   }, [renderer, picture, request, model, view, size]);
 

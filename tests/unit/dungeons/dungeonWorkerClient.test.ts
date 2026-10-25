@@ -145,6 +145,24 @@ describe('the dungeon worker client', () => {
     expect(close).toHaveBeenCalled();
   });
 
+  it('drops only the thumbnails of the group asked, the running one included', async () => {
+    const workers: FakeWorker[] = [];
+    const client = clientWith(workers);
+    const thumbnail = (seed: number): DungeonJob => ({ ...job(seed), output: { kind: 'thumbnail', width: 272, height: 204, legibleAt: 2 } });
+
+    const running = client.thumbnail(thumbnail(1), 'themes');
+    const style = client.thumbnail(thumbnail(2), 'styles');
+    const theme = client.thumbnail(thumbnail(3), 'themes');
+    client.dropThumbnails('themes');
+    await expect(theme).resolves.toBeNull();
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result: rendered() });
+    await expect(running).resolves.toBeNull();
+    await flush();
+    expect(workers[0]!.sent.map(m => m.job.request.seed)).toEqual([1, 2]);
+    workers[0]!.answer({ id: workers[0]!.lastJob(), ok: true, result: rendered() });
+    await expect(style).resolves.not.toBeNull();
+  });
+
   it('fails the job of a worker that crashed and starts a new one for the next', async () => {
     const workers: FakeWorker[] = [];
     const client = clientWith(workers);

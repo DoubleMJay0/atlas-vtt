@@ -1,34 +1,57 @@
-import React, { useRef } from 'react';
-import { Castle, Ghost, Mountain, Sparkles, type LucideIcon } from 'lucide-react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { THEME_IDS, type ThemeChoice, type ThemeId } from '../../../dungeons/themes/themeTypes';
 import { type MessageKey, t } from '../../../i18n';
 import { cn } from '../../../../utils/cn';
+import { Skeleton } from '../primitives/Skeleton';
 
-const ICONS: Readonly<Record<ThemeChoice, LucideIcon>> = { any: Sparkles, fortress: Castle, mansion: Ghost, cavern: Mountain };
 const CHOICES: readonly ThemeChoice[] = ['any', ...THEME_IDS];
 const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 export const themeName = (theme: ThemeId): string => t(`dungeon.theme.${theme}` as MessageKey);
 
-/** What a theme is, in a few words; for Surprise me, the theme it gave the dungeon shown once it did. */
-function themeHint(choice: ThemeChoice, picked: ThemeId | undefined): string {
-  if (choice === 'any' && picked) return t('dungeon.theme.anyPicked', { theme: themeName(picked) });
-  return t(`dungeon.theme.${choice}.hint` as MessageKey);
-}
-
 interface ThemeStepProps {
   value: ThemeChoice;
   /** The theme Surprise me gave the dungeon shown, named on its card while it is chosen. */
   picked: ThemeId | undefined;
+  /** Each theme's picture of the dungeon asked for, once drawn. */
+  previews: ReadonlyMap<ThemeId, ImageBitmap>;
+  /** The first card's art, measured for the size the pictures are drawn at. */
+  onArt: (art: HTMLSpanElement | null) => void;
   onChange: (theme: ThemeChoice) => void;
 }
 
+/** A picture of a theme, held until the next arrives; a breathing skeleton before the first. */
+function ThemePicture({ bitmap, className }: { bitmap: ImageBitmap | undefined; className?: string }): React.JSX.Element {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const drawn = useRef<ImageBitmap | null>(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    const target = canvas.current;
+    if (!target || !bitmap || drawn.current === bitmap) return;
+    target.width = bitmap.width;
+    target.height = bitmap.height;
+    target.getContext('2d')?.drawImage(bitmap, 0, 0);
+    drawn.current = bitmap;
+    setShown(true);
+  }, [bitmap]);
+
+  return (
+    <span className={cn('atlas-dungeon-theme__picture', className)}>
+      <canvas ref={canvas} hidden={!shown} aria-hidden="true" />
+      {!shown && <Skeleton live className="atlas-dungeon-theme__skeleton" />}
+    </span>
+  );
+}
+
 /**
- * The themes as cards, Surprise me first, one radio group: Tab reaches the chosen card and the
- * arrows choose another at once, so the preview beside the wizard shows each theme in turn.
+ * The themes as cards, each a picture of the dungeon asked for drawn in that theme (Surprise me
+ * shows the three side by side), in one radio group: Tab reaches the chosen card and the arrows
+ * choose another at once, so the preview beside the wizard shows each theme in turn.
  */
-export function ThemeStep({ value, picked, onChange }: ThemeStepProps): React.JSX.Element {
+export function ThemeStep({ value, picked, previews, onArt, onChange }: ThemeStepProps): React.JSX.Element {
   const buttons = useRef(new Map<ThemeChoice, HTMLButtonElement>());
+  const pickedId = useId();
 
   const onKeyDown = (index: number) => (event: React.KeyboardEvent): void => {
     const step = STEPS[event.key];
@@ -42,8 +65,8 @@ export function ThemeStep({ value, picked, onChange }: ThemeStepProps): React.JS
   return (
     <div className="atlas-dungeon-themes" role="radiogroup" aria-label={t('dungeon.theme.label')}>
       {CHOICES.map((choice, index) => {
-        const Icon = ICONS[choice];
         const chosen = choice === value;
+        const showsPicked = choice === 'any' && chosen && picked !== undefined;
         return (
           <button
             key={choice}
@@ -55,13 +78,22 @@ export function ThemeStep({ value, picked, onChange }: ThemeStepProps): React.JS
             role="radio"
             aria-checked={chosen}
             tabIndex={chosen ? 0 : -1}
+            aria-describedby={showsPicked ? pickedId : undefined}
             className={cn('atlas-dungeon-theme', chosen && 'atlas-active')}
             onClick={() => onChange(choice)}
             onKeyDown={onKeyDown(index)}
           >
-            <span className="atlas-dungeon-theme__icon" aria-hidden="true"><Icon /></span>
+            <span ref={index === 1 ? onArt : undefined} className="atlas-dungeon-theme__art">
+              {choice === 'any'
+                ? THEME_IDS.map((theme) => <ThemePicture key={theme} bitmap={previews.get(theme)} className="atlas-dungeon-theme__slice" />)
+                : <ThemePicture bitmap={previews.get(choice)} />}
+              {showsPicked && (
+                <span className="atlas-dungeon-theme__picked" aria-hidden="true">{themeName(picked)}</span>
+              )}
+            </span>
             <span className="atlas-dungeon-theme__name">{choice === 'any' ? t('dungeon.theme.any') : themeName(choice)}</span>
-            <span className="atlas-dungeon-theme__hint">{themeHint(choice, chosen ? picked : undefined)}</span>
+            {/* What Surprise me picked, read as the card's description rather than its name */}
+            {showsPicked && <span id={pickedId} hidden>{t('dungeon.theme.anyPicked', { theme: themeName(picked) })}</span>}
           </button>
         );
       })}
