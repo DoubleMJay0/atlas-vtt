@@ -60,9 +60,19 @@
     display: none;
   }
 
+  // A dungeon growing out of nothing: its shadow rises with it, never around an empty shape.
+  &[data-revealing='first'] {
+    animation: atlas-dungeon-shadow-rise 1100ms $transition-ease-out 150ms both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
+}
+
+@keyframes atlas-dungeon-shadow-rise {
+  from { box-shadow: 0 0 0 transparent; }
+  to { box-shadow: $shadow-elevated; }
 }
 
 // The picture shown and, over it, the last one fading out (`PreviewCanvas`).
