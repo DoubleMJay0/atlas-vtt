@@ -7,6 +7,7 @@ import type { DungeonModel, DungeonRequest } from '../../src/app/dungeons/model'
 import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { pointSegmentDistance } from '../../src/app/dungeons/render/geometry';
+import { isDarkColour } from '../../src/app/dungeons/render/stone/colours';
 import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { wallLightsOf, type WallLight } from '../../src/app/dungeons/render/wallLights/wallLightSites';
 import { dungeonScene, type DungeonSceneParts } from '../../src/app/dungeons/scene/toScene';
@@ -145,6 +146,56 @@ describe("a lived-in dungeon's wall lights at night", () => {
         await savePng(drawn.canvas, `${OUT}/${kind}-${look}`);
       }
     }
+  });
+
+  it("burn the fires of the fire lights' round as teardrop flames (fireplace, hearth, fire pit; parchment over print)", { timeout: 300_000 }, async () => {
+    const TILE = 450;
+    const fires = [
+      [{ seed: 7, theme: 'mansion', tags: ['inhabited'], floors: 1 }, 'hearth'],
+      [{ seed: 11, theme: 'fortress', tags: ['inhabited'], floors: 1 }, 'hearth'],
+      [{ seed: 808, theme: 'cavern', tags: ['inhabited', 'wet'], floors: 1 }, 'campfire'],
+    ] as const;
+    const sheet = new OffscreenCanvas(fires.length * TILE, 2 * TILE);
+    const ctx = sheet.getContext('2d')!;
+    for (const [i, [request, kind]] of fires.entries()) {
+      const model = generateDungeon(request);
+      const prop = model.floors[0]!.props.find(p => p.kind === kind)!;
+      for (const [row, look] of (['parchment', 'print'] as const).entries()) {
+        const drawn = drawWindow(model, dungeonStyle(look), DEFAULT_VIEW, 300, { x: Math.floor(prop.x) - 1, y: Math.floor(prop.y) - 1, cells: 3, rows: 3 });
+        expect(drawn.texts).toEqual([]);
+        ctx.drawImage(drawn.canvas, i * TILE, row * TILE, TILE, TILE);
+      }
+    }
+    await savePng(sheet, `${OUT}/fires-after`);
+  });
+
+  it('warm the floor round a light and never darken it, in every look with a light floor', { timeout: 300_000 }, async () => {
+    const PX = 150;
+    const luminance = (d: Uint8ClampedArray, o: number): number => 0.2126 * d[o]! + 0.7152 * d[o + 1]! + 0.0722 * d[o + 2]!;
+    let sampled = 0;
+    for (const request of [LIVED_IN.mansion, LIVED_IN.fortress, LIVED_IN.cave, BRAZIER_CAVE]) {
+      const model = generateDungeon(request);
+      const lights = wallLightsOf(visibleDungeon(model, DEFAULT_VIEW, 0)).slice(0, 4);
+      for (const { id, style } of DUNGEON_STYLES) {
+        if (style.direction !== 'stone' || isDarkColour(style.colors.floor)) continue;
+        for (const light of lights) {
+          const window = { x: Math.floor(light.flame.x) - 1, y: Math.floor(light.flame.y) - 1, cells: 3, rows: 3 };
+          const lit = drawWindow(model, dungeonStyle(id), DEFAULT_VIEW, PX, window).canvas.getContext('2d')!.getImageData(0, 0, 3 * PX, 3 * PX).data;
+          const bare = drawWindow(model, dungeonStyle(id), { ...DEFAULT_VIEW, props: false }, PX, window).canvas.getContext('2d')!.getImageData(0, 0, 3 * PX, 3 * PX).data;
+          const into = { x: Math.sin(light.rotation), y: -Math.cos(light.rotation) };
+          const along = { x: -into.y, y: into.x };
+          // Floor near the flame off the drawing: beside it, and before it a little aside.
+          const offsets = light.kind === 'brazier' ? [[0.3, 0.3], [-0.3, 0.3], [0.3, -0.3], [-0.3, -0.3]] : [[0, 0.33], [0, -0.33], [0.36, 0.22], [0.36, -0.22]];
+          for (const [ahead, side] of offsets) {
+            const p = { x: light.flame.x + into.x * ahead! + along.x * side!, y: light.flame.y + into.y * ahead! + along.y * side! };
+            const o = (Math.floor((p.y - window.y) * PX) * 3 * PX + Math.floor((p.x - window.x) * PX)) * 4;
+            sampled++;
+            expect(luminance(lit, o), `${id} ${light.kind} at ${ahead}, ${side}`).toBeGreaterThanOrEqual(luminance(bare, o) - 0.5);
+          }
+        }
+      }
+    }
+    expect(sampled).toBeGreaterThan(100);
   });
 
   it('draw each kind in every look, in colour and in monochrome (a sheet per kind)', { timeout: 300_000 }, async () => {

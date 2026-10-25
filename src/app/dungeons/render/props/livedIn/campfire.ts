@@ -6,7 +6,8 @@ import { circlePath, type GlyphPen } from '../../glyphPen';
 import { mixColours } from '../../palette';
 import { stoneOutline } from '../../terrain/stones';
 import { rngFrom } from '../../../rng';
-import { fireGlow, flames, type Tongue } from '../fire/burning';
+import { fireGlow } from '../fire/burning';
+import { openFire } from '../fire/flame';
 import { colours, darkFloorLine, fine, isPainted, lips, onDarkFloor, ring, stick, surface } from './parts';
 
 /**
@@ -89,12 +90,6 @@ const ashCracks: PathFn = path => {
 
 export const campfireSilhouette: PathFn = polysPath(RING_STONES);
 
-/** A lit fire's flames: five tongues leaning out from the middle over the sticks' burning ends, as a fire in the open burns seen from above. */
-const TONGUES: readonly Tongue[] = Array.from({ length: 5 }, (_, k) => {
-  const a = (k / 5) * Math.PI * 2 + 0.45;
-  const lean = { x: Math.cos(a), y: Math.sin(a) };
-  return { at: { x: FIRE_AREA.x + lean.x * 0.03, y: FIRE_AREA.y + lean.y * 0.03 }, r: FIRE_AREA.r * 0.42, length: FIRE_AREA.r * (0.95 + (k % 2) * 0.2), lean };
-});
 const FIRE_MIDDLE = { x: FIRE_AREA.x, y: FIRE_AREA.y };
 
 export function campfire(pen: GlyphPen, lit = false): void {
@@ -123,7 +118,7 @@ export function campfire(pen: GlyphPen, lit = false): void {
   if (lit) {
     // The bed glows from the flames out to the sticks' burning ends, and the flames stand over them.
     fireGlow(pen, ashPath, FIRE_MIDDLE, 0.24, 0.24);
-    flames(pen, TONGUES);
+    openFire(pen, FIRE_MIDDLE, 0.2);
   }
   // The ring of stones over the ash's edge, each lit on the side towards the light; on a dark floor outlined in the look's light line.
   surface(pen, campfireSilhouette, 'rock', false, true, undefined, painted && onDarkFloor(pen) ? darkFloorLine(pen) : undefined);

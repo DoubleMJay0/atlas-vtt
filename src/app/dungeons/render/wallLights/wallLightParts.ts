@@ -2,13 +2,14 @@ import type { PathFn } from '../art/paths';
 import type { Vec } from '../geometry';
 import type { GlyphPen } from '../glyphPen';
 import { mixColours } from '../palette';
-import { fireColours, fireGlow, flames, tongue, type Tongue } from '../props/fire/burning';
+import { fireColours, fireGlow } from '../props/fire/burning';
+import { flames } from '../props/fire/flame';
 import { colours, isPainted, onDarkFloor, stick, surface } from '../props/livedIn/parts';
 import { OFF_WALL } from '../propsAsDrawn';
 
 /**
  * What the wall lights share: the floor's glow before a flame, a torch's shaft and its pitch-soaked
- * head, the flame itself (the fires' own tongues, `burning.ts`), and a sconce's brass.
+ * head, the flame itself (the fires' own teardrops, `flame.ts`), and a sconce's brass.
  */
 
 /** The floor before a wall light, on the room's side of its wall: where its glow may fall. */
@@ -50,41 +51,14 @@ export function torchHead(pen: GlyphPen, at: Vec, r: number, along: Vec): void {
   ctx.strokeStyle = ink;
 }
 
-/**
- * A torch's flame seen from above: a ragged rosette of `count` tongues round `at`, `r` across each
- * at its base, longest (`length`) on the side the draught leans it (`lean`) and short on the other,
- * their hearts making its pale middle.
- */
-export function torchFlame(pen: GlyphPen, at: Vec, r: number, length: number, lean: Vec, count = 6): void {
-  const base = Math.atan2(lean.y, lean.x);
-  const tongues: Tongue[] = Array.from({ length: count }, (_, k) => {
-    const a = base + ((k + 0.5) / count - 0.5) * Math.PI * 1.7 + (k % 2 ? 0.12 : -0.08);
-    const toward = 0.5 + 0.5 * Math.cos(a - base);
-    const l = { x: Math.cos(a), y: Math.sin(a) };
-    return { at: { x: at.x + l.x * r * 0.35, y: at.y + l.y * r * 0.35 }, r: r * (0.62 + 0.38 * toward), length: length * (0.38 + 0.62 * toward) * (k % 3 === 1 ? 0.82 : 1), lean: l };
-  });
-  flames(pen, tongues);
+/** A torch's flame: a teardrop standing on its head `r` across at its base, `length` long, pointing out from the wall (`lean`), crooked a little. */
+export function torchFlame(pen: GlyphPen, at: Vec, r: number, length: number, lean: Vec): void {
+  flames(pen, [{ at, r, length, lean, bend: -0.35 }]);
 }
 
-/** A candle's flame seen from above: a single small tongue and its bright heart. */
-export function candleFlame(pen: GlyphPen, at: Vec, r: number, lean: Vec): void {
-  const { ctx } = pen;
-  const { flame, core } = fireColours(pen);
-  const ink = ctx.strokeStyle;
-  ctx.beginPath();
-  tongue(ctx, at, r, lean, r * 3);
-  ctx.fillStyle = flame;
-  ctx.fill();
-  if (!isPainted(pen)) {
-    ctx.lineWidth = pen.fine;
-    ctx.stroke();
-  } else {
-    ctx.beginPath();
-    tongue(ctx, at, r * 0.5, lean, r * 1.6);
-    ctx.fillStyle = core;
-    ctx.fill();
-  }
-  ctx.strokeStyle = ink;
+/** A candle's flame: one small teardrop on its wick, pointing out from the wall, `bend` crooked. */
+export function candleFlame(pen: GlyphPen, at: Vec, r: number, lean: Vec, bend: number): void {
+  flames(pen, [{ at, r, length: r * 3.2, lean, bend }]);
 }
 
 /** A sconce's brass: the iron's own paint warmed to yellow metal where the look has colour; iron where it has none or is dark. */

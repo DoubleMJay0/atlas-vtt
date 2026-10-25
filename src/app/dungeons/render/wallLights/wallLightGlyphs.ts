@@ -3,6 +3,7 @@ import type { Vec } from '../geometry';
 import { circlePath, inkDot, type GlyphPen } from '../glyphPen';
 import type { PropGlyph } from '../propShapes';
 import { charredFuel, fireGlow } from '../props/fire/burning';
+import { openFire } from '../props/fire/flame';
 import { colours, fine, isPainted, lips, ring, stick, surface } from '../props/livedIn/parts';
 import { rngFrom } from '../../rng';
 import { stoneOutline } from '../terrain/stones';
@@ -22,7 +23,7 @@ const OUT: Vec = { x: 0, y: -1 };
 function bracket(pen: GlyphPen): void {
   const { ctx } = pen;
   const flame = FLAME.bracket;
-  floorGlow(pen, flame, 0.62, 0.5);
+  floorGlow(pen, flame, 0.48, 1.25);
   const plate = [{ x: -0.1, y: 0.048 }, { x: 0.1, y: 0.048 }, { x: 0.1, y: 0.1 }, { x: -0.1, y: 0.1 }];
   const scrolls = [-0.11, 0.11].map(x => ring(x, 0.074, 10, () => 0.024));
   const arm = stick({ x: 0, y: 0.06 }, { x: 0, y: -0.075 }, 0.034, 0.026);
@@ -45,7 +46,7 @@ function bracket(pen: GlyphPen): void {
   ctx.strokeStyle = ink;
   ctx.lineWidth = width;
   torchHead(pen, { x: flame.x, y: flame.y + 0.012 }, 0.055, OUT);
-  torchFlame(pen, flame, 0.04, 0.12, OUT);
+  torchFlame(pen, flame, 0.05, 0.14, OUT);
 }
 
 /** A sconce's back plate: half an oval on the wall, scalloped where it meets the room. */
@@ -60,7 +61,7 @@ function sconce(pen: GlyphPen): void {
   const { ctx } = pen;
   const metal = brass(pen);
   const flame = FLAME.sconce;
-  floorGlow(pen, flame, 0.5, 0.38);
+  floorGlow(pen, flame, 0.4, 1.15);
   const pans = [{ x: -0.12, y: flame.y }, { x: 0.12, y: flame.y }];
   // The arms first, the plate and pans over their ends.
   const ink = ctx.strokeStyle;
@@ -87,7 +88,7 @@ function sconce(pen: GlyphPen): void {
   const wax = isPainted(pen) && !pen.hand.scene.env.view.monochrome ? '#eee4c8' : colours(pen, 'floor').fill;
   surface(pen, path => { for (const p of pans) circlePath(path, 0.035, p.x, p.y); }, 'cloth', false, true, wax, colours(pen, 'cloth').ink);
   for (const p of pans) inkDot(pen, p.x, p.y, 0.008);
-  for (const p of pans) candleFlame(pen, { x: p.x, y: p.y - 0.008 }, 0.021, OUT);
+  pans.forEach((p, k) => candleFlame(pen, { x: p.x, y: p.y - 0.006 }, 0.019, OUT, k ? 0.4 : -0.3));
 }
 
 const caveRandom = rngFrom(0x70c4);
@@ -97,7 +98,7 @@ const WEDGES: readonly Vec[][] = [{ x: -0.065, y: 0.068 }, { x: 0.065, y: 0.072 
 /** A torch wedged into a crack in a cave's rock with a few shards, leaning out and a little aside, burning. */
 function caveTorch(pen: GlyphPen): void {
   const flame = FLAME['cave-torch'];
-  floorGlow(pen, flame, 0.62, 0.45);
+  floorGlow(pen, flame, 0.48, 1.25);
   const base = { x: -0.01, y: 0.075 };
   const along = { x: flame.x - base.x, y: flame.y - base.y };
   const len = Math.hypot(along.x, along.y);
@@ -113,7 +114,7 @@ function caveTorch(pen: GlyphPen): void {
   surface(pen, polysPath(WEDGES), 'rock', !isPainted(pen));
   lips(pen, WEDGES);
   torchHead(pen, { x: flame.x - out.x * 0.012, y: flame.y - out.y * 0.012 }, 0.055, out);
-  torchFlame(pen, flame, 0.04, 0.12, out);
+  torchFlame(pen, flame, 0.05, 0.14, out);
 }
 
 const BOWL = ring(0, 0, 28, () => BRAZIER_RADIUS);
@@ -131,7 +132,7 @@ const SPARKS: readonly (readonly [number, number, number])[] = [[0.15, -0.05, 0.
 
 /** A brazier on a cave's floor: an iron bowl on three feet, heaped with coals glowing in its middle, flames standing over them. */
 function brazierGlyph(pen: GlyphPen): void {
-  floorGlow(pen, { x: 0, y: 0 }, 0.75, 0.4, path => path.rect(-0.9, -0.9, 1.8, 1.8));
+  floorGlow(pen, { x: 0, y: 0 }, 0.6, 1.25, path => path.rect(-0.9, -0.9, 1.8, 1.8));
   surface(pen, polysPath(FEET), 'metal', false);
   surface(pen, polyPath(BOWL), 'metal', !isPainted(pen));
   lips(pen, [BOWL]);
@@ -139,7 +140,7 @@ function brazierGlyph(pen: GlyphPen): void {
   surface(pen, polyPath(BOWL_INSIDE), 'metal', false, true, isPainted(pen) ? colours(pen, 'metal').ink : colours(pen, 'floor').fill);
   fireGlow(pen, polyPath(BOWL_INSIDE), { x: 0, y: 0 }, BRAZIER_RADIUS * 0.8, BRAZIER_RADIUS * 0.8, 0.9);
   charredFuel(pen, polysPath(COALS), COAL_CRACKS, SPARKS);
-  torchFlame(pen, { x: 0, y: 0 }, 0.05, 0.11, OUT, 7);
+  openFire(pen, { x: 0, y: 0 }, 0.2);
 }
 
 const flat = { material: 'metal', radius: 0.15, lift: 0 } as const;
