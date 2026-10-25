@@ -298,7 +298,8 @@ export class BelowLevel {
     const shapes = exploredShapes(looking, withZones(state.lighting, model.ambient.zones ?? []), model.reaches);
     const within = shapes && this.clipOf(stack, bounds);
     if (shapes && within) {
-      this.memory.record({ ...shapes, within });
+      // Assigned, not spread: a spread would work the polygons out now (`exploredShapes`).
+      this.memory.record(Object.assign(shapes, { within }));
       this.revision++;
     }
   }
