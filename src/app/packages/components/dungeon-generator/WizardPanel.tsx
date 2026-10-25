@@ -1,14 +1,14 @@
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'framer-motion';
 import { ArrowRight, Loader2, Map as MapIcon } from 'lucide-react';
 import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
 import type { ThemeId } from '../../../dungeons/themes/themeTypes';
-import { observeResize } from '../../../utils/observeResize';
 import { EASE_OUT_CONTROL_POINTS as EASE_OUT } from '../../../utils/motion';
 import { t } from '../../../i18n';
 import { cn } from '../../../../utils/cn';
 import { Button } from '../primitives/button';
 import { CloseButton } from '../primitives/CloseButton';
+import { OverlayScroll } from '../primitives/OverlayScroll';
 import { LabelTooltip } from '../primitives/tooltip';
 import type { DungeonState } from './useDungeonState';
 import type { GeneratorActions } from './useGeneratorActions';
@@ -47,20 +47,6 @@ const fadingStepVariants: Variants = {
   exit: { opacity: 0, transition: { duration: STEP_S * 0.7 } },
 };
 
-/** The height of the step shown, which the body grows or shrinks to while the steps cross. */
-function useStepHeight(): [(node: HTMLElement | null) => void, number | null] {
-  const [node, setNode] = useState<HTMLElement | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    if (!node) return undefined;
-    const measure = (): void => setHeight(node.offsetHeight);
-    measure();
-    return observeResize([node], measure);
-  }, [node]);
-  // The step leaving lets go of its node after the next one took it: only a new node counts.
-  return [(next) => { if (next) setNode(next); }, height];
-}
-
 /**
  * The wizard's panel: where it is (the steps as marks, each a way back to it), the step's
  * question and its controls, Back and Next, and Create scene at the end.
@@ -70,8 +56,10 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
   const shown = WIZARD_STEPS[step]!;
   const last = step === WIZARD_STEPS.length - 1;
   const named = state.name.trim() !== '';
-  const [stepRef, stepHeight] = useStepHeight();
   const create = (): void => { void actions.create(); };
+  // Each step starts at its top, wherever the last one was scrolled to.
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = 0; }, [shown]);
 
   return (
     <>
@@ -96,11 +84,10 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
         </span>
         <CloseButton onClick={onClose} />
       </div>
-      <div className="atlas-dungeon-wizard__body" style={stepHeight === null ? undefined : { height: stepHeight }}>
+      <OverlayScroll ref={scroller} frameClassName="atlas-dungeon-wizard__body" className="atlas-dungeon-wizard__scroll">
         <AnimatePresence initial={false} mode="popLayout" custom={direction}>
           <motion.div
             key={shown}
-            ref={stepRef}
             className="atlas-dungeon-wizard__step"
             custom={direction}
             variants={reduced ? fadingStepVariants : stepVariants}
@@ -112,7 +99,7 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
             <WizardStepContent step={shown} state={state} thumbnails={thumbnails} onArt={onArt} themePreviews={themePreviews} onThemeArt={onThemeArt} onSubmit={create} />
           </motion.div>
         </AnimatePresence>
-      </div>
+      </OverlayScroll>
       <div className="atlas-dungeon-wizard__footer">
         {actions.problem && !actions.creating && <p className="atlas-dungeon-wizard__problem" role="alert">{actions.problem}</p>}
         <div className="atlas-dungeon-wizard__nav">

@@ -22,14 +22,18 @@
   background: rgb(0 0 0 / 0.14);
 }
 
-// Placed by `wizardLayout` (left and top inline), never taller than the view.
+// Placed by `wizardLayout` (left and top inline).
+$wizard-height: 600px;
+
 .atlas-dungeon-wizard {
   @include atlas-elevated-surface;
   @include atlas-panel-radius($radius-2xl);
   position: absolute;
   display: flex;
   flex-direction: column;
-  max-height: calc(100% - 32px); // WIZARD_MARGIN on either side
+  // One height for every step, so the panel never changes size on the way; never taller than the
+  // view (WIZARD_MARGIN on either side). A step taller than the body scrolls inside it.
+  height: min(#{$wizard-height}, calc(100% - 32px));
   overflow: hidden;
   color: var(--text-normal);
   font-size: $font-ui-small;
@@ -108,20 +112,21 @@
   white-space: nowrap;
 }
 
-// Grows and shrinks to the step shown while the steps slide across; scrolls where the view is short.
+// Fills what header and footer leave; a step taller than it scrolls, under a scrollbar that takes
+// no room (`OverlayScroll`, over the inline-end padding) and shows only while it scrolls.
 .atlas-dungeon-wizard__body {
+  flex: 1;
+}
+
+.atlas-dungeon-wizard__scroll {
+  // The steps slide across inside it; the one leaving is laid over the one coming.
   position: relative;
-  flex: 0 1 auto;
-  min-height: 0;
   padding-inline: $spacing-l;
   overflow-x: hidden;
-  overflow-y: auto;
-  @include atlas-scrollbar;
-  transition: height 260ms $transition-ease-out;
+}
 
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
+.atlas-dungeon-wizard__body:hover:not(:has(> [data-scrolling])) > .atlas-overlay-scroll__track:not([data-dragging]) > .atlas-overlay-scroll__thumb:not(:hover) {
+  opacity: 0;
 }
 
 .atlas-dungeon-wizard__step {
