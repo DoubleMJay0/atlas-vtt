@@ -14,7 +14,7 @@ describe('water belongs to the generated map artwork', () => {
   cases.push({ id: 'parchment', mono: false, channel: true }, { id: 'print', mono: false, channel: true });
   for (const { id, mono, channel } of cases) {
     const name = `${id}${mono ? '-mono' : ''}${channel ? '-channel' : ''}`;
-    it(`renders still art and calm moving water in ${name}`, async () => {
+    it(`renders still art and calm, visibly moving water in ${name}`, async () => {
       const scene = await waterScene(id, mono, channel);
       try {
         scene.layer.container.visible = false;
@@ -38,6 +38,10 @@ describe('water belongs to the generated map artwork', () => {
           previous = pixels;
         }
         expect(meanChange(first, previous)).toBeGreaterThan(0.001);
+        // Visibly alive at play zoom a second on: the water moved too faintly to see before 2026-10-25.
+        scene.step(1);
+        const alive = meanChange(first, waterPicture(renderer, scene));
+        expect(alive).toBeGreaterThan(0.1);
         expect(maxStep, 'no abrupt flashes between 30 fps frames').toBeLessThan(1.2);
         scene.layer.setMode('poster');
         const poster = waterPicture(renderer, scene);

@@ -24,9 +24,11 @@ interface Drift { across: number; along: number }
  */
 const DRIFTS: Readonly<Record<LiquidKind, { flowing: readonly Drift[]; still: readonly Drift[] }>> = {
   water: {
-    // Broad wash, broken reflections, fine brushwork, unused: slow currents, never a racing caustic net.
-    flowing: [{ across: 0.008, along: 0.055 }, { across: 0, along: 0.09 }, { across: -0.01, along: 0.065 }, { across: 0, along: 0 }],
-    still: [{ across: 0.028, along: 0.014 }, { across: -0.04, along: 0.02 }, { across: 0.022, along: -0.028 }, { across: 0, along: 0 }],
+    // The body drifting downstream, the ripples at Saver (above it the shader carries them at the
+    // current's own speed), glints riding the current, unused.
+    flowing: [{ across: 0, along: 0.24 }, { across: 0, along: 0.28 }, { across: 0, along: 0.26 }, { across: 0, along: 0 }],
+    // A breath of air over still water: its body and glints sway; the flow noise does the rest.
+    still: [{ across: 0.012, along: 0.007 }, { across: 0, along: 0 }, { across: 0.012, along: 0.007 }, { across: 0, along: 0 }],
   },
   lava: {
     // Churn, plates, heat, fine crust grain: everything molten creeps.

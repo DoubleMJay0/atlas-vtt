@@ -14,9 +14,15 @@ describe('water motion remains subordinate to the map illustration', () => {
       scene.layer.container.visible = true;
       scene.step(8);
       const animated = waterPicture(renderer, scene);
+      // Light may break the hatch here and there, as the engraver's own glints do, never wash over it.
+      let ink = 0;
       let liftedInk = 0;
-      for (let i = 0; i < art.length; i += 4) if (art[i]! < 120 && animated[i]! - art[i]! > 20) liftedInk++;
-      expect(liftedInk, 'thin ink must stay ink, without white caustics laid over it').toBeLessThan(150);
+      for (let i = 0; i < art.length; i += 4) {
+        if (art[i]! >= 120) continue;
+        ink++;
+        if (animated[i]! - art[i]! > 20) liftedInk++;
+      }
+      expect(liftedInk / ink, 'thin ink must stay ink, without white caustics laid over it').toBeLessThan(0.05);
     } finally { scene.destroy(); }
   });
   it('changes spatial detail with quality even while the water is held still', async () => {
@@ -56,10 +62,12 @@ describe('water over long sessions', () => {
             renderer.render({ container: world, target, clear: true });
             return renderer.extract.pixels({ target }).pixels;
           };
+          // The water's ordinary steps, away from every wrap (they vary with the drips and glints alive): a wrap may move it no more.
+          const step = Math.max(...[1000.37, 2000.71, 3100.13].map(t => meanChange(picture(t - 1 / 60), picture(t + 1 / 60))));
           for (const time of [1600, 64 / 0.028, 64 / 0.055, 4096, 1e7]) {
             const before = picture(time - 1 / 60);
             const after = picture(time + 1 / 60);
-            expect(meanChange(before, after), `${art ?? 'painted'}, flow ${flowing}, time ${time}`).toBeLessThan(0.8);
+            expect(meanChange(before, after), `${art ?? 'painted'}, flow ${flowing}, time ${time}`).toBeLessThan(step * 1.5 + 0.1);
             // Water is pigment, never additive emission, even on a transparent target.
             for (let i = 0; i < after.length; i += 4) for (let c = 0; c < 3; c++) expect(after[i + c]!).toBeLessThanOrEqual(after[i + 3]! + 1);
           }

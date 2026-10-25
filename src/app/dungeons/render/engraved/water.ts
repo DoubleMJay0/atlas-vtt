@@ -5,7 +5,7 @@ import { GLOW, moltenAt, type Molten } from '../art/lavaField';
 import { valueNoise } from '../art/noise';
 import { clipFloors } from '../art/outline';
 import type { Field, PathFn } from '../art/paths';
-import { depthField, poolOutlines, poolsPath } from '../art/pools';
+import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolsPath } from '../art/pools';
 import { insetRuns } from '../shore';
 import { hatchFill } from './hatch';
 import type { Pens } from './pens';
@@ -19,11 +19,15 @@ export function drawPools(scene: ArtScene, pens: Pens): void {
   const outlines = poolOutlines(scene);
   if (!outlines.length) return;
   const trace = poolsPath(outlines);
-  const depth = depthField(scene, trace, outlines.flat());
-  paintWater(scene, pens, trace, outlines, depth, false);
+  const { ctx } = scene.env;
+  ctx.save();
+  clipOutBuiltWater(scene, ctx);
+  paintWater(scene, pens, trace, outlines, depthField(scene, trace, outlines.flat()), false, deepnessField(scene));
+  ctx.restore();
 }
 
-export function paintWater(scene: ArtScene, pens: Pens, trace: PathFn, outlines: readonly Vec[][], depth: Field, deep: boolean): void {
+/** `deepness` (0..1) marks the deep part of a body that is shallow elsewhere: its lines thicken there as deep water's do, without a contour between. */
+export function paintWater(scene: ArtScene, pens: Pens, trace: PathFn, outlines: readonly Vec[][], depth: Field, deep: boolean, deepness: Field | null = null): void {
   const { ctx, dungeon } = scene.env;
   const seed = dungeon.model.seed;
   const spacing = pens.spacing * 0.85;
@@ -48,7 +52,9 @@ export function paintWater(scene: ArtScene, pens: Pens, trace: PathFn, outlines:
       // Here and there a glint breaks a line, never so often that the water turns to a pattern.
       const glint = valueNoise(x * 0.9, y * 6, seed + 22);
       const open = glint > 0.8 ? Math.max(0, 1 - (glint - 0.8) * 12) : 1;
-      const body = deep ? 0.3 + 0.12 * Math.min(1, d / 0.8) : 0.1 + 0.2 * Math.exp(-d / 0.14);
+      const shallow = deep ? 0.3 + 0.12 * Math.min(1, d / 0.8) : 0.1 + 0.2 * Math.exp(-d / 0.14);
+      const dn = deepness ? deepness(x, y) : 0;
+      const body = dn > 0 ? shallow + (Math.max(shallow, 0.3 + 0.12 * Math.min(1, d / 0.8)) - shallow) * dn : shallow;
       return spacing * body * open;
     },
   });

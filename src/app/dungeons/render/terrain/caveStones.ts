@@ -68,6 +68,7 @@ export function drawRimstone(hand: Hand, piece: DungeonTerrain): void {
   }
   const rims: Vec[][] = [];
   const pools: Vec[][] = [];
+  const lips: Vec[][] = [];
   for (const [v, columns] of rows) {
     columns.sort((a, b) => a - b);
     for (let start = 0; start < columns.length;) {
@@ -88,6 +89,7 @@ export function drawRimstone(hand: Hand, piece: DungeonTerrain): void {
           const depth = 0.10 + belly * (0.48 + noise * 0.12);
           return world(u, top + noise * 0.04 + scallop + (lower ? depth - inset : inset));
         });
+        if (inset === 0) lips.push(edge(true));
         return [...edge(false), ...edge(true).reverse()];
       };
       rims.push(shelf(0));
@@ -95,7 +97,21 @@ export function drawRimstone(hand: Hand, piece: DungeonTerrain): void {
       start = end + 1;
     }
   }
+  if (submerged(hand, piece)) {
+    // Under a lake's shallows only the dams' lips show, stepping down through the water: no shelf or pool of its own.
+    hand.line(lips, 'fine');
+    return;
+  }
   hand.surface(polysPath(rims), 'stone');
   smallShallowPools(hand, pools, 0.12);
   for (const rim of rims) hand.edges(rim, true);
+}
+
+/** Whether the floor's water lies over all of a piece, as it may over a cave's rimstone at a lake's edge. */
+function submerged(hand: Hand, piece: DungeonTerrain): boolean {
+  const { dungeon, view } = hand.scene.env;
+  if (!view.water) return false;
+  const { floor } = dungeon;
+  const wet = new Set(floor.waterCells.map(c => `${c.x},${c.y}`));
+  return piece.cells.every(c => wet.has(`${c.x},${c.y}`));
 }

@@ -16,7 +16,7 @@ import { fiveRoomParams } from './layout/fiveRoom';
 import { floraOf } from './growth/flora';
 import { placeGrowth } from './growth/placeGrowth';
 import { addUndergrowth } from './growth/undergrowth';
-import { stairsAndAround } from './floors/stairSpots';
+import { entrancesAndAround, stairsAndAround } from './floors/stairSpots';
 import { type CaveFloor, DUNGEON_GENERATOR_VERSION, type DungeonFloor, type DungeonModel, type DungeonRequest, type DungeonRoom, type DungeonTerrain, requestedFloors } from './model';
 import { type DungeonParams, dungeonParams, dungeonTags, floorParams } from './params';
 import { floorColumns, placeScatter } from './props';
@@ -74,8 +74,12 @@ function finishFloor(seed: number, index: number, parts: FloorParts, terrain: Fl
   const mayPool = (id: number): boolean => parts.water?.pools.has(id) ?? true;
   const wet = cave && caveWater(cave, rooms, terrain.pieces);
   const pools = dry ? new Set<number>() : (wet?.pools ?? poolRooms(floorStream(seed, 'water', index, 'pools'), rooms, doors, params.poolChance, mayPool));
-  const kept = [...terrain.takenCells(), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(parts.water?.dry ?? [])];
-  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(wet && { rooms: wet.rooms, shoreCorners: wet.shoreCorners }) });
+  // A cave's deep water is part of its water: one body with the floor's water where they meet, its own shore where not.
+  const deep = cave ? terrain.pieces.filter((p) => p.traits.hazard === 'deep-water').flatMap((p) => p.cells) : [];
+  // Its rimstone dams lie where water steps down, at a lake's edge: water may lie over them, never round them as an island.
+  const wetted = new Set([...deep, ...(cave ? terrain.pieces.filter((p) => p.kind === 'rimstone').flatMap((p) => p.cells) : [])].map((c) => cellKey(c.x, c.y)));
+  const kept = [...[...terrain.takenCells()].filter((key) => !wetted.has(key)), ...drainCells(terrain.pieces), ...stairsAndAround(stairs), ...(cave ? entrancesAndAround(doors) : []), ...(parts.water?.dry ?? [])];
+  const { water, waterCells } = placeWater(seed, index, rooms, { level, pools, dry: new Set(kept), ...(deep.length && { deep }), ...(wet && { rooms: wet.rooms, shoreCorners: wet.shoreCorners, natural: true }) });
   const flora = floraOf(params.tags, parts.theme);
   const house = planned.house && houseCells({ rooms, stacks: planned.house.stacks });
   const outside = house && ((x: number, y: number): boolean => !house.has(cellKey(x, y)));

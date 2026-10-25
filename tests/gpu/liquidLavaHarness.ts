@@ -31,7 +31,9 @@ export function lavaDungeon(look: DungeonStyleId, monochrome = false): { world: 
   const initial = floorLiquids(dungeon, style, view, { originCell: { x: 0, y: 0 }, pxPerCell: 1 }, { unitType: 'feet', ruleDistance: 5 }, 'lava-proof');
   const surfaces = Object.values(initial.liquids).filter(s => s.liquid === 'lava');
   if (!surfaces.length) throw new Error('Generated fixture has no lava');
-  const centre = centreOf(surfaces.flatMap(s => s.polygon));
+  // The largest lava: a floor's channels may lie rooms apart, with only rock between them.
+  const largest = surfaces.sort((a, b) => b.polygon.length - a.polygon.length)[0]!;
+  const centre = centreOf(largest.polygon);
   const originCell = { x: centre.x - LAVA_SIZE.width / LAVA_CELL / 2, y: centre.y - LAVA_SIZE.height / LAVA_CELL / 2 };
   const canvas = new OffscreenCanvas(LAVA_SIZE.width, LAVA_SIZE.height);
   renderMap(canvas.getContext('2d')!, model, style, view, { pxPerCell: LAVA_CELL, window: { originCell, widthPx: canvas.width, heightPx: canvas.height } });
