@@ -73,10 +73,10 @@ export interface Tongue {
 
 /**
  * The glow of a fire's bed: an ellipse of `rx` by `ry` round `c`, brightest in its middle and gone
- * at its rim, kept inside `bed` (the recess or ash it lies in). Stone's raster wash alone, as a
- * vector picture and Engraved's line work carry no wash.
+ * at its rim, kept inside `bed` (the recess or ash it lies in), `strength` times as strong as a
+ * fire's bed. Stone's raster wash alone, as a vector picture and Engraved's line work carry no wash.
  */
-export function fireGlow(pen: GlyphPen, bed: PathFn, c: Vec, rx: number, ry: number): void {
+export function fireGlow(pen: GlyphPen, bed: PathFn, c: Vec, rx: number, ry: number, strength = 1): void {
   if (!painted(pen) || !pen.hand.scene.raster) return;
   const { ctx } = pen;
   const { core, flame, ember } = fireColours(pen);
@@ -87,9 +87,9 @@ export function fireGlow(pen: GlyphPen, bed: PathFn, c: Vec, rx: number, ry: num
   ctx.translate(c.x, c.y);
   ctx.scale(1, ry / rx);
   const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
-  glow.addColorStop(0, withAlpha(core, 0.9));
-  glow.addColorStop(0.3, withAlpha(flame, 0.75));
-  glow.addColorStop(0.7, withAlpha(ember, 0.4));
+  glow.addColorStop(0, withAlpha(core, 0.9 * strength));
+  glow.addColorStop(0.3, withAlpha(flame, 0.75 * strength));
+  glow.addColorStop(0.7, withAlpha(ember, 0.4 * strength));
   glow.addColorStop(1, withAlpha(ember, 0));
   ctx.fillStyle = glow;
   ctx.fillRect(-rx, -rx, rx * 2, rx * 2);

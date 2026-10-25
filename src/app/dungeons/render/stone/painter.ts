@@ -3,6 +3,7 @@ import { drawColumns } from '../art/columns';
 import { drawDebris } from '../art/debris';
 import { drawPassages } from '../art/passages';
 import { drawProps } from '../art/drawProps';
+import { drawWallLights } from '../art/drawWallLights';
 import { drawGrid } from '../grid';
 import { drawTerrainGround, drawTerrainOpenings, drawTerrainStanding } from '../terrain/drawTerrain';
 import { stoneColours } from './colours';
@@ -54,6 +55,7 @@ export function paintStone(scene: ArtScene): void {
   growth.overWalls();
   drawDebris(hand);
   drawProps(hand, c.water, c.cloth);
+  drawWallLights(hand, c.water, c.cloth);
   drawTerrainStanding(hand, colours);
   drawColumns(hand);
   growth.columns();

@@ -9,6 +9,7 @@ import type { DungeonStyle, DungeonView } from '../style';
 import { floorLetter } from './roomKeys';
 import { floorFeatures } from './toFeatures';
 import { floorFires } from './toFires';
+import { floorWallLights } from './toWallLights';
 import { floorLiquids } from './toLiquids';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { LightSource } from '../../types/lightingTypes';
@@ -55,7 +56,7 @@ function floorWalls(dungeon: VisibleDungeon, style: DungeonStyle, view: DungeonV
  * every floor's walls and doors and its tall objects' outlines, the stairs between floors and the
  * openings into them (holes, and bridges laid over them), the
  * map features of every floor's terrain and props, its water, lava and acid with the light lava
- * and acid give off over their whole surface, a light in every fire of a lived-in dungeon, the rooms of its note, and dynamic lighting in
+ * and acid give off over their whole surface, a light in every fire and on every wall light of a lived-in dungeon, the rooms of its note, and dynamic lighting in
  * daylight, so nothing changes until the GM dims it. Light ranges are in `unit`. A dungeon of several floors gets a level per floor; one of one floor none. Null when
  * the walls of a floor would crowd too much to be joined (`wallsCrowd`); a generated dungeon never does.
  */
@@ -87,6 +88,7 @@ export function dungeonScene(
     Object.assign(liquids, wet.liquids);
     Object.assign(lights, wet.lights);
     Object.assign(lights, floorFires(dungeon, style, view, placement, unit, `dungeon_${letter}`, level));
+    Object.assign(lights, floorWallLights(dungeon, style, view, placement, unit, `dungeon_${letter}`, level));
     if (level) Object.assign(surfaces, floorSurfaces(dungeon, placement, `levelsurface_dungeon_${letter}`, level));
     for (const [kind, count] of Object.entries(floor.doors) as [DoorKind, number][]) doors[kind] = (doors[kind] ?? 0) + count;
     unplaced += floor.unplaced;

@@ -3,6 +3,7 @@ import { drawColumns } from '../art/columns';
 import { drawDebris } from '../art/debris';
 import { drawPassages } from '../art/passages';
 import { drawProps } from '../art/drawProps';
+import { drawWallLights } from '../art/drawWallLights';
 import { drawGrid } from '../grid';
 import { drawTerrainGround, drawTerrainOpenings, drawTerrainStanding } from '../terrain/drawTerrain';
 import { drawFloor } from './floor';
@@ -51,6 +52,7 @@ export function paintEngraved(scene: ArtScene): void {
   growth.overWalls();
   drawDebris(hand);
   drawProps(hand, pens.water, pens.floor);
+  drawWallLights(hand, pens.water, pens.floor);
   drawTerrainStanding(hand, colours);
   drawColumns(hand);
   growth.columns();

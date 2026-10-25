@@ -29,12 +29,13 @@ import { outbuildingOf } from '../../src/app/dungeons/render/grounds/groundsShap
 import { drawOutbuilding } from '../../src/app/dungeons/render/grounds/outbuildings';
 import type { GroundsPaint } from '../../src/app/dungeons/render/grounds/paint';
 import { stoneGroundsPaint } from '../../src/app/dungeons/render/grounds/stonePaint';
+import { WALL_LIGHT_GLYPHS } from '../../src/app/dungeons/render/wallLights/wallLightGlyphs';
 
 /**
  * What one piece costs to draw, per painter: each kind drawn 200 times at play zoom (150 px a
  * cell), the middle of five runs. A kind of a family may cost at most twice the slowest of the
  * reference props (fountain, well, statue) in the same painter (style guide §10), and so may a
- * piece of a house's grounds, a window of each size, a kind's drawing on a house's floor and with its fire burning. The tables go to `out/perf-glyph/cost.txt` and `grounds-cost.txt`.
+ * piece of a house's grounds, a window of each size, a lived-in dungeon's wall lights, a kind's drawing on a house's floor and with its fire burning. The tables go to `out/perf-glyph/cost.txt` and `grounds-cost.txt`.
  */
 
 const PX = 150;
@@ -155,7 +156,7 @@ describe('glyph cost', () => {
     expect(over).toEqual([]);
   });
 
-  it("draws each piece of a house's grounds within twice its painter's slowest reference", async () => {
+  it("draws each piece of a house's grounds and each wall light within twice its painter's slowest reference", async () => {
     const rows = ['painter\tkind\tms per 200\tlimit'];
     const over: string[] = [];
     for (const direction of ['stone', 'engraved'] as const) {
@@ -177,6 +178,10 @@ describe('glyph cost', () => {
           ];
         }),
         ...Object.entries(WINDOW_SAMPLES).map(([size, draw]): [string, (on: ReturnType<typeof handOf>) => void] => [`${size} window`, ({ hand }) => draw(hand)]),
+        ...Object.entries(WALL_LIGHT_GLYPHS).map(([kind, glyph]): [string, (on: ReturnType<typeof handOf>) => void] => [
+          `wall light: ${kind}`,
+          ({ hand, water, cloth }) => drawGlyph(hand, { x: 2.5, y: 2.5, rotation: 0, scale: 1, fit: { along: 0.4, out: 0.3 } }, glyph, water, cloth),
+        ]),
       ];
       for (const [kind, draw] of samples) {
         const ms = timed(direction, draw);
