@@ -178,6 +178,8 @@
 }
 
 // ── Theme ───────────────────────────────────────────────────────────────────
+// Two cards a row, each a picture of the dungeon in its theme (drawn by the worker at the art's
+// device pixels, `useThemePreviews`) and its name under it; the chosen one ringed in the accent.
 
 .atlas-dungeon-themes {
   display: grid;
@@ -187,66 +189,104 @@
 
 .atlas-dungeon-theme {
   @include atlas-flex-col($gap: $spacing-xs);
-  align-items: center;
+  align-items: stretch;
   height: auto;
   margin: 0;
-  padding: $spacing-m;
-  border: $border-width-m solid transparent;
+  padding: $spacing-xs;
+  border: $border-width-l solid transparent;
   border-radius: $radius-xl;
-  background: var(--background-secondary);
+  background: transparent;
   box-shadow: none;
-  color: var(--text-normal);
+  color: var(--text-muted);
   cursor: pointer;
   @include atlas-corner-shape;
-  transition: background-color $transition-fast $transition-ease, border-color $transition-fast $transition-ease, transform $transition-press $transition-ease-out;
+  transition: background-color $transition-fast $transition-ease, border-color $transition-fast $transition-ease, color $transition-fast $transition-ease, transform $transition-press $transition-ease-out;
 
   &:hover {
     background: var(--background-modifier-hover);
+    color: var(--text-normal);
   }
 
   &:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
   &.atlas-active {
     border-color: var(--interactive-accent);
-    background: color-mix(in oklch, var(--interactive-accent) 10%, var(--background-primary));
+    background: color-mix(in oklch, var(--interactive-accent) 10%, transparent);
+    color: var(--text-normal);
   }
 
   @include atlas-focus-ring;
 }
 
-.atlas-dungeon-theme__icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  margin-bottom: $spacing-xs;
+.atlas-dungeon-theme__art {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: $radius-l;
+  background: var(--background-secondary);
+  @include atlas-corner-shape;
+
+  // A hairline over the picture, so a white or black look keeps its edge on any theme.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 $border-width-s var(--background-modifier-border);
+    pointer-events: none;
+  }
+}
+
+// The map fills its card; Surprise me's three share one, each a slice from its middle.
+.atlas-dungeon-theme__picture {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+
+  > canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  > canvas[hidden] {
+    display: none;
+  }
+}
+
+.atlas-dungeon-theme__skeleton {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+// Which theme Surprise me picked, on its picture.
+.atlas-dungeon-theme__picked {
+  position: absolute;
+  bottom: $spacing-xs;
+  left: 50%;
+  translate: -50% 0;
+  @include atlas-truncate;
+  max-width: calc(100% - 2 * #{$spacing-xs});
+  padding: 2px $spacing-s;
   border-radius: $radius-full;
-  background: var(--background-primary);
-  color: var(--text-muted);
-  transition: background-color $transition-normal $transition-ease, color $transition-normal $transition-ease, transform $transition-normal $transition-ease-out;
-
-  svg {
-    width: $icon-m;
-    height: $icon-m;
-  }
-
-  .atlas-active > & {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    transform: scale(1.06);
-  }
+  background: color-mix(in oklch, var(--background-primary) 85%, transparent);
+  box-shadow: $shadow-md;
+  color: var(--text-normal);
+  font-size: $font-ui-smaller;
+  white-space: nowrap;
 }
 
 .atlas-dungeon-theme__name {
+  @include atlas-truncate;
+  font-size: $font-ui-small;
   font-weight: $font-weight-medium;
-}
-
-.atlas-dungeon-theme__hint {
-  color: var(--text-faint);
-  font-size: $font-ui-smaller;
-  line-height: 1.3;
   text-align: center;
 }
 

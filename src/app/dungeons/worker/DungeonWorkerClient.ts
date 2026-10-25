@@ -19,6 +19,8 @@ interface Pending {
   id: number;
   job: DungeonJob;
   lane: Lane;
+  /** Which set of thumbnails it belongs to (the style gallery's, the theme cards'), dropped together. */
+  group?: string;
   /** A later preview replaced it, or its thumbnails were dropped: its result is dropped. */
   stale: boolean;
   resolve: (result: DungeonRendered | null) => void;
@@ -37,8 +39,8 @@ function closeImage(result: DungeonRendered): void {
  * The window's side of the dungeon worker: one worker per app, which generates and draws
  * dungeons off the main thread one job at a time. Previews follow the latest request: a preview
  * still queued gives way to a newer one, and one already running is answered with null.
- * Thumbnails (the style gallery's cards) run only while nothing else waits, and are answered with
- * null once dropped. A worker
+ * Thumbnails (the style gallery's and theme cards) run only while nothing else waits, and are
+ * answered with null once their group is dropped. A worker
  * that crashes or stops answering fails its job and is started anew for the next.
  */
 export class DungeonWorkerClient {
@@ -84,20 +86,21 @@ export class DungeonWorkerClient {
     return this.enqueue(job, 'preview');
   }
 
-  /** Draws a thumbnail once no render or preview waits, or answers null once dropped. */
-  thumbnail(job: DungeonJob): Promise<DungeonRendered | null> {
-    return this.enqueue(job, 'thumbnail');
+  /** Draws a thumbnail of `group` once no render or preview waits, or answers null once dropped. */
+  thumbnail(job: DungeonJob, group?: string): Promise<DungeonRendered | null> {
+    return this.enqueue(job, 'thumbnail', group);
   }
 
-  /** Drops every thumbnail asked for and not yet answered: they answer null. */
-  dropThumbnails(): void {
-    this.drop('thumbnail');
+  /** Drops the thumbnails of `group` (every one without it) asked for and not yet answered: they answer null. */
+  dropThumbnails(group?: string): void {
+    this.drop('thumbnail', group);
   }
 
-  private drop(lane: Lane): void {
-    if (this.running?.lane === lane) this.running.stale = true;
+  private drop(lane: Lane, group?: string): void {
+    const dropped = (pending: Pending): boolean => pending.lane === lane && (group === undefined || pending.group === group);
+    if (this.running && dropped(this.running)) this.running.stale = true;
     for (let i = this.queue.length - 1; i >= 0; i--) {
-      if (this.queue[i]!.lane !== lane) continue;
+      if (!dropped(this.queue[i]!)) continue;
       this.queue.splice(i, 1)[0]!.resolve(null);
     }
   }
@@ -111,10 +114,10 @@ export class DungeonWorkerClient {
     for (const pending of failed) pending.reject(new Error(STOPPED));
   }
 
-  private enqueue(job: DungeonJob, lane: Lane): Promise<DungeonRendered | null> {
+  private enqueue(job: DungeonJob, lane: Lane, group?: string): Promise<DungeonRendered | null> {
     if (this.disposed) return Promise.reject(new Error(STOPPED));
     return new Promise((resolve, reject) => {
-      this.queue.push({ id: this.nextId++, job, lane, stale: false, resolve, reject });
+      this.queue.push({ id: this.nextId++, job, lane, ...(group !== undefined && { group }), stale: false, resolve, reject });
       this.pump();
     });
   }

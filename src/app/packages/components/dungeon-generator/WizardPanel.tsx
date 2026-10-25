@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'framer-motion';
 import { ArrowRight, Loader2, Map as MapIcon } from 'lucide-react';
 import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
+import type { ThemeId } from '../../../dungeons/themes/themeTypes';
 import { observeResize } from '../../../utils/observeResize';
 import { EASE_OUT_CONTROL_POINTS as EASE_OUT } from '../../../utils/motion';
 import { t } from '../../../i18n';
@@ -25,6 +26,8 @@ interface WizardPanelProps {
   actions: GeneratorActions;
   thumbnails: ReadonlyMap<DungeonStyleId, ImageBitmap>;
   onArt: (art: HTMLSpanElement | null) => void;
+  themePreviews: ReadonlyMap<ThemeId, ImageBitmap>;
+  onThemeArt: (art: HTMLSpanElement | null) => void;
   onClose: () => void;
 }
 
@@ -62,7 +65,7 @@ function useStepHeight(): [(node: HTMLElement | null) => void, number | null] {
  * The wizard's panel: where it is (the steps as marks, each a way back to it), the step's
  * question and its controls, Back and Next, and Create scene at the end.
  */
-export function WizardPanel({ step, direction, onStep, titleId, state, actions, thumbnails, onArt, onClose }: WizardPanelProps): React.JSX.Element {
+export function WizardPanel({ step, direction, onStep, titleId, state, actions, thumbnails, onArt, themePreviews, onThemeArt, onClose }: WizardPanelProps): React.JSX.Element {
   const reduced = useReducedMotion() ?? false;
   const shown = WIZARD_STEPS[step]!;
   const last = step === WIZARD_STEPS.length - 1;
@@ -106,7 +109,7 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
             exit="exit"
           >
             <h2 id={titleId} className="atlas-dungeon-wizard__title">{stepTitle(shown)}</h2>
-            <WizardStepContent step={shown} state={state} thumbnails={thumbnails} onArt={onArt} onSubmit={create} />
+            <WizardStepContent step={shown} state={state} thumbnails={thumbnails} onArt={onArt} themePreviews={themePreviews} onThemeArt={onThemeArt} onSubmit={create} />
           </motion.div>
         </AnimatePresence>
       </div>

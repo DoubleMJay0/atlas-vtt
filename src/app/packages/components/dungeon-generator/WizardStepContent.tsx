@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
 import { MAX_FLOORS } from '../../../dungeons/model';
 import { refusedTags } from '../../../dungeons/themes/themes';
-import type { ThemeChoice } from '../../../dungeons/themes/themeTypes';
+import type { ThemeChoice, ThemeId } from '../../../dungeons/themes/themeTypes';
 import { type DungeonTag, readTags } from '../../../dungeons/tags';
 import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
 import { t } from '../../../i18n';
@@ -20,6 +20,10 @@ interface WizardStepContentProps {
   thumbnails: ReadonlyMap<DungeonStyleId, ImageBitmap>;
   /** The first style card's art, measured for the size thumbnails are drawn at. */
   onArt: (art: HTMLSpanElement | null) => void;
+  /** Each theme's picture of the dungeon asked for. */
+  themePreviews: ReadonlyMap<ThemeId, ImageBitmap>;
+  /** A theme card's art, measured for the size those pictures are drawn at. */
+  onThemeArt: (art: HTMLSpanElement | null) => void;
   /** Enter in the name field creates the scene. */
   onSubmit: () => void;
 }
@@ -31,12 +35,12 @@ function refusedOf(choice: ThemeChoice, tags: readonly DungeonTag[]): ReadonlyMa
 }
 
 /** What one step of the wizard asks. Every change reaches the preview at once. */
-export function WizardStepContent({ step, state, thumbnails, onArt, onSubmit }: WizardStepContentProps): React.JSX.Element {
+export function WizardStepContent({ step, state, thumbnails, onArt, themePreviews, onThemeArt, onSubmit }: WizardStepContentProps): React.JSX.Element {
   const { request, settings } = state;
   const theme = request.theme ?? 'any';
   switch (step) {
     case 'theme':
-      return <ThemeStep value={theme} picked={state.generated?.theme} onChange={state.setTheme} />;
+      return <ThemeStep value={theme} picked={state.generated?.theme} previews={themePreviews} onArt={onThemeArt} onChange={state.setTheme} />;
     case 'layout':
       return <LayoutStep state={state} />;
     case 'features':

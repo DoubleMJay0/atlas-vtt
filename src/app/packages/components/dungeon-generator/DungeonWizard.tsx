@@ -13,6 +13,7 @@ import { useDungeonState } from './useDungeonState';
 import { useGeneratorActions, type CreatedDungeonScene } from './useGeneratorActions';
 import { useMapPreview } from './useMapPreview';
 import { useStyleThumbnails } from './useStyleThumbnails';
+import { useThemePreviews } from './useThemePreviews';
 import { WizardPanel } from './WizardPanel';
 import { WizardPreview } from './WizardPreview';
 import { wizardLayout, type Box } from './wizardLayout';
@@ -70,6 +71,7 @@ function Wizard({ app, layer, collectionId, initialName, anchor, onCreated, onBu
   const [panelRef, panelHeight] = useElementHeight<HTMLDivElement>();
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const [art, setArt] = useState<HTMLSpanElement | null>(null);
+  const [themeArt, setThemeArt] = useState<HTMLSpanElement | null>(null);
   const titleId = useId();
   const view = useLayerBox(layer);
   const { settings } = state;
@@ -85,6 +87,9 @@ function Wizard({ app, layer, collectionId, initialName, anchor, onCreated, onBu
   }, state.setGenerated);
   // Drawn once the Style step was first shown, and kept up to date from then on, so going back to it finds them.
   const thumbnails = useStyleThumbnails(client, { request: state.request, model: state.model, view: settings.view, size: useThumbnailSize(art), first: settings.style });
+  // Drawn only while the Theme step is shown: every change of the dungeon asks for three of them.
+  const themeSize = useThumbnailSize(themeArt);
+  const themePreviews = useThemePreviews(client, { request: state.request, style: settings.style, view: settings.view, size: step === 0 ? themeSize : null });
   const actions = useGeneratorActions({ app, client, state, collectionId, onCreated, onBusyChange });
 
   // Opens on the chosen theme, so the arrows run through the themes at once.
@@ -127,6 +132,8 @@ function Wizard({ app, layer, collectionId, initialName, anchor, onCreated, onBu
           actions={actions}
           thumbnails={thumbnails}
           onArt={setArt}
+          themePreviews={themePreviews}
+          onThemeArt={setThemeArt}
           onClose={onClose}
         />
       </motion.div>
