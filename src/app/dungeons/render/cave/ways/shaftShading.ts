@@ -5,7 +5,6 @@ import { pointsBounds, type Vec } from '../../geometry';
 import { withAlpha } from '../../palette';
 import { stoneOf } from './wayColours';
 import { shiftedBack, type ShaftMouth } from './shaftMouth';
-import type { WayFrame } from './narrows';
 
 /**
  * How a shaft's depth is laid, in each painter's own way. Stone fills each ledge darker than the
@@ -125,51 +124,4 @@ export function layDark(hand: Hand, mouth: ShaftMouth): void {
   glow.addColorStop(0, 'rgba(0,0,0,0.96)');
   glow.addColorStop(1, 'rgba(0,0,0,0.8)');
   fillWith(hand, polyPath(core), glow);
-}
-
-/** Fills `path` with a gradient round `at` stretched to an ellipse of `rx` by `ry`: offsets are in units of it. */
-function ellipticFill(hand: Hand, path: PathFn, at: Vec, rx: number, ry: number, stops: readonly [number, string][]): void {
-  const { ctx } = hand.scene.env;
-  const outer = stops[stops.length - 1]![0];
-  ctx.save();
-  ctx.beginPath();
-  path(ctx);
-  ctx.clip();
-  ctx.translate(at.x, at.y);
-  ctx.scale(rx, ry);
-  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outer);
-  for (const [offset, colour] of stops) gradient.addColorStop(offset / outer, colour);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(-outer, -outer, outer * 2, outer * 2);
-  ctx.restore();
-}
-
-/**
- * Daylight, or the glow of the floor above, falling down an aven onto the floor: a pool moved by
- * the light's slant, inside the ceiling's shadow round the opening, which fades out before the
- * stairwell's edge.
- */
-export function layShaftLight(hand: Hand, frame: WayFrame, mouth: ShaftMouth): void {
-  const { bounds, down } = frame;
-  const fall = 0.12;
-  const pool = mouth.rings[0]!.map(p => ({ x: p.x + SHADOW_DIR.x * fall, y: p.y + SHADOW_DIR.y * fall }));
-  const at = { x: mouth.centre.x + SHADOW_DIR.x * fall, y: mouth.centre.y + SHADOW_DIR.y * fall };
-  const rx = down.x ? mouth.half.v : mouth.half.u;
-  const ry = down.x ? mouth.half.u : mouth.half.v;
-  // Where the shadow has faded: short of the nearest edge of the stairwell's cells.
-  const edge = Math.min((at.x - bounds.minX) / rx, (bounds.maxX - at.x) / rx, (at.y - bounds.minY) / ry, (bounds.maxY - at.y) / ry);
-  const c = stoneOf(hand);
-  // Engraved has no light to lay: a hatched shadow round the pool read as a hole's rim, so its dashes say it alone.
-  if (!c) return;
-  if (!hand.scene.raster) {
-    fillWith(hand, polyPath(pool), withAlpha(c.light, c.dark ? 0.1 : 0.3));
-    return;
-  }
-  // One gradient: the pool's light, clear at its edge, then the ceiling's shadow round it, gone before the stairwell's edge.
-  const fade = Math.max(1.12, Math.min(1.5, edge));
-  const ring = pool.map(p => ({ x: at.x + (p.x - at.x) * fade * 1.1, y: at.y + (p.y - at.y) * fade * 1.1 }));
-  ellipticFill(hand, polyPath(ring), at, rx, ry, [
-    [0, withAlpha(c.light, c.dark ? 0.24 : 0.55)], [0.75, withAlpha(c.light, c.dark ? 0.12 : 0.3)], [1, withAlpha(c.light, 0)],
-    [1.04, withAlpha('#000000', 0.2)], [fade, withAlpha('#000000', 0)],
-  ]);
 }

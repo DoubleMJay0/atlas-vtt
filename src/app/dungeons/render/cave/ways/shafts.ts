@@ -8,17 +8,17 @@ import { polyPath, polysPath } from '../../art/paths';
 import type { Vec } from '../../geometry';
 import { stoneOutline } from '../../terrain/stones';
 import { wayFrame, type WayFrame } from './narrows';
-import { coil, rope } from './rope';
+import { rope } from './rope';
 import { approachLength, dashes, shaftMouth, type ShaftMouth } from './shaftMouth';
-import { layGritIn } from './screeGrit';
 import { layRubbleShadow } from './slopeShading';
-import { layDark, layDepth, layShaftLight, ledge, rimSurface } from './shaftShading';
+import { layDark, layDepth, ledge, rimSurface } from './shaftShading';
+import { layAvenLight, poolOf } from './avenLight';
 
 /**
  * A pitch is a shaft in the floor: its rim breaks off, ledges step down into the dark, and a rope
  * tied round a boulder on the approach goes over the near lip and is lost below. An aven is the same
- * shaft seen from beneath: its opening overhead is dashed, light falls down it onto the floor with
- * the rubble that came down with it, and the rope hangs down to a coil.
+ * shaft seen from beneath: its opening overhead is dashed, its walls rising inside it as dashed
+ * contours, and light falls down it onto the floor with the rubble that came down with it.
  */
 
 function seedOf(hand: Hand, frame: WayFrame): number {
@@ -75,31 +75,29 @@ function pitch(hand: Hand, frame: WayFrame, mouth: ShaftMouth): void {
 }
 
 function aven(hand: Hand, frame: WayFrame, mouth: ShaftMouth): void {
-  const { rings, centre, half } = mouth;
-  layShaftLight(hand, frame, mouth);
-  // Grit under the middle of the shaft, thinning out before its edge.
-  const fallen = rings[2]!.map(p => ({ x: centre.x + (p.x - centre.x) * 1.15, y: centre.y + (p.y - centre.y) * 1.15 }));
-  layGritIn(hand, polyPath(fallen), { x: frame.bounds.minX, y: frame.bounds.minY });
-  // What came down the shaft lies under it: chips round the middle, a few larger stones among them.
+  const { rings, half } = mouth;
+  layAvenLight(hand, frame, mouth);
+  // What came down the chimney lies where its light lands: a heap in the middle, stones thrown wider.
+  const at = poolOf(mouth).centre;
   const rng = rngFrom(seedOf(hand, frame) + 3);
+  const [hx, hy] = frame.down.x ? [half.v, half.u] : [half.u, half.v];
   const stones: { poly: Vec[]; c: Vec; r: number }[] = [];
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 16; i++) {
     const a = rng() * Math.PI * 2;
-    const d = Math.sqrt(rng()) * 0.72;
-    const c = { x: centre.x + Math.cos(a) * d * (frame.down.x ? half.v : half.u), y: centre.y + Math.sin(a) * d * (frame.down.x ? half.u : half.v) };
-    const r = 0.025 + 0.05 * (1 - d) * rng() + (i < 2 ? 0.03 : 0);
+    const d = i < 3 ? 0.14 * rng() : 0.12 + Math.sqrt(rng()) * 0.62;
+    const c = { x: at.x + Math.cos(a) * d * hx, y: at.y + Math.sin(a) * d * hy };
+    const r = i < 3 ? 0.085 + 0.04 * rng() : 0.025 + 0.05 * (1 - d) * rng();
     stones.push({ poly: stoneOutline(rng, c, r), c, r });
   }
-  layRubbleShadow(hand, stones.map(s => s.poly), 0.018);
+  layRubbleShadow(hand, stones.map(s => s.poly), 0.02);
   hand.fill(polysPath(stones.map(s => s.poly)), 'rock');
+  hand.solid(polyPath(stones[0]!.poly), stones[0]!.c, stones[0]!.r);
   hand.line(stones.map(s => s.poly), 'fine', true);
-  // The rope hangs straight down from the opening and lies coiled where it reaches the floor.
-  const { at } = frame;
-  const v = mouth.near + half.v;
-  rope(hand, [at(0.02, v - half.v * 0.35), at(0.01, v - half.v * 0.05), ...coil((u, w) => at(u, v + w), Math.min(0.24, half.u * 0.55), 2.25)]);
-  // Overhead, so dashed: the opening's lip and, inside it, the shaft's walls going up.
-  hand.line(dashes(rings[1]!, 0.08, 0.06), 'fine');
-  hand.line(dashes(rings[0]!, 0.11, 0.06), 'outline');
+  // Overhead, so dashed: the opening's lip, and inside it the chimney's walls rising, as contours;
+  // ink, which has no light to show the chimney by, draws one contour more.
+  if (hand.scene.env.style.direction !== 'stone') hand.line(dashes(rings[2]!, 0.07, 0.05), 'fine');
+  hand.line(dashes(rings[1]!, 0.12, 0.06), 'fine');
+  hand.line(dashes(rings[0]!, 0.16, 0.06), 'outline');
 }
 
 function drawEnds(hand: Hand, end: StairEnd): void {

@@ -100,8 +100,8 @@ function gritPattern(hand: Hand, size: Size, origin: { x: number; y: number }): 
   return pattern;
 }
 
-/** Lays grit inside `path`: fine over the slope below `fineFrom`, coarse below `coarseFrom` (shares of the way down). */
-export function layGrit(hand: Hand, frame: WayFrame, path: PathFn, fineFrom: number, coarseFrom: number): void {
+/** Lays grit inside `path`, each size over its own stretch of the way down: fine high, coarse low, as scree sorts. */
+export function layGrit(hand: Hand, frame: WayFrame, path: PathFn, fine: readonly [number, number], coarse: readonly [number, number]): void {
   if (!hand.scene.raster) return;
   const { ctx } = hand.scene.env;
   const origin = { x: frame.bounds.minX, y: frame.bounds.minY };
@@ -109,23 +109,11 @@ export function layGrit(hand: Hand, frame: WayFrame, path: PathFn, fineFrom: num
   ctx.beginPath();
   path(ctx);
   ctx.clip();
-  for (const [size, from] of [['fine', fineFrom], ['coarse', coarseFrom]] as const) {
+  for (const [size, [from, to]] of [['fine', fine], ['coarse', coarse]] as const) {
     ctx.beginPath();
-    polyPath(slopeBand(frame, from, 1.2))(ctx);
+    polyPath(slopeBand(frame, from, to))(ctx);
     ctx.fillStyle = gritPattern(hand, size, origin);
     ctx.fill();
   }
-  ctx.restore();
-}
-
-/** Lays fine grit over the whole of `path`: what fell down a shaft, lying in its light. */
-export function layGritIn(hand: Hand, path: PathFn, origin: { x: number; y: number }): void {
-  if (!hand.scene.raster) return;
-  const { ctx } = hand.scene.env;
-  ctx.save();
-  ctx.beginPath();
-  path(ctx);
-  ctx.fillStyle = gritPattern(hand, 'fine', origin);
-  ctx.fill();
   ctx.restore();
 }

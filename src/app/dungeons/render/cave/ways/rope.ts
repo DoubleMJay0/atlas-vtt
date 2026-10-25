@@ -33,15 +33,3 @@ export function rope(hand: Hand, run: Vec[]): void {
   }
   hand.line(strands, 'fine');
 }
-
-/** A rope's end laid down in a coil round `at`, `turns` times, from `r` cells wide inwards. */
-export function coil(at: (u: number, v: number) => Vec, r: number, turns: number): Vec[] {
-  const run: Vec[] = [];
-  for (let k = 0; k <= 32; k++) {
-    const t = k / 32;
-    const a = -Math.PI / 2 + t * Math.PI * 2 * turns;
-    const rr = r * (1 - t * 0.7);
-    run.push(at(Math.cos(a) * rr, Math.sin(a) * rr * 0.65));
-  }
-  return run;
-}
