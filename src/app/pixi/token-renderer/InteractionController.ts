@@ -45,6 +45,7 @@ import { SelectionResourceEditing } from '../selectionResourceEditor';
 import { placedPlayerCharacterEntry } from '../../react/components/context-menu/playerCharacterMenu';
 import { holdTokens } from '../../lighting/sightOnDrop';
 import { dropTokensOnStairs, type StairsMenuPlace } from './stairsDrop';
+import type { TokenPreviewAnchor } from '../../services/NotePreviewUIManager';
 import type { ArtFloors } from '../../levels/levelSurfaces';
 import { t } from '../../i18n';
 import { levelObjects } from '../../levels/levelObjects';
@@ -95,6 +96,8 @@ export class InteractionController implements ITokenInteractionController {
   // Hover handlers
   private hoverHandlers: Record<string, { over: (e?: FederatedPointerEvent) => void; out: () => void }> = {};
   private _currentHoverId: string | null = null;
+  /** The statblock preview the hover armed, hidden by itself: the token may have left the level shown since. */
+  private hoverPreview: TokenPreviewAnchor | null = null;
   
   // Callbacks for external systems
   private onSelectionUpdate?: () => void;
@@ -201,13 +204,8 @@ export class InteractionController implements ITokenInteractionController {
 
     if (prevId) {
       this.handleHoverEnd(prevId);
-      // Emit hide preview for previous token
-      const prevToken = mapTokens(levelObjects(this.store.getState()))[prevId];
-      if (prevToken?.kind === 'character' && prevToken.statblockPath?.trim()) {
-        this.eventBus.emit('pin-hide-preview', {
-          pin: { id: prevToken.id, notePath: prevToken.statblockPath, x: prevToken.x, y: prevToken.y, type: 'token' },
-        });
-      }
+      if (this.hoverPreview) this.eventBus.emit('pin-hide-preview', { pin: this.hoverPreview });
+      this.hoverPreview = null;
     }
 
     this._currentHoverId = tokenId;
@@ -217,20 +215,21 @@ export class InteractionController implements ITokenInteractionController {
       // Emit hover preview for new token
       const token = mapTokens(levelObjects(this.store.getState()))[tokenId];
       if (token?.kind === 'character' && e && token.statblockPath?.trim()) {
+        this.hoverPreview = {
+          id: token.id,
+          notePath: token.statblockPath,
+          x: token.x,
+          y: token.y,
+          type: 'token',
+          // Vitals travel with the pin so the preview can mirror them.
+          name: token.name,
+          resources: token.resources,
+          imagePath: token.imagePath,
+          ringColor: token.ringColor,
+          showRing: token.showRing,
+        };
         this.eventBus.emit('pin-hover-preview', {
-          pin: {
-            id: token.id,
-            notePath: token.statblockPath,
-            x: token.x,
-            y: token.y,
-            type: 'token',
-            // Vitals travel with the pin so the preview can mirror them.
-            name: token.name,
-            resources: token.resources,
-            imagePath: token.imagePath,
-            ringColor: token.ringColor,
-            showRing: token.showRing,
-          },
+          pin: this.hoverPreview,
           screenX: e.clientX,
           screenY: e.clientY,
           pixiEvent: e,
