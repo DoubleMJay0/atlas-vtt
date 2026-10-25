@@ -91,15 +91,16 @@ describe('LightingWorld.animate', () => {
   it('builds a dirty bounce when it is due, between flicker redraws too', async () => {
     const { world } = await setup();
     expect(world.animate(START + BOUNCE.throttleMs - 10)).toBe(true);
-    const build = vi.spyOn(world.cascades!, 'build');
+    const begin = vi.spyOn(world.cascades!, 'begin');
     const draw = vi.spyOn(world.lightMap, 'draw');
 
     world.update([], [torch], Texture.WHITE);
     expect(world.animate(START + BOUNCE.throttleMs - 5)).toBe(false);
-    expect(build).not.toHaveBeenCalled();
+    expect(begin).not.toHaveBeenCalled();
 
     expect(world.animate(START + BOUNCE.throttleMs)).toBe(true);
-    expect(build).toHaveBeenCalledTimes(1);
+    expect(begin).toHaveBeenCalledTimes(1);
+    expect(world.cascades!.building).toBe(false);
     // Steady for the bounce, then flickering again
     expect(draw).toHaveBeenCalledTimes(2);
   });
@@ -225,19 +226,30 @@ describe('a moving light in a paced world', () => {
     expect(shown(world)?.moving).toBeUndefined();
   });
 
-  it('builds no bounce while it moves', async () => {
+  it('builds the bounce of a moving light a band a frame, and whole when it rests', async () => {
     const renderer = await createTestRenderer(256);
     cleanup.push(() => renderer.destroy());
-    const world = new LightingWorld(renderer, { width: 1024, height: 1024 });
+    const world = new LightingWorld(renderer, { width: 4096, height: 4096 });
     cleanup.push(() => world.destroy());
-    world.update([], [{ ...torch, animation: 'none' }], null);
+    world.update([], [{ ...torch, animation: 'none', x: 2048, y: 2048 }], null);
     world.flush();
-    const build = vi.spyOn(world.cascades!, 'build');
-    world.update([], [{ ...torch, animation: 'none', x: 360, moving: true }], null);
-    world.animate(START + 10 * BOUNCE.throttleMs);
-    expect(build).not.toHaveBeenCalled();
-    world.update([], [{ ...torch, animation: 'none', x: 360 }], null);
+    const cascades = world.cascades!;
+    const step = vi.spyOn(cascades, 'step');
+    world.update([], [{ ...torch, animation: 'none', x: 2100, y: 2048, moving: true }], null);
+    let frames = 0;
+    for (let now = START + 10 * BOUNCE.throttleMs; frames === 0 || cascades.building; now += 16) {
+      world.animate(now);
+      frames++;
+      expect(frames).toBeLessThan(100);
+    }
+    expect(frames).toBeGreaterThan(1);
+    expect(step.mock.calls.every(([, texels]) => texels === BOUNCE.movingTexels)).toBe(true);
+
+    step.mockClear();
+    world.update([], [{ ...torch, animation: 'none', x: 2100, y: 2048 }], null);
     world.animate(START + 20 * BOUNCE.throttleMs);
-    expect(build).toHaveBeenCalledTimes(1);
+    expect(step).toHaveBeenCalledTimes(1);
+    expect(step.mock.calls[0]![1]).toBe(Infinity);
+    expect(cascades.building).toBe(false);
   });
 });
