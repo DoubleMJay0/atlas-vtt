@@ -4,6 +4,7 @@ import { polyPath, type PathFn } from '../../art/paths';
 import { fineLines, inkDot, type GlyphPen } from '../../glyphPen';
 import { mixColours } from '../../palette';
 import { isDarkColour } from '../../stone/colours';
+import type { Bounds, Vec } from '../../geometry';
 import { partPath, partPoly, type Part } from './shapes';
 
 type Paint = ReturnType<GlyphPen['paint']>;
@@ -50,27 +51,35 @@ export function part(pen: GlyphPen, b: Part, material: Material, raised = true):
 
 /** Bounded depth: darkening ash in Stone, cross-cut lines in Engraved, and a vector lip in SVG. */
 export function recess(pen: GlyphPen, b: Part, painted: boolean): void {
-  surface(pen, partPath(b), 'stone');
+  const box = { minX: b.x - b.w / 2, minY: b.y - b.h / 2, maxX: b.x + b.w / 2, maxY: b.y + b.h / 2 };
+  sunk(pen, partPath(b), partPoly(b), box, y => 0.25 + 0.43 * (y - b.y + b.h / 2) / b.h, painted);
+}
+
+/**
+ * A recess of any outline within `box`, darkening towards +y (into the wall): Stone washes it from
+ * top to bottom, Engraved tones it by `depth`, from 0.25 at its top to 0.68 at its bottom.
+ */
+export function sunk(pen: GlyphPen, path: PathFn, poly: readonly Vec[], box: Bounds, depth: (y: number) => number, painted: boolean): void {
+  surface(pen, path, 'stone');
   if (painted) {
     // The depth field is linear: paint its black alpha ramp directly, avoiding a
     // raster layer per basin. Like Stone's tone, this wash is raster-only.
     if (pen.hand.scene.raster) {
       const { ctx } = pen;
       ctx.save();
-      const wash = ctx.createLinearGradient(b.x, b.y - b.h / 2, b.x, b.y + b.h / 2);
+      const wash = ctx.createLinearGradient(0, box.minY, 0, box.maxY);
       wash.addColorStop(0, 'rgba(0, 0, 0, 0.25)');
       wash.addColorStop(1, 'rgba(0, 0, 0, 0.68)');
       ctx.beginPath();
-      partPath(b)(ctx);
+      path(ctx);
       ctx.fillStyle = wash;
       ctx.fill();
       ctx.restore();
     }
   } else {
-    glyphTone(pen, (_x, y) => 0.25 + 0.43 * (y - b.y + b.h / 2) / b.h,
-      { minX: b.x - b.w / 2, minY: b.y - b.h / 2, maxX: b.x + b.w / 2, maxY: b.y + b.h / 2 }, partPath(b), 'depth');
+    glyphTone(pen, (_x, y) => depth(y), box, path, 'depth');
   }
-  glyphEdges(pen, partPoly(b), false);
+  glyphEdges(pen, poly, false);
 }
 
 /** Two split logs lie low in the firebox; irregular pale ash remains visible between them. */

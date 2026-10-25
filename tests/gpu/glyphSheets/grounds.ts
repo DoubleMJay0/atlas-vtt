@@ -15,7 +15,8 @@ import type { GlyphSpecimen, SpecimenScene } from './types';
  * generated houses chosen by what they hold: the front with its porch and the drive round its
  * fountain, the gate, the carriage house and its service gate, the crypt, greenhouse and parterre
  * behind the house, a medium house's path to its porch, the house's own outer wall with its
- * windows and a chimney stack, a stair hall's tall window and a cellar's small one.
+ * windows and a chimney stack, a stair hall's tall window, a cellar's small one, and a fireplace in
+ * its stack.
  */
 
 const LARGE: DungeonRequest = { seed: 2, theme: 'mansion', tags: ['large', 'overgrown'], floors: 3 };
@@ -45,12 +46,12 @@ function wallWindow(request: DungeonRequest): SpecimenScene['window'] {
   return { x: stack.x - 4, y: stack.y - 3, cells: 8, rows: 6 };
 }
 
-/** A window of 6 × 4 cells round the first window of `size` on any floor. */
-function aroundHouse(request: DungeonRequest, find: 'tall' | 'small'): { floor: number; window: SpecimenScene['window'] } {
+/** A window of 6 × 4 cells round the first window of `size` on any floor, or the first fireplace. */
+function aroundHouse(request: DungeonRequest, find: 'tall' | 'small' | 'hearth'): { floor: number; window: SpecimenScene['window'] } {
   const floors = modelOf(request).floors;
   for (let floor = 0; floor < floors.length; floor++) {
-    const { windows = [] } = floors[floor]!;
-    const at = windows.find((w) => w.size === find);
+    const { windows = [], props } = floors[floor]!;
+    const at = find === 'hearth' ? props.find((p) => p.kind === 'hearth') : windows.find((w) => w.size === find);
     if (at) return { floor, window: { x: Math.round(at.x - 3), y: Math.round(at.y - 2), cells: 6, rows: 4 } };
   }
   throw new Error(`no ${find}`);
@@ -76,7 +77,7 @@ function scenes(): SpecimenScene[] {
     scene('large-crypt', LARGE, () => around(LARGE, 'outbuilding', { x: 1, y: 1 }, 'crypt')),
     scene('medium-front', MEDIUM, () => around(MEDIUM, 'porch', { x: 1, y: 2 })),
     scene('house-wall', MEDIUM, () => wallWindow(MEDIUM)),
-    ...(['tall', 'small'] as const).map((find) => scene(`${find}-window`, LARGE, () => aroundHouse(LARGE, find).window, aroundHouse(LARGE, find).floor)),
+    ...(['tall', 'small', 'hearth'] as const).map((find) => scene(find === 'hearth' ? 'fireplace' : `${find}-window`, LARGE, () => aroundHouse(LARGE, find).window, aroundHouse(LARGE, find).floor)),
   ];
 }
 

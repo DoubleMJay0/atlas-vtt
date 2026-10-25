@@ -33,7 +33,7 @@ import { stoneGroundsPaint } from '../../src/app/dungeons/render/grounds/stonePa
  * What one piece costs to draw, per painter: each kind drawn 200 times at play zoom (150 px a
  * cell), the middle of five runs. A kind of a family may cost at most twice the slowest of the
  * reference props (fountain, well, statue) in the same painter (style guide §10), and so may a
- * piece of a house's grounds and a window of each size. The tables go to `out/perf-glyph/cost.txt` and `grounds-cost.txt`.
+ * piece of a house's grounds, a window of each size and a kind's drawing on a house's floor. The tables go to `out/perf-glyph/cost.txt` and `grounds-cost.txt`.
  */
 
 const PX = 150;
@@ -127,9 +127,12 @@ describe('glyph cost', () => {
     for (const direction of ['stone', 'engraved'] as const) {
       const costs = new Map(Object.entries(PROP_GLYPHS).map(([kind, glyph]) => [kind as PropKind, cost(direction, kind as PropKind, glyph)]));
       const limit = 2 * Math.max(...REFERENCE.map(kind => costs.get(kind)!));
-      for (const [kind, ms] of costs) {
-        rows.push(`${direction}\t${kind}\t${ms.toFixed(2)}\t${FIRST_PROPS.has(kind) ? '(reference)' : limit.toFixed(2)}`);
-        if (!FIRST_PROPS.has(kind) && ms > limit) over.push(`${direction} ${kind}: ${ms.toFixed(2)} ms, limit ${limit.toFixed(2)}`);
+      // A kind drawn otherwise on a house's floor is held to the same limit there.
+      const inHouse = Object.entries(PROP_GLYPHS).flatMap(([kind, glyph]) => (glyph.inHouse ? [[`${kind} (house)`, cost(direction, kind as PropKind, glyph.inHouse)] as const] : []));
+      for (const [kind, ms] of [...costs, ...inHouse]) {
+        const reference = FIRST_PROPS.has(kind as PropKind);
+        rows.push(`${direction}\t${kind}\t${ms.toFixed(2)}\t${reference ? '(reference)' : limit.toFixed(2)}`);
+        if (!reference && ms > limit) over.push(`${direction} ${kind}: ${ms.toFixed(2)} ms, limit ${limit.toFixed(2)}`);
       }
     }
     await commands.writeFile('out/perf-glyph/cost.txt', `${rows.join('\n')}\n`);

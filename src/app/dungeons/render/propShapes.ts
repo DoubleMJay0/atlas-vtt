@@ -39,6 +39,8 @@ export interface PropGlyph {
    * the back of its cell).
    */
   tall?: { halfW: number; halfH: number; round: boolean; x?: number; y?: number };
+  /** How it is drawn on a house's floor, where it stands before a chimney stack; unset, as anywhere else. */
+  inHouse?: PropGlyph;
 }
 
 /** A family's drawings by kind. */
@@ -51,9 +53,10 @@ export function glyphFit(prop: Pick<DungeonProp, 'kind' | 'size' | 'scale'>): Gl
   return 'reach' in footprint ? { along: footprint.reach * 2, out: footprint.reach * 2 } : { along: footprint.along, out: footprint.out };
 }
 
-/** A kind's drawing; none for a kind not drawn yet. */
-export function propGlyph(kind: PropKind): PropGlyph | undefined {
-  return PROP_GLYPHS[kind];
+/** A kind's drawing, on a house's floor (`DungeonFloor.walls === 'edges'`) or elsewhere; none for a kind not drawn yet. */
+export function propGlyph(kind: PropKind, inHouse = false): PropGlyph | undefined {
+  const glyph = PROP_GLYPHS[kind];
+  return (inHouse && glyph?.inHouse) || glyph;
 }
 
 /** Every kind with a drawing. */
@@ -62,16 +65,16 @@ export function drawnPropKinds(): PropKind[] {
 }
 
 /** Traces the outline that casts a piece's shadow, at its fit, onto `path`; false for a piece that lies flat or has no drawing. */
-export function tracePropSilhouette(prop: Pick<DungeonProp, 'kind' | 'size' | 'scale'>, path: CanvasPath): boolean {
-  const silhouette = PROP_GLYPHS[prop.kind]?.silhouette;
+export function tracePropSilhouette(prop: Pick<DungeonProp, 'kind' | 'size' | 'scale'>, path: CanvasPath, inHouse = false): boolean {
+  const silhouette = propGlyph(prop.kind, inHouse)?.silhouette;
   if (!silhouette) return false;
   silhouette(path, glyphFit(prop));
   return true;
 }
 
 /** How tall a piece stands, as a share of a column's shadow; 0 for a kind without a drawing. */
-export function propLift(kind: PropKind): number {
-  return PROP_GLYPHS[kind]?.lift ?? 0;
+export function propLift(kind: PropKind, inHouse = false): number {
+  return propGlyph(kind, inHouse)?.lift ?? 0;
 }
 
 /** The outline lighting takes as a wall for a kind; none for what does not block sight. */

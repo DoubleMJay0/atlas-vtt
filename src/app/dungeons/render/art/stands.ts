@@ -30,8 +30,9 @@ export function standsOf(env: RenderEnv): Stand[] {
     });
   }
   if (view.props) {
+    const house = dungeon.floor.walls === 'edges';
     for (const prop of dungeon.floor.props) {
-      const lift = propLift(prop.kind);
+      const lift = propLift(prop.kind, house);
       if (lift <= 0 || !dungeon.roomShapes.has(prop.room)) continue;
       stands.push({
         height: Math.min(1, lift * PROP_HEIGHT * prop.scale),
@@ -41,7 +42,7 @@ export function standsOf(env: RenderEnv): Stand[] {
           ctx.translate(prop.x, prop.y);
           ctx.rotate(prop.rotation);
           ctx.scale(prop.scale, prop.scale);
-          tracePropSilhouette(prop, ctx);
+          tracePropSilhouette(prop, ctx, house);
           ctx.restore();
         },
       });

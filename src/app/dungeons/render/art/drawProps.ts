@@ -14,12 +14,13 @@ export function drawProps(hand: Hand, water: string, cloth: string): void {
   const { dungeon, view, ctx } = scene.env;
   if (!view.props) return;
   const cave = dungeon.floor.cave !== undefined;
+  const house = dungeon.floor.walls === 'edges';
   if (cave) {
     ctx.save();
     clipFloors(scene);
   }
   for (const prop of propsAsDrawn(dungeon)) {
-    const glyph = propGlyph(prop.kind);
+    const glyph = propGlyph(prop.kind, house);
     if (!glyph || !dungeon.roomShapes.has(prop.room)) continue;
     drawGlyph(hand, { ...prop, fit: glyphFit(prop) }, glyph, water, cloth);
   }
