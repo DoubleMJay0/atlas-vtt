@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Dungeon generator – Barrel
 // ═══════════════════════════════════════════════════════════════════════════
-// A tab of its own: the map preview fills it, the settings stand in a sidebar
-// on the right with Export and Create scene at its foot.
+// A wizard over the map: a compact panel of steps where the note pin dropdown
+// stood (or in the middle of the view), the live map floating beside it.
 
-@use 'panel';
+@use 'wizard';
+@use 'preview';
 @use 'settings';
