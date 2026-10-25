@@ -1,8 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'framer-motion';
 import { ArrowRight, Loader2, Map as MapIcon } from 'lucide-react';
-import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
-import type { ThemeId } from '../../../dungeons/themes/themeTypes';
 import { EASE_OUT_CONTROL_POINTS as EASE_OUT } from '../../../utils/motion';
 import { t } from '../../../i18n';
 import { cn } from '../../../../utils/cn';
@@ -10,25 +8,16 @@ import { Button } from '../primitives/button';
 import { CloseButton } from '../primitives/CloseButton';
 import { OverlayScroll } from '../primitives/OverlayScroll';
 import { LabelTooltip } from '../primitives/tooltip';
-import type { DungeonState } from './useDungeonState';
-import type { GeneratorActions } from './useGeneratorActions';
-import { WizardStepContent } from './WizardStepContent';
+import type { Wizard } from './useWizard';
+import { WizardStepContent, type CollectionChoice } from './WizardStepContent';
 import { stepName, stepTitle, WIZARD_STEPS } from './wizardSteps';
 
 interface WizardPanelProps {
-  /** The step shown, by index into `WIZARD_STEPS`. */
-  step: number;
-  /** 1 when the step came after the one before, -1 when it came back. */
-  direction: 1 | -1;
-  onStep: (step: number) => void;
-  titleId: string;
-  state: DungeonState;
-  actions: GeneratorActions;
-  thumbnails: ReadonlyMap<DungeonStyleId, ImageBitmap>;
-  onArt: (art: HTMLSpanElement | null) => void;
-  themePreviews: ReadonlyMap<ThemeId, ImageBitmap>;
-  onThemeArt: (art: HTMLSpanElement | null) => void;
-  onClose: () => void;
+  wizard: Wizard;
+  /** Where the scene goes, offered on the Name step where the GM may choose it. */
+  collection?: CollectionChoice | undefined;
+  /** Shows the close button; a tab of its own has Obsidian's. */
+  onClose?: (() => void) | undefined;
 }
 
 const SLIDE_PX = 24;
@@ -51,7 +40,8 @@ const fadingStepVariants: Variants = {
  * The wizard's panel: where it is (the steps as marks, each a way back to it), the step's
  * question and its controls, Back and Next, and Create scene at the end.
  */
-export function WizardPanel({ step, direction, onStep, titleId, state, actions, thumbnails, onArt, themePreviews, onThemeArt, onClose }: WizardPanelProps): React.JSX.Element {
+export function WizardPanel({ wizard, collection, onClose }: WizardPanelProps): React.JSX.Element {
+  const { step, direction, goTo, titleId, state, actions } = wizard;
   const reduced = useReducedMotion() ?? false;
   const shown = WIZARD_STEPS[step]!;
   const last = step === WIZARD_STEPS.length - 1;
@@ -73,7 +63,7 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
                   className={cn('atlas-dungeon-wizard__mark', index < step && 'is-done', index === step && 'is-current')}
                   aria-current={index === step ? 'step' : undefined}
                   aria-label={stepName(id)}
-                  onClick={() => onStep(index)}
+                  onClick={() => goTo(index)}
                 />
               </LabelTooltip>
             </li>
@@ -82,7 +72,7 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
         <span className="atlas-dungeon-wizard__count" aria-live="polite">
           {t('dungeon.step.of', { current: step + 1, count: WIZARD_STEPS.length })}
         </span>
-        <CloseButton onClick={onClose} />
+        {onClose && <CloseButton onClick={onClose} />}
       </div>
       <OverlayScroll ref={scroller} frameClassName="atlas-dungeon-wizard__body" className="atlas-dungeon-wizard__scroll">
         <AnimatePresence initial={false} mode="popLayout" custom={direction}>
@@ -96,14 +86,14 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
             exit="exit"
           >
             <h2 id={titleId} className="atlas-dungeon-wizard__title">{stepTitle(shown)}</h2>
-            <WizardStepContent step={shown} state={state} thumbnails={thumbnails} onArt={onArt} themePreviews={themePreviews} onThemeArt={onThemeArt} onSubmit={create} />
+            <WizardStepContent step={shown} wizard={wizard} collection={collection} onSubmit={create} />
           </motion.div>
         </AnimatePresence>
       </OverlayScroll>
       <div className="atlas-dungeon-wizard__footer">
         {actions.problem && !actions.creating && <p className="atlas-dungeon-wizard__problem" role="alert">{actions.problem}</p>}
         <div className="atlas-dungeon-wizard__nav">
-          <Button variant="ghost" size="sm" className={cn(step === 0 && 'atlas-dungeon-wizard__back--hidden')} disabled={step === 0} onClick={() => onStep(step - 1)}>
+          <Button variant="ghost" size="sm" className={cn(step === 0 && 'atlas-dungeon-wizard__back--hidden')} disabled={step === 0} onClick={() => goTo(step - 1)}>
             {t('dungeon.back')}
           </Button>
           {last ? (
@@ -112,7 +102,7 @@ export function WizardPanel({ step, direction, onStep, titleId, state, actions, 
               <span>{actions.creating ? t('dungeon.creating') : t('dungeon.create')}</span>
             </Button>
           ) : (
-            <Button variant="default" size="sm" onClick={() => onStep(step + 1)}>
+            <Button variant="default" size="sm" onClick={() => goTo(step + 1)}>
               <span>{t('dungeon.next')}</span>
               <ArrowRight />
             </Button>

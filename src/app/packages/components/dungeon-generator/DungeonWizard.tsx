@@ -1,19 +1,12 @@
-import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { App } from 'obsidian';
-import { dungeonStyle } from '../../../dungeons/styleCatalog';
-import { DungeonWorkerClient } from '../../../dungeons/worker/DungeonWorkerClient';
 import { useElementHeight } from '../../../react/hooks/useElementHeight';
 import { ContextMenuProvider } from '../../../react/root/ContextMenuContext';
 import { observeResize } from '../../../utils/observeResize';
 import { useAnchoredPopoverVariants } from '../primitives/dialogMotion';
-import { usePreviewSize } from './PreviewCanvas';
-import { useThumbnailSize } from './StyleGallery';
-import { useDungeonState } from './useDungeonState';
-import { useGeneratorActions, type CreatedDungeonScene } from './useGeneratorActions';
-import { useMapPreview } from './useMapPreview';
-import { useStyleThumbnails } from './useStyleThumbnails';
-import { useThemePreviews } from './useThemePreviews';
+import type { CreatedDungeonScene } from './useGeneratorActions';
+import { useWizard } from './useWizard';
 import { WizardPanel } from './WizardPanel';
 import { WizardPreview } from './WizardPreview';
 import { wizardLayout, type Box } from './wizardLayout';
@@ -64,44 +57,16 @@ export function DungeonWizard(props: DungeonWizardProps): React.JSX.Element {
 }
 
 function Wizard({ app, layer, collectionId, initialName, anchor, onCreated, onBusyChange, onClose }: DungeonWizardProps): React.JSX.Element {
-  const client = useMemo(() => DungeonWorkerClient.forApp(app), [app]);
-  const state = useDungeonState(app, initialName);
-  const [{ step, direction }, setPosition] = useState<{ step: number; direction: 1 | -1 }>({ step: 0, direction: 1 });
-  const goTo = (next: number): void => setPosition((now) => ({ step: next, direction: next >= now.step ? 1 : -1 }));
+  const wizard = useWizard({ app, collectionId, initialName, onCreated, onBusyChange });
   const [panelRef, panelHeight] = useElementHeight<HTMLDivElement>();
-  const [frame, setFrame] = useState<HTMLDivElement | null>(null);
-  const [art, setArt] = useState<HTMLSpanElement | null>(null);
-  const [themeArt, setThemeArt] = useState<HTMLSpanElement | null>(null);
-  const titleId = useId();
   const view = useLayerBox(layer);
-  const { settings } = state;
-
-  const preview = useMapPreview(client, {
-    request: state.request,
-    generated: state.generated,
-    model: state.model,
-    style: dungeonStyle(settings.style),
-    view: settings.view,
-    floor: state.floor,
-    size: usePreviewSize(frame),
-  }, state.setGenerated);
-  // Drawn once the Style step was first shown, and kept up to date from then on, so going back to it finds them.
-  const thumbnails = useStyleThumbnails(client, { request: state.request, model: state.model, view: settings.view, size: useThumbnailSize(art), first: settings.style });
-  // Drawn only while the Theme step is shown: every change of the dungeon asks for three of them.
-  const themeSize = useThumbnailSize(themeArt);
-  const themePreviews = useThemePreviews(client, { request: state.request, style: settings.style, view: settings.view, size: step === 0 ? themeSize : null });
-  const actions = useGeneratorActions({ app, client, state, collectionId, onCreated, onBusyChange });
-
-  // Opens on the chosen theme, so the arrows run through the themes at once.
-  const opened = useRef(false);
-  useEffect(() => {
-    if (opened.current || panelHeight === null) return;
-    opened.current = true;
-    panelRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')?.focus({ preventScroll: true });
-  }, [panelHeight, panelRef]);
+  const { setPanel } = wizard;
 
   const local = view && anchor ? { ...anchor, left: anchor.left - view.left, top: anchor.top - view.top } : null;
   const layout = view && panelHeight !== null ? wizardLayout(view, { width: WIZARD_PANEL_WIDTH, height: panelHeight }, local) : null;
+  const laidOut = layout !== null;
+  // Hidden until laid out, and a hidden panel takes no focus.
+  useEffect(() => { if (laidOut) setPanel(panelRef.current); }, [laidOut, panelRef, setPanel]);
   const panelBox = layout?.panel ?? { left: 0, top: 0 };
   // The panel grows out of the dropdown it replaces, or out of its own middle.
   const origin = local && layout
@@ -115,27 +80,15 @@ function Wizard({ app, layer, collectionId, initialName, anchor, onCreated, onBu
         ref={panelRef}
         className="atlas-dungeon-wizard"
         role="group"
-        aria-labelledby={titleId}
+        aria-labelledby={wizard.titleId}
         style={{ ...panelBox, width: WIZARD_PANEL_WIDTH, transformOrigin: origin, visibility: layout ? 'visible' : 'hidden' }}
         variants={panelVariants}
         initial="hidden"
         animate="visible"
         exit="exit"
-        inert={actions.creating}
+        inert={wizard.actions.creating}
       >
-        <WizardPanel
-          step={step}
-          direction={direction}
-          onStep={goTo}
-          titleId={titleId}
-          state={state}
-          actions={actions}
-          thumbnails={thumbnails}
-          onArt={setArt}
-          themePreviews={themePreviews}
-          onThemeArt={setThemeArt}
-          onClose={onClose}
-        />
+        <WizardPanel wizard={wizard} onClose={onClose} />
       </motion.div>
       <AnimatePresence>
         {layout && (
@@ -143,10 +96,7 @@ function Wizard({ app, layer, collectionId, initialName, anchor, onCreated, onBu
             key="preview"
             box={layout.preview}
             side={layout.preview.left < layout.panel.left ? -1 : 1}
-            preview={preview}
-            state={state}
-            actions={actions}
-            onFrame={setFrame}
+            wizard={wizard}
           />
         )}
       </AnimatePresence>

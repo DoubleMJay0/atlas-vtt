@@ -757,6 +757,11 @@
   overflow: auto;
 }
 
+.view-content.atlas-dungeon-generator-view {
+  padding: 0;
+  overflow: hidden;
+}
+
 // Atlas VTT view styles - scoped to our plugin views only
 .workspace-leaf-content[data-type="atlas-vtt"] .atlas-vtt-view,
 .workspace-leaf-content[data-type="atlas-vtt-dashboard"] .atlas-vtt-view {

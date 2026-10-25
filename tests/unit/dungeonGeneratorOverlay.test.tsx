@@ -6,12 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openCreatedScene } from '../../src/app/import/openCreatedScene';
 import { DungeonGeneratorOverlay } from '../../src/app/packages/components/dungeon-generator/DungeonGeneratorOverlay';
 import type { DungeonWizardProps } from '../../src/app/packages/components/dungeon-generator/DungeonWizard';
-import { generateDungeonFor, showDungeonGenerator } from '../../src/app/packages/components/dungeon-generator/openDungeonGenerator';
+import { generateDungeonFor } from '../../src/app/packages/components/dungeon-generator/openDungeonGenerator';
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
 import { createViewAtlasStore, type ViewAtlasStore } from '../../src/app/storeFactory';
 import { canRunMapHotkeys } from '../../src/app/keyboard/mapHotkeys';
-import { loadAtlasView } from '../../src/app/plugin/atlasLeaves';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 const panel = vi.hoisted(() => ({ props: null as DungeonWizardProps | null }));
@@ -21,12 +20,11 @@ vi.mock('../../src/app/packages/components/dungeon-generator/DungeonWizard', () 
     return <button type="button" onClick={props.onClose}>Close</button>;
   },
 }));
-vi.mock('../../src/app/plugin/atlasLeaves', () => ({ loadAtlasView: vi.fn() }));
 vi.mock('../../src/app/import/openCreatedScene', () => ({ openCreatedScene: vi.fn(async () => true) }));
 
 const SCENE = { name: 'Crypt', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap' };
 
-function mount(): { store: ViewAtlasStore; app: ReturnType<typeof createInMemoryApp>['app'] } {
+function mount(): { store: ViewAtlasStore } {
   const { app } = createInMemoryApp({ files: {} });
   const store = createViewAtlasStore(app, `overlay-${Math.random()}`);
   store.getState().setPersistenceEnabled(false);
@@ -37,7 +35,7 @@ function mount(): { store: ViewAtlasStore; app: ReturnType<typeof createInMemory
       </ViewStoreProvider>
     </AtlasUIContext.Provider>,
   );
-  return { store, app };
+  return { store };
 }
 
 beforeEach(() => { MotionGlobalConfig.skipAnimations = true; });
@@ -84,18 +82,6 @@ describe('the dungeon generator over the map', () => {
     await expect(result).resolves.toEqual({ scenePath: SCENE.scenePath });
     expect(store.getState().dungeonGenerator).toBeNull();
     expect(openCreatedScene).not.toHaveBeenCalled();
-  });
-
-  it('opens from the asset manager in the middle of the view, for its collection, and opens the scene it created', async () => {
-    const { store, app } = mount();
-    const view = { leaf: {}, getStore: () => store };
-    vi.mocked(loadAtlasView).mockResolvedValue(view as never);
-    Object.assign(app.workspace, { revealLeaf: vi.fn(async () => {}) });
-    await act(() => showDungeonGenerator(app, 'Ruins'));
-    expect(panel.props).toMatchObject({ initialName: '', collectionId: 'Ruins', anchor: undefined });
-    act(() => panel.props!.onCreated(SCENE));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(openCreatedScene).toHaveBeenCalledWith(app, SCENE.scenePath, 'Crypt', { level: undefined });
   });
 
   it('closes on Escape, but not while a scene is being written', async () => {

@@ -1,5 +1,5 @@
 ## New
-- Dungeon generator: Generate Dungeon in the asset manager's Add menu makes a ready scene with walls, doors, grid and lighting, on up to four floors joined by stairs
+- Dungeon generator: Generate Dungeon in the asset manager's Add menu, or the Generate dungeon command, opens it in a tab of its own, its steps beside a large live map, with no scene open needed; it makes a ready scene with walls, doors, grid and lighting, on up to four floors joined by stairs
 - Generated dungeons have a boss arena, cover, hazards, bridges over chasms, galleries and shafts; the Five-room switch builds the classic five-room dungeon
 - Each generated dungeon gets a note with a heading per room and a GM-only numbered pin in each room (A1, B1 … on several floors)
 - Sixteen looks for generated dungeons, drawn as stone and shadow or as an engraving, on vellum

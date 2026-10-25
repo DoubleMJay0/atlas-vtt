@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { openCreatedScene } from '../../../import/openCreatedScene';
 import { handledByAnotherControl } from '../../../keyboard/tooltipEscape';
 import { useAtlasUI } from '../../../react/root/AtlasUIContext';
 import { useAtlasStore, useViewStoreHook } from '../../../react/ViewStoreContext';
@@ -29,9 +28,9 @@ interface OverlayProps {
 
 /**
  * A layer over the Atlas view (the leaf's `contain: strict` makes it the box of `position:
- * fixed`) holding the wizard. Escape and its X hand a waiting pin back its dropdown; a press beside
- * it closes the dropdown too, as any press outside it does. A pin waiting for the scene gets it and
- * the map shows again; otherwise the created scene opens. Closing while a scene is written waits for it.
+ * fixed`) holding the wizard. Escape and its X hand the pin back its dropdown; a press beside
+ * it closes the dropdown too, as any press outside it does. The pin waiting for the scene gets it and
+ * the map shows again. Closing while a scene is written waits for it.
  */
 function GeneratorOverlay({ request, onClose }: OverlayProps): React.JSX.Element {
   const { app } = useAtlasUI();
@@ -51,13 +50,10 @@ function GeneratorOverlay({ request, onClose }: OverlayProps): React.JSX.Element
     onClose(request.id);
   };
 
-  // A scene finished after the GM opened the generator anew closes nothing and opens nothing:
-  // only a pin that waits for it still gets it.
+  // A scene finished after the GM opened the generator anew closes nothing: only its pin still gets it.
   const created = (scene: CreatedDungeonScene): void => {
     settleDungeonRequest(request.id, scene);
-    if (store.getState().dungeonGenerator?.id !== request.id) return;
-    onClose(request.id);
-    if (!request.waiting) void openCreatedScene(app, scene.scenePath, scene.name, { level: scene.entryLevel });
+    if (store.getState().dungeonGenerator?.id === request.id) onClose(request.id);
   };
 
   return (
