@@ -869,6 +869,8 @@
     @include atlas-scrollbar;
     max-height: 240px;
     overflow-y: auto;
+    // The icon row sets the panel's width; a long note name truncates instead of widening it
+    contain: inline-size;
   }
 
   .pin-result-item {
@@ -962,6 +964,8 @@
 
   .pin-header-file {
     flex-shrink: 0;
+    max-width: 40%;
+    @include atlas-truncate;
     font-size: $font-ui-smaller;
     color: var(--text-faint);
   }
