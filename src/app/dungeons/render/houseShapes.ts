@@ -7,7 +7,7 @@
  */
 
 import { cellKey, cellsBox, doorCells, houseCells } from '../geometry';
-import type { CellDir, DungeonDoor, DungeonFloor, DungeonRoom, DungeonWindow } from '../model';
+import type { CellDir, DungeonDoor, DungeonFloor, DungeonRoom, DungeonWindow, WindowSize } from '../model';
 import { cellsShapes, shapeBounds, type FloorShape, type PolyShape, type RectShape, type Vec } from './geometry';
 
 /** An inner wall's thickness, in cells: wider than the widest wall ink (0.073), so the wall rings of two rooms never meet. */
@@ -16,8 +16,12 @@ export const INNER_WALL = 0.1;
 export const OUTER_WALL = 0.34;
 /** How far a doorway's floor reaches past the floors it joins, so the two become one. */
 const OVERLAP = 0.01;
-/** A window's span along its edge: wall stays at each end, so neighbouring windows never run together. */
-const WINDOW_INSET = 0.18;
+/**
+ * A window's span along its edge, by its size: wall stays at each end, so neighbouring windows never
+ * run together. A stair hall's tall window takes most of its cell, a closet's or cellar's small one
+ * little more than a third.
+ */
+const WINDOW_INSET: Readonly<Record<WindowSize | 'facade', number>> = { facade: 0.18, tall: 0.08, small: 0.31 };
 
 const SIDES: readonly CellDir[] = [
   { x: 0, y: -1 },
@@ -155,17 +159,18 @@ export function mouthDepth(door: Pick<DungeonDoor, 'edge'>): number {
 }
 
 /** A window's edge: where the glass stands, inset from the cell's corners, from one end to the other. */
-export function windowSpan(window: Pick<DungeonWindow, 'x' | 'y' | 'dir'>): [Vec, Vec] {
-  const [a, b] = doorEdge({ ...window });
+export function windowSpan(window: Pick<DungeonWindow, 'x' | 'y' | 'dir' | 'size'>): [Vec, Vec] {
+  const [a, b] = doorEdge({ x: window.x, y: window.y, dir: window.dir });
   const t = { x: b.x - a.x, y: b.y - a.y };
+  const inset = WINDOW_INSET[window.size ?? 'facade'];
   return [
-    { x: a.x + t.x * WINDOW_INSET, y: a.y + t.y * WINDOW_INSET },
-    { x: b.x - t.x * WINDOW_INSET, y: b.y - t.y * WINDOW_INSET },
+    { x: a.x + t.x * inset, y: a.y + t.y * inset },
+    { x: b.x - t.x * inset, y: b.y - t.y * inset },
   ];
 }
 
 /** The ground a window's wall leaves open: across its span, from inside the floor's edge out past the wall by `beyond` cells. */
-export function windowClearing(window: Pick<DungeonWindow, 'x' | 'y' | 'dir'>, beyondWall: number): Vec[] {
+export function windowClearing(window: Pick<DungeonWindow, 'x' | 'y' | 'dir' | 'size'>, beyondWall: number): Vec[] {
   const [a, b] = windowSpan(window);
   const { dir } = window;
   const inner = OUTER_WALL / 2 + 0.02;

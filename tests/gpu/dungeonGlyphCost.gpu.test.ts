@@ -16,7 +16,8 @@ import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW, type ArtDirection } from '../../src/app/dungeons/style';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { modelOf } from './glyphSheetModel';
-import { GROUNDS_KINDS, type GroundsKind } from '../../src/app/dungeons/houseModel';
+import { GROUNDS_KINDS, type GroundsKind, type WindowSize } from '../../src/app/dungeons/houseModel';
+import { drawWindowsOf } from '../../src/app/dungeons/render/art/windows';
 import { polysPath, rectPoly } from '../../src/app/dungeons/render/art/paths';
 import type { Vec } from '../../src/app/dungeons/render/geometry';
 import { drawBoundaryWall, drawGate, drawHedge } from '../../src/app/dungeons/render/grounds/boundary';
@@ -32,7 +33,7 @@ import { stoneGroundsPaint } from '../../src/app/dungeons/render/grounds/stonePa
  * What one piece costs to draw, per painter: each kind drawn 200 times at play zoom (150 px a
  * cell), the middle of five runs. A kind of a family may cost at most twice the slowest of the
  * reference props (fountain, well, statue) in the same painter (style guide §10), and so may a
- * piece of a house's grounds. The tables go to `out/perf-glyph/cost.txt` and `grounds-cost.txt`.
+ * piece of a house's grounds and a window of each size. The tables go to `out/perf-glyph/cost.txt` and `grounds-cost.txt`.
  */
 
 const PX = 150;
@@ -112,6 +113,13 @@ const GROUNDS_SAMPLES: Record<GroundsKind, (hand: Hand, paint: GroundsPaint) => 
   'garden-fountain': (hand, paint) => drawFountain(hand, paint, { kind: 'garden-fountain', cells: cells(2, 2, 2, 2), at: { x: 3, y: 3 } }),
 };
 
+/** One window of each size in a house's outer wall. */
+const WINDOW_SAMPLES: Record<WindowSize | 'facade', (hand: Hand) => void> = {
+  facade: (hand) => drawWindowsOf(hand, [{ x: 2, y: 2, dir: { x: 0, y: -1 }, room: 0 }]),
+  tall: (hand) => drawWindowsOf(hand, [{ x: 2, y: 2, dir: { x: 0, y: -1 }, room: 0, size: 'tall' }]),
+  small: (hand) => drawWindowsOf(hand, [{ x: 2, y: 2, dir: { x: 0, y: -1 }, room: 0, size: 'small' }]),
+};
+
 describe('glyph cost', () => {
   it("draws every kind within twice its painter's slowest reference", async () => {
     const rows = ['painter\tkind\tms per 200\tlimit'];
@@ -133,8 +141,12 @@ describe('glyph cost', () => {
     const over: string[] = [];
     for (const direction of ['stone', 'engraved'] as const) {
       const limit = 2 * Math.max(...REFERENCE.map(kind => cost(direction, kind, PROP_GLYPHS[kind]!)));
-      for (const kind of GROUNDS_KINDS) {
-        const ms = timed(direction, ({ hand, paint }) => GROUNDS_SAMPLES[kind](hand, paint));
+      const samples: [string, (on: ReturnType<typeof handOf>) => void][] = [
+        ...GROUNDS_KINDS.map((kind): [string, (on: ReturnType<typeof handOf>) => void] => [kind, ({ hand, paint }) => GROUNDS_SAMPLES[kind](hand, paint)]),
+        ...Object.entries(WINDOW_SAMPLES).map(([size, draw]): [string, (on: ReturnType<typeof handOf>) => void] => [`${size} window`, ({ hand }) => draw(hand)]),
+      ];
+      for (const [kind, draw] of samples) {
+        const ms = timed(direction, draw);
         rows.push(`${direction}\t${kind}\t${ms.toFixed(2)}\t${limit.toFixed(2)}`);
         if (ms > limit) over.push(`${direction} ${kind}: ${ms.toFixed(2)} ms, limit ${limit.toFixed(2)}`);
       }
