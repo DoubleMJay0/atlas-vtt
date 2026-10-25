@@ -1,7 +1,7 @@
 import type { PileStone } from './hand';
 
 /** How much farther than its reach a stone's outline may stray (`stoneOutline` stretches it by up to a fifth). */
-const STRAY = 1.25;
+export const STRAY = 1.25;
 
 /**
  * A pile's stones in layers, back to front: a stone lies one layer above the highest earlier stone

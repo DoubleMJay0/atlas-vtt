@@ -30,7 +30,7 @@ function slope(hand: Hand, frame: WayFrame, end?: StairEnd): void {
   if (!stone) drawHachures(hand, frame, shape, 4, seed);
   const polys = shape.stones.map(s => s.poly);
   layRubbleShadow(hand, polys, 0.025);
-  if (hand.pile) hand.pile(shape.stones, s => (s.r > 0.08 ? 'outline' : 'fine'));
+  if (hand.pile) hand.pile(shape.stones, () => 'fine');
   else {
     hand.fill(polysPath(polys), 'rock');
     // The stones read by their outline and shadow; the boulder heading each clump is modelled by the light.

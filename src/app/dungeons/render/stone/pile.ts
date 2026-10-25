@@ -1,7 +1,7 @@
 import type { ArtScene } from '../art/artScene';
 import type { Hand, PileStone, Weight } from '../art/hand';
 import { SHADOW_DIR } from '../art/light';
-import { pileLayers } from '../art/pileLayers';
+import { pileLayers, STRAY } from '../art/pileLayers';
 import type { Canvas2D, Vec } from '../geometry';
 import type { StoneColours } from './colours';
 import { rockTone, rockTones, stoneFacets, toneStep } from './rockFacets';
@@ -41,11 +41,16 @@ function fillPolys(ctx: Canvas2D, polys: readonly (readonly Vec[])[], colour: st
   ctx.fill();
 }
 
-/** The shadows `stones` cast on the stones already drawn beneath them, and on nothing else. */
+/**
+ * The shadows `stones` cast on the stones already drawn beneath them, and on nothing else; the clip
+ * holds only the stones a shadow can reach, not the whole pile beneath.
+ */
 function contactShadows(ctx: Canvas2D, c: StoneColours, stones: readonly PileStone[], beneath: readonly PileStone[]): void {
+  const reached = beneath.filter(b => stones.some(s => Math.hypot(b.c.x - s.c.x, b.c.y - s.c.y) < (b.r + s.r) * STRAY + s.r * CONTACT.share));
+  if (!reached.length) return;
   ctx.save();
   ctx.beginPath();
-  tracePolys(ctx, beneath.map(s => s.poly));
+  tracePolys(ctx, reached.map(s => s.poly));
   ctx.clip();
   ctx.beginPath();
   tracePolys(ctx, stones.map(s => {
@@ -57,25 +62,36 @@ function contactShadows(ctx: Canvas2D, c: StoneColours, stones: readonly PileSto
   ctx.restore();
 }
 
+function outline(hand: Hand, stones: readonly PileStone[], weight: (stone: PileStone) => Weight): void {
+  for (const w of ['fine', 'outline', 'heavy'] as const) {
+    const runs = stones.filter(s => weight(s) === w).map(s => s.poly);
+    if (runs.length) hand.line(runs, w, true);
+  }
+}
+
 /**
  * A pile of rock, back to front, a layer of stones that do not overlap at a time: the shadow each
  * stone casts where it lies on another, its body filled whole in the rock's own colour so nothing
- * beneath shows through, its own flat facets shaded or lit by their facing (chips too small to
- * show them keep the rock's colour), and its outline. The facets are the stone's own, never a
+ * beneath shows through, its own flat facets shaded or lit by their facing, and its outline.
+ * Chips too small to show facets lie beneath them all, in the rock's colour. The facets are the stone's own, never a
  * texture laid across the map, whose cracks ran on through every stone.
  */
 export function paintPile(scene: ArtScene, hand: Hand, c: StoneColours, stones: readonly PileStone[], weight: (stone: PileStone) => Weight): void {
   const { ctx } = scene.env;
   const tones = rockTones(c);
   const seed = scene.env.dungeon.model.seed;
+  // Chips go down first, all at once: a few pixels at play size, they show no facets and a contact
+  // shadow on or from one shows no more, and layering them with the stones cost a scree a tenth of its drawing.
+  const chips = stones.filter(s => s.r < FACETED);
   const beneath: PileStone[] = [];
-  for (const layer of pileLayers(stones)) {
+  fillPolys(ctx, chips.map(s => s.poly), c.rock);
+  outline(hand, chips, weight);
+  for (const layer of pileLayers(stones.filter(s => s.r >= FACETED))) {
     if (beneath.length) contactShadows(ctx, c, layer, beneath);
     fillPolys(ctx, layer.map(s => s.poly), c.rock);
     const shaded: Vec[][] = [];
     const lit: Vec[][] = [];
     for (const stone of layer) {
-      if (stone.r < FACETED) continue;
       for (const { face, light } of stoneFacets(stone.poly, seed, pileTone)) {
         const tone = pileTone(light);
         if (tone < 0) shaded.push(face);
@@ -84,10 +100,7 @@ export function paintPile(scene: ArtScene, hand: Hand, c: StoneColours, stones: 
     }
     fillPolys(ctx, shaded, rockTone(tones, -PILE_TONE.shade));
     fillPolys(ctx, lit, rockTone(tones, PILE_TONE.lit));
-    for (const w of ['fine', 'outline', 'heavy'] as const) {
-      const runs = layer.filter(s => weight(s) === w).map(s => s.poly);
-      if (runs.length) hand.line(runs, w, true);
-    }
+    outline(hand, layer, weight);
     beneath.push(...layer);
   }
 }
