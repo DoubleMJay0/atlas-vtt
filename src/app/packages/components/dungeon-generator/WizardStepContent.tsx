@@ -7,7 +7,7 @@ import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
 import { t } from '../../../i18n';
 import { Stepper, SwitchRow } from './fields';
 import { StyleGallery } from './StyleGallery';
-import { TagChips } from './TagChips';
+import { FeaturesStep } from './FeaturesStep';
 import { ThemeStep } from './ThemeStep';
 import type { DungeonState } from './useDungeonState';
 import { ViewSettings } from './ViewSettings';
@@ -44,7 +44,7 @@ export function WizardStepContent({ step, state, thumbnails, onArt, themePreview
     case 'layout':
       return <LayoutStep state={state} />;
     case 'features':
-      return <TagChips picked={request.tags} refused={refusedOf(theme, readTags(request.tags))} onToggle={state.toggleTag} />;
+      return <FeaturesStep picked={readTags(request.tags)} refused={refusedOf(theme, readTags(request.tags))} onToggle={state.toggleTag} onChoose={state.chooseTag} />;
     case 'style':
       return (
         <div className="atlas-dungeon-wizard__style">

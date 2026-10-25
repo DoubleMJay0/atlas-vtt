@@ -1,11 +1,11 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useId, useRef } from 'react';
 import { THEME_IDS, type ThemeChoice, type ThemeId } from '../../../dungeons/themes/themeTypes';
 import { type MessageKey, t } from '../../../i18n';
 import { cn } from '../../../../utils/cn';
 import { Skeleton } from '../primitives/Skeleton';
+import { ARROW_STEPS, useHeldPicture } from './StyleGallery';
 
 const CHOICES: readonly ThemeChoice[] = ['any', ...THEME_IDS];
-const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 export const themeName = (theme: ThemeId): string => t(`dungeon.theme.${theme}` as MessageKey);
 
@@ -22,19 +22,7 @@ interface ThemeStepProps {
 
 /** A picture of a theme, held until the next arrives; a breathing skeleton before the first. */
 function ThemePicture({ bitmap, className }: { bitmap: ImageBitmap | undefined; className?: string }): React.JSX.Element {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const drawn = useRef<ImageBitmap | null>(null);
-  const [shown, setShown] = useState(false);
-
-  useEffect(() => {
-    const target = canvas.current;
-    if (!target || !bitmap || drawn.current === bitmap) return;
-    target.width = bitmap.width;
-    target.height = bitmap.height;
-    target.getContext('2d')?.drawImage(bitmap, 0, 0);
-    drawn.current = bitmap;
-    setShown(true);
-  }, [bitmap]);
+  const { canvas, shown } = useHeldPicture(bitmap);
 
   return (
     <span className={cn('atlas-dungeon-theme__picture', className)}>
@@ -45,16 +33,17 @@ function ThemePicture({ bitmap, className }: { bitmap: ImageBitmap | undefined; 
 }
 
 /**
- * The themes as cards, each a picture of the dungeon asked for drawn in that theme (Surprise me
- * shows the three side by side), in one radio group: Tab reaches the chosen card and the arrows
- * choose another at once, so the preview beside the wizard shows each theme in turn.
+ * The themes as cards, each a picture of the dungeon asked for drawn in that theme with its name
+ * on it (Surprise me shows the three side by side), in one radio group: Tab reaches the chosen
+ * card and the arrows choose another at once, so the preview beside the wizard shows each theme
+ * in turn.
  */
 export function ThemeStep({ value, picked, previews, onArt, onChange }: ThemeStepProps): React.JSX.Element {
   const buttons = useRef(new Map<ThemeChoice, HTMLButtonElement>());
   const pickedId = useId();
 
   const onKeyDown = (index: number) => (event: React.KeyboardEvent): void => {
-    const step = STEPS[event.key];
+    const step = ARROW_STEPS[event.key];
     if (step === undefined) return;
     event.preventDefault();
     const next = CHOICES[(index + step + CHOICES.length) % CHOICES.length]!;
@@ -90,8 +79,8 @@ export function ThemeStep({ value, picked, previews, onArt, onChange }: ThemeSte
               {showsPicked && (
                 <span className="atlas-dungeon-theme__picked" aria-hidden="true">{themeName(picked)}</span>
               )}
+              <span className="atlas-dungeon-card-name">{choice === 'any' ? t('dungeon.theme.any') : themeName(choice)}</span>
             </span>
-            <span className="atlas-dungeon-theme__name">{choice === 'any' ? t('dungeon.theme.any') : themeName(choice)}</span>
             {/* What Surprise me picked, read as the card's description rather than its name */}
             {showsPicked && <span id={pickedId} hidden>{t('dungeon.theme.anyPicked', { theme: themeName(picked) })}</span>}
           </button>

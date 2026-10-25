@@ -7,7 +7,8 @@ import { cn } from '../../../../utils/cn';
 import { t } from '../../../i18n';
 import type { ThumbnailSize } from './useStyleThumbnails';
 
-const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+/** How far each arrow key moves the choice in a radio group of cards. */
+export const ARROW_STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 /** The name a style is shown by. */
 export function styleName(id: DungeonStyleId): string {
@@ -31,6 +32,25 @@ export function useThumbnailSize(art: HTMLElement | null): ThumbnailSize | null 
   return size;
 }
 
+/** Draws each new bitmap on the canvas and keeps it there until the next; `shown` once the first is drawn. */
+export function useHeldPicture(bitmap: ImageBitmap | undefined): { canvas: React.RefObject<HTMLCanvasElement | null>; shown: boolean } {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const drawn = useRef<ImageBitmap | null>(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    const target = canvas.current;
+    if (!target || !bitmap || drawn.current === bitmap) return;
+    target.width = bitmap.width;
+    target.height = bitmap.height;
+    target.getContext('2d')?.drawImage(bitmap, 0, 0);
+    drawn.current = bitmap;
+    setShown(true);
+  }, [bitmap]);
+
+  return { canvas, shown };
+}
+
 interface StyleCardProps {
   id: DungeonStyleId;
   thumbnail: ImageBitmap | undefined;
@@ -43,24 +63,12 @@ interface StyleCardProps {
 }
 
 /**
- * One style: a window of the dungeon drawn in it, its name under it. The picture drawn last stays
- * until the next arrives, so a new dungeon or view never empties a card; until the first, the
- * card's art breathes as a skeleton.
+ * One style: a window of the dungeon drawn in it, its name on the picture. The picture drawn last
+ * stays until the next arrives, so a new dungeon or view never empties a card; until the first,
+ * the card's art breathes as a skeleton.
  */
 function StyleCard({ id, thumbnail, selected, tabbable, onArt, onSelect, onKeyDown, buttonRef }: StyleCardProps): React.JSX.Element {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const drawn = useRef<ImageBitmap | null>(null);
-  const [shown, setShown] = useState(false);
-
-  useEffect(() => {
-    const target = canvas.current;
-    if (!target || !thumbnail || drawn.current === thumbnail) return;
-    target.width = thumbnail.width;
-    target.height = thumbnail.height;
-    target.getContext('2d')?.drawImage(thumbnail, 0, 0);
-    drawn.current = thumbnail;
-    setShown(true);
-  }, [thumbnail]);
+  const { canvas, shown } = useHeldPicture(thumbnail);
 
   return (
     <button
@@ -76,8 +84,8 @@ function StyleCard({ id, thumbnail, selected, tabbable, onArt, onSelect, onKeyDo
       <span ref={onArt} className="atlas-dungeon-style-card__art">
         <canvas ref={canvas} className="atlas-dungeon-style-card__picture" hidden={!shown} aria-hidden="true" />
         {!shown && <Skeleton live className="atlas-dungeon-style-card__skeleton" />}
+        <span className="atlas-dungeon-card-name">{styleName(id)}</span>
       </span>
-      <span className="atlas-dungeon-style-card__name">{styleName(id)}</span>
     </button>
   );
 }
@@ -98,7 +106,7 @@ export function StyleGallery({ value, thumbnails, onChange, onArt }: StyleGaller
   const buttons = useRef(new Map<DungeonStyleId, HTMLButtonElement>());
 
   const onKeyDown = (index: number) => (event: React.KeyboardEvent<HTMLButtonElement>): void => {
-    const step = STEPS[event.key];
+    const step = ARROW_STEPS[event.key];
     if (step === undefined && event.key !== 'Home' && event.key !== 'End') return;
     const count = DUNGEON_STYLES.length;
     const target = event.key === 'Home' ? 0 : event.key === 'End' ? count - 1 : (index + (step ?? 0) + count) % count;

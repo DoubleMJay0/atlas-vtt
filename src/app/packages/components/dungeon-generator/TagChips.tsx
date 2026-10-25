@@ -6,6 +6,8 @@ import { t } from '../../../i18n';
 import { cn } from '../../../../utils/cn';
 
 interface TagChipsProps {
+  /** The groups of `TAG_GROUPS` shown, by id, in their order there. */
+  groups: readonly string[];
   /** The tags the shown dungeon is generated with. */
   picked: readonly string[];
   /** Tags the chosen theme cannot take, each with the reason shown as its tooltip. */
@@ -25,15 +27,15 @@ function tagDescription(tag: DungeonTag): string {
 
 /**
  * Every tag as a chip that switches it on and off at once, on the same seed, so the map shows
- * what the tag does, grouped under headings (`TAG_GROUPS`); switching one on switches off the
+ * what the tag does, grouped under headings (the `groups` of `TAG_GROUPS`); switching one on switches off the
  * tags it rules out. A tag the chosen theme refuses keeps its place, shown off and disabled with
  * the reason as its tooltip, so the chips never move.
  */
-export function TagChips({ picked, refused, onToggle }: TagChipsProps): React.JSX.Element {
+export function TagChips({ groups, picked, refused, onToggle }: TagChipsProps): React.JSX.Element {
   const labelId = useId();
   return (
     <div className="atlas-dungeon-tags">
-      {TAG_GROUPS.map((group) => (
+      {TAG_GROUPS.filter((group) => groups.includes(group.id)).map((group) => (
         <div key={group.id} className="atlas-dungeon-tags__group" role="group" aria-labelledby={`${labelId}-${group.id}`}>
           <span id={`${labelId}-${group.id}`} className="atlas-dungeon-tags__label">{t(`dungeon.tagGroup.${group.id}` as MessageKey)}</span>
           <div className="atlas-dungeon-tags__chips">

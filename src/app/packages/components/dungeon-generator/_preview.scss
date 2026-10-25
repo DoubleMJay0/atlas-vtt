@@ -5,14 +5,10 @@
 // Dungeon generator – the live map floating beside the wizard
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Placed and sized by `wizardLayout` (inline); the map is fitted into it, $spacing-s inside.
+// Placed and sized by `wizardLayout` (inline): the room the map floats in, with nothing drawn of its own.
 .atlas-dungeon-wizard-preview {
-  @include atlas-elevated-surface;
-  @include atlas-panel-radius($radius-2xl);
   position: absolute;
   display: flex;
-  padding: $spacing-s;
-  background: var(--background-secondary);
 }
 
 .atlas-dungeon-preview {
@@ -31,20 +27,55 @@
   justify-content: center;
 }
 
-// The picture shown and, over it, the last one fading out (`PreviewCanvas`), in one grid cell.
-.atlas-dungeon-preview__pictures {
-  display: grid;
-  place-items: center;
+// Beside the wizard the map hangs from the panel's top line, on the side that faces it.
+.atlas-dungeon-wizard-preview .atlas-dungeon-preview__stage {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.atlas-dungeon-wizard-preview--left .atlas-dungeon-preview__stage {
+  justify-content: flex-end;
+}
+
+// The map itself is the floating surface: exactly its shape (sized by `PreviewCanvas`), never past
+// the room, its corner the panel's. It clips nothing, so the cell-size dialog may hang out of it.
+.atlas-dungeon-preview__map {
+  position: relative;
+  flex-shrink: 0;
+  @include atlas-panel-radius($radius-2xl, 0px);
+  box-shadow: $shadow-elevated;
+  transition: width $transition-slow $transition-ease-out, height $transition-slow $transition-ease-out;
+
+  // A hairline over the picture, so a white or black look keeps its edge on any theme.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 $border-width-s color-mix(in oklch, var(--mono-100, #fff) 12%, transparent);
+    pointer-events: none;
+  }
+
+  &[hidden] {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+// The picture shown and, over it, the last one fading out (`PreviewCanvas`).
+.atlas-dungeon-preview__canvas,
+.atlas-dungeon-preview__ghost {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-
-  > canvas {
-    grid-area: 1 / 1;
-    display: block;
-    max-width: 100%;
-    max-height: 100%;
-    @include atlas-panel-inset-radius($spacing-s);
-  }
+  object-fit: contain;
+  border-radius: inherit;
+  @include atlas-corner-shape;
 }
 
 .atlas-dungeon-preview__canvas {
@@ -61,14 +92,14 @@
 }
 
 .atlas-dungeon-preview__skeleton {
+  position: absolute;
+  inset: 0;
   @include atlas-flex-col($gap: $spacing-s);
   align-items: center;
-  width: 100%;
-  height: 100%;
   padding: $spacing-l;
-  @include atlas-panel-inset-radius($spacing-s);
-  background: var(--background-primary);
-  --atlas-skeleton-surface: var(--background-primary);
+  border-radius: inherit;
+  background: var(--background-secondary);
+  --atlas-skeleton-surface: var(--background-secondary);
 }
 
 .atlas-dungeon-preview__skeleton-map {
@@ -90,8 +121,8 @@
   font-size: $font-ui-smaller;
 }
 
-// ── On the card ─────────────────────────────────────────────────────────────
-// Export and New layout in the top right corner, concentric with the card's.
+// ── On the map ──────────────────────────────────────────────────────────────
+// Export and New layout in the map's top right corner, concentric with it.
 
 .atlas-dungeon-wizard-preview__tools {
   @include atlas-elevated-surface;
@@ -127,7 +158,7 @@
   }
 }
 
-// A dungeon of several floors: which one the map shows, at the card's foot.
+// A dungeon of several floors: which one the map shows, at the map's foot.
 .atlas-dungeon-floor-switcher {
   position: absolute;
   bottom: $spacing-m;
@@ -140,14 +171,14 @@
   }
 }
 
-// The map PNG's cell size, asked under the card's tools.
+// The map PNG's cell size, asked under the map's tools.
 .atlas-dungeon-cell-dialog {
   @include atlas-elevated-surface;
   @include atlas-panel-radius($radius-xl);
   @include atlas-flex-col($gap: $spacing-s);
   position: absolute;
-  top: calc(#{$spacing-m} + #{$button-height-m} + 2 * #{$spacing-xs} + #{$spacing-s});
-  right: $spacing-m;
+  top: calc(100% + #{$spacing-s});
+  right: 0;
   z-index: 2;
   padding: $spacing-s;
 }

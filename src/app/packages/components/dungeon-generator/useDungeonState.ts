@@ -7,7 +7,7 @@ import { randomSeed } from '../../../dungeons/rng';
 import { secretWingOf } from '../../../dungeons/secretWings';
 import type { DungeonView } from '../../../dungeons/style';
 import type { DungeonStyleId } from '../../../dungeons/styleCatalog';
-import { withTag, type DungeonTag } from '../../../dungeons/tags';
+import { SIZE_TAGS, withTag, type DungeonTag } from '../../../dungeons/tags';
 import type { ThemeChoice } from '../../../dungeons/themes/themeTypes';
 import { SettingsService } from '../../../services/SettingsService';
 
@@ -41,6 +41,8 @@ export interface DungeonState {
   newSeed: () => void;
   /** Switches a tag on or off (and the tags it rules out off): this seed with the tags as they are then. */
   toggleTag: (tag: DungeonTag) => void;
+  /** Picks one of `among` (null: none of them), as a segmented choice does; the seed stays. */
+  chooseTag: (among: readonly DungeonTag[], tag: DungeonTag | null) => void;
   setWaterLevel: (level: number | undefined) => void;
   setView: (changes: Partial<DungeonView>) => void;
   /** The look picked in the style gallery. */
@@ -49,6 +51,11 @@ export interface DungeonState {
   hideWing: (floor: number, room: number) => void;
   /** Shows every secret wing hidden by hand again. */
   showHiddenWings: () => void;
+}
+
+/** A dungeon always has a size in the wizard: medium where the tags name none. */
+function sized(tags: readonly DungeonTag[]): DungeonTag[] {
+  return tags.some((tag) => SIZE_TAGS.includes(tag)) ? [...tags] : withTag(tags, 'medium');
 }
 
 function readSettings(app: App): DungeonGeneratorSettings {
@@ -72,7 +79,7 @@ function shownFloor(picked: number, request: DungeonRequest, model: DungeonModel
 export function useDungeonState(app: App, initialName = ''): DungeonState {
   const [settings, setSettings] = useState<DungeonGeneratorSettings>(() => readSettings(app));
   const [request, setRequest] = useState<DungeonRequest>(() => ({
-    seed: randomSeed(), theme: settings.theme, tags: settings.tags, floors: settings.floors, bossRoom: settings.bossRoom, fiveRoom: settings.fiveRoom,
+    seed: randomSeed(), theme: settings.theme, tags: sized(settings.tags), floors: settings.floors, bossRoom: settings.bossRoom, fiveRoom: settings.fiveRoom,
   }));
   const [pickedFloor, setPickedFloor] = useState(0);
   const [name, setNameState] = useState(initialName.trim());
@@ -152,6 +159,10 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     toggleTag: useCallback((tag) => {
       const tags = requestRef.current.tags as DungeonTag[];
       applyTags(tags.includes(tag) ? tags.filter((t) => t !== tag) : withTag(tags, tag));
+    }, [applyTags]),
+    chooseTag: useCallback((among, tag) => {
+      const others = (requestRef.current.tags as DungeonTag[]).filter((t) => !among.includes(t));
+      applyTags(tag ? withTag(others, tag) : others);
     }, [applyTags]),
     setWaterLevel: useCallback((level) => setRequest((current) => {
       const { waterLevel: _old, ...rest } = current;

@@ -98,28 +98,28 @@
   }
 }
 
-// ── Tags ────────────────────────────────────────────────────────────────────
+// ── Features ────────────────────────────────────────────────────────────────
+// One column: each group's name above what it holds, the choices of one spanning the panel, the
+// chips wrapping under their name.
 
+.atlas-dungeon-features,
 .atlas-dungeon-tags {
-  @include atlas-flex-col($gap: $spacing-xs);
+  @include atlas-flex-col($gap: $spacing-l);
 }
 
+.atlas-dungeon-features__group,
 .atlas-dungeon-tags__group {
-  display: flex;
-  align-items: baseline;
-  gap: $spacing-s;
+  @include atlas-flex-col($gap: $spacing-s);
 }
 
-// The group's name stands at the start of its chips' first row, in a column as wide as the longest, so the chips line up.
+.atlas-dungeon-features__label,
 .atlas-dungeon-tags__label {
-  flex: 0 0 5.5em;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: $font-ui-smaller;
+  font-weight: $font-weight-medium;
 }
 
 .atlas-dungeon-tags__chips {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: $spacing-xs;
@@ -161,61 +161,13 @@
 }
 
 // ── Style gallery ───────────────────────────────────────────────────────────
-// Four cards a row in the panel; the chosen one ringed in the accent. Each card's art is a window
-// of the dungeon drawn by the worker at the art's device pixels (`useThumbnailSize`).
+// Two picture cards a row (`_cards.scss`); each card's art is a window of the dungeon drawn by the
+// worker at the art's device pixels (`useThumbnailSize`).
 
 .atlas-dungeon-style-gallery {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: $spacing-xs;
-}
-
-.atlas-dungeon-style-card {
-  @include atlas-flex-col($gap: $spacing-xs);
-  align-items: stretch;
-  height: auto;
-  margin: 0;
-  padding: $spacing-xs;
-  border: $border-width-l solid transparent;
-  border-radius: $radius-xl;
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  @include atlas-corner-shape;
-  transition: background-color $transition-fast $transition-ease, border-color $transition-fast $transition-ease, color $transition-fast $transition-ease;
-
-  &:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-
-  &.atlas-active {
-    border-color: var(--interactive-accent);
-    background: color-mix(in oklch, var(--interactive-accent) 10%, transparent);
-    color: var(--text-normal);
-  }
-
-  @include atlas-focus-ring;
-}
-
-.atlas-dungeon-style-card__art {
-  position: relative;
-  display: block;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border-radius: $radius-l;
-  @include atlas-corner-shape;
-
-  // A hairline over the picture, so a white or black look keeps its edge on any theme.
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    box-shadow: inset 0 0 0 $border-width-s var(--background-modifier-border);
-    pointer-events: none;
-  }
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $spacing-s;
 }
 
 .atlas-dungeon-style-card__picture,
@@ -231,15 +183,10 @@
   display: none;
 }
 
-.atlas-dungeon-style-card__name {
-  @include atlas-truncate;
-  font-size: $font-ui-smaller;
-  text-align: center;
-}
-
 // ── View ────────────────────────────────────────────────────────────────────
 
-.atlas-dungeon-grid-choice {
+.atlas-dungeon-grid-choice,
+.atlas-dungeon-features__choice {
   width: 100%;
 
   // Five choices share the panel's width evenly, whatever their words.

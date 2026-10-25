@@ -5,6 +5,7 @@ import { Button } from '../primitives/button';
 import { LabelTooltip } from '../primitives/tooltip';
 import { EASE_OUT_CONTROL_POINTS as EASE_OUT, MOTION_EASE_OUT, PANEL_ENTER_MS, PANEL_EXIT_MS } from '../../../utils/motion';
 import { t } from '../../../i18n';
+import { cn } from '../../../../utils/cn';
 import { ExportButton } from './ExportButton';
 import { FloorSwitcher } from './FloorSwitcher';
 import { MapPreview } from './MapPreview';
@@ -41,15 +42,16 @@ function roll(icon: SVGSVGElement | null): void {
 }
 
 /**
- * The live map of the dungeon the wizard makes, floating beside the panel: New layout and Export
- * on its top right, the floor switcher at its foot for a dungeon of several floors.
+ * The live map of the dungeon the wizard makes, floating beside the panel on its own, as large as
+ * its box allows: New layout and Export on its top right, the floor switcher at its foot for a
+ * dungeon of several floors.
  */
 export function WizardPreview({ box, side, preview, state, actions, onFrame }: WizardPreviewProps): React.JSX.Element {
   const reduced = useReducedMotion() ?? false;
   const dice = useRef<SVGSVGElement>(null);
   return (
     <motion.div
-      className="atlas-dungeon-wizard-preview"
+      className={cn('atlas-dungeon-wizard-preview', side < 0 && 'atlas-dungeon-wizard-preview--left')}
       style={box}
       variants={previewVariants(side, reduced)}
       initial="hidden"
@@ -62,25 +64,26 @@ export function WizardPreview({ box, side, preview, state, actions, onFrame }: W
         onFrame={onFrame}
         onHideWing={state.hideWing}
         onShowHiddenWings={state.edits.hiddenWings?.length ? state.showHiddenWings : undefined}
-      />
-      <div className="atlas-dungeon-wizard-preview__tools">
-        <ExportButton actions={actions} ready={state.model !== null} className="atlas-dungeon-wizard-preview__tool" />
-        <LabelTooltip label={t('dungeon.new')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="atlas-dungeon-wizard-preview__tool"
-            disabled={actions.creating}
-            onClick={() => {
-              roll(dice.current);
-              state.newSeed();
-            }}
-          >
-            <Dices ref={dice} />
-          </Button>
-        </LabelTooltip>
-      </div>
-      <FloorSwitcher floors={state.floors} floor={state.floor} onFloor={state.setFloor} model={state.model} />
+      >
+        <div className="atlas-dungeon-wizard-preview__tools">
+          <ExportButton actions={actions} ready={state.model !== null} className="atlas-dungeon-wizard-preview__tool" />
+          <LabelTooltip label={t('dungeon.new')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="atlas-dungeon-wizard-preview__tool"
+              disabled={actions.creating}
+              onClick={() => {
+                roll(dice.current);
+                state.newSeed();
+              }}
+            >
+              <Dices ref={dice} />
+            </Button>
+          </LabelTooltip>
+        </div>
+        <FloorSwitcher floors={state.floors} floor={state.floor} onFloor={state.setFloor} model={state.model} />
+      </MapPreview>
     </motion.div>
   );
 }

@@ -45,6 +45,11 @@ export const TAG_GROUPS: readonly { id: string; tags: readonly DungeonTag[] }[] 
   { id: 'secrets', tags: ['secret', 'no-secrets'] },
 ];
 
+/** The size tags, of which the wizard always has one. */
+export const SIZE_TAGS: readonly DungeonTag[] = ['small', 'medium', 'large'];
+/** The secret-room tags: none of them is the dungeon's usual share. */
+export const SECRET_TAGS: readonly DungeonTag[] = ['no-secrets', 'secret'];
+
 /** Tags that rule each other out: picking one drops the others of every group it is in. */
 const EXCLUSIVE: readonly (readonly DungeonTag[])[] = [
   ['chaotic', 'ordered'],
