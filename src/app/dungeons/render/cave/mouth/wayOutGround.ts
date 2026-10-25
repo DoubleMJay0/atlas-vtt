@@ -16,8 +16,6 @@ import { pointsBounds, type Bounds, type Canvas2D, type Vec } from '../../geomet
 import { withAlpha } from '../../palette';
 import type { StoneColours } from '../../stone/colours';
 import { stoneHand } from '../../stone/hand';
-import { cellPattern } from '../../stone/patterns';
-import { ROCK_TILE, rockTile } from '../../stone/textures';
 import { drawMouthScree } from './mouthScree';
 import { groundDistance, groundRing, wayCentre, wayHalf, wayPoint, wayStrength, type WayOut } from './wayOut';
 
@@ -128,11 +126,6 @@ export function stoneWayOut(scene: ArtScene, c: StoneColours): void {
     const runs = wornRuns(ground.way);
     const specks = grit(ground, 0.16, (_, roll) => roll < 0.35);
     throughFade(scene, ground, c.floor, (layer) => {
-      layer.globalAlpha = c.mono ? 0.05 : 0.075;
-      layer.fillStyle = cellPattern(layer, rockTile(), ROCK_TILE.cells);
-      const { bounds } = ground;
-      layer.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
-      layer.globalAlpha = 1;
       layer.beginPath();
       runsPath(runs)(layer);
       layer.strokeStyle = withAlpha(c.line, c.dark ? 0.16 : 0.14);

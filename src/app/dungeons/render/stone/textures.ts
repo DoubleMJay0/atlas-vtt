@@ -1,6 +1,7 @@
 import { DEFAULT_PX_PER_CELL } from '../layoutSize';
 import { periodicFbm, standardised } from '../art/noise';
-import { plateAt, plateValue } from '../art/plates';
+import { smoothstep } from '../art/paths';
+import { plateAt, plateValue, type Plate } from '../art/plates';
 
 /**
  * Seamless surfaces of Stone & shadow, made once per colour: heightfields lit from the top left,
@@ -29,65 +30,75 @@ function canvasOf(size: number, rgba: Uint8ClampedArray<ArrayBuffer>): Offscreen
   return canvas;
 }
 
-/** Lambert shade of a wrapping heightfield at each texel, `relief` scaling its slopes. */
-function shadeOf(h: Float32Array, size: number, relief: number): Float32Array {
-  const out = new Float32Array(size * size);
-  const at = (x: number, y: number): number => h[((y + size) % size) * size + ((x + size) % size)]!;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = (at(x + 1, y) - at(x - 1, y)) * relief;
-      const dy = (at(x, y + 1) - at(x, y - 1)) * relief;
-      out[y * size + x] = (-dx * LIGHT[0] - dy * LIGHT[1] + LIGHT[2]) / Math.hypot(dx, dy, 1);
-    }
-  }
-  return out;
+/** Facets across the tile, inside the plates: each a flat face of its own tilt. */
+const FACETS = 17;
+/** Half the width of a crack between plates, and the lit or shaded lip beside it, in texels. */
+const CRACK_TEXELS = 2.2;
+const CRACK_LIP_TEXELS = 2.4;
+/** The most a facet darkens or lightens its rock: a few steps, never so far that a whole facet takes another colour. */
+const FACET_SHADE = 0.2;
+const FACET_LIGHT = 0.16;
+
+/** The tilt of a plate or facet as the slope of its face along x and y. */
+function tiltOf(a: number, b: number, steep: number): [number, number] {
+  const angle = a * Math.PI * 2;
+  const slope = steep * (0.25 + b * 0.75);
+  return [Math.cos(angle) * slope, Math.sin(angle) * slope];
+}
+
+/** How much a face of slopes (`dx`, `dy`) is lit beyond a level one. */
+function faceLight(dx: number, dy: number): number {
+  return (-dx * LIGHT[0] - dy * LIGHT[1] + LIGHT[2]) / Math.hypot(dx, dy, 1) - LIGHT[2];
 }
 
 /**
- * Natural rock: a few large masses split by deep fissures, finer cracks running through them here
- * and there and dying out, its surface worn and grained, lit from the top left. The fine cracks
- * are `plateAt`'s plates, so a mask can break the rock off along them. Drawn as deviations (white
- * lightens, black darkens), so one tile serves every colour.
+ * Natural rock as a painter blocks it in: plates split by crisp cracks, each plate broken into
+ * flat facets, every facet one tone by how it faces the light at the top left, a crack's lip lit
+ * where it faces the light and shaded where it faces away. No noise: every change of tone is an
+ * edge, so the rock stays crisp at any zoom. Drawn as deviations (white lightens, black darkens),
+ * so one tile serves every colour.
  */
 export function rockTile(): OffscreenCanvas {
   const key = 'rock';
   const known = cache.get(key);
   if (known) return known;
   const { px: size, plates, seed } = ROCK_TILE;
-  const grain = periodicFbm(size, 40, seed + 1, 3, 0.55).values;
-  const wear = periodicFbm(size, 4, seed + 2, 6, 0.55).values;
-  const show = periodicFbm(size, 5, seed + 4, 3, 0.5).values;
-  const tint = standardised(periodicFbm(size, 3, seed + 3, 4).values);
-  const h = new Float32Array(size * size);
+  // A slow, small warp, so cracks bend a little without losing their edge.
+  const bendX = periodicFbm(size, 3, seed + 1, 2, 0.5).values;
+  const bendY = periodicFbm(size, 3, seed + 2, 2, 0.5).values;
+  const plateTexels = size / plates;
+  const facetTexels = size / FACETS;
+  const facetTone = (plate: Plate, facet: Plate): number => {
+    const [px, py] = tiltOf(plateValue(plate, plates, seed), plateValue(plate, plates, seed + 7), 0.55);
+    const [fx, fy] = tiltOf(plateValue(facet, FACETS, seed + 11), plateValue(facet, FACETS, seed + 13), 0.4);
+    return Math.max(-FACET_SHADE, Math.min(FACET_LIGHT, faceLight(px + fx, py + fy) * 0.7));
+  };
+  const out = new Uint8ClampedArray(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const k = y * size + x;
-      // The lattices are warped, so the cracks wander instead of running straight.
-      const wx = (wear[k]! - 0.5) * 0.9;
-      const wy = (show[(k + size * 37) % h.length]! - 0.5) * 0.9;
-      const u = (x / size) * plates + wx;
-      const v = (y / size) * plates + wy;
-      const fine = plateAt(u, v, plates, seed);
-      const mu = (x / size) * 3 + wx * 0.6;
-      const mv = (y / size) * 3 + wy * 0.6;
-      const mass = plateAt(mu, mv, 3, seed + 5);
-      const lift = plateValue(mass.nearest, 3, seed + 5);
-      // Fissures between the masses run deep; the fine cracks show where `show` lets them, fading out.
-      const fissure = Math.exp(-(mass.f2 - mass.f1) / 0.025);
-      const crack = Math.exp(-(fine.f2 - fine.f1) / 0.018) * Math.max(0, Math.min(1, (show[k]! - 0.48) * 6));
-      const tilt = ((mu - mass.nearest.x) * Math.cos(lift * 9) + (mv - mass.nearest.y) * Math.sin(lift * 9)) * 0.12;
-      h[k] = lift * 0.12 + tilt + wear[k]! * 0.55 + grain[k]! * 0.035 - fissure * 0.22 - crack * 0.1;
+      const wx = (bendX[k]! - 0.5) * 0.35;
+      const wy = (bendY[k]! - 0.5) * 0.35;
+      const plate = plateAt((x / size) * plates + wx, (y / size) * plates + wy, plates, seed);
+      const facet = plateAt((x / size) * FACETS + wx * 1.8, (y / size) * FACETS + wy * 1.8, FACETS, seed + 9);
+      // A facet's edge is one texel of blend between its two tones, no more.
+      const seam = Math.min(1, ((facet.f2 - facet.f1) / 2) * facetTexels);
+      let d = facetTone(plate.nearest, facet.nearest) * (0.5 + seam * 0.5) + facetTone(plate.nearest, facet.next) * (0.5 - seam * 0.5);
+      // Across a crack: dark in it, and on its lip lit or shaded by which way the plate's edge faces.
+      const fromCrack = ((plate.f2 - plate.f1) / 2) * plateTexels;
+      const ex = plate.next.x - plate.nearest.x;
+      const ey = plate.next.y - plate.nearest.y;
+      const faces = (ex * LIGHT[0] + ey * LIGHT[1]) / (Math.hypot(ex, ey) || 1);
+      const lip = 1 - smoothstep(CRACK_TEXELS, CRACK_TEXELS + CRACK_LIP_TEXELS, fromCrack);
+      d += lip * (faces > 0 ? 0.16 : -0.1) * Math.min(1, Math.abs(faces) * 2);
+      const crack = 1 - smoothstep(CRACK_TEXELS - 0.8, CRACK_TEXELS + 0.6, fromCrack);
+      d = d * (1 - crack) - 0.42 * crack;
+      const v = d > 0 ? 255 : 0;
+      out[k * 4] = v;
+      out[k * 4 + 1] = v;
+      out[k * 4 + 2] = v;
+      out[k * 4 + 3] = Math.min(255, Math.abs(d) * 255);
     }
-  }
-  const shade = shadeOf(h, size, size * 0.22);
-  const out = new Uint8ClampedArray(size * size * 4);
-  for (let k = 0; k < h.length; k++) {
-    const d = (shade[k]! - 0.74) * 0.6 + tint[k]! * 0.03;
-    const v = d > 0 ? 255 : 0;
-    out[k * 4] = v;
-    out[k * 4 + 1] = v;
-    out[k * 4 + 2] = v;
-    out[k * 4 + 3] = Math.min(255, Math.abs(d) * 255);
   }
   const canvas = canvasOf(size, out);
   cache.set(key, canvas);

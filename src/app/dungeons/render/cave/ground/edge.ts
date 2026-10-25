@@ -7,8 +7,8 @@ import type { Pens } from '../../engraved/pens';
 import type { Vec } from '../../geometry';
 import { withAlpha } from '../../palette';
 import type { StoneColours } from '../../stone/colours';
-import { cellPattern } from '../../stone/patterns';
-import { ROCK_TILE, rockTile } from '../../stone/textures';
+import { FacetBatch, rockTones } from '../../stone/rockFacets';
+import { lipChips } from './lipChips';
 import { wallInkWidth } from '../../wallInk';
 
 interface Lip {
@@ -86,19 +86,35 @@ export function stoneEdge(scene: ArtScene, c: StoneColours): void {
   ctx.beginPath();
   traceRings(ctx, lip.outer);
   traceRings(ctx, scene.floorRings);
-  ctx.fillStyle = c.rock;
-  ctx.fill('evenodd');
   ctx.clip('evenodd');
-  if (scene.raster) {
-    ctx.fillStyle = cellPattern(ctx, rockTile(), ROCK_TILE.cells);
+  if (scene.raster) drawChips(scene, c, lip);
+  else {
+    ctx.fillStyle = c.rock;
     ctx.fill('evenodd');
   }
   stroke(scene, lip.light, withAlpha(c.light, c.dark ? 0.22 : 0.55), 0.018);
   stroke(scene, lip.shade, withAlpha('#000000', 0.3), 0.022);
   stroke(scene, lip.ledges, withAlpha(c.line, 0.3), 0.007);
-  stroke(scene, lip.hachures.filter((_, i) => i % 5 === 0), withAlpha(c.line, 0.25), 0.007);
   ctx.restore();
   // paintStone draws the shared wall ink after the shade and grid, exactly on the scene's walls.
+}
+
+/** The lip as chips of flat facets on a bed of the rock's darkest tone, which shows in the cracks between them. */
+function drawChips(scene: ArtScene, c: StoneColours, lip: Lip): void {
+  const { ctx } = scene.env;
+  const tones = rockTones(c);
+  ctx.fillStyle = tones[0]!;
+  ctx.fill('evenodd');
+  const batch = new FacetBatch(tones);
+  const cracks: Vec[][] = [];
+  scene.floorRings.forEach((ring, r) => {
+    for (const chip of lipChips(ring, lip.outer[r]!, scene.env.dungeon.model.seed + r * 7)) {
+      for (const { face, light } of chip.facets) batch.add(face, light, 8);
+      cracks.push(chip.crack);
+    }
+  });
+  batch.fill(ctx);
+  stroke(scene, cracks, withAlpha(c.dark ? '#000000' : c.line, 0.45), 0.008);
 }
 
 export function engravedEdge(scene: ArtScene, pens: Pens): void {

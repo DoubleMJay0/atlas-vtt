@@ -18,6 +18,8 @@ import { depthField } from '../art/pools';
 
 /** Line weights of Stone & shadow, in cells. */
 const WEIGHTS = { heavy: 0.028, outline: 0.013, fine: 0.007 };
+/** How strongly the rock grain lies on a dark look's rock. */
+const DARK_ROCK_GRAIN = 0.65;
 
 /** The colour of a material in the look. */
 export function materialColour(c: StoneColours, material: Material): string {
@@ -83,7 +85,11 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       ctx.beginPath();
       path(ctx);
       ctx.clip();
-      if (material === 'rock') ctx.fillStyle = cellPattern(ctx, rockTile(), ROCK_TILE.cells);
+      if (material === 'rock') {
+        ctx.fillStyle = cellPattern(ctx, rockTile(), ROCK_TILE.cells);
+        // A dark look's rock lies a few steps above its paper: its shaded facets, as deep, would read as holes.
+        if (c.dark) ctx.globalAlpha *= DARK_ROCK_GRAIN;
+      }
       else if (material === 'wood' || material === 'rope') ctx.fillStyle = cellPattern(ctx, woodTile(0.12, tileTexels(0.9)), 0.9);
       else ctx.fillStyle = cellPattern(ctx, grainTile(material === 'metal' ? 0.03 : 0.06, tileTexels(1.4)), 1.4);
       ctx.fill();

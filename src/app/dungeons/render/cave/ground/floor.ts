@@ -6,8 +6,6 @@ import type { Vec } from '../../geometry';
 import type { Pens } from '../../engraved/pens';
 import { withAlpha } from '../../palette';
 import type { StoneColours } from '../../stone/colours';
-import { cellPattern } from '../../stone/patterns';
-import { ROCK_TILE, rockTile } from '../../stone/textures';
 
 /** Fractures belong to the whole floor, not to its rooms or the drawing's window. */
 function fractures(scene: ArtScene): Vec[][] {
@@ -88,15 +86,6 @@ export function stoneFloor(scene: ArtScene, c: StoneColours): void {
   ctx.fill();
   clipFloors(scene);
   mineralWash(scene, c);
-  if (scene.raster) {
-    ctx.save();
-    ctx.globalAlpha = c.mono ? 0.05 : 0.075;
-    ctx.fillStyle = cellPattern(ctx, rockTile(), ROCK_TILE.cells);
-    ctx.beginPath();
-    traceRings(ctx, scene.floorRings);
-    ctx.fill();
-    ctx.restore();
-  }
   ctx.beginPath();
   runsPath(fractures(scene))(ctx);
   ctx.strokeStyle = withAlpha(c.line, c.dark ? 0.13 : 0.15);
