@@ -4,7 +4,7 @@
     {
       "version": "0.9.2-beta.0",
       "title": "Coming in 0.9.2",
-      "markdown": "## New\n- A random table row that links its own table rolls that table again without itself, for rows such as \"Mithral + reroll\"\n- Generators: a note table whose rows are parts rolls them into one result, with a reroll and a lock per part, Give for results with a Type and Save as note; a link to a generator rolls all of it\n- Encounter builder: type dice such as 2d4 into a creature's count, and every time the encounter is placed that many are rolled\n\n## Improved\n\n- The update notice comes back each time Obsidian starts until you click it, instead of showing only once"
+      "markdown": "## New\n- A random table row that links its own table rolls that table again without itself, for rows such as \"Mithral + reroll\"\n- Generators: a note table whose rows are parts rolls them into one result, with a reroll and a lock per part, Give for results with a Type and Save as note; a link to a generator rolls all of it\n- Encounter builder: type dice such as 2d4 into a creature's count, and every time the encounter is placed that many are rolled\n- Note pins can link to a folder of encounters: a click on the pin rolls one of the encounters in it (folders below it too) and puts it in your hand to place; Cmd/Ctrl + hover lists them to pick one yourself\n\n## Improved\n\n- The update notice comes back each time Obsidian starts until you click it, instead of showing only once"
     },
     {
       "version": "0.9.1",

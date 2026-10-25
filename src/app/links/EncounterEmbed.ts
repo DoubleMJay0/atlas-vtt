@@ -1,7 +1,6 @@
 import type { EmbedContext, TFile } from 'obsidian';
-import { AssetService, type EncounterTokenRef } from '../services/AssetService';
-import { refsRange } from '../encounters/encounterQuantity';
-import { formatRange } from '../creatures/creatureValues';
+import { AssetService } from '../services/AssetService';
+import { tokenCountText } from '../encounters/encounterTokenCount';
 import { addArtIcon, AtlasLinkEmbed, type EmbedCardContent } from './AtlasLinkEmbed';
 import { encounterOfFile } from './atlasLinkAssets';
 import { placeEncounterFile } from './openAtlasLink';
@@ -30,14 +29,6 @@ function addTokenRow(artEl: HTMLElement, previews: readonly EncounterTokenPrevie
   }
   const overflow = tokenCount - previews.length;
   if (overflow > 0) row.createDiv({ cls: 'atlas-link-embed__overflow', text: `+${overflow}` });
-}
-
-/** How many tokens the encounter places, a span where some are rolled. */
-function tokenCountText(refs: readonly EncounterTokenRef[]): string {
-  const range = refsRange(refs);
-  return range.min === range.max
-    ? t('atlasLinks.tokenCount', { count: range.max })
-    : t('atlasLinks.tokenRange', { count: range.max, range: formatRange(range) });
 }
 
 /** An embedded encounter (`![[…/encounters/encounter-….json|Goblin ambush]]`). */

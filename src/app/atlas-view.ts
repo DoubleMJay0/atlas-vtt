@@ -505,6 +505,11 @@ export class AtlasView extends FileView {
     }
   }
 
+  /** Points what the scene names at or below a renamed folder at its new place, untracked like a renamed file. */
+  public handleFolderRenamed(oldPath: string, newPath: string): void {
+    runUntracked(this.store, () => this.store.getState().retargetRenamedFolder(oldPath, newPath));
+  }
+
   /**
    * Lets `rewrite` replace the file of the scene the store holds, then loads the scene again
    * from it, keeping the camera where it is. Pending changes are saved first

@@ -18,6 +18,23 @@ export function movedPathOf(moves: readonly PathMove[]): MovedPath {
   return (candidate) => (candidate ? targets.get(normalizeImagePath(candidate)) ?? null : null);
 }
 
+/**
+ * Where stored paths go after folders moved: a path at or below a moved folder moves with it, as
+ * a pin's folder of encounters does. Files inside get their own moves; this reaches what names a
+ * folder.
+ */
+export function movedFolderPathOf(moves: readonly PathMove[]): MovedPath {
+  return (candidate) => {
+    if (!candidate) return null;
+    for (const { from, to } of moves) {
+      if (from === to) continue;
+      if (candidate === from) return to;
+      if (candidate.startsWith(`${from}/`)) return `${to}${candidate.slice(from.length)}`;
+    }
+    return null;
+  };
+}
+
 /** A pin target (`path` or `path#heading`) after the moves, or null when its file did not move. */
 function movedPinTarget(target: string, moved: MovedPath): string | null {
   const hash = target.indexOf('#');

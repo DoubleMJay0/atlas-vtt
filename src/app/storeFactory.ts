@@ -42,7 +42,7 @@ import { isAtlasToolAvailable } from './tools/toolAvailability';
 import { readExploredMask } from './lighting/exploredMaskCodec';
 import { clampLitThreshold, readSceneLighting } from './lighting/sceneLightingOptions';
 import { isPinLabelKind, nextPinLabel } from './tools/pinLabels';
-import { movedPathOf, rewriteMapReferences } from './services/renamedPaths';
+import { movedFolderPathOf, movedPathOf, rewriteMapReferences } from './services/renamedPaths';
 import { conditionValue, removeCondition, setConditionValue } from './utils/conditionValues';
 import { HydrationTracker } from './stores/hydrationTracker';
 import { isolateListeners } from './stores/isolatedListeners';
@@ -93,6 +93,8 @@ export interface ViewAtlasState extends ViewState {
   updateTokens: (entries: Array<{ id: string; changes: TokenUpdates }>) => void;
   /** Points tokens and pins that name a vault file at the path it was renamed to. */
   retargetRenamedFile: (oldPath: string, newPath: string) => void;
+  /** Points what the scene names at or below a renamed folder (a pin's folder of encounters) at its new place. */
+  retargetRenamedFolder: (oldPath: string, newPath: string) => void;
   deleteToken: (id: string) => void;
   setTokens: (map: Record<string, TokenEntity>) => void;
   setTokenRing: (id: string, color: string | null) => void;
@@ -660,6 +662,10 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
 
           retargetRenamedFile: (oldPath, newPath) => set((draft) => {
             rewriteMapReferences(draft, movedPathOf([{ from: oldPath, to: newPath }]));
+          }),
+
+          retargetRenamedFolder: (oldPath, newPath) => set((draft) => {
+            rewriteMapReferences(draft, movedFolderPathOf([{ from: oldPath, to: newPath }]));
           }),
 
           deleteToken: (id) => set((draft) => {

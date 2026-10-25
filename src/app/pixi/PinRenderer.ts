@@ -14,9 +14,11 @@ import { isPinLabelKind, nextPinLabel } from '../tools/pinLabels';
 import { getPinIconDefinition, resolvePinIcon, type PinIconId } from '../types/pinIcons';
 import { canvasBadgeColors, isDarkTheme } from './utils/canvasBadgeColors';
 import { dispatchPinAction } from './utils/pinActions';
+import { pinOpenLook } from './pinOpenLook';
 import { hexLayoutOfGrid, isShownAsHex, pinDisplayPoint } from '../grid/hexLinks';
 import { MAP_LAYER_Z } from './mapLayerOrder';
-import { createReadableMark } from './pinReadableMark';
+import { createReadableMark, createRollMark } from './pinBadgeMarks';
+import { isEncounterFolderLink } from '../links/atlasLinkTargets';
 import { readablePinEntry } from './pinReadableMenu';
 import { t } from '../i18n';
 
@@ -317,7 +319,7 @@ export class PinRenderer {
           endHistoryTransaction(this.store);
           this.viewport.plugins.resume('drag');
         } else if (!hasMoved) {
-          dispatchPinAction('open', pin);
+          dispatchPinAction('open', pin, this.store);
         }
       };
 
@@ -389,7 +391,8 @@ export class PinRenderer {
         container.addChild(iconSprite);
       }
     }
-    if (pin.readable === true) container.addChild(createReadableMark(badgeRadius, colors));
+    if (isEncounterFolderLink(pin.notePath)) container.addChild(createRollMark(badgeRadius, colors));
+    else if (pin.readable === true) container.addChild(createReadableMark(badgeRadius, colors));
 
     return container;
   }
@@ -398,8 +401,8 @@ export class PinRenderer {
   private showPinContextMenu(pin: NotePin, pos: { x: number; y: number }): void {
     openContextMenuGlobal(
       [
-        { type: 'item', label: t('pinMenu.open'), icon: 'file-text', onClick: () => dispatchPinAction('open', pin) },
-        { type: 'item', label: t('pinMenu.edit'), icon: 'edit', onClick: () => dispatchPinAction('edit', pin) },
+        { type: 'item', ...pinOpenLook(pin), onClick: () => dispatchPinAction('open', pin, this.store) },
+        { type: 'item', label: t('pinMenu.edit'), icon: 'edit', onClick: () => dispatchPinAction('edit', pin, this.store) },
         ...[readablePinEntry(this.store, pin)].filter((entry) => entry !== null),
         { type: 'item', label: t('common.duplicate'), icon: 'files', onClick: () => this.store.getState().duplicateMapObjects([pin.id]) },
         { type: 'item', label: t('common.delete'), icon: 'trash', destructive: true, onClick: () => this.store.getState().deleteMapObject('pin', pin.id) },
