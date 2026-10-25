@@ -67,6 +67,8 @@ export type LightingState = SceneState & ExploredMemoryState & Pick<ViewState, '
   objects: Pick<ViewState['objects'], 'fog' | 'levelSurfaces'>;
   /** The GM hides the roofs of the GM's picture (the switcher's Roofs). */
   roofsHidden?: boolean;
+  /** How large the map draws token rings; the tokens of levels below wear theirs alike. */
+  tokenSettings?: Pick<ViewState['tokenSettings'], 'tokenRingSize'>;
 };
 
 export type LightingStore = Pick<StoreApi<LightingState>, 'getState' | 'subscribe'>;

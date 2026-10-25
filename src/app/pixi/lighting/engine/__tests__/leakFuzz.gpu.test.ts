@@ -99,7 +99,7 @@ async function fuzz({ seed, trials, gap = false, bounds = { width: 2048, height:
       };
       const lit = shoot(false);
       const seen = shoot(true);
-      // The same lights carried along a drag: traced at once, on coarse texels, without smoothing.
+      // The same lights carried along a drag: traced at once, with few rays.
       engine.update({ bounds, albedo: null, walls, lights: lights.map((light) => ({ ...light, moving: true as const })), sight: SEES_ALL, sightRadius, ambient: 0 });
       engine.flush();
       const moving = renderView(renderer, engine, target, bounds, scale, x, y);

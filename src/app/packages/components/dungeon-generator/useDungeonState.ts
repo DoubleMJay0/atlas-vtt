@@ -37,13 +37,10 @@ export interface DungeonState {
   setGenerated: (request: DungeonRequest, model: DungeonModel) => void;
   /** The Name field: names the scene, changes nothing of the dungeon. */
   setName: (name: string) => void;
-  setSeed: (seed: number) => void;
-  /** New dungeon: a new seed, the tags as they are. */
+  /** New layout: a new seed, everything else as it is. */
   newSeed: () => void;
   /** Switches a tag on or off (and the tags it rules out off): this seed with the tags as they are then. */
   toggleTag: (tag: DungeonTag) => void;
-  /** The tags as they are, a new seed. */
-  random: () => void;
   setWaterLevel: (level: number | undefined) => void;
   setView: (changes: Partial<DungeonView>) => void;
   /** The look picked in the style gallery. */
@@ -103,8 +100,8 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     setEdits(NO_EDITS);
   }, []);
 
-  const applyTags = useCallback((tags: DungeonTag[], seed?: number): void => {
-    changeRequest((current) => ({ ...current, tags, ...(seed === undefined ? {} : { seed }) }));
+  const applyTags = useCallback((tags: DungeonTag[]): void => {
+    changeRequest((current) => ({ ...current, tags }));
     persist({ tags });
   }, [changeRequest, persist]);
 
@@ -151,13 +148,11 @@ export function useDungeonState(app: App, initialName = ''): DungeonState {
     }, [changeRequest, persist]),
     setGenerated: useCallback((asked, next) => setGeneratedState({ request: asked, model: next }), []),
     setName: setNameState,
-    setSeed: useCallback((seed) => changeRequest((current) => (current.seed === seed ? current : { ...current, seed })), [changeRequest]),
     newSeed: useCallback(() => changeRequest((current) => ({ ...current, seed: randomSeed() })), [changeRequest]),
     toggleTag: useCallback((tag) => {
       const tags = requestRef.current.tags as DungeonTag[];
       applyTags(tags.includes(tag) ? tags.filter((t) => t !== tag) : withTag(tags, tag));
     }, [applyTags]),
-    random: useCallback(() => applyTags(requestRef.current.tags as DungeonTag[], randomSeed()), [applyTags]),
     setWaterLevel: useCallback((level) => setRequest((current) => {
       const { waterLevel: _old, ...rest } = current;
       return level === undefined ? rest : { ...rest, waterLevel: level };

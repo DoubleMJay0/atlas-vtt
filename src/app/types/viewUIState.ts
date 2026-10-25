@@ -14,6 +14,8 @@ export interface DungeonGeneratorRequest {
   name: string;
   /** A note pin waits for the scene: name and collection are fixed, and the map stays shown. */
   waiting: boolean;
+  /** Where the note pin dropdown it takes over stood, in the window's pixels: the wizard opens in its place. */
+  anchor?: { left: number; top: number; width: number; height: number };
 }
 
 export interface ViewUIState {

@@ -2,7 +2,9 @@ import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { TokenEntity } from '../../../types';
 import type { TokenPerception } from '../../../vision/tokenPerception';
 import { HIDDEN_TOKEN_ALPHA } from '../../playerSafeFrame';
-import { computeTokenPixelSize } from '../../token-renderer/tokenSizing';
+import { getTokenRingOuterDiameter } from '../../token-renderer/tokenRingMetrics';
+import { loadedTokenRingTexture, loadTokenRingTexture } from '../../token-renderer/tokenRingTexture';
+import { computeTokenPixelSize, computeTokenStrokeWidth } from '../../token-renderer/tokenSizing';
 import { destroyTree } from '../../utils/destroyTree';
 
 /** Token art, shared by the tokens that show it: each holds what it shows (`TextureCache`). */
@@ -17,6 +19,7 @@ interface Shown {
   group: Container;
   art: Sprite;
   mask: Graphics;
+  ring: Sprite;
   /** The art this token holds, and the load that brings it. */
   path: string;
   load: number;
@@ -35,24 +38,26 @@ export function tokenLook(perception: TokenPerception | null): (token: TokenEnti
 
 /**
  * The tokens of a level below the view, as its picture through the view's openings draws them:
- * their art in its circle, at its size, turn and place in the order, and nothing else (no ring,
- * name, bars or controls), never hit-tested. Which of them show is the picture's (`show`).
+ * their art in its circle with its ring, at its size, turn and place in the order, and nothing else
+ * (no name, bars or controls), never hit-tested. Which of them show is the picture's (`show`).
  */
 export class BelowTokens {
   readonly view = new Container({ label: 'tokens-below', sortableChildren: true, eventMode: 'none', interactiveChildren: false });
   private readonly shown = new Map<string, Shown>();
   private tokens: Record<string, TokenEntity> | null = null;
   private cellSize = 0;
+  private ringScale = 1;
   private loads = 0;
 
   constructor(private readonly art: TokenArt, private readonly onArt: () => void) {}
 
-  /** Follows the level's tokens; the same record and cell size again do nothing. */
-  sync(tokens: Record<string, TokenEntity>, cellSize: number): void {
-    if (tokens === this.tokens && cellSize === this.cellSize) return;
-    const resized = cellSize !== this.cellSize;
+  /** Follows the level's tokens; the same record, cell size and ring size (`tokenSettings.tokenRingSize`) again do nothing. */
+  sync(tokens: Record<string, TokenEntity>, cellSize: number, ringScale: number): void {
+    if (tokens === this.tokens && cellSize === this.cellSize && ringScale === this.ringScale) return;
+    const resized = cellSize !== this.cellSize || ringScale !== this.ringScale;
     this.tokens = tokens;
     this.cellSize = cellSize;
+    this.ringScale = ringScale;
     for (const [id, shown] of this.shown) {
       if (!tokens[id]) this.remove(id, shown);
     }
@@ -96,9 +101,12 @@ export class BelowTokens {
     art.anchor.set(0.5);
     const mask = new Graphics();
     art.mask = mask;
-    group.addChild(mask, art);
+    const ring = new Sprite(Texture.EMPTY);
+    ring.label = 'token-below-ring';
+    ring.anchor.set(0.5);
+    group.addChild(mask, art, ring);
     this.view.addChild(group);
-    const shown: Shown = { token, group, art, mask, path: '', load: 0 };
+    const shown: Shown = { token, group, art, mask, ring, path: '', load: 0 };
     this.shown.set(token.id, shown);
     return shown;
   }
@@ -112,8 +120,30 @@ export class BelowTokens {
     shown.art.height = size;
     shown.art.rotation = ((token.rotation ?? 0) * Math.PI) / 180;
     shown.mask.clear().circle(0, 0, size / 2).fill({ color: 0xffffff });
+    this.drawRing(shown);
     const path = token.imagePath ?? '';
     if (path !== shown.path || shown.load === 0) this.load(shown, path);
+  }
+
+  /** The ring the map draws around the token (`SpriteFactory.createTokenRing`): its texture, tinted, white without a colour. */
+  private drawRing(shown: Shown): void {
+    const { ring, token } = shown;
+    const texture = loadedTokenRingTexture();
+    ring.visible = token.showRing !== false && texture !== null;
+    if (token.showRing === false) return;
+    if (!texture) {
+      void loadTokenRingTexture().then((loaded) => {
+        if (!loaded || ring.destroyed) return;
+        this.drawRing(shown);
+        this.onArt();
+      });
+      return;
+    }
+    const size = computeTokenPixelSize(this.cellSize, token.size || 1) * this.ringScale;
+    ring.texture = texture;
+    ring.width = ring.height = getTokenRingOuterDiameter(size, computeTokenStrokeWidth(this.cellSize), this.ringScale);
+    const tint = Number.parseInt((token.ringColor || '#ffffff').replace('#', ''), 16);
+    ring.tint = Number.isFinite(tint) ? tint : 0xffffff;
   }
 
   /** Takes the art of `path` for the token, letting go of what it held; a later load wins over an earlier one still on its way. */

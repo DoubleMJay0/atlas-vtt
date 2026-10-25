@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MotionGlobalConfig } from 'framer-motion';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openCreatedScene } from '../../src/app/import/openCreatedScene';
 import { DungeonGeneratorOverlay } from '../../src/app/packages/components/dungeon-generator/DungeonGeneratorOverlay';
-import type { DungeonGeneratorPanelProps } from '../../src/app/packages/components/dungeon-generator/DungeonGeneratorPanel';
+import type { DungeonWizardProps } from '../../src/app/packages/components/dungeon-generator/DungeonWizard';
 import { generateDungeonFor, showDungeonGenerator } from '../../src/app/packages/components/dungeon-generator/openDungeonGenerator';
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
@@ -13,18 +14,15 @@ import { canRunMapHotkeys } from '../../src/app/keyboard/mapHotkeys';
 import { loadAtlasView } from '../../src/app/plugin/atlasLeaves';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
-const panel = vi.hoisted(() => ({ props: null as DungeonGeneratorPanelProps | null }));
-vi.mock('../../src/app/packages/components/dungeon-generator/DungeonGeneratorPanel', () => ({
-  DungeonGeneratorPanel: (props: DungeonGeneratorPanelProps) => {
+const panel = vi.hoisted(() => ({ props: null as DungeonWizardProps | null }));
+vi.mock('../../src/app/packages/components/dungeon-generator/DungeonWizard', () => ({
+  DungeonWizard: (props: DungeonWizardProps) => {
     panel.props = props;
-    return <div>{props.header}</div>;
+    return <button type="button" onClick={props.onClose}>Close</button>;
   },
 }));
 vi.mock('../../src/app/plugin/atlasLeaves', () => ({ loadAtlasView: vi.fn() }));
 vi.mock('../../src/app/import/openCreatedScene', () => ({ openCreatedScene: vi.fn(async () => true) }));
-vi.mock('../../src/app/packages/components/asset-manager/token-creator/useAssetCatalog', () => ({
-  useAssetCatalog: () => ({ assetService: {}, collections: [{ id: 'Dungeons', name: 'Dungeons' }, { id: 'Ruins', name: 'Ruins' }] }),
-}));
 
 const SCENE = { name: 'Crypt', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap' };
 
@@ -42,27 +40,40 @@ function mount(): { store: ViewAtlasStore; app: ReturnType<typeof createInMemory
   return { store, app };
 }
 
+beforeEach(() => { MotionGlobalConfig.skipAnimations = true; });
 afterEach(() => {
+  MotionGlobalConfig.skipAnimations = false;
   cleanup();
   panel.props = null;
   vi.clearAllMocks();
 });
 
 describe('the dungeon generator over the map', () => {
-  it('fills the view for a pin, closes with its X and tells the pin no scene came', async () => {
+  it('takes the pin dropdown\'s place, closes with its X and tells the pin no scene came', async () => {
     const { store } = mount();
     expect(screen.queryByRole('dialog')).toBeNull();
     let result: Promise<{ scenePath: string } | null> = Promise.resolve(null);
-    act(() => { result = generateDungeonFor(store, { name: 'Crypt', collectionId: 'Dungeons' }); });
+    const anchor = { left: 120, top: 80, width: 320, height: 400 };
+    act(() => { result = generateDungeonFor(store, { name: 'Crypt', collectionId: 'Dungeons', anchor }); });
     const dialog = screen.getByRole('dialog', { name: 'Dungeon generator' });
     expect(dialog.classList.contains('atlas-dungeon-generator-overlay')).toBe(true);
-    // A pin fixes the name and the collection
-    expect(panel.props).toMatchObject({ initialName: 'Crypt', collectionId: 'Dungeons', collections: undefined, onCollectionChange: undefined });
+    // A pin fixes the name and the collection, and the wizard opens where its dropdown stood
+    expect(panel.props).toMatchObject({ initialName: 'Crypt', collectionId: 'Dungeons', anchor });
+    expect(panel.props!.layer).toBe(dialog);
     // The map's shortcuts wait while it is open
     expect(canRunMapHotkeys(new KeyboardEvent('keydown', { key: 'v' }))).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await expect(result).resolves.toBeNull();
+  });
+
+  it('closes on a press beside the wizard and tells the pin no scene came', async () => {
+    const { store } = mount();
+    let result: Promise<{ scenePath: string } | null> = Promise.resolve(null);
+    act(() => { result = generateDungeonFor(store, { name: 'Crypt', collectionId: 'Dungeons' }); });
+    fireEvent.pointerDown(document.querySelector('.atlas-dungeon-generator-overlay__backdrop')!);
+    await expect(result).resolves.toBeNull();
+    expect(store.getState().dungeonGenerator).toBeNull();
   });
 
   it('hands a pin its scene and shows the map again without opening the scene', async () => {
@@ -75,22 +86,19 @@ describe('the dungeon generator over the map', () => {
     expect(openCreatedScene).not.toHaveBeenCalled();
   });
 
-  it('opens from the asset manager with a choice of collection, and opens the scene it created', async () => {
+  it('opens from the asset manager in the middle of the view, for its collection, and opens the scene it created', async () => {
     const { store, app } = mount();
     const view = { leaf: {}, getStore: () => store };
     vi.mocked(loadAtlasView).mockResolvedValue(view as never);
     Object.assign(app.workspace, { revealLeaf: vi.fn(async () => {}) });
     await act(() => showDungeonGenerator(app, 'Ruins'));
-    expect(panel.props).toMatchObject({ initialName: '', collectionId: 'Ruins' });
-    expect(panel.props!.collections).toHaveLength(2);
-    act(() => panel.props!.onCollectionChange!('Dungeons'));
-    expect(panel.props!.collectionId).toBe('Dungeons');
+    expect(panel.props).toMatchObject({ initialName: '', collectionId: 'Ruins', anchor: undefined });
     act(() => panel.props!.onCreated(SCENE));
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(openCreatedScene).toHaveBeenCalledWith(app, SCENE.scenePath, 'Crypt', { level: undefined });
   });
 
-  it('closes on Escape, but not while a scene is being written', () => {
+  it('closes on Escape, but not while a scene is being written', async () => {
     const { store } = mount();
     act(() => { void generateDungeonFor(store, { name: 'Crypt', collectionId: 'Dungeons' }); });
     act(() => panel.props!.onBusyChange!(true));
@@ -98,7 +106,7 @@ describe('the dungeon generator over the map', () => {
     expect(screen.getByRole('dialog')).toBeDefined();
     act(() => panel.props!.onBusyChange!(false));
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('lets a scene still being written answer its pin after the generator was opened anew, closing nothing', async () => {

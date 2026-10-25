@@ -947,6 +947,26 @@ describe('TokenRenderer Integration Tests', () => {
       canvas.dispatchEvent(new Event('pointerleave'));
       expect(left).toHaveBeenCalledWith({ pin: expect.objectContaining({ id: 'token-1' }) });
     });
+
+    it('should drop the statblock hover of a token that went to another level', async () => {
+      store.setState({
+        levels: [
+          { id: 'ground', name: 'Ground', elevation: { bottom: 0, top: 10 }, background: null },
+          { id: 'upper', name: 'Upper', elevation: { bottom: 10, top: 20 }, background: null },
+        ],
+        viewedLevel: 'ground',
+      });
+      store.getState().addToken(token({ id: 'token-1', x: 105, y: 105, kind: 'character', statblockPath: 'Goblin.md' }));
+      await waitForTokens('token-1');
+      const left = vi.fn();
+      eventBus.on('pin-hide-preview', left);
+
+      viewport.emit('pointermove', { ...pointerEvent(105, 105), clientX: 105, clientY: 105 });
+      store.getState().moveTokensToLevel(['token-1'], 'upper');
+      viewport.emit('pointermove', { ...pointerEvent(600, 600), clientX: 600, clientY: 600 });
+
+      expect(left).toHaveBeenCalledWith({ pin: expect.objectContaining({ id: 'token-1', notePath: 'Goblin.md' }) });
+    });
   });
 
   describe('Canvas Listeners', () => {

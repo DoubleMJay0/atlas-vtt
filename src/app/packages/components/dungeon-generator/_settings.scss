@@ -2,70 +2,10 @@
 @use '../../../../../styles/mixins' as *;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Dungeon generator – the sidebar's settings
+// Dungeon generator – the controls of the wizard's steps
 // ═══════════════════════════════════════════════════════════════════════════
 
-.atlas-dungeon-generator__settings {
-  @include atlas-flex-col($gap: $spacing-l);
-  flex: 1;
-  min-height: 0;
-  // The scrollbar sits inside the end padding, so nothing moves when the settings start to scroll.
-  @include atlas-scroll-padding($spacing-l);
-  overflow-y: auto;
-  @include atlas-scrollbar;
-}
-
-.atlas-dungeon-section {
-  @include atlas-flex-col($gap: $spacing-s);
-  flex-shrink: 0;
-  outline: none;
-}
-
-.atlas-dungeon-section__title {
-  margin: 0;
-  font-size: $font-ui-small;
-  font-weight: $font-weight-medium;
-}
-
-// The title folds its section away: the whole row is the button.
-.atlas-dungeon-section__toggle {
-  @include atlas-flex-row($gap: $spacing-xs);
-  width: 100%;
-  height: auto;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-muted);
-  font: inherit;
-  cursor: pointer;
-
-  &:hover {
-    background: transparent;
-    color: var(--text-normal);
-  }
-
-  @include atlas-focus-ring;
-}
-
-.atlas-dungeon-section__chevron {
-  flex-shrink: 0;
-  width: $icon-s;
-  height: $icon-s;
-  transition: transform $transition-fast $transition-ease;
-}
-
-.atlas-dungeon-section__toggle[aria-expanded='true'] > .atlas-dungeon-section__chevron {
-  transform: rotate(90deg);
-}
-
-.atlas-dungeon-section__body[hidden] {
-  display: none;
-}
-
-.atlas-dungeon-fields,
-.atlas-dungeon-identity {
+.atlas-dungeon-fields {
   @include atlas-flex-col($gap: $spacing-s);
 }
 
@@ -117,35 +57,6 @@
   width: 72px;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
-}
-
-// Seed and floors share a row: the seed takes what the stepper leaves, and the stepper stands
-// level with the seed field, which the taller New dungeon button centres in its line.
-.atlas-dungeon-identity__row {
-  @include atlas-flex-row($gap: $spacing-s);
-  align-items: stretch;
-
-  > .atlas-dungeon-identity__seed-field {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .atlas-dungeon-stepper {
-    margin-block: auto;
-  }
-}
-
-.atlas-dungeon-identity__seed {
-  @include atlas-flex-row($gap: $spacing-s);
-
-  > .atlas-dungeon-field__seed {
-    flex: 1;
-    font-variant-numeric: tabular-nums;
-  }
-
-  > .btn {
-    flex-shrink: 0;
-  }
 }
 
 // − count +, framed like the fields beside it; the buttons inset by the frame's padding.
@@ -249,20 +160,14 @@
   @include atlas-focus-ring;
 }
 
-.atlas-dungeon-tags__actions {
-  @include atlas-flex-row($gap: $spacing-s);
-  justify-content: flex-end;
-}
-
 // ── Style gallery ───────────────────────────────────────────────────────────
-// As many cards a row as the sidebar's width holds; the chosen one ringed in the accent. Each
-// card's art is a window of the dungeon drawn by the worker at the art's device pixels
-// (`useThumbnailSize`).
+// Four cards a row in the panel; the chosen one ringed in the accent. Each card's art is a window
+// of the dungeon drawn by the worker at the art's device pixels (`useThumbnailSize`).
 
 .atlas-dungeon-style-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: $spacing-s;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: $spacing-xs;
 }
 
 .atlas-dungeon-style-card {
@@ -330,4 +235,57 @@
   @include atlas-truncate;
   font-size: $font-ui-smaller;
   text-align: center;
+}
+
+// ── View ────────────────────────────────────────────────────────────────────
+
+.atlas-dungeon-grid-choice {
+  width: 100%;
+
+  // Five choices share the panel's width evenly, whatever their words.
+  > .atlas-segmented__option {
+    min-width: 0;
+    padding-inline: 0;
+  }
+}
+
+// Map options: the layers few change, folded under one line.
+.atlas-dungeon-more {
+  > summary {
+    @include atlas-flex-row($gap: $spacing-s);
+    list-style: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: $radius-s;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    // A chevron pointing at what opens.
+    &::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      margin-inline: 2px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: rotate(-45deg);
+      transition: transform $transition-fast $transition-ease;
+    }
+
+    &:hover {
+      color: var(--text-normal);
+    }
+
+    @include atlas-focus-ring;
+  }
+
+  &[open] > summary {
+    margin-bottom: $spacing-s;
+
+    &::before {
+      transform: rotate(45deg);
+    }
+  }
 }
