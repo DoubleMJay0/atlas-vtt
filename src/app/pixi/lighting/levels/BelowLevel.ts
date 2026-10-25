@@ -182,7 +182,7 @@ export class BelowLevel {
       sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, cellSize: state.grid?.size ?? DEFAULT_CELL_SIZE, ...sceneLook(state.lighting),
     });
     const objects = levelObjectsOn(state, id);
-    this.tokens.sync(mapTokens(objects), state.grid?.size ?? DEFAULT_CELL_SIZE);
+    this.tokens.sync(mapTokens(objects), state.grid?.size ?? DEFAULT_CELL_SIZE, state.tokenSettings?.tokenRingSize ?? 1);
     this.fog.sync(objects.fog, bounds, levelMapKey(state.mapPath, seen));
     // The level's roof: faded where its party stands, seen as the players see this level from above.
     this.roof.update({
