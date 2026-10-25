@@ -1,6 +1,7 @@
 import type { Bounds, Canvas2D, Vec } from '../geometry';
 import type { PathFn } from '../art/paths';
 import { hash2 } from '../art/noise';
+import type { Crown } from './crowns';
 
 /**
  * What the grounds need of a painter beyond its hand: the living and loose surfaces a house's
@@ -12,12 +13,10 @@ export interface GroundsPaint {
   lawn(path: PathFn, cells: readonly Vec[]): void;
   /** Raked gravel over `path`, its pebbles scattered over `cells`. */
   gravel(path: PathFn, cells: readonly Vec[]): void;
-  /**
-   * Dense leaves inside `rings`: clumps of about `clump` cells, lit on the side towards the light,
-   * scattered over `cells` where given (a hedge's), else over the rings' box. `dome` models a crown
-   * round as a whole (a tree's); without it the mass is a clipped hedge.
-   */
-  foliage(rings: readonly Vec[][], clump: number, salt: number, over: { cells?: readonly Vec[]; dome?: { centre: Vec; radius: number } }): void;
+  /** A clipped hedge's dense leaves inside `rings`: clumps of about `clump` cells, lit on the side towards the light, scattered over `cells`. */
+  foliage(rings: readonly Vec[][], clump: number, salt: number, cells: readonly Vec[]): void;
+  /** A tree's crown seen from above, its masses of leaves from the lowest up. */
+  crown(crown: Crown): void;
   /** Still water in a basin `path`, deepening towards `centre`. */
   pool(path: PathFn, centre: Vec, radius: number): void;
   /** Panes of glass over `path` that show what lies under them. */

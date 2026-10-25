@@ -24,7 +24,8 @@ import { drawBoundaryWall, drawGate, drawHedge } from '../../src/app/dungeons/re
 import { engravedGroundsPaint } from '../../src/app/dungeons/render/grounds/engravedPaint';
 import { drawColumn, drawFountain, drawTree } from '../../src/app/dungeons/render/grounds/garden';
 import { drawOutbuildingFloor, drawPorchFloor, drawWays } from '../../src/app/dungeons/render/grounds/ground';
-import { crownOf, outbuildingOf } from '../../src/app/dungeons/render/grounds/groundsShapes';
+import { crownOf, type Crown, type CrownSpecies } from '../../src/app/dungeons/render/grounds/crowns';
+import { outbuildingOf } from '../../src/app/dungeons/render/grounds/groundsShapes';
 import { drawOutbuilding } from '../../src/app/dungeons/render/grounds/outbuildings';
 import type { GroundsPaint } from '../../src/app/dungeons/render/grounds/paint';
 import { stoneGroundsPaint } from '../../src/app/dungeons/render/grounds/stonePaint';
@@ -85,6 +86,17 @@ function timed(direction: ArtDirection, draw: (on: ReturnType<typeof handOf>) =>
 const cells = (x: number, y: number, w: number, h: number): { x: number; y: number }[] => Array.from({ length: w * h }, (_, k) => ({ x: x + (k % w), y: y + Math.floor(k / w) }));
 const square = (x: number, y: number, n: number): Vec[][] => [rectPoly({ x, y, w: n, h: n })];
 
+const MIDDLE_CROWN = crownOf({ x: 2.5, y: 2.5 }, 1.1);
+
+/** The largest crown the grounds plant (1.4 cells) of a species, at the first cell along a row that grows one. */
+function largestCrown(species: CrownSpecies): Crown {
+  for (let k = 0; k < 100; k++) {
+    const crown = crownOf({ x: 2.5 + k * 10, y: 2.5 }, 1.4);
+    if (crown.species === species) return crown;
+  }
+  throw new Error(`no ${species}`);
+}
+
 /**
  * One of each piece of a house's grounds as a glyph is measured: a piece that stands alone whole
  * (gate, porch, outbuilding, tree, fountain), one that covers ground (lawn, ways, hedge, boundary
@@ -108,8 +120,8 @@ const GROUNDS_SAMPLES: Record<GroundsKind, (hand: Hand, paint: GroundsPaint) => 
     drawOutbuildingFloor(hand, building, frame);
     drawOutbuilding(hand, paint, building, frame);
   },
-  // A tree of the middle size the grounds plant (crowns 0.8 to 1.4 cells).
-  tree: (hand, paint) => drawTree(hand, paint, crownOf({ x: 2.5, y: 2.5 }, 1.1)),
+  // A tree of the middle size the grounds plant (crowns 0.8 to 1.4 cells), its crown worked out once as the layout does.
+  tree: (_, paint) => drawTree(paint, MIDDLE_CROWN),
   'garden-fountain': (hand, paint) => drawFountain(hand, paint, { kind: 'garden-fountain', cells: cells(2, 2, 2, 2), at: { x: 3, y: 3 } }),
 };
 
@@ -146,6 +158,20 @@ describe('glyph cost', () => {
       const limit = 2 * Math.max(...REFERENCE.map(kind => cost(direction, kind, PROP_GLYPHS[kind]!)));
       const samples: [string, (on: ReturnType<typeof handOf>) => void][] = [
         ...GROUNDS_KINDS.map((kind): [string, (on: ReturnType<typeof handOf>) => void] => [kind, ({ hand, paint }) => GROUNDS_SAMPLES[kind](hand, paint)]),
+        ...(['broadleaf', 'conifer'] as const).map((species): [string, (on: ReturnType<typeof handOf>) => void] => {
+          const crown = largestCrown(species);
+          return [
+            `tree (largest ${species})`,
+            ({ hand, paint }) => {
+              // Moved back onto the measuring canvas.
+              const { ctx } = hand.scene.env;
+              ctx.save();
+              ctx.translate(2.5 - crown.centre.x, 0);
+              drawTree(paint, crown);
+              ctx.restore();
+            },
+          ];
+        }),
         ...Object.entries(WINDOW_SAMPLES).map(([size, draw]): [string, (on: ReturnType<typeof handOf>) => void] => [`${size} window`, ({ hand }) => draw(hand)]),
       ];
       for (const [kind, draw] of samples) {

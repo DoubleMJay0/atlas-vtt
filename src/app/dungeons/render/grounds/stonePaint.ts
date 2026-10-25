@@ -1,7 +1,8 @@
 /**
  * Stone & shadow's grounds: lawn as broad patches of lighter and deeper green under a scatter of
- * blades, gravel as a pale bed of grit with lit and shaded pebbles, and leaves as clumps over
- * clumps, each shaded on the side away from the light and lit on the side towards it. The greens
+ * blades, gravel as a pale bed of grit with lit and shaded pebbles, a hedge's leaves as clumps
+ * over clumps, each shaded on the side away from the light and lit on the side towards it, and
+ * trees as painted crowns (`stoneCrown.ts`). The greens
  * are the look's plant ramps (`plantColours`), so they sink on a dark look and turn to tones in
  * monochrome.
  */
@@ -12,13 +13,13 @@ import { noiseSampler } from '../art/noise';
 import { polysPath, type PathFn } from '../art/paths';
 import { drawGridCanvas, fieldOf, gridOver, rgbaCanvas } from '../art/raster';
 import { boundedCached } from '../boundedCache';
-import { pointsBounds, type Canvas2D, type Vec } from '../geometry';
+import type { Canvas2D, Vec } from '../geometry';
 import { hex, mixColours, parseHex, withAlpha, type Rgb } from '../palette';
 import type { StoneColours } from '../stone/colours';
-import { lightInside } from '../stone/lightInside';
 import { cellPattern } from '../stone/patterns';
-import { css, plantColours, rampAt, type Ramp } from '../stone/plantColours';
+import { plantColours, rampAt, type Ramp } from '../stone/plantColours';
 import { grainTile, tileTexels } from '../stone/textures';
+import { paintCrown } from './stoneCrown';
 import { scatter, withClip, type GroundsPaint, type Scattered } from './paint';
 
 const lerp = (a: Rgb, b: Rgb, t: number): Rgb => [0, 1, 2].map((i) => a[i]! + (b[i]! - a[i]!) * t) as Rgb;
@@ -67,28 +68,18 @@ export function stoneGroundsPaint(hand: Hand, c: StoneColours): GroundsPaint {
         dots(pebbles, SHADOW_DIR, 0.006, (t) => 0.009 + 0.013 * t, mixColours(gravel, c.dark ? '#000000' : c.line, 0.38));
         dots(pebbles, TO_LIGHT, 0.004, (t) => (0.009 + 0.013 * t) * 0.7, mixColours(gravel, c.light, c.dark ? 0.12 : 0.45));
       }),
-    foliage: (rings, clump, salt, { cells, dome }) => {
-      const path = polysPath(rings);
-      const ramp = dome ? plants.leaves.green : plants.leaves.bramble;
-      clipped(path, () => {
+    foliage: (rings, clump, salt, cells) => {
+      const ramp = plants.leaves.bramble;
+      clipped(polysPath(rings), () => {
         // The deep between clumps is the base; each clump stands out of it, lit towards the light.
         ctx.fillStyle = rampAt(ramp, 0.06);
         ctx.fill();
-        const clumps = scatter(cells ?? pointsBounds(rings.flat()), 1 / (clump * 1.2) ** 2, seed + salt);
+        const clumps = scatter(cells, 1 / (clump * 1.2) ** 2, seed + salt);
         dots(clumps, TO_LIGHT, clump * 0.12, (t) => clump * 0.86 * (0.85 + 0.3 * t), rampAt(ramp, 0.45));
         dots(clumps, TO_LIGHT, clump * 0.32, (t) => clump * 0.48 * (0.85 + 0.3 * t), rampAt(ramp, 0.86, c.dark ? 0.5 : 0.85));
-        if (dome && scene.raster) lightInside(ctx, c, dome.centre, dome.radius, 0.9);
       });
-      if (!dome) return;
-      ctx.save();
-      ctx.beginPath();
-      path(ctx);
-      ctx.strokeStyle = css(plants.edge, c.dark ? 0.6 : 0.75);
-      ctx.lineWidth = hand.weight('fine') * 1.4;
-      ctx.lineJoin = 'round';
-      ctx.stroke();
-      ctx.restore();
     },
+    crown: (crown) => paintCrown(hand, c, plants, crown),
     pool: (path, centre, radius) =>
       clipped(path, () => {
         ctx.fillStyle = c.water;

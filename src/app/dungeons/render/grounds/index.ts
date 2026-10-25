@@ -26,7 +26,7 @@ const STANDING: readonly [GroundsKind, Draw][] = [
   ['outbuilding', (hand, paint, piece, layout) => drawOutbuilding(hand, paint, piece, layout.outbuildings.get(piece)!)],
   ['porch', (hand, _, piece) => piece.columns?.forEach((at) => drawColumn(hand, at))],
   ['garden-fountain', drawFountain],
-  ['tree', (hand, paint, piece, layout) => drawTree(hand, paint, layout.crowns.get(piece)!)],
+  ['tree', (_, paint, piece, layout) => drawTree(paint, layout.crowns.get(piece)!)],
 ];
 
 /** Every grounds kind with a drawing. */

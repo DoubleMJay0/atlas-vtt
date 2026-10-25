@@ -1,8 +1,7 @@
 /**
- * What stands free on the lawn: trees, seen from above as a lobed crown of leaves over the point of
- * their trunk; the fountain the drive turns round, an octagonal basin of water on its island of
- * grass with a pedestal bowl in its middle; and the porch's two columns, each a square plinth under
- * its capital.
+ * What stands free on the lawn: trees, seen from above as their crowns of leaves (`crowns.ts`); the
+ * fountain the drive turns round, an octagonal basin of water on its island of grass with a
+ * pedestal bowl in its middle; and the porch's two columns, each a square plinth under its capital.
  */
 
 import type { GroundsPiece } from '../../model';
@@ -10,15 +9,12 @@ import type { Hand } from '../art/hand';
 import { polyPath, rectPoly } from '../art/paths';
 import type { Vec } from '../geometry';
 import { circle } from '../terrain/cover';
-import type { Crown } from './groundsShapes';
+import type { Crown } from './crowns';
 import type { GroundsPaint } from './paint';
 
-export function drawTree(hand: Hand, paint: GroundsPaint, { ring, centre, radius }: Crown): void {
-  paint.foliage([ring], 0.18, Math.floor(centre.x * 31 + centre.y * 17), { dome: { centre, radius } });
-  // The trunk's point, where it rises under the crown: a ring of bark round its heart.
-  const trunk = circle(centre, 0.06, 16);
-  hand.fill(polyPath(trunk), 'wood');
-  hand.line([trunk], 'fine', true);
+/** Seen from above, the crown hides the trunk; its limbs show only through the gaps in the leaves. */
+export function drawTree(paint: GroundsPaint, crown: Crown): void {
+  paint.crown(crown);
 }
 
 /** The fountain a drive turns round: on its island of grass, a basin of eight sides and a bowl on a pedestal in its middle. */

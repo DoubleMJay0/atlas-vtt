@@ -64,7 +64,7 @@ export function drawBoundaryWall(hand: Hand, wall: GroundsPiece): void {
 export function drawHedge(hand: Hand, paint: GroundsPaint, hedge: GroundsPiece): void {
   const rings = cellsRings(hedge.cells);
   const first = hedge.cells[0]!;
-  paint.foliage(rings, 0.1, first.x * 13 + first.y * 7, { cells: hedge.cells });
+  paint.foliage(rings, 0.1, first.x * 13 + first.y * 7, hedge.cells);
   // The flat top a hedge is clipped to, its sides falling away below it.
   hand.line(grownRings(rings, -0.11, 'round'), 'fine', true);
   standingEdges(hand, rings);

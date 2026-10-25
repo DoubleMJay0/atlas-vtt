@@ -95,6 +95,6 @@ export function drawGroundsShade(hand: Hand, paint: GroundsPaint, layout: Ground
   const strength = env.style.shadow.strength * paint.shade.ground;
   const clip = polysPath(layout.open);
   hand.tone((x, y) => Math.min(0.85, (0.5 * scene.occlusionAt(x, y) ** 1.25 + 0.55 * scene.shadowAt(x, y)) * strength), pointsBounds(layout.lot), clip, 'shade');
-  const crowns = [...layout.crowns.values()].map((crown) => crown.ring);
+  const crowns = [...layout.crowns.values()].flatMap((crown) => crown.rings);
   if (crowns.length) castShadow(hand, polysPath(crowns), 0.85, pointsBounds(crowns.flat()), paint.shade.tree, clip);
 }

@@ -8,12 +8,12 @@
 import { cellsBox } from '../../geometry';
 import type { DungeonFloor, GroundsKind, GroundsPiece, HouseGrounds } from '../../model';
 import type { Stand } from '../art/heights';
-import { hash2 } from '../art/noise';
 import { polysPath, rectPoly, type PathFn } from '../art/paths';
 import { subtractRings, unionRings } from '../clipShapes';
 import { cellsRings, type Vec } from '../geometry';
 import { houseMass } from '../house/houseMass';
 import { circle } from '../terrain/cover';
+import { crownOf, type Crown } from './crowns';
 
 /** How tall each standing piece of the grounds is, a house's wall being 1. */
 export const GROUNDS_HEIGHT = { hedge: 0.75, boundary: 0.7, outbuilding: 1, greenhouse: 0.45 } as const;
@@ -25,13 +25,6 @@ export const SWEEP = { inner: 1.02, outer: 2.96 };
 const OUTBUILDING_WALL = { solid: 0.26, greenhouse: 0.12 };
 
 type Box = { x: number; y: number; w: number; h: number };
-
-/** A tree's crown: its lobed outline round the trunk, and the radius it reaches. */
-export interface Crown {
-  ring: Vec[];
-  centre: Vec;
-  radius: number;
-}
 
 /** An outbuilding: its cells' box, its walls' thickness, the room inside them, its walls as rings and its doorway. */
 export interface Outbuilding {
@@ -107,21 +100,6 @@ function wayRings(cells: readonly Vec[], sweep: Vec | null): Vec[][] {
   const rings = unionRings(cellsRings(cells.filter((c) => !turn(c))));
   if (!sweep) return rings;
   return subtractRings(unionRings([...rings, circle(sweep, SWEEP.outer, 64)]), [circle(sweep, SWEEP.inner, 64)]);
-}
-
-/** Rounded lobes round the trunk, each a little different, the gaps between them shallow. */
-export function crownOf(centre: Vec, radius: number): Crown {
-  const cell = { x: Math.floor(centre.x), y: Math.floor(centre.y) };
-  const lobes = 7 + Math.floor(hash2(cell.x, cell.y, 21) * 4);
-  const phase = hash2(cell.x, cell.y, 22) * Math.PI * 2;
-  const n = 72;
-  const ring = Array.from({ length: n }, (_, k) => {
-    const a = (k / n) * Math.PI * 2;
-    const lobe = Math.abs(Math.sin((a * lobes) / 2 + phase));
-    const r = radius * (0.86 + 0.12 * lobe ** 0.5 - hash2(k, cell.x * 7 + cell.y * 13, 23) * 0.04);
-    return { x: centre.x + Math.cos(a) * r, y: centre.y + Math.sin(a) * r };
-  });
-  return { ring, centre, radius };
 }
 
 export function outbuildingOf(piece: GroundsPiece): Outbuilding {

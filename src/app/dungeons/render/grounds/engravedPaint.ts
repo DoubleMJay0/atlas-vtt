@@ -1,14 +1,16 @@
 /**
  * Engraved's grounds, in ink on the paper alone: lawn as sparse tufts of three blades with a little
- * stipple, gravel as a close stipple of dots, and leaves as the engraver's scallops, each clump a
- * short arc cut on its side away from the light, a crown's roundness hatched on its shaded side.
+ * stipple, gravel as a close stipple of dots, a hedge's leaves as the engraver's scallops, each
+ * clump a short arc cut on its side away from the light, and trees as inked crowns
+ * (`engravedCrown.ts`).
  */
 
-import { SHADOW_DIR, shadeEdges } from '../art/light';
+import { SHADOW_DIR } from '../art/light';
 import type { Hand } from '../art/hand';
 import { polysPath, type PathFn } from '../art/paths';
-import { pointsBounds, type Vec } from '../geometry';
+import type { Vec } from '../geometry';
 import type { Pens } from '../engraved/pens';
+import { cutCrown } from './engravedCrown';
 import { scatter, withClip, type GroundsPaint } from './paint';
 
 const SHADE_ANGLE = Math.atan2(SHADOW_DIR.y, SHADOW_DIR.x);
@@ -82,29 +84,22 @@ export function engravedGroundsPaint(hand: Hand, pens: Pens): GroundsPaint {
         ctx.stroke();
         stipple(cells, 8, 14, 0.005);
       }),
-    foliage: (rings, clump, salt, { cells, dome }) => {
-      const path = polysPath(rings);
-      // Each clump an arc cut on its side away from the light; on a crown, the farther a clump lies towards its shaded side the heavier its cut.
-      const clumps = scatter(cells ?? pointsBounds(rings.flat()), 1 / (clump * 1.2) ** 2, seed + salt);
-      const shade = (p: Vec): number => (dome ? Math.max(0, Math.min(2, Math.floor((((p.x - dome.centre.x) * SHADOW_DIR.x + (p.y - dome.centre.y) * SHADOW_DIR.y) / dome.radius + 0.6) * 1.6))) : 0);
-      paper(path, () => {
-        for (const level of dome ? [0, 1, 2] : [0]) {
-          ctx.beginPath();
-          for (const p of clumps) {
-            if (shade(p) !== level) continue;
-            const r = clump * (0.7 + 0.3 * p.t);
-            const a = SHADE_ANGLE + (p.t - 0.5) * 0.6;
-            ctx.moveTo(p.x + Math.cos(a - 1.25) * r, p.y + Math.sin(a - 1.25) * r);
-            ctx.arc(p.x, p.y, r, a - 1.25, a + 1.25);
-          }
-          ctx.lineWidth = fine * (1 + level * 0.9);
-          ctx.stroke();
+    foliage: (rings, clump, salt, cells) => {
+      // Each clump an arc cut on its side away from the light.
+      const clumps = scatter(cells, 1 / (clump * 1.2) ** 2, seed + salt);
+      paper(polysPath(rings), () => {
+        ctx.beginPath();
+        for (const p of clumps) {
+          const r = clump * (0.7 + 0.3 * p.t);
+          const a = SHADE_ANGLE + (p.t - 0.5) * 0.6;
+          ctx.moveTo(p.x + Math.cos(a - 1.25) * r, p.y + Math.sin(a - 1.25) * r);
+          ctx.arc(p.x, p.y, r, a - 1.25, a + 1.25);
         }
+        ctx.lineWidth = fine;
+        ctx.stroke();
       });
-      if (!dome) return;
-      hand.line(rings, 'outline', true);
-      hand.line(shadeEdges(rings[0]!, true), 'heavy');
     },
+    crown: (crown) => cutCrown(hand, pens, crown),
     // The paper shows through glass: only its bars are cut.
     glass: () => undefined,
     // Shade cut over the lawn's tufts would bury them: a lighter hand there.
