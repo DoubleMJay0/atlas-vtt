@@ -47,7 +47,7 @@ const RULES: Record<string, (m: DungeonModel) => string[]> = {
   '2 stairwells line up and are reached from floor': stairsLineUp,
   '3 one back stair from bottom to top': oneBackStair,
   '4 stacks rise through the same cells': stacksRise,
-  '5 rooms are warmed from stacks, fireplaces stand on them': stacksWarm,
+  '5 the main rooms are warmed from stacks, fireplaces stand on them (the rest in houseChimneys.test.ts)': stacksWarm,
   '6 the hall takes the front door and the main stair': hallAtTheFront,
   '7 a wide way from the gate to the front door': groundsRules.wideWalkIn,
   '8 every room is reached': allReached,

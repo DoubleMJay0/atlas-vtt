@@ -1,7 +1,8 @@
 import { cellKey, floorCellsOf } from '../../../../src/app/dungeons/geometry';
 import { levelOf, stackOf } from '../../../../src/app/dungeons/floors/floorStack';
 import type { DungeonFloor, DungeonModel } from '../../../../src/app/dungeons/model';
-import { SIDES, houseKeys, stackCells } from './houseCells';
+import { houseKeys } from './houseCells';
+import { fireplacesOnStacks, mainRoomsWarm } from './houseChimneyRules';
 
 /**
  * The zone and programme rules of a house (research §5.10, rules 5, 11–14, 19, 22), checked on a
@@ -15,23 +16,9 @@ const BEDROOMS = new Set(['bedroom', 'master-bedroom', 'nursery']);
 
 const area = (floor: DungeonFloor, id: number): number => floorCellsOf(floor.rooms[id]!).length;
 
-/** 5. Every reception room and bedroom borders a stack; every fireplace stands against one. */
+/** 5. The main rooms border a stack, and every fireplace stands against one (`houseChimneyRules.ts`, C5 and C3). */
 export function stacksWarm(model: DungeonModel): string[] {
-  const out: string[] = [];
-  model.floors.forEach((floor, i) => {
-    const stacks = stackCells(floor);
-    const borders = (cells: readonly { x: number; y: number }[]): boolean => cells.some((c) => SIDES.some((s) => stacks.has(cellKey(c.x + s.x, c.y + s.y))));
-    for (const room of floor.rooms) {
-      if (!room.type || !(RECEPTION.has(room.type) || BEDROOMS.has(room.type)) || room.boss || room.stage) continue;
-      if (!borders(floorCellsOf(room))) out.push(`floor ${i}: ${room.type} ${room.id} borders no stack`);
-    }
-    for (const hearth of floor.props.filter((p) => p.kind === 'hearth')) {
-      const cell = { x: Math.floor(hearth.x), y: Math.floor(hearth.y) };
-      const near = [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => ({ x: cell.x + dx, y: cell.y + dy })));
-      if (!borders(near)) out.push(`floor ${i}: a fireplace at ${hearth.x.toFixed(1)},${hearth.y.toFixed(1)} on no stack`);
-    }
-  });
-  return out;
+  return [...mainRoomsWarm(model), ...fireplacesOnStacks(model)];
 }
 
 /** 11. No door opens drawing room to dining room or kitchen. */

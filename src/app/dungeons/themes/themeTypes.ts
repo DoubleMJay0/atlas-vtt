@@ -39,8 +39,8 @@ export interface Piece {
   count?: readonly [number, number];
   /** The chance it is there at all; unset, 1. */
   chance?: number;
-  /** Always there where people live (`RecipeContext.lived`): a house's fireplaces, ready for their fires. */
-  keptWhenLived?: true;
+  /** Built into the house, so there wherever it may stand, whatever the room's depth or the theme's richness: a house's fireplaces, lived in or abandoned. */
+  always?: true;
 }
 
 /**

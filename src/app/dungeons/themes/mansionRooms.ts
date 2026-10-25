@@ -5,7 +5,7 @@
  * `mansionQuarters.ts`. No room takes a hazard.
  */
 
-import { MANSION_HOUSE_ROOMS } from './mansionHouse';
+import { HEARTH, MANSION_HOUSE_ROOMS } from './mansionHouse';
 import { MANSION_QUARTERS } from './mansionQuarters';
 import type { RoomTypeSpec } from './themeTypes';
 
@@ -18,7 +18,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     degree: 'hub',
     floor: 'entrance',
     terrain: { features: ['stair-well'], columns: true },
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.5 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'drawing-room',
@@ -30,7 +30,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     near: ['entrance-hall'],
     apart: ['kitchen'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.8 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'dining-room',
@@ -43,7 +43,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     next: ['servery'],
     near: ['kitchen'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.5 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'servery',
@@ -63,7 +63,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     apart: ['drawing-room', 'master-bedroom'],
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'scullery',
@@ -82,7 +82,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     floor: 'entrance',
     near: ['kitchen'],
     terrain: {},
-    furnish: { pieces: [] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'wine-cellar',
@@ -108,7 +108,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     size: 'medium',
     depth: 'middle',
     terrain: {},
-    furnish: { pieces: [{ kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.8 }] },
+    furnish: { pieces: [HEARTH] },
   },
   {
     id: 'ballroom',
@@ -121,7 +121,7 @@ export const MANSION_ROOMS: readonly RoomTypeSpec[] = [
     furnish: {
       pieces: [
         { kind: 'bust', verb: 'wall', count: [2, 6] },
-        { kind: 'hearth', verb: 'wall', keptWhenLived: true, chance: 0.6 },
+        HEARTH,
       ],
     },
   },
