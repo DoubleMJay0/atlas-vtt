@@ -1,5 +1,4 @@
 import React, { useId } from 'react';
-import { Button } from '../primitives/button';
 import { LabelTooltip } from '../primitives/tooltip';
 import { TAG_GROUPS, tagKey, type DungeonTag } from '../../../dungeons/tags';
 import type { MessageKey } from '../../../i18n/types';
@@ -12,7 +11,6 @@ interface TagChipsProps {
   /** Tags the chosen theme cannot take, each with the reason shown as its tooltip. */
   refused: ReadonlyMap<DungeonTag, string>;
   onToggle: (tag: DungeonTag) => void;
-  onRandom: () => void;
 }
 
 /** A tag's name as shown. */
@@ -29,9 +27,9 @@ function tagDescription(tag: DungeonTag): string {
  * Every tag as a chip that switches it on and off at once, on the same seed, so the map shows
  * what the tag does, grouped under headings (`TAG_GROUPS`); switching one on switches off the
  * tags it rules out. A tag the chosen theme refuses keeps its place, shown off and disabled with
- * the reason as its tooltip, so the chips never move. Random takes a new seed.
+ * the reason as its tooltip, so the chips never move.
  */
-export function TagChips({ picked, refused, onToggle, onRandom }: TagChipsProps): React.JSX.Element {
+export function TagChips({ picked, refused, onToggle }: TagChipsProps): React.JSX.Element {
   const labelId = useId();
   return (
     <div className="atlas-dungeon-tags">
@@ -63,11 +61,6 @@ export function TagChips({ picked, refused, onToggle, onRandom }: TagChipsProps)
           </div>
         </div>
       ))}
-      <div className="atlas-dungeon-tags__actions">
-        <LabelTooltip label={t('dungeon.tags.randomHint')} describe>
-          <Button variant="secondary" size="sm" onClick={onRandom}>{t('dungeon.tags.random')}</Button>
-        </LabelTooltip>
-      </div>
     </div>
   );
 }

@@ -20,10 +20,8 @@ export interface Tile {
   texture: RenderTexture;
   /** An area light's: the signed distance to its outline on the tile's texel grid, which its falloff counts from. */
   distance?: RenderTexture;
-  /** Traced while its light moved, with few rays, coarser texels and no smoothing: traced in full once the light rests. */
+  /** Traced while its light moved, with few rays: traced in full once the light rests. */
   moving?: true;
-  /** Its texels are this many of the field's wide (`MOVING_TILE_SCALE` for a moving light's); unset, 1. */
-  scale?: number;
 }
 
 /** How much tile work may go to the graphics device now (`GpuPacer`). */
@@ -195,7 +193,7 @@ export class TileCache {
     }
     const limited = blocking.limited.length > 0;
     // What limited walls stop is taken out on the field's own texels.
-    const job = this.tracer.begin([placed.x, placed.y], placed.flame, rect, oneWay, { moving: !!light.moving, coarse: !limited, reach: light.dim * LIGHT_REACH });
+    const job = this.tracer.begin([placed.x, placed.y], placed.flame, rect, oneWay, { moving: !!light.moving, reach: light.dim * LIGHT_REACH });
     return { light, job, placed, walls, limited };
   }
 
@@ -226,7 +224,7 @@ export class TileCache {
     // The rule counts from where the light is, wherever a wall it stands in made the engine place it.
     const texture = build.limited ? this.limited.apply(job.tile, job.rect, { x: light.x, y: light.y }, build.walls) : job.tile;
     destroyTile(entry.tile);
-    entry.tile = { x: placed.x, y: placed.y, flame: placed.flame, rect: job.rect, texture, ...(job.moving && { moving: true as const }), ...(job.scale !== 1 && { scale: job.scale }), ...(job.area && { distance: job.area.distance }) };
+    entry.tile = { x: placed.x, y: placed.y, flame: placed.flame, rect: job.rect, texture, ...(job.moving && { moving: true as const }), ...(job.area && { distance: job.area.distance }) };
     entry.light = light;
     entry.build = null;
   }

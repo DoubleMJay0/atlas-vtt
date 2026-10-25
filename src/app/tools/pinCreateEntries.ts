@@ -20,8 +20,8 @@ export interface PinCreateEntry {
   away?: boolean;
   /** Why `name` cannot be used, shown under a disabled entry; null where it can. */
   problem?: (name: string) => string | null;
-  /** Makes it and returns what the pin links, or null when the GM cancelled. */
-  create: (name: string) => Promise<PinLinkTarget | null>;
+  /** Makes it and returns what the pin links, or null when the GM cancelled; `from` is the dropdown, which an `away` entry works in place of. */
+  create: (name: string, from: HTMLElement) => Promise<PinLinkTarget | null>;
 }
 
 /** What a new pin links: a vault path, and for a scene of several floors the floor it opens on. */
@@ -57,7 +57,7 @@ export function noteCreateEntry(app: App, mapPath: string | null): PinCreateEntr
 
 /**
  * Generates a dungeon of the typed name as a scene of the map's own collection (a pin links only
- * scenes of its collection), in the generator over the map, and links the pin to it. Offered only
+ * scenes of its collection), in the generator that takes the dropdown's place, and links the pin to it. Offered only
  * on a map in a collection.
  */
 export function dungeonCreateEntry(store: StoreApi<ViewAtlasState>, mapPath: string | null): PinCreateEntry | null {
@@ -68,8 +68,9 @@ export function dungeonCreateEntry(store: StoreApi<ViewAtlasState>, mapPath: str
     label: (name) => t('pin.search.generateDungeon', { name }),
     icon: 'castle',
     away: true,
-    create: async (name) => {
-      const scene = await generateDungeonFor(store, { name, collectionId });
+    create: async (name, from) => {
+      const { left, top, width, height } = from.getBoundingClientRect();
+      const scene = await generateDungeonFor(store, { name, collectionId, anchor: { left, top, width, height } });
       return scene ? { path: scene.scenePath, ...(scene.entryLevel && { sceneLevel: scene.entryLevel }) } : null;
     },
   };

@@ -127,7 +127,8 @@ describe('generating a dungeon from the note pin search', () => {
       await waitFor(() => expect(dropdown.classList.contains('atlas-away')).toBe(true));
       finish({ scenePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap', entryLevel: 'floor-a' });
       await waitFor(() => expect(Object.values(store.getState().objects.pins)).toHaveLength(1));
-      expect(generateDungeonFor).toHaveBeenCalledWith(store, { name: 'Crypt', collectionId: 'Dungeons' });
+      // The wizard takes the dropdown's place
+      expect(generateDungeonFor).toHaveBeenCalledWith(store, { name: 'Crypt', collectionId: 'Dungeons', anchor: { left: 0, top: 0, width: 800, height: 600 } });
       // The pin opens the dungeon on its entry floor
       expect(Object.values(store.getState().objects.pins)[0]).toMatchObject({ notePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap', sceneLevel: 'floor-a' });
     } finally {
