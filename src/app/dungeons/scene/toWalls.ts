@@ -1,12 +1,14 @@
 import type { WallSegment } from '../../types/wallTypes';
 import { doorCells, doorMiddle } from '../geometry';
 import type { DoorKind, DungeonDoor, DungeonModel } from '../model';
-import { visibleFloor } from '../render/visibleDungeon';
+import { visibleFloor, type VisibleFloor } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { wallInkWidth } from '../render/wallInk';
 import type { Vec } from '../render/geometry';
 import { OUTER_WALL, mouthDepth } from '../render/houseShapes';
 import { shownWindows } from '../render/art/windows';
+import { fireSites, firesLit } from '../render/fireSites';
+import { acrossMouth, fireboxCut, recessWalls, type FireboxCut } from './fireboxWalls';
 import { onWindow, secretDoorways, windowCuts } from './houseWalls';
 import { STEPS, doorEnds, doorLine, splitRings, wallRings, type RingHit } from './wallOutline';
 
@@ -54,6 +56,19 @@ function entranceMouth(door: DungeonDoor, half: number, cave: boolean): (p: Vec)
   };
 }
 
+/**
+ * The fireboxes of a lived-in house floor's fireplaces as cuts into its wall rings: their fires
+ * burn, so each recess is open to its room (`fireboxWalls.ts`). None on other floors.
+ */
+function litFireboxes(visible: VisibleFloor, rings: readonly Vec[][], half: number): FireboxCut[] {
+  if (!firesLit(visible.model) || visible.floor.walls !== 'edges') return [];
+  const props = visible.floor.props.filter(prop => visible.roomShapes.has(prop.room));
+  return fireSites(props, true).flatMap(site => {
+    const cut = site.firebox && fireboxCut(rings, site.firebox, 2 * half + 1 / STEPS);
+    return cut ? [cut] : [];
+  });
+}
+
 export interface DungeonWalls {
   walls: Record<string, WallSegment>;
   /** Doors of each kind that became a door wall. */
@@ -72,7 +87,8 @@ export interface WallsOf {
  * The walls and doors of one floor of a dungeon in world pixels, along the centre line of its drawn walls:
  * one chain per wall outline, every wall drawn once (rooms side by side have walls of their own,
  * a cell of rock apart), and every door ending exactly on a corner of the wall beside it, so
- * light and sight find no gap. Entrances stay open to the outside. Rooms the view hides (a secret
+ * light and sight find no gap. Entrances stay open to the outside, and so do the fireboxes of a
+ * lived-in house's fireplaces, walled round their recess (`wall_<id>_firebox_<n>`). Rooms the view hides (a secret
  * wing) have no walls. Pure.
  */
 export function dungeonWalls(
@@ -108,7 +124,9 @@ export function dungeonWalls(
     return cut ? [cut] : [];
   });
   const glass = onWindow(cuts);
-  const outlines = splitRings(rings, [...placed.flatMap(p => p.ends), ...cuts.flat()]);
+  const fireboxes = litFireboxes(visible, rings, half);
+  const mouth = acrossMouth(fireboxes);
+  const outlines = splitRings(rings, [...placed.flatMap(p => p.ends), ...cuts.flat(), ...fireboxes.flatMap(f => f.cuts)]);
   const { originCell, pxPerCell } = placement;
   const world = (p: { x: number; y: number }): { x: number; y: number } => ({
     x: (p.x - originCell.x) * pxPerCell,
@@ -117,9 +135,10 @@ export function dungeonWalls(
 
   const walls: Record<string, WallSegment> = {};
   let count = 0;
-  const add = (from: { x: number; y: number }, to: { x: number; y: number }, rest: Omit<WallSegment, 'id' | 'kind' | 'p1' | 'p2'>): void => {
+  let recesses = 0;
+  const add = (from: { x: number; y: number }, to: { x: number; y: number }, rest: Omit<WallSegment, 'id' | 'kind' | 'p1' | 'p2'>, recess = false): void => {
     if (from.x === to.x && from.y === to.y) return;
-    const id = `wall_${of.id}_${++count}`;
+    const id = recess ? `wall_${of.id}_firebox_${++recesses}` : `wall_${of.id}_${++count}`;
     walls[id] = { id, kind: 'wall', p1: world(from), p2: world(to), ...rest, ...(of.levels && { levels: of.levels }) };
   };
 
@@ -129,10 +148,14 @@ export function dungeonWalls(
     const chainId = `chain_${of.id}_${index + 1}`;
     ring.forEach((corner, i) => {
       const next = ring[(i + 1) % ring.length]!;
-      if (onMouth(corner, next)) return;
+      if (onMouth(corner, next) || mouth(corner, next)) return;
       add(corner, next, { type: 'solid', chainId, ...(glass(corner, next) && { blocks: 'movement' as const }) });
     });
   });
+  for (const firebox of fireboxes) {
+    const chainId = `chain_${of.id}_${firebox.cuts[0].ring + 1}`;
+    for (const [from, to] of recessWalls(firebox)) add(from, to, { type: 'solid', chainId }, true);
+  }
   const counts: Partial<Record<DoorKind, number>> = {};
   for (const { door, wall, ends } of placed) {
     add(ends[0].point, ends[1].point, { type: wall.type, closed: true });

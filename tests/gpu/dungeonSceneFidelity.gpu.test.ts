@@ -42,6 +42,8 @@ const CASES: readonly { seed: number; theme?: ThemeChoice; tags: string[]; floor
   { seed: 42, tags: [], floors: 1, look: 'masonry', view: {}, fiveRoom: true },
   // Ivy and moss lie over the walls' foot: the walls must still be found on the ink.
   { seed: 16, theme: 'mansion', tags: ['overgrown'], floors: 1, look: 'parchment', view: {} },
+  // A lived-in house: each fireplace's firebox is open to its room and walled round its recess.
+  { seed: 16, theme: 'mansion', tags: ['inhabited'], floors: 1, look: 'parchment', view: {} },
   { seed: 404, theme: 'fortress', tags: ['overgrown', 'colonnades', 'wet'], floors: 2, look: 'print', view: {} },
   // Caverns: walls following natural rock, narrows, crawls, pitches and scree; every cave art family runs these again.
   { seed: 606, theme: 'cavern', tags: ['medium'], floors: 1, look: 'parchment', view: {} },
@@ -144,7 +146,9 @@ describe('a dungeon scene and its map image', () => {
         const middleOf = (d: (typeof floor.doors)[number]): { x: number; y: number } => (d.edge ? toPx(doorMiddle(d).x, doorMiddle(d).y) : toPx(d.x + 0.5, d.y + 0.5));
         const inSecretCell = (p: { x: number; y: number }): boolean => floor.doors.some(d => d.kind === 'secret' && Math.abs(p.x - middleOf(d).x) <= PX_PER_CELL / 2 + halfInk + 1 && Math.abs(p.y - middleOf(d).y) <= PX_PER_CELL / 2 + halfInk + 1);
         // A window stands in the cut of its outer wall, by a thin pane (`houseRender.gpu.test.ts` holds it).
-        const solid = walls.filter(w => w.type !== 'door' && w.blocks !== 'movement');
+        // A lit firebox's recess is walled along the firebox's own outline, drawn in its stone's ink, not the walls' (`fireLights.test.ts` holds it).
+        const solid = walls.filter(w => w.type !== 'door' && w.blocks !== 'movement' && !w.id.includes('_firebox_'));
+        if (model.tags.includes('inhabited') && floor.walls === 'edges') expect(walls.filter(w => w.id.includes('_firebox_')).length, where).toBe(3 * floor.props.filter(p => p.kind === 'hearth').length);
         // Where something grows, the walls are held to the picture drawn without it, and the
         // picture with it must still show its walls nearly everywhere.
         const grows = floor.growth.length > 0;

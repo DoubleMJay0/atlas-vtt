@@ -1,7 +1,8 @@
 import { polyPath } from '../../art/paths';
 import { fineLines, type GlyphPen } from '../../glyphPen';
+import { burningFuel } from './burningFuel';
 import { part, sunk, surface } from './parts';
-import { HEARTH_STONE, MANTEL, STACK_FIREBOX, STACK_FIREBOX_OUTLINE, partPath } from './shapes';
+import { HEARTH_STONE, MANTEL, STACK_FIREBOX, STACK_FIREBOX_OUTLINE, STACK_FUEL, partPath } from './shapes';
 
 const FIREBOX_BOX = {
   minX: STACK_FIREBOX.x - STACK_FIREBOX.w / 2,
@@ -14,12 +15,14 @@ const depth = (y: number): number => 0.25 + 0.43 * (y - FIREBOX_BOX.minY) / STAC
 
 /**
  * A house's fireplace seen from above: the hearth stone on the floor, the firebox cut into the
- * chimney stack's face behind it, cold and clear, and the mantel shelf across the opening's front.
+ * chimney stack's face behind it, cold and clear or with a fire burning in it (`lit`), and the
+ * mantel shelf across the opening's front.
  */
-export function stackFireplace(pen: GlyphPen, painted: boolean): void {
+export function stackFireplace(pen: GlyphPen, painted: boolean, lit = false): void {
   // The hearth stone lies flush with the floor: outlined, with no lit or shaded edges.
   surface(pen, partPath(HEARTH_STONE), 'stone');
   sunk(pen, firebox, STACK_FIREBOX_OUTLINE, FIREBOX_BOX, depth, painted);
+  if (lit) burningFuel(pen, STACK_FUEL, firebox);
   part(pen, MANTEL, 'dressed');
   // The shelf's moulded front edge.
   const front = MANTEL.y - MANTEL.h / 2 + 0.035;

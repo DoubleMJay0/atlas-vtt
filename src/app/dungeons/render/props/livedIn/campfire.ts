@@ -6,14 +6,15 @@ import { circlePath, type GlyphPen } from '../../glyphPen';
 import { mixColours } from '../../palette';
 import { stoneOutline } from '../../terrain/stones';
 import { rngFrom } from '../../../rng';
+import { fireGlow, flames, type Tongue } from '../fire/burning';
 import { colours, darkFloorLine, fine, isPainted, lips, onDarkFloor, ring, stick, surface } from './parts';
 
 /**
- * A cold campfire: a ring of fieldstones round a bed of ash, the charred ends of the last sticks
- * pushed in towards its middle. The middle itself is left clear, as a later plan lights flames there.
+ * A campfire: a ring of fieldstones round a bed of ash, the charred ends of the last sticks pushed
+ * in towards its middle, cold, or with flames burning in that middle where someone lives (`lit`).
  */
 
-/** Where flames will burn: the clear middle of the ash bed, in the piece's own cells. */
+/** Where flames burn: the clear middle of the ash bed, in the piece's own cells. */
 export const FIRE_AREA = { x: 0, y: 0, r: 0.11 } as const;
 
 const random = rngFrom(0x6a11);
@@ -88,7 +89,15 @@ const ashCracks: PathFn = path => {
 
 export const campfireSilhouette: PathFn = polysPath(RING_STONES);
 
-export function campfire(pen: GlyphPen): void {
+/** A lit fire's flames: five tongues leaning out from the middle over the sticks' burning ends, as a fire in the open burns seen from above. */
+const TONGUES: readonly Tongue[] = Array.from({ length: 5 }, (_, k) => {
+  const a = (k / 5) * Math.PI * 2 + 0.45;
+  const lean = { x: Math.cos(a), y: Math.sin(a) };
+  return { at: { x: FIRE_AREA.x + lean.x * 0.03, y: FIRE_AREA.y + lean.y * 0.03 }, r: FIRE_AREA.r * 0.42, length: FIRE_AREA.r * (0.95 + (k % 2) * 0.2), lean };
+});
+const FIRE_MIDDLE = { x: FIRE_AREA.x, y: FIRE_AREA.y };
+
+export function campfire(pen: GlyphPen, lit = false): void {
   const painted = isPainted(pen);
   const { ctx } = pen;
   // The ash: pale where it is thin by the stones, sooted towards the middle the fire burnt in.
@@ -111,6 +120,11 @@ export function campfire(pen: GlyphPen): void {
   surface(pen, path => { polysPath(CHAR_POLYS)(path); crumbsPath(path); }, 'wood', false, false, mixColours(colours(pen, 'wood').ink, '#000000', 0.55));
   // The ash's cracks lie between the sticks, so they share the sticks' grain pass.
   fine(pen, path => { ashCracks(path); grainPath(path); }, 'wood');
+  if (lit) {
+    // The bed glows from the flames out to the sticks' burning ends, and the flames stand over them.
+    fireGlow(pen, ashPath, FIRE_MIDDLE, 0.24, 0.24);
+    flames(pen, TONGUES);
+  }
   // The ring of stones over the ash's edge, each lit on the side towards the light; on a dark floor outlined in the look's light line.
   surface(pen, campfireSilhouette, 'rock', false, true, undefined, painted && onDarkFloor(pen) ? darkFloorLine(pen) : undefined);
   lips(pen, RING_STONES);

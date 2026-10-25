@@ -84,20 +84,43 @@ export function sunk(pen: GlyphPen, path: PathFn, poly: readonly Vec[], box: Bou
 
 /** Two split logs lie low in the firebox; irregular pale ash remains visible between them. */
 export function coldFuel(pen: GlyphPen, b: Part): void {
-  const at = (x: number, y: number): { x: number; y: number } => ({ x: b.x + x * b.w, y: b.y + y * b.h });
+  const at = (x: number, y: number): Vec => inBox(b, x, y);
   surface(pen, polyPath([at(-0.39, -0.31), at(-0.12, -0.4), at(0.05, -0.34), at(0.37, -0.36), at(0.4, 0.16), at(0.15, 0.25), at(-0.32, 0.15)]), 'dressed');
-  const logs = [-0.16, 0.14].map(y => polyPath([
-    at(-0.32, y - 0.08), at(0.27, y - 0.02), at(0.32, y + 0.1), at(-0.27, y + 0.08),
-  ]));
   // Stone's final silhouette grain covers the fuel too; Engraved needs the wood cuts here.
-  surface(pen, path => { for (const log of logs) log(path); }, 'wood', pen.hand.scene.env.style.direction === 'engraved');
-  fineLines(pen, [-0.16, 0.14].flatMap(y => {
-    const a = at(-0.22, y - 0.01);
-    const z = at(0.21, y + 0.04);
-    return [a.x, a.y, z.x, z.y];
-  }));
-  for (const [x, y] of [[-0.35, 0.3], [0.29, -0.3], [0.1, 0.31]] as const) {
+  surface(pen, logsIn(b).logs, 'wood', pen.hand.scene.env.style.direction === 'engraved');
+  fineLines(pen, logGrain(b));
+  for (const [x, y] of ASH_DOTS) {
     const p = at(x, y);
     inkDot(pen, p.x, p.y, 0.012);
   }
+}
+
+/** The two logs' rows across a firebox, as shares of its depth. */
+const LOG_ROWS = [-0.16, 0.14] as const;
+/** Crumbs on the ash between the logs, as shares of the firebox. */
+export const ASH_DOTS: readonly (readonly [number, number])[] = [[-0.35, 0.3], [0.29, -0.3], [0.1, 0.31]];
+
+/** A point of a firebox `b` given as shares of its width and depth. */
+export function inBox(b: Part, x: number, y: number): Vec {
+  return { x: b.x + x * b.w, y: b.y + y * b.h };
+}
+
+/** A split log lying across firebox `b` in the row `y`. */
+function logOutline(b: Part, y: number): Vec[] {
+  return [inBox(b, -0.32, y - 0.08), inBox(b, 0.27, y - 0.02), inBox(b, 0.32, y + 0.1), inBox(b, -0.27, y + 0.08)];
+}
+
+/** The split along each log, as x0, y0, x1, y1 quadruples. */
+function logGrain(b: Part): number[] {
+  return LOG_ROWS.flatMap(y => {
+    const a = inBox(b, -0.22, y - 0.01);
+    const z = inBox(b, 0.21, y + 0.04);
+    return [a.x, a.y, z.x, z.y];
+  });
+}
+
+/** The logs of a firebox `b` as one path, and the splits along them, where a lit fire glows through. */
+export function logsIn(b: Part): { logs: PathFn; splits: number[] } {
+  const outlines = LOG_ROWS.map(y => polyPath(logOutline(b, y)));
+  return { logs: path => { for (const log of outlines) log(path); }, splits: logGrain(b) };
 }

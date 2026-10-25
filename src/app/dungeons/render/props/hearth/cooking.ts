@@ -1,12 +1,16 @@
 import { circlePath, fineLines, type GlyphPen } from '../../glyphPen';
+import { burningFuel } from './burningFuel';
 import { coldFuel, part, recess, surface } from './parts';
 import { HEARTH, HEARTH_FIREBOX, partPath } from './shapes';
 
-/** A cutaway chimney breast: masonry cheeks surround an open, cold firebox. */
-export function hearthBody(pen: GlyphPen, painted: boolean): void {
+const recessPath = partPath(HEARTH_FIREBOX);
+
+/** A cutaway chimney breast: masonry cheeks surround an open firebox, cold, or with a fire burning in it (`lit`). */
+export function hearthBody(pen: GlyphPen, painted: boolean, lit = false): void {
   part(pen, HEARTH, 'dressed');
   recess(pen, HEARTH_FIREBOX, painted);
-  coldFuel(pen, HEARTH_FIREBOX);
+  if (lit) burningFuel(pen, HEARTH_FIREBOX, recessPath);
+  else coldFuel(pen, HEARTH_FIREBOX);
   const cheeks = [-0.685, 0.685].map(x => ({ x, y: 0.015, w: 0.22, h: 0.51 }));
   surface(pen, path => {
     for (const b of cheeks) partPath(b)(path);

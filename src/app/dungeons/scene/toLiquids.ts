@@ -1,5 +1,3 @@
-import { toGameUnits } from '../../grid/statedDistance';
-import type { MeasurementSettings } from '../../grid/measurementFormat';
 import { MAX_AREA_CORNERS } from '../../lighting/lightArea';
 import type { LightEmission, LightSource } from '../../types/lightingTypes';
 import type { LiquidKind, LiquidSurface } from '../../types/liquidTypes';
@@ -9,6 +7,7 @@ import { shapeRings, type Vec } from '../render/geometry';
 import { simplifyRing } from '../render/simplifyRing';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
+import { cellsToUnits, type SceneUnit } from './gameUnits';
 import { liquidColours } from './liquidColours';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
@@ -183,7 +182,7 @@ export function floorLiquids(
   style: DungeonStyle,
   view: DungeonView,
   placement: DungeonPlacement,
-  unit: Pick<MeasurementSettings, 'unitType' | 'ruleDistance'>,
+  unit: SceneUnit,
   id: string,
   level?: string,
 ): FloorLiquids {
@@ -192,8 +191,7 @@ export function floorLiquids(
   const colours = liquidColours(style, view);
   const { originCell, pxPerCell } = placement;
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
-  const squares = view.smallTiles ? 2 : 1;
-  const units = (cells: number): number => toGameUnits({ value: cells * squares, unit: 'squares' }, { unitType: unit.unitType, ruleDistance: unit.ruleDistance });
+  const units = (cells: number): number => cellsToUnits(cells, view, unit);
   const liquids: Record<string, LiquidSurface> = {};
   cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow, lavaLight }, index) => {
     const liquidId = `liquid_${id}_${index + 1}`;
