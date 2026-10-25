@@ -7,6 +7,7 @@ import { openPinMenu, type PinnedSceneLevels } from '../pinSceneLevelMenu';
 import { readablePinEntry } from '../pinReadableMenu';
 import { watchClick } from '../utils/clickRelease';
 import { dispatchPinAction } from '../utils/pinActions';
+import { pinOpenLook } from '../pinOpenLook';
 import type { HexLinkRenderer } from './HexLinkRenderer';
 import { t } from '../../i18n';
 import { levelObjects } from '../../levels/levelObjects';
@@ -67,7 +68,7 @@ export class HexLinkInteraction implements HexLinkPointerHandlers {
       e,
       () => {
         const pin = this.pin(pinId);
-        if (pin) dispatchPinAction('open', pin);
+        if (pin) dispatchPinAction('open', pin, this.options.store);
       },
       () => {
         renderer.setPressed(null);
@@ -81,8 +82,8 @@ export class HexLinkInteraction implements HexLinkPointerHandlers {
     if (!pin) return;
     const position = { x: e.clientX, y: e.clientY };
     const entries: ContextMenuEntry[] = [
-      { type: 'item', label: t('pinMenu.open'), icon: 'file-text', onClick: () => dispatchPinAction('open', pin) },
-      { type: 'item', label: t('hex.changeNote'), icon: 'edit', onClick: () => dispatchPinAction('edit', pin) },
+      { type: 'item', ...pinOpenLook(pin), onClick: () => dispatchPinAction('open', pin, this.options.store) },
+      { type: 'item', label: t('hex.changeNote'), icon: 'edit', onClick: () => dispatchPinAction('edit', pin, this.options.store) },
       ...[readablePinEntry(this.options.store, pin)].filter((entry) => entry !== null),
       {
         type: 'item',

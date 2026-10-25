@@ -23,6 +23,8 @@
 - Cavern dungeons are natural caves: chambers and tunnels in the rock with a way two squares wide to the boss, chasms along the faults, lakes in the low chambers, pitches and scree slopes between floors, and lava or acid deep down where the tags ask for them
 - With the Inhabited tag a cavern near water is lived in: fire pits in its hollows and at a guard post by its mouth, and the chief's den at the end
 - Generated dungeons show structure, not furniture: statues, busts, fountains, wells, daises and fireplaces, and in caves stalagmites, crystals, mushrooms and boulders, so what each room is for is yours to decide
+- Encounter builder: type dice such as 2d4 into a creature's count, and every time the encounter is placed that many are rolled
+- Note pins can link to a folder of encounters: a click on the pin rolls one of the encounters in it (folders below it too) and puts it in your hand to place; Cmd/Ctrl + hover lists them to pick one yourself
 
 ## Improved
 

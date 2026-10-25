@@ -950,6 +950,11 @@
     letter-spacing: 0.02em;
   }
 
+  .pin-result-badge.is-encounters {
+    color: var(--color-orange);
+    background: color-mix(in oklch, var(--color-orange) 14%, transparent);
+  }
+
   .pin-header-level {
     color: var(--text-muted);
     background: var(--background-modifier-hover);

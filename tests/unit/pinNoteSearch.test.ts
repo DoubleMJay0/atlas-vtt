@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { App, TFile } from 'obsidian';
+import { App, TFile, TFolder } from 'obsidian';
 import { createPinNoteSearch } from '../../src/app/tools/pinNoteSearch';
 import { noteNameProblem, type PinCreateEntry, type PinLinkTarget } from '../../src/app/tools/pinCreateEntries';
 
@@ -11,12 +11,14 @@ interface SetupOptions {
   paths?: string[];
   mapPath?: string | null;
   createEntries?: PinCreateEntry[];
+  /** Folders the vault finds by path, such as a collection's encounters folder. */
+  folders?: Record<string, TFolder>;
 }
 
-function setup({ headings = {}, paths = ['Tavern.md', 'Temple.md', 'Town.atlasmap'], mapPath = null, createEntries }: SetupOptions = {}): { onPick: ReturnType<typeof vi.fn>; onCancel: ReturnType<typeof vi.fn> } {
+function setup({ headings = {}, paths = ['Tavern.md', 'Temple.md', 'Town.atlasmap'], mapPath = null, createEntries, folders = {} }: SetupOptions = {}): { onPick: ReturnType<typeof vi.fn>; onCancel: ReturnType<typeof vi.fn> } {
   const files = paths.map((path) => new TFile(path));
   const app = {
-    vault: { getAllLoadedFiles: () => files },
+    vault: { getAllLoadedFiles: () => files, getAbstractFileByPath: (path: string) => folders[path] ?? null },
     metadataCache: {
       getFileCache: (file: TFile) => ({
         headings: (headings[file.path] ?? headings[file.basename] ?? []).map((heading) => ({ heading, level: 2 })),
@@ -178,6 +180,20 @@ describe('pin note search', () => {
     });
     const names = [...container.querySelectorAll('.pin-result-name')].map((element) => element.textContent);
     expect(names).toEqual(['Tavern', 'Keep']);
+  });
+
+  it('offers the map\'s folders of encounters first, with how many each holds', () => {
+    const folder = (path: string, children: Array<TFile | TFolder>): TFolder => Object.assign(new TFolder(path), { children });
+    const root = 'atlas-vtt/collections/Realm/encounters';
+    const forest = folder(`${root}/Forest`, [new TFile(`${root}/Forest/wolves.json`), new TFile(`${root}/Forest/bandits.json`)]);
+    const { onPick } = setup({ mapPath: 'atlas-vtt/collections/Realm/scenes/Town.atlasmap', paths: ['Forest notes.md'], folders: { [root]: folder(root, [forest]) } });
+    const names = [...container.querySelectorAll('.pin-result-name')].map((element) => element.textContent);
+    expect(names).toEqual(['All encounters', 'Forest', 'Forest notes']);
+    type('forest');
+    expect(activeName()).toBe('Forest');
+    expect(container.querySelector('.pin-result-item.is-active .pin-result-badge')?.textContent).toBe('2 encounters');
+    press('Enter');
+    expect(onPick).toHaveBeenCalledWith(`${root}/Forest`);
   });
 });
 

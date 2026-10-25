@@ -19,6 +19,10 @@ import { showPinnedLevel } from '../links/openAtlasLink';
 import { t } from '../i18n';
 import { showNotice } from '../ui/notice';
 import { levelObjects } from '../levels/levelObjects';
+import { isEncounterFolderLink } from '../links/atlasLinkTargets';
+import { linkedEncounterFolder } from '../encounters/encounterFolders';
+import { rollEncounterFolder } from '../encounters/encounterFolderRoll';
+import { atlasViewOfStore } from '../plugin/atlasLeaves';
 
 interface NotePinDropdownResult {
   accepted: boolean;
@@ -97,8 +101,10 @@ export class NotePinTool {
     
     // Listen for pin action events from the PixiRenderer
     this.pinActionHandler = (e): void => {
-      const { action, pin } = e.detail;
-      
+      const { action, pin, store: source } = e.detail;
+      // Every view's tool hears the window's event: only the one whose map holds the pin acts.
+      if (source !== this.store) return;
+
       if (action === 'open') {
         // Explicitly tell NotePreviewUIManager to hide any preview for this pin's notePath
         this.eventBus.emit('close-active-preview', pin.notePath);
@@ -288,11 +294,15 @@ export class NotePinTool {
   }
   
   /**
-   * Opens the note or scene a pin links to. A scene opens in the Atlas view;
-   * one of another collection opens only where this collection has it too.
+   * Opens the note or scene a pin links to, or rolls from its folder of encounters. A scene opens
+   * in the Atlas view; one of another collection opens only where this collection has it too.
    */
   public openLinkedNote(pin: NotePin): void {
     if (!pin.notePath) return;
+    if (isEncounterFolderLink(pin.notePath)) {
+      this.rollEncounters(pin.notePath);
+      return;
+    }
 
     const state = this.store.getState();
     const { mapPath } = state;
@@ -313,6 +323,20 @@ export class NotePinTool {
     }
   }
   
+  /** Rolls an encounter of the pin's folder into the GM's hand on this map. */
+  private rollEncounters(link: string): void {
+    const folder = linkedEncounterFolder(this.store.getState().mapPath, link);
+    if (!folder) {
+      showNotice(t('pin.crossCollection'));
+      return;
+    }
+    runInBackground(
+      rollEncounterFolder(this.obsidianApp, atlasViewOfStore(this.obsidianApp, this.store), folder),
+      `Rolling an encounter from ${folder}`,
+      t('pin.encounters.failed'),
+    );
+  }
+
   /** Asks which note to link and drops a pin for it at the clicked world position. */
   private async placePinAt(worldX: number, worldY: number): Promise<void> {
     this.preview.hold();

@@ -5,6 +5,7 @@ import { baseName, parentPath } from '../utils/pathUtils';
 import { STANDING_LIST } from '../keyboard/tooltipEscape';
 import { runInBackground } from '../utils/backgroundTask';
 import type { PinCreateEntry, PinLinkTarget } from './pinCreateEntries';
+import { encounterFoldersOf, type EncounterFolder } from '../encounters/encounterFolders';
 
 const RESULT_LIMIT = 30;
 
@@ -12,7 +13,7 @@ export interface PinNoteSearchOptions {
   app: App;
   /** The map the pin goes on; it may only link to scenes of its own collection. */
   mapPath: string | null;
-  /** A note (optionally `path#heading`) was chosen; a scene made for the pin names the floor it opens on. */
+  /** A note (optionally `path#heading`), a scene or a folder of encounters was chosen; a scene made for the pin names the floor it opens on. */
   onPick: (notePath: string, sceneLevel?: string) => void;
   onCancel: () => void;
   /** Ways to make what a typed name names, offered first while no file carries that name. */
@@ -33,7 +34,8 @@ interface ResultEntry {
 let listCount = 0;
 
 /**
- * Search field, result list and key hints of the note pin dropdown. Picking a
+ * Search field, result list and key hints of the note pin dropdown, offering notes, the scenes of
+ * the map's collection and its folders of encounters. Picking a
  * note with headings, or typing `note#`, lists its headings. One result is
  * always active (the first after every change), so Enter picks it and the
  * arrow keys move through the list.
@@ -70,6 +72,9 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
   const files = app.vault.getAllLoadedFiles().filter((f): f is TFile =>
     f instanceof TFile && (f.extension === 'md' || (f.extension === 'atlasmap' && mayLinkFromScene(options.mapPath, f.path)))
   );
+
+  // The scene's own folders of encounters, which a pin rolls from
+  const encounterFolders = encounterFoldersOf(app, options.mapPath);
 
   const nameCounts = new Map<string, number>();
   files.forEach((file) => {
@@ -188,6 +193,14 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
     if (isMap) item.createSpan({ cls: 'pin-result-badge is-map', text: t('pin.search.map') });
   };
 
+  const addEncounterFolderEntry = (folder: EncounterFolder): void => {
+    const item = addEntry(() => options.onPick(folder.path));
+    setIcon(item.createDiv({ cls: 'pin-result-icon' }), 'swords');
+    item.createSpan({ cls: 'pin-result-name', text: folder.name });
+    if (folder.trail) item.createSpan({ cls: 'pin-header-file', text: folder.trail });
+    item.createSpan({ cls: 'pin-result-badge is-encounters', text: t('pin.search.encounters', { count: folder.count }) });
+  };
+
   /** The notes whose headings `note#` lists: the picked one, else every note of that name, else every note containing it. */
   const headingTargets = (fileNamePart: string): TFile[] => {
     if (pickedNote?.basename === fileNamePart) return [pickedNote];
@@ -233,16 +246,19 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
     });
   };
 
+  /** Folders of encounters first, as they are few and only this search offers them, then notes and scenes. */
   const renderFiles = (query: string): void => {
     const needle = query.toLowerCase();
     const name = query.trim();
     if (name !== '' && !files.some((f) => f.basename.toLowerCase() === name.toLowerCase())) renderCreateEntries(name);
+    const folders = encounterFolders.filter((folder) => `${folder.trail} ${folder.name}`.toLowerCase().includes(needle));
     const matching = files.filter((f) => f.basename.toLowerCase().includes(needle));
-    if (matching.length === 0) {
+    if (folders.length + matching.length === 0) {
       if (results.childElementCount > 0) return;
       results.createDiv({ cls: 'pin-empty-state', text: t('pin.search.noNotes') });
       return;
     }
+    folders.forEach(addEncounterFolderEntry);
     matching.slice(0, RESULT_LIMIT).forEach((file) => addFileEntry(file));
   };
 

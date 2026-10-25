@@ -82,7 +82,7 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
     const folder = new TFolder(path);
     const inside = (candidate: string): boolean => parentOf(candidate) === path;
     folder.children = [
-      ...[...folders].filter(inside).map((child) => new TFolder(child)),
+      ...[...folders].filter(inside).map(folderAt),
       ...[...files.keys()].filter(inside).map(fileAt),
     ];
     return folder;
