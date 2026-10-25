@@ -1,5 +1,6 @@
 import { LIGHT_LEVELS, REFLECTION, lightFade } from '../lighting/lightingConstants';
 import { distToSeg, type Seg } from '../lighting/segments';
+import { segmentIntersection } from './visionGeometry';
 import { unionShapes } from '../lighting/polygonClip';
 import { quantizeCoordinate } from '../lighting/quantizedPoint';
 import { Q_SCALE } from '../types/shapeTypes';
@@ -59,6 +60,8 @@ const MAX_CANDIDATES = 16 * MAX_REFLECTION_SAMPLES;
 
 interface Sample {
   point: Point;
+  /** Where the light that reached it comes from: the light, or for an area light the point of its outline. */
+  source: Point;
   /** How far the light travelled to it. */
   travelled: number;
 }
@@ -99,7 +102,7 @@ function samples(reach: ReflectingReach, spacing: number): Sample[] {
   if (!parts) {
     const edges = shadowEdges(polygon, origin);
     const step = Math.max(spacing, totalLength(edges) / MAX_REFLECTION_SAMPLES);
-    return along(edges, step).map((point) => ({ point, travelled: Math.hypot(point.x - origin.x, point.y - origin.y) }));
+    return along(edges, step).map((point) => ({ point, source: origin, travelled: Math.hypot(point.x - origin.x, point.y - origin.y) }));
   }
   // An area light's lit floor is the union of the reaches of its outline: a shadow's edge of one
   // of them is the floor's only where no other reach and not the area itself holds the point.
@@ -110,7 +113,7 @@ function samples(reach: ReflectingReach, spacing: number): Sample[] {
     const source = parts[i]!.origin;
     for (const point of along(edges, step)) {
       if (pointInPolygon(point, polygon) || withinAnother(point, parts, i, reach.dim)) continue;
-      found.push({ point, travelled: Math.hypot(point.x - source.x, point.y - source.y) });
+      found.push({ point, source, travelled: Math.hypot(point.x - source.x, point.y - source.y) });
     }
   });
   return found;
@@ -146,21 +149,72 @@ export function reflectionReach({ bright, dim }: Pick<ReflectingReach, 'bright' 
 }
 
 /**
+ * The visibility polygons of reflection points, kept from one round of tracing to the next
+ * (`endRound`): a light dragged a little finds most points of its shadows' edges again, since
+ * they lie on a grid (`reflectionParts`), and traces only the new ones. Kept for one set of walls.
+ */
+export class ReflectionTraces {
+  private walls: readonly WallSegment[] | null = null;
+  private kept = new Map<string, Polygon>();
+  private used = new Map<string, Polygon>();
+
+  trace(point: Point, radius: number, walls: readonly WallSegment[]): Polygon {
+    if (walls !== this.walls) {
+      this.walls = walls;
+      this.kept.clear();
+      this.used.clear();
+    }
+    const key = `${point.x},${point.y},${radius}`;
+    const polygon = this.used.get(key) ?? this.kept.get(key) ?? computeVisibility(point, radius, walls, undefined, 'light');
+    this.used.set(key, polygon);
+    return polygon;
+  }
+
+  /** Lets go of every polygon the round that ends asked for none of, after a round that asked for any. */
+  endRound(): void {
+    if (this.used.size === 0) return;
+    this.kept = this.used;
+    this.used = new Map();
+  }
+}
+
+/**
+ * `point` moved to the nearest corner of a grid `step` wide, unless that comes nearer a wall than
+ * `clearance` or lies across one: then it stays where it is.
+ */
+function onGrid(point: Point, step: number, near: readonly Seg[], clearance: number): Point {
+  const corner = { x: Math.round(point.x / step) * step, y: Math.round(point.y / step) * step };
+  const clear = near.every((seg) => distToSeg(corner.x, corner.y, seg) >= clearance
+    && !segmentIntersection(point, corner, { x: seg[0], y: seg[1] }, { x: seg[2], y: seg[3] }));
+  return clear ? corner : point;
+}
+
+/**
  * Where the light `reach` lights gives some of it back: points along its shadows' edges, each
  * traced (`computeVisibility`, channel `light`, one-way walls stopping it both ways, as for area
  * lights, since the floor may lie on both sides) as far as `reflectionReach`. Points nearer a
- * wall than the clearance give nothing past it, as with area lights.
+ * wall than the clearance give nothing past it, as with area lights. A point is moved to a grid
+ * half the spacing wide and its reach rounded down to that step, so `traces` finds it again when
+ * the light has moved a little: a dragged light keeps its reflection without tracing it anew.
  */
-export function reflectionParts(reach: ReflectingReach, walls: readonly WallSegment[], sampling: ReflectionSampling): ReflectionPart[] {
+export function reflectionParts(reach: ReflectingReach, walls: readonly WallSegment[], sampling: ReflectionSampling, traces = new ReflectionTraces()): ReflectionPart[] {
   const solid = twoWayWalls(walls);
   const found = samples(reach, sampling.spacing);
   if (found.length === 0) return [];
-  const near: Seg[] = nearbySegments(found.map((sample) => sample.point), solid, sampling.clearance);
+  const step = sampling.spacing / 2;
+  const near: Seg[] = nearbySegments(found.map((sample) => sample.point), solid, sampling.clearance + step);
   const kept = found.filter(({ point, travelled }) => reflectionReach(reach, travelled, sampling) >= sampling.spacing
     && near.every((seg) => distToSeg(point.x, point.y, seg) >= sampling.clearance));
-  return evenlyChosen(kept, MAX_REFLECTION_SAMPLES).map(({ point, travelled }) => {
-    const radius = reflectionReach(reach, travelled, sampling);
-    return { origin: point, reach: radius, strength: floorLight(reach, travelled), polygon: computeVisibility(point, radius, solid, undefined, 'light') };
+  const seen = new Set<string>();
+  return evenlyChosen(kept, MAX_REFLECTION_SAMPLES).flatMap(({ point, source }) => {
+    const origin = onGrid(point, step, near, sampling.clearance);
+    const travelled = Math.hypot(origin.x - source.x, origin.y - source.y);
+    const radius = Math.floor(reflectionReach(reach, travelled, sampling) / step) * step;
+    if (radius <= 0) return [];
+    const key = `${origin.x},${origin.y}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ origin, reach: radius, strength: floorLight(reach, travelled), polygon: traces.trace(origin, radius, solid) }];
   });
 }
 

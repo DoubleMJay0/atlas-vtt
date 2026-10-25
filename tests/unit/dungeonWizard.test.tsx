@@ -77,6 +77,8 @@ const preview = (): HTMLElement => document.querySelector<HTMLElement>('.atlas-d
 const lastJob = (): DungeonJob => worker.preview.mock.calls.at(-1)![0] as DungeonJob;
 const tag = (name: string): HTMLElement => screen.getByRole('button', { name, pressed: undefined });
 const exportButton = (): HTMLElement => within(preview()).getByRole('button', { name: 'Export' });
+/** The thumbnails asked for by one set of cards: `styles` or `themes`. */
+const thumbnailJobs = (group: string): DungeonJob[] => worker.thumbnail.mock.calls.filter((call) => call[1] === group).map((call) => call[0] as DungeonJob);
 
 describe('the dungeon wizard', () => {
   it('draws the map fitted into the card beside the panel, off the main thread', async () => {
@@ -112,7 +114,7 @@ describe('the dungeon wizard', () => {
   it('opens with the chosen theme focused, so the arrows run through the themes', async () => {
     renderPanel();
     await waitFor(() => expect(document.activeElement?.getAttribute('aria-checked')).toBe('true'));
-    expect(document.activeElement?.textContent).toMatch(/^Surprise me/);
+    expect(document.activeElement?.querySelector('.atlas-dungeon-card-name')?.textContent).toBe('Surprise me');
   });
 
   it('never draws another dungeon for another name', async () => {
@@ -142,24 +144,50 @@ describe('the dungeon wizard', () => {
     renderPanel(vi.fn(), 'Sunken Vault', 'Features');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const seed = lastJob().request.seed;
-    fireEvent.click(tag('small'));
-    await waitFor(() => expect(lastJob().request.tags).toEqual(['small']));
-    fireEvent.click(tag('large'));
-    expect(tag('small').getAttribute('aria-pressed')).toBe('false');
-    expect(tag('large').getAttribute('aria-pressed')).toBe('true');
-    await waitFor(() => expect(lastJob().request.tags).toEqual(['large']));
+    fireEvent.click(tag('wet'));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'wet']));
+    fireEvent.click(tag('flooded'));
+    expect(tag('wet').getAttribute('aria-pressed')).toBe('false');
+    expect(tag('flooded').getAttribute('aria-pressed')).toBe('true');
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'flooded']));
     expect(lastJob().request.seed).toBe(seed);
+    expect(settings.getDungeonGenerator().tags).toEqual(['medium', 'flooded']);
+  });
+
+  it('chooses the size as one of three, medium where the tags name none', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
+    const size = screen.getByRole('radiogroup', { name: 'Size' });
+    expect(within(size).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['Small', 'Medium', 'Large']);
+    expect(within(size).getByRole('radio', { checked: true }).textContent).toBe('Medium');
+    fireEvent.click(within(size).getByRole('radio', { name: 'Large' }));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['large']));
+    // Choosing it again keeps it
+    fireEvent.click(within(size).getByRole('radio', { name: 'Large' }));
     expect(settings.getDungeonGenerator().tags).toEqual(['large']);
+    // No size is a chip any more
+    expect(document.querySelector('.atlas-dungeon-tag[data-tag="small"]')).toBeNull();
+  });
+
+  it('asks for no, some or many secret rooms', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
+    const secrets = screen.getByRole('radiogroup', { name: 'Secret rooms' });
+    expect(within(secrets).getByRole('radio', { checked: true }).textContent).toBe('Some');
+    fireEvent.click(within(secrets).getByRole('radio', { name: 'None' }));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'no-secrets']));
+    fireEvent.click(within(secrets).getByRole('radio', { name: 'Many' }));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'secret']));
+    fireEvent.click(within(secrets).getByRole('radio', { name: 'Some' }));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium']));
   });
 
   it('draws a new layout from the card, everything else as it is', async () => {
     renderPanel(vi.fn(), 'Sunken Vault', 'Features');
-    fireEvent.click(tag('large'));
-    await waitFor(() => expect(lastJob().request.tags).toEqual(['large']));
+    fireEvent.click(tag('overgrown'));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'overgrown']));
     const seed = lastJob().request.seed;
     fireEvent.click(within(preview()).getByRole('button', { name: 'New layout' }));
     await waitFor(() => expect(lastJob().request.seed).not.toBe(seed));
-    expect(lastJob().request.tags).toEqual(['large']);
+    expect(lastJob().request.tags).toEqual(['medium', 'overgrown']);
   });
 
   it('keeps what is shown in Atlas settings', async () => {
@@ -235,7 +263,7 @@ describe('the theme', () => {
   it('offers the themes as cards, Surprise me first', () => {
     renderPanel();
     const cards = within(screen.getByRole('radiogroup', { name: 'Theme' })).getAllByRole('radio');
-    expect(cards.map((card) => card.querySelector('.atlas-dungeon-theme__name')?.textContent)).toEqual(['Surprise me', 'Fortress', 'Haunted Mansion', 'Cavern']);
+    expect(cards.map((card) => card.querySelector('.atlas-dungeon-card-name')?.textContent)).toEqual(['Surprise me', 'Fortress', 'Haunted Mansion', 'Cavern']);
     expect(cards.filter((card) => card.tabIndex === 0)).toEqual([cards[0]]);
   });
 
@@ -243,7 +271,7 @@ describe('the theme', () => {
     renderPanel();
     fireEvent.keyDown(screen.getByRole('radio', { name: /^Surprise me/ }), { key: 'ArrowRight' });
     await waitFor(() => expect(lastJob().request.theme).toBe('fortress'));
-    expect(document.activeElement?.textContent).toMatch(/^Fortress/);
+    expect(document.activeElement?.querySelector('.atlas-dungeon-card-name')?.textContent).toBe('Fortress');
     fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
     await waitFor(() => expect(lastJob().request.theme).toBe('any'));
   });
@@ -257,7 +285,7 @@ describe('the theme', () => {
     expect(refused().sort()).toEqual(['acid', 'flooded', 'lava']);
     expect(chips()).toEqual(order);
     fireEvent.click(tag('lava'));
-    expect(lastJob().request.tags).toEqual([]);
+    expect(lastJob().request.tags).toEqual(['medium']);
     const reason = document.getElementById(tag('lava').getAttribute('aria-describedby')!);
     expect(reason?.textContent).toBe(t('dungeon.theme.refused.noMolten'));
   });
@@ -267,7 +295,7 @@ describe('the theme', () => {
     chooseTheme('Cavern');
     goTo('Features');
     fireEvent.click(tag('lava'));
-    await waitFor(() => expect(lastJob().request.tags).toEqual(['lava']));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'lava']));
     expect(tag('lava').getAttribute('aria-pressed')).toBe('true');
     chooseTheme('Fortress');
     await waitFor(() => expect(lastJob().request.theme).toBe('fortress'));
@@ -304,7 +332,42 @@ describe('the theme', () => {
 
   it('names the theme Surprise me picked once the dungeon is there', async () => {
     renderPanel();
-    await waitFor(() => expect(screen.getByRole('radio', { name: /^Surprise me/ }).textContent).toMatch(/This time: (Fortress|Haunted Mansion|Cavern)$/));
+    const card = screen.getByRole('radio', { name: 'Surprise me' });
+    await waitFor(() => expect(document.getElementById(card.getAttribute('aria-describedby') ?? '')?.textContent).toMatch(/^This time: (Fortress|Haunted Mansion|Cavern)$/));
+  });
+});
+
+describe('the theme pictures', () => {
+  it('draws the whole entry floor of the dungeon asked for in every theme, the chosen one first', async () => {
+    settings.setDungeonGenerator({ theme: 'cavern', style: 'night' });
+    renderPanel();
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(3));
+    const jobs = thumbnailJobs('themes');
+    expect(jobs.map((job) => job.request.theme)).toEqual(['cavern', 'fortress', 'mansion']);
+    expect(new Set(jobs.map((job) => job.request.seed)).size).toBe(1);
+    expect(jobs.every((job) => job.output.kind === 'preview' && job.output.floor === 0 && job.style === dungeonStyle('night'))).toBe(true);
+    // Surprise me shows the three, each theme card its own
+    await waitFor(() => expect(document.querySelectorAll('.atlas-dungeon-theme canvas:not([hidden])')).toHaveLength(6));
+  });
+
+  it('draws nothing anew for a change of theme alone, and anew for another dungeon', async () => {
+    renderPanel();
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(3));
+    fireEvent.click(screen.getByRole('radio', { name: /^Fortress/ }));
+    await act(async () => { await Promise.resolve(); });
+    expect(thumbnailJobs('themes')).toHaveLength(3);
+    fireEvent.click(within(preview()).getByRole('button', { name: 'New layout' }));
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(6));
+    expect(worker.dropThumbnails).toHaveBeenCalledWith('themes');
+  });
+
+  it('draws none while another step is shown', async () => {
+    renderPanel();
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(3));
+    goTo('Features');
+    fireEvent.click(tag('overgrown'));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'overgrown']));
+    expect(thumbnailJobs('themes')).toHaveLength(3);
   });
 });
 
@@ -378,7 +441,7 @@ describe('floors, the boss room and five-room dungeons', () => {
 
   it('hides the secret rooms right-clicked on the floor shown', async () => {
     const seed = Array.from({ length: 40 }, (_, k) => k + 1)
-      .find((candidate) => generateDungeon({ seed: candidate, tags: [], floors: 2, bossRoom: true, fiveRoom: false }).floors[1]?.rooms.some((room) => room.wing === 'secret'))!;
+      .find((candidate) => generateDungeon({ seed: candidate, tags: ['medium'], floors: 2, bossRoom: true, fiveRoom: false }).floors[1]?.rooms.some((room) => room.wing === 'secret'))!;
     vi.mocked(randomSeed).mockReturnValue(seed);
     renderPanel(vi.fn(), 'Sunken Vault', 'Layout');
     fireEvent.click(screen.getByRole('button', { name: 'More floors' }));
@@ -444,14 +507,14 @@ describe('the style gallery', () => {
     renderPanel();
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     await act(async () => { await Promise.resolve(); });
-    expect(worker.thumbnail).not.toHaveBeenCalled();
+    expect(thumbnailJobs('styles')).toHaveLength(0);
   });
 
   it('draws a thumbnail of the dungeon as shown in every style, the chosen one first', async () => {
     settings.setDungeonGenerator({ style: 'volcanic' });
     renderPanel(vi.fn(), 'Sunken Vault', 'Style');
-    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
-    const jobs = worker.thumbnail.mock.calls.map(([job]) => job as DungeonJob);
+    await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length));
+    const jobs = thumbnailJobs('styles');
     expect(jobs[0]!.style).toBe(dungeonStyle('volcanic'));
     expect(new Set(jobs.map((job) => job.style)).size).toBe(DUNGEON_STYLES.length);
     expect(jobs.every((job) => job.output.kind === 'thumbnail' && job.model !== undefined)).toBe(true);
@@ -459,23 +522,23 @@ describe('the style gallery', () => {
 
   it('keeps the thumbnails drawn when the GM leaves the step and comes back', async () => {
     renderPanel(vi.fn(), 'Sunken Vault', 'Style');
-    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
+    await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length));
     goTo('Name');
     goTo('Style');
     await act(async () => { await Promise.resolve(); });
-    expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length);
+    expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length);
   });
 
   it('asks for no thumbnail again for a dungeon and view it has drawn, and drops those of the last view', async () => {
     renderPanel(vi.fn(), 'Sunken Vault', 'Style');
-    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
+    await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length));
     fireEvent.click(screen.getByText('Map options'));
     fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
-    expect(worker.dropThumbnails).toHaveBeenCalled();
-    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length * 2));
+    expect(worker.dropThumbnails).toHaveBeenCalledWith('styles');
+    await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length * 2));
     fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
     await act(async () => { await Promise.resolve(); });
-    expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length * 2);
+    expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length * 2);
   });
 });
 
@@ -502,7 +565,7 @@ describe('the generator state', () => {
 
   it('keeps the hidden wings while only the water changes, and drops them for another seed', () => {
     // A seed whose first floor has a secret wing: the test must not depend on a random one
-    vi.mocked(randomSeed).mockReturnValue(seedWhere(60, (seed) => generateDungeon({ seed, tags: [] }).floors[0]!.rooms.some((room) => room.wing === 'secret')));
+    vi.mocked(randomSeed).mockReturnValue(seedWhere(60, (seed) => generateDungeon({ seed, tags: ['medium'] }).floors[0]!.rooms.some((room) => room.wing === 'secret')));
     const { result } = renderHook(() => useDungeonState(app));
     const request = result.current.request;
     act(() => result.current.setGenerated(request, generateDungeon(request)));
@@ -517,7 +580,7 @@ describe('the generator state', () => {
   });
 
   it('hides a secret wing on the floor it lies on', () => {
-    vi.mocked(randomSeed).mockReturnValue(seedWhere(40, (seed) => generateDungeon({ seed, tags: [], floors: 2 }).floors[1]?.rooms.some((room) => room.wing === 'secret') ?? false));
+    vi.mocked(randomSeed).mockReturnValue(seedWhere(40, (seed) => generateDungeon({ seed, tags: ['medium'], floors: 2 }).floors[1]?.rooms.some((room) => room.wing === 'secret') ?? false));
     const { result } = renderHook(() => useDungeonState(app));
     act(() => result.current.setFloors(2));
     const request = result.current.request;

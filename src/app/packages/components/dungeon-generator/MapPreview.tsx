@@ -14,13 +14,15 @@ interface MapPreviewProps {
   onHideWing: (floor: number, room: number) => void;
   /** Shows the wings hidden by hand again; unset while none is. */
   onShowHiddenWings?: (() => void) | undefined;
+  /** Laid over the map (its tools, the floor switcher). */
+  children?: React.ReactNode;
 }
 
 /**
  * The map preview of the floor shown; right-click a secret room to hide its wing on that floor, or
  * show the hidden wings again.
  */
-export function MapPreview({ preview, view, onFrame, onHideWing, onShowHiddenWings }: MapPreviewProps): React.JSX.Element {
+export function MapPreview({ preview, view, onFrame, onHideWing, onShowHiddenWings, children }: MapPreviewProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const menu = useOptionalContextMenu();
@@ -48,7 +50,9 @@ export function MapPreview({ preview, view, onFrame, onHideWing, onShowHiddenWin
 
   return (
     <div ref={setFrame} className="atlas-dungeon-preview" tabIndex={-1} onContextMenu={onContextMenu}>
-      <PreviewCanvas picture={picture} drawing={preview.drawing} failed={preview.failed} canvasRef={canvasRef} className="atlas-dungeon-preview__stage" />
+      <PreviewCanvas picture={picture} drawing={preview.drawing} failed={preview.failed} canvasRef={canvasRef} className="atlas-dungeon-preview__stage">
+        {children}
+      </PreviewCanvas>
     </div>
   );
 }

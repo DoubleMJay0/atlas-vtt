@@ -11,8 +11,8 @@ export const NO_MOVING_LIGHTS: ReadonlySet<string> = new Set();
 /**
  * Which lights are moving: those whose place changed less than `LIGHT_REST_MS` ago (a carried
  * light whose token is dragged or glides, a placed light being dragged). While a light moves,
- * what only makes it look finer waits for it to rest (its reflection, its soft shadows, the
- * bounce), so each frame of the move costs little and the light is drawn where its token is;
+ * what only makes it look finer waits for it to rest (its soft shadows, the bounce; its
+ * reflection does not wait, as it showed up late with a flicker), so each frame of the move costs little and the light is drawn where its token is;
  * once it rests (`restsAt`), it is worked out whole. A light seen for the first time is at rest.
  */
 export class LightMotion {

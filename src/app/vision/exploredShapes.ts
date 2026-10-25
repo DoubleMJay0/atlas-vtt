@@ -72,10 +72,19 @@ export function exploredShapes(
   }
   const byLight = regions.filter(seesByLight).map((region) => region.polygon);
   const inDarkness = regions.filter(seesInDarkness).map((region) => region.polygon);
-  const shining = lights.filter((light) => !light.darkness);
-  const seen = [...(byLight.length > 0 ? shining.flatMap(litPolygons) : []), ...inDarkness];
+  const shining = byLight.length > 0 ? lights.filter((light) => !light.darkness) : [];
+  if (shining.length === 0 && inDarkness.length === 0) return null;
   // The light polygons count only inside a region that sees by light; a region that sees in darkness is seen whole.
-  return seen.length > 0 ? { polygons: seen, clip: [...new Set([...byLight, ...inDarkness])], ...except } : null;
+  return withPolygons({ clip: [...new Set([...byLight, ...inDarkness])], ...except }, () => [...shining.flatMap(litPolygons), ...inDarkness]);
+}
+
+/**
+ * `shapes` whose polygons are worked out when first read: a drag records at most every 100 ms,
+ * and a light's reflection makes them cost a union of its parts (`reflectedArea`).
+ */
+function withPolygons(shapes: Omit<ExploredShapes, 'polygons'>, polygons: () => Polygon[]): ExploredShapes {
+  let found: Polygon[] | null = null;
+  return Object.defineProperty(shapes, 'polygons', { get: () => (found ??= polygons()), enumerable: true }) as ExploredShapes;
 }
 
 /**
@@ -88,10 +97,10 @@ function withZones(regions: readonly MapRegion[], scene: AmbientLight, lights: r
   const inDarkness = regions.filter(seesInDarkness).map((region) => region.polygon);
   const clip = [...new Set([...byLight, ...inDarkness])];
   if (clip.length === 0) return null;
-  const shining = byLight.length > 0 ? lights.filter((light) => !light.darkness).flatMap(litPolygons) : [];
+  const shining = byLight.length > 0 ? lights.filter((light) => !light.darkness) : [];
   const lit = (ambient: number): boolean => ambientLevel({ ...scene, ambient }) !== 'dark';
   const ambient = { base: lit(scene.ambient), zones: (scene.zones ?? []).map((zone) => ({ polygon: zone.polygon, lit: lit(zone.ambient) })) };
-  return { polygons: [...shining, ...inDarkness], clip, ...(byLight.length > 0 && { ambient }), ...except };
+  return withPolygons({ clip, ...(byLight.length > 0 && { ambient }), ...except }, () => [...shining.flatMap(litPolygons), ...inDarkness]);
 }
 
 /**

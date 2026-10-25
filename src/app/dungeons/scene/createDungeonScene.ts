@@ -8,6 +8,7 @@ import { LEVEL_HEIGHT } from '../../levels/levelEdits';
 import type { SceneLevel } from '../../types/sceneLevelTypes';
 import type { AssetService } from '../../services/AssetService';
 import { AssetThumbnailService, THUMBNAIL_SPEC } from '../../services/AssetThumbnailService';
+import { MAP_THUMBNAIL_SIZE, MapThumbnailService } from '../../services/MapThumbnailService';
 import { t } from '../../i18n';
 import { INVALID_NAME_CHARACTERS } from '../../services/assetPaths';
 import type { DungeonModel, DungeonRequest } from '../model';
@@ -17,6 +18,7 @@ import { DungeonWorkerClient } from '../worker/DungeonWorkerClient';
 import type { DungeonJob, DungeonRendered } from '../worker/dungeonJob';
 import { floorName } from './roomKeys';
 import { dungeonNote, roomPins } from './toNote';
+import { dungeonSceneThumbnail } from './sceneThumbnail';
 import { dungeonScene } from './toScene';
 import type { DungeonPlacement } from './toWalls';
 
@@ -183,8 +185,22 @@ export async function createDungeonSceneWith(deps: DungeonSceneDeps, options: Du
 }
 
 /**
- * `createDungeonSceneWith` on the app's dungeon worker and image workers; the asset manager is told
- * of the new scene.
+ * Gives a new scene the thumbnail a scene gets when its view is first shown, so a note pin that
+ * links it shows the map before anyone opened it. A thumbnail that cannot be made leaves the
+ * scene as it is: the next time it is shown makes one.
+ */
+async function giveSceneThumbnail(app: App, client: DungeonWorkerClient, scenePath: string, options: DungeonSceneOptions): Promise<void> {
+  try {
+    const bytes = await dungeonSceneThumbnail((job) => client.render(job), options, MAP_THUMBNAIL_SIZE);
+    if (bytes) await new MapThumbnailService(app).saveThumbnail(scenePath, bytes);
+  } catch (error) {
+    console.warn('[Atlas] The new dungeon scene got no thumbnail yet', error);
+  }
+}
+
+/**
+ * `createDungeonSceneWith` on the app's dungeon worker and image workers, with the scene's
+ * thumbnail; the asset manager is told of the new scene.
  */
 export async function createDungeonScene(app: App, assetService: AssetService, options: DungeonSceneOptions): Promise<DungeonSceneResult> {
   const client = DungeonWorkerClient.forApp(app);
@@ -199,6 +215,9 @@ export async function createDungeonScene(app: App, assetService: AssetService, o
     },
     options,
   );
-  if (result.ok) app.workspace.trigger('atlas-vtt:refresh-assets');
+  if (result.ok) {
+    await giveSceneThumbnail(app, client, result.scenePath, options);
+    app.workspace.trigger('atlas-vtt:refresh-assets');
+  }
   return result;
 }

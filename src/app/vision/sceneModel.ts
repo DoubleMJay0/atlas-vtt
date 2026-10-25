@@ -92,9 +92,9 @@ export class SceneModelBuilder {
 
   /**
    * `reflectedLight: false` builds lights without their reflection (`REFLECTION`), as before it
-   * existed. With a `clock` (ms), a light that moves is built as moving (`LightMotion`): without
-   * its reflection and marked `moving`, so the engine draws it cheaply; once it rests, the next
-   * update builds it whole (`restsAt`).
+   * existed. With a `clock` (ms), a light that moves is built as moving (`LightMotion`): marked
+   * `moving`, so the engine traces its tile cheaply; once it rests, the next update builds it
+   * whole (`restsAt`). Its reflection is there all along.
    */
   constructor(private readonly options: { reflectedLight?: boolean; clock?: () => number } = {}) {
     this.motion = options.clock ? new LightMotion() : null;
@@ -148,7 +148,7 @@ export class SceneModelBuilder {
     const sampling = { spacing: scale.cellSize * AREA_SAMPLE_SPACING, clearance: wallRadius(worldTexel(bounds)) };
     const reflection = this.options.reflectedLight === false ? null : { ...sampling, reach: REFLECTION.cells * scale.cellSize };
     const moving = this.motion?.note(shining, this.options.clock!()) ?? NO_MOVING_LIGHTS;
-    const everyReach = this.lightReaches.sync(shining, walls, sampling, reflection, moving);
+    const everyReach = this.lightReaches.sync(shining, walls, sampling, reflection);
     // A light whose flame stands in magical darkness it does not outshine gives nothing: the picture and the rule both leave it out.
     const out = shining.map((light) => !light.darkness && quenched(light, light.priority ?? 0, everyReach));
     // A darkness is drawn as the polygon the rule counts, and veils the light it swallows where the

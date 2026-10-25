@@ -43,15 +43,14 @@ describe('the reflection of a moving light', () => {
   const reflection = { ...sampling, reach: 200 };
   const light: EngineLight = { key: 'torch', x: 60, y: 0, bright: 150, dim: 300, flame: 10, color: [1, 1, 1], intensity: 1, animation: 'none' };
 
-  it('is left out while it moves and worked out from the same reach once it rests', () => {
+  it('is there while it moves, and a small step traces only the points it did not have', () => {
     const reaches = new LightReaches();
     const [resting] = reaches.sync([light], walls, sampling, reflection);
     expect(resting!.reflection?.length).toBeGreaterThan(0);
-    const [moving] = reaches.sync([{ ...light, x: 70 }], walls, sampling, reflection, new Set(['torch']));
-    expect(moving!.reflection).toBeUndefined();
-    const [rested] = reaches.sync([{ ...light, x: 70 }], walls, sampling, reflection);
-    expect(rested!.polygon).toBe(moving!.polygon);
-    expect(rested!.reflection?.length).toBeGreaterThan(0);
-    expect(reaches.sync([{ ...light, x: 70 }], walls, sampling, reflection)[0]).toBe(rested);
+    const [moved] = reaches.sync([{ ...light, x: 61 }], walls, sampling, reflection);
+    expect(moved!.reflection?.length).toBeGreaterThan(0);
+    const before = new Set(resting!.reflection!.map((part) => part.polygon));
+    const kept = moved!.reflection!.filter((part) => before.has(part.polygon)).length;
+    expect(kept).toBeGreaterThan(moved!.reflection!.length / 2);
   });
 });

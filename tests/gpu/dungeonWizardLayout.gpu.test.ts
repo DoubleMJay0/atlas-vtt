@@ -51,6 +51,22 @@ const box = (selector: string): DOMRect => tab.querySelector(selector)!.getBound
 const computed = (selector: string, property: 'borderTopWidth' | 'borderTopRightRadius'): number => parseFloat(getComputedStyle(tab.querySelector(selector)!)[property]);
 const goTo = (step: string): void => act(() => tab.querySelector<HTMLButtonElement>(`.atlas-dungeon-wizard__mark[aria-label="${step}"]`)!.click());
 
+/** Whether `inner` lies within `outer`, to the half pixel. */
+const within = (outer: DOMRect, inner: DOMRect): boolean =>
+  inner.left >= outer.left - 0.5 && inner.top >= outer.top - 0.5 && inner.right <= outer.right + 0.5 && inner.bottom <= outer.bottom + 0.5;
+
+/** Waits until the map's edges have glided to the shape of the picture shown. */
+async function mapSettled(): Promise<void> {
+  let last = '';
+  await expect.poll(() => {
+    const rect = box('.atlas-dungeon-preview__map');
+    const now = `${rect.width}x${rect.height}`;
+    const still = now === last;
+    last = now;
+    return still;
+  }, { timeout: 5000, interval: 150 }).toBe(true);
+}
+
 /** Whether a press at the middle of `selector` reaches it. */
 const takesPresses = (selector: string): boolean => {
   const target = tab.querySelector(selector)!;
@@ -92,16 +108,31 @@ describe('the dungeon wizard over the Atlas view', () => {
     expect(takesPresses('.atlas-close-btn')).toBe(true);
     expect(takesPresses('.atlas-dungeon-wizard-preview__tools')).toBe(true);
 
-    // The map is drawn as large as the card allows
+    // The map itself is the floating surface: exactly its shape, as large as its room allows
     await expect.poll(() => tab.querySelector('canvas.atlas-dungeon-preview__canvas'), { timeout: 20_000 }).not.toBeNull();
-    const room = box('.atlas-dungeon-preview');
-    const inset = computed('.atlas-dungeon-wizard-preview', 'borderTopWidth') + 8;
-    expect(room.left - card.left).toBeCloseTo(inset, 1);
-    expect(card.right - room.right).toBeCloseTo(inset, 1);
-    await expect.poll(() => {
-      const canvas = box('canvas.atlas-dungeon-preview__canvas');
-      return Math.max(canvas.width / room.width, canvas.height / room.height);
-    }, { timeout: 20_000 }).toBeCloseTo(1, 1);
+    await mapSettled();
+    const map = box('.atlas-dungeon-preview__map');
+    const bitmap = tab.querySelector<HTMLCanvasElement>('canvas.atlas-dungeon-preview__canvas')!;
+    expect(map.width / map.height).toBeCloseTo(bitmap.width / bitmap.height, 1);
+    expect(Math.max(map.width / card.width, map.height / card.height)).toBeCloseTo(1, 2);
+    expect(within(card, map)).toBe(true);
+  });
+
+  it('keeps the map inside its room whatever the next dungeon’s shape', async () => {
+    await openWizard(1440, 860, { left: 300, top: 120, width: 320, height: 420 });
+    const card = box('.atlas-dungeon-wizard-preview');
+    await expect.poll(() => tab.querySelector('canvas.atlas-dungeon-preview__canvas'), { timeout: 20_000 }).not.toBeNull();
+    for (const step of ['Layout', 'Features']) {
+      goTo(step);
+      const control = step === 'Layout'
+        ? [...tab.querySelectorAll<HTMLButtonElement>('.atlas-dungeon-stepper__button')].at(-1)!
+        : [...tab.querySelectorAll<HTMLButtonElement>('.atlas-dungeon-features__choice [role="radio"]')].at(-1)!;
+      act(() => control.click());
+      await expect.poll(() => tab.querySelector('.atlas-dungeon-preview--drawing'), { timeout: 20_000 }).toBeNull();
+      await mapSettled();
+      expect(within(card, box('.atlas-dungeon-preview__map'))).toBe(true);
+      expect(within(card, box('canvas.atlas-dungeon-preview__canvas'))).toBe(true);
+    }
   });
 
   it('stands panel and card side by side in the middle of the view without a pin', async () => {
@@ -113,32 +144,57 @@ describe('the dungeon wizard over the Atlas view', () => {
     expect(Math.abs(card.top - (860 - card.bottom))).toBeLessThanOrEqual(1);
   });
 
-  it('keeps New layout and Export in the card’s top right corner, concentric with it', async () => {
+  it('keeps New layout and Export in the map’s top right corner, concentric with it', async () => {
     await openWizard(1440, 860, { left: 300, top: 120, width: 320, height: 420 });
-    const card = box('.atlas-dungeon-wizard-preview');
+    await expect.poll(() => tab.querySelector('canvas.atlas-dungeon-preview__canvas'), { timeout: 20_000 }).not.toBeNull();
+    await mapSettled();
+    const map = box('.atlas-dungeon-preview__map');
     const tools = box('.atlas-dungeon-wizard-preview__tools');
-    const border = computed('.atlas-dungeon-wizard-preview', 'borderTopWidth');
-    expect(tools.top - card.top).toBeCloseTo(border + 12, 1);
-    expect(card.right - tools.right).toBeCloseTo(border + 12, 1);
-    // outer = inner + inset, the inset measured from inside the card's border (which a 1x screen rounds to whole pixels)
-    const concentric = computed('.atlas-dungeon-wizard-preview', 'borderTopRightRadius') - border - 12;
+    expect(tools.top - map.top).toBeCloseTo(12, 1);
+    expect(map.right - tools.right).toBeCloseTo(12, 1);
+    // outer = inner + inset (the map has no border)
+    const concentric = computed('.atlas-dungeon-preview__map', 'borderTopRightRadius') - 12;
     expect(Math.abs(concentric - computed('.atlas-dungeon-wizard-preview__tools', 'borderTopRightRadius'))).toBeLessThanOrEqual(0.5);
   });
 
-  it('grows the panel to each step, the style gallery four cards a row, never past the view', async () => {
-    await openWizard(1440, 700, { left: 300, top: 60, width: 320, height: 420 });
-    const themeHeight = box('.atlas-dungeon-wizard').height;
+  it('keeps one height on every step, the style gallery two cards a row scrolling under a scrollbar that takes no room', async () => {
+    await openWizard(1440, 860, { left: 300, top: 60, width: 320, height: 420 });
+    const height = box('.atlas-dungeon-wizard').height;
+    expect(height).toBe(600);
+    const themesWidth = box('.atlas-dungeon-themes').width;
+    for (const step of ['Layout', 'Features', 'Style', 'Name']) {
+      goTo(step);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(box('.atlas-dungeon-wizard').height).toBe(height);
+    }
     goTo('Style');
-    await expect.poll(() => box('.atlas-dungeon-wizard').height, { timeout: 2000 }).toBeGreaterThan(themeHeight);
+    await new Promise((resolve) => setTimeout(resolve, 400));
     const cards = [...tab.querySelectorAll('.atlas-dungeon-style-card')].map((card) => card.getBoundingClientRect());
     expect(cards).toHaveLength(DUNGEON_STYLES.length);
-    expect(cards.filter((card) => card.top === cards[0]!.top)).toHaveLength(4);
-    await expect.poll(() => box('.atlas-dungeon-wizard').bottom, { timeout: 2000 }).toBeLessThanOrEqual(700 - WIZARD_MARGIN);
-    // The footer stays in sight; the step scrolls
-    expect(box('.atlas-dungeon-wizard__footer').bottom).toBeLessThanOrEqual(700 - WIZARD_MARGIN);
+    expect(cards.filter((card) => card.top === cards[0]!.top)).toHaveLength(2);
+    // The step scrolls, and its content is as wide as one that does not
+    const area = tab.querySelector<HTMLElement>('.atlas-dungeon-wizard__scroll')!;
+    expect(area.scrollHeight).toBeGreaterThan(area.clientHeight);
+    expect(box('.atlas-dungeon-style-gallery').width).toBe(themesWidth);
+    // The scrollbar shows only while the step scrolls, never just under the pointer
+    const thumb = tab.querySelector<HTMLElement>('.atlas-dungeon-wizard__body .atlas-overlay-scroll__thumb')!;
+    await expect.poll(() => getComputedStyle(thumb).opacity, { timeout: 4000 }).toBe('0');
+    area.scrollTop = 200;
+    area.dispatchEvent(new Event('scroll'));
+    await expect.poll(() => getComputedStyle(thumb).opacity, { timeout: 2000 }).toBe('1');
+    await expect.poll(() => getComputedStyle(thumb).opacity, { timeout: 4000 }).toBe('0');
+    // The next step starts at its top
+    goTo('Name');
+    await expect.poll(() => area.scrollTop).toBe(0);
   });
 
-  it('puts the floor switcher of a dungeon of several floors centred at the card’s foot', async () => {
+  it('is never taller than a short view', async () => {
+    await openWizard(1440, 500, { left: 300, top: 60, width: 320, height: 420 });
+    expect(box('.atlas-dungeon-wizard').height).toBe(500 - 2 * WIZARD_MARGIN);
+    expect(box('.atlas-dungeon-wizard__footer').bottom).toBeLessThanOrEqual(500 - WIZARD_MARGIN);
+  });
+
+  it('puts the floor switcher of a dungeon of several floors centred at the map’s foot', async () => {
     await openWizard(1440, 860, { left: 300, top: 120, width: 320, height: 420 });
     expect(tab.querySelector('.atlas-dungeon-floor-switcher')).toBeNull();
     goTo('Layout');
@@ -146,10 +202,11 @@ describe('the dungeon wizard over the Atlas view', () => {
     act(() => more.click());
     act(() => more.click());
     await expect.poll(() => tab.querySelectorAll('.atlas-dungeon-floor-switcher [role="radio"]').length).toBe(3);
-    const card = box('.atlas-dungeon-wizard-preview');
+    await mapSettled();
+    const map = box('.atlas-dungeon-preview__map');
     const switcher = box('.atlas-dungeon-floor-switcher');
-    expect(card.bottom - switcher.bottom).toBeCloseTo(computed('.atlas-dungeon-wizard-preview', 'borderTopWidth') + 12, 1);
-    expect(Math.abs((switcher.left + switcher.right) / 2 - (card.left + card.right) / 2)).toBeLessThanOrEqual(0.5);
+    expect(map.bottom - switcher.bottom).toBeCloseTo(12, 1);
+    expect(Math.abs((switcher.left + switcher.right) / 2 - (map.left + map.right) / 2)).toBeLessThanOrEqual(0.5);
     const options = [...tab.querySelectorAll('.atlas-dungeon-floor-switcher [role="radio"]')].map((option) => option.getBoundingClientRect().width);
     expect(new Set(options).size).toBe(1);
   });
