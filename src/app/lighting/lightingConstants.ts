@@ -20,16 +20,11 @@ export const MAX_LIGHT_REACH = MAX_TEXELS * BASE_TEXEL;
 export const TILE_RAYS = 32;
 /**
  * Rays a moving light's tile traces across its flame (`EngineLight.moving`): its shadows are a
- * little harder while it moves, and the tile is traced in full once it rests.
+ * little harder while it moves, and the tile is traced in full once it rests. It keeps the
+ * field's texels and is smoothed like any tile: traced on coarser texels and left unsmoothed,
+ * a dragged torch showed stair steps along every wall and grainy shadows.
  */
 export const MOVING_TILE_RAYS = 4;
-/**
- * A moving light's tile is traced on texels this many of the field's wide, a sixteenth of the
- * work for the tile of a torch on a large map. Only texels whose whole square is free of every
- * wall's capsule are lit, so no light ever reaches past a wall; along walls and at the edges of
- * shadows the light is a coarse texel shorter or longer until the light rests.
- */
-export const MOVING_TILE_SCALE = 2;
 /**
  * Most tile texels one draw traces. A light's tile is traced in bands of rows within this, each
  * handed to the driver on its own: Windows resets a graphics device whose draw runs for about two
