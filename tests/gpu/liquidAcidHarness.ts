@@ -13,7 +13,7 @@ import { centreOf } from './liquidHarness';
 export const ACID_SIZE = { width: 800, height: 600 };
 export const ACID_CELL = 100;
 export const ACID_OUT = 'out/liquids-acid';
-export const ACID_REQUEST = { seed: 43, tags: ['acid', 'large'], floors: 1 };
+export const ACID_REQUEST = { seed: 1, theme: 'cavern', tags: ['acid', 'large'], floors: 1 } as const;
 
 /** The actual generator, painter, scene converter, file reader and runtime layer together. */
 export async function acidScene(look: DungeonStyleId, monochrome = false): Promise<{

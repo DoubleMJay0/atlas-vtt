@@ -131,3 +131,58 @@ export function wetGrid(grid: CellGrid, floor: Uint8Array, wetFloor: Uint8Array,
   fillPockets(grid, wet, keepDry);
   return wet;
 }
+
+/** The most cells a puddle has that is dropped beside a larger body of water. */
+const PUDDLE = 3;
+/** How near, in cells, a larger body lies to drop a puddle beside it. */
+const PUDDLE_REACH = 2;
+
+/**
+ * Dries every puddle (at most `PUDDLE` cells, none of them in `keep`) that lies within
+ * `PUDDLE_REACH` cells of a body of water at least three times its size: a puddle beside a lake
+ * reads as a stray mark of it, never as water of its own.
+ */
+export function dropPuddles(grid: CellGrid, wet: Uint8Array, keep: Uint8Array): void {
+  const body = new Int32Array(wet.length).fill(-1);
+  const sizes: number[] = [];
+  const members: number[][] = [];
+  for (let start = 0; start < wet.length; start++) {
+    if (wet[start] !== WET || body[start]! >= 0) continue;
+    const id = sizes.length;
+    const cells = [start];
+    body[start] = id;
+    for (let k = 0; k < cells.length; k++) {
+      const at = cells[k]!;
+      const x = at % grid.w;
+      const y = (at - x) / grid.w;
+      for (const [dx, dy] of NEAR8) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= grid.w || ny >= grid.h) continue;
+        const next = ny * grid.w + nx;
+        if (wet[next] !== WET || body[next]! >= 0) continue;
+        body[next] = id;
+        cells.push(next);
+      }
+    }
+    sizes.push(cells.length);
+    members.push(cells);
+  }
+  members.forEach((cells, id) => {
+    const size = sizes[id]!;
+    if (size > PUDDLE || cells.some((i) => keep[i])) return;
+    const beside = cells.some((at) => {
+      const x = at % grid.w;
+      const y = (at - x) / grid.w;
+      for (let dy = -PUDDLE_REACH; dy <= PUDDLE_REACH; dy++) for (let dx = -PUDDLE_REACH; dx <= PUDDLE_REACH; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= grid.w || ny >= grid.h) continue;
+        const other = body[ny * grid.w + nx]!;
+        if (other >= 0 && other !== id && sizes[other]! >= size * 3) return true;
+      }
+      return false;
+    });
+    if (beside) for (const i of cells) wet[i] = DRY;
+  });
+}

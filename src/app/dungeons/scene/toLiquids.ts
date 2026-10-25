@@ -9,6 +9,7 @@ import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { cellsToUnits, type SceneUnit } from './gameUnits';
 import { liquidColours } from './liquidColours';
+import { isBuiltWater, isNaturalDeepWater, naturalDeepRings } from '../render/art/pools';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
@@ -54,13 +55,19 @@ function smoothRing(points: readonly Vec[], steps: number): Vec[] {
 /** What each hazard on the floor holds, if it is a liquid. */
 const HAZARD_LIQUID: Readonly<Partial<Record<string, LiquidKind>>> = { lava: 'lava', acid: 'acid', 'deep-water': 'water' };
 
-/** Where a floor is a traced cave, its liquids keep to the drawn floor, which a cell at the cave's edge reaches past. */
-function terrainLiquids(pieces: readonly DungeonTerrain[], floorRings: Vec[][] | null): Liquid[] {
+/**
+ * Where a floor is a traced cave, its liquids keep to the drawn floor, which a cell at the cave's
+ * edge reaches past. A cave's deep water is part of the pool it lies in (`poolLiquids`); only where
+ * the view hides the pools is it a surface of its own, with the shore the map draws it with.
+ */
+function terrainLiquids(dungeon: VisibleDungeon, pieces: readonly DungeonTerrain[], floorRings: Vec[][] | null, poolsShown: boolean): Liquid[] {
   return pieces.flatMap(piece => {
     const liquid = piece.traits.hazard && HAZARD_LIQUID[piece.traits.hazard];
     if (!liquid || (piece.kind !== 'channel' && piece.kind !== 'deep-water')) return [];
+    const natural = isNaturalDeepWater(dungeon.floor, piece);
+    if (natural && poolsShown) return [];
     const flow = piece.kind === 'channel' && piece.facing ? { x: piece.facing.x, y: piece.facing.y } : undefined;
-    const rings = cellRings(piece.cells);
+    const rings = natural ? naturalDeepRings(piece.cells, dungeon.model.seed + piece.id) : cellRings(piece.cells);
     return withHoles(floorRings ? intersectRings(rings, floorRings) : rings).map(({ ring, holes }): Liquid => ({ liquid, ring, ...(holes.length && { holes }), ...(flow && { flow }) }));
   });
 }
@@ -90,12 +97,37 @@ function withHoles(rings: Vec[][]): { ring: Vec[]; holes: Vec[][] }[] {
   return outlines.map(ring => ({ ring, holes: holes.filter(hole => inside(ring, hole[0]!)) }));
 }
 
-/** The floor's pools of water, on what of them lies on the floor (the map clips them there too). Lava and acid are hazards of their own, never pools. */
+/** The share of a cave's pool a stream must fill to carry the whole pool along with it. */
+const STREAM_SHARE = 0.25;
+
+/**
+ * The floor's pools of water, on what of them lies on the floor (the map clips them there too) and
+ * off its built water, which keeps its own banks. A cave's pool holds its deep water, and flows
+ * where a stream fills enough of it. Lava and acid are hazards of their own, never pools.
+ */
 function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
   const floorRings = floorRingsOf(dungeon);
-  return dungeon.floor.water.flatMap(pool => {
-    return withHoles(intersectRings([smoothRing(pool.outline, 4)], floorRings)).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }) }));
+  const { floor } = dungeon;
+  const built = cellRings(floor.terrain.filter(piece => isBuiltWater(floor, piece)).flatMap(piece => piece.cells));
+  const streams = floor.terrain.filter(piece => isNaturalDeepWater(floor, piece) && piece.kind === 'channel' && piece.facing);
+  // All shores at once, as the map fills them: an island's shore is a hole in its lake, never water of its own.
+  const onFloor = intersectRings(floor.water.map(pool => smoothRing(pool.outline, 4)), floorRings);
+  return withHoles(built.length ? subtractRings(onFloor, built) : onFloor).map(({ ring, holes }): Liquid => {
+    const flow = streamThrough(ring, streams);
+    return { liquid: 'water', ring, ...(holes.length && { holes }), ...(flow && { flow }) };
   });
+}
+
+/** The way the stream that fills most of a pool runs, where it fills at least `STREAM_SHARE` of it. */
+function streamThrough(ring: readonly Vec[], streams: readonly DungeonTerrain[]): Vec | undefined {
+  const area = signedArea(ring);
+  let best: DungeonTerrain | undefined;
+  let most = 0;
+  for (const stream of streams) {
+    const cells = stream.cells.filter(c => inside(ring, { x: c.x + 0.5, y: c.y + 0.5 })).length;
+    if (cells > most) { most = cells; best = stream; }
+  }
+  return best?.facing && most >= area * STREAM_SHARE ? { x: best.facing.x, y: best.facing.y } : undefined;
 }
 
 function floorRingsOf(dungeon: VisibleDungeon): Vec[][] {
@@ -187,7 +219,7 @@ export function floorLiquids(
   level?: string,
 ): FloorLiquids {
   const shown = dungeon.floor.terrain.filter(piece => dungeon.roomShapes.has(piece.room));
-  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(shown, dungeon.floors.some(shape => shape.kind === 'poly') ? floorRingsOf(dungeon) : null)].map((piece, index) => ({ ...piece, ...(piece.liquid === 'lava' && { lavaLight: `light_${id}_${index + 1}` }) }));
+  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(dungeon, shown, dungeon.floors.some(shape => shape.kind === 'poly') ? floorRingsOf(dungeon) : null, view.water)].map((piece, index) => ({ ...piece, ...(piece.liquid === 'lava' && { lavaLight: `light_${id}_${index + 1}` }) }));
   const colours = liquidColours(style, view);
   const { originCell, pxPerCell } = placement;
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });

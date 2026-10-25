@@ -7,11 +7,12 @@
 import type { CellPoint, DungeonDoor, DungeonRoom, DungeonTerrain, DungeonWater } from './model';
 import { type Rng, chance, floorStream, int, stream } from './rng';
 import { HOLE_KINDS } from './terrain/catalog';
+import { unionRings } from './render/clipShapes';
 import { traceLoops } from './water/contour';
 import { fractalNoise } from './water/noise';
 import { chaikin, jitter, resample, wobble } from './water/smooth';
-import { holdsCell } from './geometry';
-import { type CellGrid, DRY, WET, floorCells, floorMarks, gridAround, indexOf, wetGrid } from './water/wetGrid';
+import { cellKey, holdsCell } from './geometry';
+import { type CellGrid, DRY, WET, dropPuddles, floorCells, floorMarks, gridAround, indexOf, wetGrid } from './water/wetGrid';
 
 export interface WaterResult {
   water: DungeonWater[];
@@ -29,6 +30,14 @@ export interface WaterRequest {
   rooms?: ReadonlySet<number>;
   /** The fewest corners a shoreline has, so a pool of one cell is drawn round (a cave's); unset, three. */
   shoreCorners?: number;
+  /**
+   * Natural deep water (a cave's lakes, sumps and streams): always under water and traced with the
+   * floor's water, so where the two meet they are one body with one shore, the deep cells its depth.
+   * They are terrain, so they are no shallow water: `waterCells` leaves them out.
+   */
+  deep?: readonly CellPoint[];
+  /** Natural water (a cave's): a puddle beside a larger body is dropped (`dropPuddles`). */
+  natural?: boolean;
 }
 
 /**
@@ -69,7 +78,15 @@ export function chooseWaterLevel(seed: number, requested: number | undefined, fr
   return int(stream(seed, 'water', 'level'), 0, 4) / 10;
 }
 
-function noiseFloor(rng: Rng, grid: CellGrid, floors: readonly CellPoint[], level: number, wet: Uint8Array): void {
+/** Over how many steps a room's water thins out towards a room beside that takes none, so it never ends on their straight edge. */
+const THINNING = 2;
+
+/**
+ * Water where the floor's noise lies below the level. `thinning` cells (by their steps from a room
+ * that takes no water) take it only where the noise lies that share of the way further down towards
+ * its lowest, so even a flooded room's water ends raggedly before its neighbour's edge.
+ */
+function noiseFloor(rng: Rng, grid: CellGrid, floors: readonly CellPoint[], level: number, wet: Uint8Array, thinning: ReadonlyMap<string, number> = new Map()): void {
   const size = Math.max(grid.w, grid.h);
   const noise = fractalNoise(rng, Math.round(Math.log2(size)), 0.5 + rng() * 0.3, size / 2);
   const values = floors.map((c) => noise(c.x + 0.5, c.y + 0.5));
@@ -77,8 +94,28 @@ function noiseFloor(rng: Rng, grid: CellGrid, floors: readonly CellPoint[], leve
   const max = Math.max(...values);
   const threshold = min + (max - min) * level;
   floors.forEach((c, k) => {
-    if ((values[k] ?? Infinity) < threshold) wet[indexOf(grid, c.x, c.y)] = WET;
+    const steps = thinning.get(cellKey(c.x, c.y));
+    const below = steps === undefined ? threshold : threshold - ((THINNING + 1 - steps) / (THINNING + 1)) * (threshold - min);
+    if ((values[k] ?? Infinity) < below) wet[indexOf(grid, c.x, c.y)] = WET;
   });
+}
+
+/** The cells of `taking` within `THINNING` steps of `refusing`, by their steps, walking only over `taking`. */
+function thinningCells(taking: readonly CellPoint[], refusing: readonly CellPoint[]): Map<string, number> {
+  const open = new Set(taking.map((c) => cellKey(c.x, c.y)));
+  const out = new Map<string, number>();
+  let front = refusing;
+  for (let steps = 1; steps <= THINNING; steps++) {
+    const next: CellPoint[] = [];
+    for (const c of front) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const key = cellKey(c.x + dx, c.y + dy);
+      if (!open.has(key) || out.has(key)) continue;
+      out.set(key, steps);
+      next.push({ x: c.x + dx, y: c.y + dy });
+    }
+    front = next;
+  }
+  return out;
 }
 
 function poolIn(room: DungeonRoom, grid: CellGrid, wet: Uint8Array): void {
@@ -98,18 +135,45 @@ function shoreline(rng: Rng, loop: readonly CellPoint[], least?: number): CellPo
   return wobble(rng, resample(chaikin(rough, 2), 0.5, least), 0.3);
 }
 
+/**
+ * The shores as one: where two smoothed shores cross (pools a cell apart whose wobble meets, an
+ * island's shore running out of its lake), the water they hold is one body with one shore, and an
+ * island stays a hole in it (NonZero, as the map fills them). Unchanged where they do not cross.
+ */
+function oneShore(shores: CellPoint[][]): CellPoint[][] {
+  if (shores.length < 2) return shores;
+  const united = unionRings(shores);
+  // The water held, holes taken off; the union's rounding (a thousandth of a cell) moves it by far less than a crossing does.
+  const held = (rings: readonly (readonly CellPoint[])[]): number => Math.abs(rings.reduce((sum, ring) => sum + ringArea(ring), 0));
+  const before = held(shores);
+  return Math.abs(held(united) - before) <= 0.02 + before * 0.002 ? shores : united;
+}
+
+function ringArea(ring: readonly CellPoint[]): number {
+  let sum = 0;
+  ring.forEach((p, i) => {
+    const q = ring[(i + 1) % ring.length]!;
+    sum += p.x * q.y - q.x * p.y;
+  });
+  return sum / 2;
+}
+
 export function placeWater(seed: number, floor: number, rooms: readonly DungeonRoom[], request: WaterRequest): WaterResult {
-  if (rooms.length === 0 || (request.level <= 0 && request.pools.size === 0)) return { water: [], waterCells: [] };
+  const deep = request.deep ?? [];
+  if (rooms.length === 0 || (request.level <= 0 && request.pools.size === 0 && deep.length === 0)) return { water: [], waterCells: [] };
   const rng = floorStream(seed, 'water', floor);
   const grid = gridAround(rooms);
   const floors = floorCells(rooms);
   const wetFloor = new Uint8Array(grid.w * grid.h);
   const { rooms: only } = request;
-  if (request.level > 0) noiseFloor(rng, grid, only ? floorCells(rooms.filter((room) => only.has(room.id))) : floors, request.level, wetFloor);
+  const taking = only ? floorCells(rooms.filter((room) => only.has(room.id))) : floors;
+  const refusing = only ? floorCells(rooms.filter((room) => !only.has(room.id))) : [];
+  // Water thins out towards the rooms beside that take none, so it never stops on their straight edge.
+  if (request.level > 0) noiseFloor(rng, grid, taking, request.level, wetFloor, refusing.length ? thinningCells(taking, refusing) : undefined);
   rooms.filter((room) => request.pools.has(room.id)).forEach((room) => poolIn(room, grid, wetFloor));
   const keepDry = new Uint8Array(grid.w * grid.h);
   // Rooms that take no water stay dry, also where water closes round them (a cave's chamber swelling round a tunnel).
-  if (only) for (const c of floorCells(rooms.filter((room) => !only.has(room.id)))) keepDry[indexOf(grid, c.x, c.y)] = 1;
+  for (const c of refusing) keepDry[indexOf(grid, c.x, c.y)] = 1;
   for (const key of request.dry ?? []) {
     const [x, y] = key.split(',').map(Number) as [number, number];
     const i = indexOf(grid, x, y);
@@ -117,9 +181,19 @@ export function placeWater(seed: number, floor: number, rooms: readonly DungeonR
     wetFloor[i] = DRY;
     keepDry[i] = 1;
   }
+  const deepMarks = new Uint8Array(grid.w * grid.h);
+  for (const c of deep) {
+    const i = indexOf(grid, c.x, c.y);
+    if (i < 0) continue;
+    wetFloor[i] = WET;
+    keepDry[i] = 0;
+    deepMarks[i] = 1;
+  }
   const wet = wetGrid(grid, floorMarks(grid, rooms), wetFloor, keepDry);
-  const waterCells = floors.filter((c) => wet[indexOf(grid, c.x, c.y)] === WET);
-  if (waterCells.length === 0) return { water: [], waterCells: [] };
-  const water = traceLoops(grid, wet).map((loop) => ({ outline: shoreline(rng, loop, request.shoreCorners) }));
-  return { water, waterCells };
+  if (request.natural) dropPuddles(grid, wet, deepMarks);
+  const deepKeys = new Set(deep.map((c) => cellKey(c.x, c.y)));
+  const waterCells = floors.filter((c) => wet[indexOf(grid, c.x, c.y)] === WET && !deepKeys.has(cellKey(c.x, c.y)));
+  if (waterCells.length === 0 && deep.length === 0) return { water: [], waterCells: [] };
+  const shores = traceLoops(grid, wet).map((loop) => shoreline(rng, loop, request.shoreCorners));
+  return { water: oneShore(shores).map((outline) => ({ outline })), waterCells };
 }

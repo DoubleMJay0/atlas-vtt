@@ -138,3 +138,11 @@ export function spotsWithin(rect: CellRect, least = 1): StairSpot[] {
   }
   return out;
 }
+
+/** Every cell within `reach` of an entrance from the outside, by key: where a cave's water keeps off, so it never meets the floor's straight edge at a mouth. */
+export function entrancesAndAround(doors: readonly DungeonDoor[], reach = 2): string[] {
+  const cells = doors.filter((door) => door.from === null).flatMap((door) => [{ x: door.x, y: door.y }, ...(door.wide ? [{ x: door.x + door.wide.x, y: door.y + door.wide.y }] : [])]);
+  const out: string[] = [];
+  for (const c of cells) for (let dx = -reach; dx <= reach; dx++) for (let dy = -reach; dy <= reach; dy++) out.push(cellKey(c.x + dx, c.y + dy));
+  return out;
+}
