@@ -30,6 +30,10 @@ export function drawScatter(hand: Hand, piece: DungeonTerrain, size: number, per
   }
   const all: PathFn = path => stones.forEach(st => polyPath(st.poly)(path));
   castShadow(hand, all, 0.05, bounds, 0.55);
+  if (hand.pile) {
+    hand.pile(stones, () => 'fine');
+    return;
+  }
   hand.surface(all, 'rock');
   for (const st of stones) if (st.r > size * 0.9) hand.solid(polyPath(st.poly), st.c, st.r, 1.2);
   hand.line(stones.map(st => st.poly), 'fine', true);

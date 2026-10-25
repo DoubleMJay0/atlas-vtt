@@ -35,7 +35,12 @@ export function drawRubbleHeap(hand: Hand, piece: DungeonTerrain): void {
     }
   }
   stones.sort((p, q) => p.r - q.r);
-  for (const s of stones.filter((st) => clearOfCaveWall(hand.scene.env, st.c, st.r))) {
+  const shown = stones.filter((st) => clearOfCaveWall(hand.scene.env, st.c, st.r));
+  if (hand.pile) {
+    hand.pile(shown, () => 'fine');
+    return;
+  }
+  for (const s of shown) {
     const path = polyPath(s.poly);
     hand.surface(path, 'rock');
     hand.solid(path, s.c, s.r, 1.3);

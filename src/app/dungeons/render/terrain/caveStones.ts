@@ -23,6 +23,11 @@ export function drawBoulderChoke(hand: Hand, piece: DungeonTerrain): void {
     }
   }
   stones.sort((a, b) => a.centre.y - b.centre.y);
+  if (hand.pile) {
+    // Each block's own facets carry its fractures.
+    hand.pile(stones.map(({ poly, centre, radius }) => ({ poly, c: centre, r: radius })), () => 'outline');
+    return;
+  }
   hand.surface(polysPath(stones.map(stone => stone.poly)), 'rock');
   for (const { poly, centre, radius } of stones) {
     const path = polyPath(poly);

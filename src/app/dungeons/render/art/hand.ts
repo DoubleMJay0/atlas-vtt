@@ -9,6 +9,13 @@ import { blurField, gridOver, sampleField } from './raster';
 export type Material = 'stone' | 'dressed' | 'rock' | 'wood' | 'rope' | 'floor' | 'raised' | 'metal' | 'cloth' | 'glass';
 export type Weight = 'heavy' | 'outline' | 'fine';
 
+/** A stone of a pile of loose rock: its outline, middle and reach, in cells. */
+export interface PileStone {
+  poly: Vec[];
+  c: Vec;
+  r: number;
+}
+
 /**
  * A direction's hand: how it darkens, fills, draws a line, marks a raised or sunken edge, models a
  * small solid and lays water. Terrain, passages and stairs are drawn once, through a hand, so
@@ -36,6 +43,11 @@ export interface Hand {
   grain(path: PathFn, material: Material): void;
   /** A line weight, in cells. */
   weight(weight: Weight): number;
+  /**
+   * A pile of rock stones, back to front: each opaque over those it lies on, outlined `weight`. A
+   * direction that models each stone draws the pile whole; without it, the caller draws its stones.
+   */
+  pile?(stones: readonly PileStone[], weight: (stone: PileStone) => Weight): void;
 }
 
 /**

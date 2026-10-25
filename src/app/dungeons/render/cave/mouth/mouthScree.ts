@@ -50,6 +50,10 @@ export function drawMouthScree(hand: Hand, ways: readonly WayOut[]): void {
   if (!stones.length) return;
   const all: PathFn = polysPath(stones.map((s) => s.poly));
   castShadow(hand, all, 0.05, pointsBounds(stones.flatMap((s) => s.poly)), 0.55);
+  if (hand.pile) {
+    hand.pile(stones, (s) => (s.r > 0.07 ? 'outline' : 'fine'));
+    return;
+  }
   hand.surface(all, 'rock');
   for (const s of stones) if (s.r > 0.07) hand.solid(polyPath(s.poly), s.c, s.r, 1.1);
   hand.line(stones.filter((s) => s.r <= 0.07).map((s) => s.poly), 'fine', true);

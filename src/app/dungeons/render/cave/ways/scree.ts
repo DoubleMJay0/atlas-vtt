@@ -26,10 +26,13 @@ function slope(hand: Hand, frame: WayFrame): void {
     const c = at(u, v);
     stones.push({ poly: stoneOutline(rng, c, r), c, r });
   }
-  hand.surface(polysPath(stones.map(s => s.poly)), 'rock');
-  for (const s of stones.slice(-2)) hand.solid(polyPath(s.poly), s.c, s.r, frame.progress(s.c.x, s.c.y));
-  hand.line(stones.filter(s => s.r <= 0.08).map(s => s.poly), 'fine', true);
-  hand.line(stones.filter(s => s.r > 0.08).map(s => s.poly), 'outline', true);
+  if (hand.pile) hand.pile(stones, s => (s.r > 0.08 ? 'outline' : 'fine'));
+  else {
+    hand.surface(polysPath(stones.map(s => s.poly)), 'rock');
+    for (const s of stones.slice(-2)) hand.solid(polyPath(s.poly), s.c, s.r, frame.progress(s.c.x, s.c.y));
+    hand.line(stones.filter(s => s.r <= 0.08).map(s => s.poly), 'fine', true);
+    hand.line(stones.filter(s => s.r > 0.08).map(s => s.poly), 'outline', true);
+  }
   // Broken runnels connect the scatter without making a regular grid.
   hand.line([-0.28, 0.22].map(u => [at(u * across, -end * 0.62), at((u + 0.05) * across, -end * 0.16), at((u - 0.02) * across, end * 0.36)]), 'fine');
 }

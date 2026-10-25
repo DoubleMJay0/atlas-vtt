@@ -11,7 +11,7 @@ import { filledPockets, inPocket, type Pocket } from '../../pockets';
 import { strokeWidth } from '../../renderEnv';
 import { stoneOutline } from '../../terrain/stones';
 import type { StoneColours } from '../../stone/colours';
-import { boulderFacets, FacetBatch, rockTones } from '../../stone/rockFacets';
+import { FacetBatch, rockTones, stoneFacets, toneStep } from '../../stone/rockFacets';
 import { enclosedRock } from './enclosedRock';
 
 /** How far the bed under the slabs reaches from the wall, as a share of the look's reach. */
@@ -156,18 +156,10 @@ export function stoneSurround(scene: ArtScene, c: StoneColours): void {
   ctx.restore();
 }
 
-/** A slab's planes: a flat top off its middle and bevelled faces down to its outline, each one tone of the rock by its facing. */
+/** A slab's planes, each one tone of the rock by its facing. */
 function facetSlab(ctx: Canvas2D, poly: Vec[], tones: readonly string[], seed: number): void {
-  const middle = centroid(poly);
-  const radius = Math.max(...poly.map(p => Math.hypot(p.x - middle.x, p.y - middle.y)));
-  const key = [Math.round(middle.x * 61), Math.round(middle.y * 61)] as const;
-  const angle = hash2(key[0], key[1], seed + 41) * Math.PI * 2;
-  const off = radius * (0.12 + hash2(key[0], key[1], seed + 42) * 0.28);
-  const apex = { x: middle.x + Math.cos(angle) * off, y: middle.y + Math.sin(angle) * off };
-  const tip = { x: (hash2(key[0], key[1], seed + 44) - 0.5) * 0.5, y: (hash2(key[0], key[1], seed + 45) - 0.5) * 0.5 };
-  const top = 0.42 + hash2(key[0], key[1], seed + 46) * 0.22;
   const batch = new FacetBatch(tones);
-  for (const { face, light } of boulderFacets(poly, apex, radius * (0.25 + hash2(key[0], key[1], seed + 43) * 0.2), top, tip)) batch.add(face, light, 4);
+  for (const { face, light } of stoneFacets(poly, seed, light => toneStep(light, 4))) batch.add(face, light, 4);
   batch.fill(ctx);
 }
 

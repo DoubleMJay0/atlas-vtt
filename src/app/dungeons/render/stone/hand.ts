@@ -1,6 +1,6 @@
 import { mixColours, parseHex, withAlpha } from '../palette';
 import { layerOf, type ArtScene } from '../art/artScene';
-import type { Hand, Material } from '../art/hand';
+import type { Hand, Material, PileStone, Weight } from '../art/hand';
 import { shadeEdges, TO_LIGHT } from '../art/light';
 import { polysPath, runsPath } from '../art/paths';
 import { drawGridCanvas, fieldOf, gridOver, rgbaCanvas } from '../art/raster';
@@ -12,6 +12,7 @@ import { cellPattern } from './patterns';
 import { grainTile, rockTile, tileTexels, woodTile, ROCK_TILE } from './textures';
 import { paintWater } from './water';
 import { lightInside } from './lightInside';
+import { paintPile } from './pile';
 import { depthField } from '../art/pools';
 
 /** Acid: a murky, poisonous green. */
@@ -112,6 +113,8 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       ctx.restore();
     },
     edges: (poly, raised) => edges(scene, c, poly, raised),
+    // A vector picture keeps each caller's plain stones.
+    ...(scene.raster ? { pile: (stones: readonly PileStone[], weight: (stone: PileStone) => Weight) => paintPile(scene, hand, c, stones, weight) } : {}),
     solid: (path, centre, radius, strength = 1) => {
       if (!scene.raster) return;
       ctx.save();
