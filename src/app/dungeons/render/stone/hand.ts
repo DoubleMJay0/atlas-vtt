@@ -38,6 +38,8 @@ export function materialColour(c: StoneColours, material: Material): string {
       return c.metal;
     case 'cloth':
       return c.cloth;
+    case 'glass':
+      return c.mono ? mixColours(c.floor, c.line, 0.06) : mixColours(c.water, c.light, c.dark ? 0.12 : 0.5);
     default:
       return c.stone;
   }
@@ -64,16 +66,19 @@ export function stoneHand(scene: ArtScene, c: StoneColours): Hand {
       }, bounds);
     },
     surface: (path, material) => {
+      hand.fill(path, material);
+      hand.grain(path, material);
+    },
+    fill: (path, material) => {
       ctx.save();
       ctx.beginPath();
       path(ctx);
       ctx.fillStyle = materialColour(c, material);
       ctx.fill();
       ctx.restore();
-      hand.grain(path, material);
     },
     grain: (path, material) => {
-      if (!scene.raster) return;
+      if (!scene.raster || material === 'glass') return;
       ctx.save();
       ctx.beginPath();
       path(ctx);

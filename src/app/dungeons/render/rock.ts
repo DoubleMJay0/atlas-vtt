@@ -1,9 +1,6 @@
 import { drawBricks } from './bricks';
 import { drawDots } from './dots';
-import { cellsShapes, traceShapes, tracePolygon, type Vec } from './geometry';
-import { cellsOf, floorCellsOf, floorRect } from '../geometry';
-import { OUTER_WALL, windowClearing } from './houseShapes';
-import { shownWindows } from './art/windows';
+import { traceShapes, tracePolygon, type Vec } from './geometry';
 import { drawHatching } from './hatching';
 import { filledPockets } from './pockets';
 import { withAlpha } from './palette';
@@ -19,7 +16,6 @@ export function drawRock(env: RenderEnv): void {
   const { ctx } = env;
   ctx.save();
   clipLanes(env, env.dungeon.open);
-  clipToHouse(env);
   drawRockMode(env);
   ctx.restore();
 }
@@ -84,24 +80,5 @@ function clipLanes(env: RenderEnv, open: readonly Vec[][]): void {
   ctx.beginPath();
   ctx.rect(b.minX - 10, b.minY - 10, b.maxX - b.minX + 20, b.maxY - b.minY + 20);
   for (const ground of open) tracePolygon(ctx, ground);
-  ctx.clip('evenodd');
-}
-
-/** In a house rock is wall mass alone: it lies inside the house (between its rooms and in its stacks), never round it. */
-function clipToHouse(env: RenderEnv): void {
-  const { floor } = env.dungeon;
-  if (floor.walls !== 'edges') return;
-  const cells = [...floor.rooms.flatMap(floorCellsOf), ...(floor.stacks ?? []).flatMap((s) => cellsOf(floorRect(s)))];
-  const { ctx } = env;
-  ctx.beginPath();
-  for (const shape of cellsShapes(cells)) for (const ring of shape.rings) tracePolygon(ctx, ring);
-  ctx.clip('evenodd');
-  // A window's cut shows no wall mass either.
-  const windows = shownWindows(env.dungeon);
-  if (windows.length === 0) return;
-  const b = env.dungeon.bounds;
-  ctx.beginPath();
-  ctx.rect(b.minX - 10, b.minY - 10, b.maxX - b.minX + 20, b.maxY - b.minY + 20);
-  for (const window of windows) tracePolygon(ctx, windowClearing(window, OUTER_WALL));
   ctx.clip('evenodd');
 }

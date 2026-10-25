@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { blocksNothing, concerns, stopsNothing } from '../../../../src/app/lighting/segments';
 import { readWall } from '../../../../src/app/lighting/lightingObjects';
 import { sealedWalls } from '../../../../src/app/lighting/sealWalls';
-import { windowSpan } from '../../../../src/app/dungeons/render/houseShapes';
+import { OUTER_WALL, windowSpan } from '../../../../src/app/dungeons/render/houseShapes';
 import { dungeonWalls, type DungeonPlacement } from '../../../../src/app/dungeons/scene/toWalls';
 import { DEFAULT_VIEW } from '../../../../src/app/dungeons/style';
 import { dungeonStyle } from '../../../../src/app/dungeons/styleCatalog';
@@ -22,7 +22,8 @@ const middle = (wall: WallSegment): { x: number; y: number } => cell({ x: (wall.
 function crossesInside(wall: WallSegment, room: { x: number; y: number; w: number; h: number }): boolean {
   const a = cell(wall.p1);
   const b = cell(wall.p2);
-  const inset = 0.12;
+  // A room's walls stand on its floor's edge: half an outer wall in from the cell edge, and the wall's ink.
+  const inset = OUTER_WALL / 2 + 0.04;
   for (let t = 0; t <= 1; t += 0.05) {
     const p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
     if (p.x > room.x + inset && p.x < room.x + room.w - inset && p.y > room.y + inset && p.y < room.y + room.h - inset) return true;
@@ -54,7 +55,7 @@ describe('the walls of a house in the scene', () => {
     }
     expect(walls.filter((wall) => wall.type === 'secret-door')).toHaveLength(1);
     // Nothing closes the front doorway's outer face below the hall (y = 4 + the outer wall).
-    const face = walls.filter((wall) => wall.type === 'solid' && wall.p1.y === wall.p2.y && Math.abs(cell(wall.p1).y - 5.08) < 0.05 && middle(wall).x > 1 && middle(wall).x < 2);
+    const face = walls.filter((wall) => wall.type === 'solid' && wall.p1.y === wall.p2.y && Math.abs(cell(wall.p1).y - (5 + OUTER_WALL / 2)) < 0.05 && middle(wall).x > 1 && middle(wall).x < 2);
     expect(face).toEqual([]);
   });
 
@@ -66,7 +67,7 @@ describe('the walls of a house in the scene', () => {
     for (const window of model.floors[0]!.windows!) {
       const [a, b] = windowSpan(window);
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const near = (wall: WallSegment): boolean => Math.hypot(middle(wall).x - mid.x, middle(wall).y - mid.y) < 0.15;
+      const near = (wall: WallSegment): boolean => Math.hypot(middle(wall).x - mid.x, middle(wall).y - mid.y) < OUTER_WALL / 2 + 0.07;
       expect(panes.filter(near)).toHaveLength(1);
       expect(walls.filter((wall) => wall.blocks !== 'movement' && near(wall))).toEqual([]);
     }

@@ -40,13 +40,16 @@ export function engravedHand(scene: ArtScene, pens: Pens): Hand {
       if (kind === 'depth') hatch(bounds, clip, pens.angle + Math.PI / 2, pens.spacing, (x, y) => pens.spacing * 0.85 * Math.max(0, (field(x, y) - 0.6) / 0.4), pens.spacing / 2);
     },
     surface: (path, material) => {
+      hand.fill(path, material);
+      hand.grain(path, material);
+    },
+    fill: (path) => {
       ctx.save();
       ctx.beginPath();
       path(ctx);
       ctx.fillStyle = pens.floor;
       ctx.fill();
       ctx.restore();
-      hand.grain(path, material);
     },
     grain: (path, material) => {
       const t = TEXTURE[material];

@@ -5,8 +5,8 @@ import { grown, type Field, type PathFn } from './paths';
 import { blurField, gridOver, sampleField } from './raster';
 
 /** What a surface is made of; each direction gives it its own colour and texture. */
-/** `raised`: the top of a platform, lighter than the floor it stands on. */
-export type Material = 'stone' | 'dressed' | 'rock' | 'wood' | 'rope' | 'floor' | 'raised' | 'metal' | 'cloth';
+/** `raised`: the top of a platform, lighter than the floor it stands on; `glass`: a window's pane, pale and smooth, without texture. */
+export type Material = 'stone' | 'dressed' | 'rock' | 'wood' | 'rope' | 'floor' | 'raised' | 'metal' | 'cloth' | 'glass';
 export type Weight = 'heavy' | 'outline' | 'fine';
 
 /**
@@ -19,6 +19,8 @@ export interface Hand {
   /** Darkens by `field` (0..1) within `bounds`, inside `clip` if given: a shadow, or depth going down into darkness. */
   tone(field: Field, bounds: Bounds, clip: PathFn | null, kind: 'shade' | 'depth'): void;
   surface(path: PathFn, material: Material): void;
+  /** The material's colour over `path`, without its texture: for parts too small or too plain to show it. */
+  fill(path: PathFn, material: Material): void;
   line(runs: readonly (readonly Vec[])[], weight: Weight, closed?: boolean): void;
   /** A polygon's edges, as standing up from the floor (`raised`) or falling away below it. */
   edges(polygon: readonly Vec[], raised: boolean): void;

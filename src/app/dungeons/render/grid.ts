@@ -1,10 +1,12 @@
-import { doorCells } from '../geometry';
+import { cellsBox, doorCells } from '../geometry';
 import { doorEdge } from './houseShapes';
 import type { DungeonDoor, DungeonRoom } from '../model';
 import type { Rng } from '../rng';
 import { clipToFloors } from './floors';
 import { floorRing, type WayOut } from './cave/mouth/wayOut';
 import { pointsBounds, type Bounds, type Vec } from './geometry';
+import { polysPath } from './art/paths';
+import { groundsLayout } from './grounds/groundsShapes';
 import { strokeWidth, type RenderEnv } from './renderEnv';
 
 type Line = [Vec, Vec];
@@ -12,10 +14,10 @@ type Line = [Vec, Vec];
 /**
  * The grid inside the floors: interior cell lines of every room (chords in a rotunda), the
  * lines where an open passage meets its rooms, and a cave's ways out as far as they read as floor,
- * in the view's style.
+ * in the view's style; and on a house's open ground.
  */
 export function drawGrid(env: RenderEnv): void {
-  const { view, ctx, palette, style } = env;
+  const { view } = env;
   if (view.grid === 'off') return;
   const step = view.smallTiles ? 0.5 : 1;
   const lines: Line[] = [];
@@ -25,9 +27,23 @@ export function drawGrid(env: RenderEnv): void {
   const { ways } = env.dungeon;
   const wayRings = ways.map(way => floorRing(env.dungeon.field, way));
   ways.forEach((way, k) => lines.push(...wayLines(way, pointsBounds(wayRings[k]!), step)));
-  const rng = env.rng('grid');
+  strokeGrid(env, lines, step, env.rng('grid'), () => clipToFloors(env, wayRings));
+  // A house's grounds are walked on as its floors are: the lawn and its ways take the grid too.
+  const grounds = groundsLayout(env.dungeon.floor);
+  if (grounds) {
+    strokeGrid(env, boxLines(grounds.lotBox, step), step, env.rng('grounds-grid'), () => {
+      env.ctx.beginPath();
+      polysPath(grounds.open)(env.ctx);
+      env.ctx.clip();
+    });
+  }
+}
+
+/** Strokes grid lines in the view's style, inside the clip `clip` sets. */
+function strokeGrid(env: RenderEnv, lines: readonly Line[], step: number, rng: Rng, clip: () => void): void {
+  const { view, ctx, palette, style } = env;
   ctx.save();
-  clipToFloors(env, wayRings);
+  clip();
   ctx.strokeStyle = palette.grid;
   ctx.lineCap = 'round';
   ctx.lineWidth = strokeWidth(env, view.grid === 'dotted' && !view.smallTiles ? style.strokes.normal : style.strokes.thin) * style.grid.weight;
@@ -73,19 +89,20 @@ function traceLine(ctx: CanvasPath, a: Vec, b: Vec): void {
   ctx.lineTo(b.x, b.y);
 }
 
+type Box = { x: number; y: number; w: number; h: number };
+
 /** A room's box: its rectangle, or round a cave room's cells. */
-function boxOf(room: DungeonRoom): { x: number; y: number; w: number; h: number } {
-  if (!room.cells?.length) return room;
-  const xs = room.cells.map((c) => c.x);
-  const ys = room.cells.map((c) => c.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, w: Math.max(...xs) + 1 - x, h: Math.max(...ys) + 1 - y };
+function boxOf(room: DungeonRoom): Box {
+  return room.cells?.length ? cellsBox(room.cells) : room;
 }
 
 /** Interior lines of a room's box; the floor clip turns them into chords in a rotunda and keeps a cave's to its cells. */
 function roomLines(room: DungeonRoom, step: number): Line[] {
-  const box = boxOf(room);
+  return boxLines(boxOf(room), step);
+}
+
+/** The lines between the cells of a box, `step` apart. */
+function boxLines(box: Box, step: number): Line[] {
   const lines: Line[] = [];
   for (let x = box.x + step; x < box.x + box.w - 1e-9; x += step) lines.push([{ x, y: box.y }, { x, y: box.y + box.h }]);
   for (let y = box.y + step; y < box.y + box.h - 1e-9; y += step) lines.push([{ x: box.x, y }, { x: box.x + box.w, y }]);

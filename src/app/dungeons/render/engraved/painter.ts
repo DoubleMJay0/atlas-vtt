@@ -7,12 +7,15 @@ import { drawGrid } from '../grid';
 import { drawTerrainGround, drawTerrainOpenings, drawTerrainStanding } from '../terrain/drawTerrain';
 import { drawFloor } from './floor';
 import { engravedHand } from './hand';
-import { pensOf } from './pens';
+import { pensOf, type Pens } from './pens';
 import { drawRock } from '../rock';
 import { drawShade } from './shade';
 import { drawWalls } from './walls';
 import { drawPools } from './water';
 import { engravedGrowth } from './growth';
+import { drawHouseMass } from '../house/houseWalls';
+import { groundsPainter } from '../grounds';
+import { engravedGroundsPaint } from '../grounds/engravedPaint';
 import { type CaveGroundPainting, type CaveGroundPart, builtSurround, caveGround } from '../cave/caveArt';
 
 /**
@@ -28,17 +31,23 @@ export function paintEngraved(scene: ArtScene): void {
   const growth = engravedGrowth(scene, hand, pens);
   const cave = (part: CaveGroundPart): CaveGroundPainting | undefined => caveGround(part, scene.env);
   const surround = builtSurround(scene.env) ? cave('surround') : undefined;
-  if (surround) surround.engraved(scene, pens);
-  else drawRock(scene.env);
+  const grounds = groundsPainter(hand, () => engravedGroundsPaint(hand, pens));
+  grounds.ground();
+  const house = drawHouseMass(hand);
+  if (!house) {
+    if (surround) surround.engraved(scene, pens);
+    else drawRock(scene.env);
+  }
   cave('mouth')?.engraved(scene, pens);
   (cave('floor')?.engraved ?? drawFloor)(scene, pens);
   drawPools(scene, pens);
   drawTerrainGround(hand, colours);
   growth.ground();
   drawShade(scene, pens);
+  grounds.shade();
   drawGrid(scene.env);
   growth.climbers();
-  (cave('edge')?.engraved ?? drawWalls)(scene, pens);
+  (cave('edge')?.engraved ?? ((art: ArtScene, p: Pens): void => drawWalls(art, p, !house)))(scene, pens);
   growth.overWalls();
   drawDebris(hand);
   drawProps(hand, pens.water, pens.floor);
@@ -47,4 +56,5 @@ export function paintEngraved(scene: ArtScene): void {
   growth.columns();
   drawPassages(hand);
   drawTerrainOpenings(hand);
+  grounds.standing();
 }

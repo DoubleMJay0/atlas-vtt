@@ -342,8 +342,8 @@ describe('the outlines of tall objects', () => {
         outlines += new Set(objects.map(w => w.chainId)).size;
         // Cover for sight and light alike, one-way from inside so the top is seen and lit.
         for (const wall of objects) expect(wall.blocks).toBeUndefined();
-        // A house's windows stop a token alone; every other wall stops both.
-        for (const wall of walls.filter(w => !w.id.includes('_shadow_'))) expect([undefined, 'movement']).toContain(wall.blocks);
+        // A house's windows stop a token alone and its garden's hedges sight alone; every other wall stops both.
+        for (const wall of walls.filter(w => !w.id.includes('_shadow_'))) expect(wall.id.includes('_grounds_') ? [undefined, 'sight'] : [undefined, 'movement']).toContain(wall.blocks);
         const owner = (id: string): string => (id.includes('_shadow_') ? id.replace(/_\d+$/, '') : 'walls');
         for (const bridge of sealWalls(walls, tolerance).slice(walls.length)) {
           const named = bridge.id.split(':').filter(part => part.startsWith('wall_'));

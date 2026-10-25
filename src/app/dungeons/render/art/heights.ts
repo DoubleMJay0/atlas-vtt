@@ -1,4 +1,5 @@
 import { pointInPolygon, tracePolygon, traceShapes, type Canvas2D, type FloorShape, type Vec } from '../geometry';
+import type { PathFn } from './paths';
 import type { Grid } from './raster';
 
 /** Something that stands on the floor: its footprint and its height (a wall's is 1). */
@@ -25,7 +26,7 @@ const grey = (h: number): string => {
  * floors is rock, as tall as a wall, but the open ground before each way in), pockets in green.
  * Without a canvas (outside a browser) the floors and open ground alone, from the field.
  */
-export function rasterRelief(grid: Grid, floors: readonly FloorShape[], open: readonly (readonly Vec[])[], pockets: readonly (readonly Vec[])[], stands: readonly Stand[], outside: (x: number, y: number) => boolean): Relief {
+export function rasterRelief(grid: Grid, floors: readonly FloorShape[], open: readonly (readonly Vec[])[], pockets: readonly (readonly Vec[])[], stands: readonly Stand[], outside: (x: number, y: number) => boolean, ground: PathFn | null = null): Relief {
   const size = grid.w * grid.h;
   if (typeof OffscreenCanvas === 'undefined') {
     const heights = new Float32Array(size);
@@ -45,6 +46,11 @@ export function rasterRelief(grid: Grid, floors: readonly FloorShape[], open: re
   for (const ring of open) {
     ctx.beginPath();
     tracePolygon(ctx, ring);
+    ctx.fill();
+  }
+  if (ground) {
+    ctx.beginPath();
+    ground(ctx);
     ctx.fill();
   }
   ctx.globalCompositeOperation = 'lighten';

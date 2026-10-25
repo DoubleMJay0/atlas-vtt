@@ -16,12 +16,23 @@ import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW, type ArtDirection } from '../../src/app/dungeons/style';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 import { modelOf } from './glyphSheetModel';
+import { GROUNDS_KINDS, type GroundsKind } from '../../src/app/dungeons/houseModel';
+import { polysPath, rectPoly } from '../../src/app/dungeons/render/art/paths';
+import type { Vec } from '../../src/app/dungeons/render/geometry';
+import { drawBoundaryWall, drawGate, drawHedge } from '../../src/app/dungeons/render/grounds/boundary';
+import { engravedGroundsPaint } from '../../src/app/dungeons/render/grounds/engravedPaint';
+import { drawColumn, drawFountain, drawTree } from '../../src/app/dungeons/render/grounds/garden';
+import { drawOutbuildingFloor, drawPorchFloor, drawWays } from '../../src/app/dungeons/render/grounds/ground';
+import { crownOf, outbuildingOf } from '../../src/app/dungeons/render/grounds/groundsShapes';
+import { drawOutbuilding } from '../../src/app/dungeons/render/grounds/outbuildings';
+import type { GroundsPaint } from '../../src/app/dungeons/render/grounds/paint';
+import { stoneGroundsPaint } from '../../src/app/dungeons/render/grounds/stonePaint';
 
 /**
  * What one piece costs to draw, per painter: each kind drawn 200 times at play zoom (150 px a
  * cell), the middle of five runs. A kind of a family may cost at most twice the slowest of the
- * reference props (fountain, well, statue) in the same painter (style guide §10). The table
- * goes to `out/perf-glyph/cost.txt`.
+ * reference props (fountain, well, statue) in the same painter (style guide §10), and so may a
+ * piece of a house's grounds. The tables go to `out/perf-glyph/cost.txt` and `grounds-cost.txt`.
  */
 
 const PX = 150;
@@ -32,7 +43,7 @@ const FIRST_PROPS = new Set(FIRST_PROP_KINDS);
 const LOOK: Record<ArtDirection, string> = { stone: 'parchment', engraved: 'print' };
 
 /** A painter's hand over a canvas of one room, at play zoom, and the colours its props take for water and cloth. */
-function handOf(direction: ArtDirection): { hand: Hand; canvas: OffscreenCanvas; water: string; cloth: string } {
+function handOf(direction: ArtDirection): { hand: Hand; canvas: OffscreenCanvas; water: string; cloth: string; paint: GroundsPaint } {
   const canvas = new OffscreenCanvas(5 * PX, 5 * PX);
   const ctx = canvas.getContext('2d')!;
   const model = modelOf(5, 5, []);
@@ -42,26 +53,64 @@ function handOf(direction: ArtDirection): { hand: Hand; canvas: OffscreenCanvas;
   const scene = buildArtScene(env, { originCell: { x: 0, y: 0 }, widthPx: canvas.width, heightPx: canvas.height, pxPerCell: PX }, [], false);
   if (direction === 'stone') {
     const c = stoneColours(env.palette, false);
-    return { hand: stoneHand(scene, c), canvas, water: c.water, cloth: c.cloth };
+    const hand = stoneHand(scene, c);
+    return { hand, canvas, water: c.water, cloth: c.cloth, paint: stoneGroundsPaint(hand, c) };
   }
   const pens = pensOf(scene);
-  return { hand: engravedHand(scene, pens), canvas, water: pens.water, cloth: pens.floor };
+  const hand = engravedHand(scene, pens);
+  return { hand, canvas, water: pens.water, cloth: pens.floor, paint: engravedGroundsPaint(hand, pens) };
 }
 
 /** Milliseconds for `DRAWS` drawings of a kind, the middle of `RUNS` runs; reading a pixel waits for the canvas. */
 function cost(direction: ArtDirection, kind: PropKind, glyph: PropGlyph): number {
-  const { hand, canvas, water, cloth } = handOf(direction);
   const place = { x: 2.5, y: 2.5, rotation: 0, scale: 1, fit: glyphFit({ kind, scale: 1 }) };
-  const read = canvas.getContext('2d')!;
+  return timed(direction, ({ hand, water, cloth }) => drawGlyph(hand, place, glyph, water, cloth));
+}
+
+/** Milliseconds for `DRAWS` of a drawing on a painter's hand, the middle of `RUNS` runs. */
+function timed(direction: ArtDirection, draw: (on: ReturnType<typeof handOf>) => void): number {
+  const on = handOf(direction);
+  const read = on.canvas.getContext('2d')!;
   const runs: number[] = [];
   for (let run = 0; run < RUNS; run++) {
     const started = performance.now();
-    for (let i = 0; i < DRAWS; i++) drawGlyph(hand, place, glyph, water, cloth);
+    for (let i = 0; i < DRAWS; i++) draw(on);
     read.getImageData(0, 0, 1, 1);
     runs.push(performance.now() - started);
   }
   return runs.sort((a, b) => a - b)[Math.floor(RUNS / 2)]!;
 }
+
+const cells = (x: number, y: number, w: number, h: number): { x: number; y: number }[] => Array.from({ length: w * h }, (_, k) => ({ x: x + (k % w), y: y + Math.floor(k / w) }));
+const square = (x: number, y: number, n: number): Vec[][] => [rectPoly({ x, y, w: n, h: n })];
+
+/**
+ * One of each piece of a house's grounds as a glyph is measured: a piece that stands alone whole
+ * (gate, porch, outbuilding, tree, fountain), one that covers ground (lawn, ways, hedge, boundary
+ * wall) by one cell of it, in the middle of a stretch so its edges are those of a cell in a run.
+ */
+const GROUNDS_SAMPLES: Record<GroundsKind, (hand: Hand, paint: GroundsPaint) => void> = {
+  garden: (_, paint) => paint.lawn(polysPath(square(2, 2, 1)), cells(2, 2, 1, 1)),
+  path: (hand, paint) => drawWays(hand, paint, square(2, 2, 1), cells(2, 2, 1, 1)),
+  drive: (hand, paint) => drawWays(hand, paint, square(2, 2, 1), cells(2, 2, 1, 1)),
+  hedge: (hand, paint) => drawHedge(hand, paint, { kind: 'hedge', cells: cells(2, 2, 1, 1) }),
+  'boundary-wall': (hand) => drawBoundaryWall(hand, { kind: 'boundary-wall', cells: cells(2, 2, 1, 1) }),
+  gate: (hand) => drawGate(hand, { kind: 'gate', cells: cells(1, 2, 3, 1), dir: { x: 0, y: -1 } }),
+  porch: (hand) => {
+    const porch = { kind: 'porch' as const, cells: cells(1, 2, 3, 1), columns: [{ x: 1.15, y: 2.85 }, { x: 3.85, y: 2.85 }] };
+    drawPorchFloor(hand, porch);
+    porch.columns.forEach((at) => drawColumn(hand, at));
+  },
+  outbuilding: (hand, paint) => {
+    const building = { kind: 'outbuilding' as const, cells: cells(1, 1, 3, 3), use: 'carriage-house' as const, door: { x: 2, y: 4, dir: { x: 0, y: -1 } as const } };
+    const frame = outbuildingOf(building);
+    drawOutbuildingFloor(hand, building, frame);
+    drawOutbuilding(hand, paint, building, frame);
+  },
+  // A tree of the middle size the grounds plant (crowns 0.8 to 1.4 cells).
+  tree: (hand, paint) => drawTree(hand, paint, crownOf({ x: 2.5, y: 2.5 }, 1.1)),
+  'garden-fountain': (hand, paint) => drawFountain(hand, paint, { kind: 'garden-fountain', cells: cells(2, 2, 2, 2), at: { x: 3, y: 3 } }),
+};
 
 describe('glyph cost', () => {
   it("draws every kind within twice its painter's slowest reference", async () => {
@@ -76,6 +125,21 @@ describe('glyph cost', () => {
       }
     }
     await commands.writeFile('out/perf-glyph/cost.txt', `${rows.join('\n')}\n`);
+    expect(over).toEqual([]);
+  });
+
+  it("draws each piece of a house's grounds within twice its painter's slowest reference", async () => {
+    const rows = ['painter\tkind\tms per 200\tlimit'];
+    const over: string[] = [];
+    for (const direction of ['stone', 'engraved'] as const) {
+      const limit = 2 * Math.max(...REFERENCE.map(kind => cost(direction, kind, PROP_GLYPHS[kind]!)));
+      for (const kind of GROUNDS_KINDS) {
+        const ms = timed(direction, ({ hand, paint }) => GROUNDS_SAMPLES[kind](hand, paint));
+        rows.push(`${direction}\t${kind}\t${ms.toFixed(2)}\t${limit.toFixed(2)}`);
+        if (ms > limit) over.push(`${direction} ${kind}: ${ms.toFixed(2)} ms, limit ${limit.toFixed(2)}`);
+      }
+    }
+    await commands.writeFile('out/perf-glyph/grounds-cost.txt', `${rows.join('\n')}\n`);
     expect(over).toEqual([]);
   });
 });

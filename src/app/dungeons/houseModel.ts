@@ -33,7 +33,7 @@ export interface DungeonStack {
   h: number;
 }
 
-/** What the grounds of a house hold. None has a drawing yet: the generator offers only those `drawnKinds.ts` lists. */
+/** What the grounds of a house hold; the generator offers only those `drawnKinds.ts` lists. */
 export const GROUNDS_KINDS = ['garden', 'path', 'drive', 'hedge', 'boundary-wall', 'gate', 'porch', 'outbuilding', 'tree', 'garden-fountain'] as const;
 
 export type GroundsKind = (typeof GROUNDS_KINDS)[number];

@@ -35,7 +35,8 @@ export function withAlpha(colour: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function hex([r, g, b]: Rgb): string {
+/** A colour as `#rrggbb`. */
+export function hex([r, g, b]: Rgb): string {
   return `#${[r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 }
 

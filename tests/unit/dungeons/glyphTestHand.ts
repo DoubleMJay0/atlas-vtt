@@ -41,6 +41,7 @@ export function recordingHand(ctx: Canvas2D, rotation: () => number, direction: 
     scene: { env: { ctx, palette, style: { direction } }, raster: false },
     tone: (_field: unknown, _bounds: unknown, path: PathFn | null) => calls.push({ kind: 'tone', rotation: rotation(), ...(path && { path }) }),
     surface: () => undefined,
+    fill: () => undefined,
     line: () => undefined,
     edges: (poly: readonly Vec[]) => calls.push({ kind: 'edges', rotation: rotation(), poly }),
     solid: (path: PathFn, centre: Vec) => calls.push({ kind: 'solid', rotation: rotation(), path, centre }),

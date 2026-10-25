@@ -6,12 +6,13 @@ import { TO_LIGHT } from './light';
 import { hash2 } from './noise';
 import { clipFloors } from './outline';
 import { polyPath, type PathFn } from './paths';
+import { wallInkWidth } from '../wallInk';
 
 /** Rubble and cracks of a crumbling floor, where the view shows props. */
 export function drawDebris(hand: Hand): void {
   const { dungeon, view } = hand.scene.env;
   if (!view.props) return;
-  const stones = dungeon.floor.rubble;
+  const stones = dungeon.floor.walls === 'edges' ? dungeon.floor.rubble.filter(s => clearOfWalls(hand, s.points)) : dungeon.floor.rubble;
   if (stones.length) {
     const all: PathFn = path => stones.forEach(s => traceSmoothClosed(path, s.points));
     castShadow(hand, all, 0.05, pointsBounds(stones.flatMap(s => s.points)), 0.5);
@@ -23,6 +24,16 @@ export function drawDebris(hand: Hand): void {
     hand.line(stones.map(s => [...s.points, s.points[0]!]), 'fine');
   }
   if (dungeon.floor.cracks.length) drawCracks(hand, dungeon.floor.cracks);
+}
+
+/**
+ * Whether a stone lies wholly on the floor, clear of the wall's ink: a house's rubble is laid by its
+ * cells, and its outer walls are thick enough to stand where a stone by the cell's edge would lie.
+ */
+function clearOfWalls(hand: Hand, points: readonly Vec[]): boolean {
+  const { dungeon, style } = hand.scene.env;
+  const ink = wallInkWidth(style);
+  return points.every(p => dungeon.field.distance(p.x, p.y) < -ink);
 }
 
 /** A crack's line broken up finer, each piece bent a little off the straight, as stone splits. */

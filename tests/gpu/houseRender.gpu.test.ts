@@ -14,7 +14,7 @@ import { savePng, withoutText } from './dungeonRenderHarness';
 /**
  * A house's walls on cell edges in both painters: the scene's walls lie on drawn ink, inner walls
  * as well as outer ones, and each window cuts its outer wall, so the wall's ink is gone over the
- * window's middle but for the thin pane.
+ * window's embrasure, where the window's own sill, board and frame stand.
  */
 
 const PX = 120;
@@ -49,8 +49,8 @@ describe('a house drawn with its walls on cell edges', () => {
       const toPx = (p: { x: number; y: number }): { x: number; y: number } => ({ x: (p.x - layout.originCell.x) * PX, y: (p.y - layout.originCell.y) * PX });
       for (const window of model.floors[0]!.windows!) {
         const [a, b] = windowSpan(window);
-        // Just outside the pane, in the middle of where the outer wall's ink would run.
-        const off = OUTER_WALL / 2 + 0.02;
+        // In the embrasure between the window board and the frame, where the wall's joints, hatching or ink would show were it not cut.
+        const off = -(OUTER_WALL / 2 - 0.07);
         const probes = [0.3, 0.5, 0.7].map((t) => toPx({ x: a.x + (b.x - a.x) * t + window.dir.x * off, y: a.y + (b.y - a.y) * t + window.dir.y * off }));
         for (const p of probes) expect(nearestInk(mask, picture, p, 1), `${look}: window at ${window.x},${window.y}`).toBe(Infinity);
       }
