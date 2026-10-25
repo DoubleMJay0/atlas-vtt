@@ -136,7 +136,7 @@ export function createPinNoteSearch(container: HTMLElement, options: PinNoteSear
     if (entry.away) container.addClass('atlas-away');
     let target: PinLinkTarget | null;
     try {
-      target = await entry.create(name);
+      target = await entry.create(name, container);
     } finally {
       creating = false;
       container.removeClass('atlas-away');

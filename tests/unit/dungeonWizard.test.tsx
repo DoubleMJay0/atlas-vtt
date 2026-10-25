@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { MotionGlobalConfig } from 'framer-motion';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
 import { generateDungeon } from '../../src/app/dungeons/generate';
@@ -9,7 +10,8 @@ import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { roomCentre } from '../../src/app/dungeons/render/geometry';
 import { createDungeonScene } from '../../src/app/dungeons/scene/createDungeonScene';
 import type { DungeonJob, DungeonRendered } from '../../src/app/dungeons/worker/dungeonJob';
-import { DungeonGeneratorPanel } from '../../src/app/packages/components/dungeon-generator/DungeonGeneratorPanel';
+import { randomSeed } from '../../src/app/dungeons/rng';
+import { DungeonWizard } from '../../src/app/packages/components/dungeon-generator/DungeonWizard';
 import { useDungeonState } from '../../src/app/packages/components/dungeon-generator/useDungeonState';
 import { AssetService } from '../../src/app/services/AssetService';
 import { SettingsService } from '../../src/app/services/SettingsService';
@@ -18,6 +20,10 @@ import { t } from '../../src/app/i18n';
 
 const worker = vi.hoisted(() => ({ preview: vi.fn(), render: vi.fn(), thumbnail: vi.fn(), dropThumbnails: vi.fn() }));
 vi.mock('../../src/app/dungeons/worker/DungeonWorkerClient', () => ({ DungeonWorkerClient: { forApp: () => worker } }));
+vi.mock('../../src/app/dungeons/rng', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/app/dungeons/rng')>();
+  return { ...actual, randomSeed: vi.fn(actual.randomSeed) };
+});
 vi.mock('../../src/app/dungeons/scene/createDungeonScene', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../src/app/dungeons/scene/createDungeonScene')>(),
   createDungeonScene: vi.fn(),
@@ -37,6 +43,7 @@ let app: App;
 let settings: SettingsService;
 
 beforeEach(() => {
+  MotionGlobalConfig.skipAnimations = true;
   vi.clearAllMocks();
   vi.stubGlobal('ResizeObserver', class { observe(): void {} unobserve(): void {} disconnect(): void {} });
   HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
@@ -46,28 +53,70 @@ beforeEach(() => {
   worker.thumbnail.mockImplementation(answer);
   vi.spyOn(AssetService, 'getInstance').mockReturnValue(assets);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  document.body.empty();
+  vi.restoreAllMocks();
+  MotionGlobalConfig.skipAnimations = false;
+});
 
-function renderPanel(onCreated = vi.fn(), initialName = 'Sunken Vault'): ReturnType<typeof vi.fn> {
-  render(<DungeonGeneratorPanel app={app} collectionId="Dungeons" initialName={initialName} onCreated={onCreated} />);
+function renderPanel(onCreated = vi.fn(), initialName = 'Sunken Vault', step?: string): ReturnType<typeof vi.fn> {
+  const layer = document.body.createDiv();
+  render(<DungeonWizard app={app} layer={layer} collectionId="Dungeons" initialName={initialName} onCreated={onCreated} onClose={vi.fn()} />);
+  if (step) goTo(step);
   return onCreated;
 }
 
+/** Goes to a step by its mark in the wizard's header. */
+function goTo(step: string): void {
+  fireEvent.click(within(screen.getByRole('list', { name: 'Steps' })).getByRole('button', { name: step }));
+}
+
+const preview = (): HTMLElement => document.querySelector<HTMLElement>('.atlas-dungeon-wizard-preview')!;
+
 const lastJob = (): DungeonJob => worker.preview.mock.calls.at(-1)![0] as DungeonJob;
 const tag = (name: string): HTMLElement => screen.getByRole('button', { name, pressed: undefined });
+const exportButton = (): HTMLElement => within(preview()).getByRole('button', { name: 'Export' });
 
-describe('the dungeon generator panel', () => {
-  it('draws the map fitted into the preview off the main thread', async () => {
+describe('the dungeon wizard', () => {
+  it('draws the map fitted into the card beside the panel, off the main thread', async () => {
     renderPanel();
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const job = lastJob();
     expect(job.output).toMatchObject({ kind: 'preview' });
     expect(job.model).toBeUndefined();
-    expect(await screen.findByRole('img', { name: 'Dungeon preview' })).toBeTruthy();
+    expect(await within(preview()).findByRole('img', { name: 'Dungeon preview' })).toBeTruthy();
+  });
+
+  it('asks one thing a step, theme first, and goes back and forth with Back and Next', async () => {
+    renderPanel();
+    // The step leaving is gone once it has slid away
+    const shows = (title: string): Promise<void> => waitFor(() => expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(title));
+    await shows('What kind of place is it?');
+    expect(screen.getByRole('button', { name: 'Back' }).hasAttribute('disabled')).toBe(true);
+    const order = ['How is it laid out?', 'What is it like?', 'How should the map look?', 'What is it called?'];
+    for (const next of order) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      await shows(next);
+    }
+    // The last step creates the scene instead
+    expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Create scene' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await shows('How should the map look?');
+    goTo('Theme');
+    await shows('What kind of place is it?');
+    expect(screen.getByText('Step 1 of 5')).toBeTruthy();
+  });
+
+  it('opens with the chosen theme focused, so the arrows run through the themes', async () => {
+    renderPanel();
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-checked')).toBe('true'));
+    expect(document.activeElement?.textContent).toMatch(/^Surprise me/);
   });
 
   it('never draws another dungeon for another name', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Name');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const calls = worker.preview.mock.calls.length;
     const { request } = lastJob();
@@ -77,8 +126,8 @@ describe('the dungeon generator panel', () => {
     expect(lastJob().request).toBe(request);
   });
 
-  it('creates a scene only once it has a name', async () => {
-    renderPanel(vi.fn(), '');
+  it('creates a scene only once it has a name', () => {
+    renderPanel(vi.fn(), '', 'Name');
     const create = screen.getByRole('button', { name: 'Create scene' });
     expect(create.hasAttribute('disabled')).toBe(true);
     const name = screen.getByRole('textbox', { name: 'Name' });
@@ -90,7 +139,7 @@ describe('the dungeon generator panel', () => {
   });
 
   it('generates at once with a tag picked, on the same seed, and lets one tag of a group stand', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const seed = lastJob().request.seed;
     fireEvent.click(tag('small'));
@@ -101,24 +150,38 @@ describe('the dungeon generator panel', () => {
     await waitFor(() => expect(lastJob().request.tags).toEqual(['large']));
     expect(lastJob().request.seed).toBe(seed);
     expect(settings.getDungeonGenerator().tags).toEqual(['large']);
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Random' }));
+  it('draws a new layout from the card, everything else as it is', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
+    fireEvent.click(tag('large'));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['large']));
+    const seed = lastJob().request.seed;
+    fireEvent.click(within(preview()).getByRole('button', { name: 'New layout' }));
     await waitFor(() => expect(lastJob().request.seed).not.toBe(seed));
     expect(lastJob().request.tags).toEqual(['large']);
   });
 
   it('keeps what is shown in Atlas settings', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
+    fireEvent.click(screen.getByText('Map options'));
     fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
     expect(settings.getDungeonGenerator().view.monochrome).toBe(true);
     await waitFor(() => expect(lastJob().view.monochrome).toBe(true));
   });
 
+  it('picks the grid in sight on the Style step', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Grid' })).getByRole('radio', { name: 'Dashed' }));
+    expect(settings.getDungeonGenerator().view.grid).toBe('dashed');
+    await waitFor(() => expect(lastJob().view.grid).toBe('dashed'));
+  });
+
   it('creates the scene of the dungeon as shown and hands it on', async () => {
     vi.mocked(createDungeonScene).mockResolvedValue({ ok: true, name: 'Sunken Vault', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Sunken Vault.atlasmap' });
-    const onCreated = renderPanel();
+    const onCreated = renderPanel(vi.fn(), 'Sunken Vault', 'Name');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole('button', { name: /Export/ }).hasAttribute('disabled')).toBe(false));
+    await waitFor(() => expect(exportButton().hasAttribute('disabled')).toBe(false));
 
     fireEvent.click(screen.getByRole('button', { name: 'Create scene' }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith({ name: 'Sunken Vault', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Sunken Vault.atlasmap' }));
@@ -129,43 +192,19 @@ describe('the dungeon generator panel', () => {
     expect(options.style).toBe(dungeonStyle(settings.getDungeonGenerator().style));
   });
 
+  it('creates the scene with Enter in the name field', async () => {
+    vi.mocked(createDungeonScene).mockResolvedValue({ ok: true, name: 'Crypt', scenePath: 'atlas-vtt/collections/Dungeons/scenes/Crypt.atlasmap' });
+    const onCreated = renderPanel(vi.fn(), 'Crypt', 'Name');
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Name' }), { key: 'Enter' });
+    await waitFor(() => expect(onCreated).toHaveBeenCalled());
+  });
+
   it('says why a scene could not be created', async () => {
     vi.mocked(createDungeonScene).mockResolvedValue({ ok: false, problem: 'The collection no longer exists.' });
-    const onCreated = renderPanel();
+    const onCreated = renderPanel(vi.fn(), 'Sunken Vault', 'Name');
     fireEvent.click(screen.getByRole('button', { name: 'Create scene' }));
     expect(await screen.findByText('The collection no longer exists.')).toBeTruthy();
     expect(onCreated).not.toHaveBeenCalled();
-  });
-
-  it('folds a sidebar section away by its title, keeping what it holds', async () => {
-    renderPanel();
-    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
-    const style = screen.getByRole('button', { name: 'Style' });
-    expect(style.getAttribute('aria-expanded')).toBe('true');
-    fireEvent.click(style);
-    expect(style.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByRole('radiogroup', { name: 'Style' })).toBeNull();
-    fireEvent.click(style);
-    expect(screen.getByRole('radiogroup', { name: 'Style' })).toBeTruthy();
-    // The cards drawn before are kept for the unfolded gallery
-    expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length);
-  });
-
-  it('offers the collections where the GM may choose one', () => {
-    const onCollectionChange = vi.fn();
-    render(
-      <DungeonGeneratorPanel
-        app={app}
-        collectionId="Dungeons"
-        collections={[{ id: 'Dungeons', name: 'Dungeons' }, { id: 'Ruins', name: 'Ruins' }] as never}
-        onCollectionChange={onCollectionChange}
-        onCreated={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole('group', { name: 'Collection' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Dungeons/ }));
-    fireEvent.click(screen.getByRole('option', { name: /Ruins/ }));
-    expect(onCollectionChange).toHaveBeenCalledWith('Ruins');
   });
 
   it('has no keyboard shortcuts: keys pressed in the panel change nothing', async () => {
@@ -174,8 +213,7 @@ describe('the dungeon generator panel', () => {
     const calls = worker.preview.mock.calls.length;
     const { request } = lastJob();
     const before = settings.getDungeonGenerator();
-    const panel = document.querySelector<HTMLElement>('.atlas-dungeon-generator')!;
-    panel.focus();
+    const panel = document.querySelector<HTMLElement>('.atlas-dungeon-wizard')!;
     for (const key of ['Enter', ' ', 'n', 'g', 'G', 'h', 'm', 'w', 'p', 'e', 'j', '1']) {
       fireEvent.keyDown(panel, { key, shiftKey: key === 'G' });
     }
@@ -187,28 +225,35 @@ describe('the dungeon generator panel', () => {
 });
 
 describe('the theme', () => {
-  const themeSelect = (): HTMLElement => screen.getByRole('combobox', { name: 'Theme' });
   const chooseTheme = (label: string): void => {
-    fireEvent.click(themeSelect());
-    fireEvent.click(screen.getByRole('option', { name: label }));
+    goTo('Theme');
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp(`^${label}`) }));
   };
   const chips = (): string[] => [...document.querySelectorAll('.atlas-dungeon-tag')].map((chip) => chip.getAttribute('data-tag') ?? '');
   const refused = (): string[] => [...document.querySelectorAll('.atlas-dungeon-tag[aria-disabled="true"]')].map((chip) => chip.getAttribute('data-tag') ?? '');
 
-  it('offers the theme choice with Any first', () => {
+  it('offers the themes as cards, Surprise me first', () => {
     renderPanel();
-    fireEvent.click(themeSelect());
-    const labels = screen.getAllByRole('option').map((option) => option.textContent);
-    // Any names the theme it picked once the dungeon is there
-    expect(labels[0]).toMatch(/^Any/);
-    expect(labels.slice(1)).toEqual(['Fortress', 'Haunted Mansion', 'Cavern']);
+    const cards = within(screen.getByRole('radiogroup', { name: 'Theme' })).getAllByRole('radio');
+    expect(cards.map((card) => card.querySelector('.atlas-dungeon-theme__name')?.textContent)).toEqual(['Surprise me', 'Fortress', 'Haunted Mansion', 'Cavern']);
+    expect(cards.filter((card) => card.tabIndex === 0)).toEqual([cards[0]]);
+  });
+
+  it('runs through the themes with the arrow keys, drawing each at once', async () => {
+    renderPanel();
+    fireEvent.keyDown(screen.getByRole('radio', { name: /^Surprise me/ }), { key: 'ArrowRight' });
+    await waitFor(() => expect(lastJob().request.theme).toBe('fortress'));
+    expect(document.activeElement?.textContent).toMatch(/^Fortress/);
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
+    await waitFor(() => expect(lastJob().request.theme).toBe('any'));
   });
 
   it('shows the chips the Haunted Mansion refuses disabled, in place, with the reason', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
     const order = chips();
     chooseTheme('Haunted Mansion');
     await waitFor(() => expect(lastJob().request.theme).toBe('mansion'));
+    goTo('Features');
     expect(refused().sort()).toEqual(['acid', 'flooded', 'lava']);
     expect(chips()).toEqual(order);
     fireEvent.click(tag('lava'));
@@ -220,26 +265,30 @@ describe('the theme', () => {
   it('shows a tag picked before the theme refused it as off and disabled, and gives it back with a theme that takes it', async () => {
     renderPanel();
     chooseTheme('Cavern');
+    goTo('Features');
     fireEvent.click(tag('lava'));
     await waitFor(() => expect(lastJob().request.tags).toEqual(['lava']));
     expect(tag('lava').getAttribute('aria-pressed')).toBe('true');
     chooseTheme('Fortress');
     await waitFor(() => expect(lastJob().request.theme).toBe('fortress'));
+    goTo('Features');
     expect([tag('lava').getAttribute('aria-pressed'), tag('lava').getAttribute('aria-disabled')]).toEqual(['false', 'true']);
     expect(tag('lava').classList.contains('atlas-active')).toBe(false);
     chooseTheme('Cavern');
     await waitFor(() => expect(lastJob().request.theme).toBe('cavern'));
+    goTo('Features');
     expect(tag('lava').getAttribute('aria-pressed')).toBe('true');
   });
 
   it('refuses ruined only for the Cavern', () => {
     renderPanel();
     chooseTheme('Cavern');
+    goTo('Features');
     expect(refused()).toEqual(['ruined']);
   });
 
-  it('refuses nothing for Any', () => {
-    renderPanel();
+  it('refuses nothing for Surprise me', () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
     expect(refused()).toEqual([]);
   });
 
@@ -253,9 +302,9 @@ describe('the theme', () => {
     expect(settings.getDungeonGenerator().theme).toBe('fortress');
   });
 
-  it('names the theme Any picked once the dungeon is there', async () => {
+  it('names the theme Surprise me picked once the dungeon is there', async () => {
     renderPanel();
-    await waitFor(() => expect(themeSelect().textContent).toMatch(/^Any \((Fortress|Haunted Mansion|Cavern)\)$/));
+    await waitFor(() => expect(screen.getByRole('radio', { name: /^Surprise me/ }).textContent).toMatch(/This time: (Fortress|Haunted Mansion|Cavern)$/));
   });
 });
 
@@ -263,7 +312,7 @@ describe('floors, the boss room and five-room dungeons', () => {
   const floorSwitcher = (): HTMLElement | null => screen.queryByRole('radiogroup', { name: 'Floor shown' });
 
   it('asks for as many floors as the stepper says, one to four', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Layout');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const fewer = screen.getByRole('button', { name: 'Fewer floors' });
     const more = screen.getByRole('button', { name: 'More floors' });
@@ -278,28 +327,24 @@ describe('floors, the boss room and five-room dungeons', () => {
     await waitFor(() => expect(lastJob().request.floors).toBe(3));
   });
 
-  it('shows the floor picked above the preview, drawing that floor of the same dungeon', async () => {
-    renderPanel();
+  it('shows the floor picked on the card, drawing that floor of the same dungeon', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Layout');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     expect(floorSwitcher()).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'More floors' }));
-    const switcher = await screen.findByRole('radiogroup', { name: 'Floor shown' });
+    const switcher = await within(preview()).findByRole('radiogroup', { name: 'Floor shown' });
     expect(within(switcher).getAllByRole('radio').map((radio) => radio.textContent)).toEqual(['A', 'B']);
-    await waitFor(() => expect(screen.getByRole('button', { name: /Export/ }).hasAttribute('disabled')).toBe(false));
+    await waitFor(() => expect(exportButton().hasAttribute('disabled')).toBe(false));
     const { request } = lastJob();
-    const thumbnails = worker.thumbnail.mock.calls.length;
 
     fireEvent.click(within(switcher).getByRole('radio', { name: 'B' }));
     await waitFor(() => expect(lastJob().output).toMatchObject({ kind: 'preview', floor: 1 }));
     expect(lastJob().request).toBe(request);
     expect(within(switcher).getByRole('radio', { name: 'B' }).getAttribute('aria-checked')).toBe('true');
-    // The style cards keep showing floor A
-    await act(async () => { await Promise.resolve(); });
-    expect(worker.thumbnail.mock.calls.length).toBe(thumbnails);
   });
 
   it('builds the boss room unless switched off', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Layout');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     const boss = screen.getByRole('switch', { name: 'Boss room' });
     expect(boss.getAttribute('aria-checked')).toBe('true');
@@ -309,7 +354,7 @@ describe('floors, the boss room and five-room dungeons', () => {
   });
 
   it('makes a five-room dungeon one floor, its boss room fixed', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Layout');
     await waitFor(() => expect(worker.preview).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'More floors' }));
     await screen.findByRole('radiogroup', { name: 'Floor shown' });
@@ -334,14 +379,12 @@ describe('floors, the boss room and five-room dungeons', () => {
   it('hides the secret rooms right-clicked on the floor shown', async () => {
     const seed = Array.from({ length: 40 }, (_, k) => k + 1)
       .find((candidate) => generateDungeon({ seed: candidate, tags: [], floors: 2, bossRoom: true, fiveRoom: false }).floors[1]?.rooms.some((room) => room.wing === 'secret'))!;
-    renderPanel();
-    const seedField = screen.getByRole('textbox', { name: 'Seed' });
-    fireEvent.change(seedField, { target: { value: String(seed) } });
-    fireEvent.blur(seedField);
+    vi.mocked(randomSeed).mockReturnValue(seed);
+    renderPanel(vi.fn(), 'Sunken Vault', 'Layout');
     fireEvent.click(screen.getByRole('button', { name: 'More floors' }));
     fireEvent.click(within(await screen.findByRole('radiogroup', { name: 'Floor shown' })).getByRole('radio', { name: 'B' }));
     await waitFor(() => expect(lastJob().output).toMatchObject({ floor: 1 }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Export/ }).hasAttribute('disabled')).toBe(false));
+    await waitFor(() => expect(exportButton().hasAttribute('disabled')).toBe(false));
 
     // The answer is 10 px wide at 1 px a cell, the canvas 800 px wide: 80 client px a map pixel
     const model = generateDungeon(lastJob().request);
@@ -356,7 +399,7 @@ describe('floors, the boss room and five-room dungeons', () => {
   });
 
   it('explains the two switches in a line each', () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Layout');
     for (const [name, hint] of [['Boss room', 'A large arena'], ['Five-room dungeon', 'Five main rooms']] as const) {
       const id = screen.getByRole('switch', { name }).getAttribute('aria-describedby')!;
       expect(document.getElementById(id)?.textContent).toContain(hint);
@@ -366,7 +409,7 @@ describe('floors, the boss room and five-room dungeons', () => {
 
 describe('the style gallery', () => {
   it('offers every style as one radio group, the chosen one checked', () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     const group = screen.getByRole('radiogroup', { name: 'Style' });
     const radios = within(group).getAllByRole('radio');
     expect(radios).toHaveLength(DUNGEON_STYLES.length);
@@ -377,7 +420,7 @@ describe('the style gallery', () => {
   });
 
   it('keeps the style picked by its id and draws the map in it', async () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     fireEvent.click(screen.getByRole('radio', { name: 'Lantern' }));
     expect(settings.getDungeonGenerator().style).toBe('night');
     expect(screen.getByRole('radio', { name: 'Lantern' }).getAttribute('aria-checked')).toBe('true');
@@ -385,7 +428,7 @@ describe('the style gallery', () => {
   });
 
   it('moves the choice with the arrow keys, Home and End', () => {
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     const first = screen.getByRole('radio', { name: 'Scriptorium' });
     fireEvent.keyDown(first, { key: 'ArrowRight' });
     const second = DUNGEON_STYLES[1]!.id;
@@ -397,9 +440,16 @@ describe('the style gallery', () => {
     expect(settings.getDungeonGenerator().style).toBe(DEFAULT_STYLE_ID);
   });
 
+  it('draws no thumbnail before the Style step was shown', async () => {
+    renderPanel();
+    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    expect(worker.thumbnail).not.toHaveBeenCalled();
+  });
+
   it('draws a thumbnail of the dungeon as shown in every style, the chosen one first', async () => {
     settings.setDungeonGenerator({ style: 'volcanic' });
-    renderPanel();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
     const jobs = worker.thumbnail.mock.calls.map(([job]) => job as DungeonJob);
     expect(jobs[0]!.style).toBe(dungeonStyle('volcanic'));
@@ -407,9 +457,19 @@ describe('the style gallery', () => {
     expect(jobs.every((job) => job.output.kind === 'thumbnail' && job.model !== undefined)).toBe(true);
   });
 
-  it('asks for no thumbnail again for a dungeon and view it has drawn, and drops those of the last view', async () => {
-    renderPanel();
+  it('keeps the thumbnails drawn when the GM leaves the step and comes back', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
+    goTo('Name');
+    goTo('Style');
+    await act(async () => { await Promise.resolve(); });
+    expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length);
+  });
+
+  it('asks for no thumbnail again for a dungeon and view it has drawn, and drops those of the last view', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
+    await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length));
+    fireEvent.click(screen.getByText('Map options'));
     fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
     expect(worker.dropThumbnails).toHaveBeenCalled();
     await waitFor(() => expect(worker.thumbnail).toHaveBeenCalledTimes(DUNGEON_STYLES.length * 2));
@@ -420,6 +480,13 @@ describe('the style gallery', () => {
 });
 
 describe('the generator state', () => {
+  /** A seed of the first `count` whose dungeon has what `fits` asks for. */
+  const seedWhere = (count: number, fits: (seed: number) => boolean): number => {
+    const seed = Array.from({ length: count }, (_, k) => k + 1).find(fits);
+    expect(seed).toBeDefined();
+    return seed!;
+  };
+
   it('names the scene with the Name field and keeps the dungeon as it is', () => {
     const { result } = renderHook(() => useDungeonState(app, ' Sunken Vault '));
     expect(result.current.name).toBe('Sunken Vault');
@@ -435,26 +502,23 @@ describe('the generator state', () => {
 
   it('keeps the hidden wings while only the water changes, and drops them for another seed', () => {
     // A seed whose first floor has a secret wing: the test must not depend on a random one
-    const seed = Array.from({ length: 60 }, (_, k) => k + 1)
-      .find((candidate) => generateDungeon({ seed: candidate, tags: [] }).floors[0]!.rooms.some((room) => room.wing === 'secret'));
-    expect(seed).toBeDefined();
+    vi.mocked(randomSeed).mockReturnValue(seedWhere(60, (seed) => generateDungeon({ seed, tags: [] }).floors[0]!.rooms.some((room) => room.wing === 'secret')));
     const { result } = renderHook(() => useDungeonState(app));
-    act(() => result.current.setSeed(seed!));
     const request = result.current.request;
     act(() => result.current.setGenerated(request, generateDungeon(request)));
     const secret = result.current.model!.floors[0]!.rooms.find((room) => room.wing === 'secret')!;
     act(() => result.current.hideWing(0, secret.id));
     expect(result.current.edits.hiddenWings?.length).toBe(1);
+    act(() => result.current.setWaterLevel(0.5));
+    expect(result.current.edits.hiddenWings?.length).toBe(1);
+    vi.mocked(randomSeed).mockReturnValue(999);
     act(() => result.current.newSeed());
     expect(result.current.edits).toEqual({});
   });
 
   it('hides a secret wing on the floor it lies on', () => {
-    const seed = Array.from({ length: 40 }, (_, k) => k + 1)
-      .find((candidate) => generateDungeon({ seed: candidate, tags: [], floors: 2 }).floors[1]?.rooms.some((room) => room.wing === 'secret'));
-    expect(seed).toBeDefined();
+    vi.mocked(randomSeed).mockReturnValue(seedWhere(40, (seed) => generateDungeon({ seed, tags: [], floors: 2 }).floors[1]?.rooms.some((room) => room.wing === 'secret') ?? false));
     const { result } = renderHook(() => useDungeonState(app));
-    act(() => result.current.setSeed(seed!));
     act(() => result.current.setFloors(2));
     const request = result.current.request;
     act(() => result.current.setGenerated(request, generateDungeon(request)));

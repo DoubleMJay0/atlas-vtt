@@ -236,7 +236,8 @@ describe('pin note search create entries', () => {
     expect(activeName()).toBe('Create note “Te”');
     press('ArrowDown');
     press('Enter');
-    expect(dungeon).toHaveBeenCalledWith('Te');
+    // It works in the dropdown's place, so it is handed the dropdown
+    expect(dungeon).toHaveBeenCalledWith('Te', container);
     await settle();
     // A scene made for the pin names the floor it opens on
     expect(onPick).toHaveBeenCalledWith('Dungeons/Crypt.atlasmap', 'floor-a');
@@ -252,7 +253,7 @@ describe('pin note search create entries', () => {
     press('ArrowDown');
     press('Enter');
     expect(create).toHaveBeenCalledTimes(1);
-    expect(create).toHaveBeenCalledWith('Cellar');
+    expect(create).toHaveBeenCalledWith('Cellar', container);
     expect(onPick).not.toHaveBeenCalled();
     finish({ path: 'Notes/Cellar.md' });
     await settle();
