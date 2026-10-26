@@ -39,7 +39,7 @@ export function LevelSwitcher(): React.ReactElement | null {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className={cn('atlas-level-switcher', roofed && 'atlas-level-switcher--roofs')}>
+      <div className="atlas-level-switcher">
         {several && (
           <div className="atlas-level-switcher__levels" role="tablist" aria-orientation="vertical" aria-label={t('levels.switcher')}>
             {[...levels].reverse().map((level) => {

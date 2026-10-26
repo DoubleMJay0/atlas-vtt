@@ -13,11 +13,8 @@ $roofs-height: 28px;
   height: $roofs-height;
   padding: 6px;
   border: none;
-  border-radius: $radius-l;
-  // The foot of the switcher: its lower corners are the panel's, concentric, capped at half its height.
-  border-bottom-left-radius: atlas-panel-inset-radius-value($roofs-inset, $roofs-height * 0.5);
-  border-bottom-right-radius: atlas-panel-inset-radius-value($roofs-inset, $roofs-height * 0.5);
-  @include atlas-corner-shape;
+  // A capsule like the floors above it, concentric with the switcher's corners
+  @include atlas-panel-inset-radius($roofs-inset);
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
@@ -39,24 +36,12 @@ $roofs-height: 28px;
   &--hidden {
     color: var(--text-faint);
   }
-
-  // Alone in the switcher (a scene of one level): every corner is the panel's.
-  &:only-child {
-    border-top-left-radius: atlas-panel-inset-radius-value($roofs-inset, $roofs-height * 0.5);
-    border-top-right-radius: atlas-panel-inset-radius-value($roofs-inset, $roofs-height * 0.5);
-  }
 }
 
 .atlas-roofs-toggle__name {
   flex: 1 1 auto;
   min-width: 0;
   text-align: left;
-}
-
-// With the Roofs below them, the floors' list ends inside the panel: its last floor keeps the floors' own corners.
-.atlas-level-switcher--roofs .atlas-level-switcher__level:last-child {
-  border-bottom-left-radius: $radius-l;
-  border-bottom-right-radius: $radius-l;
 }
 
 .atlas-level-switcher__levels {

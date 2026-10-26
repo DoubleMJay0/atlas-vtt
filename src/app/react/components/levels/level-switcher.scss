@@ -2,6 +2,7 @@
 @use '../../../../../styles/tokens' as *;
 @use '../../../../../styles/mixins' as *;
 
+// Floors are capsules like a context menu's rows; the panel's corner is set so every floor runs concentric with it.
 $level-switcher-inset: $spacing-xs;
 $level-height: 28px;
 
@@ -22,7 +23,7 @@ $level-height: 28px;
   pointer-events: auto;
 
   @include atlas-elevated-surface;
-  @include atlas-panel-radius($radius-2xl);
+  @include atlas-panel-radius($level-height * 0.5 + $level-switcher-inset + $border-width-m);
 }
 
 .atlas-level-switcher__level {
@@ -31,8 +32,7 @@ $level-height: 28px;
   gap: $level-switcher-inset;
   height: $level-height;
   padding: 6px;
-  border-radius: $radius-l;
-  @include atlas-corner-shape;
+  @include atlas-panel-inset-radius($level-switcher-inset);
   cursor: pointer;
   color: var(--text-muted);
   font-size: 12px;
@@ -52,17 +52,6 @@ $level-height: 28px;
     background: var(--background-modifier-hover);
     color: var(--text-normal);
     font-weight: 500;
-  }
-
-  // The floors at the ends follow the panel's corners: concentric, capped at half their height.
-  &:first-child {
-    border-top-left-radius: atlas-panel-inset-radius-value($level-switcher-inset, $level-height * 0.5);
-    border-top-right-radius: atlas-panel-inset-radius-value($level-switcher-inset, $level-height * 0.5);
-  }
-
-  &:last-child {
-    border-bottom-left-radius: atlas-panel-inset-radius-value($level-switcher-inset, $level-height * 0.5);
-    border-bottom-right-radius: atlas-panel-inset-radius-value($level-switcher-inset, $level-height * 0.5);
   }
 }
 
@@ -84,7 +73,9 @@ $level-height: 28px;
   height: 16px;
   padding: 0;
   border: none;
-  border-radius: $radius-s;
+  // Concentric with the floor's capsule: its 6px padding leaves a circle
+  border-radius: 50%;
+  @include atlas-corner-shape;
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);

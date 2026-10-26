@@ -7,7 +7,7 @@
 - A new dungeon grows into being the first time you open its scene: its rooms bloom from the entrance in the order they were made, then the rock and paper settle around them
 - A random table row that links its own table rolls that table again without itself, for rows such as "Mithral + reroll"
 - Generators: a note table whose rows are parts rolls them into one result, with a reroll and a lock per part, Give for results with a Type and Save as note; a link to a generator rolls all of it
-- Scenes with several floors: add, name and stack them in the command palette's Scene levels page, and switch floors at the map's left edge or with Page Up and Page Down
+- Scenes with several floors: add, name and stack them in the command palette's Scene levels page, and switch floors at the map's left edge or with Page Up and Page Down, the map sinking away or rising past you to the next floor
 - Each floor has its own map, tokens, walls, lights, fog and explored areas, and a floor's map is fitted to the scene's grid when you align it there
 - Show players a floor with the eye in the floor switcher, and move tokens to another floor from their right-click menu
 - Stairs between floors: a token put down on them goes to the floor they lead to, and an elevator lets you pick the floor
