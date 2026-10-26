@@ -16,7 +16,7 @@ interface WizardPanelProps {
   wizard: Wizard;
   /** Where the scene goes, offered on the Name step where the GM may choose it. */
   collection?: CollectionChoice | undefined;
-  /** Shows the close button; a tab of its own has Obsidian's. */
+  /** Shows the close button. */
   onClose?: (() => void) | undefined;
 }
 

@@ -12,6 +12,8 @@ export interface DungeonGeneratorPageProps {
   collectionId: string;
   onCollectionChange: (id: string) => void;
   onCreated: (scene: CreatedDungeonScene) => void;
+  /** The panel's close button: closes the tab. */
+  onClose: () => void;
 }
 
 /**
@@ -27,14 +29,14 @@ export function DungeonGeneratorPage(props: DungeonGeneratorPageProps): React.JS
   );
 }
 
-function Page({ app, collectionId, onCollectionChange, onCreated }: DungeonGeneratorPageProps): React.JSX.Element {
+function Page({ app, collectionId, onCollectionChange, onCreated, onClose }: DungeonGeneratorPageProps): React.JSX.Element {
   const wizard = useWizard({ app, collectionId, onCreated });
   const { collections } = useAssetCatalog(app, true);
   return (
     <div className="atlas-dungeon-generator-page" inert={wizard.actions.creating}>
       <div className="atlas-dungeon-generator-page__grid">
         <div ref={wizard.setPanel} className="atlas-dungeon-wizard atlas-dungeon-wizard--page" role="group" aria-labelledby={wizard.titleId}>
-          <WizardPanel wizard={wizard} collection={{ id: collectionId, options: collections, onChange: onCollectionChange }} />
+          <WizardPanel wizard={wizard} collection={{ id: collectionId, options: collections, onChange: onCollectionChange }} onClose={onClose} />
         </div>
         <WizardPreview wizard={wizard} />
       </div>
