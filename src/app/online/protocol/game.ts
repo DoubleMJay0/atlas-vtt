@@ -2,6 +2,7 @@ import { ASSET_CHUNK_BYTES, isCount, isHash, isMaxSide, MAX_ASSET_BYTES, parseAs
 import { isBookType, isPlayerBookType, parseBookCover, parseBookMessage, parseBookTokenMessage, parsePlayerBookMessage, type BookMessage, type BookTokenMessage, type PlayerBookCover, type PlayerBookMessage, type PlayerBookParts } from './book.ts';
 import { parseBookRestMessage, type BookRestMessage } from './bookRest.ts';
 import { isDeltaOf, parseDelta, parseSeq, type DeltaMessage, type DeltaOf } from './delta.ts';
+import { parseFloor, type SharedFloor } from './floor.ts';
 import { parseFog, type SharedFog } from './fog.ts';
 import { parseImageMessage, type ImageMessage } from './image.ts';
 import { parseInitiative, type SharedInitiative } from './initiative.ts';
@@ -29,6 +30,8 @@ export interface SharedScene {
    * and `sight` messages, and nothing until it can be (never the map unlit).
    */
   readonly lit: boolean;
+  /** Which floor of a map with several this scene is; none for a map of one floor (and from an older GM). */
+  readonly floor?: SharedFloor;
 }
 
 /** Parts of one message a client puts together: at most this many, each as large as an asset chunk. */
@@ -118,12 +121,18 @@ const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 const isSceneId = (value: unknown): value is string => typeof value === 'string' && value.length <= MAX_SCENE_ID;
 const isBase64Chunk = (value: unknown): value is string => typeof value === 'string' && value.length <= (ASSET_CHUNK_BYTES / 3) * 4 && BASE64.test(value);
 
+/** A scene's floor where it is given and well formed; a malformed one is left out, so the scene still shows. */
+function sceneExtras(value: Record<string, unknown>): Pick<SharedScene, 'floor'> {
+  const floor = parseFloor(value.floor);
+  return floor !== undefined ? { floor } : {};
+}
+
 function parseScene(value: unknown): SharedScene | null | undefined {
   if (value === null) return null;
   if (!isRecord(value) || !isSceneId(value.id) || typeof value.lit !== 'boolean') return undefined;
-  if (value.map === null) return { id: value.id, map: null, lit: value.lit };
+  if (value.map === null) return { id: value.id, map: null, lit: value.lit, ...sceneExtras(value) };
   const map = parseAsset(value.map);
-  return map === null ? undefined : { id: value.id, map, lit: value.lit };
+  return map === null ? undefined : { id: value.id, map, lit: value.lit, ...sceneExtras(value) };
 }
 
 /** A message about the scene's fog or lighting, or null for anything malformed. */
