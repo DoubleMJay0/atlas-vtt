@@ -83,6 +83,7 @@ export class DungeonGeneratorView extends ItemView {
         collectionId={this.collection}
         onCollectionChange={(id) => this.setCollection(id)}
         onCreated={(scene) => { void this.openScene(scene); }}
+        onClose={() => this.leaf.detach()}
       />,
     );
   }
