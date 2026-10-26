@@ -295,10 +295,10 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
   return composite;
 }
 
-/** The world's two wall fields under the names the composite reads them by: the walls that stop light, and those that stop sight. */
+/** The world's wall fields under the names the composite reads them by: the walls that stop light, those that stop sight, and those that stop light both ways. */
 function fieldResources(world: LightingWorld): ReturnType<LightingWorld['fields']['tiles']['resources']> {
   const { light, sight } = world.fields.bound();
-  return { ...light.resources(), ...sight.resourcesAs('uSightField') };
+  return { ...light.resources(), ...sight.resourcesAs('uSightField'), ...world.fields.tiles.resourcesAs('uTwoWayField') };
 }
 
 /** Writes an sRGB colour into `out` in linear light, scaled by `level`. */

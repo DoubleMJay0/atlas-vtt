@@ -9,11 +9,12 @@ import type { DungeonView } from '../style';
 import type { DungeonPlacement } from './toWalls';
 
 /**
- * Tall objects as small closed walls in their scene that block sight and light (cover, and the
- * shadows a lamp casts) without walls drawn by the GM: standing columns, statues, wells, and the
- * terrain that is total cover (pillars, statues, wall fragments, obelisks). Each face blocks only
- * from inside (`insideOf`): the object's top is seen and lit with its faces, never a black hole in
- * the players' picture, and what stands behind it is hidden and in its shadow. Low ones (a dais,
+ * Tall objects as small closed walls in their scene that block light (the shadows a lamp casts)
+ * without walls drawn by the GM: standing columns, statues, wells, and the terrain that is total
+ * cover (pillars, statues, wall fragments, obelisks). They never block sight (`blocks: 'light'`):
+ * players see the object and past it. Each face blocks light only from inside (`insideOf`): the
+ * object's top is lit with its faces, never a black hole in the players' picture, and what stands
+ * behind it lies in its shadow. Low ones (a dais,
  * a fountain, a fire pit, low walls) get none. Each outline is one convex
  * polygon of at most eight corners, lies inside what the map draws, and keeps farther than the
  * engine's seal tolerance from every wall and every other outline, so sealing never bridges an
@@ -118,11 +119,10 @@ function segmentDistance(a: Point, b: Point, c: Point, d: Point): number {
 }
 
 /**
- * The side of the edge `a`→`b` the outline's middle lies on, which the edge blocks sight and light
- * from (`WallSegment.direction`): a token or a lamp outside sees or shines through the near faces
- * onto the object's top and is stopped at the far faces, so the top shows as seen and lit wherever
- * its faces are while what lies behind stays hidden and dark. (The outline is convex, so every
- * face's inside is the middle's side.)
+ * The side of the edge `a`→`b` the outline's middle lies on, which the edge blocks light from
+ * (`WallSegment.direction`): a lamp outside shines through the near faces onto the object's top
+ * and is stopped at the far faces, so the top is lit wherever its faces are while what lies behind
+ * stays in its shadow. (The outline is convex, so every face's inside is the middle's side.)
  */
 function insideOf(a: Point, b: Point, centre: Point): 'left' | 'right' {
   // The left normal of a→b is (-dy, dx), as `wallNormal` has it.
@@ -176,7 +176,7 @@ export function objectShadows(
     ring.forEach((p1, k) => {
       const wallId = `${id}_${placed}_${k + 1}`;
       const p2 = ring[(k + 1) % ring.length]!;
-      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', direction: insideOf(p1, p2, centre), p1, p2, chainId: `${id}_${placed}`, ...(levels && { levels }) };
+      out[wallId] = { id: wallId, kind: 'wall', type: 'solid', blocks: 'light', direction: insideOf(p1, p2, centre), p1, p2, chainId: `${id}_${placed}`, ...(levels && { levels }) };
       segments.push([p1, p2]);
     });
   }

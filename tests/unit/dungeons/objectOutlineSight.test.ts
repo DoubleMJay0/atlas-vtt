@@ -12,13 +12,13 @@ import { computeVisibility, pointInPolygon } from '../../../src/app/vision/visib
 import { wallList } from '../../../src/app/vision/wallList';
 
 /**
- * A column's outline stops sight and light (cover, and a lamp's shadow) but is no hole: a token
- * that sees a column's faces sees its top, a lamp that lights its faces lights its top, the way the
- * players' picture draws it, and what stands right behind the column stays hidden and dark. Before,
- * the outline was a closed wall from both sides and every column top was a black octagon.
+ * A column's outline casts a lamp's shadow but is no hole and no cover: a lamp that lights a
+ * column's faces lights its top, the way the players' picture draws it, and what stands right
+ * behind the column lies in its shadow, while sight passes the outline altogether. Before, the
+ * outline was a closed wall from both sides and every column top was a black octagon.
  */
 describe('the outline of a tall object, as sight and light see it', () => {
-  it.each(['sight', 'light'] as const)('shows the top of every column a %s source reaches the faces of, and hides what lies behind it', (channel) => {
+  it.each(['sight', 'light'] as const)('shows the top of every column a %s source reaches the faces of, and what lies behind it to sight alone', (channel) => {
     const model = generateDungeon({ seed: 3, theme: 'fortress', tags: ['colonnades', 'large'], floors: 1 });
     const pxPerCell = DEFAULT_PX_PER_CELL;
     const layout = mapLayout(model, pxPerCell, DEFAULT_VIEW);
@@ -38,16 +38,16 @@ describe('the outline of a tall object, as sight and light see it', () => {
       for (const angle of [0, Math.PI / 2, Math.PI, 1.5 * Math.PI]) {
         const [dx, dy] = [Math.cos(angle), Math.sin(angle)];
         const viewer = { x: middle.x + dx * (radius + pxPerCell * 0.6), y: middle.y + dy * (radius + pxPerCell * 0.6) };
-        const sight = computeVisibility(viewer, pxPerCell * 20, walls, undefined, channel);
-        // Only where the token sees the near face, which another wall or object may hide.
+        const reach = computeVisibility(viewer, pxPerCell * 20, walls, undefined, channel);
+        // Only where the source reaches the near face, which another wall or object may hide.
         const near = { x: middle.x + dx * radius * 0.95, y: middle.y + dy * radius * 0.95 };
         const nearOutside = { x: middle.x + dx * (radius + 4), y: middle.y + dy * (radius + 4) };
-        if (!pointInPolygon(nearOutside, sight)) continue;
+        if (!pointInPolygon(nearOutside, reach)) continue;
         checked++;
-        expect(pointInPolygon(near, sight), `the near edge of the top of ${faces[0]!.chainId}`).toBe(true);
-        expect(pointInPolygon(middle, sight), `the top of ${faces[0]!.chainId}`).toBe(true);
+        expect(pointInPolygon(near, reach), `the near edge of the top of ${faces[0]!.chainId}`).toBe(true);
+        expect(pointInPolygon(middle, reach), `the top of ${faces[0]!.chainId}`).toBe(true);
         const behind = { x: middle.x - dx * (radius + 6), y: middle.y - dy * (radius + 6) };
-        expect(pointInPolygon(behind, sight), `right behind ${faces[0]!.chainId}`).toBe(false);
+        expect(pointInPolygon(behind, reach), `right behind ${faces[0]!.chainId}`).toBe(channel === 'sight');
       }
     }
     expect(checked).toBeGreaterThan(40);
