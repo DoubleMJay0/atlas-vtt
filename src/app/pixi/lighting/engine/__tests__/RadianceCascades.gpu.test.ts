@@ -116,14 +116,14 @@ describe('RadianceCascades', () => {
     return { probes, probe };
   }
 
-  it('builds anew in bands over the part a moved light can reach, as a whole build would', async () => {
+  it.each([1, 2.5])('builds anew in bands over the part a moved light can reach, as a whole build would (scale %s)', async (scale) => {
     const world = { width: 6144, height: 1024 };
     const renderer: WebGLRenderer = await createTestRenderer(64);
     const field = new CapsuleField(renderer, [0, 0, world.width, world.height], 2, wallRadius(2));
     const tiles = new TileCache(renderer, field, world);
     const map = new LightMap(renderer, world, 2);
-    const banded = new RadianceCascades(renderer, world, field);
-    const whole = new RadianceCascades(renderer, world, field);
+    const banded = new RadianceCascades(renderer, world, field, scale);
+    const whole = new RadianceCascades(renderer, world, field, scale);
     cleanup.push(() => {
       for (const done of [banded, whole, map, tiles, field]) done.destroy();
       renderer.destroy();

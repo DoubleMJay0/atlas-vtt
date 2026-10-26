@@ -59,6 +59,7 @@ uniform vec2 uUpCount;
 uniform float uUpSpacing;
 uniform float uUpS;
 uniform float uUpStart;
+uniform float uSafe;
 uniform float uSigma;
 uniform float uFloorGain;
 uniform float uWallGain;
@@ -66,8 +67,7 @@ out vec4 finalColor;
 ${fieldGlsl('uField')}
 float clearance(vec2 w) { return uFieldClearance(w); }
 
-// Emission is read only where the clearance keeps every bilinear texel on this side of a wall.
-const float SAFE = 6.0;
+// Emission is read only where the clearance (uSafe) keeps every bilinear texel on this side of a wall.
 vec3 emitAt(vec2 w) { return textureLod(uEmit, w / uEmitWorld, 0.0).rgb; }
 
 // Light reaching a from b: floor glow on the way, a lit wall where the path stops.
@@ -85,7 +85,7 @@ vec4 march(vec2 a, vec2 b) {
   for (int i = 0; i < 64; i++) {
     vec2 x = a + dir * t;
     float c = clearance(x);
-    if (c >= SAFE) { lastSafe = x; hasSafe = true; }
+    if (c >= uSafe) { lastSafe = x; hasSafe = true; }
     if (c < 0.05) { hit = true; tEnd = t; break; }
     if (L - t <= c) break;
     t += c;
@@ -95,7 +95,7 @@ vec4 march(vec2 a, vec2 b) {
   for (int j = 0; j < 4; j++) {
     float tj = (float(j) + 0.5) * 0.25 * tEnd;
     vec2 x = a + dir * tj;
-    if (clearance(x) < SAFE) continue;
+    if (clearance(x) < uSafe) continue;
     rad += emitAt(x) * exp(-uSigma * tj) * tEnd * 0.25;
   }
   rad *= uFloorGain;

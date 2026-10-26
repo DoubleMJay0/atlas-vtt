@@ -1,4 +1,4 @@
-import { BOUNCE } from '../../../lighting/lightingConstants';
+import { BASE_TEXEL, BOUNCE } from '../../../lighting/lightingConstants';
 import type { Rect } from '../../../lighting/segments';
 import { sameCone } from '../../../vision/visionCone';
 import type { DrawnDarkness } from './DarknessMap';
@@ -7,19 +7,33 @@ import { drawnRect, union, type DrawnLight } from './LightMap';
 /** What the steady light map drew, by light, in its order. */
 export type SteadyDrawing = ReadonlyMap<string, DrawnLight | DrawnDarkness>;
 
-/** Where cascade `i`'s intervals start; each is four times longer than the last. */
-export function intervalStart(i: number): number {
-  return (BOUNCE.interval * (4 ** i - 1)) / 3;
+/**
+ * How much coarser than on an ordinary map the bounce is built on a world of `texel` world px
+ * whose grid cell is `cell` px (unknown: the texel alone decides): its probes, emission texels and
+ * intervals are as many per cell as on a map of `BOUNCE.cell` px cells, and never finer than the
+ * picture's texel allows. Bounce is soft light: at 16 px probes a 282 px cell held 300 probes of
+ * it, and a drag waited a third of a second for each build. 1 on ordinary maps, which keep it as it was.
+ */
+export function bounceScale(texel: number, cell?: number): number {
+  const byCell = cell && Number.isFinite(cell) && cell > 0 ? cell / BOUNCE.cell : 0;
+  return Math.max(1, texel / BASE_TEXEL, byCell);
+}
+
+/** Where cascade `i`'s intervals start at `scale` (`bounceScale`); each is four times longer than the last. */
+export function intervalStart(i: number, scale = 1): number {
+  return (BOUNCE.interval * scale * (4 ** i - 1)) / 3;
 }
 
 /**
- * How far from a change of the light map the bounce can change: a probe of the top cascade reads
- * the floor up to its interval's end, and each cascade below reads the probes of the one above
- * up to √2 of their spacing away (`cascadeFragment`), plus the emission's bilinear read.
+ * How far from a change of the light map the bounce at `scale` can change: a probe of the top
+ * cascade reads the floor up to its interval's end, and each cascade below reads the probes of the
+ * one above up to √2 of their spacing away (`cascadeFragment`), plus the emission's bilinear read.
  */
-export const BOUNCE_REACH = intervalStart(BOUNCE.cascades)
-  + Array.from({ length: BOUNCE.cascades - 1 }, (_, i) => Math.SQRT2 * BOUNCE.probe * 2 ** (i + 1)).reduce((sum, d) => sum + d, 0)
-  + 2 * BOUNCE.emitTexel;
+export function bounceReach(scale = 1): number {
+  return scale * (intervalStart(BOUNCE.cascades)
+    + Array.from({ length: BOUNCE.cascades - 1 }, (_, i) => Math.SQRT2 * BOUNCE.probe * 2 ** (i + 1)).reduce((sum, d) => sum + d, 0)
+    + 2 * BOUNCE.emitTexel);
+}
 
 /**
  * The world rect of the light map that differs between two steady drawings (each changed light's

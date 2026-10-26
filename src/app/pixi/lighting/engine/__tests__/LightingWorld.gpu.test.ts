@@ -156,6 +156,24 @@ describe('LightingWorld.animate', () => {
     expect(balanced.fits(LIGHTING_QUALITY.high)).toBe(false);
     expect(balanced.fits(LIGHTING_QUALITY.saver)).toBe(false);
   });
+
+  it('builds the bounce as coarse per cell as on a map of 70 px cells, and anew when the cell changes it', async () => {
+    const renderer = await createTestRenderer(64);
+    cleanup.push(() => renderer.destroy());
+    const world = (cell?: number): LightingWorld => {
+      const made = new LightingWorld(renderer, { width: 512, height: 512 }, LIGHTING_QUALITY.high, false, cell);
+      cleanup.push(() => made.destroy());
+      return made;
+    };
+    expect(world().cascades!.scale).toBe(1);
+    expect(world(50).cascades!.scale).toBe(1);
+    expect(world(140).cascades!.scale).toBe(2);
+    const ordinary = world(70);
+    expect(ordinary.cascades!.scale).toBe(1);
+    // A cell of 90 px keeps the texel (2 px) and coarsens the bounce.
+    expect(ordinary.fits(LIGHTING_QUALITY.high, 90)).toBe(false);
+    expect(ordinary.fits(LIGHTING_QUALITY.high, 60)).toBe(true);
+  });
 });
 
 describe('a paced LightingWorld', () => {

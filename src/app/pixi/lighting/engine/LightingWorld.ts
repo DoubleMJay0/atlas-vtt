@@ -13,7 +13,7 @@ import type { Box } from '../../../vision/polygonBounds';
 import type { CapsuleField } from './CapsuleField';
 import { glOf } from './gpu';
 import { GpuPacer } from './GpuPacer';
-import { changedArea, type SteadyDrawing } from './bounceArea';
+import { bounceScale, changedArea, type SteadyDrawing } from './bounceArea';
 import { DarknessMap, type DrawnDarkness, type LitShape, type PierceShape } from './DarknessMap';
 import { areaRadius } from '../../../lighting/lightArea';
 import { filledPieces } from '../../../lighting/polygonFill';
@@ -81,7 +81,7 @@ export class LightingWorld {
     this.flickerMs = quality.flickerMs;
     this.fields = new WallFields(renderer, bounds, this.texel);
     this.lightMap = new LightMap(renderer, bounds, this.texel);
-    this.cascades = bouncesOn(quality, bounds) ? new RadianceCascades(renderer, bounds, this.fields.tiles) : null;
+    this.cascades = bouncesOn(quality, bounds) ? new RadianceCascades(renderer, bounds, this.fields.tiles, bounceScale(this.texel, cell)) : null;
     this.tiles = new TileCache(renderer, this.fields.tiles, bounds, { rays: quality.tileRays });
     this.reflections = new ReflectionTiles(renderer, bounds, this.texel);
     const gl = paced ? glOf(renderer) : null;
@@ -96,9 +96,11 @@ export class LightingWorld {
     if (ms === null && flickered) this.drawSteady();
   }
 
-  /** Whether this world was made as `quality` makes one for its map and cell (texel, bounce, tile rays): else it is built anew. */
+  /** Whether this world was made as `quality` makes one for its map and cell (texel, bounce and its scale, tile rays): else it is built anew. */
   fits(quality: LightingQuality, cell: number | undefined = this.cell): boolean {
-    return this.texel === pictureTexel(this.bounds, quality, cell) && !!this.cascades === bouncesOn(quality, this.bounds) && this.tileRays === quality.tileRays;
+    const texel = pictureTexel(this.bounds, quality, cell);
+    const bounce = bouncesOn(quality, this.bounds);
+    return this.texel === texel && !!this.cascades === bounce && (!this.cascades || this.cascades.scale === bounceScale(texel, cell)) && this.tileRays === quality.tileRays;
   }
 
   /** Every wall that blocks light, one-way walls too, which bounce treats as blocking both ways. */
@@ -169,13 +171,15 @@ export class LightingWorld {
     if (cascades && !waits) {
       const field = this.fieldAll();
       // A moving light's build goes a band a frame: a whole pass on a large map was a dropped frame.
-      const texels = buildBounce ? Infinity : this.lights.some((light) => light.moving) ? BOUNCE.movingTexels : Infinity;
+      // The band paces it, so the next build starts as the last ends, without the throttle.
+      const moving = !buildBounce && this.lights.some((light) => light.moving);
+      const texels = moving ? BOUNCE.movingTexels : Infinity;
       if (cascades.building) {
         cascades.step(field, texels);
         this.pacer.submitted();
         drew = true;
       }
-      if (!cascades.building && this.bounceDirty && !this.tiles.busy() && now - this.lastBounce >= BOUNCE.throttleMs) {
+      if (!cascades.building && this.bounceDirty && !this.tiles.busy() && (moving || now - this.lastBounce >= BOUNCE.throttleMs)) {
         // Bounce uses steady intensity, so flicker never rebuilds it.
         const drawn = this.drawSteady();
         cascades.begin(this.lightMap, this.albedo, this.bounceAll ? null : changedArea(this.bounceDrawn, drawn));

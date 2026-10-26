@@ -151,13 +151,15 @@ export const REFLECTION = {
 export const BOUNCE = {
   probe: 16,
   interval: 16,
+  /** Grid cell (world px) at which the bounce is built at `probe`: maps with larger cells build it as coarse per cell (`bounceScale`). */
+  cell: 70,
   cascades: 4,
   emitTexel: 4,
   spread: 250,
   floorGain: 0.001,
   wallGain: 0.6,
   gain: 1,
-  /** While lights move, bounce is rebuilt at most this often. */
+  /** While lights change, bounce is rebuilt at most this often; a moving light's banded builds follow each other (`LightingWorld.animate`). */
   throttleMs: 100,
   /** Texels of cascade a frame draws of the bounce while a light moves (`RadianceCascades.step`). */
   movingTexels: 1 << 18,

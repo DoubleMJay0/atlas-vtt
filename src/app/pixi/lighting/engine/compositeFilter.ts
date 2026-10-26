@@ -43,6 +43,8 @@ export const NO_BELOW: BelowPictures = { textures: [null, null], x: 0, y: 0, sub
 
 /** The bounce's weight in the composite; 0 in a world without bounce. */
 const BOUNCE_GAIN: number = BOUNCE.gain;
+/** Until a world with bounce names its own (`RadianceCascades.probe`). */
+const PROBE_SPACING: number = BOUNCE.probe;
 
 /** Final pass of the lighting layer: lights the scene beneath it and hides what no one sees. */
 export interface CompositeFilter {
@@ -134,7 +136,7 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     uGmVeil: { value: new Float32Array(DARKNESS.gmVeil), type: 'vec3<f32>' },
     uGreyLevel: { value: 0, type: 'f32' },
     uDarkLevels: { value: new Float32Array([DARK_SIGHT_LEVELS.dim, DARK_SIGHT_LEVELS.bright]), type: 'vec2<f32>' },
-    uFluSpacing: { value: BOUNCE.probe, type: 'f32' },
+    uFluSpacing: { value: PROBE_SPACING, type: 'f32' },
     uGrid: { value: 0, type: 'f32' },
     uGridColor: { value: gridColor, type: 'vec3<f32>' },
     uStackBox: { value: stackBox, type: 'vec4<f32>' },
@@ -184,6 +186,7 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
       u.uTexel = next.texel;
       // A world without bounce: the composite reads none (gain 0) and binds the placeholder.
       u.uBounceGain = next.cascades ? BOUNCE_GAIN : 0;
+      u.uFluSpacing = next.cascades?.probe ?? PROBE_SPACING;
       Object.assign(filter.resources, { uLightMap: next.lightMap.texture.source, uFluence: (next.cascades?.fluence ?? noDarkness).source, ...fieldResources(next) });
       group.update();
     },
