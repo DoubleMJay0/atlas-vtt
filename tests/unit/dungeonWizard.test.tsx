@@ -12,6 +12,8 @@ import { createDungeonScene } from '../../src/app/dungeons/scene/createDungeonSc
 import type { DungeonJob, DungeonRendered } from '../../src/app/dungeons/worker/dungeonJob';
 import { randomSeed } from '../../src/app/dungeons/rng';
 import { DungeonWizard } from '../../src/app/packages/components/dungeon-generator/DungeonWizard';
+import { SAMPLE_REQUEST } from '../../src/app/packages/components/dungeon-generator/sampleStyleCards';
+import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
 import { useDungeonState } from '../../src/app/packages/components/dungeon-generator/useDungeonState';
 import { AssetService } from '../../src/app/services/AssetService';
 import { SettingsService } from '../../src/app/services/SettingsService';
@@ -19,7 +21,9 @@ import { stubLayout } from '../mocks/jsdomLayout';
 import { t } from '../../src/app/i18n';
 
 const worker = vi.hoisted(() => ({ preview: vi.fn(), render: vi.fn(), thumbnail: vi.fn(), dropThumbnails: vi.fn() }));
-vi.mock('../../src/app/dungeons/worker/DungeonWorkerClient', () => ({ DungeonWorkerClient: { forApp: () => worker } }));
+/** A new client per test: the style cards are kept per client for as long as the app runs. */
+const clients = vi.hoisted(() => ({ current: {} as object }));
+vi.mock('../../src/app/dungeons/worker/DungeonWorkerClient', () => ({ DungeonWorkerClient: { forApp: () => clients.current } }));
 vi.mock('../../src/app/dungeons/rng', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/app/dungeons/rng')>();
   return { ...actual, randomSeed: vi.fn(actual.randomSeed) };
@@ -51,6 +55,7 @@ beforeEach(() => {
   settings = new SettingsService(app);
   worker.preview.mockImplementation(answer);
   worker.thumbnail.mockImplementation(answer);
+  clients.current = { ...worker };
   vi.spyOn(AssetService, 'getInstance').mockReturnValue(assets);
 });
 afterEach(() => {
@@ -513,42 +518,42 @@ describe('the style gallery', () => {
     expect(settings.getDungeonGenerator().style).toBe(DEFAULT_STYLE_ID);
   });
 
-  it('draws no thumbnail before the Style step was shown', async () => {
+  it('draws the style cards once the theme cards are in, before the Style step', async () => {
     renderPanel();
-    await waitFor(() => expect(worker.preview).toHaveBeenCalled());
-    await act(async () => { await Promise.resolve(); });
-    expect(thumbnailJobs('styles')).toHaveLength(0);
+    await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length));
+    const order = (group: string): number[] => worker.thumbnail.mock.calls
+      .map((call, index) => (call[1] === group ? worker.thumbnail.mock.invocationCallOrder[index]! : -1))
+      .filter((at) => at >= 0);
+    expect(Math.min(...order('styles'))).toBeGreaterThan(Math.max(...order('themes')));
   });
 
-  it('draws a thumbnail of the dungeon as shown in every style, the chosen one first', async () => {
+  it('draws every style on one sample dungeon, made once, the chosen one first', async () => {
     settings.setDungeonGenerator({ style: 'volcanic' });
     renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length));
-    const jobs = thumbnailJobs('styles');
-    expect(jobs[0]!.style).toBe(dungeonStyle('volcanic'));
-    expect(new Set(jobs.map((job) => job.style)).size).toBe(DUNGEON_STYLES.length);
-    expect(jobs.every((job) => job.output.kind === 'thumbnail' && job.model !== undefined)).toBe(true);
+    const [first, ...rest] = thumbnailJobs('styles');
+    expect(first!.style).toBe(dungeonStyle('volcanic'));
+    expect(first!.model).toBeUndefined();
+    expect(new Set(thumbnailJobs('styles').map((job) => job.style)).size).toBe(DUNGEON_STYLES.length);
+    expect(thumbnailJobs('styles').every((job) => job.request === SAMPLE_REQUEST && job.view === DEFAULT_VIEW)).toBe(true);
+    expect(new Set(rest.map((job) => job.model)).size).toBe(1);
+    expect(rest[0]!.model).toBeDefined();
   });
 
-  it('keeps the thumbnails drawn when the GM leaves the step and comes back', async () => {
-    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
-    await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length));
-    goTo('Name');
-    goTo('Style');
-    await act(async () => { await Promise.resolve(); });
-    expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length);
-  });
-
-  it('asks for no thumbnail again for a dungeon and view it has drawn, and drops those of the last view', async () => {
+  it('never draws them again for what the GM chooses, nor in the next wizard', async () => {
     renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length));
     fireEvent.click(screen.getByText('Map options'));
     fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
-    expect(worker.dropThumbnails).toHaveBeenCalledWith('styles');
-    await waitFor(() => expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length * 2));
-    fireEvent.click(screen.getByRole('switch', { name: 'Monochrome' }));
+    goTo('Features');
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Size' })).getByRole('radio', { name: 'Large' }));
+    await waitFor(() => expect(lastJob().request.tags).toEqual(['large']));
+    goTo('Style');
+    cleanup();
+    renderPanel(vi.fn(), 'Sunken Vault', 'Style');
     await act(async () => { await Promise.resolve(); });
-    expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length * 2);
+    expect(thumbnailJobs('styles')).toHaveLength(DUNGEON_STYLES.length);
+    expect(worker.dropThumbnails).not.toHaveBeenCalledWith('styles');
   });
 });
 
