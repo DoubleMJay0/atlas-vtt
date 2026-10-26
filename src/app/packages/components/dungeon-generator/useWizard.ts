@@ -9,14 +9,12 @@ import { useThumbnailSize } from './StyleGallery';
 import { useDungeonState, type DungeonState } from './useDungeonState';
 import { useGeneratorActions, type CreatedDungeonScene, type GeneratorActions } from './useGeneratorActions';
 import { useMapPreview, type MapPreview } from './useMapPreview';
-import { useStyleThumbnails, type ThumbnailSize } from './useStyleThumbnails';
+import { useStyleThumbnails } from './useStyleThumbnails';
 import { useThemePreviews } from './useThemePreviews';
 import { WIZARD_STEPS } from './wizardSteps';
 
 /** From this step on, the style cards are drawn ahead, so the Style step opens on them. */
-const STYLE_HEAD_START = WIZARD_STEPS.indexOf('features');
-/** The size the style cards had when last measured, in any wizard: theirs before they are shown. */
-let lastStyleCardSize: ThumbnailSize | null = null;
+const STYLE_HEAD_START = WIZARD_STEPS.indexOf('layout');
 
 export interface WizardOptions {
   app: App;
@@ -73,15 +71,14 @@ export function useWizard({ app, collectionId, initialName, onCreated, onBusyCha
     floor: state.floor,
     size: usePreviewSize(frame),
   }, state.setGenerated);
-  // Drawn from the step before Style on, and kept up to date from then on, so going back to it finds them.
-  const styleCardSize = useThumbnailSize(art);
-  useEffect(() => {
-    if (styleCardSize) lastStyleCardSize = styleCardSize;
-  }, [styleCardSize]);
-  const thumbnailSize = styleCardSize ?? (step >= STYLE_HEAD_START ? lastStyleCardSize : null);
-  const thumbnails = useStyleThumbnails(client, { request: state.request, model: state.model, view: settings.view, size: thumbnailSize, first: settings.style });
   // Drawn only while the Theme step is shown: every change of the dungeon asks for three of them.
   const themeSize = useThumbnailSize(themeArt);
+  // Drawn from the Layout step on, and kept up to date from then on, so the Style step and going back
+  // to it find them. Theme and style cards share one grid, so the theme card measured on the first
+  // step gives the style cards' size before they are shown.
+  const styleCardSize = useThumbnailSize(art);
+  const thumbnailSize = styleCardSize ?? (step >= STYLE_HEAD_START ? themeSize : null);
+  const thumbnails = useStyleThumbnails(client, { request: state.request, model: state.model, view: settings.view, size: thumbnailSize, first: settings.style });
   const themePreviews = useThemePreviews(client, { request: state.request, style: settings.style, view: settings.view, size: step === 0 ? themeSize : null });
   const actions = useGeneratorActions({ app, client, state, collectionId, onCreated, onBusyChange });
 
