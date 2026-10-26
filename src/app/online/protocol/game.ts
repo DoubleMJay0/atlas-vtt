@@ -13,6 +13,7 @@ import type { LogMessage, PlayerLogMessage } from './log.ts';
 import { isPlayerLogType, parseLogMessage, parsePlayerLog } from './logParse.ts';
 import { parsePlayerRoll, parseRoll, parseRollDice, parseRollRefused, type PlayerRoll, type RollMessage, type RollRefused, type SharedRollDice } from './dice.ts';
 import { parseAnnotations, parseDoors, parseGrid, parsePinFound, parsePins, parseSensed, type PlayerPinFound, type SensedMark, type SharedAnnotations, type SharedDoor, type SharedGrid, type SharedPin } from './mapLayers.ts';
+import { parseMapPlacement, type SharedMapPlacement } from './mapPlacement.ts';
 import { parseMarks, parsePlayerMark, type MarksMessage, type PlayerCursor, type PlayerLaser, type PlayerMeasure } from './marks.ts';
 import { isRecord } from './shape.ts';
 import { MAX_SCENE_ID, parseDragCancel, parseMoveRefused, parsePlayerMove, parseSnapGrid, type MoveRefused, type PlayerDrag, type PlayerDragCancel, type PlayerMove, type SnapGrid } from './moves.ts';
@@ -20,11 +21,11 @@ import { parseRules, type RulesMessage } from './rules.ts';
 import { MAX_TOKEN_SIZE, MAX_TOKENS, parseTokens, TOKEN_ID_PATTERN, type SharedToken } from './tokens.ts';
 import { parseWidgetBar, type SharedWidgetBar } from './widgets.ts';
 
-/** What the players see of the shared scene; null while nothing is shared. */
-export interface SharedScene {
+/** What the players see of the shared scene; null while nothing is shared. A scene with a map may say where it lies (`SharedMapPlacement`). */
+export interface SharedScene extends SharedMapPlacement {
   /** Random per shared scene, so a client can tell a new scene from a resend. */
   readonly id: string;
-  /** The map image, drawn at its natural size at (0, 0); null for a scene without one. */
+  /** The map image, drawn at its natural size at (0, 0) unless `stretch` or `fit` say otherwise; null for a scene without one. */
   readonly map: AssetRef | null;
   /**
    * The scene is lit: players see only what the lighting shows them, worked out from the `lighting`
@@ -146,7 +147,7 @@ function parseScene(value: unknown): SharedScene | null | undefined {
   if (!isRecord(value) || !isSceneId(value.id) || typeof value.lit !== 'boolean') return undefined;
   if (value.map === null) return { id: value.id, map: null, lit: value.lit, ...sceneExtras(value) };
   const map = parseAsset(value.map);
-  return map === null ? undefined : { id: value.id, map, lit: value.lit, ...sceneExtras(value), ...sceneVideo(value) };
+  return map === null ? undefined : { id: value.id, map, lit: value.lit, ...sceneExtras(value), ...parseMapPlacement(value), ...sceneVideo(value) };
 }
 
 /** A message about the scene's fog or lighting, or null for anything malformed. */
