@@ -304,6 +304,24 @@ export function rotate(v: Vec, angle: number): Vec {
   return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
 }
 
+/** The closed curve `traceSmoothClosed` draws through `points`, as points `steps` to a corner. */
+export function smoothClosedPoints(points: readonly Vec[], steps: number): Vec[] {
+  const n = points.length;
+  const mid = (a: Vec, b: Vec): Vec => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const out: Vec[] = [];
+  for (let i = 0; i < n; i++) {
+    const from = mid(points[(i + n - 1) % n]!, points[i]!);
+    const control = points[i]!;
+    const to = mid(control, points[(i + 1) % n]!);
+    for (let k = 0; k < steps; k++) {
+      const t = k / steps;
+      const u = 1 - t;
+      out.push({ x: u * u * from.x + 2 * u * t * control.x + t * t * to.x, y: u * u * from.y + 2 * u * t * control.y + t * t * to.y });
+    }
+  }
+  return out;
+}
+
 /** A closed curve through the midpoints of a polygon's edges, its corners as control points. */
 export function traceSmoothClosed(path: CanvasPath, points: readonly Vec[]): void {
   const n = points.length;

@@ -1,5 +1,6 @@
-import type { CellDir, DungeonTerrain } from '../../model';
+import type { CellDir, DungeonFloor, DungeonTerrain } from '../../model';
 import type { Hand } from '../art/hand';
+import { isSubmergedRimstone } from '../art/pools';
 import { smallFloorHand, smallShallowPools } from '../stone/smallFloorFields';
 import { valueNoise } from '../art/noise';
 import { polyPath, polysPath } from '../art/paths';
@@ -40,9 +41,8 @@ export function drawBoulderChoke(hand: Hand, piece: DungeonTerrain): void {
 }
 
 /** Face the nearest water, or the piece's given descent; everything stays in map coordinates. */
-function downhill(hand: Hand, piece: DungeonTerrain): CellDir {
+function downhill(floor: DungeonFloor, piece: DungeonTerrain): CellDir {
   if (piece.facing) return piece.facing;
-  const floor = hand.scene.env.dungeon.floor;
   const water = [...floor.waterCells, ...floor.terrain.filter(p => p.kind === 'pool' || p.kind === 'shallow-water' || p.traits.hazard === 'deep-water').flatMap(p => p.cells)];
   const centre = piece.cells.reduce((a, c) => ({ x: a.x + (c.x + 0.5) / piece.cells.length, y: a.y + (c.y + 0.5) / piece.cells.length }), { x: 0, y: 0 });
   const near = water.reduce<Vec | undefined>((best, c) => !best || Math.hypot(c.x + 0.5 - centre.x, c.y + 0.5 - centre.y) < Math.hypot(best.x + 0.5 - centre.x, best.y + 0.5 - centre.y) ? c : best, undefined);
@@ -52,9 +52,9 @@ function downhill(hand: Hand, piece: DungeonTerrain): CellDir {
   return Math.abs(x) > Math.abs(y) ? { x: x > 0 ? 1 : -1, y: 0 } : { x: 0, y: y >= 0 ? 1 : -1 };
 }
 
-/** Shallow gours behind scalloped calcite lips, in terraces spanning contiguous cells. */
-export function drawRimstone(hand: Hand, piece: DungeonTerrain): void {
-  const down = downhill(hand, piece);
+/** A rimstone's dams as drawn: each dam's outline (`rims`), the gour inside it (`pools`) and its lip (`lips`). */
+export function rimstoneShelves(floor: DungeonFloor, piece: DungeonTerrain): { rims: Vec[][]; pools: Vec[][]; lips: Vec[][] } {
+  const down = downhill(floor, piece);
   const across = { x: down.y, y: -down.x };
   const local = (p: Vec): Vec => ({ x: p.x * across.x + p.y * across.y, y: p.x * down.x + p.y * down.y });
   const world = (u: number, v: number): Vec => ({ x: u * across.x + v * down.x, y: u * across.y + v * down.y });
@@ -97,7 +97,14 @@ export function drawRimstone(hand: Hand, piece: DungeonTerrain): void {
       start = end + 1;
     }
   }
-  if (submerged(hand, piece)) {
+  return { rims, pools, lips };
+}
+
+/** Shallow gours behind scalloped calcite lips, in terraces spanning contiguous cells. */
+export function drawRimstone(hand: Hand, piece: DungeonTerrain): void {
+  const { floor } = hand.scene.env.dungeon;
+  const { rims, pools, lips } = rimstoneShelves(floor, piece);
+  if (hand.scene.env.view.water && isSubmergedRimstone(floor, piece)) {
     // Under a lake's shallows only the dams' lips show, stepping down through the water: no shelf or pool of its own.
     hand.line(lips, 'fine');
     return;
@@ -105,13 +112,4 @@ export function drawRimstone(hand: Hand, piece: DungeonTerrain): void {
   hand.surface(polysPath(rims), 'stone');
   smallShallowPools(hand, pools, 0.12);
   for (const rim of rims) hand.edges(rim, true);
-}
-
-/** Whether the floor's water lies over all of a piece, as it may over a cave's rimstone at a lake's edge. */
-function submerged(hand: Hand, piece: DungeonTerrain): boolean {
-  const { dungeon, view } = hand.scene.env;
-  if (!view.water) return false;
-  const { floor } = dungeon;
-  const wet = new Set(floor.waterCells.map(c => `${c.x},${c.y}`));
-  return piece.cells.every(c => wet.has(`${c.x},${c.y}`));
 }

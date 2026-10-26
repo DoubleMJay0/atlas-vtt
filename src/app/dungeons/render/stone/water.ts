@@ -5,7 +5,7 @@ import { layerOf, type ArtScene } from '../art/artScene';
 import { noiseSampler } from '../art/noise';
 import { clipFloors } from '../art/outline';
 import { grown, smoothstep, type Field, type PathFn } from '../art/paths';
-import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolsPath } from '../art/pools';
+import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolShores, poolsPath } from '../art/pools';
 import { drawGridCanvas, fieldOf, gridOver, rgbaCanvas } from '../art/raster';
 import { paintLayer } from '../art/strips';
 import type { StoneColours } from './colours';
@@ -16,9 +16,10 @@ import type { StoneColours } from './colours';
  * on the floor round it and a lit lip at its edge.
  */
 export function drawPools(scene: ArtScene, c: StoneColours): void {
-  const outlines = poolOutlines(scene);
-  if (!outlines.length) return;
-  const trace = poolsPath(outlines);
+  const corners = poolOutlines(scene);
+  if (!corners.length) return;
+  const trace = poolsPath(corners);
+  const outlines = poolShores(corners);
   const { ctx } = scene.env;
   ctx.save();
   clipOutBuiltWater(scene, ctx);

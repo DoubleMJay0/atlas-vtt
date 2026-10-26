@@ -2,12 +2,19 @@ import type { CellPoint, DungeonFloor, DungeonTerrain } from '../../model';
 import { chaikin, resample } from '../../water/smooth';
 import { cellRings } from '../terrain/cellRings';
 import type { Vec } from '../geometry';
-import { traceSmoothClosed } from '../geometry';
+import { smoothClosedPoints, traceSmoothClosed } from '../geometry';
 import type { ArtScene } from './artScene';
 import { valueNoise } from './noise';
 import { smoothstep, type Field, type PathFn } from './paths';
 import { blurField, fieldOf, gridOver, insideDistance, pathMask, sampleField } from './raster';
 import { pointsBounds } from '../geometry';
+
+/** Whether the floor's water lies over all of a piece of rimstone, as it may at a lake's edge: the map then draws only its dams' lips, through the water. */
+export function isSubmergedRimstone(floor: DungeonFloor, piece: DungeonTerrain): boolean {
+  if (piece.kind !== 'rimstone') return false;
+  const wet = new Set(floor.waterCells.map(c => `${c.x},${c.y}`));
+  return piece.cells.every(c => wet.has(`${c.x},${c.y}`));
+}
 
 /** The pools of the floor as drawn: their smoothed outlines, or none where the view hides water. */
 export function poolOutlines(scene: ArtScene): Vec[][] {
@@ -17,6 +24,14 @@ export function poolOutlines(scene: ArtScene): Vec[][] {
 
 export function poolsPath(outlines: readonly Vec[][]): PathFn {
   return path => outlines.forEach(outline => traceSmoothClosed(path, outline));
+}
+
+/**
+ * The shores `poolsPath` draws, as points: what is drawn along a shore (a lit lip, contours) follows
+ * these, never the corners the curve is traced through, or it runs off the shore as straight chords.
+ */
+export function poolShores(outlines: readonly Vec[][]): Vec[][] {
+  return outlines.map(outline => smoothClosedPoints(outline, 8));
 }
 
 /** Distance into the shapes `trace` adds, from their shore, in cells; 0 outside. Worked out on a grid of their own. */

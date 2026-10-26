@@ -31,7 +31,7 @@ export async function waterScene(look: DungeonStyleId, monochrome: boolean, chan
   const water = Object.fromEntries(Object.entries(scene.liquids ?? {}).filter(([, s]) => s.liquid === 'water'));
   const largest = Object.values(water).filter(s => !channel || s.flow).sort((a, b) => area(b.polygon) - area(a.polygon))[0];
   if (!largest) throw new Error(`Seed ${model.seed} has no water`);
-  const centre = deepPoint(largest.polygon, WATER_CELL, 0.65);
+  const centre = deepPoint(largest.polygon, WATER_CELL);
   // Render a real window of the map at scene resolution, keeping the generator's world origin.
   const zoom = WATER_PLAY_CELL / WATER_CELL;
   const canvas = new OffscreenCanvas(WATER_SIZE.width / zoom, WATER_SIZE.height / zoom);

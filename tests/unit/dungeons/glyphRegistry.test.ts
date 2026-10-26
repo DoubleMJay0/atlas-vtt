@@ -25,9 +25,9 @@ const FAMILY_GLYPHS = import.meta.glob<{ GLYPHS: FamilyGlyphs }>('../../../src/a
  * depth each painter's ink reaches (only its clip rectangle changed).
  */
 const RECORDED: Record<string, string> = {
-  night: '4b4932d75550b6569af78f38f3a0920f467f8cb85d2380a0d93e5689eb7d3ff0',
-  parchment: '215257130c10770bbbcc3b0e2b1cea4c66c5169d0b2c5b9669df7309cd796df6',
-  print: 'b9c36f8a56c28f4a34c73f01af41fc6bad5856aba3a3b70b364023774b035a6f',
+  night: '3fe1b6f30190c36c1ba672c15a29a677d930fa5423085f52b977758c10f8a994',
+  parchment: 'ae0345db06639b791da99fd0be44c7c5e1eaab4e6876f055be3f75dd0f2f419a',
+  print: '1ae04adc60dc3c1522d49516f59f6bdf76dfb963cb3abf86cf0dc97e3368a09b',
 };
 
 const LOOKS: readonly DungeonStyleId[] = ['parchment', 'print', 'night'];

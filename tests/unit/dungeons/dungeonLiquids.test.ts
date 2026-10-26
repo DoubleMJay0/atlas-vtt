@@ -7,6 +7,8 @@ import { mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { dungeonScene } from '../../../src/app/dungeons/scene/toScene';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
 import { dungeonStyle, type DungeonStyleId } from '../../../src/app/dungeons/styleCatalog';
+import { MAX_AREA_CORNERS } from '../../../src/app/lighting/lightArea';
+import { MAX_LIQUID_CORNERS } from '../../../src/app/liquids/liquids';
 import type { LiquidSurface } from '../../../src/app/types/liquidTypes';
 import { drainCells } from '../../../src/app/dungeons/water';
 
@@ -73,7 +75,7 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
     for (const liquid of liquids) {
       expect(areas.some(area => inside(area, liquid.polygon[0]!.x, liquid.polygon[0]!.y))).toBe(false);
       expect(liquid.polygon.length).toBeGreaterThanOrEqual(3);
-      expect(liquid.polygon.length).toBeLessThanOrEqual(256);
+      expect(liquid.polygon.length).toBeLessThanOrEqual(MAX_LIQUID_CORNERS);
     }
   });
 
@@ -90,14 +92,15 @@ describe('a dungeon\'s water, lava and acid in its scene', () => {
     }
   });
 
-  it('makes one surface of a lake with an island, never a surface per row, and keeps every outline within an area light\'s corners', () => {
+  it('makes one surface of a lake with an island, never a surface per row, each within a surface\'s corners and its light within an area light\'s', () => {
     for (let seed = 1; seed < 80; seed++) {
       const parts = partsOf(generateDungeon({ seed, tags: ['flooded', 'large'], floors: 1 }), 'parchment');
       for (const liquid of Object.values(parts.scene.liquids ?? {})) {
-        expect(liquid.polygon.length).toBeLessThanOrEqual(256);
-        for (const hole of liquid.holes ?? []) expect(hole.length).toBeLessThanOrEqual(256);
+        // A surface keeps its drawn shore up to the surface limit: fitted to an area light's 256 it ran off the shore in chords.
+        const corners = liquid.polygon.length + (liquid.holes ?? []).reduce((sum, hole) => sum + hole.length, 0);
+        expect(corners).toBeLessThanOrEqual(MAX_LIQUID_CORNERS);
       }
-      for (const light of Object.values(parts.scene.lights)) expect(light.area!.length).toBeLessThanOrEqual(256);
+      for (const light of Object.values(parts.scene.lights)) expect(light.area!.length).toBeLessThanOrEqual(MAX_AREA_CORNERS);
     }
   }, 60_000);
 

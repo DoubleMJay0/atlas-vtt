@@ -1,15 +1,17 @@
 import { MAX_AREA_CORNERS } from '../../lighting/lightArea';
 import type { LightEmission, LightSource } from '../../types/lightingTypes';
+import { MAX_LIQUID_CORNERS } from '../../liquids/liquids';
 import type { LiquidKind, LiquidSurface } from '../../types/liquidTypes';
-import type { CellPoint, DungeonColumn, DungeonTerrain } from '../model';
+import type { CellPoint, DungeonColumn, DungeonFloor, DungeonTerrain } from '../model';
 import { intersectRings, subtractRings, unionRings } from '../render/clipShapes';
-import { shapeRings, type Vec } from '../render/geometry';
+import { shapeRings, smoothClosedPoints, type Vec } from '../render/geometry';
 import { simplifyRing } from '../render/simplifyRing';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { cellsToUnits, type SceneUnit } from './gameUnits';
 import { liquidColours } from './liquidColours';
-import { isBuiltWater, isNaturalDeepWater, naturalDeepRings } from '../render/art/pools';
+import { isBuiltWater, isNaturalDeepWater, isSubmergedRimstone, naturalDeepRings } from '../render/art/pools';
+import { rimstoneShelves } from '../render/terrain/caveStones';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
@@ -19,8 +21,6 @@ import type { DungeonPlacement } from './toWalls';
  * that glows from the whole of that surface (`LightSource.area`), so a room with lava is lit by it.
  */
 
-/** The most corners an outline gets: as many as an area light reads; a larger one is simplified (`fitCorners`). */
-const MAX_CORNERS = MAX_AREA_CORNERS;
 /** How far a simplified outline may stray from the drawn one at first, in cells; doubled until it fits. */
 const FIRST_TOLERANCE = 0.01;
 
@@ -32,24 +32,6 @@ interface Liquid {
   holes?: Vec[][];
   flow?: Vec;
   lavaLight?: string;
-}
-
-/** The closed curve `traceSmoothClosed` draws through a pool's corners, as points `steps` to a corner. */
-function smoothRing(points: readonly Vec[], steps: number): Vec[] {
-  const n = points.length;
-  const mid = (a: Vec, b: Vec): Vec => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-  const out: Vec[] = [];
-  for (let i = 0; i < n; i++) {
-    const from = mid(points[(i + n - 1) % n]!, points[i]!);
-    const control = points[i]!;
-    const to = mid(control, points[(i + 1) % n]!);
-    for (let k = 0; k < steps; k++) {
-      const t = k / steps;
-      const u = 1 - t;
-      out.push({ x: u * u * from.x + 2 * u * t * control.x + t * t * to.x, y: u * u * from.y + 2 * u * t * control.y + t * t * to.y });
-    }
-  }
-  return out;
 }
 
 /** What each hazard on the floor holds, if it is a liquid. */
@@ -77,10 +59,15 @@ function cellRings(cells: readonly CellPoint[]): Vec[][] {
   return unionRings(cells.map(({ x, y }) => [{ x, y }, { x: x + 1, y }, { x: x + 1, y: y + 1 }, { x, y: y + 1 }]));
 }
 
-/** A ring within `MAX_CORNERS`: as drawn where it fits, else simplified as little as it takes. */
-function fitCorners(ring: Vec[]): Vec[] {
-  let fitted = ring;
-  for (let tolerance = FIRST_TOLERANCE; fitted.length > MAX_CORNERS; tolerance *= 2) fitted = simplifyRing(ring, tolerance);
+/**
+ * Rings within `limit` corners together: as drawn where they fit, else all simplified alike, as
+ * little as it takes. A surface may hold `MAX_LIQUID_CORNERS`, an area light `MAX_AREA_CORNERS`:
+ * fitting a pool's shore to the light's limit drew it as chords far off the painted shore.
+ */
+function fitCorners(rings: Vec[][], limit: number): Vec[][] {
+  const corners = (fitted: Vec[][]): number => fitted.reduce((sum, ring) => sum + ring.length, 0);
+  let fitted = rings;
+  for (let tolerance = FIRST_TOLERANCE; corners(fitted) > limit; tolerance *= 2) fitted = rings.map(ring => simplifyRing(ring, tolerance));
   return fitted;
 }
 
@@ -111,7 +98,7 @@ function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
   const built = cellRings(floor.terrain.filter(piece => isBuiltWater(floor, piece)).flatMap(piece => piece.cells));
   const streams = floor.terrain.filter(piece => isNaturalDeepWater(floor, piece) && piece.kind === 'channel' && piece.facing);
   // All shores at once, as the map fills them: an island's shore is a hole in its lake, never water of its own.
-  const onFloor = intersectRings(floor.water.map(pool => smoothRing(pool.outline, 4)), floorRings);
+  const onFloor = intersectRings(floor.water.map(pool => smoothClosedPoints(pool.outline, 4)), floorRings);
   return withHoles(built.length ? subtractRings(onFloor, built) : onFloor).map(({ ring, holes }): Liquid => {
     const flow = streamThrough(ring, streams);
     return { liquid: 'water', ring, ...(holes.length && { holes }), ...(flow && { flow }) };
@@ -137,26 +124,37 @@ function floorRingsOf(dungeon: VisibleDungeon): Vec[][] {
 /** Terrain that is part of the water itself, not drawn over it. */
 const UNDER_WATER: ReadonlySet<string> = new Set(['shallow-water']);
 
+/** The outline a piece of terrain is drawn with over the water: rimstone as its dams, none where it lies submerged. */
+function terrainOver(floor: DungeonFloor, view: DungeonView, piece: DungeonTerrain): Vec[][] {
+  if (piece.kind !== 'rimstone') return cellRings(piece.cells);
+  if (view.water && isSubmergedRimstone(floor, piece)) return [];
+  return unionRings(rimstoneShelves(floor, piece).rims);
+}
+
 /**
  * What the map draws over its water: stairwells, every piece of terrain that is no liquid (bridges
- * among them), props and columns. Cut out of the surfaces, so the motion never runs over them.
+ * among them; rimstone as its dams, none where the water lies over it and the map draws only their
+ * lips), props and columns. Cut out of the surfaces, so the motion never runs over them.
  */
 function drawnOver(dungeon: VisibleDungeon, view: DungeonView): Vec[][] {
   const { floor, roomShapes } = dungeon;
   const stairs = floor.stairs.map(({ x, y, w, h }) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }]);
   const terrain = floor.terrain
     .filter(piece => roomShapes.has(piece.room) && !UNDER_WATER.has(piece.kind) && !(piece.traits.hazard && HAZARD_LIQUID[piece.traits.hazard]))
-    .flatMap(piece => cellRings(piece.cells));
+    .flatMap(piece => terrainOver(floor, view, piece));
   const props = view.props ? floor.props.filter(prop => roomShapes.has(prop.room)).map(propPolygon) : [];
   return [...stairs, ...terrain, ...props, ...floor.columns.map(columnRing)];
 }
 
-/** Each liquid with what the map draws over it cut out: islands as holes, a surface cut in two as two, every ring within `MAX_CORNERS`. */
+/** Each liquid with what the map draws over it cut out: islands as holes, a surface cut in two as two, each within `MAX_LIQUID_CORNERS`. */
 function cutOut(found: readonly Liquid[], over: readonly Vec[][]): Liquid[] {
   return found.flatMap(({ ring, holes = [], ...rest }) =>
     withHoles(over.length ? subtractRings([ring, ...holes], over) : [ring, ...holes])
       .filter(cut => cut.ring.length >= 3 && signedArea(cut.ring) > 0.05)
-      .map((cut): Liquid => ({ ...rest, ring: fitCorners(cut.ring), ...(cut.holes.length && { holes: cut.holes.map(fitCorners) }) })));
+      .map((cut): Liquid => {
+        const [ring, ...holes] = fitCorners([cut.ring, ...cut.holes], MAX_LIQUID_CORNERS);
+        return { ...rest, ring: ring!, ...(holes.length && { holes }) };
+      }));
 }
 
 /** Positive for an outline, negative for a hole, as clipping orients them. */
@@ -234,7 +232,7 @@ export function floorLiquids(
   whole.forEach(({ liquid, ring }, index) => {
     const glow = GLOWS[liquid];
     if (!glow) return;
-    const area = fitCorners(ring).map(world);
+    const area = fitCorners([ring], MAX_AREA_CORNERS)[0]!.map(world);
     const middle = centroid(area);
     const emission: LightEmission = { bright: units(glow.bright), dim: units(glow.dim), color: liquid === 'lava' && (style.direction === 'engraved' || view.monochrome) ? colours.lava.glint : glow.color, intensity: glow.intensity, animation: 'smoulder', kind: 'custom' };
     const lightId = `light_${id}_${index + 1}`;
