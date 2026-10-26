@@ -1,9 +1,9 @@
 {
-  "version": "0.10.1-beta.0",
+  "version": "0.10.2-beta.0",
   "releases": [
     {
-      "version": "0.10.1-beta.0",
-      "title": "Coming in 0.10.1",
+      "version": "0.10.2-beta.0",
+      "title": "Coming in 0.10.2",
       "markdown": "## Atlas Online\n- Players see animated maps move, and the water, lava and acid of generated dungeons\n- Maps that grid alignment stretched or turned line up with tokens and walls for players"
     },
     {
