@@ -30,3 +30,8 @@
 - Fixed issue where Atlas would crash with third party Atlas plugins installed
 - A token exactly at the edge of a light's reach, such as one standing next to a token carrying a 5 ft light, no longer counts as lit from one side and unlit from another. Inside magical darkness it no longer gets its sight back
 - One-way walls no longer show a thick black line where they stop a light
+
+
+Thanks to my Patreon supporters Aaron, Andrew, Bradley Bell, Carl Corneil, Daria Ambrose, Deus Ex Minima, Dewwww, Giodude, Ionazh, Kevin Hait, Michael Breuer, Pavel Zinoviev, s g, SamDark, Scaradeus, Silo Slate, Tim, Xethgnur and Zack Samuels. You mean everything to me :heart:
+
+Help me develop Atlas: https://www.patreon.com/cw/atlas_vtt
