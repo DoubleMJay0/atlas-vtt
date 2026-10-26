@@ -5,47 +5,70 @@ import type { Hand } from '../../art/hand';
 import { hash2 } from '../../art/noise';
 import { polyPath, polysPath } from '../../art/paths';
 import { doorFrame, wayFrame, type WayFrame } from './narrows';
-import { layGrit } from './screeGrit';
 import { screeShape } from './screeShape';
 import { dashes } from './shaftMouth';
-import { drawHachures, drawRunnels, layRubbleShadow, layScreeForm } from './slopeShading';
+import { drawFaceTicks, layDepth, layFaces } from './slopeShading';
 import { stoneOf } from './wayColours';
+import { withAlpha } from '../../palette';
 
 /**
- * A scree slope: a tongue of loose rock spilling from a broken lip, widening and fraying downslope
- * until its stones run out onto the floor (`screeShape`). Its light follows its form, hachures under
- * the crest say how steep it falls, and its stones are sorted, grit high, boulders clumped low.
- * Where it comes up to this floor (`lower`) its crest is overhead: dashed, with no lip.
+ * A scree slope as a way down: a ramp of loose stone cut into the rock between two faces that widen
+ * as the floor drops away beside it, darkening with depth until it runs in under a brow of rock into
+ * the dark (`screeShape`). From the floor below the same slope comes out of the dark under the
+ * ceiling, its edge there dashed as the aven's rim is, and spills down to the floor. Its stones lie
+ * in rows across the slope, small high up, cobbles and boulders low down.
  */
 function slope(hand: Hand, frame: WayFrame, end?: StairEnd): void {
+  // A cave's wall may wander into the stairwell's cells: the cutting is drawn on the floor only, never over the wall's ink.
+  const { ctx } = hand.scene.env;
+  ctx.save();
+  ctx.beginPath();
+  polysPath(hand.scene.floorRings)(ctx);
+  ctx.clip();
+  drawSlope(hand, frame, end);
+  ctx.restore();
+}
+
+function drawSlope(hand: Hand, frame: WayFrame, end?: StairEnd): void {
   const seed = Math.floor(hash2(frame.bounds.minX, frame.bounds.minY, hand.scene.env.dungeon.model.seed) * 0x7fffffff);
-  const shape = screeShape(frame, seed);
-  const path = polyPath(shape.outline);
+  const shape = screeShape(frame, seed, end);
   const stone = stoneOf(hand) !== null;
-  layScreeForm(hand, frame, shape, end);
-  // Grit stops short of the toe, where only the stones that rolled farthest lie.
-  layGrit(hand, frame, path, [0.08, 0.55], [0.45, 0.88]);
-  drawRunnels(hand, frame, shape, seed);
-  // Stone carries the slope's steepness in its light and runnels; ink, without tone, in its hachures.
-  if (!stone) drawHachures(hand, frame, shape, 4, seed);
-  const polys = shape.stones.map(s => s.poly);
-  layRubbleShadow(hand, polys, 0.025);
+  // The stones lie on the ramp first, so the slope's depth darkens them with it.
   if (hand.pile) hand.pile(shape.stones, () => 'fine');
   else {
+    const polys = shape.stones.map(s => s.poly);
     hand.fill(polysPath(polys), 'rock');
-    // The stones read by their outline and shadow; the boulder heading each clump is modelled by the light.
-    const boulder = shape.stones.reduce((a, b) => (b.r > a.r ? b : a));
-    hand.solid(polyPath(boulder.poly), boulder.c, boulder.r, frame.progress(boulder.c.x, boulder.c.y));
+    const boulders = shape.stones.slice().sort((a, b) => b.r - a.r).slice(0, 2);
+    for (const s of boulders) hand.solid(polyPath(s.poly), s.c, s.r, frame.progress(s.c.x, s.c.y));
     hand.line(polys, 'fine', true);
   }
-  // Stone's fill gives the heap its edge; ink, with no fill, draws its frayed flanks.
-  if (!stone) hand.line(shape.flanks, 'fine');
+  layFaces(hand, frame, shape, end);
+  layDepth(hand, frame, shape, end);
+  drawFaceTicks(hand, frame, shape, end, stone ? 0.55 : 1, seed);
+  hand.line(shape.rims, 'outline');
+  if (!shape.brow) return;
   if (end === 'lower') {
-    hand.line(dashes(shape.crest, 0.1, 0.06), 'outline');
+    // The ceiling's edge overhead, which the slope comes down from under: dashed as the aven's rim,
+    // each dash on a pale lip so it shows over the dark.
+    const marks = dashes(shape.brow, 0.12, 0.06);
+    const { ctx } = hand.scene.env;
+    const c = stoneOf(hand);
+    ctx.save();
+    ctx.beginPath();
+    for (const run of marks) {
+      ctx.moveTo(run[0]!.x, run[0]!.y);
+      for (const p of run.slice(1)) ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = c ? withAlpha(c.light, c.dark ? 0.5 : 0.7) : hand.paint('rock').fill;
+    ctx.lineWidth = hand.weight('outline') * 2.6;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.restore();
+    hand.line(marks, 'outline');
     return;
   }
-  hand.fill(polyPath(shape.lip), 'rock');
-  hand.edges(shape.lip, true);
+  // The brow the ramp runs in under: the floor's own edge, standing over the dark.
+  hand.line([shape.brow], 'outline');
 }
 
 export function drawScree(hand: Hand): void {

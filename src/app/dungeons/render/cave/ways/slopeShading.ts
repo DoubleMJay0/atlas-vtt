@@ -10,178 +10,169 @@ import type { ScreeShape } from './screeShape';
 import { stoneOf } from './wayColours';
 
 /**
- * A scree slope's light, following its form: loose rock heaped into a tongue is lit on the flank
- * that faces the light and shaded on the other, which casts a soft shadow on the floor beside it;
- * the whole slope is a little lighter where it faces the light. Its fill fades out at the toe, so
- * the stones run out onto the floor. Where it goes down from this floor (`upper`) its foot sinks
- * into the dark; where it comes up (`lower`) its crest is in the ceiling's shadow. Stone lays all of
- * this as gradients (raster pictures; an SVG keeps a plain tint and the slope's lines); Engraved has
- * no tone box at all, only its hachures, stones and a little hatching where the slope goes dark.
+ * A scree cutting's light. The face on the side towards the light looks away from it and lies in
+ * shade, casting its shadow onto the ramp below it; the far face is lit. Down the slope everything
+ * darkens with depth until the ramp runs into the dark under its brow (`upper`); from below, it
+ * comes out of the dark under the ceiling (`lower`), where the raised ramp's faces take the light the
+ * other way round and its shadow falls on the floor beside it. Stone lays it as fills and one
+ * gradient; Engraved as constant hatching where the slope goes dark, with its ticks for the faces.
  */
 
-/** Engraved's hatching inside the tongue (from, to, tone), only where the slope goes dark. */
-const ENGRAVED_DARK: Record<StairEnd | 'steps', readonly (readonly [number, number, number])[]> = {
-  upper: [],
-  lower: [[-0.2, 0.22, 0.36]],
-  steps: [],
-};
-
-/** The way across the slope that faces the light, as +1 or −1 of `u`. */
-function litSide(frame: WayFrame): number {
+/** The side of the ramp (−1, +1 of `u`) that lies towards the light. */
+export function lightSide(frame: WayFrame): number {
   const a = frame.at(0, 0);
   const b = frame.at(1, 0);
   return (b.x - a.x) * TO_LIGHT.x + (b.y - a.y) * TO_LIGHT.y > 0 ? 1 : -1;
 }
 
-function fill(hand: Hand, path: PathFn, style: string | CanvasGradient, clip: PathFn | null = null): void {
+function fill(hand: Hand, path: PathFn, style: string | CanvasGradient): void {
   const { ctx } = hand.scene.env;
-  ctx.save();
-  if (clip) {
-    ctx.beginPath();
-    clip(ctx);
-    ctx.clip();
-  }
   ctx.beginPath();
   path(ctx);
   ctx.fillStyle = style;
   ctx.fill();
-  ctx.restore();
 }
 
-export function layScreeForm(hand: Hand, frame: WayFrame, shape: ScreeShape, end?: StairEnd): void {
-  const path = polyPath(shape.outline);
+/** How dark the slope is with depth at `t` (0 its high end, 1 its low end), as black's alpha. */
+function depthAlpha(end: StairEnd | undefined, t: number): number {
+  if (end === 'upper') return t < 0.2 ? 0 : t < 0.6 ? 0.36 * ((t - 0.2) / 0.4) : t < 0.88 ? 0.36 + 0.46 * ((t - 0.6) / 0.28) : 0.82 + 0.16 * ((t - 0.88) / 0.12);
+  if (end === 'lower') return t > 0.6 ? 0 : 0.7 * (1 - t / 0.6) ** 1.4;
+  return 0.3 * Math.max(0, (t - 0.3) / 0.7);
+}
+
+/** The faces in rock, shaded and lit by their facing (Stone), before the slope's depth is laid. */
+export function layFaces(hand: Hand, frame: WayFrame, shape: ScreeShape, end?: StairEnd): void {
   const c = stoneOf(hand);
-  if (!c) {
-    if (!ENGRAVED_DARK[end ?? 'steps'].length) return;
-    const { ctx } = hand.scene.env;
-    ctx.save();
-    ctx.beginPath();
-    path(ctx);
-    ctx.clip();
-    for (const [t0, t1, level] of ENGRAVED_DARK[end ?? 'steps']) {
-      const band = slopeBand(frame, t0, t1);
-      hand.tone(() => level, pointsBounds(band), polyPath(band), 'shade');
-    }
-    ctx.restore();
-    return;
-  }
-  const rock = hand.paint('rock').fill;
+  if (!c) return;
+  // The lit face in the rock's own colour, the shaded one deeper: two fills, as the pile's stones are toned.
+  const towards = lightSide(frame) * (end === 'lower' ? -1 : 1);
+  const tone = (shaded: boolean): string => (shaded ? mixColours(c.rock, '#000000', c.dark ? 0.4 : 0.3) : mixColours(c.rock, c.light, c.dark ? 0.08 : 0.16));
+  for (const face of shape.faces) fill(hand, polyPath(face.poly), tone(face.side === towards));
+}
+
+/**
+ * Depth, in one fill over the whole cutting: the ramp and its faces darken down the slope into the
+ * mouth; the shaded face's shadow on the ramp (a cutting) or on the floor beside it (a raised ramp).
+ */
+export function layDepth(hand: Hand, frame: WayFrame, shape: ScreeShape, end?: StairEnd): void {
   const { ctx } = hand.scene.env;
-  if (!hand.scene.raster) {
-    fill(hand, path, withAlpha(rock, 0.35));
+  const c = stoneOf(hand);
+  const cut = polysPath([shape.ramp, ...shape.faces.map(f => f.poly)]);
+  if (!c) {
+    inkDepth(hand, frame, shape, end, cut);
     return;
   }
-  layHeapShadow(hand, shape);
-  // One gradient, round a point on the crest's lit side and stretched down the fall line: lighter
-  // there, where the heap faces the light, darker across to its shaded flank and on down the slope;
-  // sinking into the dark where the slope goes down, shaded under the ceiling where it comes up,
-  // fading out over the toe elsewhere, so it ends on the floor without an edge. One fill over the
-  // heap's whole area: the ways' cost is the area they fill, not the shapes they draw.
-  const side = litSide(frame);
-  const facing = frame.down.x * TO_LIGHT.x + frame.down.y * TO_LIGHT.y > 0;
-  const lift = mixColours(rock, c.light, (c.dark ? 0.12 : 0.22) + (facing ? 0.06 : 0));
-  const dark = (k: number): string => mixColours(rock, '#000000', k);
-  const stops: readonly [number, string, number][] = end === 'upper'
-    ? [[0, lift, 0.66], [0.45, rock, 0.62], [0.72, dark(0.45), 0.72], [1, '#000000', 0.62]]
-    : end === 'lower'
-      ? [[0, dark(0.45), 0.72], [0.3, lift, 0.6], [0.62, dark(0.18), 0.45], [0.86, rock, 0.18], [1, rock, 0]]
-      : [[0, lift, 0.66], [0.45, rock, 0.56], [0.7, dark(0.2), 0.42], [0.88, rock, 0.14], [1, rock, 0]];
-  const from = frame.at(side * shape.width(0) * 0.6, shape.vAt(0.04));
-  const length = shape.vAt(1) - shape.vAt(0.04);
-  const [rx, ry] = frame.down.x ? [length, shape.width(0.8) * 1.9] : [shape.width(0.8) * 1.9, length];
+  if (!hand.scene.raster) {
+    if (end) fill(hand, polyPath(shape.ramp), withAlpha('#000000', 0.3));
+    return;
+  }
+  const [a, b] = [frame.at(0, shape.vAt(0)), frame.at(0, shape.vAt(1))];
+  const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+  for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, withAlpha('#000000', depthAlpha(end, k / 6)));
+  // Only where the slope darkens: the gradient is clear above it, and its fill costs by its area.
+  const [t0, t1] = end === 'upper' ? [0.17, 1] : end === 'lower' ? [0, 0.65] : [0.25, 1];
+  fill(hand, polyPath(shape.outlineBetween(t0, t1)), g);
+  if (shape.opening) fill(hand, polyPath(shape.opening), withAlpha('#000000', 0.9));
+  layFaceShadow(hand, frame, shape, end);
+}
+
+/** The shaded face's shadow: across the ramp's edge below a cutting's face, or out on the floor beside a raised ramp. */
+function layFaceShadow(hand: Hand, frame: WayFrame, shape: ScreeShape, end?: StairEnd): void {
+  if (!hand.scene.env.view.shadow) return;
+  const towards = lightSide(frame) * (end === 'lower' ? -1 : 1);
+  const index = towards < 0 ? 0 : 1;
+  const raised = end === 'lower';
+  const line = raised ? shape.rims[index]! : shape.edges[index]!;
+  // Into the ramp (−towards) below a cutting's face; out from the ramp (+towards) beside a raised one.
+  const away = raised ? towards : -towards;
+  const n = line.length - 1;
+  const out = line.map((p, i) => {
+    const t = i / n;
+    const reach = 0.02 + 0.13 * (raised ? 1 - t : t);
+    const q = frame.at(away * reach, 0);
+    const o = frame.at(0, 0);
+    return { x: p.x + (q.x - o.x) + SHADOW_DIR.x * reach * 0.3, y: p.y + (q.y - o.y) + SHADOW_DIR.y * reach * 0.3 };
+  });
+  fill(hand, polyPath([...line, ...out.reverse()]), withAlpha('#000000', 0.26));
+}
+
+/** Ink has no tone to spare: hatching only where the slope goes dark, and solid hatching in its mouth. */
+function inkDepth(hand: Hand, frame: WayFrame, shape: ScreeShape, end: StairEnd | undefined, cut: PathFn): void {
+  const bands: readonly (readonly [number, number, number, 'shade' | 'depth'])[] = end === 'upper'
+    ? [[0.55, 0.82, 0.32, 'shade'], [0.82, 1.2, 1, 'depth']]
+    : end === 'lower' ? [[-0.2, 0.3, 0.55, 'shade']] : [[0.7, 1.2, 0.25, 'shade']];
+  const { ctx } = hand.scene.env;
   ctx.save();
   ctx.beginPath();
-  path(ctx);
+  cut(ctx);
   ctx.clip();
-  ctx.translate(from.x, from.y);
-  ctx.scale(rx, ry);
-  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-  for (const [t, colour, alpha] of stops) g.addColorStop(t, withAlpha(colour, alpha));
-  ctx.fillStyle = g;
-  ctx.fillRect(-1.2, -1.2, 2.4, 2.4);
+  for (const [t0, t1, level, kind] of bands) {
+    const band = slopeBand(frame, shape, t0, t1);
+    hand.tone(() => level, pointsBounds(band), polyPath(band), kind);
+  }
   ctx.restore();
+  if (shape.opening) hand.tone(() => 1, pointsBounds(shape.opening), polyPath(shape.opening), 'depth');
+}
+
+/** The slope between `t0` and `t1`, its edges across the slope wandering, so a change of tone reads as rock, not a ruled line. */
+function slopeBand(frame: WayFrame, shape: ScreeShape, t0: number, t1: number): Vec[] {
+  const edge = (t: number): Vec[] => Array.from({ length: 9 }, (_, i) => frame.at((i / 8 - 0.5) * frame.across, shape.vAt(t) + (t > 0 && t < 1 ? 0.06 * Math.sin(i * 2.3 + t * 11) : 0)));
+  return [...edge(t0), ...edge(t1).reverse()];
 }
 
 /**
- * The heap's shadow on the floor beside it, away from the light: a strip along the part of its edge
- * that faces away, as far out as the light's fall moves it, tapering where that edge turns.
+ * Ticks down the faces from their top edge, tapering, as maps draw a bank or a cutting: each as long
+ * as the face is wide there, so they lengthen as the slope drops, and heavier on the shaded face.
+ * A cutting's top edge is its rim; a raised ramp's is the ramp's own edge.
  */
-function layHeapShadow(hand: Hand, shape: ScreeShape): void {
-  if (!hand.scene.env.view.shadow) return;
-  const { outline } = shape;
-  const mid = outline.reduce((m, p) => ({ x: m.x + p.x / outline.length, y: m.y + p.y / outline.length }), { x: 0, y: 0 });
-  const away = outline.map(p => (p.x - mid.x) * SHADOW_DIR.x + (p.y - mid.y) * SHADOW_DIR.y > 0);
-  // The longest run of the outline facing away from the light, round the ring.
-  const start = away.findIndex((a, i) => a && !away[(i + outline.length - 1) % outline.length]);
-  if (start < 0) return;
-  const run: Vec[] = [];
-  for (let k = 0; k < outline.length && away[(start + k) % outline.length]; k++) run.push(outline[(start + k) % outline.length]!);
-  const d = 0.07;
-  const out = run.map((p, i) => {
-    const taper = Math.sin(Math.PI * (i / Math.max(1, run.length - 1)));
-    return { x: p.x + SHADOW_DIR.x * d * taper, y: p.y + SHADOW_DIR.y * d * taper };
-  });
-  fill(hand, polyPath([...run, ...out.reverse()]), withAlpha('#000000', 0.2));
-}
-
-/**
- * Hachures: short strokes down the fall line, tapering from their top, set in rows along the slope's
- * contours, close together and long where it is steep (under the crest) and sparser and shorter
- * below, as cartographers draw a slope; heavier on its shaded flank. `rows` how far down they go.
- */
-export function drawHachures(hand: Hand, frame: WayFrame, shape: ScreeShape, rows: number, seed: number): void {
-  const { at, along } = frame;
-  const side = litSide(frame);
+export function drawFaceTicks(hand: Hand, frame: WayFrame, shape: ScreeShape, end: StairEnd | undefined, alpha: number, seed: number): void {
+  const raised = end === 'lower';
+  const towards = lightSide(frame) * (raised ? -1 : 1);
   const wedges: Vec[][] = [];
-  const steep = Math.min(1, 2.4 / along);
-  let t = 0.015;
-  for (let row = 0; row < rows; row++) {
-    const length = (0.17 - row * 0.03) * (0.7 + 0.3 * steep);
-    const gap = 0.045 + row * 0.018;
-    const half = shape.width(t) - 0.04;
-    const count = Math.max(3, Math.round(half * 2 / gap));
-    for (let i = 0; i <= count; i++) {
-      const s = (i + 0.5 * (valueNoise(i * 2.3, row * 3.1, seed) - 0.5)) / count * 2 - 1;
-      if (Math.abs(s) > 1) continue;
-      const shade = 1 + 0.55 * -s * side;
-      const width = 0.018 * shade * (1 - row * 0.12);
-      const len = length * (0.65 + 0.5 * valueNoise(i * 1.3, row + 5, seed));
-      const v = shape.vAt(t) + 0.02 * valueNoise(i * 3.3, row, seed);
-      const u = s * half;
-      // Each stroke follows the tongue's spread a little, as the fall line fans out.
-      const spread = (shape.width(t + len / along) / shape.width(t) - 1) * u;
-      wedges.push([at(u - width / 2, v), at(u + width / 2, v), at(u + spread + width * 0.08, v + len), at(u + spread - width * 0.08, v + len)]);
+  for (let index = 0; index < 2; index++) {
+    const top = raised ? shape.edges[index]! : shape.rims[index]!;
+    const foot = raised ? shape.rims[index]! : shape.edges[index]!;
+    const heavy = shape.faces[index]!.side === towards ? 1.5 : 1;
+    const n = top.length - 1;
+    // Along the face, about one tick every 0.14 cells.
+    const length = top.reduce((sum, p, i) => (i ? sum + Math.hypot(p.x - top[i - 1]!.x, p.y - top[i - 1]!.y) : 0), 0);
+    const count = Math.max(4, Math.round(length / 0.14));
+    for (let k = 0; k <= count; k++) {
+      const f = (k + 0.3 * (valueNoise(k * 1.9, index * 7, seed) - 0.5)) / count * n;
+      const i = Math.min(n - 1, Math.max(0, Math.floor(f)));
+      const s = Math.max(0, Math.min(1, f - i));
+      const lerp = (run: Vec[]): Vec => ({ x: run[i]!.x + (run[i + 1]!.x - run[i]!.x) * s, y: run[i]!.y + (run[i + 1]!.y - run[i]!.y) * s });
+      const a = lerp(top);
+      const b = lerp(foot);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.025) continue;
+      // Long and short in turn, as a hand draws a bank's ticks.
+      const reach = k % 2 ? 0.6 : 0.95;
+      const w = 0.016 * heavy;
+      const nx = -dy / len * w / 2;
+      const ny = dx / len * w / 2;
+      wedges.push([{ x: a.x - nx, y: a.y - ny }, { x: a.x + nx, y: a.y + ny }, { x: a.x + dx * reach, y: a.y + dy * reach }]);
     }
-    t += (length * 0.8 + 0.02) / along;
+  }
+  if (end === 'upper' && shape.brow && !stoneOf(hand)) {
+    // Under the brow, down into the dark the ramp runs into (ink; Stone's dark says it).
+    const o = frame.at(0, 0);
+    const back = frame.at(0, -1);
+    const dx = back.x - o.x;
+    const dy = back.y - o.y;
+    shape.brow.forEach((p, i) => {
+      if (i === 0 || i === shape.brow!.length - 1) return;
+      const reach = i % 2 ? 0.1 : 0.16;
+      wedges.push([{ x: p.x - dy * 0.012, y: p.y + dx * 0.012 }, { x: p.x + dy * 0.012, y: p.y - dx * 0.012 }, { x: p.x + dx * reach, y: p.y + dy * reach }]);
+    });
   }
   const { ctx } = hand.scene.env;
-  ctx.save();
   ctx.beginPath();
   polysPath(wedges)(ctx);
-  ctx.fillStyle = hand.paint('rock').ink;
+  ctx.fillStyle = withAlpha(hand.paint('rock').ink, alpha);
   ctx.fill();
-  ctx.restore();
-}
-
-/** Runnels down the slope where loose stone has slid (Stone; ink has its hachures). */
-export function drawRunnels(hand: Hand, frame: WayFrame, shape: ScreeShape, seed: number): void {
-  const c = stoneOf(hand);
-  if (!c || !hand.scene.raster) return;
-  const { at } = frame;
-  const count = 2;
-  const runs: Vec[][] = [];
-  for (let i = 0; i < count; i++) {
-    const s = ((i + 0.5) / count * 2 - 1) * 0.85 + (valueNoise(i * 1.9, 4, seed) - 0.5) * 0.2;
-    const start = 0.12 + 0.2 * valueNoise(i * 3.1, 2, seed);
-    const end = start + 0.18 + 0.22 * valueNoise(i * 2.7, 6, seed);
-    const run: Vec[] = [];
-    for (let k = 0; k <= 6; k++) {
-      const t = start + (end - start) * k / 6;
-      run.push(at(s * shape.width(t) + 0.045 * (valueNoise(i * 7 + k * 0.8, 8, seed) - 0.5), shape.vAt(t)));
-    }
-    runs.push(run);
-  }
-  hand.line(runs, 'fine');
 }
 
 /** Loose stones' contact shadows: Stone lays each stone's shape again a little down the light's fall, under it. */
@@ -189,17 +180,4 @@ export function layRubbleShadow(hand: Hand, stones: readonly Vec[][], lift: numb
   const { env } = hand.scene;
   if (env.style.direction !== 'stone' || !env.view.shadow) return;
   fill(hand, polysPath(stones.map(poly => poly.map(p => ({ x: p.x + SHADOW_DIR.x * lift, y: p.y + SHADOW_DIR.y * lift })))), withAlpha('#000000', 0.38));
-}
-
-/**
- * The part of a slope between `t0` and `t1` of the way down, with both edges wandering, so where a
- * tone or the grit changes reads as a thinning across loose stone, never as a ruled line.
- */
-export function slopeBand(frame: WayFrame, t0: number, t1: number): Vec[] {
-  const { at, across, along } = frame;
-  const edge = (t: number, reverse: boolean): Vec[] => {
-    const points = Array.from({ length: 9 }, (_, i) => at((i / 8 - 0.5) * across, (t - 0.5 + (t > 0 && t < 1 ? 0.07 * Math.sin(i * 2.3 + t * 11) : 0)) * along));
-    return reverse ? points.reverse() : points;
-  };
-  return [...edge(t0, false), ...edge(t1, true)];
 }
