@@ -281,18 +281,15 @@ describe('the theme', () => {
     await waitFor(() => expect(lastJob().request.theme).toBe('any'));
   });
 
-  it('shows the chips the Haunted Mansion refuses disabled, in place, with the reason', async () => {
-    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
-    const order = chips();
+  it('offers the Haunted Mansion only the tags that change it, and no secret rooms', async () => {
+    renderPanel();
     chooseTheme('Haunted Mansion');
     await waitFor(() => expect(lastJob().request.theme).toBe('mansion'));
     goTo('Features');
-    expect(refused().sort()).toEqual(['acid', 'flooded', 'lava']);
-    expect(chips()).toEqual(order);
-    fireEvent.click(tag('lava'));
-    expect(lastJob().request.tags).toEqual(['medium']);
-    const reason = document.getElementById(tag('lava').getAttribute('aria-describedby')!);
-    expect(reason?.textContent).toBe('Not available with this theme');
+    expect(chips()).toEqual(['dry', 'wet', 'overgrown', 'crumbling', 'ruined', 'inhabited']);
+    expect(screen.queryByRole('group', { name: 'Layout' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Secret rooms' })).toBeNull();
+    expect(screen.getByRole('radiogroup', { name: 'Size' })).toBeTruthy();
   });
 
   it('names the tag a refusal comes from', async () => {
@@ -305,29 +302,39 @@ describe('the theme', () => {
     expect(reason?.textContent).toBe('Not available with dry');
   });
 
-  it('shows a tag picked before the theme refused it as off and disabled, and gives it back with a theme that takes it', async () => {
+  it('hides a tag picked before the theme that ignores it, and gives it back with a theme that takes it', async () => {
     renderPanel();
     chooseTheme('Cavern');
     goTo('Features');
     fireEvent.click(tag('lava'));
     await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'lava']));
-    expect(tag('lava').getAttribute('aria-pressed')).toBe('true');
     chooseTheme('Fortress');
     await waitFor(() => expect(lastJob().request.theme).toBe('fortress'));
     goTo('Features');
-    expect([tag('lava').getAttribute('aria-pressed'), tag('lava').getAttribute('aria-disabled')]).toEqual(['false', 'true']);
-    expect(tag('lava').classList.contains('atlas-active')).toBe(false);
+    expect(chips()).not.toContain('lava');
     chooseTheme('Cavern');
     await waitFor(() => expect(lastJob().request.theme).toBe('cavern'));
     goTo('Features');
     expect(tag('lava').getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('refuses ruined only for the Cavern', () => {
+  it('offers the Cavern neither ruins nor columns, and the Fortress no molten pools', () => {
     renderPanel();
     chooseTheme('Cavern');
     goTo('Features');
-    expect(refused()).toEqual(['ruined']);
+    expect(chips().filter((chip) => ['ruined', 'colonnades', 'square'].includes(chip))).toEqual([]);
+    expect(refused()).toEqual([]);
+    chooseTheme('Fortress');
+    goTo('Features');
+    expect(chips().filter((chip) => ['lava', 'acid'].includes(chip))).toEqual([]);
+    expect(chips()).toContain('string');
+  });
+
+  it('offers every tag for Surprise me', () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
+    expect(chips()).toContain('lava');
+    expect(chips()).toContain('string');
+    expect(chips()).toContain('ruined');
   });
 
   it('refuses nothing for Surprise me', () => {

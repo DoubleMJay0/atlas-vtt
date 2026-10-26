@@ -1,6 +1,6 @@
 import React, { useId } from 'react';
 import { MAX_FLOORS } from '../../../dungeons/model';
-import { refusedTags } from '../../../dungeons/themes/themes';
+import { refusedTags, takesTag } from '../../../dungeons/themes/themes';
 import type { ThemeChoice } from '../../../dungeons/themes/themeTypes';
 import { type DungeonTag, readTags } from '../../../dungeons/tags';
 import type { CollectionMetadata } from '../../../services/AssetService';
@@ -31,13 +31,16 @@ interface WizardStepContentProps {
   onSubmit: () => void;
 }
 
-/** The tags the chosen theme refuses, with the reasons as shown; none for Surprise me, which only picks among themes that take them. */
+/** The tags the chosen theme refuses beside another, with the reason as shown; none for Surprise me, which only picks among themes that take them. */
 function refusedOf(choice: ThemeChoice, tags: readonly DungeonTag[]): ReadonlyMap<DungeonTag, string> {
   if (choice === 'any') return new Map();
-  return new Map([...refusedTags(choice, tags)].map(([tag, beside]) => [
-    tag,
-    beside ? t('dungeon.theme.refused.beside', { tag: tagName(beside) }) : t('dungeon.theme.refused'),
-  ]));
+  // A tag refused always is not offered at all
+  return new Map([...refusedTags(choice, tags)].flatMap(([tag, beside]) => (beside ? [[tag, t('dungeon.theme.refused.beside', { tag: tagName(beside) })] as const] : [])));
+}
+
+/** Whether the step offers a tag: every tag for Surprise me, else those that change the chosen theme's dungeons. */
+function offeredFor(choice: ThemeChoice): (tag: DungeonTag) => boolean {
+  return (tag) => choice === 'any' || takesTag(choice, tag);
 }
 
 /** What one step of the wizard asks. Every change reaches the preview at once. */
@@ -51,7 +54,7 @@ export function WizardStepContent({ step, wizard, collection, onSubmit }: Wizard
     case 'layout':
       return <LayoutStep state={state} />;
     case 'features':
-      return <FeaturesStep picked={readTags(request.tags)} refused={refusedOf(theme, readTags(request.tags))} onToggle={state.toggleTag} onChoose={state.chooseTag} />;
+      return <FeaturesStep picked={readTags(request.tags)} offered={offeredFor(theme)} refused={refusedOf(theme, readTags(request.tags))} onToggle={state.toggleTag} onChoose={state.chooseTag} />;
     case 'style':
       return (
         <div className="atlas-dungeon-wizard__style">

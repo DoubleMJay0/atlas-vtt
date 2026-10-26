@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
-import { readTags } from '../../../src/app/dungeons/tags';
-import { pickTheme, themedTags } from '../../../src/app/dungeons/themes/themes';
+import { readTags, type DungeonTag } from '../../../src/app/dungeons/tags';
+import { pickTheme, takesTag, themedTags } from '../../../src/app/dungeons/themes/themes';
 import type { ThemeId } from '../../../src/app/dungeons/themes/themeTypes';
 
 const SEEDS = Array.from({ length: 200 }, (_, k) => k + 1);
@@ -41,6 +41,17 @@ describe('themes', () => {
 
   it('ignores the tags a theme refuses', () => {
     expect(themedTags('mansion', ['lava', 'wet', 'flooded'])).toEqual(['wet']);
+  });
+
+  it('offers a theme only the tags that change its dungeons', () => {
+    expect(['string', 'secret', 'lava'].filter((tag) => takesTag('mansion', tag as DungeonTag))).toEqual([]);
+    expect(['dry', 'no-secrets', 'wet', 'ruined'].every((tag) => takesTag('mansion', tag as DungeonTag))).toBe(true);
+    expect(['colonnades', 'square', 'ruined'].filter((tag) => takesTag('cavern', tag as DungeonTag))).toEqual([]);
+  });
+
+  it('picks for Surprise me only a theme every chosen tag changes', () => {
+    for (const seed of SEEDS) expect(pickTheme(seed, 'any', ['string'])).not.toBe('mansion');
+    for (const seed of SEEDS) expect(pickTheme(seed, 'any', ['colonnades'])).toBe('fortress');
   });
 
   it('drops the retired theme tags', () => {

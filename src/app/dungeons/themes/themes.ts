@@ -13,11 +13,14 @@ import { MANSION } from './mansion';
 import { THEME_IDS, type RoomProgramme, type ThemeChoice, type ThemeDefinition, type ThemeFacts, type ThemeId } from './themeTypes';
 
 const NO_MOLTEN: readonly { tag: DungeonTag }[] = [{ tag: 'lava' }, { tag: 'acid' }];
+/** Every layout tag: a Haunted Mansion is planned as a house (`layout/house/`), which none of them shapes. */
+const LAYOUT_TAGS: readonly DungeonTag[] = ['chaotic', 'ordered', 'colonnades', 'compact', 'winding', 'cramped', 'spacious', 'deep', 'flat', 'round', 'square', 'string'];
 
 export const THEMES: Readonly<Record<ThemeId, ThemeDefinition>> = {
   // A gate passage three cells long holds two murder holes a cell apart.
-  fortress: { id: 'fortress', built: true, rise: 'up', stairsFromEntrance: true, entranceDepth: 5, refuses: NO_MOLTEN, params: fortressParams, programme: FORTRESS },
-  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, architectureOnly: true, layout: 'house', facts: houseFacts, refuses: [...NO_MOLTEN, { tag: 'flooded' }], programme: MANSION },
+  fortress: { id: 'fortress', built: true, rise: 'up', stairsFromEntrance: true, entranceDepth: 5, ignores: [], refuses: NO_MOLTEN, params: fortressParams, programme: FORTRESS },
+  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, architectureOnly: true, layout: 'house', facts: houseFacts,
+    ignores: [...LAYOUT_TAGS, 'secret'], refuses: [...NO_MOLTEN, { tag: 'flooded' }], programme: MANSION },
   cavern: CAVERN,
 };
 
@@ -25,7 +28,13 @@ export function themeOf(id: ThemeId): ThemeDefinition {
   return THEMES[id];
 }
 
-/** The tags a theme cannot take beside `tags`, each with the tag it cannot take beside, or null where the theme takes it never. */
+/** Whether the wizard offers a tag for a theme: one that changes its dungeons and that it may take. */
+export function takesTag(theme: ThemeId, tag: DungeonTag): boolean {
+  const { ignores, refuses } = THEMES[theme];
+  return !ignores.includes(tag) && !refuses.some((r) => r.tag === tag && r.with === undefined);
+}
+
+/** The tags a theme refuses beside `tags`, each with the tag it refuses it beside, or null where it refuses it always. */
 export function refusedTags(theme: ThemeId, tags: readonly DungeonTag[] = []): ReadonlyMap<DungeonTag, DungeonTag | null> {
   return new Map(THEMES[theme].refuses.filter((r) => r.with === undefined || tags.includes(r.with)).map(({ tag, with: beside }) => [tag, beside ?? null]));
 }
@@ -37,11 +46,11 @@ export function themedTags(theme: ThemeId, tags: readonly DungeonTag[]): Dungeon
 }
 
 /**
- * The dungeon's theme: the chosen one, or for Any one of the themes that take every chosen tag (any
- * theme where none takes them all), by the seed alone. The roll is made whatever the choice.
+ * The dungeon's theme: the chosen one, or for Any one of the themes on which every chosen tag has
+ * its effect (any theme where none takes them all), by the seed alone. The roll is made whatever the choice.
  */
 export function pickTheme(seed: number, choice: ThemeChoice, tags: readonly DungeonTag[]): ThemeId {
-  const takers = THEME_IDS.filter((id) => themedTags(id, tags).length === tags.length);
+  const takers = THEME_IDS.filter((id) => themedTags(id, tags).length === tags.length && tags.every((tag) => takesTag(id, tag)));
   const rolled = pick(stream(seed, 'layout', 'theme'), takers.length ? takers : THEME_IDS);
   return choice === 'any' ? rolled : choice;
 }

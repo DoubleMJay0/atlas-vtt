@@ -72,6 +72,7 @@ export const CAVERN: ThemeDefinition = {
   id: 'cavern',
   built: false,
   rise: 'down',
+  ignores: ['colonnades', 'square'],
   refuses: [
     { tag: 'ruined' },
     { tag: 'inhabited', with: 'dry' },

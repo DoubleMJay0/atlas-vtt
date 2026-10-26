@@ -14,7 +14,9 @@ const SECRET_ORDER = Object.keys(SECRET_CHOICES) as SecretChoice[];
 
 interface FeaturesStepProps {
   picked: readonly DungeonTag[];
-  /** Tags the chosen theme cannot take, each with the reason shown as its tooltip. */
+  /** Whether a tag changes the chosen theme's dungeons: only those are offered. */
+  offered: (tag: DungeonTag) => boolean;
+  /** Tags the chosen theme cannot take beside another, each with the reason shown as its tooltip. */
   refused: ReadonlyMap<DungeonTag, string>;
   onToggle: (tag: DungeonTag) => void;
   onChoose: (among: readonly DungeonTag[], tag: DungeonTag | null) => void;
@@ -43,9 +45,10 @@ function Choice<T extends string>({ label, value, options, onChange }: ChoicePro
 
 /**
  * What the dungeon is like: its size and how many secret rooms it hides as a choice of one each,
- * the rest (water and fire, age and growth, layout) as chips that switch on and off.
+ * the rest (water and fire, age and growth, layout) as chips that switch on and off. Only what
+ * changes the chosen theme's dungeons is offered: a Haunted Mansion has no secret rooms to ask for.
  */
-export function FeaturesStep({ picked, refused, onToggle, onChoose }: FeaturesStepProps): React.JSX.Element {
+export function FeaturesStep({ picked, offered, refused, onToggle, onChoose }: FeaturesStepProps): React.JSX.Element {
   const size = SIZE_TAGS.find((tag) => picked.includes(tag)) ?? 'medium';
   const secrets = SECRET_ORDER.find((choice) => {
     const tag = SECRET_CHOICES[choice];
@@ -60,17 +63,19 @@ export function FeaturesStep({ picked, refused, onToggle, onChoose }: FeaturesSt
         options={SIZE_TAGS.map((tag) => ({ value: tag, label: t(`dungeon.size.${tag}` as MessageKey), hint: tagDescription(tag) }))}
         onChange={(tag) => onChoose(SIZE_TAGS, tag)}
       />
-      <TagChips groups={CHIP_GROUPS} picked={picked} refused={refused} onToggle={onToggle} />
-      <Choice<SecretChoice>
-        label={t('dungeon.secrets')}
-        value={secrets}
-        options={SECRET_ORDER.map((choice) => ({
-          value: choice,
-          label: t(`dungeon.secrets.${choice}` as MessageKey),
-          hint: t(`dungeon.secrets.${choice}.hint` as MessageKey),
-        }))}
-        onChange={(choice) => onChoose(SECRET_TAGS, SECRET_CHOICES[choice])}
-      />
+      <TagChips groups={CHIP_GROUPS} picked={picked} offered={offered} refused={refused} onToggle={onToggle} />
+      {offered('secret') && (
+        <Choice<SecretChoice>
+          label={t('dungeon.secrets')}
+          value={secrets}
+          options={SECRET_ORDER.map((choice) => ({
+            value: choice,
+            label: t(`dungeon.secrets.${choice}` as MessageKey),
+            hint: t(`dungeon.secrets.${choice}.hint` as MessageKey),
+          }))}
+          onChange={(choice) => onChoose(SECRET_TAGS, SECRET_CHOICES[choice])}
+        />
+      )}
     </div>
   );
 }

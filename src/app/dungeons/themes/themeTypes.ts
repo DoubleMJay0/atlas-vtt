@@ -219,7 +219,17 @@ export interface ThemeDefinition {
   layout?: 'house';
   /** The least depth of the room the dungeon is entered by, walls included, where it is a normal room: a Fortress's gate passage holds a row of murder holes. */
   entranceDepth?: number;
-  /** Tags the theme cannot take; one with `with` only beside that tag. */
+  /**
+   * Tags that change nothing in the theme's dungeons (a Haunted Mansion is planned as a house, which
+   * no layout tag shapes): the wizard does not offer them and Surprise me picks the theme for none of
+   * them. A tag whose wish the theme fulfils anyway is not one (`dry` for a Fortress, `no-secrets`
+   * for a Mansion, which has no secret rooms). `themeTagEffects.test.ts` measures both.
+   */
+  ignores: readonly DungeonTag[];
+  /**
+   * Tags the theme must not take, which generation drops: one with `with` only beside that tag, and
+   * shown disabled naming it; one without is never offered.
+   */
   refuses: readonly { tag: DungeonTag; with?: DungeonTag }[];
   programme: RoomProgramme;
   /** What the theme changes in the layout's params (a Cavern's chambers, a Fortress's passages and towers); unset, nothing. */
