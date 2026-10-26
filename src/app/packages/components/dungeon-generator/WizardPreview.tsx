@@ -9,19 +9,15 @@ import { cn } from '../../../../utils/cn';
 import { ExportButton } from './ExportButton';
 import { FloorSwitcher } from './FloorSwitcher';
 import { MapPreview } from './MapPreview';
-import type { DungeonState } from './useDungeonState';
-import type { GeneratorActions } from './useGeneratorActions';
-import type { MapPreview as Preview } from './useMapPreview';
+import type { Wizard } from './useWizard';
 import type { Box } from './wizardLayout';
 
 interface WizardPreviewProps {
-  box: Box;
+  wizard: Wizard;
+  /** Where it floats beside the panel over the map; unset, it fills its place in the generator's tab. */
+  box?: Box | undefined;
   /** The preview slides out from the panel: -1 when it stands to the panel's left, 1 otherwise. */
-  side: -1 | 1;
-  preview: Preview;
-  state: DungeonState;
-  actions: GeneratorActions;
-  onFrame: (frame: HTMLDivElement | null) => void;
+  side?: -1 | 1;
 }
 
 /** Slides out from behind the panel a beat after it, as if the panel unfolded it. */
@@ -42,17 +38,18 @@ function roll(icon: SVGSVGElement | null): void {
 }
 
 /**
- * The live map of the dungeon the wizard makes, floating beside the panel on its own, as large as
- * its box allows: New layout and Export on its top right, the floor switcher at its foot for a
- * dungeon of several floors.
+ * The live map of the dungeon the wizard makes, floating beside the panel on its own (or filling
+ * the generator's tab beside it), as large as its box allows: New layout and Export on its top
+ * right, the floor switcher at its foot for a dungeon of several floors.
  */
-export function WizardPreview({ box, side, preview, state, actions, onFrame }: WizardPreviewProps): React.JSX.Element {
+export function WizardPreview({ wizard, box, side = 1 }: WizardPreviewProps): React.JSX.Element {
+  const { preview, state, actions, setFrame } = wizard;
   const reduced = useReducedMotion() ?? false;
   const dice = useRef<SVGSVGElement>(null);
   return (
     <motion.div
-      className={cn('atlas-dungeon-wizard-preview', side < 0 && 'atlas-dungeon-wizard-preview--left')}
-      style={box}
+      className={cn('atlas-dungeon-wizard-preview', side < 0 && 'atlas-dungeon-wizard-preview--left', !box && 'atlas-dungeon-wizard-preview--page')}
+      {...(box && { style: box })}
       variants={previewVariants(side, reduced)}
       initial="hidden"
       animate="visible"
@@ -61,7 +58,7 @@ export function WizardPreview({ box, side, preview, state, actions, onFrame }: W
       <MapPreview
         preview={preview}
         view={state.settings.view}
-        onFrame={onFrame}
+        onFrame={setFrame}
         onHideWing={state.hideWing}
         onShowHiddenWings={state.edits.hiddenWings?.length ? state.showHiddenWings : undefined}
       >

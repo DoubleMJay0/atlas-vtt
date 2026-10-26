@@ -79,7 +79,7 @@ export class LightMap {
       if (!light) return;
       const u = slot.uniforms.uniforms;
       const { reflection } = light;
-      slot.rect.set(reflection ? union(light.tile.rect, reflection.rect) : light.tile.rect);
+      slot.rect.set(drawnRect(light));
       slot.tileOrigin.set([light.tile.rect[0], light.tile.rect[1]]);
       u.uHasReflection = reflection ? 1 : 0;
       if (reflection) slot.reflectOrigin.set([reflection.rect[0], reflection.rect[1]]);
@@ -180,7 +180,12 @@ export class LightMap {
 }
 
 /** The smallest rectangle around both. */
-function union([ax, ay, aw, ah]: Rect, [bx, by, bw, bh]: Rect): Rect {
+/** Where a light draws into the light map: over its tile and its reflection. */
+export function drawnRect(light: DrawnLight): Rect {
+  return light.reflection ? union(light.tile.rect, light.reflection.rect) : light.tile.rect;
+}
+
+export function union([ax, ay, aw, ah]: Rect, [bx, by, bw, bh]: Rect): Rect {
   const x = Math.min(ax, bx), y = Math.min(ay, by);
   return [x, y, Math.max(ax + aw, bx + bw) - x, Math.max(ay + ah, by + bh) - y];
 }

@@ -2,7 +2,7 @@ import type { WallSegment } from '../types/wallTypes';
 import { areaLightReach, kindOf, lightReach, type LightReach } from './sight';
 import { sameCone } from './visionCone';
 import type { AreaSampling } from './areaReach';
-import { ReflectionTraces, reflectionParts, type ReflectionSampling } from './reflectedLight';
+import { reflectionParts, type ReflectionSampling } from './reflectedLight';
 import type { EngineLight } from '../pixi/lighting/engine/types';
 
 interface Entry {
@@ -25,14 +25,13 @@ const DEFAULT_SAMPLING: AreaSampling = { spacing: 17.5, clearance: 3 };
  * does not retrace every light, and again when its cone turned or an area light's area changed.
  * A new bright radius, kind or priority keeps the polygon, which they do not shape; the
  * reflection is worked out again from it, since how far and how strongly the lit floor reflects
- * follows the bright radius. The reflection's traces are kept from one sync to the next
- * (`ReflectionTraces`), so a dragged light traces only the points of its shadows it did not have.
+ * follows the bright radius. A moving light (`LightMotion`) keeps its reflection: it is traced
+ * anew at every step, as its reach is.
  */
 export class LightReaches {
   private entries = new Map<string, Entry>();
   private sampling: AreaSampling = DEFAULT_SAMPLING;
   private reflection: ReflectionSampling | null = null;
-  private readonly traces = new ReflectionTraces();
 
   /**
    * `sampling` says how area lights' outlines are traced (`areaSamples`), `reflection` how the
@@ -57,18 +56,17 @@ export class LightReaches {
       else {
         const { origin, polygon, parts } = cached.reach;
         const kept: LightReach = { origin, dim, polygon, ...(parts && { parts }), bright, ...kindOf(light) };
-        next.set(key, { ...cached, reach: reflects ? { ...kept, reflection: reflectionParts(kept, walls, this.reflection!, this.traces) } : kept, reflected: reflects });
+        next.set(key, { ...cached, reach: reflects ? { ...kept, reflection: reflectionParts(kept, walls, this.reflection!) } : kept, reflected: reflects });
       }
     }
     this.entries = next;
-    this.traces.endRound();
     return [...next.values()].map((entry) => entry.reach);
   }
 
   private trace(light: EngineLight, walls: readonly WallSegment[], reflects: boolean): LightReach {
     const { x, y, bright, dim, surface } = light;
     const reach = surface ? areaLightReach({ x, y }, surface, dim, walls, this.sampling, bright, light) : lightReach({ x, y }, dim, walls, bright, light);
-    return reflects ? { ...reach, reflection: reflectionParts(reach, walls, this.reflection!, this.traces) } : reach;
+    return reflects ? { ...reach, reflection: reflectionParts(reach, walls, this.reflection!) } : reach;
   }
 }
 

@@ -159,6 +159,8 @@ export const BOUNCE = {
   gain: 1,
   /** While lights move, bounce is rebuilt at most this often. */
   throttleMs: 100,
+  /** Texels of cascade a frame draws of the bounce while a light moves (`RadianceCascades.step`). */
+  movingTexels: 1 << 18,
 } as const;
 
 /**

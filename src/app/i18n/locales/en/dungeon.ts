@@ -17,13 +17,13 @@ export const dungeon = {
   'dungeon.steps': 'Steps',
   'dungeon.next': 'Next',
   'dungeon.back': 'Back',
-  'dungeon.needsAtlasView': 'Open a scene first: the dungeon generator opens over its map.',
 
   'dungeon.preview.label': 'Dungeon preview',
   'dungeon.preview.failed': 'The preview could not be drawn.',
   'dungeon.preview.floor': 'Floor shown',
 
   'dungeon.name': 'Name',
+  'dungeon.collection': 'Collection',
   'dungeon.namePlaceholder': 'Name it to create the scene',
   'dungeon.new': 'New layout',
   'dungeon.floors': 'Floors',

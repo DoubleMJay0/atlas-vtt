@@ -13,6 +13,7 @@ import type { Box } from '../../../vision/polygonBounds';
 import type { CapsuleField } from './CapsuleField';
 import { glOf } from './gpu';
 import { GpuPacer } from './GpuPacer';
+import { changedArea, type SteadyDrawing } from './bounceArea';
 import { DarknessMap, type DrawnDarkness, type LitShape, type PierceShape } from './DarknessMap';
 import { areaRadius } from '../../../lighting/lightArea';
 import { filledPieces } from '../../../lighting/polygonFill';
@@ -63,6 +64,10 @@ export class LightingWorld {
   private lights: readonly EngineLight[] = [];
   private albedo: Texture | null = null;
   private bounceDirty = false;
+  /** The bounce must be built over the whole map: the walls or the map image changed since the last build. */
+  private bounceAll = true;
+  /** What the steady light map drew for the last bounce build: the next draws only where that changed. */
+  private bounceDrawn: SteadyDrawing | null = null;
   private lastBounce = -Infinity;
   /** When the light map last took its flicker; -Infinity while it holds the steady lights. */
   private lastFlicker = -Infinity;
@@ -121,6 +126,7 @@ export class LightingWorld {
       if (changed === 'all' || changed.length > 0) {
         this.fields.rebuild(walls);
         this.bounceDirty = true;
+        this.bounceAll = true;
         this.zonesStale = true;
       }
     }
@@ -142,6 +148,7 @@ export class LightingWorld {
     if (albedo !== this.albedo) {
       this.albedo = albedo;
       this.bounceDirty = true;
+      this.bounceAll = true;
     }
   }
 
@@ -149,21 +156,37 @@ export class LightingWorld {
    * Tiles still to build, throttled flicker and bounce, each as the pacer lets it through; true
    * when a world texture changed. A light map drawn steady (a light moved, the bounce was built)
    * takes its flicker back at once, so a dragged light never blinks between the two. Bounce
-   * waits for the last tile: it reads the light map they make, and for every moving light to rest
-   * (`EngineLight.moving`): a light dragged over the map would rebuild it every few frames, a
-   * stall each time. `buildBounce` builds a pending bounce whatever the pacer says or moves (`flush`).
+   * waits for the last tile: it reads the light map they make. While a light moves
+   * (`EngineLight.moving`) the bounce is built one pass a frame (`RadianceCascades.step`), so it
+   * follows a dragged light without the stall a whole build costs; frozen, it stayed where the
+   * drag began until the drop. `buildBounce` builds a pending bounce whatever the pacer says or
+   * moves (`flush`).
    */
   animate(now: number, buildBounce = false, view?: Box): boolean {
     let drew = this.buildTiles(this.pacer);
-    const waits = !buildBounce && (this.lights.some((light) => light.moving) || this.pacer.allowance() <= 0);
-    if (this.bounceDirty && this.cascades && !this.tiles.busy() && now - this.lastBounce >= BOUNCE.throttleMs && !waits) {
-      // Bounce uses steady intensity, so flicker never rebuilds it.
-      this.drawSteady();
-      this.cascades.build(this.lightMap, this.albedo, this.fieldAll());
-      this.pacer.submitted();
-      this.bounceDirty = false;
-      this.lastBounce = now;
-      drew = true;
+    const { cascades } = this;
+    const waits = !buildBounce && this.pacer.allowance() <= 0;
+    if (cascades && !waits) {
+      const field = this.fieldAll();
+      // A moving light's build goes a band a frame: a whole pass on a large map was a dropped frame.
+      const texels = buildBounce ? Infinity : this.lights.some((light) => light.moving) ? BOUNCE.movingTexels : Infinity;
+      if (cascades.building) {
+        cascades.step(field, texels);
+        this.pacer.submitted();
+        drew = true;
+      }
+      if (!cascades.building && this.bounceDirty && !this.tiles.busy() && now - this.lastBounce >= BOUNCE.throttleMs) {
+        // Bounce uses steady intensity, so flicker never rebuilds it.
+        const drawn = this.drawSteady();
+        cascades.begin(this.lightMap, this.albedo, this.bounceAll ? null : changedArea(this.bounceDrawn, drawn));
+        this.bounceDrawn = drawn;
+        this.bounceAll = false;
+        this.bounceDirty = false;
+        this.lastBounce = now;
+        cascades.step(field, texels);
+        this.pacer.submitted();
+        drew = true;
+      }
     }
     if (this.flickerDue(now, view) && this.pacer.allowance() > 0) {
       this.drawLightMap((light) => this.flicker.sample(light.key, light.animation, now));
@@ -219,7 +242,7 @@ export class LightingWorld {
 
   /** Tiles or bounce still to build, or animated lights: keep calling `animate`. */
   busy(): boolean {
-    return (this.bounceDirty && !!this.cascades) || this.animated() || this.tiles.busy();
+    return (!!this.cascades && (this.bounceDirty || this.cascades.building)) || this.animated() || this.tiles.busy();
   }
 
   /** Builds every tile and the bounce now, whatever the pacer says (a thumbnail, tests). */
@@ -287,10 +310,11 @@ export class LightingWorld {
     }
   }
 
-  private drawSteady(): void {
-    this.drawLightMap(() => STEADY);
+  private drawSteady(): SteadyDrawing {
+    const drawn = this.drawLightMap(() => STEADY);
     this.lastFlicker = -Infinity;
     if (this.lights.some((light) => light.darkness)) this.drawDarkness();
+    return drawn;
   }
 
   private drawDarkness(): void {
@@ -301,21 +325,23 @@ export class LightingWorld {
     this.darkness.draw(sources.map((light) => this.darknessOf(light)), this.pierce, lit.flatMap((light) => this.litShapes(light)));
   }
 
-  private drawLightMap(sample: (light: EngineLight) => FlickerSample): void {
+  /** Draws the light map, each light as `sample` has it; what was drawn, by light, in order. */
+  private drawLightMap(sample: (light: EngineLight) => FlickerSample): Map<string, DrawnLight | DrawnDarkness> {
     const tiles = this.tiles.tiles();
-    const drawn: (DrawnLight | DrawnDarkness)[] = [];
+    const drawn = new Map<string, DrawnLight | DrawnDarkness>();
     for (const light of byPriority(this.lights)) {
       if (light.darkness) {
-        drawn.push(this.darknessOf(light));
+        drawn.set(light.key, this.darknessOf(light));
         continue;
       }
       const tile = tiles.get(light.key);
       if (!tile) continue;
       const { intensity, radiusScale } = sample(light);
       // Flicker breathes the bright radius only: where a light ends is where the rules end it.
-      drawn.push({ tile, bright: light.bright * radiusScale, dim: light.dim, color: light.color, intensity: light.intensity * intensity, cone: light.cone, edge: light.edge, reflection: this.reflections.get(light.key) });
+      drawn.set(light.key, { tile, bright: light.bright * radiusScale, dim: light.dim, color: light.color, intensity: light.intensity * intensity, cone: light.cone, edge: light.edge, reflection: this.reflections.get(light.key) });
     }
-    this.lightMap.draw(drawn);
+    this.lightMap.draw([...drawn.values()]);
+    return drawn;
   }
 
   /**

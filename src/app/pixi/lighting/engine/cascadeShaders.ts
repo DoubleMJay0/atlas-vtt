@@ -1,6 +1,17 @@
-import { FULLSCREEN_VERTEX, GLSL_VERSION, SRGB_GLSL, fieldGlsl } from './glsl';
+import { GLSL_VERSION, SRGB_GLSL, fieldGlsl } from './glsl';
 
-export const cascadeVertex = FULLSCREEN_VERTEX;
+/**
+ * Every bounce pass draws over `uRegion` of its target (uv: left, top, right, bottom), the whole
+ * target or the part a change of the light map can reach (`RadianceCascades.begin`), in bands.
+ */
+export const cascadeVertex = `${GLSL_VERSION}
+in vec2 aPosition;
+uniform vec4 uRegion;
+out vec2 vUv;
+void main() {
+  vUv = mix(uRegion.xy, uRegion.zw, aPosition);
+  gl_Position = vec4(vUv * 2.0 - 1.0, 0.0, 1.0);
+}`;
 
 /**
  * Lit floor: the light map times the map's colour (linear), over the emission grid. Where the

@@ -43,14 +43,12 @@ describe('the reflection of a moving light', () => {
   const reflection = { ...sampling, reach: 200 };
   const light: EngineLight = { key: 'torch', x: 60, y: 0, bright: 150, dim: 300, flame: 10, color: [1, 1, 1], intensity: 1, animation: 'none' };
 
-  it('is there while it moves, and a small step traces only the points it did not have', () => {
+  it('is there while it moves, worked out where the light now is', () => {
     const reaches = new LightReaches();
     const [resting] = reaches.sync([light], walls, sampling, reflection);
     expect(resting!.reflection?.length).toBeGreaterThan(0);
-    const [moved] = reaches.sync([{ ...light, x: 61 }], walls, sampling, reflection);
+    const [moved] = reaches.sync([{ ...light, x: 70 }], walls, sampling, reflection);
     expect(moved!.reflection?.length).toBeGreaterThan(0);
-    const before = new Set(resting!.reflection!.map((part) => part.polygon));
-    const kept = moved!.reflection!.filter((part) => before.has(part.polygon)).length;
-    expect(kept).toBeGreaterThan(moved!.reflection!.length / 2);
+    expect(moved!.reflection).not.toBe(resting!.reflection);
   });
 });
