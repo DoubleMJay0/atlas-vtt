@@ -37,6 +37,10 @@
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 - The command palette keeps a steady width above a toolbar with very few or very many tools
 
+## Fixed
+
+- A token exactly at the edge of a light's reach, such as one standing next to a token carrying a 5 ft light, no longer counts as lit from one side and unlit from another; inside magical darkness it no longer gets its sight back there
+
 ## Important changes
 
 - A scene with several floors is saved in a newer format that older versions of Atlas cannot open; scenes with one floor are saved as before
