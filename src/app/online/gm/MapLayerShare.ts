@@ -1,5 +1,5 @@
 import { Pacer, type PacerClock } from '../marks/index.ts';
-import type { GmMessage, SharedAnnotations } from '../protocol/index.ts';
+import type { GmMessage, SharedAnnotations, SharedLiquid } from '../protocol/index.ts';
 import { FogCoverageCache } from '../../fog/FogCoverageCache';
 import type { FogCoverage } from '../../fog/fogCoverage';
 import type { ViewState } from '../../types/viewState';
@@ -10,6 +10,7 @@ import type { SceneState, SceneStore } from './atlasView.ts';
 import { sharedInitiative } from './initiativeInputs.ts';
 import { sharedAnnotations, sharedDoors, sharedGrid } from './mapLayerInputs.ts';
 import { ReadablePins, type ListedPin } from './pins/ReadablePins.ts';
+import { SharedLiquids } from './sharedLiquids.ts';
 import type { VaultImage } from './TokenShare.ts';
 import { WidgetShare } from './WidgetShare.ts';
 import { levelObjects } from '../../levels/levelObjects';
@@ -35,7 +36,7 @@ export interface MapLayerSharePorts extends PacerClock {
 /** The shortest time between two sends of the map's layers, as for the token list. */
 export const MAP_LAYER_INTERVAL_MS = 66;
 
-type LayerMessage = Extract<GmMessage, { t: 'grid' | 'doors' | 'sensed' | 'annotations' | 'initiative' | 'pins' }>;
+type LayerMessage = Extract<GmMessage, { t: 'grid' | 'liquids' | 'doors' | 'sensed' | 'annotations' | 'initiative' | 'pins' }>;
 type LayerState = SceneState & Partial<Pick<ViewState, 'initiative' | 'initiativeTrackerOpen'>>;
 
 interface Sent {
@@ -53,7 +54,8 @@ interface AnnotationKey {
 
 /**
  * What players see of the map beside its tokens, fog and lighting, sent to all whenever it changes, at
- * most every `MAP_LAYER_INTERVAL_MS`: the grid, the drawings and texts that fog does not cover whole,
+ * most every `MAP_LAYER_INTERVAL_MS`: the grid, the water, lava and acid that move on the map (part of
+ * the map's picture, under its lighting and fog, so all of the floor's), the drawings and texts that fog does not cover whole,
  * the initiative list, the widgets (`WidgetShare`) and, in a lit scene, the badges of the doors they see and the outlines of the
  * tokens they only sense. Of the pins only those the GM made readable, where the players see the map
  * (`ReadablePins`); every other pin is the GM's alone and never sent.
@@ -70,6 +72,8 @@ export class MapLayerShare {
   private readonly last = new Map<LayerMessage['t'], Sent>();
   private annotations: { readonly key: AnnotationKey; readonly value: SharedAnnotations } | null = null;
   private annotationsSent: SharedAnnotations | null = null;
+  private readonly liquids: SharedLiquids;
+  private liquidsSent: readonly SharedLiquid[] | null = null;
   /** Vault paths of the portraits the last initiative list shows, by hash. */
   private shownArt = new Map<string, string>();
 
@@ -79,6 +83,7 @@ export class MapLayerShare {
     this.pacer = new Pacer(ports, MAP_LAYER_INTERVAL_MS, () => this.flush());
     this.art = new ArtRefs((path) => ports.readImage(path), () => this.update());
     this.pins = new ReadablePins(() => ports.randomId());
+    this.liquids = new SharedLiquids(() => ports.randomId());
     this.widgets = new WidgetShare(store, { ...ports, showWidgets: () => ports.atlasSettings().showWidgets });
   }
 
@@ -89,6 +94,8 @@ export class MapLayerShare {
     this.last.clear();
     this.annotations = null;
     this.annotationsSent = null;
+    this.liquids.clear();
+    this.liquidsSent = null;
     this.shownArt = new Map();
     this.art.clear();
     this.pins.clear();
@@ -126,6 +133,7 @@ export class MapLayerShare {
     if (scene === null || source === null || !state.mapLoaded || state.isMapLoading) return;
     const settings = this.ports.atlasSettings();
     this.publish({ t: 'grid', scene: scene.id, grid: sharedGrid(source.grid()) });
+    this.publishLiquids(scene.id, levelObjects(state).liquids);
     const fog = this.fog.get(levelObjects(state).fog, levelMapKey(state.mapPath, state));
     const annotations = this.annotationsOf(state, fog);
     // Drawings may run to megabytes: they are compared as text only when worked out anew.
@@ -181,6 +189,17 @@ export class MapLayerShare {
     const value = sharedAnnotations(levelObjects(state).drawings, levelObjects(state).texts, fog);
     this.annotations = { key, value };
     return value;
+  }
+
+  /**
+   * The floor's surfaces, compared as text only when worked out anew (they may run to megabytes); none
+   * are said of a floor that has had none, so older pages and maps without liquids cost no message.
+   */
+  private publishLiquids(scene: string, record: Parameters<SharedLiquids['of']>[0]): void {
+    const liquids = this.liquids.of(record);
+    if (liquids === this.liquidsSent || (liquids.length === 0 && !this.last.has('liquids'))) return;
+    this.liquidsSent = liquids;
+    this.publish({ t: 'liquids', scene, liquids });
   }
 
   /** Sends a message unless it says what the last of its kind said. */

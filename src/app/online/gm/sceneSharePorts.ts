@@ -9,7 +9,7 @@ import type { MarkSharePorts } from './MarkShare.ts';
 import type { RemoteDrag } from '../marks/index.ts';
 import type { RulesSharePorts } from './RulesShare.ts';
 import type { SeatSource } from './seatSource.ts';
-import type { TokenSharePorts } from './TokenShare.ts';
+import type { TokenSharePorts, VaultImage } from './TokenShare.ts';
 
 /** What the shared scene of an Atlas tab reads of the tab and the table, and how it reaches players. */
 export interface SceneSharePorts extends TokenSharePorts, RulesSharePorts, Pick<MarkSharePorts, 'gmMarks' | 'showPlayerMarks' | 'showPlayerCursors' | 'nameOf'> {
@@ -34,6 +34,8 @@ export interface SceneSharePorts extends TokenSharePorts, RulesSharePorts, Pick<
   mapLayers?(): MapLayerSource | null;
   /** Scales an image for a player who asks for a longest side; without it players get originals only. */
   scaleImage?: ScaleImage;
+  /** An animated map's video as players may be sent it beside its poster (`readVaultVideo`); without it players get the poster only. */
+  readVideo?: ((path: string) => Promise<VaultImage | null>) | undefined;
   /** Takes a roll of the shared tab into the table's log. */
   logRoll?(roll: LoggedRoll): void;
   /** The vault path of a speaker's artwork the log shows, by hash. */

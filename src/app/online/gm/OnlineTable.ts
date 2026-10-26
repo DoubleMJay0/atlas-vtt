@@ -25,7 +25,7 @@ import { CoveredPages } from './coveredPages.ts';
 import { TableConnection, type TableStatus } from './TableConnection.ts';
 import { TableRoster } from './tableRoster.ts';
 import { closingText, tableEndOf, tableEndText, type TableEnd } from './tableEnd.ts';
-import { readVaultImage } from './vaultImage.ts';
+import { readVaultImage, readVaultVideo } from './vaultImage.ts';
 import { LOST_NOTICES, type OnlineTableEvents } from './tableEvents.ts';
 
 export type { OnlineTableEvents };
@@ -145,6 +145,7 @@ export class OnlineTable {
         send: (body, to) => this.connection.send(body, to),
         sendLive: (body, key, to) => this.covers.sendLive(body, key, to),
         readImage: (path) => readVaultImage(app, path),
+        readVideo: (path) => readVaultVideo(app, path),
         isLive: (binding) => this.watch.isLive(binding),
         randomId: () => randomHex(12),
         logRoll: (roll) => this.log.rolled(roll),
