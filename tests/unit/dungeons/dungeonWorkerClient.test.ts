@@ -163,6 +163,37 @@ describe('the dungeon worker client', () => {
     await expect(style).resolves.not.toBeNull();
   });
 
+  it('shares thumbnails out to helper workers, drops them there too, and stops an idle helper', async () => {
+    vi.useFakeTimers();
+    const workers: FakeWorker[] = [];
+    const client = new DungeonWorkerClient({
+      createWorker: () => {
+        const worker = new FakeWorker();
+        workers.push(worker);
+        return worker as unknown as Worker;
+      },
+      helpers: 2,
+    });
+    const thumbnail = (seed: number): DungeonJob => ({ ...job(seed), output: { kind: 'thumbnail', width: 272, height: 204, legibleAt: 2 } });
+
+    const preview = client.preview(job(1));
+    const drawn = [2, 3, 4].map(seed => client.thumbnail(thumbnail(seed), 'styles'));
+    const dropped = client.thumbnail(thumbnail(5), 'styles');
+    // The main worker draws the preview; the first three thumbnails each go to whoever is least busy
+    expect(workers.map(worker => worker.sent.map(m => m.job.request.seed))).toEqual([[1], [2], [3]]);
+
+    client.dropThumbnails('styles');
+    await expect(dropped).resolves.toBeNull();
+    for (const worker of workers) worker.answer({ id: worker.lastJob(), ok: true, result: rendered() });
+    await expect(preview).resolves.not.toBeNull();
+    await expect(Promise.all(drawn)).resolves.toEqual([null, null, null]);
+
+    vi.advanceTimersByTime(60_000);
+    expect(workers.map(worker => worker.terminated)).toEqual([false, true, true]);
+    client.dispose();
+    vi.useRealTimers();
+  });
+
   it('fails the job of a worker that crashed and starts a new one for the next', async () => {
     const workers: FakeWorker[] = [];
     const client = clientWith(workers);

@@ -46,12 +46,13 @@ const NONE: ReadonlyMap<DungeonStyleId, ImageBitmap> = new Map();
 
 /**
  * The style gallery's thumbnails of the dungeon as shown, one per style, drawn by the dungeon
- * worker after any preview. A new dungeon, view or card size drops the thumbnails still asked
- * for; those already drawn are kept for the last pictures, so returning to one draws nothing.
+ * worker and its helpers after any preview, and shown together once all are drawn. A new dungeon,
+ * view or card size drops the thumbnails still asked for; those already drawn are kept for the
+ * last pictures, so returning to one draws nothing.
  */
 export function useStyleThumbnails(renderer: ThumbnailRenderer, input: ThumbnailInput): ReadonlyMap<DungeonStyleId, ImageBitmap> {
   const cache = useRef<ThumbnailCache<DungeonStyleId> | null>(null);
-  cache.current ??= new ThumbnailCache<DungeonStyleId>();
+  cache.current ??= new ThumbnailCache<DungeonStyleId>(DUNGEON_STYLES.map(entry => entry.id));
   const [, redraw] = useState(0);
   const { request, model, view, size, first } = input;
   const firstRef = useRef(first);
@@ -74,6 +75,7 @@ export function useStyleThumbnails(renderer: ThumbnailRenderer, input: Thumbnail
         if (cache.current!.put(picture, id, result.image.bitmap) && live) redraw(n => n + 1);
       }, (error: unknown) => {
         console.error('[Atlas] A dungeon style thumbnail could not be drawn', error);
+        if (cache.current!.fail(picture, id) && live) redraw(n => n + 1);
       });
     }
     return () => {
@@ -84,5 +86,5 @@ export function useStyleThumbnails(renderer: ThumbnailRenderer, input: Thumbnail
 
   useEffect(() => () => cache.current?.clear(), []);
 
-  return picture ? cache.current.of(picture) : NONE;
+  return picture ? cache.current.shown(picture) : NONE;
 }
