@@ -37,6 +37,10 @@
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 - The command palette keeps a steady width above a toolbar with very few or very many tools
 
+## Fixed
+
+- Tags removed in an asset's Manage Tags dialog are removed from it; tags given in the token creator or Edit Token showed there as missing and stayed on the asset
+
 ## Important changes
 
 - A scene with several floors is saved in a newer format that older versions of Atlas cannot open; scenes with one floor are saved as before
