@@ -37,6 +37,9 @@
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
 - The command palette keeps a steady width above a toolbar with very few or very many tools
 
+## Fixed
+- Scenes open again in vaults with a plugin that adds its own functions to every list (such as an early DnD Beyond importer build), where they failed with "WebGL could not start" and then a blank map
+
 ## Important changes
 
 - A scene with several floors is saved in a newer format that older versions of Atlas cannot open; scenes with one floor are saved as before
