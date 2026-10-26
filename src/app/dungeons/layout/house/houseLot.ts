@@ -9,7 +9,7 @@
 import { cellKey } from '../../geometry';
 import type { CellPoint, GroundsPiece } from '../../model';
 import { type Rng, chance, int } from '../../rng';
-import { type Box, box, boxCells } from './houseGrid';
+import { type Box, box, boxCells, inBox } from './houseGrid';
 import type { HouseSize } from './houseParams';
 
 /** Cells of ground round the house on each side, by the map's size (inclusive ranges). */
@@ -19,8 +19,8 @@ const MARGINS: Record<HouseSize, { front: [number, number]; side: [number, numbe
   large: { front: [9, 14], side: [4, 7], back: [6, 12] },
 };
 
-/** A front this deep or deeper turns the drive round a fountain before the porch. */
-const SWEEP_FRONT = 12;
+/** Rows of front the turning circle needs beyond its own: the drive's row from the porch and two to the gate. */
+const SWEEP_SPARE = 8;
 
 export interface Lot {
   box: Box;
@@ -31,6 +31,8 @@ export interface Lot {
   taken: Set<string>;
   /** The cells of the way from the gate to the porch. */
   way: CellPoint[];
+  /** The box of cells the drive turns round its fountain in, or null. */
+  sweep: Box | null;
 }
 
 /**
@@ -48,9 +50,10 @@ export function houseLot(rng: Rng, size: HouseSize, around: Box, door: readonly 
   const taken = new Set<string>();
   const take = (cells: readonly CellPoint[]): void => cells.forEach((c) => taken.add(cellKey(c.x, c.y)));
   const drive = size === 'large';
-  const width = drive ? 3 : 2;
+  // The way in is centred on the door, so it is as odd or even as the door is wide: a walk two or three cells, a drive two more.
+  const width = (door.length === 1 ? 3 : 2) + (drive && door.length === 2 ? 2 : 0);
   const doorX = Math.min(...door.map((c) => c.x));
-  const x0 = doorX - Math.floor((width - door.length) / 2);
+  const x0 = doorX - (width - door.length) / 2;
   const bottom = lot.y + lot.h - 1;
   const gate = Array.from({ length: width }, (_, k) => ({ x: x0 + k, y: bottom }));
   if (walled) {
@@ -61,24 +64,27 @@ export function houseLot(rng: Rng, size: HouseSize, around: Box, door: readonly 
     take(ring);
   }
   const porchRow = door[0]!.y;
-  const sweep = drive && front >= SWEEP_FRONT ? sweepAround(x0, width, porchRow + 2) : null;
-  const inCentre = (c: CellPoint): boolean => !!sweep?.centre.some((m) => m.x === c.x && m.y === c.y);
+  const sweep = drive && front >= width + SWEEP_SPARE ? sweepAround(x0, width, porchRow + 2) : null;
+  const inCentre = (c: CellPoint): boolean => !!sweep && inBox(sweep.island, c.x, c.y);
   const straight = boxCells(box(x0, porchRow + 1, width, Math.max(0, (walled ? bottom : lot.y + lot.h) - porchRow - 1))).filter((c) => !inCentre(c));
   const way = [...straight, ...(sweep?.ring ?? []).filter((c) => !straight.some((w) => w.x === c.x && w.y === c.y))];
   pieces.push({ kind: drive ? 'drive' : 'path', cells: way });
-  if (sweep) pieces.push({ kind: 'garden-fountain', cells: sweep.centre, at: { x: sweep.centre[0]!.x + 1, y: sweep.centre[0]!.y + 1 } });
+  if (sweep) pieces.push({ kind: 'garden-fountain', cells: sweep.centre, at: { x: sweep.island.x + sweep.island.w / 2, y: sweep.island.y + sweep.island.h / 2 } });
   // The porch before the front door: its floor and a column at each outer corner.
   const porch = boxCells(box(x0, porchRow, width, 1));
   pieces.push({ kind: 'porch', cells: porch, columns: [{ x: x0 + 0.15, y: porchRow + 0.85 }, { x: x0 + width - 0.15, y: porchRow + 0.85 }] });
   take([...way, ...porch, ...(sweep ? [...sweep.ring, ...sweep.centre] : [])]);
-  return { box: lot, walled, pieces, taken, way };
+  return { box: lot, walled, pieces, taken, way, sweep: sweep?.outer ?? null };
 }
 
-/** The ring a drive turns round before the porch: a loop two cells wide round a square of two cells holding a fountain. */
-function sweepAround(x0: number, width: number, top: number): { ring: CellPoint[]; centre: CellPoint[] } {
-  const cx = x0 + Math.floor(width / 2) - 1;
-  const outer = box(cx - 2, top, 6, 6);
-  const centre = boxCells(box(cx, top + 2, 2, 2));
-  const ring = boxCells(outer).filter((c) => !centre.some((m) => m.x === c.x && m.y === c.y));
-  return { ring, centre };
+/**
+ * The circle a drive turns round before the porch, on the door's axis: a loop two cells wide round an
+ * island as wide as the drive, the fountain in its middle, so porch, fountain and gate lie on one line.
+ */
+function sweepAround(x0: number, width: number, top: number): { outer: Box; island: Box; ring: CellPoint[]; centre: CellPoint[] } {
+  const outer = box(x0 - 2, top, width + 4, width + 4);
+  const island = box(x0, top + 2, width, width);
+  const centre = boxCells(island);
+  const ring = boxCells(outer).filter((c) => !inBox(island, c.x, c.y));
+  return { outer, island, ring, centre };
 }

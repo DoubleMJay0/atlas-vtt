@@ -13,7 +13,7 @@ import { hops, neighbours, openDoor } from '../../roomGraph';
 import { type Rng, rngFrom } from '../../rng';
 import { type Noise2, fractalNoise } from '../../water/noise';
 import { CaveGrid, type CaveFloorPlan, NEAR4, NEAR8, unkey } from './caveGrid';
-import { MinHeap } from './minHeap';
+import { MinHeap } from '../minHeap';
 import { type LaneOwner, crossingConflict, entranceDoor, laneConflict, laneOwners } from './laneCells';
 
 export { claimLane } from './laneCells';

@@ -176,7 +176,8 @@ function groundsOf(seed: number, size: HouseSize, ground: PlannedFloor, front: D
   const lot = houseLot(rng, size, around, doorCells(front));
   // The garden door leads out of the back of the house, towards −y.
   const garden = ground.doors.find((d) => d.from === null && d.dir.y === 1) ?? null;
-  const grounds = houseGrounds(rng, size, lot, keys, around, true, garden && { x: garden.x, y: garden.y });
+  const gardenCells = garden && doorCells(garden);
+  const grounds = houseGrounds(rng, size, lot, keys, around, true, gardenCells && { x: Math.min(...gardenCells.map((c) => c.x)), y: garden.y, width: gardenCells.length });
   return { lot: grounds.lot, pieces: grounds.pieces.filter((piece) => DRAWN_GROUNDS_KINDS.has(piece.kind)) };
 }
 

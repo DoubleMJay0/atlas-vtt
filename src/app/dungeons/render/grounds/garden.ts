@@ -4,6 +4,7 @@
  * pedestal bowl in its middle; and the porch's two columns, each a square plinth under its capital.
  */
 
+import { cellsBox } from '../../geometry';
 import type { GroundsPiece } from '../../model';
 import type { Hand } from '../art/hand';
 import { polyPath, rectPoly } from '../art/paths';
@@ -21,22 +22,24 @@ export function drawTree(paint: GroundsPaint, crown: Crown): void {
 export function drawFountain(hand: Hand, paint: GroundsPaint, fountain: GroundsPiece): void {
   const c = fountain.at;
   if (!c) return;
+  // The basin grows with its island: a drive four cells wide turns round an island of four.
+  const s = 0.55 + 0.45 * (cellsBox(fountain.cells).w / 2);
   const octagon = (r: number): Vec[] => Array.from({ length: 8 }, (_, k) => ({ x: c.x + Math.cos(((k + 0.5) / 8) * Math.PI * 2) * r, y: c.y + Math.sin(((k + 0.5) / 8) * Math.PI * 2) * r }));
-  const rim = octagon(0.9);
-  const water = octagon(0.76);
+  const rim = octagon(0.9 * s);
+  const water = octagon(0.76 * s);
   hand.surface(polyPath(rim), 'dressed');
   hand.line(rim.map((p, k) => [p, water[k]!]), 'fine');
-  paint.pool(polyPath(water), c, 0.76);
+  paint.pool(polyPath(water), c, 0.76 * s);
   hand.edges(water, false);
   hand.edges(rim, true);
-  const pedestal = circle(c, 0.3, 32);
-  const bowl = circle(c, 0.22, 32);
+  const pedestal = circle(c, 0.3 * s, 32);
+  const bowl = circle(c, 0.22 * s, 32);
   hand.surface(polyPath(pedestal), 'dressed');
-  hand.solid(polyPath(pedestal), c, 0.3, 0.8);
+  hand.solid(polyPath(pedestal), c, 0.3 * s, 0.8);
   hand.edges(pedestal, true);
-  paint.pool(polyPath(bowl), c, 0.22);
+  paint.pool(polyPath(bowl), c, 0.22 * s);
   hand.edges(bowl, false);
-  const jet = circle(c, 0.045, 12);
+  const jet = circle(c, 0.045 * s, 12);
   hand.surface(polyPath(jet), 'metal');
   hand.edges(jet, true);
 }

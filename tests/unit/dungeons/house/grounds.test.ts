@@ -6,6 +6,9 @@ vi.mock('../../../../src/app/dungeons/drawnKinds', async (original) => ({ ...(aw
 
 import { generateDungeon } from '../../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../../src/app/dungeons/model';
+import { groundsLayout } from '../../../../src/app/dungeons/render/grounds/groundsShapes';
+import { sweepOf } from '../../../../src/app/dungeons/render/grounds/wayLines';
+import { pointInPolygon, pointSegmentDistance } from '../../../../src/app/dungeons/render/geometry';
 import { groundsWalls } from '../../../../src/app/dungeons/scene/toGroundsWalls';
 import { groundsRules, lotMargins } from './groundsRules';
 
@@ -47,5 +50,21 @@ describe('the grounds of a house', () => {
       const masonry = grounds.pieces.some((p) => p.kind === 'boundary-wall' || p.kind === 'outbuilding');
       expect(walls.some((w) => w.type === 'solid' && w.blocks === undefined)).toBe(masonry);
     }
+  });
+
+  it('draw their ways over the cells the scene gives them: the middle of every way cell on the drawn ground or within a tenth of a cell of it, but the corners of the box the drive turns in, which its circle leaves', () => {
+    const misses: string[] = [];
+    for (const { model } of RUNS) {
+      const floor = model.floors[0]!;
+      const layout = groundsLayout(floor);
+      if (!layout) continue;
+      const inside = (x: number, y: number): boolean => layout.ways.reduce((n, ring) => n + (pointInPolygon(ring, x, y) ? 1 : 0), 0) % 2 === 1;
+      const near = (x: number, y: number): boolean => layout.ways.some((ring) => ring.some((p, i) => pointSegmentDistance({ x, y }, p, ring[(i + 1) % ring.length]!) < 0.1));
+      const sweep = sweepOf(floor.grounds!.pieces.find((p) => p.kind === 'garden-fountain'));
+      const inTurn = (c: { x: number; y: number }): boolean => !!sweep && Math.abs(c.x + 0.5 - sweep.centre.x) < sweep.reach && Math.abs(c.y + 0.5 - sweep.centre.y) < sweep.reach && Math.hypot(c.x + 0.5 - sweep.centre.x, c.y + 0.5 - sweep.centre.y) > sweep.outer;
+      const cells = floor.grounds!.pieces.filter((p) => p.kind === 'path' || p.kind === 'drive').flatMap((p) => p.cells).filter((c) => !inTurn(c));
+      for (const c of cells) if (!inside(c.x + 0.5, c.y + 0.5) && !near(c.x + 0.5, c.y + 0.5)) misses.push(`seed ${model.seed}: ${c.x},${c.y}`);
+    }
+    expect(misses.slice(0, 8)).toEqual([]);
   });
 });

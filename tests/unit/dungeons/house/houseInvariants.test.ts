@@ -49,7 +49,7 @@ const RULES: Record<string, (m: DungeonModel) => string[]> = {
   '4 stacks rise through the same cells': stacksRise,
   '5 the main rooms are warmed from stacks, fireplaces stand on them (the rest in houseChimneys.test.ts)': stacksWarm,
   '6 the hall takes the front door and the main stair': hallAtTheFront,
-  '7 a wide way from the gate to the front door': groundsRules.wideWalkIn,
+  '7 a wide way from the gate to the front door, on its axis': (m) => [...groundsRules.wideWalkIn(m), ...groundsRules.approachOnAxis(m)],
   '8 every room is reached': allReached,
   '9–10 rooms open on corridors, corridors are wide enough': onCorridors,
   '11 no door from drawing room to dining room or kitchen': receptionApart,
@@ -59,7 +59,7 @@ const RULES: Record<string, (m: DungeonModel) => string[]> = {
   '15 main rooms are lit, windows stand over windows (the rest in houseWindows.test.ts)': (m) => [...mainRoomsLit(m), ...windowsOverWindows(mirrored)(m)],
   '16 walls stand on walls below': wallsAlign,
   '17–18 doors on edges, clear of corners and stairs': doorsOnEdges,
-  '20 outbuildings on the lot, each by a path': groundsRules.outbuildings,
+  '20 outbuildings on the lot, each by a path; walks laid out from door to way': (m) => [...groundsRules.outbuildings(m), ...groundsRules.walksLaidOut(m)],
   '21 the boundary closed but at its gates': groundsRules.closedBoundary,
   '22 structure only': structureOnly,
   'terrain keeps its cells, ways, bridges and holes': (m) =>
