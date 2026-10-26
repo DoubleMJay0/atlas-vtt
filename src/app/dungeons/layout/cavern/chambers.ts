@@ -1,5 +1,5 @@
 /**
- * A cave chamber grown cell by cell inside its room's rectangle (Watabou's seed growth on square
+ * A cave chamber grown cell by cell inside its room's rectangle (seed growth on square
  * cells): from what the room must keep (a 3 × 3 core near its middle, the cells before its doors,
  * its stairwells and their rows, the lane, the boss arena's platform), each step taking a cell
  * beside the chamber, likelier the more of its eight neighbours are already chamber (`pow(c,

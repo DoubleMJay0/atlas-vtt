@@ -9,7 +9,7 @@ export type Rng = () => number;
  */
 export type RngStream = 'layout' | 'stairs' | 'terrain' | 'furnish' | 'props' | 'water' | 'growth' | 'rooms' | 'cave' | 'render' | 'lights';
 
-/** Largest seed a GM can type (as Watabou's: 1 to 2³¹ − 2). */
+/** Largest seed a GM can type (1 to 2³¹ − 2). */
 export const MAX_SEED = 2_147_483_646;
 
 /** mulberry32: small, fast, full 32-bit period, good enough for maps. */
