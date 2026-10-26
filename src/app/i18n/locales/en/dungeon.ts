@@ -55,8 +55,6 @@ export const dungeon = {
   'dungeon.view.waterLevel': 'Water level',
   'dungeon.view.waterByTags': 'By tags',
   'dungeon.view.props': 'Props',
-  'dungeon.view.shadow': 'Shadow',
-  'dungeon.view.secrets': 'Secret rooms',
   'dungeon.view.monochrome': 'Monochrome',
 
   'dungeon.room.hide': 'Hide these secret rooms',

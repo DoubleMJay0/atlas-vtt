@@ -48,8 +48,8 @@ export function readDungeonView(value: unknown, base: DungeonView = DEFAULT_VIEW
     smallTiles: flag(record.smallTiles, base.smallTiles),
     water: flag(record.water, base.water),
     props: flag(record.props, base.props),
-    shadow: flag(record.shadow, base.shadow),
-    secrets: flag(record.secrets, base.secrets),
+    shadow: base.shadow,
+    secrets: base.secrets,
     monochrome: flag(record.monochrome, base.monochrome),
   };
 }

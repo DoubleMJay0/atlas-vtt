@@ -64,7 +64,9 @@ export interface DungeonView {
   smallTiles: boolean;
   water: boolean;
   props: boolean;
+  /** Always on for the GM (no switch); off only where tests draw a layer alone. */
   shadow: boolean;
+  /** Always on for the GM: the Secrets tag decides whether there are secret rooms. */
   secrets: boolean;
   /** Only the style's ink and paper (Stone & shadow: tones between the two). */
   monochrome: boolean;

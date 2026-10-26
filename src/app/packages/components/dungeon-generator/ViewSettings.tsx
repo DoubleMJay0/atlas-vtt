@@ -7,10 +7,10 @@ import type { MessageKey } from '../../../i18n/types';
 import { t } from '../../../i18n';
 import { SwitchRow } from './fields';
 
-type ViewSwitch = Exclude<keyof DungeonView, 'grid' | 'smallTiles' | 'water'>;
+type ViewSwitch = Exclude<keyof DungeonView, 'grid' | 'smallTiles' | 'water' | 'shadow' | 'secrets'>;
 
 /** The layers a switch turns on and off, in the order shown. */
-const SWITCHES: readonly ViewSwitch[] = ['props', 'shadow', 'secrets', 'monochrome'];
+const SWITCHES: readonly ViewSwitch[] = ['props', 'monochrome'];
 
 interface ViewSettingsProps {
   view: DungeonView;
@@ -21,8 +21,8 @@ interface ViewSettingsProps {
 }
 
 /**
- * What the map shows: the grid in sight, the other layers (water and its level, props, shadow,
- * secret rooms, monochrome) folded away under Map options, which few need.
+ * What the map shows: the grid in sight, the other layers (water and its level, props,
+ * monochrome) folded away under Map options, which few need.
  */
 export function ViewSettings({ view, waterLevel, onView, onWaterLevel }: ViewSettingsProps): React.JSX.Element {
   const levelId = useId();
