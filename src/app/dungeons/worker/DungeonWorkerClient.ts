@@ -10,6 +10,10 @@ export interface DungeonWorkerClientOptions {
   /** Used when the worker cannot start. */
   inThread?: InThreadRunner;
   jobTimeoutMs?: number;
+  /** Workers beside this one that draw thumbnails only, so a gallery is drawn in parallel. */
+  helpers?: number;
+  /** Stops the worker once it has been idle this long; the next job starts a new one. */
+  idleMs?: number;
 }
 
 /** Renders go first and are never dropped; a preview follows the latest; thumbnails wait for both. */
@@ -30,6 +34,17 @@ interface Pending {
 /** A huge map takes a few seconds; one that has not come back after this long never will. */
 const JOB_TIMEOUT_MS = 2 * 60_000;
 const STOPPED = 'Drawing dungeons has stopped.';
+/** A helper keeps its warmed textures for a while, so going through the wizard again finds it ready. */
+const HELPER_IDLE_MS = 60_000;
+
+/**
+ * Thumbnail helpers by the cores the device has: none on two, at most three (a cave's gallery
+ * takes 2.7 s on one worker, 0.8 s with three helpers). Each worker builds its own textures on
+ * its first drawing, about a second, so more would mostly repeat that work.
+ */
+function helperCount(): number {
+  return Math.min(3, Math.max(0, (navigator.hardwareConcurrency || 2) - 2));
+}
 
 function closeImage(result: DungeonRendered): void {
   if (result.image.type === 'bitmap') result.image.bitmap.close();
@@ -40,8 +55,9 @@ function closeImage(result: DungeonRendered): void {
  * dungeons off the main thread one job at a time. Previews follow the latest request: a preview
  * still queued gives way to a newer one, and one already running is answered with null.
  * Thumbnails (the style gallery's and theme cards) run only while nothing else waits, and are
- * answered with null once their group is dropped. A worker
- * that crashes or stops answering fails its job and is started anew for the next.
+ * answered with null once their group is dropped; they go to whichever of this worker and its
+ * helpers has the least to do. A worker that crashes or stops answering fails its job and is
+ * started anew for the next.
  */
 export class DungeonWorkerClient {
   private static readonly instances = new WeakMap<App, DungeonWorkerClient>();
@@ -52,6 +68,7 @@ export class DungeonWorkerClient {
       client = new DungeonWorkerClient({
         createWorker: () => new DungeonWorker({ name: 'Atlas dungeons' }),
         inThread: (job) => runDungeonJob(job),
+        helpers: helperCount(),
       });
       DungeonWorkerClient.instances.set(app, client);
     }
@@ -68,6 +85,9 @@ export class DungeonWorkerClient {
   private running: Pending | null = null;
   private readonly queue: Pending[] = [];
   private timeout: number | null = null;
+  private idle: number | null = null;
+  /** Made with the first thumbnail once this worker runs; none where dungeons are drawn in the window. */
+  private helpers: DungeonWorkerClient[] | null = null;
   private nextId = 1;
   private disposed = false;
 
@@ -88,12 +108,31 @@ export class DungeonWorkerClient {
 
   /** Draws a thumbnail of `group` once no render or preview waits, or answers null once dropped. */
   thumbnail(job: DungeonJob, group?: string): Promise<DungeonRendered | null> {
-    return this.enqueue(job, 'thumbnail', group);
+    // Helpers first, so a tie leaves this worker free for the next preview
+    const drawers = [...this.thumbnailHelpers(), this];
+    const least = drawers.reduce((best, drawer) => (drawer.load() < best.load() ? drawer : best));
+    return least.enqueue(job, 'thumbnail', group);
   }
 
   /** Drops the thumbnails of `group` (every one without it) asked for and not yet answered: they answer null. */
   dropThumbnails(group?: string): void {
-    this.drop('thumbnail', group);
+    for (const drawer of [this, ...(this.helpers ?? [])]) drawer.drop('thumbnail', group);
+  }
+
+  private thumbnailHelpers(): readonly DungeonWorkerClient[] {
+    if (this.helpers) return this.helpers;
+    if (!this.worker || !this.options.helpers) return [];
+    const { createWorker, jobTimeoutMs } = this.options;
+    this.helpers = Array.from({ length: this.options.helpers }, () => new DungeonWorkerClient({
+      createWorker,
+      idleMs: HELPER_IDLE_MS,
+      ...(jobTimeoutMs !== undefined && { jobTimeoutMs }),
+    }));
+    return this.helpers;
+  }
+
+  private load(): number {
+    return this.queue.length + (this.running ? 1 : 0);
   }
 
   private drop(lane: Lane, group?: string): void {
@@ -109,6 +148,7 @@ export class DungeonWorkerClient {
   dispose(): void {
     this.disposed = true;
     this.stopWorker();
+    for (const helper of this.helpers ?? []) helper.dispose();
     const failed = [...(this.running ? [this.running] : []), ...this.queue.splice(0)];
     this.running = null;
     for (const pending of failed) pending.reject(new Error(STOPPED));
@@ -116,6 +156,7 @@ export class DungeonWorkerClient {
 
   private enqueue(job: DungeonJob, lane: Lane, group?: string): Promise<DungeonRendered | null> {
     if (this.disposed) return Promise.reject(new Error(STOPPED));
+    this.clearIdle();
     return new Promise((resolve, reject) => {
       this.queue.push({ id: this.nextId++, job, lane, ...(group !== undefined && { group }), stale: false, resolve, reject });
       this.pump();
@@ -191,6 +232,10 @@ export class DungeonWorkerClient {
     } else if (error) pending.reject(error);
     else pending.resolve(result);
     this.pump();
+    if (!this.running && this.options.idleMs !== undefined) {
+      this.clearIdle();
+      this.idle = window.setTimeout(() => this.stopWorker(), this.options.idleMs);
+    }
   }
 
   /** Fails the running job and stops its worker; the next job starts a new one. */
@@ -202,6 +247,7 @@ export class DungeonWorkerClient {
 
   private stopWorker(): void {
     this.clearTimeout();
+    this.clearIdle();
     this.worker?.terminate();
     this.worker = null;
   }
@@ -210,5 +256,11 @@ export class DungeonWorkerClient {
     if (this.timeout === null) return;
     window.clearTimeout(this.timeout);
     this.timeout = null;
+  }
+
+  private clearIdle(): void {
+    if (this.idle === null) return;
+    window.clearTimeout(this.idle);
+    this.idle = null;
   }
 }

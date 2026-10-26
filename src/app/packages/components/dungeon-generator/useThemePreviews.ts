@@ -22,12 +22,13 @@ export interface ThemePreviewInput {
 /**
  * A picture of the whole entry floor for every theme: the dungeon the wizard asks for, on the same
  * seed, tags and floors, generated in that theme and drawn in the chosen style by the dungeon
- * worker while nothing else waits. Another request, style, view or card size drops the pictures
- * still asked for; those drawn are kept for the last two, so going back to one draws nothing.
+ * worker and its helpers while nothing else waits, and shown together once all are drawn.
+ * Another request, style, view or card size drops the pictures still asked for; those drawn are
+ * kept for the last two, so going back to one draws nothing.
  */
 export function useThemePreviews(renderer: ThumbnailRenderer, input: ThemePreviewInput): ReadonlyMap<ThemeId, ImageBitmap> {
   const cache = useRef<ThumbnailCache<ThemeId> | null>(null);
-  cache.current ??= new ThumbnailCache<ThemeId>();
+  cache.current ??= new ThumbnailCache<ThemeId>(THEME_IDS);
   const [, redraw] = useState(0);
   const { request, style, view, size } = input;
   // The theme picked is the one thing a card changes, so it is left out of the picture.
@@ -61,6 +62,7 @@ export function useThemePreviews(renderer: ThumbnailRenderer, input: ThemePrevie
         if (cache.current!.put(picture, theme, result.image.bitmap) && live) redraw((n) => n + 1);
       }, (error: unknown) => {
         console.error('[Atlas] A dungeon theme preview could not be drawn', error);
+        if (cache.current!.fail(picture, theme) && live) redraw((n) => n + 1);
       });
     }
     return () => {
@@ -71,5 +73,5 @@ export function useThemePreviews(renderer: ThumbnailRenderer, input: ThemePrevie
 
   useEffect(() => () => cache.current?.clear(), []);
 
-  return picture ? cache.current.of(picture) : NONE;
+  return picture ? cache.current.shown(picture) : NONE;
 }
