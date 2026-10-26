@@ -39,12 +39,12 @@
 
 // The map itself is the floating surface: exactly its shape (sized by `PreviewCanvas`), never past
 // the room, its corner the panel's. It clips nothing, so the cell-size dialog may hang out of it.
+// Each picture has one, laid over the last while that fades out: out of flow, but placed by the
+// stage's alignment as its only item would be, so both stand where a lone surface stands.
 .atlas-dungeon-preview__map {
-  position: relative;
-  flex-shrink: 0;
+  position: absolute;
   @include atlas-panel-radius($radius-2xl, 0px);
   box-shadow: $shadow-elevated;
-  transition: width $transition-slow $transition-ease-out, height $transition-slow $transition-ease-out;
 
   // A hairline over the picture, so a white or black look keeps its edge on any theme.
   &::after {
@@ -55,19 +55,21 @@
     box-shadow: inset 0 0 0 $border-width-s color-mix(in oklch, var(--mono-100, #fff) 12%, transparent);
     pointer-events: none;
   }
+}
 
-  &[hidden] {
-    display: none;
-  }
+// The map's tools and floor switcher, over the surface shown: placed as it is, letting presses
+// through to the map but for its controls.
+.atlas-dungeon-preview__chrome {
+  position: absolute;
+  @include atlas-panel-radius($radius-2xl, 0px);
+  pointer-events: none;
 
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
+  > * {
+    pointer-events: auto;
   }
 }
 
-// The picture shown and, over it, the last one fading out (`PreviewCanvas`).
-.atlas-dungeon-preview__canvas,
-.atlas-dungeon-preview__ghost {
+.atlas-dungeon-preview__canvas {
   position: absolute;
   inset: 0;
   display: block;
@@ -76,14 +78,7 @@
   object-fit: contain;
   border-radius: inherit;
   @include atlas-corner-shape;
-}
-
-.atlas-dungeon-preview__canvas {
   transition: filter $transition-slow $transition-ease;
-}
-
-.atlas-dungeon-preview__ghost {
-  pointer-events: none;
 }
 
 // A drawing that takes a moment: the picture shown dims until the next melts in.

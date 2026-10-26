@@ -88,4 +88,29 @@ describe('the dungeon generator in its own tab', () => {
     expect(panel.right).toBeCloseTo(600 - 16, 0);
     expect(panel.bottom).toBeCloseTo(900 - 16, 0);
   });
+
+  it('fades a new picture in on a surface of its own, none of them changing size on the way', async () => {
+    await openTab(1400, 860);
+    MotionGlobalConfig.skipAnimations = false;
+    const sizes = new Map<Element, Set<string>>();
+    let fadedOut = false;
+    let watching = true;
+    const watch = (): void => {
+      const surfaces = [...tab.querySelectorAll('.atlas-dungeon-preview__map')];
+      for (const surface of surfaces) {
+        const { width, height } = surface.getBoundingClientRect();
+        sizes.set(surface, (sizes.get(surface) ?? new Set()).add(`${Math.round(width)}x${Math.round(height)}`));
+      }
+      if (surfaces.length > 1) fadedOut ||= Number(getComputedStyle(surfaces[0]!).opacity) < 1;
+      if (watching) requestAnimationFrame(watch);
+    };
+    watch();
+    const first = tab.querySelector('.atlas-dungeon-preview__map');
+    // New layout, the last of the map's tools
+    act(() => [...tab.querySelectorAll<HTMLButtonElement>('.atlas-dungeon-wizard-preview__tool')].at(-1)!.click());
+    await expect.poll(() => tab.querySelector('.atlas-dungeon-preview__map') !== first && tab.querySelectorAll('.atlas-dungeon-preview__map').length === 1, { timeout: 15000 }).toBe(true);
+    watching = false;
+    expect(fadedOut).toBe(true);
+    for (const seen of sizes.values()) expect([...seen]).toHaveLength(1);
+  });
 });
