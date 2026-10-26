@@ -46,11 +46,12 @@ function drawSlope(hand: Hand, frame: WayFrame, end?: StairEnd): void {
   layDepth(hand, frame, shape, end);
   drawFaceTicks(hand, frame, shape, end, stone ? 0.55 : 1, seed);
   hand.line(shape.rims, 'outline');
+  if (shape.head.length) hand.line(shape.head, 'fine');
   if (!shape.brow) return;
   if (end === 'lower') {
     // The ceiling's edge overhead, which the slope comes down from under: dashed as the aven's rim,
     // each dash on a pale lip so it shows over the dark.
-    const marks = dashes(shape.brow, 0.12, 0.06);
+    const marks = dashes(shape.brow, 0.12, 0.06, false);
     const { ctx } = hand.scene.env;
     const c = stoneOf(hand);
     ctx.save();
@@ -67,8 +68,10 @@ function drawSlope(hand: Hand, frame: WayFrame, end?: StairEnd): void {
     hand.line(marks, 'outline');
     return;
   }
-  // The brow the ramp runs in under: the floor's own edge, standing over the dark.
-  hand.line([shape.brow], 'outline');
+  // The brow the ramp runs in under: an arch of the cave's own rock, standing over the dark.
+  hand.fill(polyPath(shape.browRock!), 'rock');
+  hand.line(shape.browCracks, 'fine');
+  hand.edges(shape.browRock!, true);
 }
 
 export function drawScree(hand: Hand): void {

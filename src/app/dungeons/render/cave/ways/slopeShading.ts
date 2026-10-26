@@ -33,12 +33,12 @@ function fill(hand: Hand, path: PathFn, style: string | CanvasGradient): void {
   ctx.fill();
 }
 
-/** How dark the slope is with depth at `t` (0 its high end, 1 its low end), as black's alpha. */
-function depthAlpha(end: StairEnd | undefined, t: number): number {
-  if (end === 'upper') return t < 0.2 ? 0 : t < 0.6 ? 0.36 * ((t - 0.2) / 0.4) : t < 0.88 ? 0.36 + 0.46 * ((t - 0.6) / 0.28) : 0.82 + 0.16 * ((t - 0.88) / 0.12);
-  if (end === 'lower') return t > 0.6 ? 0 : 0.7 * (1 - t / 0.6) ** 1.4;
-  return 0.3 * Math.max(0, (t - 0.3) / 0.7);
-}
+/** The hollow's darkness out from its deep end (share of its reach, black's alpha). */
+const HOLLOW: Record<StairEnd | 'steps', readonly (readonly [number, number])[]> = {
+  upper: [[0, 0.97], [0.25, 0.9], [0.45, 0.6], [0.7, 0.24], [1, 0]],
+  lower: [[0, 0.88], [0.3, 0.6], [0.6, 0.2], [1, 0]],
+  steps: [[0, 0.32], [0.5, 0.14], [1, 0]],
+};
 
 /** The faces in rock, shaded and lit by their facing (Stone), before the slope's depth is laid. */
 export function layFaces(hand: Hand, frame: WayFrame, shape: ScreeShape, end?: StairEnd): void {
@@ -66,12 +66,22 @@ export function layDepth(hand: Hand, frame: WayFrame, shape: ScreeShape, end?: S
     if (end) fill(hand, polyPath(shape.ramp), withAlpha('#000000', 0.3));
     return;
   }
-  const [a, b] = [frame.at(0, shape.vAt(0)), frame.at(0, shape.vAt(1))];
-  const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-  for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, withAlpha('#000000', depthAlpha(end, k / 6)));
-  // Only where the slope darkens: the gradient is clear above it, and its fill costs by its area.
-  const [t0, t1] = end === 'upper' ? [0.17, 1] : end === 'lower' ? [0, 0.65] : [0.25, 1];
-  fill(hand, polyPath(shape.outlineBetween(t0, t1)), g);
+  // A hollow, not a flat ramp: the depth is an ellipse round the cutting's deep end, so its contours
+  // curve across the slope and reach farther up its middle than along its faces.
+  const { hollow } = shape;
+  const [rx, ry] = frame.down.x ? [hollow.along, hollow.across] : [hollow.across, hollow.along];
+  // The path is traced in the map's frame and the gradient laid in the ellipse's: one fill, no clip.
+  ctx.save();
+  ctx.beginPath();
+  polyPath(shape.outline)(ctx);
+  ctx.translate(hollow.at.x, hollow.at.y);
+  ctx.scale(rx, ry);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+  // Out from the deep end: black along the brow, falling off up the ramp, faster towards its faces.
+  for (const [q, alpha] of HOLLOW[end ?? 'steps']) g.addColorStop(q, withAlpha('#000000', alpha));
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.restore();
   if (shape.opening) fill(hand, polyPath(shape.opening), withAlpha('#000000', 0.9));
   layFaceShadow(hand, frame, shape, end);
 }
@@ -107,16 +117,31 @@ function inkDepth(hand: Hand, frame: WayFrame, shape: ScreeShape, end: StairEnd 
   cut(ctx);
   ctx.clip();
   for (const [t0, t1, level, kind] of bands) {
-    const band = slopeBand(frame, shape, t0, t1);
-    hand.tone(() => level, pointsBounds(band), polyPath(band), kind);
+    const band = slopeBand(frame, shape, t0, t1, end);
+    // Hatching costs by the area it covers: only where the band and the cutting meet.
+    const [b, c] = [pointsBounds(band), pointsBounds(shape.outline)];
+    const bounds = { minX: Math.max(b.minX, c.minX), minY: Math.max(b.minY, c.minY), maxX: Math.min(b.maxX, c.maxX), maxY: Math.min(b.maxY, c.maxY) };
+    if (bounds.minX < bounds.maxX && bounds.minY < bounds.maxY) hand.tone(() => level, bounds, polyPath(band), kind);
   }
   ctx.restore();
   if (shape.opening) hand.tone(() => 1, pointsBounds(shape.opening), polyPath(shape.opening), 'depth');
 }
 
 /** The slope between `t0` and `t1`, its edges across the slope wandering, so a change of tone reads as rock, not a ruled line. */
-function slopeBand(frame: WayFrame, shape: ScreeShape, t0: number, t1: number): Vec[] {
-  const edge = (t: number): Vec[] => Array.from({ length: 9 }, (_, i) => frame.at((i / 8 - 0.5) * frame.across, shape.vAt(t) + (t > 0 && t < 1 ? 0.06 * Math.sin(i * 2.3 + t * 11) : 0)));
+function slopeBand(frame: WayFrame, shape: ScreeShape, t0: number, t1: number, end: StairEnd | undefined): Vec[] {
+  // A contour of the hollow: bowed towards the high end in the ramp's middle, its edge feathered so
+  // the hatching of two bands ends in a ragged line, never a ruled one.
+  // The deep end lies at t = 1 (the mouth) or, from below, at t = 0 (the opening): contours bow away from it.
+  const away = end === 'lower' ? 1 : -1;
+  const half = frame.across / 2;
+  const edge = (t: number): Vec[] => Array.from({ length: 21 }, (_, i) => {
+    const s = i / 20 * 2 - 1;
+    const inner = t > 0 && t < 1;
+    const bow = inner ? away * 0.3 * (1 - (s / 0.8) ** 2) : 0;
+    // Feathered: the edge wanders at two scales, never a regular tooth.
+    const feather = inner ? 0.06 * (valueNoise(i * 0.9, t * 23, 5) - 0.5) * 2 + 0.03 * (valueNoise(i * 2.7, t * 31, 9) - 0.5) * 2 : 0;
+    return frame.at(s * half, shape.vAt(t) + bow + feather);
+  });
   return [...edge(t0), ...edge(t1).reverse()];
 }
 
@@ -134,9 +159,9 @@ export function drawFaceTicks(hand: Hand, frame: WayFrame, shape: ScreeShape, en
     const foot = raised ? shape.rims[index]! : shape.edges[index]!;
     const heavy = shape.faces[index]!.side === towards ? 1.5 : 1;
     const n = top.length - 1;
-    // Along the face, about one tick every 0.14 cells.
+    // Along the face, about one tick every 0.16 cells.
     const length = top.reduce((sum, p, i) => (i ? sum + Math.hypot(p.x - top[i - 1]!.x, p.y - top[i - 1]!.y) : 0), 0);
-    const count = Math.max(4, Math.round(length / 0.14));
+    const count = Math.max(4, Math.round(length / 0.16));
     for (let k = 0; k <= count; k++) {
       const f = (k + 0.3 * (valueNoise(k * 1.9, index * 7, seed) - 0.5)) / count * n;
       const i = Math.min(n - 1, Math.max(0, Math.floor(f)));

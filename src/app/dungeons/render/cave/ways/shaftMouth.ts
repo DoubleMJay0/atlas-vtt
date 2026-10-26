@@ -66,13 +66,13 @@ export function shiftedBack(ring: readonly Vec[], dir: Vec, d: number): Vec[] {
   return ring.map(p => ({ x: p.x + dir.x * d, y: p.y + dir.y * d })).reverse();
 }
 
-/** A closed ring cut into dashes, as a cartographer draws what lies overhead. */
-export function dashes(ring: readonly Vec[], dash: number, gap: number): Vec[][] {
+/** A closed ring (or, `closed` false, an open line) cut into dashes, as a cartographer draws what lies overhead. */
+export function dashes(ring: readonly Vec[], dash: number, gap: number, closed = true): Vec[][] {
   const out: Vec[][] = [];
   let run: Vec[] = [];
   let left = dash;
   let drawing = true;
-  for (let i = 0; i < ring.length; i++) {
+  for (let i = 0; i < ring.length - (closed ? 0 : 1); i++) {
     let a = ring[i]!;
     const b = ring[(i + 1) % ring.length]!;
     let len = Math.hypot(b.x - a.x, b.y - a.y);
