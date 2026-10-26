@@ -35,6 +35,7 @@
 - Lava moves as slowly drifting crust and molten channels, with hatching on engraved maps and matching tones on Monochrome maps
 - Water on generated dungeon maps moves in the drawing’s own style: soft painted reflections or quiet engraved ripples, with gentler banks and cheaper shading at lower graphics quality.
 - The update notice comes back each time Obsidian starts until you click it, instead of showing only once
+- The command palette keeps a steady width above a toolbar with very few or very many tools
 
 ## Important changes
 

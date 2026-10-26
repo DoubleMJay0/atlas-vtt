@@ -47,6 +47,12 @@ describe('the dungeon generator in its own tab', () => {
     expect(page.props?.collectionId).toBe('Crypts');
   });
 
+  it('closes its tab from the panel\'s close button', async () => {
+    const { leaf } = await openView();
+    page.props!.onClose();
+    expect(leaf.detach).toHaveBeenCalled();
+  });
+
   it('opens the scene it created in its own place where no Atlas view is open', async () => {
     const { leaf } = await openView();
     await act(async () => page.props!.onCreated(SCENE));

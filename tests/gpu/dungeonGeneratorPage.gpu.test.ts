@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { act } from '@testing-library/react';
 import { MotionGlobalConfig } from 'framer-motion';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import type { App } from 'obsidian';
 import css from '../../styles/main.scss?inline';
@@ -26,6 +26,7 @@ const THEME = `
 const app = {} as App;
 let root: Root | null = null;
 let tab: HTMLElement;
+const closed = vi.fn();
 const style = document.createElement('style');
 style.textContent = THEME + css;
 
@@ -35,7 +36,7 @@ async function openTab(width: number, height: number): Promise<void> {
   tab = document.body.createDiv({ cls: 'view-content atlas-vtt-plugin atlas-dungeon-generator-view' });
   tab.style.cssText = `position: fixed; inset: 0;`;
   root = createRoot(tab);
-  act(() => root!.render(createElement(DungeonGeneratorPage, { app, collectionId: 'Dungeons', onCollectionChange: () => {}, onCreated: () => {} })));
+  act(() => root!.render(createElement(DungeonGeneratorPage, { app, collectionId: 'Dungeons', onCollectionChange: () => {}, onCreated: () => {}, onClose: closed })));
   // Measured once the map has slid into place and is drawn
   const preview = (): Element => tab.querySelector('.atlas-dungeon-wizard-preview--page')!;
   await expect.poll(() => ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(preview()).transform), { timeout: 2000 }).toBe(true);
@@ -75,8 +76,9 @@ describe('the dungeon generator in its own tab', () => {
     expect(map.top).toBeGreaterThanOrEqual(room.top - 0.5);
     expect(map.bottom).toBeLessThanOrEqual(room.bottom + 0.5);
     expect(Math.abs((map.left + map.right) / 2 - (room.left + room.right) / 2)).toBeLessThan(1);
-    // No close button of its own: the tab has Obsidian's
-    expect(tab.querySelector('.atlas-dungeon-wizard__header .atlas-close-btn')).toBeNull();
+    // Its close button closes the tab
+    act(() => tab.querySelector<HTMLButtonElement>('.atlas-dungeon-wizard__header .atlas-close-btn')!.click());
+    expect(closed).toHaveBeenCalledOnce();
   });
 
   it('stands the map above the panel in a narrow tab', async () => {
@@ -87,5 +89,30 @@ describe('the dungeon generator in its own tab', () => {
     expect(panel.left).toBeCloseTo(16, 0);
     expect(panel.right).toBeCloseTo(600 - 16, 0);
     expect(panel.bottom).toBeCloseTo(900 - 16, 0);
+  });
+
+  it('fades a new picture in on a surface of its own, none of them changing size on the way', async () => {
+    await openTab(1400, 860);
+    MotionGlobalConfig.skipAnimations = false;
+    const sizes = new Map<Element, Set<string>>();
+    let fadedOut = false;
+    let watching = true;
+    const watch = (): void => {
+      const surfaces = [...tab.querySelectorAll('.atlas-dungeon-preview__map')];
+      for (const surface of surfaces) {
+        const { width, height } = surface.getBoundingClientRect();
+        sizes.set(surface, (sizes.get(surface) ?? new Set()).add(`${Math.round(width)}x${Math.round(height)}`));
+      }
+      if (surfaces.length > 1) fadedOut ||= Number(getComputedStyle(surfaces[0]!).opacity) < 1;
+      if (watching) requestAnimationFrame(watch);
+    };
+    watch();
+    const first = tab.querySelector('.atlas-dungeon-preview__map');
+    // New layout, the last of the map's tools
+    act(() => [...tab.querySelectorAll<HTMLButtonElement>('.atlas-dungeon-wizard-preview__tool')].at(-1)!.click());
+    await expect.poll(() => tab.querySelector('.atlas-dungeon-preview__map') !== first && tab.querySelectorAll('.atlas-dungeon-preview__map').length === 1, { timeout: 15000 }).toBe(true);
+    watching = false;
+    expect(fadedOut).toBe(true);
+    for (const seen of sizes.values()) expect([...seen]).toHaveLength(1);
   });
 });

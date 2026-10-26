@@ -8,6 +8,7 @@ import { t } from '../../../i18n';
 import { CollectionSelect } from '../asset-manager/token-creator/CollectionSelect';
 import { Stepper, SwitchRow } from './fields';
 import { StyleGallery } from './StyleGallery';
+import { tagName } from './TagChips';
 import { FeaturesStep } from './FeaturesStep';
 import { ThemeStep } from './ThemeStep';
 import type { DungeonState } from './useDungeonState';
@@ -33,7 +34,10 @@ interface WizardStepContentProps {
 /** The tags the chosen theme refuses, with the reasons as shown; none for Surprise me, which only picks among themes that take them. */
 function refusedOf(choice: ThemeChoice, tags: readonly DungeonTag[]): ReadonlyMap<DungeonTag, string> {
   if (choice === 'any') return new Map();
-  return new Map([...refusedTags(choice, tags)].map(([tag, reason]) => [tag, t(reason)]));
+  return new Map([...refusedTags(choice, tags)].map(([tag, beside]) => [
+    tag,
+    beside ? t('dungeon.theme.refused.beside', { tag: tagName(beside) }) : t('dungeon.theme.refused'),
+  ]));
 }
 
 /** What one step of the wizard asks. Every change reaches the preview at once. */

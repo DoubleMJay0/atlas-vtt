@@ -5,7 +5,6 @@
 
 import { pick, stream } from '../rng';
 import type { DungeonTag } from '../tags';
-import type { MessageKey } from '../../i18n';
 import { fortressParams } from '../layout/fortressParams';
 import { CAVERN } from './cavern';
 import { FORTRESS } from './fortress';
@@ -13,15 +12,12 @@ import { houseFacts } from './houseFacts';
 import { MANSION } from './mansion';
 import { THEME_IDS, type RoomProgramme, type ThemeChoice, type ThemeDefinition, type ThemeFacts, type ThemeId } from './themeTypes';
 
-const NO_MOLTEN: readonly { tag: DungeonTag; reason: MessageKey }[] = [
-  { tag: 'lava', reason: 'dungeon.theme.refused.noMolten' },
-  { tag: 'acid', reason: 'dungeon.theme.refused.noMolten' },
-];
+const NO_MOLTEN: readonly { tag: DungeonTag }[] = [{ tag: 'lava' }, { tag: 'acid' }];
 
 export const THEMES: Readonly<Record<ThemeId, ThemeDefinition>> = {
   // A gate passage three cells long holds two murder holes a cell apart.
   fortress: { id: 'fortress', built: true, rise: 'up', stairsFromEntrance: true, entranceDepth: 5, refuses: NO_MOLTEN, params: fortressParams, programme: FORTRESS },
-  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, architectureOnly: true, layout: 'house', facts: houseFacts, refuses: [...NO_MOLTEN, { tag: 'flooded', reason: 'dungeon.theme.refused.noFlooding' }], programme: MANSION },
+  mansion: { id: 'mansion', built: true, rise: 'up', stairsFromEntrance: true, architectureOnly: true, layout: 'house', facts: houseFacts, refuses: [...NO_MOLTEN, { tag: 'flooded' }], programme: MANSION },
   cavern: CAVERN,
 };
 
@@ -29,9 +25,9 @@ export function themeOf(id: ThemeId): ThemeDefinition {
   return THEMES[id];
 }
 
-/** The tags a theme cannot take beside `tags`, each with the reason the panel shows. */
-export function refusedTags(theme: ThemeId, tags: readonly DungeonTag[] = []): ReadonlyMap<DungeonTag, MessageKey> {
-  return new Map(THEMES[theme].refuses.filter((r) => r.with === undefined || tags.includes(r.with)).map(({ tag, reason }) => [tag, reason]));
+/** The tags a theme cannot take beside `tags`, each with the tag it cannot take beside, or null where the theme takes it never. */
+export function refusedTags(theme: ThemeId, tags: readonly DungeonTag[] = []): ReadonlyMap<DungeonTag, DungeonTag | null> {
+  return new Map(THEMES[theme].refuses.filter((r) => r.with === undefined || tags.includes(r.with)).map(({ tag, with: beside }) => [tag, beside ?? null]));
 }
 
 /** `tags` without those the theme refuses: a tag a theme cannot take is ignored for it. */
