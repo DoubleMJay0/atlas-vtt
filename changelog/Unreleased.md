@@ -40,6 +40,7 @@
 ## Fixed
 
 - Tags removed in an asset's Manage Tags dialog are removed from it; tags given in the token creator or Edit Token showed there as missing and stayed on the asset
+- Scenes open again in vaults with a plugin that adds its own functions to every list (such as an early DnD Beyond importer build), where they failed with "WebGL could not start" and then a blank map
 
 ## Important changes
 
