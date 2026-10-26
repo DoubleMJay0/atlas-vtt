@@ -35,7 +35,9 @@ import { SHOWN_GLSL } from './compositeUpscaleShader';
  * rule counts it; uZonesLifted is the same where dim light is perceived as bright.
  * Two wall fields: uField holds the walls that stop light (the faces of walls and the bounce
  * read it), uSightField those that stop sight (the explored memory's blur must not cross them).
- * They are one texture bound twice unless a wall of the scene blocks one thing only.
+ * They are one texture bound twice unless a wall of the scene blocks one thing only. uTwoWayField
+ * holds the walls that stop light both ways, the same texture as uField unless a wall is one-way:
+ * where it is farther than uField, the nearest wall is one-way.
  * While the grid is marked (uGrid 1, or 2 for a colour picked to contrast with the map; `UnlitGrid`)
  * it drew no colour but erased the alpha beneath its lines, which the tokens drawn after it fill in
  * again: uBackTexture's missing alpha is how much of the grid shows, painted unlit in uGridColor
@@ -116,6 +118,7 @@ uniform vec3 uBelowGrid;
 uniform float uShownOut;
 ${fieldGlsl('uField')}
 ${fieldGlsl('uSightField')}
+${fieldGlsl('uTwoWayField')}
 float clearance(vec2 w) { return uFieldClearance(w); }
 float sightClearance(vec2 w) { return uSightFieldClearance(w); }
 ${TRACE_GLSL}
@@ -267,6 +270,36 @@ void main() {
   if (uHasZones > 0.5) {
     zone = textureLod(uZones, world / uLightWorld, 0.0);
     zoneLifted = textureLod(uZonesLifted, world / uLightWorld, 0.0);
+  }
+  // Nearer than the core a wall that stops light both ways keeps its own light, its ink. A one-way
+  // wall's core takes the darker of the floors on its two sides instead: on its blocking side the
+  // rule lights the floor up to the centre line, and a tile ending at the capsule drew a black
+  // line where a lit object's top meets its shadow. The darker side is never more than either
+  // side has, so no light crosses the line, whichever way the gradient points this close to it.
+  // Each side's floor is read a texel past the band, and only where no wall that stops light both
+  // ways comes within that reach of the pixel and the conservative field proves both floors a
+  // band (less a texel) from every centre line: no other wall lies between them and this one,
+  // so neither reads a neighbouring room.
+  float reach = uBand + uTexel;
+  vec2 n = vec2(0.0);
+  if (d < uCore + uPixelWorld && uTwoWayFieldDistance(world) + uTwoWayFieldParams.x > d + reach) n = wallNormal(world);
+  if (n != vec2(0.0)) {
+    vec2 sideA = world + n * (reach - d);
+    vec2 sideB = world - n * (reach + d);
+    if (min(uFieldDistance(sideA), uFieldDistance(sideB)) >= uBand - uTexel) {
+      vec4 lampsA = textureLod(uLightMap, sideA / uLightWorld, 0.0);
+      vec4 lampsB = textureLod(uLightMap, sideB / uLightWorld, 0.0);
+      vec3 bounceA = bounces ? bounceAt(sideA) : vec3(0.0);
+      vec3 bounceB = bounces ? bounceAt(sideB) : vec3(0.0);
+      bool darkerA = dot(lampsA.rgb + bounceA * uBounceGain, LUMA) <= dot(lampsB.rgb + bounceB * uBounceGain, LUMA);
+      vec2 floorAt = darkerA ? sideA : sideB;
+      lamps = darkerA ? lampsA : lampsB;
+      bounce = darkerA ? bounceA : bounceB;
+      if (uHasZones > 0.5) {
+        zone = textureLod(uZones, floorAt / uLightWorld, 0.0);
+        zoneLifted = textureLod(uZonesLifted, floorAt / uLightWorld, 0.0);
+      }
+    }
   }
   if (front > 0.0) {
     vec2 floorAt = climbFromWall(world, uBand);

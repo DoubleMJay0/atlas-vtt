@@ -330,7 +330,7 @@ const cellsOfStair = (s: Parameters<typeof spotRect>[0]): { x: number; y: number
 };
 
 describe('the outlines of tall objects', () => {
-  it('stand on columns, statues and wells, block sight and light, and sealing never bridges one to a wall or another', () => {
+  it('stand on columns, statues and wells, block light alone, and sealing never bridges one to a wall or another', () => {
     let outlines = 0;
     for (let seed = 1; seed <= 40; seed++) {
       const model = generateDungeon({ seed, theme: seed % 2 ? 'fortress' : undefined, tags: seed % 2 ? ['colonnades'] : ['large'], floors: 1 + (seed % 2) });
@@ -340,8 +340,11 @@ describe('the outlines of tall objects', () => {
         const walls = wallsOn(parts, level);
         const objects = walls.filter(w => w.id.includes('_shadow_'));
         outlines += new Set(objects.map(w => w.chainId)).size;
-        // Cover for sight and light alike, one-way from inside so the top is seen and lit.
-        for (const wall of objects) expect(wall.blocks).toBeUndefined();
+        // Shadows, not cover: light alone, one-way from inside so the top is lit.
+        for (const wall of objects) {
+          expect(wall.blocks).toBe('light');
+          expect(wall.direction).toBeDefined();
+        }
         // A house's windows stop a token alone and its garden's hedges sight alone; every other wall stops both.
         for (const wall of walls.filter(w => !w.id.includes('_shadow_'))) expect(wall.id.includes('_grounds_') ? [undefined, 'sight'] : [undefined, 'movement']).toContain(wall.blocks);
         const owner = (id: string): string => (id.includes('_shadow_') ? id.replace(/_\d+$/, '') : 'walls');
