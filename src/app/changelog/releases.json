@@ -7,6 +7,12 @@
       "markdown": "## Atlas Online\n- Players see animated maps move, and the water, lava and acid of generated dungeons\n- Maps that grid alignment stretched or turned line up with tokens and walls for players"
     },
     {
+      "version": "0.10.1",
+      "date": "2026-10-26",
+      "title": "Lit maps on Windows",
+      "markdown": "## Fixed\n- Maps with dynamic lighting no longer turn black on Windows with the Balanced or Saver lighting quality"
+    },
+    {
       "version": "0.10.0",
       "date": "2026-10-26",
       "title": "Dungeon generator, map layers and random encounters",
