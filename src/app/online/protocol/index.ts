@@ -16,6 +16,7 @@ export * from './image.ts';
 export * from './initiative.ts';
 export * from './level.ts';
 export * from './lighting.ts';
+export * from './liquids.ts';
 export * from './live.ts';
 export * from './chat.ts';
 export * from './log.ts';
