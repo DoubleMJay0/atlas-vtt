@@ -13,7 +13,6 @@ import type { CellPoint, FiveRoomStage, TerrainKind } from '../model';
 import type { PropKind } from '../props/propKinds';
 import type { DungeonTag } from '../tags';
 import type { HazardChoice } from '../terrain/hazards';
-import type { MessageKey } from '../../i18n';
 import type { FeatureReason } from './features';
 import type { RoomTypeId } from './roomTypes';
 
@@ -220,8 +219,8 @@ export interface ThemeDefinition {
   layout?: 'house';
   /** The least depth of the room the dungeon is entered by, walls included, where it is a normal room: a Fortress's gate passage holds a row of murder holes. */
   entranceDepth?: number;
-  /** Tags the theme cannot take, each with the reason the panel shows; one with `with` only beside that tag. */
-  refuses: readonly { tag: DungeonTag; reason: MessageKey; with?: DungeonTag }[];
+  /** Tags the theme cannot take; one with `with` only beside that tag. */
+  refuses: readonly { tag: DungeonTag; with?: DungeonTag }[];
   programme: RoomProgramme;
   /** What the theme changes in the layout's params (a Cavern's chambers, a Fortress's passages and towers); unset, nothing. */
   params?: (params: DungeonParams) => DungeonParams;

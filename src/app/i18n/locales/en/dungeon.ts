@@ -39,10 +39,8 @@ export const dungeon = {
   'dungeon.theme.fortress': 'Fortress',
   'dungeon.theme.mansion': 'Haunted Mansion',
   'dungeon.theme.cavern': 'Cavern',
-  'dungeon.theme.refused.noMolten': 'This theme has no lava or acid',
-  'dungeon.theme.refused.noFlooding': 'A mansion is never flooded',
-  'dungeon.theme.refused.notBuilt': 'Nature builds no ruins',
-  'dungeon.theme.refused.dryUninhabited': 'Nobody lives in a cave without water',
+  'dungeon.theme.refused': 'Not available with this theme',
+  'dungeon.theme.refused.beside': 'Not available with {tag}',
   'dungeon.tags': 'Tags',
 
   'dungeon.view.more': 'Map options',

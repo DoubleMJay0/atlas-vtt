@@ -73,8 +73,8 @@ export const CAVERN: ThemeDefinition = {
   built: false,
   rise: 'down',
   refuses: [
-    { tag: 'ruined', reason: 'dungeon.theme.refused.notBuilt' },
-    { tag: 'inhabited', reason: 'dungeon.theme.refused.dryUninhabited', with: 'dry' },
+    { tag: 'ruined' },
+    { tag: 'inhabited', with: 'dry' },
   ],
   programme: CAVERN_PROGRAMME,
   params: caveParams,

@@ -287,7 +287,17 @@ describe('the theme', () => {
     fireEvent.click(tag('lava'));
     expect(lastJob().request.tags).toEqual(['medium']);
     const reason = document.getElementById(tag('lava').getAttribute('aria-describedby')!);
-    expect(reason?.textContent).toBe(t('dungeon.theme.refused.noMolten'));
+    expect(reason?.textContent).toBe('Not available with this theme');
+  });
+
+  it('names the tag a refusal comes from', async () => {
+    renderPanel(vi.fn(), 'Sunken Vault', 'Features');
+    chooseTheme('Cavern');
+    await waitFor(() => expect(lastJob().request.theme).toBe('cavern'));
+    goTo('Features');
+    fireEvent.click(tag('dry'));
+    const reason = document.getElementById(tag('inhabited').getAttribute('aria-describedby')!);
+    expect(reason?.textContent).toBe('Not available with dry');
   });
 
   it('shows a tag picked before the theme refused it as off and disabled, and gives it back with a theme that takes it', async () => {
