@@ -41,6 +41,7 @@
 
 - Tags removed in an asset's Manage Tags dialog are removed from it; tags given in the token creator or Edit Token showed there as missing and stayed on the asset
 - Scenes open again in vaults with a plugin that adds its own functions to every list (such as an early DnD Beyond importer build), where they failed with "WebGL could not start" and then a blank map
+- A token exactly at the edge of a light's reach, such as one standing next to a token carrying a 5 ft light, no longer counts as lit from one side and unlit from another; inside magical darkness it no longer gets its sight back there
 
 ## Important changes
 
