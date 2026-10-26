@@ -5,6 +5,7 @@ import type { SceneState, SceneStore } from './atlasView.ts';
 import { dragRulerPaths, PlayerDragRulers, type RulerPaths } from './dragRulers.ts';
 import { AssetAnswers } from './assetAnswers.ts';
 import { readFloorImages, type FloorImages } from './floorImages.ts';
+import { floorPlacement, floorWorldSize } from './floorPlacement.ts';
 import { MineShare } from './mineShare.ts';
 import { mapRollDice, tokenRollDice } from './rollAdvantage.ts';
 import { InputShare } from './InputShare.ts';
@@ -39,9 +40,9 @@ export class FloorShare {
   private readonly ports: FloorSharePorts;
   private scene: SharedScene | null = null;
   private images: Pick<FloorImages, 'map'> = { map: null };
-  /** The floor map's size, by which players' moves are kept on it; null when it is unknown. */
+  /** The floor map's size in world pixels (its image as Atlas draws it), by which players' moves are kept on it; null when it is unknown. */
   private mapSize: MapSize | null = null;
-  /** The map path, floor and images of the scene sent or being read: a change starts a new scene. */
+  /** The map path, floor, images and placement of the scene sent or being read: a change starts a new scene. */
   private key: string | null = null;
   private refusal: string | null = null;
   private readonly assets: AssetAnswers;
@@ -237,7 +238,9 @@ export class FloorShare {
     const level = viewedLevelId(state);
     const background = levelBackground(state, level);
     const floor = this.ports.floor?.();
-    const key = JSON.stringify([state.mapPath, level, background, lit, floor ?? null]);
+    // A map drawn another way is another world: its tokens, walls and fog moved with it in the same write.
+    const placement = floorPlacement(state, level, background);
+    const key = JSON.stringify([state.mapPath, level, background, lit, floor ?? null, placement]);
     if (key === this.key) {
       this.marks.update();
       this.tokens.update();
@@ -257,8 +260,8 @@ export class FloorShare {
       this.publish(null, null);
       return;
     }
-    const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }) };
-    this.publish(scene, built);
+    const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }), ...placement };
+    this.publish(scene, { map: built.map, size: built.size && floorWorldSize(state, level, built.size) });
   }
 
   private publish(scene: SharedScene | null, built: FloorImages | null): void {
