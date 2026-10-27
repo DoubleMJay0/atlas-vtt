@@ -13,17 +13,13 @@ export class UIOverlay {
   private view: AtlasView | null = null;
   private mountObserver: MutationObserver | null = null;
   private remountTimeout: number | null = null;
-  private stopFollowingWindow: (() => void) | null = null;
 
   constructor(private app: App, eventBus: EventEmitter, private store: ViewAtlasStore) {
     this.eventBus = eventBus;
   }
 
   /**
-   * Mount the React UI overlay. When Obsidian moves the view to another window (a tab dragged
-   * into a popout, or back), the UI is built again there: elements made by the old window keep
-   * its document (menus and dialogs opened in the main window) and its clock, on which Motion
-   * started their animations minutes late in the popout.
+   * Mount the React UI overlay
    * @param containerEl The parent container element
    * @param view The AtlasView instance
    * @param pixiApp The PixiJS application instance
@@ -64,7 +60,6 @@ export class UIOverlay {
     
     // Pass the obtained PixiApp instance, renderer, and store to mountUI
     mountUI(this.app, this.reactRootEl, view, pixiApp, this.store);
-    this.stopFollowingWindow = containerEl.onWindowMigrated(() => this.mount(containerEl, view, pixiApp));
 
     this.eventBus.emit('ui-mounted', this.uiContainer);
   }
@@ -73,8 +68,6 @@ export class UIOverlay {
    * Unmount the React UI overlay
    */
   public unmount(): void {
-    this.stopFollowingWindow?.();
-    this.stopFollowingWindow = null;
     if (this.remountTimeout) {
       window.clearTimeout(this.remountTimeout);
       this.remountTimeout = null;

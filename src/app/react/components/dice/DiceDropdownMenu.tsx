@@ -43,8 +43,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef }: Dic
       onToggle();
     };
 
-    // The document the tray is in: a map in a popout hears its presses there, never in the main one.
-    // Its timer too: a main window a maximised popout covers runs timers at most once a second.
+    // The document the tray is in, and its window's timer.
     const doc = trayRef.current?.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
     const timer = win.setTimeout(() => {

@@ -64,7 +64,7 @@ function controllersIn(doc: Document): RegisteredController[] {
 /**
  * Opens a menu for callers outside React; false where no provider is rendered (in that document) to open it.
  * Without a document, a provider of the focused window serves it, which is the one that was just clicked:
- * the newest provider may be a map's in another window.
+ * the newest provider may be in another window.
  */
 export function openContextMenuGlobal(
   entries: ContextMenuEntry[],
@@ -121,7 +121,7 @@ interface ContextMenuProviderProps {
 
 export const ContextMenuProvider: React.FC<ContextMenuProviderProps> = ({ children, ownerId, local = false }) => {
   const [menuState, setMenuState] = useState<MenuState | null>(null);
-  // The body of the document the provider renders in: a map in a popout opens its menus there.
+  // The body of the document the provider renders in: a provider in a popout opens its menus there.
   const [body, setBody] = useState<HTMLElement | null>(null);
   const anchorElement = useRef<HTMLSpanElement | null>(null);
   const anchor = useCallback((node: HTMLSpanElement | null): void => {

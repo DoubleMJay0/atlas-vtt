@@ -79,7 +79,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
       }
     };
 
-    // The document the menu is in: a map in a popout hears its presses there, never in the main one.
+    // The document the menu is in: a menu in a popout hears its presses there, never in the main one.
     const doc = containerRef.current?.ownerDocument ?? document;
     doc.addEventListener('mousedown', handlePointerDown);
     doc.addEventListener('touchstart', handlePointerDown);

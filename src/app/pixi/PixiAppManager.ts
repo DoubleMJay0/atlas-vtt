@@ -8,7 +8,6 @@ import { webglAvailable } from "./utils/webglAvailable";
 import { addRendererSystemsByEntry } from "./utils/rendererSystems";
 import { showSoftwareRenderingNotice } from "./softwareRenderingNotice";
 import { MAX_ZOOM, MIN_ZOOM } from "./zoomRange";
-import { bindPopoutCanvas } from "./popout/bindPopoutCanvas";
 
 type RendererPreference = 'webgl' | 'canvas';
 
@@ -21,7 +20,6 @@ export class PixiAppManager {
   private height: number;
   private canvasEl: HTMLCanvasElement;
   private _canvasContextMenuPreventer: ((e: Event) => void) | null = null;
-  private unbindPopout: (() => void) | null = null;
   public onRecoverCallback?: () => void;
 
   constructor(initialWidth: number, initialHeight: number) {
@@ -38,7 +36,7 @@ export class PixiAppManager {
       return;
     }
     try {
-      await this.initRenderer(containerEl.win.devicePixelRatio || 1);
+      await this.initRenderer();
       if (usesCanvasRenderer(this.app.renderer)) showSoftwareRenderingNotice();
 
       this.app.stage.eventMode = 'static'; // Or 'passive'. 'static' means it can be an event target.
@@ -85,7 +83,6 @@ export class PixiAppManager {
       this.canvasEl.id = 'atlas-pixi-canvas-debug'; // For debugging
 
       this.initViewport(); // Initialize viewport and add to stage
-      this.unbindPopout = bindPopoutCanvas(this.app, containerEl);
       
       // Force a single render AFTER viewport is part of the stage
       if(this.app.renderer && this.app.stage) {
@@ -109,22 +106,21 @@ export class PixiAppManager {
    * reference to the renderer whose start threw, so that one cannot be destroyed: its
    * scheduler stays on PIXI's system ticker, with nothing to do.
    */
-  private async initRenderer(resolution: number): Promise<void> {
+  private async initRenderer(): Promise<void> {
     if (!webglAvailable()) {
-      await this.app.init(this.rendererOptions(['canvas'], resolution));
+      await this.app.init(this.rendererOptions(['canvas']));
       return;
     }
     try {
-      await this.app.init(this.rendererOptions(['webgl', 'canvas'], resolution));
+      await this.app.init(this.rendererOptions(['webgl', 'canvas']));
     } catch (error) {
       console.error('[PixiAppManager] WebGL could not start, drawing with Canvas 2D instead:', error);
       this.canvasEl = createEl('canvas');
-      await this.app.init(this.rendererOptions(['canvas'], resolution));
+      await this.app.init(this.rendererOptions(['canvas']));
     }
   }
 
-  /** `resolution`: the device pixel ratio of the window the map opens in, which may be a popout's. */
-  private rendererOptions(preference: RendererPreference[], resolution: number): Partial<ApplicationOptions> {
+  private rendererOptions(preference: RendererPreference[]): Partial<ApplicationOptions> {
     return {
       preference,
       canvas: this.canvasEl,
@@ -139,7 +135,7 @@ export class PixiAppManager {
       // drew into. A scene that is not lit pays about 80 MB more than samples on the canvas would.
       useBackBuffer: true,
       autoDensity: true,
-      resolution,
+      resolution: window.devicePixelRatio || 1,
       // The map has no accessible display objects; since PIXI 8.22 Tab would otherwise
       // switch on its accessibility layer, which walks the whole stage after every render.
       accessibilityOptions: { activateOnTab: false },
@@ -251,8 +247,6 @@ export class PixiAppManager {
       return;
     }
     this._isDestroyed = true;
-    this.unbindPopout?.();
-    this.unbindPopout = null;
     if (this._canvasContextMenuPreventer && this.canvasEl) {
       this.canvasEl.removeEventListener('contextmenu', this._canvasContextMenuPreventer);
       this._canvasContextMenuPreventer = null;
