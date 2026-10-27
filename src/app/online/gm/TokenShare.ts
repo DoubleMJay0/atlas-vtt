@@ -1,12 +1,11 @@
 import type { GmMessage, SharedToken, SnapGrid } from '../protocol/index.ts';
-import { NO_INSTANCE_NUMBERS, badgeNumberInView, type InstanceNumbers } from '../../vision/instanceNumbers';
 import { ArtRefs } from './artRefs.ts';
 import type { PlayerTokenSource, SceneStore } from './atlasView.ts';
 import type { ListedTokens } from './mineShare.ts';
 import type { SeatSource } from './seatSource.ts';
 import { sharedTokens, snapGridOf } from './scenePicture.ts';
 import { SequencedList } from './sequencedList.ts';
-import { NO_TOKEN_RULES, numberShownTokens, type TokenRules } from './tokenUI.ts';
+import { NO_TOKEN_RULES, shownBadgeNumbers, type TokenRules } from './tokenUI.ts';
 import { levelObjects } from '../../levels/levelObjects';
 import type { AtlasPlayerSettings } from './atlasLighting.ts';
 import { movesOutOfTurn, sharedTurnTokens, type TurnShareState } from './turnShare.ts';
@@ -32,7 +31,7 @@ export interface TokenSharePorts {
   seats?: Pick<SeatSource, 'claimOf'> | undefined;
   /** Atlas's settings for the players' view: whether they are shown the initiative list, and so the turn. */
   atlasSettings?(): Pick<AtlasPlayerSettings, 'showInitiative' | 'movesOnTurn'>;
-  /** The players' look-alike numbers changed (`badgeOf`): what shows them besides the token list is worked out again. */
+  /** The look-alike numbers players are shown changed (`badgeOf`): what shows them besides the token list is worked out again. */
   numbersChanged?(): void;
   /** Until when the live lane carries a held token's place, by the id players know it by (`LiveShare.carriedUntil`); without it every place goes in the list. */
   liveCarriedUntil?(alias: string): number | undefined;
@@ -78,10 +77,8 @@ export class TokenShare {
   private readonly art: ArtRefs;
   /** Vault paths of the artwork the last list shows, by hash. */
   private shownArt = new Map<string, string>();
-  /** The instance numbers of the tokens players see, as their picture numbers them; anew for each scene. */
-  private numbers: InstanceNumbers = NO_INSTANCE_NUMBERS;
-  /** Whether the scene shows look-alike badges, as the last list read it. */
-  private badgesOn = true;
+  /** The GM's look-alike numbers of the tokens players see, as the last list read them. */
+  private numbers: ReadonlyMap<string, number> = new Map();
   /** Where the last list put each token, by the id players know it by. */
   private listedPlaces: ReadonlyMap<string, { readonly x: number; readonly y: number }> = new Map();
   /** The GM ids of the dragged tokens the last list kept where they were listed (`heldWhereListed`). */
@@ -110,8 +107,7 @@ export class TokenShare {
     this.listedAliases = new Map();
     this.listedPlaces = new Map();
     this.kept = new Set();
-    this.numbers = NO_INSTANCE_NUMBERS;
-    this.badgesOn = true;
+    this.numbers = new Map();
     this.art.clear();
     this.cancel();
     this.cancelPoll();
@@ -183,12 +179,12 @@ export class TokenShare {
   }
 
   /**
-   * The number a token's look-alike badge shows the players, as the last list numbered them (the
-   * tokens they see and the combatants beside the map their initiative list shows), or null
-   * without a badge: a token they do not see never takes or shows one.
+   * The GM's number on a token's look-alike badge, as the last list read it, where players see the
+   * token (the tokens they see and the combatants beside the map their initiative list shows), or
+   * null without a badge: a token they do not see shows them none.
    */
   badgeOf(tokenId: string): number | null {
-    return badgeNumberInView(this.numbers, tokenId, this.badgesOn);
+    return this.numbers.get(tokenId) ?? null;
   }
 
   /** The random id players know a token by. */
@@ -237,14 +233,13 @@ export class TokenShare {
     const { mapPath } = state;
     const seats = this.ports.seats;
     const shown = source.playerRollTokens(state.mapPath);
-    // As Atlas's player window numbers them: the tokens they see, and the combatants beside the map their list shows unless hidden
+    // The GM's numbers, as Atlas's player window shows them: on the tokens they see, and the combatants beside the map their list shows unless hidden
     const scene = sceneTokens(levelObjects(state));
     const inView = (id: string): boolean => (isOffMap(scene[id]) ? scene[id]?.isHidden !== true : shown.has(id));
-    const before = { numbers: this.numbers, badgesOn: this.badgesOn };
-    const badges = numberShownTokens(this.numbers, scene, inView, state.tokenSettings?.showInstanceBadges ?? true);
-    this.numbers = badges.numbers;
-    this.badgesOn = state.tokenSettings?.showInstanceBadges ?? true;
-    if (before.numbers !== this.numbers || before.badgesOn !== this.badgesOn) this.ports.numbersChanged?.();
+    const numbers = shownBadgeNumbers(scene, inView, state.tokenSettings?.showInstanceBadges ?? true);
+    const changed = numbers.size !== this.numbers.size || [...numbers].some(([id, number]) => this.numbers.get(id) !== number);
+    this.numbers = numbers;
+    if (changed) this.ports.numbersChanged?.();
     // The store holds the fight too: the scene's type names only what every share reads
     const turnState: TurnShareState = state;
     const rules = this.ports.tokenRules?.() ?? NO_TOKEN_RULES;
@@ -261,7 +256,7 @@ export class TokenShare {
       showNames: this.ports.showNames(),
       claimOf: (id, token) => seats?.claimOf(mapPath, id, token) ?? null,
       rules,
-      badge: (id) => badges.badge(id),
+      badge: (id) => numbers.get(id) ?? null,
       turn,
       held,
       art: (path) => {

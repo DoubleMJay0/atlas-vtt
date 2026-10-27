@@ -2,7 +2,11 @@ import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { getTokenRingCenterRadius } from './tokenRingMetrics';
 import type { TokenGroupContainer } from './types';
 import { destroyTree } from '../utils/destroyTree';
-import { BADGE_DISC_LABEL, BADGE_TEXT_LABEL, INSTANCE_BADGE_LABEL } from './instanceBadgeParts';
+
+/** The badge in a token's group, its disc and its number. */
+const INSTANCE_BADGE_LABEL = 'instanceBadge';
+const BADGE_DISC_LABEL = 'badgeBg';
+const BADGE_TEXT_LABEL = 'badgeText';
 
 /**
  * Create or update the instance badge on a token container.

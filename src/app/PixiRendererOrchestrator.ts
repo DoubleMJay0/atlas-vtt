@@ -61,7 +61,7 @@ import { findAtlasLeafByViewId } from './utils/atlasLeafLookup';
 import { requestRender } from './pixi/RenderScheduler';
 import { MAP_LAYER_Z } from './pixi/mapLayerOrder';
 import { shownRollTokens } from './pixi/playerRollTokens';
-import type { PlayerBadgeNumbers } from './pixi/token-renderer/PlayerInstanceBadges';
+import type { PlayerBadgeNumbers } from './pixi/token-renderer/PlayerBadgeNumbers';
 import type { ShownRollToken } from './services/playerRollSource';
 import { t } from './i18n';
 import { showNotice } from './ui/notice';
