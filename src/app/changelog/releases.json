@@ -4,7 +4,7 @@
     {
       "version": "0.10.2-beta.0",
       "title": "Coming in 0.10.2",
-      "markdown": "## Atlas Online\n- Players see animated maps move, and the water, lava and acid of generated dungeons\n- Maps that grid alignment stretched or turned line up with tokens and walls for players\n\n## Fixed\n- Players see the same token numbers as the GM\n- Ticking the boxes of a Track on a player's online sheet no longer writes over the maximum its field holds\n- A resource switched to static and back still defeats its token, so Kill stays on the token menu\n- Maps in their own window keep working when that window is maximised, and their menus and Edit Token open in that window\n- Dark maps with dynamic lighting no longer look darker and purple in daylight: at 100 % ambient light a map shows as it does unlit"
+      "markdown": "## Atlas Online\n- Players see animated maps move, and the water, lava and acid of generated dungeons\n- Maps that grid alignment stretched or turned line up with tokens and walls for players\n\n## Fixed\n- Players see the same token numbers as the GM\n- Ticking the boxes of a Track on a player's online sheet no longer writes over the maximum its field holds\n- A resource switched to static and back still defeats its token, so Kill stays on the token menu\n- Maps in their own window keep working when that window is maximised, and their menus and Edit Token open in that window\n- Dark maps with dynamic lighting no longer look darker and purple in daylight: at 100 % ambient light a map shows as it does unlit\n- A token standing next to a token whose small light outshines magical darkness no longer gets its sight back on some grids"
     },
     {
       "version": "0.10.1",
