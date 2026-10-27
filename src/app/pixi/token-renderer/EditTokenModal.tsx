@@ -102,7 +102,7 @@ function EditTokenModalInner({ initial, definitions, lighting, statblock, onSave
         handleSave();
       }
     };
-    // The window the dialog is in: a map in a popout opens it there
+    // The window the dialog is in
     const win = overlayRef.current?.ownerDocument.defaultView ?? window;
     win.addEventListener('keydown', handleKeyDown);
     return () => win.removeEventListener('keydown', handleKeyDown);
@@ -166,7 +166,7 @@ function lightingContext(state: ViewAtlasState, app: App, rules: SenseRules): To
 /**
  * Imperatively opens an Edit Token modal by mounting a React root.
  * Call from non-React code (e.g. InteractionController).
- * @param doc The document of the map the token is on, which is a popout's for a map in its own window.
+ * @param doc The document of the map the token is on.
  */
 export function openEditTokenModal(
   token: TokenEntity,

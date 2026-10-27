@@ -17,9 +17,8 @@ export interface ObjectUrls {
 const LOAD_TIMEOUT_MS = 30_000;
 
 /**
- * Makes a video of `bytes` in `doc` (the document of the view that shows it, so a popout's map
- * plays in the popout) through an object URL, never a resource URL: the vault's bytes stay the
- * one way a map reaches the view. The element is never attached; PIXI draws its frames.
+ * Makes a video of `bytes` in `doc` (the document of the view that shows it) through an object
+ * URL, never a resource URL: the vault's bytes stay the one way a map reaches the view. The element is never attached; PIXI draws its frames.
  * Resolves once its first frame is decoded; rejects when it cannot be played, the URL revoked.
  */
 export function openVideoElement(doc: Document, bytes: BlobPart, mime: string, urls: ObjectUrls = URL): Promise<OpenedVideo> {

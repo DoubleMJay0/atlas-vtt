@@ -42,7 +42,7 @@ export default defineConfig({
         optimizeDeps: { include: ['yaml', 'pixi-viewport', 'eventemitter3', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime'] },
         test: {
           name: 'gpu',
-          // Obsidian's helpers on the DOM (`createEl`, `el.win`, `onWindowMigrated`), which map views use as in Obsidian.
+          // Obsidian's helpers on the DOM (`createEl`, `el.win`), which map views use as in Obsidian.
           setupFiles: ['./tests/setup/obsidianDom.ts', './tests/setup/domHost.ts'],
           include: ['src/**/*.gpu.test.ts', 'tests/**/*.gpu.test.ts'],
           testTimeout: 600_000,

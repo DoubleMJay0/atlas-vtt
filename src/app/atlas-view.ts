@@ -14,7 +14,8 @@ import { runInBackground } from './utils/backgroundTask';
 import { restoreLinkedSnapshot } from './links/openAtlasLink';
 import type { ViewCamera } from './pixi/viewCamera';
 import { showNotice } from './ui/notice';
-import { followResize } from './utils/followWindow';
+import { observeResize } from './utils/observeResize';
+import { inMainWindow } from './plugin/atlasMainWindow';
 
 import { ATLAS_VIEW_TYPE } from './atlasViewType';
 
@@ -234,6 +235,10 @@ export class AtlasView extends FileView {
     containerEl.addClass('atlas-vtt-view');
     containerEl.tabIndex = -1;
 
+    // Atlas runs in the main window only: a view opened in a popout loads nothing, since
+    // `keepAtlasInMainWindow` closes it and opens its scenes in the main window.
+    if (!inMainWindow(this.app.workspace, this.leaf)) return;
+
     this.detachLeafFocusHandlers();
     this.boundClaimLeafFocus = () => this.claimLeafFocus();
     containerEl.addEventListener('pointerdown', this.boundClaimLeafFocus, true);
@@ -253,7 +258,7 @@ export class AtlasView extends FileView {
       if (this.isViewClosing) {
         return;
       }
-      this._serviceManager.getNotePreviewUIManager().followView(containerEl);
+      this._serviceManager.getNotePreviewUIManager().setViewElement(containerEl);
 
       // Mount UI overlay once the renderer is initialized
       const uiOverlay = this._serviceManager.getUIOverlay();
@@ -834,14 +839,10 @@ export class AtlasView extends FileView {
     return this._serviceManager.getRendererService().getRenderer();
   }
 
-  /**
-   * Sizes the PIXI canvas to the pane whenever the pane changes size. The observer follows the
-   * view into whichever window it is in: a popout's pane is measured by the popout, since the
-   * main window reports nothing while a maximised popout covers it.
-   */
+  /** Sizes the PIXI canvas to the pane whenever the pane changes size. */
   private setupWindowResizeDetection(): void {
     this.stopResizeObserver?.();
-    this.stopResizeObserver = followResize(this.containerEl, () => {
+    this.stopResizeObserver = observeResize([this.containerEl], () => {
       const currentWidth = this.containerEl.clientWidth;
       const currentHeight = this.containerEl.clientHeight;
       if (currentWidth === this.lastContainerWidth && currentHeight === this.lastContainerHeight) return;

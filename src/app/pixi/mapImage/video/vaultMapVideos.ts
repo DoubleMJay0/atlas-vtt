@@ -8,7 +8,7 @@ import { videoMimeType } from './videoMapFiles';
 
 /**
  * How a view plays animated maps: the file's bytes read through the vault (never a resource URL),
- * the video made in the document of the view's canvas, so a popout's map plays in the popout.
+ * the video made in the document of the view's canvas.
  */
 export function vaultMapVideos(app: App, service: MapImageService, renderer: Renderer, canvas: HTMLCanvasElement): MapVideoDeps {
   return {
