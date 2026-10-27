@@ -1,4 +1,5 @@
 import type { ViewAtlasStore } from '../../storeFactory';
+import type { MapVideoMode } from '../mapImage/video/mapVideoPlayback';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
 import type { AmbientLight, LightReach, Sight } from '../../vision/sight';
 import type { HideableLayer } from '../playerSafeFrame';
@@ -61,6 +62,8 @@ export class LightingViewHost implements SceneLightingView {
   /** The map whose unfinished attempt the GM was last told about, so a reload does not say it again. */
   private toldAbout: string | null = null;
   private readonly unsubscribe: () => void;
+  /** How the view's animated map plays, handed on to a view that replaces the last. */
+  private videoMode: MapVideoMode | null = null;
 
   constructor(private readonly deps: LightingViewHostDeps) {
     this.view = deps.canvasRenderer ? deps.createFallback() : this.startEngine();
@@ -86,6 +89,10 @@ export class LightingViewHost implements SceneLightingView {
   resetExplored(): void { this.view.resetExplored(); }
   editExplored(edit: ExploredEdit): boolean { return this.view.editExplored(edit); }
   beforeMapUnload(): void { this.view.beforeMapUnload(); }
+  setVideoMode(mode: MapVideoMode): void {
+    this.videoMode = mode;
+    this.view.setVideoMode?.(mode);
+  }
   prepareBelow(picture?: BelowRender): void { this.view.prepareBelow?.(picture); }
   releaseBelowPicture(): void { this.view.releaseBelowPicture?.(); }
   belowTokenPerception(): TokenPerception { return this.view.belowTokenPerception?.() ?? ((): 'unseen' => 'unseen'); }
@@ -140,6 +147,7 @@ export class LightingViewHost implements SceneLightingView {
     const last = this.view;
     this.view = next;
     next.modeLayer.visible = this.modeLayer.visible;
+    if (this.videoMode) next.setVideoMode?.(this.videoMode);
     this.release(last);
     this.deps.onSightChange?.();
   }

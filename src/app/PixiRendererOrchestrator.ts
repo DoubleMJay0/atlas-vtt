@@ -707,6 +707,8 @@ export class PixiRendererOrchestrator { // Renamed class
         setVideoMode: (mode): void => {
           mapImage.setVideoMode(mode);
           this.liquids?.setMode(mode);
+          // A video fog map plays as the map does, where the players' picture may show it.
+          this.lighting?.renderer.setVideoMode?.(mode);
         },
       },
       canvas: app.canvas,
