@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventSystem } from 'pixi.js';
-import { followWindow } from '../../src/app/utils/followWindow';
+import { followResize, followWindow } from '../../src/app/utils/followWindow';
 import { bridgePopoutPointer } from '../../src/app/pixi/popout/popoutPointerBridge';
 import { stepStalledTickers, type PumpedTicker } from '../../src/app/pixi/popout/popoutFramePump';
+import { stepStalledMotion } from '../../src/app/pixi/popout/popoutMotionPump';
+import { frameData as framerFrameData } from 'framer-motion';
+import { frameData, type FrameData, type StepId, type Steps } from 'motion-dom';
 import { isActiveAtlasLeaf } from '../../src/app/utils/activeLeafGuard';
 
 /** A second window, as a popout is one: jsdom gives an iframe a window and document of its own. */
@@ -113,6 +116,69 @@ describe('stepStalledTickers', () => {
     stepStalledTickers([running, stopped], 100, 116);
     expect(running.update).not.toHaveBeenCalled();
     expect(stopped.update).not.toHaveBeenCalled();
+  });
+});
+
+/** A ResizeObserver for `win` that records what it observes, as each window has its own. */
+function recordingObserver(win: Window): { observed: Element[]; disconnected: () => boolean } {
+  const observed: Element[] = [];
+  let disconnected = false;
+  Object.defineProperty(win, 'ResizeObserver', {
+    configurable: true,
+    value: class {
+      observe(target: Element): void { observed.push(target); }
+      unobserve(): void {}
+      disconnect(): void { disconnected = true; }
+    },
+  });
+  return { observed, disconnected: () => disconnected };
+}
+
+describe('followResize', () => {
+  it("measures with the observer of the window the element is in now, the popout's once the tab moved there", () => {
+    const other = popout();
+    const main = recordingObserver(window);
+    const inPopout = recordingObserver(other);
+    const { el, moveTo } = movableElement(window);
+    document.body.appendChild(el);
+    const stop = followResize(el, vi.fn());
+    expect(main.observed).toEqual([el]);
+
+    // A main window that a maximised popout covers reports no sizes: the popout's own observer must
+    other.document.body.appendChild(el);
+    moveTo(other);
+    expect(main.disconnected()).toBe(true);
+    expect(inPopout.observed).toEqual([el]);
+
+    stop();
+    expect(inPopout.disconnected()).toBe(true);
+    delete (window as { ResizeObserver?: unknown }).ResizeObserver;
+  });
+});
+
+describe('stepStalledMotion', () => {
+  const ORDER: StepId[] = ['read', 'resolveKeyframes', 'update', 'preRender', 'render', 'postRender'];
+  const steps = (ran: string[]): Steps => Object.fromEntries(ORDER.map((id) => [id, {
+    schedule: vi.fn(), cancel: vi.fn(), process: (data: FrameData) => { ran.push(`${id}@${data.timestamp}:${data.isProcessing}`); },
+  }])) as unknown as Steps;
+
+  it("pumps framer-motion's own frame loop", () => {
+    expect(framerFrameData).toBe(frameData);
+  });
+
+  it('runs a frame of every step in order when Motion ran none since the previous frame, as under a covered main window', () => {
+    const ran: string[] = [];
+    const data: FrameData = { timestamp: 90, delta: 16, isProcessing: false };
+    stepStalledMotion(steps(ran), data, 100, 116);
+    expect(ran).toEqual(ORDER.map((id) => `${id}@116:true`));
+    expect(data).toEqual({ timestamp: 116, delta: 26, isProcessing: false });
+  });
+
+  it('leaves a frame Motion ran itself since, and one it is running', () => {
+    const ran: string[] = [];
+    stepStalledMotion(steps(ran), { timestamp: 110, delta: 16, isProcessing: false }, 100, 116);
+    stepStalledMotion(steps(ran), { timestamp: 90, delta: 16, isProcessing: true }, 100, 116);
+    expect(ran).toEqual([]);
   });
 });
 
