@@ -467,6 +467,10 @@ export class PixiRendererOrchestrator { // Renamed class
         viewId: this.viewId,
         bounds: () => this.getMapRect(),
         albedo: () => this.mapImage?.albedoTexture() ?? null,
+        mapImage: () => {
+          const size = this.mapImage?.imageSize;
+          return size && this.mapImage ? { size, stretch: this.mapImage.mapStretch } : null;
+        },
         grid: () => this.gridSystem ?? null,
         fogCoverage: () => this.fogRenderer!.getCommittedCoverage(),
         shown: this.shownPlaces,

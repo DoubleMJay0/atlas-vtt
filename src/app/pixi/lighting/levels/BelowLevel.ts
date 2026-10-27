@@ -29,6 +29,8 @@ import { ExploredMemory } from '../ExploredMemory';
 import { exploredGrid } from '../ExploredTexture';
 import type { LightingState } from '../LightingRenderer';
 import { BelowFog } from './BelowFog';
+import { UnexploredImage, unexploredLook } from '../UnexploredImage';
+import { levelUnexploredImage } from '../../../lighting/levelUnexploredImages';
 import { BelowStage } from './BelowStage';
 import { BelowTokens, type BelowTokenLook } from './BelowTokens';
 import { levelRoof, Roof } from './Roof';
@@ -63,6 +65,8 @@ export class BelowLevel {
   private readonly tokens: BelowTokens;
   private readonly fog: BelowFog;
   private readonly roof: Roof;
+  /** The level's fog map for never-seen areas, decoded once asked for. */
+  private readonly unexploredImage: UnexploredImage | null;
   private readonly builder = new SceneModelBuilder();
   private readonly spots = new SceneSpots();
   private readonly gmSpots = new SceneSpots(GM_SIGHT_POLICY);
@@ -111,6 +115,8 @@ export class BelowLevel {
       edits: false,
     });
     this.roof = new Roof({ host: deps.roofs, requestRender: this.changed, onReady: deps.onReady, fadeMs: deps.fadeMs, camera: this.camera });
+    // Once decoded the level is built anew with it, as when its map image is in.
+    this.unexploredImage = deps.readUnexploredImage ? new UnexploredImage(deps.readUnexploredImage, deps.onReady) : null;
     this.stage = new BelowStage({ map: this.image.layer, liquids: this.liquids?.container, tokens: this.tokens.view, lighting: this.engine.layer, roof: this.roof.layer.view, fog: this.fog.view });
   }
 
@@ -170,7 +176,8 @@ export class BelowLevel {
     const spots = this.spots.update(model, seen, measurement, rules);
     const gmSpots = own === model.sight ? spots : this.gmSpots.update(model, seen, measurement, rules, own);
     this.rule = { sight: player, ambient: model.ambient, reaches: model.reaches };
-    const inputs = [model, gm, player, spots, gmSpots, state.lighting, state.grid?.size, bounds.width, bounds.height];
+    const unexplored = this.unexploredImage?.textureOf(levelUnexploredImage(state, id)) ?? null;
+    const inputs = [model, gm, player, spots, gmSpots, state.lighting, state.grid?.size, bounds.width, bounds.height, unexplored, this.image.mapStretch];
     if (inputs.length !== this.inputs.length || inputs.some((input, i) => input !== this.inputs[i])) {
       this.inputs = inputs;
       this.revision++;
@@ -180,7 +187,10 @@ export class BelowLevel {
       bounds, walls: model.walls, lights: model.lights, albedo: null, zones: model.zones,
       sight: gm, spots: gmSpots, ...(gm !== player && { playerSight: player, playerSpots: spots }),
       sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, cellSize: state.grid?.size ?? DEFAULT_CELL_SIZE, ...sceneLook(state.lighting),
+      ...unexploredLook(unexplored, state, this.image.imageSize && { size: this.image.imageSize, stretch: this.image.mapStretch }),
     });
+    // The engine holds the level's current fog map: the one it replaced can go.
+    this.unexploredImage?.release();
     const objects = levelObjectsOn(state, id);
     this.tokens.sync(mapTokens(objects), state.grid?.size ?? DEFAULT_CELL_SIZE, state.tokenSettings?.tokenRingSize ?? 1);
     this.fog.sync(objects.fog, bounds, levelMapKey(state.mapPath, seen));
@@ -274,6 +284,7 @@ export class BelowLevel {
     this.stage.release();
     this.roof.destroy();
     this.engine.destroy();
+    this.unexploredImage?.destroy();
     this.liquids?.destroy();
     this.memory.destroy();
     this.tokens.destroy();

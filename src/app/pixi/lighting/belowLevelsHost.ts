@@ -1,4 +1,5 @@
 import { Ticker, type Application, type Container } from 'pixi.js';
+import { vaultImageReader } from './unexploredImageReader';
 import type { App } from 'obsidian';
 import type { Viewport } from 'pixi-viewport';
 import { mapImageSourceFor } from '../../MapLoader';
@@ -147,5 +148,6 @@ export function createBelowLevelsHost({ obsApp, app, viewport, store, viewedFog,
     viewedFog,
     viewedRoof,
     placeEraser,
+    readUnexploredImage: vaultImageReader(obsApp),
   };
 }
