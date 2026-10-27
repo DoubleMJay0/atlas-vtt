@@ -5,7 +5,7 @@ import type { WallSegment } from '../../types/wallTypes';
 import { wallList } from '../../vision/wallList';
 import { stairSides, withStairSides, type StairsOfTokens } from './stairSides.ts';
 
-/** The map's size in world pixels: the image lies at (0, 0) at its natural size. */
+/** The map's size in world pixels, from (0, 0): its image's own size, or the box Atlas draws it into turned, stretched and placed (`floorWorldSize`). */
 export interface MapSize {
   readonly width: number;
   readonly height: number;

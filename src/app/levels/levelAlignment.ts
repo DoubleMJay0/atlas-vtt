@@ -29,7 +29,7 @@ export function readLevelAlignment(value: unknown): LevelAlignment | undefined {
 }
 
 /** How a level's alignment draws its image: the stretch scaled, placed at its offset. */
-function placementOf({ offset, scale, stretch }: LevelAlignment): MapStretch {
+export function alignmentPlacement({ offset, scale, stretch }: LevelAlignment): MapStretch {
   const placed = offset.x > 0 || offset.y > 0;
   return {
     x: stretch.x * scale,
@@ -48,7 +48,7 @@ function placementOf({ offset, scale, stretch }: LevelAlignment): MapStretch {
  */
 export function levelImagePlacement(scene: AlignedScene, levelId: string | null): MapStretch {
   const alignment = levelId === null ? undefined : scene.levelAlignments?.[levelId];
-  return alignment ? placementOf(alignment) : readMapStretch(scene.grid?.mapStretch);
+  return alignment ? alignmentPlacement(alignment) : readMapStretch(scene.grid?.mapStretch);
 }
 
 /**
@@ -106,5 +106,5 @@ export function levelImageOnItsOwn(scene: AlignedScene, levelId: string | null):
 /** Whether two alignments draw the image alike. */
 export function sameAlignment(a: LevelAlignment | undefined, b: LevelAlignment | undefined): boolean {
   if (!a || !b) return a === b;
-  return sameStretch(placementOf(a), placementOf(b));
+  return sameStretch(alignmentPlacement(a), alignmentPlacement(b));
 }

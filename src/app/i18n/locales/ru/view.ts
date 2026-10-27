@@ -4,7 +4,6 @@ export const view: Translation = {
   'view.copyFailed': 'Не удалось скопировать путь',
   'view.copyPath': 'Копировать путь к файлу',
   'view.more': 'Другие действия',
-  'view.newWindow': 'Переместить в новое окно',
   'view.pathCopied': 'Путь к файлу скопирован',
   'view.rename': 'Переименовать...',
   'view.reveal': 'Показать в проводнике',

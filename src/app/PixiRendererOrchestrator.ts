@@ -61,7 +61,7 @@ import { findAtlasLeafByViewId } from './utils/atlasLeafLookup';
 import { requestRender } from './pixi/RenderScheduler';
 import { MAP_LAYER_Z } from './pixi/mapLayerOrder';
 import { shownRollTokens } from './pixi/playerRollTokens';
-import type { PlayerBadgeNumbers } from './pixi/token-renderer/PlayerInstanceBadges';
+import type { PlayerBadgeNumbers } from './pixi/token-renderer/PlayerBadgeNumbers';
 import type { ShownRollToken } from './services/playerRollSource';
 import { t } from './i18n';
 import { showNotice } from './ui/notice';
@@ -83,7 +83,6 @@ import { fitZoomRange } from './pixi/fitMapRect';
 import { viewCentreInClient, worldToClient, type ClientPoint } from './pixi/utils/worldToClient';
 import { mapTokens } from './tokens/offMap';
 import { TokenPlacer } from './pixi/tokenPlacement/TokenPlacer';
-import { followWindow } from './utils/followWindow';
 
 export class PixiRendererOrchestrator { // Renamed class
   private _isDestroyed: boolean = false;
@@ -1079,11 +1078,8 @@ export class PixiRendererOrchestrator { // Renamed class
       }
     };
     
-    // On the canvas' own window, which follows the view into a popout
-    this.unbindKeyboard = followWindow(this.pixiAppManager.getCanvasElement(), (win: Window): (() => void) => {
-      win.document.addEventListener('keydown', handleKeyDown);
-      return (): void => win.document.removeEventListener('keydown', handleKeyDown);
-    });
+    document.addEventListener('keydown', handleKeyDown);
+    this.unbindKeyboard = (): void => document.removeEventListener('keydown', handleKeyDown);
   }
   
 

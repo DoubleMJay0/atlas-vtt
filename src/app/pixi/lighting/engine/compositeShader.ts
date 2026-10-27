@@ -232,7 +232,7 @@ vec3 litAsBright(vec3 albedo, vec4 lamps, vec3 bounce, vec3 ambient) {
   vec3 direct = lamps.rgb * (lamps.a / max(dot(lamps.rgb, LUMA), 1e-4));
   vec3 light = ambient + (direct + bounce * uBounceGain) * uExposure;
   float level = dot(light, LUMA);
-  vec3 lit = neutral(albedo * light);
+  vec3 lit = neutral(albedo * light, dot(ambient, LUMA));
   float fill = 1.0 - lamps.a * uExposure / max(level, 1e-4);
   float night = (1.0 - smoothstep(0.03, 0.35, level)) * uPurkinje * fill;
   return nightShift(lit, night);
@@ -332,7 +332,7 @@ void main() {
   // dim range showed far below its share of the bright range. A light is tonemapped at its
   // bright level instead and the result scaled back to what it gives; without a light this is 1.
   float lift = 1.0 + max(lamps.a - dot(direct, LUMA), 0.0) * uExposure / max(level, 1e-4);
-  vec3 lit = neutral(albedo * light * lift) / lift;
+  vec3 lit = neutral(albedo * light * lift, dot(ambient, LUMA)) / lift;
   // Cool grey where the light is low, by the share of it that is no light's own (ambient and
   // bounce): shifting a light's fade to black drew a pale ring around it.
   float fill = 1.0 - dot(direct, LUMA) * uExposure / max(level, 1e-4);

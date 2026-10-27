@@ -1,4 +1,4 @@
-import { ASSET_CHUNK_BYTES, isCount, isHash, isMaxSide, MAX_ASSET_BYTES, parseAsset, parseAssetVariant, type AssetRef, type AssetVariant } from './asset.ts';
+import { ASSET_CHUNK_BYTES, isCount, isHash, isMaxSide, MAX_ASSET_BYTES, parseAsset, parseAssetVariant, parseVideoAsset, type AssetRef, type AssetVariant } from './asset.ts';
 import { isBookType, isPlayerBookType, parseBookCover, parseBookMessage, parseBookTokenMessage, parsePlayerBookMessage, type BookMessage, type BookTokenMessage, type PlayerBookCover, type PlayerBookMessage, type PlayerBookParts } from './book.ts';
 import { parseBookRestMessage, type BookRestMessage } from './bookRest.ts';
 import { isDeltaOf, parseDelta, parseSeq, type DeltaMessage, type DeltaOf } from './delta.ts';
@@ -7,11 +7,13 @@ import { parseFog, type SharedFog } from './fog.ts';
 import { parseImageMessage, type ImageMessage } from './image.ts';
 import { parseInitiative, type SharedInitiative } from './initiative.ts';
 import { parseLightingScene, parseSight, type SharedLightingScene, type SharedSight } from './lighting.ts';
+import { parseLiquids, type SharedLiquid } from './liquids.ts';
 import { parseLive, type LiveMessage } from './live.ts';
 import type { LogMessage, PlayerLogMessage } from './log.ts';
 import { isPlayerLogType, parseLogMessage, parsePlayerLog } from './logParse.ts';
 import { parsePlayerRoll, parseRoll, parseRollDice, parseRollRefused, type PlayerRoll, type RollMessage, type RollRefused, type SharedRollDice } from './dice.ts';
 import { parseAnnotations, parseDoors, parseGrid, parsePinFound, parsePins, parseSensed, type PlayerPinFound, type SensedMark, type SharedAnnotations, type SharedDoor, type SharedGrid, type SharedPin } from './mapLayers.ts';
+import { parseMapPlacement, type SharedMapPlacement } from './mapPlacement.ts';
 import { parseMarks, parsePlayerMark, type MarksMessage, type PlayerCursor, type PlayerLaser, type PlayerMeasure } from './marks.ts';
 import { isRecord } from './shape.ts';
 import { MAX_SCENE_ID, parseDragCancel, parseMoveRefused, parsePlayerMove, parseSnapGrid, type MoveRefused, type PlayerDrag, type PlayerDragCancel, type PlayerMove, type SnapGrid } from './moves.ts';
@@ -19,11 +21,11 @@ import { parseRules, type RulesMessage } from './rules.ts';
 import { MAX_TOKEN_SIZE, MAX_TOKENS, parseTokens, TOKEN_ID_PATTERN, type SharedToken } from './tokens.ts';
 import { parseWidgetBar, type SharedWidgetBar } from './widgets.ts';
 
-/** What the players see of the shared scene; null while nothing is shared. */
-export interface SharedScene {
+/** What the players see of the shared scene; null while nothing is shared. A scene with a map may say where it lies (`SharedMapPlacement`). */
+export interface SharedScene extends SharedMapPlacement {
   /** Random per shared scene, so a client can tell a new scene from a resend. */
   readonly id: string;
-  /** The map image, drawn at its natural size at (0, 0); null for a scene without one. */
+  /** The map image, drawn at its natural size at (0, 0) unless `stretch` or `fit` say otherwise; null for a scene without one. */
   readonly map: AssetRef | null;
   /**
    * The scene is lit: players see only what the lighting shows them, worked out from the `lighting`
@@ -32,6 +34,11 @@ export interface SharedScene {
   readonly lit: boolean;
   /** Which floor of a map with several this scene is; none for a map of one floor (and from an older GM). */
   readonly floor?: SharedFloor;
+  /**
+   * An animated map's video, fetched by hash like the map, which stays its poster: a page that plays
+   * it shows the poster until it plays and where it cannot. Added later: an older page shows the poster.
+   */
+  readonly video?: AssetRef;
 }
 
 /** Parts of one message a client puts together: at most this many, each as large as an asset chunk. */
@@ -69,6 +76,8 @@ export type GmMessage =
    * bytes; the pieces of one `id` joined in `index` order are that text.
    */
   | { readonly t: 'part'; readonly id: string; readonly index: number; readonly count: number; readonly data: string }
+  /** The water, lava and acid that move on the map of scene `scene`, in drawing order. Added later: an older page shows the still map. */
+  | { readonly t: 'liquids'; readonly scene: string; readonly liquids: readonly SharedLiquid[] }
   /** The grid as the players' picture draws it in scene `scene`; null when it shows none. */
   | { readonly t: 'grid'; readonly scene: string; readonly grid: SharedGrid | null }
   /** The badges of the doors the players see now (a lit scene only). */
@@ -127,12 +136,18 @@ function sceneExtras(value: Record<string, unknown>): Pick<SharedScene, 'floor'>
   return floor !== undefined ? { floor } : {};
 }
 
+/** An animated map's video where it is given and well formed; a malformed one is left out, so the poster still shows. */
+function sceneVideo(value: Record<string, unknown>): Pick<SharedScene, 'video'> {
+  const video = parseVideoAsset(value.video);
+  return video !== null ? { video } : {};
+}
+
 function parseScene(value: unknown): SharedScene | null | undefined {
   if (value === null) return null;
   if (!isRecord(value) || !isSceneId(value.id) || typeof value.lit !== 'boolean') return undefined;
   if (value.map === null) return { id: value.id, map: null, lit: value.lit, ...sceneExtras(value) };
   const map = parseAsset(value.map);
-  return map === null ? undefined : { id: value.id, map, lit: value.lit, ...sceneExtras(value) };
+  return map === null ? undefined : { id: value.id, map, lit: value.lit, ...sceneExtras(value), ...parseMapPlacement(value), ...sceneVideo(value) };
 }
 
 /** A message about the scene's fog or lighting, or null for anything malformed. */
@@ -158,6 +173,10 @@ function parseSceneInput(value: Record<string, unknown>, scene: string): GmMessa
       if (value.mask === null) return { t: 'explored', scene, mask: null };
       const mask = parseAsset(value.mask);
       return mask === null || mask.mime !== 'image/png' ? null : { t: 'explored', scene, mask };
+    }
+    case 'liquids': {
+      const liquids = parseLiquids(value.liquids);
+      return liquids === null ? null : { t: 'liquids', scene, liquids };
     }
     case 'grid': {
       const grid = parseGrid(value.grid);

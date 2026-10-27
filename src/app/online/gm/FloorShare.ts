@@ -5,6 +5,8 @@ import type { SceneState, SceneStore } from './atlasView.ts';
 import { dragRulerPaths, PlayerDragRulers, type RulerPaths } from './dragRulers.ts';
 import { AssetAnswers } from './assetAnswers.ts';
 import { readFloorImages, type FloorImages } from './floorImages.ts';
+import { readFloorVideo, type SharedVideo } from './floorVideo.ts';
+import { floorPlacement, floorWorldSize } from './floorPlacement.ts';
 import { MineShare } from './mineShare.ts';
 import { mapRollDice, tokenRollDice } from './rollAdvantage.ts';
 import { InputShare } from './InputShare.ts';
@@ -39,9 +41,11 @@ export class FloorShare {
   private readonly ports: FloorSharePorts;
   private scene: SharedScene | null = null;
   private images: Pick<FloorImages, 'map'> = { map: null };
-  /** The floor map's size, by which players' moves are kept on it; null when it is unknown. */
+  /** The map's video while the map is an animated one players may play in its poster's place. */
+  private video: SharedVideo | null = null;
+  /** The floor map's size in world pixels (its image as Atlas draws it), by which players' moves are kept on it; null when it is unknown. */
   private mapSize: MapSize | null = null;
-  /** The map path, floor and images of the scene sent or being read: a change starts a new scene. */
+  /** The map path, floor, images and placement of the scene sent or being read: a change starts a new scene. */
   private key: string | null = null;
   private refusal: string | null = null;
   private readonly assets: AssetAnswers;
@@ -98,8 +102,9 @@ export class FloorShare {
     });
     this.marks = new MarkShare({ ...ports, cursorsShown }, () => this.mapSize);
     this.dragRulers = new PlayerDragRulers((drags) => ports.showPlayerDrags?.(drags));
-    this.assets = new AssetAnswers({ send: (body, to) => ports.send(body, to), now: () => ports.now(), readImage: (path) => ports.readImage(path), scaleImage: ports.scaleImage }, {
+    this.assets = new AssetAnswers({ send: (body, to) => ports.send(body, to), now: () => ports.now(), readImage: (path) => ports.readImage(path), scaleImage: ports.scaleImage, readVideo: ports.readVideo }, {
       map: () => this.images.map,
+      video: () => this.video,
       explored: (hash) => this.inputs.exploredBytes(hash),
       artPath: (hash) => this.artPath(hash),
     });
@@ -170,7 +175,7 @@ export class FloorShare {
   /** Withdraws the scene: players see none until a scene is shared again. */
   withdraw(): void {
     this.key = null;
-    this.publish(null, null);
+    this.publish(null, null, null);
   }
 
   /** The GM's canvas shows another floor now, or this one again: what it draws of players' marks starts afresh. */
@@ -237,7 +242,9 @@ export class FloorShare {
     const level = viewedLevelId(state);
     const background = levelBackground(state, level);
     const floor = this.ports.floor?.();
-    const key = JSON.stringify([state.mapPath, level, background, lit, floor ?? null]);
+    // A map drawn another way is another world: its tokens, walls and fog moved with it in the same write.
+    const placement = floorPlacement(state, level, background);
+    const key = JSON.stringify([state.mapPath, level, background, lit, floor ?? null, placement]);
     if (key === this.key) {
       this.marks.update();
       this.tokens.update();
@@ -254,16 +261,20 @@ export class FloorShare {
     if (this.key !== key) return;
     if (built === null) {
       this.ports.notice('Atlas Online cannot send this scene\'s map image.');
-      this.publish(null, null);
+      this.publish(null, null, null);
       return;
     }
-    const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }) };
-    this.publish(scene, built);
+    const readVideo = this.ports.readVideo;
+    const video = built.map === null || readVideo === undefined ? null : await readFloorVideo(readVideo, background);
+    if (this.key !== key) return;
+    const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }), ...placement, ...(video !== null && { video: video.ref }) };
+    this.publish(scene, { map: built.map, size: built.size && floorWorldSize(state, level, built.size) }, video);
   }
 
-  private publish(scene: SharedScene | null, built: FloorImages | null): void {
+  private publish(scene: SharedScene | null, built: FloorImages | null, video: SharedVideo | null): void {
     this.scene = scene;
     this.images = { map: built?.map ?? null };
+    this.video = video;
     this.mapSize = built?.size ?? null;
     this.moves.sceneChanged();
     this.dragRulers.clear();

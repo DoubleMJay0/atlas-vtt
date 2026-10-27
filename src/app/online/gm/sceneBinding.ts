@@ -43,6 +43,8 @@ export interface SceneBindingPorts {
   /** Sends a live message to all ahead of other frames; a newer one of the same key replaces it while it waits. */
   sendLive(body: GmMessage, key: string, to?: string): void;
   readImage(path: string): Promise<VaultImage | null>;
+  /** An animated map's video as players may be sent it beside its poster. */
+  readVideo(path: string): Promise<VaultImage | null>;
   /** Whether the binding is still the table's and its tab the same objects. */
   isLive(binding: SceneBinding): boolean;
   randomId(): string;
@@ -116,6 +118,7 @@ export function bindScene(ports: SceneBindingPorts, tab: AtlasTab, presented: Pr
     showNames: () => atlasPlayerSettings(ports.app).showNames,
     tokenRules: () => tokenRulesOf(shownRenderer()),
     readImage: (path) => ports.readImage(path),
+    readVideo: (path) => ports.readVideo(path),
     scaleImage: scaleInWindow,
     send: (body, to) => live() && ports.send(body, to),
     sendLive: (body, key, to) => live() && ports.sendLive(body, key, to),
