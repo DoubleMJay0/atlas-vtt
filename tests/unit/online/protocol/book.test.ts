@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bookLine, bookText, fitsPlayerFrame, isQuestDone, MAX_BOOK_NOTES, MAX_RESOURCE_KEY, MAX_TOKEN_VALUE, MAX_BOOK_QUESTS, MAX_NOTE_BODY, MAX_QUEST_REWARDS, parseGmMessage, parsePlayerMessage, type BookItem, type BookQuest, type PlayerBook,
+  bookLine, bookText, fitsPlayerFrame, isQuestDone, MAX_BOOK_NOTES, MAX_RESOURCE_KEY, MAX_TOKEN_VALUE, MAX_BOOK_QUESTS, MAX_NOTE_BODY, MAX_QUEST_REWARDS, parseGmMessage, parsePlayerMessage, withoutItem, type BookItem, type BookQuest, type PlayerBook,
 } from '../../../../src/app/online/protocol/index.ts';
 
 const HASH = 'a'.repeat(64);
@@ -158,6 +158,19 @@ describe('what a player writes into their book', () => {
       expect(parsePlayerMessage({ t: 'book-token', ...broken }), JSON.stringify(broken)).toBeNull();
     }
     expect(parseGmMessage({ t: 'book-token', scene: 'scene-1', token: ID })).toBeNull();
+  });
+
+  it('reads an item taken out of the book by its id alone, and refuses any other id, or the message from the GM', () => {
+    expect(parsePlayerMessage({ t: 'book-item-delete', id: ID, item: ITEM })).toEqual({ t: 'book-item-delete', id: ID });
+    for (const id of ['../x', ID.toUpperCase(), `${ID}0`, '', 12, null, undefined]) expect(parsePlayerMessage({ t: 'book-item-delete', id }), String(id)).toBeNull();
+    expect(parseGmMessage({ t: 'book-item-delete', id: ID })).toBeNull();
+  });
+
+  it('takes an item out of a book only where the book holds it, and out of its slot with it', () => {
+    const other = { ...ITEM, id: 'fedcba9876543210fedcba98', name: 'Lamp' };
+    const book = { ...BOOK, items: [ITEM, other], equipped: [{ slot: 'head', item: ID }, { slot: 'neck', item: other.id }] };
+    expect(withoutItem(book, ID)).toEqual({ ...book, items: [other], equipped: [{ slot: 'neck', item: other.id }] });
+    expect(withoutItem(book, '0'.repeat(24))).toBeNull();
   });
 
   it('refuses what is malformed or too long, and never takes a GM kind from a player', () => {
