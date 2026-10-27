@@ -42,6 +42,8 @@ function animationView(viewport: Viewport, screen: { width: number; height: numb
   const [width, height] = [screen.width / scaleX, screen.height / scaleY];
   return { minX: left - width / 2, minY: top - height / 2, maxX: left + width * 1.5, maxY: top + height * 1.5 };
 }
+import { UnexploredImage, unexploredLook, type DrawnMapImage, type ReadUnexploredImage } from './UnexploredImage';
+import { levelUnexploredImage } from '../../lighting/levelUnexploredImages';
 
 /** Above tokens, below their nameplates and bars (100): the GM keeps readable labels in the dark. */
 export const LIGHTING_Z_INDEX = 90;
@@ -85,6 +87,10 @@ export interface LightingRendererDeps {
    * reads them. Null while they are not ready (mid grey meanwhile); the view follows when they arrive.
    */
   albedo: () => Texture | null;
+  /** Decodes the levels' fog maps for never-seen areas (`levelUnexploredImage`); without it the players see the unexplored colour. */
+  readUnexploredImage?: ReadUnexploredImage;
+  /** The viewed level's map image as it is drawn, which its fog map lies over exactly; null before it loaded. */
+  mapImage?: () => DrawnMapImage | null;
   /** The grid the composite draws unlit, while there is one (`UnlitGrid`). */
   grid?: () => UnlitGrid | null;
   /** The senses and conditions of the map's collection; the generic ones without it. */
@@ -105,7 +111,7 @@ export interface LightingRendererDeps {
   roofFadeMs?: number;
 }
 
-type SceneWithoutLook = Omit<EngineScene, keyof SceneLook | 'albedo'>;
+type SceneWithoutLook = Omit<EngineScene, keyof SceneLook | 'albedo' | 'unexploredTexture' | 'unexploredSoftness' | 'unexploredPlacement'>;
 
 /**
  * Scene lighting for one map view: feeds the store's walls, lights and vision tokens to the
@@ -140,6 +146,10 @@ export class LightingRenderer implements SceneLightingView {
   /** The albedo the engine was last given. */
   private albedo: Texture | null = null;
   private readonly attempt: AttemptProgress;
+  /** The scene's fog map for never-seen areas, decoded once asked for. */
+  private readonly unexploredImage: UnexploredImage | null;
+  /** The fog map texture the engine was last given. */
+  private unexploredTexture: Texture | null = null;
   private stopped = false;
   /** A scene build worked out new sight; reported once the guarded work is over. */
   private sightChanged = false;
@@ -161,6 +171,7 @@ export class LightingRenderer implements SceneLightingView {
     this.engine = new LightingEngine(renderer, this.quality, { paced: true });
     this.attempt = new AttemptProgress(renderer, deps.attempt);
     this.layer = this.engine.layer;
+    this.unexploredImage = deps.readUnexploredImage ? new UnexploredImage(deps.readUnexploredImage, () => this.run(() => this.followTextures())) : null;
     this.memory = new ExploredMemory({
       renderer,
       store: deps.store,
@@ -218,7 +229,7 @@ export class LightingRenderer implements SceneLightingView {
     // Bounce still to build after an edit belongs in the picture; so does a world a restored context took.
     let below: BelowShown | undefined;
     this.run(() => {
-      this.followAlbedo();
+      this.followTextures();
       this.engine.flush();
       below = this.belowForFrame(frame);
     });
@@ -340,6 +351,7 @@ export class LightingRenderer implements SceneLightingView {
       this.levelsBelow?.reset(true);
       this.engine.setCoverage(null);
       this.engine.setEnabled(false);
+      this.unexploredImage?.release();
       this.model.reset();
       this.lastScene = null;
       this.attempt.end();
@@ -370,7 +382,13 @@ export class LightingRenderer implements SceneLightingView {
     // Both pictures always show the same tokens (`GM_SIGHT_POLICY`), so the same sight gives the same footprints.
     const gmSpots = gmSight === model.sight ? spots : this.gmSpots.update(model, state, this.deps.measurement, this.deps.rules, gmSight);
     this.albedo = this.deps.albedo();
-    this.engine.update({ ...base, albedo: this.albedo, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(state.lighting) });
+    this.unexploredTexture = this.unexploredImage?.textureOf(levelUnexploredImage(state, viewedLevelId(state))) ?? null;
+    this.engine.update({
+      ...base, albedo: this.albedo, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(state.lighting),
+      ...unexploredLook(this.unexploredTexture, state, this.deps.mapImage?.() ?? null),
+    });
+    // The engine holds the current fog map: the one it replaced can go.
+    this.unexploredImage?.release();
     this.levelsBelow?.update(state, bounds, { sight: model.sight, gmSight });
     if (this.levelsBelow?.failed()) this.engine.fail(new Error('The lighting of a level below stopped'));
     requestRender(this.deps.app);
@@ -421,14 +439,18 @@ export class LightingRenderer implements SceneLightingView {
   /**
    * The map image's albedo is made after the image (from its overview, once asked for) and goes
    * with it: a lit scene hands the engine the one there is now, which rebuilds only the bounce.
+   * The fog map for never-seen areas is decoded after its path is set, and followed the same way.
    */
-  private followAlbedo(): void {
-    if (this.lastScene && this.deps.albedo() !== this.albedo) this.update(this.deps.store.getState());
+  private followTextures(): void {
+    if (!this.lastScene) return;
+    const state = this.deps.store.getState();
+    const unexplored = this.unexploredImage?.textureOf(levelUnexploredImage(state, viewedLevelId(state))) ?? null;
+    if (this.deps.albedo() !== this.albedo || unexplored !== this.unexploredTexture) this.update(this.deps.store.getState());
   }
 
   private animate(): void {
     this.attempt.settle();
-    this.followAlbedo();
+    this.followTextures();
     // The display frame's time, which every animation of the map shares, so their frames share renders.
     const now = this.clock();
     // A light that moved has come to rest: its reflection, its full tile and the bounce follow.
@@ -453,6 +475,7 @@ export class LightingRenderer implements SceneLightingView {
     this.levelsBelow?.reset(false);
     this.engine.destroy();
     this.levelsBelow?.destroy();
+    this.unexploredImage?.destroy();
     this.memory.destroy();
   }
 }

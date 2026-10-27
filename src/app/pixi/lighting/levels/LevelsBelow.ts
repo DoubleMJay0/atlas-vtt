@@ -1,4 +1,5 @@
 import { Matrix, type Application, type Container } from 'pixi.js';
+import type { ReadUnexploredImage } from '../UnexploredImage';
 import type { Viewport } from 'pixi-viewport';
 import type { MeasurementSettings } from '../../../grid/measurementFormat';
 import { belowQuality, type LightingQuality } from '../../../lighting/lightingQuality';
@@ -53,6 +54,8 @@ export interface BelowLevelsHost extends RoofHost {
   viewedRoof(): ((point: Point) => boolean) | null;
   /** Puts the openings' eraser into the view's stage, between its grid and its tokens. */
   placeEraser(eraser: Container): void;
+  /** Decodes a level's fog map for never-seen areas; without it the levels below show the unexplored colour. */
+  readUnexploredImage?: ReadUnexploredImage;
 }
 
 export interface LevelsBelowDeps {
@@ -306,6 +309,7 @@ export class LevelsBelow {
       roofs: deps.host,
       ...(deps.host.createLiquids && { liquids: (changed: () => void) => deps.host.createLiquids!(id, changed) }),
       fadeMs: deps.fadeMs ?? 0,
+      ...(deps.host.readUnexploredImage && { readUnexploredImage: deps.host.readUnexploredImage }),
       requestRender: deps.requestRender,
       onReady: deps.onReady,
       guard: deps.guard,

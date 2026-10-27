@@ -1,4 +1,5 @@
 import type { FogCoverage } from '../../fog/fogCoverage';
+import type { DrawnMapImage } from './UnexploredImage';
 import type { EventEmitter } from 'events';
 import type { App } from 'obsidian';
 import type { Application, Texture } from 'pixi.js';
@@ -56,6 +57,8 @@ export interface LightingControllerDeps {
   bounds: () => MapBounds | null;
   /** The map image, for the colours light bounces off. */
   albedo: () => Texture | null;
+  /** The viewed level's map image as it is drawn, which its fog map lies over; null before it loaded. */
+  mapImage?: () => DrawnMapImage | null;
   /** The grid the composite draws unlit, while there is one (`UnlitGrid`). */
   grid?: () => UnlitGrid | null;
   /** How each token perceives; unset, by its own vision and its linked statblock (`tokenSensesResolver`). */
@@ -124,7 +127,7 @@ export class LightingController {
       onActiveChange: () => this.session.sync(), onFull: showZonesFullNotice, onSurfacesFull: showSurfacesFullNotice, announce: showExploredTravelNotice,
     });
     this.renderer = createSceneLighting({
-      viewport, app, store, obsApp, measurement, bounds: deps.bounds, albedo: deps.albedo, ...(deps.grid && { grid: deps.grid }),
+      viewport, app, store, obsApp, measurement, bounds: deps.bounds, albedo: deps.albedo, ...(deps.mapImage && { mapImage: deps.mapImage }), ...(deps.grid && { grid: deps.grid }),
       rules: () => this.sightRules(),
       onSightChange: () => this.onSightChange(),
       exploredWatcher: this.modes.memory,

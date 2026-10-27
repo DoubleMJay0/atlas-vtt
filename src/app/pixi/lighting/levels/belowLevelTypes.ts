@@ -8,6 +8,7 @@ import type { LightingStore } from '../LightingRenderer';
 import type { SnapshotView } from './belowSnapshot';
 import type { TokenArt } from './BelowTokens';
 import type { RoofHost } from './Roof';
+import type { ReadUnexploredImage } from '../UnexploredImage';
 
 /** What a level below (`BelowLevel`) is made with, and what its snapshots are drawn at. */
 
@@ -49,6 +50,8 @@ export interface BelowLevelDeps {
   liquids?: (changed: () => void) => BelowLiquids;
   /** How long a piece of the roof takes to fade. */
   fadeMs: number;
+  /** Decodes the level's fog map for never-seen areas; without it the level shows the unexplored colour. */
+  readUnexploredImage?: ReadUnexploredImage;
   requestRender: () => void;
   /** The level's picture became ready, or stopped being: the stack must be worked out again. */
   onReady: () => void;

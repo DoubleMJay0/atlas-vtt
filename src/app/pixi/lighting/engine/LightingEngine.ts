@@ -152,6 +152,7 @@ export class LightingEngine {
     composite.setAmbient(scene.ambient, scene.ambientColor, ambientLift(scene));
     composite.setMemoryShown(exploredMemoryOn(scene));
     composite.setMemoryColours(scene.exploredColor, scene.unexploredColor);
+    composite.setUnexploredImage(scene.unexploredTexture ?? null, scene.unexploredPlacement ?? new Matrix(1 / scene.bounds.width, 0, 0, 1 / scene.bounds.height), scene.unexploredSoftness ?? 0);
   }
 
   /**

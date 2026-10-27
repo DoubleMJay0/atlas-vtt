@@ -63,6 +63,30 @@ export function gmPictureDiffers(a: SceneLighting, b: SceneLighting): boolean {
     || darkSightLookOf(a) !== darkSightLookOf(b) || darkSightTintOf(a) !== darkSightTintOf(b);
 }
 
+/** The vault path of the scene's fog map for never-seen areas, or null when it sets none it could read. */
+export function unexploredImageOf(lighting: Pick<SceneLighting, 'unexploredImage'>): string | null {
+  const path: unknown = lighting.unexploredImage;
+  return typeof path === 'string' && path.trim() !== '' ? path : null;
+}
+
+/** The fog maps of a scene's other levels, only those that name a path: a hand edit that holds anything else is dropped when the scene is read. */
+export function readLevelUnexploredImages(saved: unknown): Record<string, string> | undefined {
+  if (typeof saved !== 'object' || saved === null || Array.isArray(saved)) return undefined;
+  const kept = Object.entries(saved).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '');
+  return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+}
+
+/** Cells over which a light's revealed map fades into the fog map, when the scene sets none. */
+export const DEFAULT_UNEXPLORED_SOFTNESS = 1.5;
+/** The widest fade the panel offers, in cells. */
+export const MAX_UNEXPLORED_SOFTNESS = 6;
+
+/** The scene's fade into its fog map in cells: its own within 0..`MAX_UNEXPLORED_SOFTNESS`, or the default. */
+export function unexploredSoftnessOf(lighting: Pick<SceneLighting, 'unexploredSoftness'>): number {
+  const cells = lighting.unexploredSoftness;
+  return typeof cells === 'number' && Number.isFinite(cells) ? Math.min(MAX_UNEXPLORED_SOFTNESS, Math.max(0, cells)) : DEFAULT_UNEXPLORED_SOFTNESS;
+}
+
 /** A threshold within 0..1; anything that is not a number falls back to the default. */
 export function clampLitThreshold(value: number): number {
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : DEFAULT_LIT_THRESHOLD;
@@ -111,5 +135,12 @@ export function readSceneLighting(saved: unknown): SceneLighting {
     if (field in lighting && !isHexColor(lighting[field])) delete lighting[field];
   }
   if ('darkSightLook' in lighting && !isDarkSightLook(lighting.darkSightLook)) delete lighting.darkSightLook;
+  if ('unexploredImage' in lighting && !unexploredImageOf(lighting)) delete lighting.unexploredImage;
+  if ('levelUnexploredImages' in lighting) {
+    const images = readLevelUnexploredImages(lighting.levelUnexploredImages);
+    if (images) lighting.levelUnexploredImages = images;
+    else delete lighting.levelUnexploredImages;
+  }
+  if ('unexploredSoftness' in lighting && !(typeof lighting.unexploredSoftness === 'number' && Number.isFinite(lighting.unexploredSoftness))) delete lighting.unexploredSoftness;
   return lighting;
 }

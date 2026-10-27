@@ -71,6 +71,12 @@ export interface CompositeFilter {
   setMemoryShown(shown: boolean): void;
   /** Tint of remembered areas and fill of never-seen ones in the player view, picked in sRGB. */
   setMemoryColours(explored: string | undefined, unexplored: string | undefined): void;
+  /**
+   * The fog map the players see over never-seen areas (`SceneLighting.unexploredImage`), or null for
+   * the unexplored colour, the matrix from world pixels to its texture coordinates, and the width in
+   * world pixels of the fade into it at a light's edge. The caller owns the texture.
+   */
+  setUnexploredImage(texture: Texture | null, placement: Matrix, softness: number): void;
   /** The caller owns `texture` and rebinds before destroying it. */
   setExplored(texture: Texture): void;
   /** The marked grid's colour (`UnlitGrid`), or null while no grid is marked and shown. */
@@ -98,6 +104,7 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
   const ambient = new Float32Array(3);
   const exploredTint = new Float32Array([1, 1, 1]);
   const unexplored = new Float32Array(3);
+  const unexploredUv = new Matrix();
   const greyTint = new Float32Array(3);
   const darkTint = new Float32Array([1, 1, 1]);
   const gridColor = new Float32Array(3);
@@ -124,6 +131,9 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     uMemory: { value: 1, type: 'f32' },
     uExploredTint: { value: exploredTint, type: 'vec3<f32>' },
     uUnexplored: { value: unexplored, type: 'vec3<f32>' },
+    uHasUnexploredImage: { value: 0, type: 'f32' },
+    uUnexploredSoftness: { value: 0, type: 'f32' },
+    uUnexploredUv: { value: unexploredUv, type: 'mat3x3<f32>' },
     uGreyKeep: { value: 0, type: 'f32' },
     uGreyTint: { value: greyTint, type: 'vec3<f32>' },
     uDarkTint: { value: darkTint, type: 'vec3<f32>' },
@@ -150,10 +160,11 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     uShownOut: { value: 0, type: 'f32' },
   });
   const u = group.uniforms;
-  // Bound while the scene has no darkness source, no ambient zone or no bounce, so the filter never holds a destroyed map.
+  // Bound while the scene has no darkness source, no ambient zone, no fog map or no bounce, so the filter never holds a destroyed map.
   const noDarkness = createPlaceholder();
   let darkness: DarknessMap | null = null;
   let zones: ZoneMap | null = null;
+  let unexploredImage: Texture | null = null;
   const filter = new CompositeUpscale({
     glProgram: engineProgram(ENGINE_SHADERS.composite),
     resources: {
@@ -167,6 +178,7 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
       uStack: noDarkness.source,
       uBelow1: noDarkness.source,
       uBelow2: noDarkness.source,
+      uUnexploredImage: noDarkness.source,
       ...fieldResources(world),
     },
     blendRequired: true,
@@ -240,6 +252,15 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
       setLinear(unexplored, unexploredColor ?? DEFAULT_UNEXPLORED_COLOR);
       group.update();
     },
+    setUnexploredImage(texture, placement, softness): void {
+      if (texture === unexploredImage && softness === u.uUnexploredSoftness && sameMatrix(placement, unexploredUv)) return;
+      unexploredImage = texture;
+      unexploredUv.copyFrom(placement);
+      u.uUnexploredSoftness = softness;
+      filter.resources.uUnexploredImage = (texture ?? noDarkness).source;
+      u.uHasUnexploredImage = texture ? 1 : 0;
+      group.update();
+    },
     setExplored(texture): void {
       filter.resources.uExplored = texture.source;
     },
@@ -305,4 +326,8 @@ function fieldResources(world: LightingWorld): ReturnType<LightingWorld['fields'
 function setLinear(out: Float32Array, color: string, level = 1): void {
   const c = new Color(color);
   out.set([srgbToLinear(c.red) * level, srgbToLinear(c.green) * level, srgbToLinear(c.blue) * level]);
+}
+
+function sameMatrix(a: Matrix, b: Matrix): boolean {
+  return a.a === b.a && a.b === b.b && a.c === b.c && a.d === b.d && a.tx === b.tx && a.ty === b.ty;
 }
