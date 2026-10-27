@@ -1,4 +1,5 @@
 import type { Texture } from 'pixi.js';
+import type { MapVideoMode } from '../mapImage/video/mapVideoPlayback';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
 import type { AmbientLight, LightReach, Sight } from '../../vision/sight';
 import type { HideableLayer } from '../playerSafeFrame';
@@ -48,6 +49,8 @@ export interface SceneLightingView {
   editExplored(edit: ExploredEdit): boolean;
   /** The view's map is about to unload: finish pending saves for it. */
   beforeMapUnload(): void;
+  /** How the view's animated map plays (`watchMapVideoPlayback`): a video fog map follows it; a view without fog maps ignores it. */
+  setVideoMode?(mode: MapVideoMode): void;
   /**
    * Hands the composite the snapshots of the levels below the viewed level, seen through its
    * openings (`LevelsBelow`), for a render of the stage about to happen through the camera the

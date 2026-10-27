@@ -53,3 +53,20 @@ describe('UnexploredImage', () => {
     }
   });
 });
+
+describe('UnexploredImage with a video', () => {
+  it('gives up a video too large to draw, releasing it, and reports nothing ready', async () => {
+    const release = vi.fn();
+    const ready = vi.fn();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const element = { videoWidth: 9000, videoHeight: 4000 } as HTMLVideoElement;
+    const image = new UnexploredImage(() => Promise.resolve({ kind: 'video', video: { element, release } }), ready);
+    image.textureOf('Maps/fog.mp4');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(ready).not.toHaveBeenCalled();
+    expect(image.textureOf('Maps/fog.mp4')).toBeNull();
+    warn.mockRestore();
+  });
+});

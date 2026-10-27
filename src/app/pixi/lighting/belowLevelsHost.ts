@@ -148,6 +148,6 @@ export function createBelowLevelsHost({ obsApp, app, viewport, store, viewedFog,
     viewedFog,
     viewedRoof,
     placeEraser,
-    readUnexploredImage: vaultImageReader(obsApp),
+    readUnexploredImage: vaultImageReader(obsApp, () => app.canvas.ownerDocument),
   };
 }

@@ -42,6 +42,7 @@ function animationView(viewport: Viewport, screen: { width: number; height: numb
   const [width, height] = [screen.width / scaleX, screen.height / scaleY];
   return { minX: left - width / 2, minY: top - height / 2, maxX: left + width * 1.5, maxY: top + height * 1.5 };
 }
+import type { MapVideoMode } from '../mapImage/video/mapVideoPlayback';
 import { UnexploredImage, unexploredLook, type DrawnMapImage, type ReadUnexploredImage } from './UnexploredImage';
 import { levelUnexploredImage } from '../../lighting/levelUnexploredImages';
 
@@ -158,6 +159,8 @@ export class LightingRenderer implements SceneLightingView {
   private readonly unexploredImage: UnexploredImage | null;
   /** The fog map texture the engine was last given. */
   private unexploredTexture: Texture | null = null;
+  /** How the view's animated map plays, which a video fog map follows while the scene is lit. */
+  private videoMode: MapVideoMode = 'pause';
   private stopped = false;
   /** A scene build worked out new sight; reported once the guarded work is over. */
   private sightChanged = false;
@@ -179,7 +182,9 @@ export class LightingRenderer implements SceneLightingView {
     this.engine = new LightingEngine(renderer, this.quality, { paced: true });
     this.attempt = new AttemptProgress(renderer, deps.attempt);
     this.layer = this.engine.layer;
-    this.unexploredImage = deps.readUnexploredImage ? new UnexploredImage(deps.readUnexploredImage, () => this.run(() => this.followTextures())) : null;
+    this.unexploredImage = deps.readUnexploredImage
+      ? new UnexploredImage(deps.readUnexploredImage, () => this.run(() => this.followTextures()), () => requestRender(deps.app))
+      : null;
     this.memory = new ExploredMemory({
       renderer,
       store: deps.store,
@@ -285,6 +290,12 @@ export class LightingRenderer implements SceneLightingView {
     requestRender(this.deps.app);
   }
 
+  /** A video fog map plays as the view's animated map does (`watchMapVideoPlayback`), and only while the scene is lit. */
+  setVideoMode(mode: MapVideoMode): void {
+    this.videoMode = mode;
+    this.unexploredImage?.setMode(this.isEnabled() ? mode : 'pause');
+  }
+
   /** The map image changed size or finished loading. */
   refreshBounds(): void {
     this.run(() => {
@@ -372,6 +383,8 @@ export class LightingRenderer implements SceneLightingView {
       this.levelsBelow?.reset(true);
       this.engine.setCoverage(null);
       this.engine.setEnabled(false);
+      // Unlit, nothing draws a video fog map: it costs no renders.
+      this.unexploredImage?.setMode('pause');
       this.unexploredImage?.release();
       this.model.reset();
       this.lastScene = null;
@@ -404,6 +417,7 @@ export class LightingRenderer implements SceneLightingView {
     const gmSpots = gmSight === model.sight ? spots : this.gmSpots.update(model, state, this.deps.measurement, this.deps.rules, gmSight);
     this.albedo = this.deps.albedo();
     this.unexploredTexture = this.unexploredImage?.textureOf(levelUnexploredImage(state, viewedLevelId(state))) ?? null;
+    this.unexploredImage?.setMode(this.videoMode);
     this.engine.update({
       ...base, albedo: this.albedo, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(state.lighting),
       ...unexploredLook(this.unexploredTexture, state, this.deps.mapImage?.() ?? null),
