@@ -43,13 +43,17 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef }: Dic
       onToggle();
     };
 
-    const timer = window.setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
+    // The document the tray is in: a map in a popout hears its presses there, never in the main one.
+    // Its timer too: a main window a maximised popout covers runs timers at most once a second.
+    const doc = trayRef.current?.ownerDocument ?? document;
+    const win = doc.defaultView ?? window;
+    const timer = win.setTimeout(() => {
+      doc.addEventListener('mousedown', handleClickOutside);
     }, 0);
 
     return () => {
-      window.clearTimeout(timer);
-      document.removeEventListener('mousedown', handleClickOutside);
+      win.clearTimeout(timer);
+      doc.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, onToggle, triggerRef]);
 
