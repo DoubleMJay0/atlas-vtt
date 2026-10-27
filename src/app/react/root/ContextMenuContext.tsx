@@ -57,13 +57,22 @@ export interface GlobalContextMenuOptions extends ContextMenuOptions {
   doc?: Document | undefined;
 }
 
-/** Opens a menu for callers outside React; false where no provider is rendered (in that document) to open it. */
+function controllersIn(doc: Document): RegisteredController[] {
+  return controllers.filter((controller) => controller.doc() === doc);
+}
+
+/**
+ * Opens a menu for callers outside React; false where no provider is rendered (in that document) to open it.
+ * Without a document, a provider of the focused window serves it, which is the one that was just clicked:
+ * the newest provider may be a map's in another window.
+ */
 export function openContextMenuGlobal(
   entries: ContextMenuEntry[],
   position: { x: number; y: number },
   options?: GlobalContextMenuOptions,
 ): boolean {
-  const inDoc = options?.doc === undefined ? controllers : controllers.filter((controller) => controller.doc() === options.doc);
+  const focused = controllersIn(activeDocument);
+  const inDoc = options?.doc !== undefined ? controllersIn(options.doc) : focused.length > 0 ? focused : controllers;
   const controller = inDoc[inDoc.length - 1];
   controller?.open(entries, position, options);
   return controller !== undefined;

@@ -14,6 +14,7 @@ import { runInBackground } from './utils/backgroundTask';
 import { restoreLinkedSnapshot } from './links/openAtlasLink';
 import type { ViewCamera } from './pixi/viewCamera';
 import { showNotice } from './ui/notice';
+import { followResize } from './utils/followWindow';
 
 import { ATLAS_VIEW_TYPE } from './atlasViewType';
 
@@ -76,7 +77,7 @@ export class AtlasView extends FileView {
    */
   private openingLevel: string | null = null;
   private plugin: AtlasVTTPlugin | undefined;
-  private resizeObserver: ResizeObserver | null = null;
+  private stopResizeObserver: (() => void) | null = null;
   private lastContainerWidth: number = 0;
   private lastContainerHeight: number = 0;
   private isViewClosing = false;
@@ -299,11 +300,8 @@ export class AtlasView extends FileView {
     this.temporalCache.clear();
     this.viewportCache.clear();
 
-    // Clean up resize observer
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
+    this.stopResizeObserver?.();
+    this.stopResizeObserver = null;
 
     // Clean up event listeners
     this.detachLeafFocusHandlers();
@@ -837,34 +835,19 @@ export class AtlasView extends FileView {
   }
 
   /**
-   * Sets up window resize detection to update the PIXI canvas
-   * Only responds to actual window size changes, not container changes
+   * Sizes the PIXI canvas to the pane whenever the pane changes size. The observer follows the
+   * view into whichever window it is in: a popout's pane is measured by the popout, since the
+   * main window reports nothing while a maximised popout covers it.
    */
   private setupWindowResizeDetection(): void {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
-
-    // Observe the actual container element so PIXI sizes to the pane, not the window
-    this.resizeObserver = new ResizeObserver(() => {
+    this.stopResizeObserver?.();
+    this.stopResizeObserver = followResize(this.containerEl, () => {
       const currentWidth = this.containerEl.clientWidth;
       const currentHeight = this.containerEl.clientHeight;
-
-      // Only resize if the container dimensions actually changed
-      if (currentWidth !== this.lastContainerWidth ||
-          currentHeight !== this.lastContainerHeight) {
-
-        this.lastContainerWidth = currentWidth;
-        this.lastContainerHeight = currentHeight;
-
-        // Resize the renderer to match the container
-        const rendererService = this._serviceManager.getRendererService();
-        rendererService.resize(currentWidth, currentHeight);
-      }
+      if (currentWidth === this.lastContainerWidth && currentHeight === this.lastContainerHeight) return;
+      this.lastContainerWidth = currentWidth;
+      this.lastContainerHeight = currentHeight;
+      this._serviceManager.getRendererService().resize(currentWidth, currentHeight);
     });
-
-    // Observe the container element for size changes (fires immediately)
-    this.resizeObserver.observe(this.containerEl);
   }
 }
