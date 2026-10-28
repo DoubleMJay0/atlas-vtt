@@ -102,26 +102,34 @@ export function knobsOf(choice: GraphicsChoice): GraphicsKnobs {
   return { ...GRAPHICS_PRESETS[choice.preset], ...choice.overrides };
 }
 
+/** `overrides` over `base` with one knob set: an override where it differs from the base, none where it is the base's again. */
+export function overrideKnob<K extends GraphicsKnob>(base: GraphicsKnobs, overrides: Partial<GraphicsKnobs>, knob: K, value: GraphicsKnobs[K]): Partial<GraphicsKnobs> {
+  const { [knob]: _dropped, ...rest } = overrides;
+  return base[knob] === value ? rest : { ...rest, [knob]: value };
+}
+
 /** `choice` with one knob set: an override where it differs from the preset, none where it is the preset's again. */
 export function withKnob<K extends GraphicsKnob>(choice: GraphicsChoice, knob: K, value: GraphicsKnobs[K]): GraphicsChoice {
-  const { [knob]: _dropped, ...rest } = choice.overrides;
-  const overrides = GRAPHICS_PRESETS[choice.preset][knob] === value ? rest : { ...rest, [knob]: value };
-  return { preset: choice.preset, overrides };
+  return { preset: choice.preset, overrides: overrideKnob(GRAPHICS_PRESETS[choice.preset], choice.overrides, knob, value) };
 }
 
 function isChoiceOf<K extends GraphicsKnob>(knob: K, value: unknown): value is GraphicsKnobs[K] {
   return (CHOICES[knob] as readonly unknown[]).includes(value);
 }
 
+/** Stored overrides read back: each knob's value where it is a choice of that knob, nothing of anything else. */
+export function parseGraphicsOverrides(value: unknown): Partial<GraphicsKnobs> {
+  const overrides: Partial<GraphicsKnobs> = {};
+  if (!isRecord(value)) return overrides;
+  for (const knob of GRAPHICS_KNOBS) {
+    const stored = value[knob];
+    if (stored !== undefined && isChoiceOf(knob, stored)) Object.assign(overrides, { [knob]: stored });
+  }
+  return overrides;
+}
+
 /** A stored choice read back, or null for anything that is not one; an override that is no choice of its knob is dropped. */
 export function parseGraphicsChoice(value: unknown): GraphicsChoice | null {
   if (!isRecord(value) || !isLightingQualityLevel(value.preset)) return null;
-  const overrides: Partial<GraphicsKnobs> = {};
-  if (isRecord(value.overrides)) {
-    for (const knob of GRAPHICS_KNOBS) {
-      const stored = value.overrides[knob];
-      if (stored !== undefined && isChoiceOf(knob, stored)) Object.assign(overrides, { [knob]: stored });
-    }
-  }
-  return { preset: value.preset, overrides };
+  return { preset: value.preset, overrides: parseGraphicsOverrides(value.overrides) };
 }
