@@ -97,7 +97,7 @@ const SETTINGS_PANEL_META: Record<SettingsPanelId, { title: string; icon: React.
   'local-player-view-settings': { title: t('palette.panel.localPlayerView'), icon: <MonitorUp /> },
   'dice-settings': { title: t('diceSettings.title'), icon: <Dices /> },
   'experimental-features': { title: 'Experimental Features', icon: <FlaskConical /> },
-  graphics: { title: t('graphics.title'), icon: <Gauge /> },
+  'graphics-settings': { title: t('graphics.title'), icon: <Gauge /> },
 };
 
 export function CommandPalette({ isOpen, onClose, toolbarRef, onCustomizeToolbar }: CommandPaletteProps): React.ReactElement | null {
@@ -456,7 +456,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef, onCustomizeToolbar
       ],
     },
     {
-      id: "graphics",
+      id: "graphics-settings",
       icon: <Gauge />,
       label: t('graphics.command'),
       keywords: ["graphics", "quality", "performance", "lighting", "gpu", "battery", "fps", "bounce", "flicker", "saver", "balanced"],
@@ -464,7 +464,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef, onCustomizeToolbar
       hasSubmenu: true,
       submenu: [
         {
-          id: "graphics-all",
+          id: "graphics-all-settings",
           icon: null,
           label: t('graphics.commandHint'),
           section: "graphics",
@@ -547,7 +547,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef, onCustomizeToolbar
     if (!isOpen) return;
     setSearchQuery("");
     setActiveTab("all");
-    // A page asked for with the opening (a menu's "Graphics…" row) is opened in place of the list.
+    // A page asked for with the opening (a menu's "Graphics settings…" row) is opened in place of the list.
     const page = store.getState().commandPalettePage;
     setActiveSubmenu(isSettingsPanelId(page) ? page : null);
     setSubmenuOptions([]);
@@ -893,7 +893,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef, onCustomizeToolbar
         return <DiceSettingsPanel />;
       case 'experimental-features':
         return <ExperimentalFeaturesPanel />;
-      case 'graphics':
+      case 'graphics-settings':
         return <GraphicsPanel />;
     }
   };
