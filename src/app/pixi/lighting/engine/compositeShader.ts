@@ -1,3 +1,4 @@
+import { LIGHT_CEILING } from '../../../lighting/lightingConstants';
 import { BOUNCE_GATHER_GLSL } from './cascadeShaders';
 import { GLSL_VERSION, SRGB_GLSL, TONEMAP_GLSL, TRACE_GLSL, fieldGlsl, traceGlsl } from './glsl';
 import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
@@ -132,6 +133,16 @@ ${SHOWN_GLSL}
 
 // Share of its colour an area no token sees loses in the GM view.
 const float UNSEEN_FADE = 0.4;
+// How much the other lights here may add to the brightest one, as a share of it (LIGHT_CEILING).
+const float CEILING_REACH = ${LIGHT_CEILING.reach.toFixed(4)};
+
+// What all the lights here give, as a share of their sum, when the brightest gives \`strongest\` of
+// \`all\`: that one whole, what the others add easing towards CEILING_REACH of it.
+float underCeiling(float all, float strongest) {
+  float rest = all - strongest;
+  if (rest <= 0.0 || strongest <= 0.0) return 1.0;
+  return (strongest + rest / (1.0 + rest / (CEILING_REACH * strongest))) / all;
+}
 // Ambient light below which a grid coloured against the map is drawn white: a bright map lies too dark there for black lines.
 const float GRID_DARK_AMBIENT = 0.35;
 
@@ -311,6 +322,14 @@ void main() {
       zoneLifted = mix(zoneLifted, textureLod(uZonesLifted, floorAt / uLightWorld, 0.0), front);
     }
   }
+  // Lights add up in the light map's colour, and its alpha keeps the brightest one's level at its
+  // bright level, which is never below what that light gives here: so the brightest light gives at
+  // most that much, and one light alone is drawn as it always was. What the others add eases, and
+  // their bounce with them, so lights held together never whiten the floor.
+  float all = dot(lamps.rgb, LUMA);
+  float eased = underCeiling(all, min(lamps.a, all));
+  lamps.rgb *= eased;
+  bounce *= eased;
   // Magical darkness swallows the ambient light and the bounce; the lights it swallows are not in the light map.
   float lightLeft = 1.0 - dark.r;
   // The ambient light here before the darkness takes of it.
