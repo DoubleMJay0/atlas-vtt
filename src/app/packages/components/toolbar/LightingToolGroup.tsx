@@ -12,6 +12,7 @@ import type { LightKind } from "../../../types/lightingTypes"
 import type { WallToolMode, WallToolSubMode } from "../../../tools/WallTool"
 import { DropdownMenuItem, type DropdownMenuItemProps } from "../primitives/DropdownMenuItem"
 import { ExploredMemorySection } from "./ExploredMemorySection"
+import { LightingQualitySection } from "./LightingQualitySection"
 import { SceneLightingSection } from "./SceneLightingSection"
 import { ToolGroup, type ToolGroupControls } from "./ToolGroup"
 import { lightingToolFace } from "./toolFaces"
@@ -143,6 +144,8 @@ export function LightingToolGroup({ activeTool, selectTool, menuOpen, toggleMenu
           />
         ))}
       </div>}
+
+      <LightingQualitySection />
 
       <SceneLightingSection
         lighting={lighting}

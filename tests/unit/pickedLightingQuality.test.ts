@@ -3,7 +3,7 @@ import { App } from 'obsidian';
 import type { GpuFacts } from '../../src/app/lighting/deviceTier';
 import { LIGHTING_QUALITY_STORAGE_KEY, PICKED_LIGHTING_QUALITY_STORAGE_KEY } from '../../src/app/services/deviceSettings';
 import { SettingsService } from '../../src/app/services/SettingsService';
-import { lightingSettingsSection } from '../../src/app/settings/lightingSettingsSection';
+import { lightingQualityChoices } from '../../src/app/lighting/lightingQualityChoices';
 import { memoryPluginData } from '../mocks/pluginData';
 
 const gpu = vi.hoisted(() => ({ facts: null as GpuFacts | null, reads: 0 }));
@@ -66,13 +66,17 @@ describe('the lighting quality Atlas picks for a device', () => {
     expect(settings.getLightingQuality()).toBe('saver');
   });
 
-  it('is shown in the settings with a word that Atlas picked it', async () => {
+  it('is offered in the lighting menu with a word, on its own level only, that Atlas picked it', async () => {
     const app = new App();
     gpu.facts = INTEGRATED;
     const settings = await reloaded(app);
-    const row = lightingSettingsSection(settings).rows[0]!;
-    expect(row.desc).toContain('picked this level');
+    const picked = lightingQualityChoices(settings.getLightingQuality(), settings.isLightingQualityPicked());
+    expect(picked.map(({ value }) => value)).toEqual(['high', 'balanced', 'saver']);
+    expect(picked.find(({ value }) => value === 'balanced')?.hint).toContain('picked this level');
+    expect(picked.filter(({ hint }) => hint.includes('picked this level'))).toHaveLength(1);
     settings.setLightingQuality('saver');
-    expect(lightingSettingsSection(settings).rows[0]!.desc).not.toContain('picked this level');
+    const chosen = lightingQualityChoices(settings.getLightingQuality(), settings.isLightingQualityPicked());
+    expect(chosen.every(({ hint }) => !hint.includes('picked this level'))).toBe(true);
+    expect(chosen.find(({ value }) => value === 'saver')?.hint).toContain('Polygon light');
   });
 });

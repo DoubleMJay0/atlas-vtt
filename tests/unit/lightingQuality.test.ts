@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { App, Setting } from 'obsidian';
+import { App } from 'obsidian';
 import { LIGHTING_QUALITY, bouncesOn, isLightingQualityLevel } from '../../src/app/lighting/lightingQuality';
 import { TILE_RAYS, worldTexel } from '../../src/app/lighting/lightingConstants';
 import { LIGHTING_QUALITY_STORAGE_KEY } from '../../src/app/services/deviceSettings';
 import { SettingsService } from '../../src/app/services/SettingsService';
-import { lightingSettingsSection } from '../../src/app/settings/lightingSettingsSection';
+import { lightingQualityChoices } from '../../src/app/lighting/lightingQualityChoices';
 import { memoryPluginData } from '../mocks/pluginData';
 
 async function settingsOn(app: App, stored: unknown = {}): Promise<{ settings: SettingsService; write: ReturnType<typeof vi.fn> }> {
@@ -75,11 +75,11 @@ describe('the lighting quality setting', () => {
     expect((await settingsOn(app)).settings.getLightingQuality()).toBe('high');
   });
 
-  it('is offered in Atlas\' settings', async () => {
+  it('is offered in the lighting menu as three levels, each telling what it draws', async () => {
     const { settings } = await settingsOn(new App());
-    const section = lightingSettingsSection(settings);
-    expect(section.rows.map((row) => row.name)).toEqual(['Lighting quality']);
-    expect(section.rows[0]!.desc).toContain('Full detail');
-    expect(() => section.rows[0]!.render(new Setting(document.createElement('div')))).not.toThrow();
+    const choices = lightingQualityChoices(settings.getLightingQuality(), settings.isLightingQualityPicked());
+    expect(choices.map(({ label }) => label)).toEqual(['High', 'Balanced', 'Saver']);
+    expect(choices[0]!.hint).toContain('Ray-traced');
+    expect(choices[2]!.hint).toContain('Polygon light');
   });
 });
