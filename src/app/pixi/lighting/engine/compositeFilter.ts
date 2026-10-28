@@ -178,7 +178,7 @@ export function createCompositeFilter(world: EngineWorld, explored: Texture): Co
     if (u.uShownOut === footprint) return;
     u.uShownOut = footprint;
     group.update();
-  }, !traced);
+  });
   const composite: CompositeFilter = {
     filter,
     picture: world.picture,
