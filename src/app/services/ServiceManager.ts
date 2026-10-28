@@ -261,10 +261,11 @@ export class ServiceManager {
     this.diceToastObserver.destroy();
     this.soundEffectService.destroy();
     this.toolController.destroy();
+    // Ends a load, a grid detection and a new dungeon's reveal, which still hold the renderer's ticker
+    this.mapService.destroy();
     this.rendererService.destroy();
     this.layerGraph.destroy();
     this.uiOverlay.unmount();
-    this.mapService.destroy();
     this.notePreviewUIManager.destroy();
 
     // Remove all event listeners
