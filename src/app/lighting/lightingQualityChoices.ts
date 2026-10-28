@@ -20,9 +20,9 @@ const HINTS: Record<LightingQualityLevel, () => string> = {
   saver: () => t('graphics.saverHint'),
 };
 
-/** The three presets for the Graphics page's tabs. */
+/** The three presets for the Graphics page's tabs, from the cheapest to the finest as a game's presets go, left to right. */
 export function lightingQualityChoices(): LightingQualityChoice[] {
-  return LIGHTING_QUALITY_LEVELS.map((value) => ({ value, label: LABELS[value](), hint: HINTS[value]() }));
+  return [...LIGHTING_QUALITY_LEVELS].reverse().map((value) => ({ value, label: LABELS[value](), hint: HINTS[value]() }));
 }
 
 /** A preset's name, for a sentence about it. */
