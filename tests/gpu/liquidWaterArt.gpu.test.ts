@@ -11,7 +11,7 @@ describe('water belongs to the generated map artwork', () => {
   afterAll(() => renderer.destroy());
 
   const cases = DUNGEON_STYLES.flatMap(({ id }) => [false, true].map(mono => ({ id, mono, channel: false })));
-  cases.push({ id: 'parchment', mono: false, channel: true }, { id: 'print', mono: false, channel: true });
+  cases.push({ id: 'parchment', mono: false, channel: true }, { id: 'print', mono: false, channel: true }, { id: 'crayon', mono: false, channel: true });
   for (const { id, mono, channel } of cases) {
     const name = `${id}${mono ? '-mono' : ''}${channel ? '-channel' : ''}`;
     it(`renders still art and calm, visibly moving water in ${name}`, async () => {
