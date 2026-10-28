@@ -1,7 +1,7 @@
 import { t } from '../i18n';
 import { LIGHTING_QUALITY_LEVELS, type LightingQualityLevel } from './lightingQuality';
 
-/** One level as the lighting menu offers it: its name and, on hover, what it draws and whom it is for. */
+/** One preset as the Graphics page offers it: its name and, on hover, what it draws and whom it is for. */
 export interface LightingQualityChoice {
   readonly value: LightingQualityLevel;
   readonly label: string;
@@ -9,24 +9,21 @@ export interface LightingQualityChoice {
 }
 
 const LABELS: Record<LightingQualityLevel, () => string> = {
-  high: () => t('sceneLight.qualityHigh'),
-  balanced: () => t('sceneLight.qualityBalanced'),
-  saver: () => t('sceneLight.qualitySaver'),
+  high: () => t('graphics.high'),
+  balanced: () => t('graphics.balanced'),
+  saver: () => t('graphics.saver'),
 };
 
 const HINTS: Record<LightingQualityLevel, () => string> = {
-  high: () => t('sceneLight.qualityHighHint'),
-  balanced: () => t('sceneLight.qualityBalancedHint'),
-  saver: () => t('sceneLight.qualitySaverHint'),
+  high: () => t('graphics.highHint'),
+  balanced: () => t('graphics.balancedHint'),
+  saver: () => t('graphics.saverHint'),
 };
 
-/**
- * The three levels for the lighting menu's choice. The level in effect says, where Atlas picked it
- * for this device's graphics (`SettingsService.isLightingQualityPicked`), that it did.
- */
-export function lightingQualityChoices(current: LightingQualityLevel, picked: boolean): LightingQualityChoice[] {
-  return LIGHTING_QUALITY_LEVELS.map((value) => {
-    const hint = HINTS[value]();
-    return { value, label: LABELS[value](), hint: picked && value === current ? t('sceneLight.qualityPicked', { hint }) : hint };
-  });
+/** The three presets for the Graphics page's tabs. */
+export function lightingQualityChoices(): LightingQualityChoice[] {
+  return LIGHTING_QUALITY_LEVELS.map((value) => ({ value, label: LABELS[value](), hint: HINTS[value]() }));
 }
+
+/** A preset's name, for a sentence about it. */
+export const presetLabel = (level: LightingQualityLevel): string => LABELS[level]();

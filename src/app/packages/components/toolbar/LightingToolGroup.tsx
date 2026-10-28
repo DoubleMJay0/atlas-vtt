@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { ArrowDownToDot, BrickWall, Flame, FlameKindling, Footprints, Lamp, Lightbulb, Moon, MousePointer2, Pencil, Sparkles, SunMoon } from "lucide-react"
+import { ArrowDownToDot, BrickWall, Flame, FlameKindling, Footprints, Gauge, Lamp, Lightbulb, Moon, MousePointer2, Pencil, Sparkles, SunMoon } from "lucide-react"
 import { t } from '../../../i18n';
 import { useHotkeyLabels } from "../../../keyboard/useMapHotkeys"
 import { useAtlasStore } from "../../../react/ViewStoreContext"
@@ -12,7 +12,6 @@ import type { LightKind } from "../../../types/lightingTypes"
 import type { WallToolMode, WallToolSubMode } from "../../../tools/WallTool"
 import { DropdownMenuItem, type DropdownMenuItemProps } from "../primitives/DropdownMenuItem"
 import { ExploredMemorySection } from "./ExploredMemorySection"
-import { LightingQualitySection } from "./LightingQualitySection"
 import { SceneLightingSection } from "./SceneLightingSection"
 import { ToolGroup, type ToolGroupControls } from "./ToolGroup"
 import { lightingToolFace } from "./toolFaces"
@@ -52,6 +51,7 @@ export function LightingToolGroup({ activeTool, selectTool, menuOpen, toggleMenu
   const lighting = useAtlasStore((state) => state.lighting)
   const setSceneLighting = useAtlasStore((state) => state.setSceneLighting)
   const setSceneLightingPanelOpen = useAtlasStore((state) => state.setSceneLightingPanelOpen)
+  const setCommandPaletteOpen = useAtlasStore((state) => state.setCommandPaletteOpen)
   const [subMode, setSubMode] = useState<WallToolSubMode>('draw')
   const [drawMode, setDrawMode] = useState<WallToolMode>('point-to-point')
   const presets = useMapLightPresets()
@@ -145,7 +145,16 @@ export function LightingToolGroup({ activeTool, selectTool, menuOpen, toggleMenu
         ))}
       </div>}
 
-      <LightingQualitySection />
+      <div className="atlas-dropdown-section">
+        <DropdownMenuItem
+          icon={Gauge}
+          label={t('graphics.open')}
+          onClick={() => {
+            setCommandPaletteOpen(true, 'graphics')
+            closeMenu()
+          }}
+        />
+      </div>
 
       <SceneLightingSection
         lighting={lighting}

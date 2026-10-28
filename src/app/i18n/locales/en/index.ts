@@ -96,6 +96,7 @@ import { encounter } from './encounter';
 import { migration } from './migration';
 import { wall } from './wall';
 import { sceneLight } from './sceneLight';
+import { graphics } from './graphics';
 import { vision } from './vision';
 import { videoMap } from './videoMap';
 import { uvttFloors } from './uvttFloors';
@@ -203,6 +204,7 @@ export const en = {
   ...migration,
   ...wall,
   ...sceneLight,
+  ...graphics,
   ...vision,
   ...videoMap,
   ...uvttFloors,

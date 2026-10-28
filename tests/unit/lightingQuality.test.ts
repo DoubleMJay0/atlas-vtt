@@ -75,9 +75,8 @@ describe('the lighting quality setting', () => {
     expect((await settingsOn(app)).settings.getLightingQuality()).toBe('high');
   });
 
-  it('is offered in the lighting menu as three levels, each telling what it draws', async () => {
-    const { settings } = await settingsOn(new App());
-    const choices = lightingQualityChoices(settings.getLightingQuality(), settings.isLightingQualityPicked());
+  it('is offered on the Graphics page as three presets, each telling what it draws', async () => {
+    const choices = lightingQualityChoices();
     expect(choices.map(({ label }) => label)).toEqual(['High', 'Balanced', 'Saver']);
     expect(choices[0]!.hint).toContain('Ray-traced');
     expect(choices[2]!.hint).toContain('Polygon light');
