@@ -66,17 +66,17 @@ describe('the lighting quality Atlas picks for a device', () => {
     expect(settings.getLightingQuality()).toBe('saver');
   });
 
-  it('is offered in the lighting menu with a word, on its own level only, that Atlas picked it', async () => {
+  it('reads as picked until the GM chooses on the Graphics page, and again once the page is reset', async () => {
     const app = new App();
     gpu.facts = INTEGRATED;
     const settings = await reloaded(app);
-    const picked = lightingQualityChoices(settings.getLightingQuality(), settings.isLightingQualityPicked());
-    expect(picked.map(({ value }) => value)).toEqual(['high', 'balanced', 'saver']);
-    expect(picked.find(({ value }) => value === 'balanced')?.hint).toContain('picked this level');
-    expect(picked.filter(({ hint }) => hint.includes('picked this level'))).toHaveLength(1);
-    settings.setLightingQuality('saver');
-    const chosen = lightingQualityChoices(settings.getLightingQuality(), settings.isLightingQualityPicked());
-    expect(chosen.every(({ hint }) => !hint.includes('picked this level'))).toBe(true);
-    expect(chosen.find(({ value }) => value === 'saver')?.hint).toContain('Polygon light');
+    expect(settings.isLightingQualityPicked()).toBe(true);
+    expect(settings.getGraphics()).toEqual({ preset: 'balanced', overrides: {} });
+    settings.setGraphics({ preset: 'balanced', overrides: { liquids: 30 } });
+    expect(settings.isLightingQualityPicked()).toBe(false);
+    expect(settings.getGraphicsQuality().liquidFps).toBe(30);
+    settings.resetGraphics();
+    expect(settings.isLightingQualityPicked()).toBe(true);
+    expect(settings.getGraphicsQuality().liquidFps).toBe(15);
   });
 });
