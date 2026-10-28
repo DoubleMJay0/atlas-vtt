@@ -6,8 +6,16 @@ import { paintWater } from '../engraved/water';
 import { pathBounds } from '../art/paths';
 import { traceShape } from '../grounds/crowns';
 import { engravedGroundsPaint } from '../grounds/engravedPaint';
-import { withAlpha } from '../palette';
+import { mapLayout } from '../layoutSize';
+import { mixColours, withAlpha } from '../palette';
+import { drawVellum } from '../vellum';
+import { forestLookOf } from '../../forestLooks';
+import { colourIn, strokeLimbs } from './forestPaint';
 import { drawForest, massShare } from './drawForest';
+
+/** How much of the woods' colour the paper takes, and how strongly its grain shows. */
+const WOODS_TINT = 0.35;
+const WOODS_GRAIN = 1.5;
 
 /**
  * Engraved's forest: the woods cut in the hatch the shade is cut in, as dark as it goes; each clump of
@@ -19,19 +27,30 @@ export function paintEngravedForest(scene: ArtScene): void {
   const hand = engravedHand(scene, pens);
   const { ctx } = scene.env;
   const b = viewBounds(scene.frame, 1);
+  const { env } = scene;
+  const { dungeon } = env;
+  const look = forestLookOf(env.style);
   drawForest(scene, {
     hand,
     ground: engravedGroundsPaint(hand, pens),
-    colours: { water: pens.water, cloth: pens.floor },
+    colours: { water: look.water, cloth: pens.floor },
     woods: () => {
-      ctx.fillStyle = pens.floor;
-      ctx.fillRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+      // The paper as vellum, a little of the woods' colour in it, under the hatch.
+      const layout = mapLayout(dungeon.model, env.pxPerCell, env.view);
+      ctx.save();
+      ctx.translate(layout.originCell.x, layout.originCell.y);
+      ctx.scale(1 / env.pxPerCell, 1 / env.pxPerCell);
+      drawVellum(ctx, mixColours(pens.floor, look.woods, WOODS_TINT), layout, dungeon.model.seed, !scene.raster, 1, true, WOODS_GRAIN);
+      ctx.restore();
       hand.tone(() => 0.85, b, null, 'shade');
     },
+    // Worn ground in the path's tone, cut in the hatch the shade is: a road reads in ink alone.
     trail: (path, fade) => {
+      colourIn(scene, path, look.path, (x, y) => 0.8 * fade({ x, y }));
       const box = pathBounds(path);
-      if (box) hand.tone((x, y) => 0.25 * fade({ x, y }), box, path, 'shade');
+      if (box) hand.tone((x, y) => 0.4 * fade({ x, y }), box, path, 'shade');
     },
+    bare: (entry) => strokeLimbs(ctx, entry, pens.ink, hand.weight('fine') * 2),
     clump: ({ clump, depth }) => {
       const edge = 1 - massShare(depth);
       ctx.beginPath();
@@ -56,6 +75,6 @@ export function paintEngravedForest(scene: ArtScene): void {
       const union = (path: CanvasPath): void => { for (const { clump } of mass) traceShape(path, clump.shape); };
       hand.tone((x, y) => 0.75 * depth(x, y) ** 1.3, b, union, 'shade');
     },
-    water: (waterScene, trace, outlines, depth, deepness) => paintWater(waterScene, pens, trace, outlines, depth, false, deepness),
+    water: (waterScene, trace, outlines, depth, deepness) => paintWater(waterScene, { ...pens, water: look.water }, trace, outlines, depth, false, deepness),
   });
 }

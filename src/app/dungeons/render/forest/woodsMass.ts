@@ -1,11 +1,13 @@
 import { hash2 } from '../art/noise';
 import type { Vec } from '../geometry';
-import { leafyMass, type Clump } from '../grounds/crowns';
+import type { Clump } from '../grounds/crowns';
+import { crownClump, treeKind, type TreeKind } from './treeShapes';
 
 /** A clump of the woods' mass and how deep into the woods it stands (cells from the clearing). */
 export interface WoodsClump {
   clump: Clump;
   depth: number;
+  kind: TreeKind;
 }
 
 /** How deep the drawn mass reaches into the woods before it is the woods' flat colour. */
@@ -23,7 +25,7 @@ const COVER_STEP = 0.12;
  * distance outside every clearing (cells, negative inside). Deepest first, then top to bottom, the
  * order they are drawn in. Deterministic in `seed`.
  */
-export function woodsMass(bounds: { minX: number; minY: number; maxX: number; maxY: number }, outside: (p: Vec) => number, seed: number): WoodsClump[] {
+export function woodsMass(bounds: { minX: number; minY: number; maxX: number; maxY: number }, outside: (p: Vec) => number, seed: number, trees: { conifers: number; bare: number }): WoodsClump[] {
   const placed: WoodsClump[] = [];
   const buckets = new Map<string, WoodsClump[]>();
   const keyOf = (x: number, y: number): string => `${Math.floor(x)},${Math.floor(y)}`;
@@ -36,7 +38,8 @@ export function woodsMass(bounds: { minX: number; minY: number; maxX: number; ma
     return true;
   };
   const add = (at: Vec, r: number, depth: number, salt: number): void => {
-    const entry = { clump: leafyMass(at, r, 0, salt, 13 + (salt % 5)), depth };
+    const kind = treeKind(salt, trees);
+    const entry = { clump: crownClump(at, r, salt, kind, 13 + (salt % 5)), depth, kind };
     placed.push(entry);
     const key = keyOf(at.x, at.y);
     buckets.set(key, [...(buckets.get(key) ?? []), entry]);

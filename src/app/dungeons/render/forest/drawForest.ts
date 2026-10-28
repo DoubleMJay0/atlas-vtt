@@ -15,10 +15,11 @@ import { wayCentre, wayFrameOf, wayHalf, type WayOut } from '../cave/mouth/wayOu
 import { drawGrid } from '../grid';
 import type { GroundsPaint } from '../grounds/paint';
 import { drawTerrainGround, drawTerrainOpenings, drawTerrainStanding } from '../terrain/drawTerrain';
-import { leafyMass } from '../grounds/crowns';
 import { loneTrees } from './loneTrees';
 import { trailFade, trailRing } from './trails';
 import { MASS_DEPTH, woodsMass, type WoodsClump } from './woodsMass';
+import { crownClump, treeKind } from './treeShapes';
+import { forestLookOf } from '../../forestLooks';
 
 /** What a direction brings to a forest floor: its hand and ground, the woods' colour, each clump of the mass and what it lays over the whole mass, its water. */
 export interface ForestArt {
@@ -29,6 +30,8 @@ export interface ForestArt {
   /** A trail's worn ground over `path`, as strong as `fade` says where it lies (0..1). */
   trail(path: PathFn, fade: (p: Vec) => number): void;
   clump(entry: WoodsClump): void;
+  /** A bare tree's limbs (`bareLimbs`), standing over the mass. */
+  bare(entry: WoodsClump): void;
   /** `depth`: how far into the mass a point lies, 0 at a clearing's or trail's edge to 1 at its depth. */
   finish(mass: readonly WoodsClump[], depth: (x: number, y: number) => number): void;
   /** The floor's water within `trace` (shores `outlines`), as the direction draws a pool; `scene`'s floor holds the water. */
@@ -97,17 +100,26 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const bars = riverWater.length ? [...subtractRings(rivers.flatMap(riverBars), drawn), ...riverIslands(rivers)] : [];
   if (bars.length) art.ground.gravel(polysPath(bars), cellsOf(pointsBounds(bars.flat())));
   drawTerrainGround(hand, art.colours);
-  const mass = woodsMass(view, (p) => outsideAt(p.x, p.y), dungeon.model.seed);
-  const rings = [...mass.map((entry) => entry.clump.ring), ...loneTrees(scene.env.dungeon).map((tree) => discRing(tree.x, tree.y, tree.radius))];
+  const look = forestLookOf(scene.env.style);
+  const mass = woodsMass(view, (p) => outsideAt(p.x, p.y), dungeon.model.seed, look);
+  // The lone trees in the clearings, drawn as the mass's edge is, each a crown (or bare limbs) of its own.
+  const lone = loneTrees(scene.env.dungeon).map((tree): WoodsClump => {
+    const salt = Math.floor(tree.x * 7349 + tree.y * 3083);
+    const kind = treeKind(salt, look);
+    return { clump: crownClump({ x: tree.x, y: tree.y }, tree.radius, salt, kind, 15), depth: 0, kind };
+  });
+  const crowned = (entries: readonly WoodsClump[]): WoodsClump[] => entries.filter((entry) => entry.kind !== 'bare');
+  // Only crowns cast the trees' merged shadow: a bare tree's limbs let the light through.
+  const rings = crowned([...mass, ...lone]).map((entry) => entry.clump.ring);
   if (rings.length) castShadow(hand, polysPath(rings), 0.55, pointsBounds(rings.flat()), art.ground.shade.tree, ground);
   drawGrid(scene.env);
-  for (const entry of mass) art.clump(entry);
+  for (const entry of crowned(mass)) art.clump(entry);
   const depth = (x: number, y: number): number => massShare(outsideAt(x, y));
-  art.finish(mass, depth);
-  // The lone trees in the clearings, drawn as the mass's edge is, each a crown of its own.
-  const lone = loneTrees(scene.env.dungeon).map((tree): WoodsClump => ({ clump: leafyMass({ x: tree.x, y: tree.y }, tree.radius, 0, Math.floor(tree.x * 7349 + tree.y * 3083), 15), depth: 0 }));
-  for (const entry of lone) art.clump(entry);
-  art.finish(lone, () => 0);
+  art.finish(crowned(mass), depth);
+  for (const entry of crowned(lone)) art.clump(entry);
+  art.finish(crowned(lone), () => 0);
+  // Bare trees stand over the crowns round them, their limbs against the sky.
+  for (const entry of [...mass, ...lone]) if (entry.kind === 'bare') art.bare(entry);
   drawRiverBridges(hand, bridges);
   drawProps(hand, art.colours.water, art.colours.cloth);
   drawTerrainStanding(hand, art.colours);
@@ -164,10 +176,6 @@ function cellsOf(bounds: { minX: number; minY: number; maxX: number; maxY: numbe
   return cells;
 }
 
-/** A circle's outline as a ring of points, for a lone tree's shadow. */
-function discRing(x: number, y: number, r: number): { x: number; y: number }[] {
-  return Array.from({ length: 16 }, (_, k) => ({ x: x + r * Math.cos((k * Math.PI) / 8), y: y + r * Math.sin((k * Math.PI) / 8) }));
-}
 
 /** How far `p` lies outside a trail, in cells (negative on it): beside its middle line, between its mouth and its far end. */
 function trailDistance(way: WayOut, p: Vec): number {

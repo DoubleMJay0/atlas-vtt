@@ -13,6 +13,7 @@ import { mapLayout } from '../layoutSize';
 import { mixColours, withAlpha } from '../palette';
 import { drawVellum } from '../vellum';
 import { drawForest, massShare } from './drawForest';
+import { strokeLimbs } from './forestPaint';
 
 /** Dolmenwood's meadow, the light yellow-green of a forest's open ground. */
 const MEADOW = '#a8a348';
@@ -66,6 +67,7 @@ export function paintCrayonForest(scene: ArtScene): void {
       ctx.restore();
     },
     trail: (path, fade) => box.colourIn(path, { colour: CRAYONS.earth, cover: 0.55, passes: 2 }, (x, y) => fade({ x, y }), b),
+    bare: (entry) => strokeLimbs(ctx, entry, pens.ink, hand.weight('fine') * 2),
     clump: ({ clump, depth }) => {
       ctx.beginPath();
       traceShape(ctx, clump.shape);

@@ -61,6 +61,32 @@ export interface DungeonStyle {
   weathering?: { color: string; amount: number };
   /** The grid's line width as a share of the usual, and how strongly its ink shows over the floor (0..1). */
   grid: { weight: number; strength: number };
+  /** How the look draws a Forest's entry floor, its mood with it; unset, the generic summer woods (`forestLookOf`). */
+  forest?: ForestLook;
+}
+
+/**
+ * How a look draws a Forest's entry floor: the woods round the clearings (the look's paper as
+ * vellum in this colour), the canopy, which trees grow, the clearings' ground, the roads and the
+ * water. Each look a forest of its own mood: a dark wood by lantern light, a burnt one in Ember, a
+ * snowbound one in Rime, autumn in Ochre and Oxblood.
+ */
+export interface ForestLook {
+  woods: string;
+  /** The canopy from the lit edge of the trees to their depth. */
+  canopy: { lit: string; mid: string; deep: string };
+  /** The shares of the trees that are conifers, and that stand bare (leafless or dead). */
+  conifers: number;
+  bare: number;
+  /** Bare branches, snags and trunks. */
+  bark: string;
+  /** The clearings' ground, and the grass in patches over it. */
+  ground: string;
+  grass: string;
+  /** Roads and trails worn into the ground. */
+  path: string;
+  /** Rivers, lakes and pools. */
+  water: string;
 }
 
 export type GridStyle = 'off' | 'dotted' | 'dashed' | 'solid' | 'broken';

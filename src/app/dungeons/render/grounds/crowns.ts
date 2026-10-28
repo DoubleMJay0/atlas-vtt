@@ -161,7 +161,7 @@ function conifer(centre: Vec, radius: number, h: (k: number) => number): { clump
 }
 
 /** A whorl's outline: branch tips, every one a point, of lengths that differ, with the needles' notches between. */
-function needledRing(at: Vec, r: number, branches: number, turn: number, salt: number): Vec[] {
+export function needledRing(at: Vec, r: number, branches: number, turn: number, salt: number): Vec[] {
   const out: Vec[] = [];
   for (let k = 0; k < branches; k++) {
     const a = turn + ((k + 0.25 * (hash2(salt, k, 1) - 0.5)) / branches) * Math.PI * 2;
@@ -186,7 +186,7 @@ function gapAt(centre: Vec, angle: number, distance: number, size: number, salt:
  * lit part is an edge between two tones of leaves, so it is traced more coarsely: a curve through
  * every second root, the root between pulling it out (a scaled curve is the curve of its scaled points).
  */
-function litPart(shape: MassShape, centre: Vec, radius: number): MassShape {
+export function litPart(shape: MassShape, centre: Vec, radius: number): MassShape {
   const ox = centre.x + TO_LIGHT.x * radius * 0.72;
   const oy = centre.y + TO_LIGHT.y * radius * 0.72;
   const scaled = (p: Vec, out = 1): Vec => ({ x: ox + (centre.x + (p.x - centre.x) * out - ox) * 0.82, y: oy + (centre.y + (p.y - centre.y) * out - oy) * 0.82 });
