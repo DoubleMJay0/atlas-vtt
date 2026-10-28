@@ -17,8 +17,8 @@ import { drawForest, massShare } from './drawForest';
 
 /** Dolmenwood's meadow, the light yellow-green of a forest's open ground. */
 const MEADOW = '#a8a348';
-/** The woods' vellum: a mid green near the mass's coats, so the mass reads as the woods' edge. */
-const WOODS = '#667f58';
+/** The woods' vellum: a light green, lighter than the mass's coats, so the mass stands out as the woods' edge. */
+const WOODS = '#94ab84';
 /** How much stronger the woods' vellum grain is than the paper's: a mid green shows little of it. */
 const WOODS_GRAIN = 3;
 /** Grass growing thicker in spots. */
