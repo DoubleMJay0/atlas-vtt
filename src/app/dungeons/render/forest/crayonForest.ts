@@ -10,13 +10,17 @@ import { drawPools } from '../engraved/water';
 import { traceShape } from '../grounds/crowns';
 import { crayonGroundsPaint } from '../grounds/crayonPaint';
 import type { GroundsPaint } from '../grounds/paint';
+import { mapLayout } from '../layoutSize';
 import { mixColours, withAlpha } from '../palette';
+import { drawVellum } from '../vellum';
 import { drawForest, massShare } from './drawForest';
 
 /** Dolmenwood's meadow, the light yellow-green of a forest's open ground. */
 const MEADOW = '#a8a348';
-/** The woods' depth, a shade darker than the mass's coats, so the mass reads as the woods' edge (Watabou's glades). */
-const WOODS = '#55704f';
+/** The woods' vellum: a mid green near the mass's coats, so the mass reads as the woods' edge. */
+const WOODS = '#667f58';
+/** How much stronger the woods' vellum grain is than the paper's: a mid green shows little of it. */
+const WOODS_GRAIN = 3;
 /** Grass growing thicker in spots. */
 const GRASS = '#7f9a4a';
 
@@ -51,11 +55,16 @@ export function paintCrayonForest(scene: ArtScene): void {
     ground,
     colours: { water: pens.water, cloth: pens.floor },
     woods: () => {
-      // The woods' depth one flat colour, as Watabou paints it: crayon strokes over all of it cost a
-      // scene's map 10–25 MB of lossy WebP and seconds to encode.
-      // Monochrome: graphite shading on the paper, as the clumps' coats are left out.
-      ctx.fillStyle = scene.env.view.monochrome ? mixColours(pens.floor, pens.ink, 0.35) : WOODS;
-      ctx.fillRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+      // The woods are vellum in a green, as the paper round every map is, its grain strong enough to
+      // show on the tint: crayon over the woods doubled a scene's map (10 MB of lossy WebP, 6 s to
+      // encode), the vellum costs about what flat colour does. Monochrome: graphite's tone of the paper.
+      const green = scene.env.view.monochrome ? mixColours(pens.floor, pens.ink, 0.35) : WOODS;
+      const layout = mapLayout(dungeon.model, scene.env.pxPerCell, scene.env.view);
+      ctx.save();
+      ctx.translate(layout.originCell.x, layout.originCell.y);
+      ctx.scale(1 / scene.env.pxPerCell, 1 / scene.env.pxPerCell);
+      drawVellum(ctx, green, layout, dungeon.model.seed, !scene.raster, 1, true, WOODS_GRAIN);
+      ctx.restore();
     },
     trail: (path, fade) => box.colourIn(path, { colour: CRAYONS.earth, cover: 0.55, passes: 2 }, (x, y) => fade({ x, y }), b),
     clump: ({ clump, depth }) => {

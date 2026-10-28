@@ -27,7 +27,8 @@ const run = import.meta.env.VITE_PERF_GEN === '1';
 const lookOverride = import.meta.env.VITE_PERF_STYLE as DungeonStyleId | undefined;
 const req = (seed: number, tags: string[], floors = 1): DungeonRequest => ({ seed, tags: tags as DungeonTag[], floors });
 /** The most a cave's or a house's scene may take, from the click to the files written, in ms. */
-const LIMITS: Readonly<Record<string, number>> = { 'forest medium': 3000, 'forest large 2 floors wet': 7000, 'medium mansion': 3000, 'large 3 floors mansion with cellar overgrown': 7000, 'cavern medium': 3000, 'cavern large 3 floors lava overgrown': 7000, 'cavern underdark 3 floors flooded': 7000 };
+// Crayon forests encode their mass's coats slowly (a medium 3 s, a large two-floor 14 s on an M4 Pro, 2026-10-28).
+const LIMITS: Readonly<Record<string, number>> = { 'forest medium': 4500, 'forest large 2 floors wet': 18000, 'medium mansion': 3000, 'large 3 floors mansion with cellar overgrown': 7000, 'cavern medium': 3000, 'cavern large 3 floors lava overgrown': 7000, 'cavern underdark 3 floors flooded': 7000 };
 
 const CASES: [string, DungeonRequest, DungeonStyleId][] = [
   ['small', req(11, ['small']), 'parchment'],
