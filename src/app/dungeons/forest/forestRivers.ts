@@ -1,10 +1,10 @@
-import { cellKey, holdsStairs } from '../geometry';
-import type { CellPoint, DungeonFloor, DungeonLake, DungeonRiver, DungeonRiverBridge, DungeonRoom } from '../model';
+import { holdsStairs } from '../geometry';
+import type { CellPoint, DungeonFloor, DungeonLake, DungeonRiver, DungeonRoom } from '../model';
 import { floorStream, type Rng } from '../rng';
 import { fractalNoise } from '../water/noise';
-import { floorCells } from '../water/wetGrid';
 import { lakeOutline } from './lakeShape';
 import { COURSE_STEP, riverCourse } from './riverCourse';
+import { pathBridges } from './pathCrossings';
 import { bends, normalAt, waterField } from './riverShape';
 
 /**
@@ -13,21 +13,14 @@ import { bends, normalAt, waterField } from './riverShape';
  * so it shapes the fight. Its width holds steady along a reach, a little wider in its bends and
  * wider again below a confluence. Now and then it flows into a lake, which the river drains again
  * on the far side or does not; now and then a narrower tributary joins it from a side, meeting it
- * at an acute angle that points downstream, as rivers join. Where a river too deep to wade crosses
- * a clearing, a footbridge spans its straightest reach there, where rivers are bridged; shallower
- * water is forded. Pure, deterministic in the seed.
+ * at an acute angle that points downstream, as rivers join. Bridges stand only where a path
+ * crosses a river (`pathCrossings.ts`). Pure, deterministic in the seed.
  */
 
 type Vec = CellPoint;
 
 /** How far beyond the rooms a river begins and ends, so it runs off the map's edge. */
 const BEYOND = 10;
-/** A river this wide or wider cannot be waded: a clearing it crosses gets a bridge. */
-const DEEP = 1.3;
-/** A bridge reaches this far onto the banks on either side. */
-const BRIDGE_REACH = 0.6;
-/** Two bridges stand at least this far apart, in cells. */
-const BRIDGES_APART = 10;
 /** How many courses are tried before a floor goes without water: one that floods stairs or a way down is refused. */
 const TRIES = 6;
 /** Water keeps this far from stairs and the ways down, in cells. */
@@ -60,16 +53,16 @@ function waterPlan(tags: ReadonlySet<string>, rng: Rng): WaterPlan | null {
   return { width, swing: 0.9 + rng() * 0.7, tributary: wet ? 0.6 : 0.4, lake: flooded ? 0.6 : wet ? 0.45 : 0.3 };
 }
 
-type RiverFloor = Pick<DungeonFloor, 'rooms' | 'stairs' | 'terrain' | 'waterCells'>;
+type RiverFloor = Pick<DungeonFloor, 'rooms' | 'stairs' | 'terrain'>;
 
-export function forestWater(floor: RiverFloor, seed: number, tags: ReadonlySet<string>): ForestWater {
+export function forestWater(floor: DungeonFloor, seed: number, tags: ReadonlySet<string>): ForestWater {
   const plan = waterPlan(tags, floorStream(seed, 'water', 0, 'river'));
   if (!plan || floor.rooms.length === 0) return { rivers: [], lakes: [] };
   const kept = keptCells(floor);
   for (let k = 0; k < TRIES; k++) {
     const water = course(floor, plan, floorStream(seed, 'water', 0, `river-${k}`));
     const field = waterField(water.rivers, water.lakes);
-    if (kept.every((c) => field.distance(c.x, c.y) > CLEAR)) return { ...water, rivers: withBridges(water, floor) };
+    if (kept.every((c) => field.distance(c.x, c.y) > CLEAR)) return { ...water, rivers: pathBridges(water, floor, seed) };
   }
   return { rivers: [], lakes: [] };
 }
@@ -181,51 +174,4 @@ function boundsOf(rooms: readonly DungeonRoom[]): Bounds {
     maxX: Math.max(...rooms.map((r) => r.x + r.w)),
     maxY: Math.max(...rooms.map((r) => r.y + r.h)),
   };
-}
-
-/**
- * The rivers with their bridges: where a river too deep to wade runs through a clearing, a bridge
- * on the straightest reach of that stretch, both its ends on the clearing's dry ground (never in a
- * pool, a lake or another river's water), and bridges well apart. Shallower stretches are fords.
- */
-function withBridges({ rivers, lakes }: ForestWater, floor: RiverFloor): DungeonRiver[] {
-  const ground = new Set(floorCells(floor.rooms).map((c) => cellKey(c.x, c.y)));
-  for (const c of floor.waterCells) ground.delete(cellKey(c.x, c.y));
-  const dry = (p: Vec): boolean => ground.has(cellKey(Math.floor(p.x), Math.floor(p.y)));
-  const field = waterField(rivers, lakes);
-  const placed: Vec[] = [];
-  return rivers.map((river) => {
-    const bent = bends(river.points);
-    const bridges: DungeonRiverBridge[] = [];
-    for (const run of dryRuns(river.points, dry)) {
-      // Away from the run's ends, on its straightest point that takes a bridge.
-      const middle = run.slice(Math.floor(run.length * 0.2), Math.ceil(run.length * 0.8)).sort((a, b) => Math.abs(bent[a]!) - Math.abs(bent[b]!));
-      const bridge = middle.map((i) => bridgeAt(river, i, dry, field)).find((found): found is DungeonRiverBridge => found !== null);
-      if (!bridge || placed.some((p) => Math.hypot(p.x - bridge.at.x, p.y - bridge.at.y) < BRIDGES_APART)) continue;
-      bridges.push(bridge);
-      placed.push(bridge.at);
-    }
-    return { ...river, bridges };
-  });
-}
-
-/** The runs of a line's points that lie on dry ground, as lists of their indices: two cells and longer. */
-function dryRuns(points: readonly Vec[], dry: (p: Vec) => boolean): number[][] {
-  const runs: number[][] = [[]];
-  points.forEach((p, i) => {
-    if (dry(p)) runs[runs.length - 1]!.push(i);
-    else if (runs[runs.length - 1]!.length) runs.push([]);
-  });
-  return runs.filter((run) => run.length * COURSE_STEP >= 2);
-}
-
-/** A bridge across the river at its point `i`, where the river is too deep to wade there and both ends of the bridge stand on dry ground. */
-function bridgeAt(river: DungeonRiver, i: number, dry: (p: Vec) => boolean, field: { distance(x: number, y: number): number }): DungeonRiverBridge | null {
-  const width = river.widths[i]!;
-  if (width < DEEP) return null;
-  const at = river.points[i]!;
-  const along = normalAt(river.points, i);
-  const length = width + 2 * BRIDGE_REACH;
-  const ends = [-1, 1].map((side) => ({ x: at.x + along.x * side * (length / 2), y: at.y + along.y * side * (length / 2) }));
-  return ends.every((end) => dry(end) && field.distance(end.x, end.y) > 0.1) ? { at, along, length } : null;
 }

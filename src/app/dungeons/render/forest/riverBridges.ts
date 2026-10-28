@@ -45,3 +45,35 @@ function footbridge(hand: Hand, bridge: DungeonRiverBridge): void {
     }
   }
 }
+
+/** How far a path runs on from a bridge's end into the clearing before it fades, in cells. */
+const APPROACH = 2.6;
+
+/** A worn path onto a bridge's end: its outline and how strong it is where it lies (0..1, fading away from the bridge). */
+export interface Approach {
+  ring: Vec[];
+  fade: (p: Vec) => number;
+}
+
+/**
+ * The paths onto the bridges' ends that no trail already leads to: a bridge on the way through the
+ * clearings is reached over worn ground that fades into the grass a few cells off, so it reads as
+ * part of a path and not a deck set down on the bank.
+ */
+export function bridgeApproaches(bridges: readonly DungeonRiverBridge[], onTrail: (p: Vec) => boolean): Approach[] {
+  return bridges.flatMap((bridge) => [0, bridge.length].flatMap((u): Approach[] => {
+    const start = bridgePoint(bridge, u, 0);
+    if (onTrail(start)) return [];
+    const out = u === 0 ? -1 : 1;
+    const point = (along: number, v: number): Vec => bridgePoint(bridge, u + out * along, v);
+    const ring = [point(-0.1, -0.42), point(APPROACH * 0.5, -0.46), point(APPROACH, -0.3), point(APPROACH, 0.3), point(APPROACH * 0.5, 0.46), point(-0.1, 0.42)];
+    const fade = (p: Vec): number => 1 - Math.max(0, Math.min(1, ((p.x - start.x) * bridge.along.x + (p.y - start.y) * bridge.along.y) * out / APPROACH)) ** 1.5;
+    return [{ ring, fade }];
+  }));
+}
+
+/** The line the woods keep off along a bridge: its deck, and its approaches where it has them (`bridgeApproaches`), end to end. */
+export function bridgeSpan(bridge: DungeonRiverBridge, onTrail: (p: Vec) => boolean): [Vec, Vec] {
+  const reach = (u: number): number => (onTrail(bridgePoint(bridge, u, 0)) ? 0 : APPROACH);
+  return [bridgePoint(bridge, -reach(0), 0), bridgePoint(bridge, bridge.length + reach(bridge.length), 0)];
+}

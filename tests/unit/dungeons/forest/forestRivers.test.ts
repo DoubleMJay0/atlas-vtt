@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../../src/app/dungeons/generate';
-import { floorCellsOf } from '../../../../src/app/dungeons/geometry';
 import type { DungeonModel } from '../../../../src/app/dungeons/model';
+import { trailLine } from '../../../../src/app/dungeons/forest/pathCrossings';
 import { bends, floorWater, waterField, waterStretches } from '../../../../src/app/dungeons/forest/riverShape';
 import { signedArea2 } from '../../../../src/app/dungeons/render/geometry';
 import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
@@ -71,25 +71,27 @@ describe('a Forest’s rivers', () => {
     }
   });
 
-  it('are bridged in clearings where too deep to wade, each bridge on dry ground at both ends and well apart from the next', () => {
+  it('are bridged only where a path crosses them, two bridges at most on a map, each on dry ground off the water', () => {
     let bridges = 0;
     for (const seed of SEEDS) {
-      const floor = forest(seed, ['wet']).floors[0]!;
-      const ground = new Set(floor.rooms.flatMap((room) => floorCellsOf(room)).map((c) => `${c.x},${c.y}`));
+      const model = forest(seed, ['wet']);
+      const floor = model.floors[0]!;
       const field = waterField(floor.rivers, floor.lakes);
+      const shown = visibleDungeon(model, DEFAULT_VIEW, 0);
+      const lane = floor.cave?.lane ?? [];
       const all = (floor.rivers ?? []).flatMap((river) => river.bridges);
+      expect(all.length).toBeLessThanOrEqual(2);
       bridges += all.length;
       for (const { at, along, length } of all) {
-        expect(length).toBeGreaterThan(1.3);
-        for (const side of [-1, 1]) {
-          const end = { x: at.x + (along.x * side * length) / 2, y: at.y + (along.y * side * length) / 2 };
-          expect(ground.has(`${Math.floor(end.x)},${Math.floor(end.y)}`)).toBe(true);
-          expect(field.distance(end.x, end.y)).toBeGreaterThan(0);
-        }
+        // On a trail, or on the lane the layout leads through the clearings (a bridge may move a cell and a half along the river for a straighter reach).
+        const onPath = shown.ways.some((way) => trailLine(way).some((p) => Math.hypot(p.x - at.x, p.y - at.y) < 2.5))
+          || lane.some((c) => Math.hypot(c.x + 0.5 - at.x, c.y + 0.5 - at.y) < 2);
+        expect(onPath).toBe(true);
+        for (const side of [-1, 1]) expect(field.distance(at.x + (along.x * side * length) / 2, at.y + (along.y * side * length) / 2)).toBeGreaterThan(0);
       }
-      all.forEach((a, i) => all.slice(i + 1).forEach((b) => expect(Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y)).toBeGreaterThanOrEqual(10)));
+      all.forEach((a, i) => all.slice(i + 1).forEach((b) => expect(Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y)).toBeGreaterThanOrEqual(8)));
     }
-    expect(bridges).toBeGreaterThan(10);
+    expect(bridges).toBeGreaterThan(5);
   });
 
   it('flow in stretches that hold all their water once', () => {

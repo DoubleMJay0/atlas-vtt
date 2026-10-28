@@ -7,8 +7,8 @@ import { polysPath, rectPoly, type Field, type PathFn } from '../art/paths';
 import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolShores } from '../art/pools';
 import { grownRings, intersectRings, subtractRings, unionRings } from '../clipShapes';
 import { floorWater, riverBars, waterField } from '../../forest/riverShape';
-import { drawRiverBridges } from './riverBridges';
-import { pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
+import { bridgeApproaches, bridgeSpan, drawRiverBridges } from './riverBridges';
+import { pointSegmentDistance, pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
 import { wayCentre, wayFrameOf, wayHalf, type WayOut } from '../cave/mouth/wayOut';
 import { drawGrid } from '../grid';
 import type { GroundsPaint } from '../grounds/paint';
@@ -35,6 +35,8 @@ export interface ForestArt {
 
 /** How far the mass keeps off a river's water, in cells: the trees stand on its banks and lean over it a little. */
 const RIVER_BANK = 0.3;
+/** How far the mass keeps off a bridge's middle line, in cells: the deck and a little either side. */
+const BRIDGE_CLEAR = 0.7;
 
 /**
  * A Forest's entry floor, as Watabou's Glade view and Reprieve draw woods, bottom to top: the woods'
@@ -61,9 +63,15 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   // The mass overhangs a trail's sides a little, so the woods' colour never shows between them.
   // Asked a few million times: no allocation in it.
   const field = waterField(rivers, lakes);
+  // The bridges, with worn paths onto the ends no trail reaches: the woods keep off them too.
+  const bridges = scene.env.view.water ? rivers.flatMap((river) => river.bridges) : [];
+  const onTrail = (p: Vec): boolean => dungeon.ways.some((way) => trailDistance(way, p) < 0.3);
+  const approaches = bridgeApproaches(bridges, onTrail);
+  const spans = bridges.map((bridge) => bridgeSpan(bridge, onTrail));
   const outsideAt = (x: number, y: number): number => {
     let best = Math.min(scene.sdfAt(x, y), field.distance(x, y) - RIVER_BANK);
     for (const way of dungeon.ways) best = Math.min(best, trailDistance(way, { x, y }) + TRAIL_OVERHANG);
+    for (const [a, b] of spans) best = Math.min(best, pointSegmentDistance({ x, y }, a, b) - BRIDGE_CLEAR);
     return best;
   };
   // The woods first and the ground over them, never the woods cut out of the frame: an even-odd cut turns back where two clearings' reaches overlap.
@@ -71,6 +79,7 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   art.ground.lawn(ground, cellsOf(view));
   // Each trail worn into the ground, fading where it leaves into the woods.
   for (const [k, way] of dungeon.ways.entries()) art.trail(polysPath([trails[k]!]), (p) => trailFade(way, wayFrameOf(way, p).u));
+  for (const { ring, fade } of approaches) art.trail(polysPath([ring]), fade);
   if (scene.env.view.water) drawWater(scene, art, riverWater, field);
   // The bars on the insides of the bends, where no other water lies over them.
   const bars = riverWater.length ? subtractRings(rivers.flatMap(riverBars), riverWater) : [];
@@ -87,7 +96,7 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const lone = loneTrees(scene.env.dungeon).map((tree): WoodsClump => ({ clump: leafyMass({ x: tree.x, y: tree.y }, tree.radius, 0, Math.floor(tree.x * 7349 + tree.y * 3083), 15), depth: 0 }));
   for (const entry of lone) art.clump(entry);
   art.finish(lone, () => 0);
-  if (scene.env.view.water) drawRiverBridges(hand, rivers.flatMap((river) => river.bridges));
+  drawRiverBridges(hand, bridges);
   drawProps(hand, art.colours.water, art.colours.cloth);
   drawTerrainStanding(hand, art.colours);
   drawPassages(hand);
