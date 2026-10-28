@@ -162,6 +162,21 @@ export interface DungeonWater {
   outline: CellPoint[];
 }
 
+/** A bridge over a river: its middle, the way its deck runs (across the river, a unit vector) and its length, in cells. */
+export interface DungeonRiverBridge {
+  at: CellPoint;
+  along: CellPoint;
+  length: number;
+}
+
+/** A river of a Forest: its middle line from where it enters to where it ends, its width there, and its bridges. */
+export interface DungeonRiver {
+  points: CellPoint[];
+  /** By point, in cells. */
+  widths: number[];
+  bridges: DungeonRiverBridge[];
+}
+
 /** One floor of a dungeon. Room ids count from 0 on every floor; an entrance is a door with `from === null`. */
 export interface DungeonFloor {
   rooms: DungeonRoom[];
@@ -187,6 +202,8 @@ export interface DungeonFloor {
   cave?: CaveFloor;
   /** A Forest's entry floor: a cave floor drawn as glades in the woods (`forestFloor`). */
   forest?: true;
+  /** A Forest's rivers, the first its main river, any after it tributaries that end where they join it (`forest/forestRivers.ts`). */
+  rivers?: DungeonRiver[];
   /** Set on every floor of a house: walls on the edges between cells (`houseModel.ts`); unset, rooms are walled by whole cells. */
   walls?: FloorWalls;
   /** A house's windows, in its outer walls. */

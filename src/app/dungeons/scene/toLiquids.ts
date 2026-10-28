@@ -4,14 +4,17 @@ import { MAX_LIQUID_CORNERS } from '../../liquids/liquids';
 import type { LiquidKind, LiquidSurface } from '../../types/liquidTypes';
 import type { CellPoint, DungeonColumn, DungeonFloor, DungeonTerrain } from '../model';
 import { intersectRings, subtractRings, unionRings } from '../render/clipShapes';
-import { shapeRings, smoothClosedPoints, type Vec } from '../render/geometry';
-import { simplifyRing } from '../render/simplifyRing';
+import { smoothClosedPoints, type Vec } from '../render/geometry';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonStyle, DungeonView } from '../style';
 import { cellsToUnits, type SceneUnit } from './gameUnits';
 import { liquidColours } from './liquidColours';
 import { isBuiltWater, isNaturalDeepWater, isSubmergedRimstone, naturalDeepRings } from '../render/art/pools';
 import { rimstoneShelves } from '../render/terrain/caveStones';
+import { deckOf, riverRings, riverStretches } from '../forest/riverShape';
+import { rectPoly } from '../render/art/paths';
+import { mapLayout } from '../render/layoutSize';
+import { fitCorners, floorRingsOf } from './sceneRings';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
 
@@ -20,9 +23,6 @@ import type { DungeonPlacement } from './toWalls';
  * animated (`objects.liquids`) on exactly what the map paints of it, and for lava and acid a light
  * that glows from the whole of that surface (`LightSource.area`), so a room with lava is lit by it.
  */
-
-/** How far a simplified outline may stray from the drawn one at first, in cells; doubled until it fits. */
-const FIRST_TOLERANCE = 0.01;
 
 interface Liquid {
   liquid: LiquidKind;
@@ -59,18 +59,6 @@ function cellRings(cells: readonly CellPoint[]): Vec[][] {
   return unionRings(cells.map(({ x, y }) => [{ x, y }, { x: x + 1, y }, { x: x + 1, y: y + 1 }, { x, y: y + 1 }]));
 }
 
-/**
- * Rings within `limit` corners together: as drawn where they fit, else all simplified alike, as
- * little as it takes. A surface may hold `MAX_LIQUID_CORNERS`, an area light `MAX_AREA_CORNERS`:
- * fitting a pool's shore to the light's limit drew it as chords far off the painted shore.
- */
-function fitCorners(rings: Vec[][], limit: number): Vec[][] {
-  const corners = (fitted: Vec[][]): number => fitted.reduce((sum, ring) => sum + ring.length, 0);
-  let fitted = rings;
-  for (let tolerance = FIRST_TOLERANCE; corners(fitted) > limit; tolerance *= 2) fitted = rings.map(ring => simplifyRing(ring, tolerance));
-  return fitted;
-}
-
 /** The outline of a standing column, which the water flows round. */
 function columnRing({ x, y, radius, square }: DungeonColumn): Vec[] {
   if (square) return [{ x: x - radius, y: y - radius }, { x: x + radius, y: y - radius }, { x: x + radius, y: y + radius }, { x: x - radius, y: y + radius }];
@@ -95,14 +83,29 @@ const STREAM_SHARE = 0.25;
 function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
   const floorRings = floorRingsOf(dungeon);
   const { floor } = dungeon;
-  const built = cellRings(floor.terrain.filter(piece => isBuiltWater(floor, piece)).flatMap(piece => piece.cells));
+  // A Forest's rivers flow through its pools: what a river covers is the river's (`riverLiquids`).
+  const rivers = (floor.rivers ?? []).flatMap(river => riverRings(river));
+  const notPool = [...cellRings(floor.terrain.filter(piece => isBuiltWater(floor, piece)).flatMap(piece => piece.cells)), ...rivers];
   const streams = floor.terrain.filter(piece => isNaturalDeepWater(floor, piece) && piece.kind === 'channel' && piece.facing);
   // All shores at once, as the map fills them: an island's shore is a hole in its lake, never water of its own.
   const onFloor = intersectRings(floor.water.map(pool => smoothClosedPoints(pool.outline, 4)), floorRings);
-  return withHoles(built.length ? subtractRings(onFloor, built) : onFloor).map(({ ring, holes }): Liquid => {
+  return withHoles(onFloor.length && notPool.length ? subtractRings(onFloor, notPool) : onFloor).map(({ ring, holes }): Liquid => {
     const flow = streamThrough(ring, streams);
     return { liquid: 'water', ring, ...(holes.length && { holes }), ...(flow && { flow }) };
   });
+}
+
+/**
+ * A Forest's rivers in stretches, each flowing the way the river runs there, on what of them lies
+ * on the map's image (they rise and end beyond it).
+ */
+function riverLiquids(dungeon: VisibleDungeon, view: DungeonView): Liquid[] {
+  const { rivers } = dungeon.floor;
+  if (!rivers?.length) return [];
+  const { originCell: o, cellsWide, cellsHigh } = mapLayout(dungeon.model, 1, view);
+  const frame = rectPoly({ x: o.x, y: o.y, w: cellsWide, h: cellsHigh });
+  return riverStretches(rivers).flatMap(({ rings, flow }) =>
+    withHoles(intersectRings(rings, [frame])).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }), flow })));
 }
 
 /** The way the stream that fills most of a pool runs, where it fills at least `STREAM_SHARE` of it. */
@@ -115,10 +118,6 @@ function streamThrough(ring: readonly Vec[], streams: readonly DungeonTerrain[])
     if (cells > most) { most = cells; best = stream; }
   }
   return best?.facing && most >= area * STREAM_SHARE ? { x: best.facing.x, y: best.facing.y } : undefined;
-}
-
-function floorRingsOf(dungeon: VisibleDungeon): Vec[][] {
-  return unionRings(dungeon.floors.flatMap(shape => shapeRings(shape, 0, 100)));
 }
 
 /** Terrain that is part of the water itself, not drawn over it. */
@@ -134,7 +133,7 @@ function terrainOver(floor: DungeonFloor, view: DungeonView, piece: DungeonTerra
 /**
  * What the map draws over its water: stairwells, every piece of terrain that is no liquid (bridges
  * among them; rimstone as its dams, none where the water lies over it and the map draws only their
- * lips), props and columns. Cut out of the surfaces, so the motion never runs over them.
+ * lips), props, columns and a Forest river's footbridges. Cut out of the surfaces, so the motion never runs over them.
  */
 function drawnOver(dungeon: VisibleDungeon, view: DungeonView): Vec[][] {
   const { floor, roomShapes } = dungeon;
@@ -143,7 +142,8 @@ function drawnOver(dungeon: VisibleDungeon, view: DungeonView): Vec[][] {
     .filter(piece => roomShapes.has(piece.room) && !UNDER_WATER.has(piece.kind) && !(piece.traits.hazard && HAZARD_LIQUID[piece.traits.hazard]))
     .flatMap(piece => terrainOver(floor, view, piece));
   const props = view.props ? floor.props.filter(prop => roomShapes.has(prop.room)).map(propPolygon) : [];
-  return [...stairs, ...terrain, ...props, ...floor.columns.map(columnRing)];
+  const decks = (floor.rivers ?? []).flatMap(river => river.bridges.map(deckOf));
+  return [...stairs, ...terrain, ...props, ...floor.columns.map(columnRing), ...decks];
 }
 
 /** Each liquid with what the map draws over it cut out: islands as holes, a surface cut in two as two, each within `MAX_LIQUID_CORNERS`. */
@@ -217,7 +217,7 @@ export function floorLiquids(
   level?: string,
 ): FloorLiquids {
   const shown = dungeon.floor.terrain.filter(piece => dungeon.roomShapes.has(piece.room));
-  const whole = [...(view.water ? poolLiquids(dungeon) : []), ...terrainLiquids(dungeon, shown, dungeon.floors.some(shape => shape.kind === 'poly') ? floorRingsOf(dungeon) : null, view.water)].map((piece, index) => ({ ...piece, ...(piece.liquid === 'lava' && { lavaLight: `light_${id}_${index + 1}` }) }));
+  const whole = [...(view.water ? [...poolLiquids(dungeon), ...riverLiquids(dungeon, view)] : []), ...terrainLiquids(dungeon, shown, dungeon.floors.some(shape => shape.kind === 'poly') ? floorRingsOf(dungeon) : null, view.water)].map((piece, index) => ({ ...piece, ...(piece.liquid === 'lava' && { lavaLight: `light_${id}_${index + 1}` }) }));
   const colours = liquidColours(style, view);
   const { originCell, pxPerCell } = placement;
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });

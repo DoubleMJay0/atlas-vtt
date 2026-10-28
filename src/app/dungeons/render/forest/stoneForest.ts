@@ -6,7 +6,7 @@ import { stoneGroundsPaint } from '../grounds/stonePaint';
 import { mixColours } from '../palette';
 import { stoneColours } from '../stone/colours';
 import { stoneHand } from '../stone/hand';
-import { drawPools } from '../stone/water';
+import { paintWater } from '../stone/water';
 import { drawForest, massShare } from './drawForest';
 
 /** Stone's greens: the lit tops of the clumps, their bodies and the woods' depth. */
@@ -58,6 +58,6 @@ export function paintStoneForest(scene: ArtScene): void {
       ctx.fill();
     },
     finish: () => undefined,
-    pools: () => drawPools(scene, c),
+    water: (waterScene, trace, outlines, depth, deepness) => paintWater(waterScene, c, trace, outlines, depth, false, deepness),
   });
 }

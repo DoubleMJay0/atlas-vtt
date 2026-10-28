@@ -2,7 +2,7 @@ import type { ArtScene } from '../art/artScene';
 import { viewBounds } from '../art/artScene';
 import { engravedHand } from '../engraved/hand';
 import { pensOf } from '../engraved/pens';
-import { drawPools } from '../engraved/water';
+import { paintWater } from '../engraved/water';
 import { pathBounds } from '../art/paths';
 import { traceShape } from '../grounds/crowns';
 import { engravedGroundsPaint } from '../grounds/engravedPaint';
@@ -56,6 +56,6 @@ export function paintEngravedForest(scene: ArtScene): void {
       const union = (path: CanvasPath): void => { for (const { clump } of mass) traceShape(path, clump.shape); };
       hand.tone((x, y) => 0.75 * depth(x, y) ** 1.3, b, union, 'shade');
     },
-    pools: () => drawPools(scene, pens),
+    water: (waterScene, trace, outlines, depth, deepness) => paintWater(waterScene, pens, trace, outlines, depth, false, deepness),
   });
 }

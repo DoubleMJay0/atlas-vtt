@@ -6,7 +6,6 @@ import { crayonBox } from '../crayon/crayonBox';
 import { crayonHand } from '../crayon/hand';
 import { crayonPens } from '../crayon/pens';
 import { crayonWater } from '../crayon/pools';
-import { drawPools } from '../engraved/water';
 import { traceShape } from '../grounds/crowns';
 import { crayonGroundsPaint } from '../grounds/crayonPaint';
 import type { GroundsPaint } from '../grounds/paint';
@@ -94,6 +93,6 @@ export function paintCrayonForest(scene: ArtScene): void {
       box.colourIn(union, { colour: CRAYONS.leaf, cover: 1, passes: 3 }, (x, y) => 1 - depthAt(x, y), b);
       box.colourIn(union, { colour: CRAYONS.shadeLeaf, cover: 1, passes: 3 }, depthAt, b);
     },
-    pools: () => drawPools(scene, pens, crayonWater(box)),
+    water: (waterScene, trace, outlines, depth, deepness) => crayonWater(box)(waterScene, pens, trace, outlines, depth, false, deepness),
   });
 }
