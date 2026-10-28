@@ -1,10 +1,11 @@
-import { Container, Mesh, UniformGroup, type Geometry, type Renderer, type RenderTexture, type Shader, type TextureSource } from 'pixi.js';
+import { Container, Mesh, UniformGroup, type Geometry, type Renderer, type RenderTexture, type Shader } from 'pixi.js';
 import { MAX_ZONE_CORNERS } from '../../../lighting/lightZones';
 import { wallBand } from '../../../lighting/lightingConstants';
 import { DEFAULT_AMBIENT_COLOR } from '../../../lighting/sceneLightingOptions';
 import { linearColor } from '../../../lighting/srgb';
 import type { MapBounds } from '../../../vision/visibility';
-import type { EngineShaderSource } from './engineShaders';
+import type { CapsuleField } from './CapsuleField';
+import { ENGINE_SHADERS } from './engineShaders';
 import { ambientLift } from './senseDrawing';
 import { createQuad, createShader, createTarget, destroyQuad, quadGeometry, renderInto, type Quad } from './gpu';
 import type { EngineZone } from './types';
@@ -28,14 +29,6 @@ interface Slot {
 }
 
 /**
- * What tells a zone where the walls are: a capsule field (`zoneFragment`) or a band of the map's
- * texels around them (`flatZoneFragment`), bound under the names the zone's program reads.
- */
-export interface ZoneWalls {
-  resources(): Record<string, UniformGroup | TextureSource>;
-}
-
-/**
  * What of the scene decides how its zones are drawn: its ambient light, which only darker zones
  * replace on walls, its colour where a zone has none, and the levels dim light lies between.
  */
@@ -54,8 +47,7 @@ export interface ZoneLook {
  * has the darkest light that lies on it, the scene's or a zone's: zones are drawn onto the floor
  * in their order and onto the walls from the brightest to the darkest, those darker than the
  * scene only. `lifted` is the same with every zone's light where dim light is perceived as
- * bright. It exists only while the scene has a zone. `shader` is the program each zone is drawn
- * with: the traced picture's soft edge through the wall field, or the polygon picture's flat fill.
+ * bright. It exists only while the scene has a zone.
  */
 export class ZoneMap {
   readonly texture: RenderTexture;
@@ -66,35 +58,30 @@ export class ZoneMap {
   private readonly quad: Quad = createQuad();
   private readonly geometry: Geometry = quadGeometry(this.quad);
 
-  /**
-   * `wallReach` is how far past its outline a zone darker than the scene lies on the walls: a
-   * band past it where the composite lights a wall's face from the floor in front of it, else as
-   * far as a read of the texel a pixel lies in reaches (`flatZoneFragment`).
-   */
-  constructor(private readonly renderer: Renderer, bounds: MapBounds, private readonly texel: number, private readonly shader: EngineShaderSource, private readonly wallReach = wallBand(texel)) {
+  constructor(private readonly renderer: Renderer, bounds: MapBounds, private readonly texel: number) {
     this.texture = createTarget(bounds.width / texel, bounds.height / texel, 'rgba16float');
     this.lifted = createTarget(bounds.width / texel, bounds.height / texel, 'rgba16float');
     this.world = [this.texture.source.pixelWidth * texel, this.texture.source.pixelHeight * texel];
   }
 
-  /** Draws `zones` in their order, later ones over earlier ones, ending at the walls `walls` tells of. */
-  draw(zones: readonly EngineZone[], look: ZoneLook, walls: ZoneWalls): void {
+  /** Draws `zones` in their order, later ones over earlier ones, through the walls of `field`. */
+  draw(zones: readonly EngineZone[], look: ZoneLook, field: CapsuleField): void {
     const drawn = zones.map((zone) => drawnZone(zone, look));
     const scene = sceneLuma(look);
     const onWalls = drawn.filter((zone) => luma(zone.light) < scene).sort((a, b) => luma(b.light) - luma(a.light));
-    while (this.slots.length < drawn.length) this.slots.push(this.createSlot(walls));
+    while (this.slots.length < drawn.length) this.slots.push(this.createSlot(field));
     for (const [target, pick] of [[this.texture, 'light'], [this.lifted, 'lifted']] as const) {
-      this.fill(drawn, pick, false, walls);
+      this.fill(drawn, pick, false, field);
       renderInto(this.renderer, this.scene, target, [0, 0, 0, 0]);
       if (onWalls.length === 0) continue;
-      this.fill(onWalls, pick, true, walls);
+      this.fill(onWalls, pick, true, field);
       renderInto(this.renderer, this.scene, target);
     }
   }
 
   /** Sets the slots to draw `zones` in this order, onto the floor or onto the walls. */
-  private fill(zones: readonly DrawnZone[], pick: 'light' | 'lifted', onWalls: boolean, walls: ZoneWalls): void {
-    const { wallReach } = this;
+  private fill(zones: readonly DrawnZone[], pick: 'light' | 'lifted', onWalls: boolean, field: CapsuleField): void {
+    const wallReach = wallBand(this.texel);
     this.slots.forEach((slot, i) => {
       const next = zones[i];
       slot.mesh.visible = !!next;
@@ -110,11 +97,11 @@ export class ZoneMap {
       slot.light.set(next[pick]);
       Object.assign(slot.uniforms.uniforms, { uCount: polygon.length, uSoft: soft, uOnWalls: onWalls ? 1 : 0, uWallReach: wallReach });
       slot.uniforms.update();
-      Object.assign(slot.mesh.shader!.resources, walls.resources());
+      Object.assign(slot.mesh.shader!.resources, field.resources());
     });
   }
 
-  private createSlot(walls: ZoneWalls): Slot {
+  private createSlot(field: CapsuleField): Slot {
     const rect = new Float32Array(4);
     const points = new Float32Array(MAX_ZONE_CORNERS * 2);
     const light = new Float32Array(3);
@@ -128,7 +115,7 @@ export class ZoneMap {
       uWallReach: { value: 1, type: 'f32' },
       uZoneLight: { value: light, type: 'vec3<f32>' },
     });
-    const mesh = new Mesh({ geometry: this.geometry, shader: createShader(this.shader, { zoneUniforms: uniforms, ...walls.resources() }) });
+    const mesh = new Mesh({ geometry: this.geometry, shader: createShader(ENGINE_SHADERS.zone, { zoneUniforms: uniforms, ...field.resources() }) });
     this.scene.addChild(mesh);
     return { mesh, uniforms, rect, points, light };
   }

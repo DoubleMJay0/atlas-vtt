@@ -27,7 +27,7 @@ describe('generateDungeon', () => {
   });
 
   it('starts at an opening in (0, 0) on the entry floor', () => {
-    const model = generateDungeon({ seed: 9, tags: [], floors: 1 });
+    const model = generateDungeon({ seed: 9, tags: [], floors: 1, theme: 'fortress' });
     expect(model.floors[0]!.doors[0]).toMatchObject({ x: 0, y: 0, kind: 'opening', from: null, to: 0 });
   });
 

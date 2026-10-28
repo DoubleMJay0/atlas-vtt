@@ -31,6 +31,8 @@ export const ART_DUNGEONS: readonly { name: string; request: DungeonRequest }[] 
   { name: 'cavern-lava', request: { seed: 707, theme: 'cavern', tags: ['large', 'lava'], floors: 3 } },
   { name: 'cavern-underdark', request: { seed: 5, theme: 'cavern', tags: ['deep', 'spacious', 'flooded'], floors: 3 } },
   { name: 'cavern-inhabited', request: { seed: 808, theme: 'cavern', tags: ['inhabited', 'wet', 'secret'], floors: 2 } },
+  { name: 'forest', request: { seed: 606, theme: 'forest', tags: ['medium', 'dry'], floors: 1 } },
+  { name: 'forest-wet', request: { seed: 909, theme: 'forest', tags: ['wet', 'overgrown'], floors: 2, waterLevel: 0.4 } },
   { name: 'cavern-five-room', request: { seed: 909, theme: 'cavern', tags: [], floors: 1, fiveRoom: true } },
 ];
 

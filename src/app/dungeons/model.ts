@@ -185,6 +185,8 @@ export interface DungeonFloor {
   hiddenWings?: number[];
   /** A Cavern floor's lane, heights, water and faults. */
   cave?: CaveFloor;
+  /** A Forest's entry floor: a cave floor drawn as glades in the woods (`forestFloor`). */
+  forest?: true;
   /** Set on every floor of a house: walls on the edges between cells (`houseModel.ts`); unset, rooms are walled by whole cells. */
   walls?: FloorWalls;
   /** A house's windows, in its outer walls. */
@@ -198,7 +200,7 @@ export interface DungeonFloor {
 export interface DungeonModel {
   version: number;
   seed: number;
-  /** Fortress, Haunted Mansion or Cavern: one per dungeon. */
+  /** Fortress, Haunted Mansion, Cavern or Forest: one per dungeon. */
   theme: ThemeId;
   /** The tags the dungeon was built with: the GM's that its theme takes, and those added by chance (`dungeonTags`). */
   tags: string[];

@@ -49,6 +49,7 @@ export const dungeonScene = {
 
   'dungeonScene.feature.column': 'Column',
   'dungeonScene.feature.brokenColumn': 'Broken column',
+  'dungeonScene.feature.tree': 'Tree',
 
   'dungeonScene.terrain': 'Terrain: {list}.',
   'dungeonScene.growth': 'Growing here: {list}.',

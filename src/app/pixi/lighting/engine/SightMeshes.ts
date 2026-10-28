@@ -8,7 +8,7 @@ import { destroyTree } from '../../utils/destroyTree';
 import { ENGINE_SHADERS } from './engineShaders';
 import { createShader } from './gpu';
 import { SPOT_CHANNELS, sightChannels, type SightChannels } from './senseDrawing';
-import { MAX_WEDGES, layoutWedges, wedgeSource, writeWedges } from './wedges';
+import { MAX_WEDGES } from './sightShader';
 
 /** A sight mesh with the GPU objects it owns besides the mesh itself, filled anew for each area it draws. */
 interface SightMesh {
@@ -16,7 +16,7 @@ interface SightMesh {
   positions: Buffer;
   indices: Buffer;
   uniforms: UniformGroup;
-  /** The wedge texture, `capacity` columns wide, in the sector layout `WEDGE_GLSL` reads (`writeWedges`). */
+  /** The wedge texture, `capacity` columns wide; only the first `uWedgeCount` are read. */
   wedges: BufferImageSource;
   wedgeData: Float32Array;
   capacity: number;
@@ -31,8 +31,8 @@ interface Area {
   channels: [number, number, number, number];
 }
 
-/** Wedge texture columns a mesh starts with (a layout is at least its sectors wide), and the most spare meshes kept between frames. */
-const WEDGE_COLUMNS = 64;
+/** Wedge texture columns a mesh starts with, and the most spare meshes kept between frames. */
+const WEDGE_COLUMNS = 16;
 const SPARE_MESHES = 8;
 
 /**
@@ -125,10 +125,11 @@ function create(): SightMesh {
   const indices = new Buffer({ data: new Uint32Array(0), usage: BufferUsage.INDEX | BufferUsage.COPY_DST, shrinkToFit: false });
   const geometry = new Geometry({ attributes: { aPosition: { buffer: positions, format: 'float32x2' } }, indexBuffer: indices });
   const uniforms = new UniformGroup({
+    uWedgeCount: { value: 0, type: 'i32' },
     uChannel: { value: new Float32Array(4), type: 'vec4<f32>' },
     uFade: { value: new Float32Array(3), type: 'vec3<f32>' },
   });
-  const { source: wedges, data: wedgeData } = wedgeSource(WEDGE_COLUMNS);
+  const { source: wedges, data: wedgeData } = wedgeTexture(WEDGE_COLUMNS);
   const shader = createShader(ENGINE_SHADERS.sight, { sightUniforms: uniforms, uWedges: wedges });
   const mesh = new Mesh({ geometry, shader });
   mesh.blendMode = 'max';
@@ -153,18 +154,18 @@ function fill(entry: SightMesh, polygon: Polygon, origin: Point, wedges: readonl
   }
   entry.positions.data = positions;
   entry.indices.data = indices;
-  const layout = layoutWedges(wedges, origin);
-  if (layout.width > entry.capacity) {
+  if (wedges.length > entry.capacity) {
     let capacity = entry.capacity;
-    while (capacity < layout.width) capacity *= 2;
+    while (capacity < wedges.length) capacity *= 2;
     entry.wedges.destroy();
-    ({ source: entry.wedges, data: entry.wedgeData } = wedgeSource(capacity));
+    ({ source: entry.wedges, data: entry.wedgeData } = wedgeTexture(capacity));
     entry.capacity = capacity;
     entry.mesh.shader!.resources.uWedges = entry.wedges;
   }
-  writeWedges(entry.wedgeData, entry.capacity, layout);
+  writeWedges(entry.wedgeData, entry.capacity, wedges);
   entry.wedges.update();
   const { uniforms } = entry.uniforms;
+  uniforms.uWedgeCount = wedges.length;
   (uniforms.uChannel as Float32Array).set(channels);
   (uniforms.uFade as Float32Array).set([origin.x, origin.y, range]);
   entry.uniforms.update();
@@ -177,3 +178,29 @@ function dispose({ mesh, wedges }: SightMesh): void {
   mesh.destroy();
 }
 
+/** Two rows of `rgba32float` texels, `columns` wide, one column per wedge: corner and edge, then side and angle. */
+function wedgeTexture(columns: number): { source: BufferImageSource; data: Float32Array } {
+  const data = new Float32Array(columns * 2 * 4);
+  // Premultiplying on upload is invalid for float data and leaves the texture empty.
+  const source = new BufferImageSource({
+    resource: data,
+    width: columns,
+    height: 2,
+    format: 'rgba32float',
+    scaleMode: 'nearest',
+    alphaMode: 'no-premultiply-alpha',
+  });
+  return { source, data };
+}
+
+function writeWedges(data: Float32Array, columns: number, wedges: readonly SightWedge[]): void {
+  data.fill(0);
+  wedges.forEach((w, i) => {
+    data[i * 4] = w.a.x;
+    data[i * 4 + 1] = w.a.y;
+    data[i * 4 + 2] = w.e.x;
+    data[i * 4 + 3] = w.e.y;
+    data[(columns + i) * 4] = w.side;
+    data[(columns + i) * 4 + 1] = w.phi;
+  });
+}

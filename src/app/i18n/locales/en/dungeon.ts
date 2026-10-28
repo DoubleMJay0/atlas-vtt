@@ -39,6 +39,7 @@ export const dungeon = {
   'dungeon.theme.fortress': 'Fortress',
   'dungeon.theme.mansion': 'Haunted Mansion',
   'dungeon.theme.cavern': 'Cavern',
+  'dungeon.theme.forest': 'Forest',
   'dungeon.theme.refused.beside': 'Not available with {tag}',
   'dungeon.tags': 'Tags',
 

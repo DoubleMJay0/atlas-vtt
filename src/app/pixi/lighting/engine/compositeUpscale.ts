@@ -16,12 +16,11 @@ export function reducedPixelRatio(max: number | undefined, resolution: number): 
  * then it draws into a texture of that many pixels, writing in alpha how much each one shows
  * (`SHOWN_GLSL`), and a second pass draws that up to the render's pixels with darkness winning
  * at every edge (`compositeUpscaleFragment`). Thumbnails and every render at or below the ratio
- * are drawn in one pass as before. With `inputsAtRatio` the filter's input (the layer's sight
- * meshes) is drawn at the ratio too: of the lighting only the second pass then works on every
- * pixel of the render, which is what a device that fills pixels slowly pays for.
+ * are drawn in one pass as before.
  */
 export class CompositeUpscale extends AreaAwareFilter {
-  private ratio: number | undefined;
+  /** At most this many device pixels per screen pixel; unset, the render's own. */
+  maxPixelRatio: number | undefined;
   private readonly upscaleUniforms = new UniformGroup({
     uReducedRatio: { value: 1, type: 'f32' },
     uReducedLast: { value: new Float32Array(2), type: 'vec2<f32>' },
@@ -35,24 +34,12 @@ export class CompositeUpscale extends AreaAwareFilter {
    * `shownOut` tells the composite how many of the render's pixels across one of its own covers
    * while it works on fewer (it then writes how much each pixel shows into alpha), 0 otherwise.
    */
-  constructor(options: FilterWithShader, origin: Float32Array, group: UniformGroup, private readonly shownOut: (footprint: number) => void, private readonly inputsAtRatio = false) {
+  constructor(options: FilterWithShader, origin: Float32Array, group: UniformGroup, private readonly shownOut: (footprint: number) => void) {
     super(options, origin, group);
   }
 
-  /** At most this many device pixels per screen pixel; unset, the render's own. */
-  get maxPixelRatio(): number | undefined {
-    return this.ratio;
-  }
-
-  set maxPixelRatio(max: number | undefined) {
-    this.ratio = max;
-    // PIXI renders the input at the least resolution of a filter chain and of its target.
-    if (this.inputsAtRatio) this.resolution = max !== undefined && max > 0 ? max : 'inherit';
-  }
-
   override apply(filterManager: FilterSystem, input: Texture, output: RenderSurface, clearMode: boolean): void {
-    const rendered = this.inputsAtRatio ? filterManager.renderer.renderTarget.getRenderTarget(output).colorTexture.source.resolution : input.source.resolution;
-    const ratio = reducedPixelRatio(this.ratio, rendered);
+    const ratio = reducedPixelRatio(this.maxPixelRatio, input.source.resolution);
     if (ratio === null) {
       this.shownOut(0);
       super.apply(filterManager, input, output, clearMode);
@@ -61,7 +48,6 @@ export class CompositeUpscale extends AreaAwareFilter {
     const { width, height } = input.frame;
     const reduced = TexturePool.getOptimalTexture({ width, height, resolution: ratio, antialias: false, scaleMode: 'nearest' });
     try {
-      // The input's pixels per reduced pixel, across: the least of them is what the sight shows there.
       this.shownOut(input.source.resolution / ratio);
       super.apply(filterManager, input, reduced, true);
       const { uniforms } = this.upscaleUniforms;

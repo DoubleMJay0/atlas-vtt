@@ -27,18 +27,18 @@ describe('lighting quality levels', () => {
     expect(large.width / worldTexel(large, LIGHTING_QUALITY.saver.maxTexels)).toBe(1024);
   });
 
-  it('bounce light everywhere at high and on maps up to 6,144 px when balanced', () => {
+  it('bounce light everywhere at high, on maps up to 6,144 px when balanced, nowhere on saver', () => {
     const map = (side: number): { width: number; height: number } => ({ width: side, height: side / 2 });
     expect(bouncesOn(LIGHTING_QUALITY.high, map(12_000))).toBe(true);
     expect(bouncesOn(LIGHTING_QUALITY.balanced, map(6144))).toBe(true);
     expect(bouncesOn(LIGHTING_QUALITY.balanced, map(8192))).toBe(false);
+    expect(bouncesOn(LIGHTING_QUALITY.saver, map(512))).toBe(false);
   });
 
-  it('trace every ray at high and fewer across a flame when balanced; saver draws the rule\'s polygons and traces none', () => {
+  it('trace every ray at high and fewer across a flame at the lower levels', () => {
     expect(LIGHTING_QUALITY.high.tileRays).toBe(TILE_RAYS);
     expect(LIGHTING_QUALITY.balanced.tileRays).toBe(16);
-    expect(LIGHTING_QUALITY.saver.picture).toBe('polygons');
-    expect([LIGHTING_QUALITY.high.picture, LIGHTING_QUALITY.balanced.picture]).toEqual([undefined, undefined]);
+    expect(LIGHTING_QUALITY.saver.tileRays).toBe(8);
   });
 
   it('reads only the levels it knows', () => {

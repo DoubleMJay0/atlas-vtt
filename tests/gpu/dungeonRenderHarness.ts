@@ -25,8 +25,7 @@ export function withoutText<T extends object>(ctx: T): { ctx: T; texts: string[]
 /** The most pixels a picture is written with; larger ones are written reduced, as the browser can hand over only so much. */
 const SAVED_PIXELS = 16_000_000;
 
-/** Writes `canvas` as `<dir>/<name>.png` under the project root. */
-export async function savePng(canvas: OffscreenCanvas, name: string, dir = RENDER_OUT): Promise<void> {
+export async function savePng(canvas: OffscreenCanvas, name: string): Promise<void> {
   const k = Math.min(1, Math.sqrt(SAVED_PIXELS / (canvas.width * canvas.height)));
   let saved = canvas;
   if (k < 1) {
@@ -39,7 +38,7 @@ export async function savePng(canvas: OffscreenCanvas, name: string, dir = RENDE
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  await commands.writeFile(`${dir}/${name}.png`, btoa(binary), 'base64');
+  await commands.writeFile(`${RENDER_OUT}/${name}.png`, btoa(binary), 'base64');
 }
 
 export interface PixelStats {

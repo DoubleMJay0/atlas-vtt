@@ -27,7 +27,7 @@ const run = import.meta.env.VITE_PERF_GEN === '1';
 const lookOverride = import.meta.env.VITE_PERF_STYLE as DungeonStyleId | undefined;
 const req = (seed: number, tags: string[], floors = 1): DungeonRequest => ({ seed, tags: tags as DungeonTag[], floors });
 /** The most a cave's or a house's scene may take, from the click to the files written, in ms. */
-const LIMITS: Readonly<Record<string, number>> = { 'medium mansion': 3000, 'large 3 floors mansion with cellar overgrown': 7000, 'cavern medium': 3000, 'cavern large 3 floors lava overgrown': 7000, 'cavern underdark 3 floors flooded': 7000 };
+const LIMITS: Readonly<Record<string, number>> = { 'forest medium': 3000, 'forest large 2 floors wet': 7000, 'medium mansion': 3000, 'large 3 floors mansion with cellar overgrown': 7000, 'cavern medium': 3000, 'cavern large 3 floors lava overgrown': 7000, 'cavern underdark 3 floors flooded': 7000 };
 
 const CASES: [string, DungeonRequest, DungeonStyleId][] = [
   ['small', req(11, ['small']), 'parchment'],
@@ -40,6 +40,8 @@ const CASES: [string, DungeonRequest, DungeonStyleId][] = [
   ['large 3 floors rising fortress', { ...req(3, ['large', 'ruined', 'overgrown'], 3), theme: 'fortress' }, 'masonry'],
   ['large 3 floors mansion with cellar overgrown', { ...req(2, ['large', 'overgrown'], 3), theme: 'mansion' }, 'parchment'],
   ['cavern medium', { ...req(7, ['medium']), theme: 'cavern' }, 'parchment'],
+  ['forest medium', { ...req(7, ['medium']), theme: 'forest' }, 'crayon'],
+  ['forest large 2 floors wet', { ...req(3, ['large', 'wet'], 2), theme: 'forest' }, 'crayon'],
   ['cavern large 3 floors lava overgrown', { ...req(3, ['large', 'lava', 'overgrown'], 3), theme: 'cavern' }, 'volcanic'],
   ['cavern underdark 3 floors flooded', { ...req(5, ['deep', 'spacious', 'flooded'], 3), theme: 'cavern' }, 'masonry'],
 ];

@@ -268,7 +268,7 @@ describe('the theme', () => {
   it('offers the themes as cards, Surprise me first', () => {
     renderPanel();
     const cards = within(screen.getByRole('radiogroup', { name: 'Theme' })).getAllByRole('radio');
-    expect(cards.map((card) => card.querySelector('.atlas-dungeon-card-name')?.textContent)).toEqual(['Surprise me', 'Fortress', 'Haunted Mansion', 'Cavern']);
+    expect(cards.map((card) => card.querySelector('.atlas-dungeon-card-name')?.textContent)).toEqual(['Surprise me', 'Fortress', 'Haunted Mansion', 'Cavern', 'Forest']);
     expect(cards.filter((card) => card.tabIndex === 0)).toEqual([cards[0]]);
   });
 
@@ -355,7 +355,7 @@ describe('the theme', () => {
   it('names the theme Surprise me picked once the dungeon is there', async () => {
     renderPanel();
     const card = screen.getByRole('radio', { name: 'Surprise me' });
-    await waitFor(() => expect(document.getElementById(card.getAttribute('aria-describedby') ?? '')?.textContent).toMatch(/^This time: (Fortress|Haunted Mansion|Cavern)$/));
+    await waitFor(() => expect(document.getElementById(card.getAttribute('aria-describedby') ?? '')?.textContent).toMatch(/^This time: (Fortress|Haunted Mansion|Cavern|Forest)$/));
   });
 });
 
@@ -363,33 +363,33 @@ describe('the theme pictures', () => {
   it('draws the whole entry floor of the dungeon asked for in every theme, the chosen one first', async () => {
     settings.setDungeonGenerator({ theme: 'cavern', style: 'night' });
     renderPanel();
-    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(3));
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(4));
     const jobs = thumbnailJobs('themes');
-    expect(jobs.map((job) => job.request.theme)).toEqual(['cavern', 'fortress', 'mansion']);
+    expect(jobs.map((job) => job.request.theme)).toEqual(['cavern', 'fortress', 'mansion', 'forest']);
     expect(new Set(jobs.map((job) => job.request.seed)).size).toBe(1);
     expect(jobs.every((job) => job.output.kind === 'preview' && job.output.floor === 0 && job.style === dungeonStyle('night'))).toBe(true);
-    // Surprise me shows the three, each theme card its own
-    await waitFor(() => expect(document.querySelectorAll('.atlas-dungeon-theme canvas:not([hidden])')).toHaveLength(6));
+    // Surprise me shows the four, each theme card its own
+    await waitFor(() => expect(document.querySelectorAll('.atlas-dungeon-theme canvas:not([hidden])')).toHaveLength(8));
   });
 
   it('draws nothing anew for a change of theme alone, and anew for another dungeon', async () => {
     renderPanel();
-    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(3));
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(4));
     fireEvent.click(screen.getByRole('radio', { name: /^Fortress/ }));
     await act(async () => { await Promise.resolve(); });
-    expect(thumbnailJobs('themes')).toHaveLength(3);
+    expect(thumbnailJobs('themes')).toHaveLength(4);
     fireEvent.click(within(preview()).getByRole('button', { name: 'New layout' }));
-    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(6));
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(8));
     expect(worker.dropThumbnails).toHaveBeenCalledWith('themes');
   });
 
   it('draws none while another step is shown', async () => {
     renderPanel();
-    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(3));
+    await waitFor(() => expect(thumbnailJobs('themes')).toHaveLength(4));
     goTo('Features');
     fireEvent.click(tag('overgrown'));
     await waitFor(() => expect(lastJob().request.tags).toEqual(['medium', 'overgrown']));
-    expect(thumbnailJobs('themes')).toHaveLength(3);
+    expect(thumbnailJobs('themes')).toHaveLength(4);
   });
 });
 

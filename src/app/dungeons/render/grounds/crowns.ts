@@ -130,8 +130,8 @@ function broadleaf(centre: Vec, radius: number, h: (k: number) => number): { clu
  * irregular widths and depths, round a body that is itself a little out of round. A mass on the
  * rim, whose edge is the crown's against the lawn, has finer scallops than one inside the crown.
  */
-function leafyMass(at: Vec, r: number, height: number, salt: number): Clump {
-  const count = Math.max(9, Math.round(r * (height < 0.2 ? 24 : 18)));
+export function leafyMass(at: Vec, r: number, height: number, salt: number, lobes?: number): Clump {
+  const count = lobes ?? Math.max(9, Math.round(r * (height < 0.2 ? 24 : 18)));
   const lean = hash2(salt, 3, 7) * Math.PI * 2;
   const roots: Vec[] = [];
   let angle = hash2(salt, 1, 7) * Math.PI * 2;
