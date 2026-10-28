@@ -86,7 +86,7 @@ function readLiquid(id: string, value: unknown): LiquidSurface | null {
     liquid,
     polygon: copy(polygon),
     colors: readColors(value.colors, liquid),
-    ...(value.art === 'engraved' && { art: 'engraved' as const }),
+    ...((value.art === 'engraved' || value.art === 'crayon') && { art: value.art }),
     ...(liquid === 'lava' && typeof value.lavaLight === 'string' && value.lavaLight.length <= 256 && { lavaLight: value.lavaLight }),
     ...(holes.length > 0 && { holes }),
     ...(flow && { flow }),

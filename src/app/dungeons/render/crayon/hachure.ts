@@ -48,14 +48,25 @@ const PASSES: readonly Pass[] = [
   },
 ];
 
+/**
+ * How much harder than Reprieve the hand presses: a map is lit by the scene's lights, whose warm
+ * colour and tonemap take a light tint back to the paper's colour (Reprieve is only ever seen unlit).
+ */
+const PRESSURE = 1.35;
+
 /** Steps a stroke's strength is rounded to, so an area that darkens is still a few strokes calls. */
 const LEVELS = 4;
 /** The most weights a pass has. */
 const MOST_LANES = Math.max(...PASSES.map(pass => pass.lanes.length));
 
-/** The hand's unit in cells: Reprieve's 3 px at a scene's 280 px a cell, never under a pixel. */
+/**
+ * The hand's unit in cells: Reprieve's 3 px, its strokes about 6 px wide, so they stay strokes on a
+ * scene's map (150 px a cell, lossy WebP, a Retina screen showing it twice its size; strokes half
+ * that wide were a smear there). On a smaller picture no coarser than a fiftieth of a cell, and never
+ * under a pixel.
+ */
 export function crayonUnit(pxPerCell: number): number {
-  return Math.max(0.011, 1.1 / pxPerCell);
+  return Math.max(1.1 / pxPerCell, Math.min(3 / pxPerCell, 0.022));
 }
 
 export interface CrayonArea {
@@ -102,7 +113,7 @@ export function crayonArea(ctx: Canvas2D, area: CrayonArea, unit: number): void 
   ctx.lineCap = 'round';
   for (const { lane, level, path } of lanes.values()) {
     ctx.lineWidth = lane.width * unit;
-    ctx.globalAlpha = Math.min(1, lane.opacity * area.cover * (level / LEVELS));
+    ctx.globalAlpha = Math.min(1, lane.opacity * PRESSURE * area.cover * (level / LEVELS));
     ctx.stroke(path);
   }
   ctx.restore();

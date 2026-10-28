@@ -64,6 +64,7 @@ export class LiquidMesh {
     uniforms.uCell = cell;
     uniforms.uKind = KIND_CODE[surface.liquid];
     uniforms.uEngraved = surface.art === 'engraved' ? 1 : 0;
+    uniforms.uCrayon = surface.art === 'crayon' ? 1 : 0;
     const { flow } = surface;
     uniforms.uFlowing = flow ? 1 : 0;
     // Its frame: across the flow, then along it; a still surface keeps the map's axes.

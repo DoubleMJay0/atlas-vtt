@@ -29,11 +29,14 @@ export interface LiquidSurface extends OnOneLevel {
   holes?: { x: number; y: number }[][] | undefined;
   /** Where it flows, a unit vector in world space; absent, it stands still. */
   flow?: { x: number; y: number } | undefined;
-  /** Drawn in the engraved looks' ink and hatching; absent, painted, as every scene was before. */
-  art?: 'engraved' | undefined;
+  /** Drawn in the engraved looks' ink and hatching, or as Crayon's hand-coloured strokes; absent, painted, as every scene was before. */
+  art?: LiquidArt | undefined;
   /** The area light this lava glows with (`LightSource.area`), so the pieces a bridge cuts it into smoulder as one. */
   lavaLight?: string | undefined;
   colors: LiquidColors;
 }
+
+/** How a surface is drawn beyond painted: `LiquidSurface.art`. */
+export type LiquidArt = 'engraved' | 'crayon';
 
 export type LiquidSurfaceInput = Omit<LiquidSurface, 'id' | 'kind'>;

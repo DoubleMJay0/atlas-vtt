@@ -2,6 +2,7 @@ import { GlProgram, Shader, UniformGroup, type Texture } from 'pixi.js';
 import { HIGHP } from '../lighting/engine/gpu';
 import { GLSL_VERSION } from '../lighting/engine/glsl';
 import { ACID_GLSL } from './glsl/acidGlsl';
+import { CRAYON_GLSL } from './glsl/crayonGlsl';
 import { LAVA_GLSL } from './glsl/lavaGlsl';
 import { NOISE_GLSL } from './glsl/noiseGlsl';
 import { WATER_GLSL } from './glsl/waterGlsl';
@@ -23,7 +24,7 @@ void main() {
 /**
  * Pigment over the painted map, in the surface's own colours, as premultiplied colour never above
  * alpha: drawn with normal blending it paints over the map and never lights it, so every look keeps
- * its art beneath, painted or engraved (`uEngraved`). The shore fades to nothing over the field's
+ * its art beneath, painted, engraved (`uEngraved`) or in crayon (`uCrayon`). The shore fades to nothing over the field's
  * first cells, so no hard edge is drawn, and nothing is drawn past the outline: the mesh is the
  * outline.
  */
@@ -46,12 +47,14 @@ uniform vec3 uSurface;
 uniform vec3 uDeep;
 uniform vec3 uGlint;
 uniform float uEngraved;
+uniform float uCrayon;
 uniform float uDetail;
 uniform float uLavaGlow;
 ${NOISE_GLSL}
 ${WATER_GLSL}
 ${LAVA_GLSL}
 ${ACID_GLSL}
+${CRAYON_GLSL}
 /** The shore's distance in cells at this pixel, positive inside. */
 float shoreDistance() {
   vec2 uv = (vWorld - uFieldRect.xy) / uFieldRect.zw;
@@ -70,7 +73,9 @@ void main() {
   float d = shoreDistance();
   float feather = smoothstep(0.0, max(0.07, px * 1.5), d);
   if (feather <= 0.0) discard;
-  vec4 colour = uKind < 0.5 ? water(q, d, px, near) : uKind < 1.5 ? lava(q, d, px, near) : acid(q, d, px, near);
+  vec4 colour = uCrayon > 0.5
+    ? (uKind < 0.5 ? crayonWater(q, d, px) : uKind < 1.5 ? crayonLava(q, d, px) : crayonAcid(q, d, px))
+    : (uKind < 0.5 ? water(q, d, px, near) : uKind < 1.5 ? lava(q, d, px, near) : acid(q, d, px, near));
   finalColor = colour * feather;
 }`;
 
@@ -98,6 +103,8 @@ export interface LiquidUniforms {
   uGlint: Float32Array;
   /** 1 where the map is engraved (`LiquidSurface.art`): ink and hatching instead of paint. */
   uEngraved: number;
+  /** 1 where the map is coloured in crayon (`LiquidSurface.art`): hand-drawn strokes that boil. */
+  uCrayon: number;
   /** `LiquidDetail`. */
   uDetail: number;
   /** Lava's smoulder, in step with the light it glows with; 1 holds it steady. */
@@ -129,6 +136,7 @@ export function createLiquidShader(field: Texture): LiquidShader {
     uDeep: { value: new Float32Array(3), type: 'vec3<f32>' },
     uGlint: { value: new Float32Array(3), type: 'vec3<f32>' },
     uEngraved: { value: 0, type: 'f32' },
+    uCrayon: { value: 0, type: 'f32' },
     uDetail: { value: 2, type: 'f32' },
     uLavaGlow: { value: 1, type: 'f32' },
   });

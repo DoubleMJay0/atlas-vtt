@@ -11,13 +11,17 @@ import { poreTile } from '../vellumSkin';
  * breaks up on the same tooth, anchored to the map.
  */
 
-/** The tile's side in texels and the cells it covers: a texel two pixels wide on a scene's map, the grain Reprieve's crayon breaks on. */
-const TILE_PX = (3 * DEFAULT_PX_PER_CELL) / 2;
+/** The tile's side in texels and the cells it covers: a texel a pixel on a scene's map (a tile scaled up blurs the grain). */
+const TILE_PX = 3 * DEFAULT_PX_PER_CELL;
 const TILE_CELLS = 3;
 const TOOTH_SEED = 0x7007;
-/** How much of the colour a peak keeps, and how strongly the grain moves it (Dolmenwood's `CRAYON_MAP_FILTER`). */
-const KEPT = 0.6;
-const DEPTH = 0.33;
+/**
+ * How much of the colour the paper keeps on average, and how strongly its grain moves that. Firmer
+ * than Dolmenwood's `CRAYON_MAP_FILTER` (0.6 ± 0.33): a map at play zoom shows its grain a pixel or
+ * two large, where that many bare holes read as speckle rather than crayon.
+ */
+const KEPT = 0.78;
+const DEPTH = 0.24;
 /** The pores' deviations, back to one standard deviation (`poreTile` scales them to 1 %). */
 const PORE_SCALE = 100;
 const TILE_LIMIT = 16;

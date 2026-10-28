@@ -225,7 +225,7 @@ export function floorLiquids(
   const liquids: Record<string, LiquidSurface> = {};
   cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow, lavaLight }, index) => {
     const liquidId = `liquid_${id}_${index + 1}`;
-    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(style.direction === 'engraved' && { art: 'engraved' }), ...(lavaLight && { lavaLight }), ...(level && { level }) };
+    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(style.direction !== 'stone' && { art: style.direction }), ...(lavaLight && { lavaLight }), ...(level && { level }) };
   });
   // The glow comes from the whole of the lava, under its bridges and what stands in it too
   const lights: Record<string, LightSource> = {};
