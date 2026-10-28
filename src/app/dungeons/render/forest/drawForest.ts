@@ -8,7 +8,7 @@ import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolShores 
 import { grownRings, intersectRings, subtractRings, unionRings } from '../clipShapes';
 import { floorWater, riverBars, riverIslands, waterField } from '../../forest/riverShape';
 import { drawRiverBridges } from './riverBridges';
-import { roadBand, roadSurfaces } from './roads';
+import { ROAD_WEAR, RUT_WEAR, roadBand, rutRings } from './roads';
 import { roadField } from '../../forest/forestRoads';
 import { pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
 import { wayCentre, wayFrameOf, wayHalf, type WayOut } from '../cave/mouth/wayOut';
@@ -81,8 +81,17 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   art.woods();
   art.ground.lawn(ground, cellsOf(view));
   // Each trail worn into the ground, fading where it leaves into the woods.
-  for (const [k, way] of dungeon.ways.entries()) art.trail(polysPath([trails[k]!]), (p) => trailFade(way, wayFrameOf(way, p).u));
-  for (const { path, wear } of roadSurfaces(roads)) art.trail(path, () => wear);
+  // Trails and roads are one worn ground, painted once: two bands laid over each other show where each lies.
+  const worn = unionRings([...trails, ...roads.map((r) => roadBand(r, r.width / 2))]);
+  if (worn.length) {
+    art.trail(polysPath(worn), (p) => {
+      let wear = road.distance(p.x, p.y) < 0 ? ROAD_WEAR : 0;
+      for (const way of dungeon.ways) if (trailDistance(way, p) < 0) wear = Math.max(wear, trailFade(way, wayFrameOf(way, p).u));
+      return wear;
+    });
+  }
+  const ruts = rutRings(roads);
+  if (ruts.length) art.trail(polysPath(ruts), () => RUT_WEAR);
   const drawn = scene.env.view.water ? drawWater(scene, art, riverWater, field) : riverWater;
   // The bars on the insides of the bends, where no other water (a pool, another river) lies over them, and the islands.
   const bars = riverWater.length ? [...subtractRings(rivers.flatMap(riverBars), drawn), ...riverIslands(rivers)] : [];

@@ -1,6 +1,6 @@
 import type { DungeonRoad } from '../../model';
 import { normalAt } from '../../forest/riverShape';
-import { polysPath, type PathFn } from '../art/paths';
+import { unionRings } from '../clipShapes';
 import type { Vec } from '../geometry';
 
 /**
@@ -25,10 +25,11 @@ export function roadBand(road: DungeonRoad, half: number, offset = 0): Vec[] {
 const RUT_SPREAD = 0.27;
 const RUT_HALF = 0.06;
 
-/** The worn ground of every road, and the ruts of the cart roads, each a path with how strongly it is worn. */
-export function roadSurfaces(roads: readonly DungeonRoad[]): { path: PathFn; wear: number }[] {
-  return roads.flatMap((road) => [
-    { path: polysPath([roadBand(road, road.width / 2)]), wear: road.ruts ? 0.85 : 0.7 },
-    ...(road.ruts ? [-1, 1].map((side) => ({ path: polysPath([roadBand(road, RUT_HALF, side * RUT_SPREAD * road.width)]), wear: 0.9 })) : []),
-  ]);
+/** How worn a road's ground is (0..1), and its ruts. */
+export const ROAD_WEAR = 0.8;
+export const RUT_WEAR = 0.9;
+
+/** The ruts of every cart road as one outline: where two roads meet their ruts run on into each other, never one band laid over another. */
+export function rutRings(roads: readonly DungeonRoad[]): Vec[][] {
+  return unionRings(roads.filter((road) => road.ruts).flatMap((road) => [-1, 1].map((side) => roadBand(road, RUT_HALF, side * RUT_SPREAD * road.width))));
 }

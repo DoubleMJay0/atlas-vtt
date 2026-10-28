@@ -15,7 +15,8 @@ const SEEDS = Array.from({ length: 40 }, (_, k) => k + 1);
 const forest = (seed: number, tags: string[] = []): DungeonModel => generateDungeon({ seed, theme: 'forest', tags, floors: 1 });
 const area = (rings: readonly (readonly { x: number; y: number }[])[]): number => rings.reduce((sum, ring) => sum + signedArea2(ring) / 2, 0);
 
-describe('a Forest’s rivers', () => {
+// Each test lays the water and roads of dozens of forests: more than the default allows beside a full suite.
+describe('a Forest’s rivers', { timeout: 30000 }, () => {
   it('run through most woods, every wet one, never a dry one, and come out the same for the same request', () => {
     expect(SEEDS.filter((seed) => forest(seed, ['dry']).floors[0]!.rivers).length).toBe(0);
     expect(SEEDS.filter((seed) => forest(seed, ['wet']).floors[0]!.rivers).length).toBeGreaterThanOrEqual(36);
@@ -134,7 +135,12 @@ describe('a Forest’s rivers', () => {
         // A road leads somewhere: off the map at both ends; a branch leaves the map at its one end and meets the road at its other.
         expect(beyond(main.points[0]!)).toBe(true);
         expect(beyond(main.points[main.points.length - 1]!)).toBe(true);
-        for (const branch of branches) expect(beyond(branch.points[0]!) || beyond(branch.points[branch.points.length - 1]!)).toBe(true);
+        // A path off it leaves the map at one end or joins the road there: every way leads somewhere.
+        const joins = (p: { x: number; y: number }): boolean => main.points.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < 1.5);
+        for (const branch of branches) {
+          const ends = [branch.points[0]!, branch.points[branch.points.length - 1]!];
+          expect(ends.some(beyond) || ends.some(joins)).toBe(true);
+        }
       }
       const water = waterField(floor.rivers, floor.lakes);
       for (const road of floor.roads ?? []) {

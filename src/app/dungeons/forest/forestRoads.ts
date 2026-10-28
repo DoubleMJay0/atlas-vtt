@@ -36,6 +36,11 @@ const SHORTEST_BRANCH = 8;
 const MOST_BRIDGES = 2;
 /** How many edge-to-edge ways are tried after the ways through the entrances. */
 const EDGE_PLANS = 6;
+/** A road that leaves the map this near an entrance's edge serves that entrance's way out too, in cells. */
+const SHARED_EDGE = 5;
+/** What a cell within `BESIDE` cells of a laid road costs a path more, as a factor. */
+const BESIDE = 2.5;
+const BESIDE_COST = 6;
 /** Two bridges stand at least this far apart, in cells. */
 const BRIDGES_APART = 8;
 /** How many ways are tried for each road. */
@@ -75,18 +80,23 @@ export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: numbe
   }
   if (main) {
     roads.push({ points: main, width, ruts: kinds.cart });
+    // Paths laid after the road meet it, never run beside it.
+    const beside = besideRoad(ground, main);
     // An entrance the road does not pass gets a footpath of its own, from the map's edge along its trail on to the road.
     const missed = ways.filter((way) => !main.some((p) => Math.hypot(p.x - way.mouth.at.x, p.y - way.mouth.at.y) < 2.5));
     // Where it cannot join the road without doubling back, it ends at the entrance: the clearings beyond lead on.
     for (const way of missed) {
-      const legs = [[edgeBeyond(ground, way).edge], [mouthCell(way)]];
-      const path = layRoad(ground, water, legs, 0.7, bridges, rng, main) ?? layRoad(ground, water, legs, 0.7, bridges, rng);
+      // Where the road already leaves the map by this trail's edge, the path only runs from the entrance to the road.
+      const { edge } = edgeBeyond(ground, way);
+      const sharesEdge = main.some((p) => Math.hypot(p.x - edge.x - 0.5, p.y - edge.y - 0.5) < SHARED_EDGE);
+      const legs = sharesEdge ? [[mouthCell(way)]] : [[edge], [mouthCell(way)]];
+      const path = layRoad(beside, water, legs, 0.7, bridges, rng, main) ?? layRoad(beside, water, legs, 0.7, bridges, rng);
       if (path) roads.push({ points: path, width: 0.7, ruts: false });
     }
     // A footpath off the road to an edge the road does not reach, now and then.
     if (!missed.length && rng() < 0.35) {
       const free = [0, 1, 2, 3].filter((side) => !sides.includes(side));
-      const branch = layRoad(ground, water, [[edgeCell(ground, free[Math.floor(rng() * free.length)]!, rng)]], 0.7, bridges, rng, main);
+      const branch = layRoad(beside, water, [[edgeCell(ground, free[Math.floor(rng() * free.length)]!, rng)]], 0.7, bridges, rng, main);
       if (branch) roads.push({ points: branch, width: 0.7, ruts: false });
     }
   }
@@ -287,6 +297,26 @@ function hairpin(line: readonly Vec[]): boolean {
     if (a.x * b.x + a.y * b.y < HAIRPIN_TURN) return true;
   }
   return false;
+}
+
+/** The ground with the cells beside a laid road dearer, so a path laid after it meets it rather than running along it. */
+function besideRoad(ground: Ground, road: readonly Vec[]): Ground {
+  const { x0, y0, w, h } = ground.grid;
+  const cost = Float32Array.from(ground.grid.cost);
+  const reach = Math.ceil(BESIDE);
+  const marked = new Uint8Array(w * h);
+  for (const p of road) {
+    for (let y = Math.floor(p.y) - reach; y <= Math.floor(p.y) + reach; y++) {
+      for (let x = Math.floor(p.x) - reach; x <= Math.floor(p.x) + reach; x++) {
+        if (x < x0 || y < y0 || x >= x0 + w || y >= y0 + h) continue;
+        const k = (y - y0) * w + (x - x0);
+        if (marked[k] || Math.hypot(x + 0.5 - p.x, y + 0.5 - p.y) > BESIDE) continue;
+        marked[k] = 1;
+        cost[k] = cost[k]! * BESIDE_COST;
+      }
+    }
+  }
+  return { ...ground, grid: { ...ground.grid, cost } };
 }
 
 function nearestOn(line: readonly Vec[], p: Vec): Vec {
