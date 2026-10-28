@@ -136,6 +136,9 @@ export class PixiAppManager {
       useBackBuffer: true,
       autoDensity: true,
       resolution: window.devicePixelRatio || 1,
+      // Asks for the faster of two graphics chips, as Foundry and Owlbear Rodeo do; Chromium on
+      // Windows keeps the chip its GPU process started on whatever this says.
+      powerPreference: 'high-performance',
       // The map has no accessible display objects; since PIXI 8.22 Tab would otherwise
       // switch on its accessibility layer, which walks the whole stage after every render.
       accessibilityOptions: { activateOnTab: false },
