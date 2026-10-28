@@ -6,6 +6,7 @@
 - Atlas asks the computer for its faster graphics chip where there are two, as Foundry and Owlbear Rodeo do
 
 ## Fixed
+- Online play: players see the resource wheels beside a token that are shown to them, as Atlas's player window shows them; before, the browser drew only the bars
 - Several lights together no longer wash the map out to white: the brightest light at a spot shows as it always did, and every further torch adds less and less
 - Moving a token that carries a light no longer stutters as badly on large maps with many walls
 - Dragging a token that sees no longer builds new graphics objects for its sight every frame, so each step of a drag costs less on large generated dungeons
