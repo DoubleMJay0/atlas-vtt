@@ -78,7 +78,7 @@ describe('the lighting quality setting', () => {
   it('is offered on the Graphics page as three presets, each telling what it draws', async () => {
     const choices = lightingQualityChoices();
     expect(choices.map(({ label }) => label)).toEqual(['High', 'Balanced', 'Saver']);
-    expect(choices[0]!.hint).toContain('Ray-traced');
-    expect(choices[2]!.hint).toContain('Polygon light');
+    expect(choices[0]!.hint).toContain('ray-traced');
+    expect(choices[2]!.hint).toContain('Classic lighting');
   });
 });

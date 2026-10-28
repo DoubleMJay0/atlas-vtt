@@ -4,7 +4,7 @@ import { SegmentedControl, type SegmentedOption } from '../../../packages/compon
 import { t } from '../../../i18n';
 import { useAtlasSettings } from '../../../keyboard/useMapHotkeys';
 import { lightingQualityChoices, presetLabel } from '../../../lighting/lightingQualityChoices';
-import { choicesOf, knobsOf, presetOf, TRACED_KNOBS, withKnob, type GraphicsKnob, type GraphicsKnobs } from '../../../lighting/graphicsSettings';
+import { choicesOf, knobsOf, presetOf, TRACED_KNOBS, withKnob, type DetailChoice, type GraphicsKnob, type GraphicsKnobs, type LiquidsChoice, type ShadowsChoice } from '../../../lighting/graphicsSettings';
 import { isLightingQualityLevel, type LightingQualityLevel } from '../../../lighting/lightingQuality';
 import type { SettingsService } from '../../../services/SettingsService';
 import { SettingChoiceRow } from './SettingRows';
@@ -18,14 +18,17 @@ interface KnobRow<K extends GraphicsKnob> {
   readonly name: (value: GraphicsKnobs[K]) => string;
 }
 
+const LEVEL_NAMES: Record<'coarse' | 'medium' | 'fine', () => string> = { coarse: () => t('graphics.low'), medium: () => t('graphics.medium'), fine: () => t('graphics.highChoice') };
+const LIQUID_NAMES: Record<LiquidsChoice, () => string> = { 10: () => t('graphics.low'), 15: () => t('graphics.medium'), 30: () => t('graphics.highChoice') };
+
 const KNOB_ROWS: readonly KnobRow<GraphicsKnob>[] = [
   { knob: 'picture', group: 'lighting', label: () => t('graphics.picture'), hint: () => t('graphics.pictureHint'), name: (value) => (value === 'traced' ? t('graphics.traced') : t('graphics.polygons')) },
-  { knob: 'detail', group: 'lighting', label: () => t('graphics.detail'), hint: () => t('graphics.detailHint'), name: (value) => t(`graphics.${String(value)}` as 'graphics.fine') },
+  { knob: 'detail', group: 'lighting', label: () => t('graphics.detail'), hint: () => t('graphics.detailHint'), name: (value) => LEVEL_NAMES[value as DetailChoice]() },
   { knob: 'bounce', group: 'lighting', label: () => t('graphics.bounce'), hint: () => t('graphics.bounceHint'), name: (value) => (value === 'all' ? t('graphics.bounceAll') : value === 'smaller' ? t('graphics.bounceSmaller') : t('graphics.bounceOff')) },
-  { knob: 'flames', group: 'lighting', label: () => t('graphics.flames'), hint: () => t('graphics.flamesHint'), name: (value) => (value === 'lively' ? t('graphics.lively') : t('graphics.calm')) },
-  { knob: 'shadows', group: 'lighting', label: () => t('graphics.shadows'), hint: () => t('graphics.shadowsHint'), name: (value) => t(`graphics.${String(value)}` as 'graphics.fine') },
-  { knob: 'liquids', group: 'animated', label: () => t('graphics.liquids'), hint: () => t('graphics.liquidsHint'), name: (value) => t('graphics.perSecond', { count: Number(value) }) },
-  { knob: 'litMap', group: 'screen', label: () => t('graphics.litMap'), hint: () => t('graphics.litMapHint'), name: (value) => (value === 'sharp' ? t('graphics.sharp') : t('graphics.standard')) },
+  { knob: 'flames', group: 'lighting', label: () => t('graphics.flames'), hint: () => t('graphics.flamesHint'), name: (value) => (value === 'lively' ? t('graphics.highChoice') : t('graphics.low')) },
+  { knob: 'shadows', group: 'lighting', label: () => t('graphics.shadows'), hint: () => t('graphics.shadowsHint'), name: (value) => LEVEL_NAMES[value as ShadowsChoice]() },
+  { knob: 'liquids', group: 'animated', label: () => t('graphics.liquids'), hint: () => t('graphics.liquidsHint'), name: (value) => LIQUID_NAMES[value as LiquidsChoice]() },
+  { knob: 'litMap', group: 'screen', label: () => t('graphics.litMap'), hint: () => t('graphics.litMapHint'), name: (value) => (value === 'sharp' ? t('graphics.full') : t('graphics.reduced')) },
 ] as readonly KnobRow<GraphicsKnob>[];
 
 type PresetTab = LightingQualityLevel | 'custom';

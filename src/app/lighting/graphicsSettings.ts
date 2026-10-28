@@ -37,19 +37,20 @@ export const GRAPHICS_PRESETS: Record<LightingQualityLevel, GraphicsKnobs> = {
   saver: { picture: 'polygons', detail: 'coarse', bounce: 'off', flames: 'calm', shadows: 'coarse', liquids: 10, litMap: 'standard' },
 };
 
+/** The values a knob may take, from the cheapest to the finest, as a game's options list them. */
 const CHOICES: { readonly [K in GraphicsKnob]: readonly GraphicsKnobs[K][] } = {
-  picture: ['traced', 'polygons'],
-  detail: ['fine', 'medium', 'coarse'],
-  bounce: ['all', 'smaller', 'off'],
-  flames: ['lively', 'calm'],
-  shadows: ['fine', 'medium', 'coarse'],
-  liquids: [30, 15, 10],
-  litMap: ['sharp', 'standard'],
+  picture: ['polygons', 'traced'],
+  detail: ['coarse', 'medium', 'fine'],
+  bounce: ['off', 'smaller', 'all'],
+  flames: ['calm', 'lively'],
+  shadows: ['coarse', 'medium', 'fine'],
+  liquids: [10, 15, 30],
+  litMap: ['standard', 'sharp'],
 };
 
 export const GRAPHICS_KNOBS = Object.keys(CHOICES) as readonly GraphicsKnob[];
 
-/** The values a knob may take, in the order the page offers them. */
+/** The values a knob may take, from the cheapest to the finest. */
 export function choicesOf<K extends GraphicsKnob>(knob: K): readonly GraphicsKnobs[K][] {
   return CHOICES[knob];
 }
