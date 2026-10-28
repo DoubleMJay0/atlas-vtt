@@ -8,6 +8,7 @@
 - On Balanced and Saver lighting quality, a high-resolution screen draws the lit map at standard resolution, which takes the graphics less work; the edges of what players see never reach further
 
 ## Fixed
+- Online play: players see the resource wheels beside a token that are shown to them, as Atlas's player window shows them; before, the browser drew only the bars
 - Several lights together no longer wash the map out to white: the brightest light at a spot shows as it always did, and every further torch adds less and less
 - Moving a token that carries a light no longer stutters as badly on large maps with many walls
 - Dragging a token that sees no longer builds new graphics objects for its sight every frame, so each step of a drag costs less on large generated dungeons

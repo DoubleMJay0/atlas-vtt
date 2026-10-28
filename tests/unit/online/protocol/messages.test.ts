@@ -189,7 +189,7 @@ describe('token lists', () => {
     const condition = ui.conditions[0];
     const bad = [
       { badge: 0 }, { badge: 1.5 }, { badge: '2' }, { ui: { ...ui, nameplate: 'yes' } }, { ui: { ...ui, downed: undefined } },
-      { ui: { ...ui, bars: [bar, bar, bar] } }, { ui: { ...ui, bars: [{ ...bar, colour: 'red' }] } }, { ui: { ...ui, bars: [{ ...bar, max: 0 }] } },
+      { ui: { ...ui, bars: [bar, bar, bar, bar, bar, bar, bar] } }, { ui: { ...ui, bars: [{ ...bar, slot: 6 }] } }, { ui: { ...ui, bars: [{ ...bar, slot: 1.5 }] } }, { ui: { ...ui, bars: [{ ...bar, colour: 'red' }] } }, { ui: { ...ui, bars: [{ ...bar, max: 0 }] } },
       { ui: { ...ui, bars: [{ ...bar, current: Number.NaN }] } }, { ui: { ...ui, bars: [{ ...bar, direction: 'up' }] } }, { ui: { ...ui, bars: [{ ...bar, defeats: 1 }] } },
       { ui: { ...ui, conditions: [{ ...condition, glyph: { kind: 'icon', icon: '<svg>' } }] } }, { ui: { ...ui, conditions: [{ ...condition, glyph: { kind: 'text', text: '' } }] } },
       { ui: { ...ui, conditions: [{ ...condition, value: Number.POSITIVE_INFINITY }] } }, { ui: { ...ui, conditions: Array.from({ length: MAX_TOKEN_CONDITIONS + 1 }, () => condition) } },
