@@ -51,6 +51,7 @@ export const dungeonScene = {
   'dungeonScene.feature.brokenColumn': 'Broken column',
   'dungeonScene.feature.tree': 'Tree',
   'dungeonScene.feature.river': 'River',
+  'dungeonScene.feature.lake': 'Lake',
   'dungeonScene.feature.footbridge': 'Footbridge',
 
   'dungeonScene.terrain': 'Terrain: {list}.',

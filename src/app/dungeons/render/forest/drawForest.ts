@@ -5,9 +5,8 @@ import { drawProps } from '../art/drawProps';
 import { castShadow, type Hand } from '../art/hand';
 import { polysPath, rectPoly, type Field, type PathFn } from '../art/paths';
 import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolShores } from '../art/pools';
-import { grownRings, intersectRings, unionRings } from '../clipShapes';
-import type { DungeonRiver } from '../../model';
-import { riverField, riverRings } from '../../forest/riverShape';
+import { grownRings, intersectRings, subtractRings, unionRings } from '../clipShapes';
+import { floorWater, riverBars, waterField } from '../../forest/riverShape';
 import { drawRiverBridges } from './riverBridges';
 import { pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
 import { wayCentre, wayFrameOf, wayHalf, type WayOut } from '../cave/mouth/wayOut';
@@ -49,9 +48,9 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const view = viewBounds(scene.frame, 1);
   const { dungeon } = scene.env;
   const trails = dungeon.ways.map(trailRing);
-  const rivers = dungeon.floor.rivers ?? [];
-  const riverWater = rivers.flatMap((river) => riverRings(river));
-  // The ground runs on under the mass along a river as along a clearing.
+  const { rivers = [], lakes } = dungeon.floor;
+  const riverWater = floorWater(rivers, lakes);
+  // The ground runs on under the mass along a river and round a lake as along a clearing.
   const banks = riverWater.length ? grownRings(riverWater, MASS_DEPTH) : [];
   const ground = (path: CanvasPath): void => {
     traceShapes(path, scene.floors, MASS_DEPTH, MASS_DEPTH);
@@ -61,7 +60,7 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   // The trails and rivers run through the woods: the mass keeps off them as off a clearing.
   // The mass overhangs a trail's sides a little, so the woods' colour never shows between them.
   // Asked a few million times: no allocation in it.
-  const field = riverField(rivers);
+  const field = waterField(rivers, lakes);
   const outsideAt = (x: number, y: number): number => {
     let best = Math.min(scene.sdfAt(x, y), field.distance(x, y) - RIVER_BANK);
     for (const way of dungeon.ways) best = Math.min(best, trailDistance(way, { x, y }) + TRAIL_OVERHANG);
@@ -72,7 +71,10 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   art.ground.lawn(ground, cellsOf(view));
   // Each trail worn into the ground, fading where it leaves into the woods.
   for (const [k, way] of dungeon.ways.entries()) art.trail(polysPath([trails[k]!]), (p) => trailFade(way, wayFrameOf(way, p).u));
-  if (scene.env.view.water) drawWater(scene, art, rivers, riverWater);
+  if (scene.env.view.water) drawWater(scene, art, riverWater, field);
+  // The bars on the insides of the bends, where no other water lies over them.
+  const bars = riverWater.length ? subtractRings(rivers.flatMap(riverBars), riverWater) : [];
+  if (bars.length) art.ground.gravel(polysPath(bars), cellsOf(pointsBounds(bars.flat())));
   drawTerrainGround(hand, art.colours);
   const mass = woodsMass(view, (p) => outsideAt(p.x, p.y), dungeon.model.seed);
   const rings = [...mass.map((entry) => entry.clump.ring), ...loneTrees(scene.env.dungeon).map((tree) => discRing(tree.x, tree.y, tree.radius))];
@@ -96,23 +98,23 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
 const WATER_MARGIN = 3;
 
 /**
- * The floor's pools and rivers as one water, painted together as the direction paints a pool, so
- * no shore crosses another's water: off the floor's built water, as far as the picture reaches.
- * A river is deep where it lies far from both banks; a pool where the cave's deep water lies.
+ * The floor's pools, rivers and lakes as one water, painted together as the direction paints a
+ * pool, so no shore crosses another's water: off the floor's built water, as far as the picture
+ * reaches. A river or lake is deep where it lies far from its shores; a pool where the cave's deep
+ * water lies.
  */
-function drawWater(scene: ArtScene, art: ForestArt, rivers: readonly DungeonRiver[], riverWater: readonly Vec[][]): void {
+function drawWater(scene: ArtScene, art: ForestArt, riverWater: readonly Vec[][], field: { distance(x: number, y: number): number }): void {
   const pools = poolShores(poolOutlines(scene));
   if (!pools.length && !riverWater.length) return;
   const b = viewBounds(scene.frame, WATER_MARGIN);
   const water = intersectRings(unionRings([...riverWater, ...pools]), [rectPoly({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY })]);
   if (!water.length) return;
   const trace = polysPath(water);
-  // The painters clip to the floor, which a river leaves for the woods.
-  const waterScene: ArtScene = rivers.length ? { ...scene, floorRings: unionRings([...scene.floorRings, ...water]) } : scene;
+  // The painters clip to the floor, which a river or a lake leaves for the woods.
+  const waterScene: ArtScene = riverWater.length ? { ...scene, floorRings: unionRings([...scene.floorRings, ...water]) } : scene;
   const depth = depthField(waterScene, trace, water.flat());
   const caveDeep = deepnessField(scene);
-  const river = riverField(rivers);
-  const deepness: Field = (x, y) => Math.max(caveDeep?.(x, y) ?? 0, river.distance(x, y) < 0 ? Math.max(0, Math.min(1, (depth(x, y) - 0.8) / 0.9)) : 0);
+  const deepness: Field = (x, y) => Math.max(caveDeep?.(x, y) ?? 0, field.distance(x, y) < 0 ? Math.max(0, Math.min(1, (depth(x, y) - 0.8) / 0.9)) : 0);
   const { ctx } = scene.env;
   ctx.save();
   clipOutBuiltWater(scene, ctx);

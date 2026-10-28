@@ -1,5 +1,5 @@
 import { hash2 } from '../art/noise';
-import { riverField } from '../../forest/riverShape';
+import { waterField } from '../../forest/riverShape';
 import type { VisibleDungeon } from '../visibleDungeon';
 
 /** A tree standing on its own in a clearing, near its edge: its crown and how thick its trunk is. */
@@ -29,7 +29,7 @@ export function loneTrees(dungeon: VisibleDungeon): LoneTree[] {
   if (!dungeon.floor.forest) return [];
   const { bounds, field, model } = dungeon;
   const seed = model.seed + dungeon.index * 7919;
-  const river = riverField(dungeon.floor.rivers);
+  const river = waterField(dungeon.floor.rivers, dungeon.floor.lakes);
   const trees: LoneTree[] = [];
   for (let j = Math.floor(bounds.minY); j < bounds.maxY; j++) {
     for (let i = Math.floor(bounds.minX); i < bounds.maxX; i++) {

@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../../src/app/dungeons/generate';
 import { floorCellsOf } from '../../../../src/app/dungeons/geometry';
 import type { DungeonModel } from '../../../../src/app/dungeons/model';
-import { riverField, riverRings, riverStretches } from '../../../../src/app/dungeons/forest/riverShape';
-import { unionRings } from '../../../../src/app/dungeons/render/clipShapes';
+import { bends, floorWater, waterField, waterStretches } from '../../../../src/app/dungeons/forest/riverShape';
 import { signedArea2 } from '../../../../src/app/dungeons/render/geometry';
 import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
 import { loneTrees } from '../../../../src/app/dungeons/render/forest/loneTrees';
@@ -24,6 +23,25 @@ describe('a Forest’s rivers', () => {
     expect(forest(7, ['wet'])).toEqual(forest(7, ['wet']));
   });
 
+  it('meander as rivers do, no bend tighter than the banks allow, and sometimes flow into a lake', () => {
+    let lakes = 0;
+    let sinuous = 0;
+    for (const seed of SEEDS) {
+      const floor = forest(seed, ['wet']).floors[0]!;
+      lakes += floor.lakes?.length ?? 0;
+      for (const river of floor.rivers ?? []) {
+        // Banks half a width out fold where a bend's radius is under half the width: hold it well clear.
+        bends(river.points).forEach((bend, i) => expect(Math.abs(bend) * river.widths[i]!).toBeLessThan(1.25));
+        const along = river.points.reduce((sum, p, i) => sum + (i ? Math.hypot(p.x - river.points[i - 1]!.x, p.y - river.points[i - 1]!.y) : 0), 0);
+        const first = river.points[0]!;
+        const last = river.points[river.points.length - 1]!;
+        if (along / Math.hypot(last.x - first.x, last.y - first.y) > 1.15) sinuous += 1;
+      }
+    }
+    expect(lakes).toBeGreaterThan(8);
+    expect(sinuous).toBeGreaterThan(20);
+  });
+
   it('vary in width, fork now and then, and a tributary ends in the river it joins', () => {
     let forks = 0;
     for (const seed of SEEDS) {
@@ -36,7 +54,7 @@ describe('a Forest’s rivers', () => {
       for (const tributary of tributaries) {
         forks += 1;
         const end = tributary.points[tributary.points.length - 1]!;
-        expect(riverField([main!]).distance(end.x, end.y)).toBeLessThan(0);
+        expect(waterField([main!]).distance(end.x, end.y)).toBeLessThan(0);
       }
     }
     expect(forks).toBeGreaterThan(10);
@@ -45,7 +63,7 @@ describe('a Forest’s rivers', () => {
   it('keep off stairs and the ways down, and nothing stands in them', () => {
     for (const seed of SEEDS) {
       const floor = forest(seed, ['wet']).floors[0]!;
-      const field = riverField(floor.rivers);
+      const field = waterField(floor.rivers, floor.lakes);
       for (const s of floor.stairs) expect(field.distance(s.x + s.w / 2, s.y + s.h / 2)).toBeGreaterThan(1);
       for (const piece of floor.terrain.filter((p) => p.opening)) for (const c of piece.cells) expect(field.distance(c.x + 0.5, c.y + 0.5)).toBeGreaterThan(1);
       for (const prop of floor.props) expect(field.distance(prop.x, prop.y)).toBeGreaterThan(0.8);
@@ -58,7 +76,7 @@ describe('a Forest’s rivers', () => {
     for (const seed of SEEDS) {
       const floor = forest(seed, ['wet']).floors[0]!;
       const ground = new Set(floor.rooms.flatMap((room) => floorCellsOf(room)).map((c) => `${c.x},${c.y}`));
-      const field = riverField(floor.rivers);
+      const field = waterField(floor.rivers, floor.lakes);
       const all = (floor.rivers ?? []).flatMap((river) => river.bridges);
       bridges += all.length;
       for (const { at, along, length } of all) {
@@ -78,10 +96,11 @@ describe('a Forest’s rivers', () => {
     for (const seed of SEEDS.slice(0, 10)) {
       const rivers = forest(seed, ['wet']).floors[0]!.rivers ?? [];
       if (!rivers.length) continue;
-      const stretches = riverStretches(rivers);
-      const whole = area(unionRings(rivers.flatMap((river) => riverRings(river))));
+      const floor = forest(seed, ['wet']).floors[0]!;
+      const stretches = waterStretches(rivers, floor.lakes);
+      const whole = area(floorWater(rivers, floor.lakes));
       expect(Math.abs(area(stretches.flatMap((s) => s.rings)) - whole) / whole).toBeLessThan(0.01);
-      for (const { flow } of stretches) expect(Math.hypot(flow.x, flow.y)).toBeCloseTo(1);
+      for (const { flow } of stretches) if (flow) expect(Math.hypot(flow.x, flow.y)).toBeCloseTo(1);
     }
   });
 
@@ -102,7 +121,7 @@ describe('a Forest’s rivers', () => {
         expect(p.y).toBeLessThanOrEqual(layout.heightPx + 0.01);
       }
       const features = Object.values(parts.scene.mapFeatures ?? {});
-      for (const river of features.filter((f) => f.name === 'River')) expect(river.terrain?.difficult).toBe(true);
+      for (const water of features.filter((f) => f.name === 'River' || f.name === 'Lake')) expect(water.terrain?.difficult).toBe(true);
       const decks = model.floors[0]!.rivers!.flatMap((river) => river.bridges).length;
       expect(features.filter((f) => f.name === 'Footbridge')).toHaveLength(decks);
     }

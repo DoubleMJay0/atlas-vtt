@@ -11,7 +11,7 @@ import { cellsToUnits, type SceneUnit } from './gameUnits';
 import { liquidColours } from './liquidColours';
 import { isBuiltWater, isNaturalDeepWater, isSubmergedRimstone, naturalDeepRings } from '../render/art/pools';
 import { rimstoneShelves } from '../render/terrain/caveStones';
-import { deckOf, riverRings, riverStretches } from '../forest/riverShape';
+import { deckOf, floorWater, waterStretches } from '../forest/riverShape';
 import { rectPoly } from '../render/art/paths';
 import { mapLayout } from '../render/layoutSize';
 import { fitCorners, floorRingsOf } from './sceneRings';
@@ -83,8 +83,8 @@ const STREAM_SHARE = 0.25;
 function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
   const floorRings = floorRingsOf(dungeon);
   const { floor } = dungeon;
-  // A Forest's rivers flow through its pools: what a river covers is the river's (`riverLiquids`).
-  const rivers = (floor.rivers ?? []).flatMap(river => riverRings(river));
+  // A Forest's rivers and lakes take in its pools: what they cover is theirs (`riverLiquids`).
+  const rivers = floorWater(floor.rivers, floor.lakes);
   const notPool = [...cellRings(floor.terrain.filter(piece => isBuiltWater(floor, piece)).flatMap(piece => piece.cells)), ...rivers];
   const streams = floor.terrain.filter(piece => isNaturalDeepWater(floor, piece) && piece.kind === 'channel' && piece.facing);
   // All shores at once, as the map fills them: an island's shore is a hole in its lake, never water of its own.
@@ -96,16 +96,16 @@ function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
 }
 
 /**
- * A Forest's rivers in stretches, each flowing the way the river runs there, on what of them lies
- * on the map's image (they rise and end beyond it).
+ * A Forest's lakes, still, and its rivers in stretches, each flowing the way the river runs there,
+ * on what of them lies on the map's image (they rise and end beyond it).
  */
 function riverLiquids(dungeon: VisibleDungeon, view: DungeonView): Liquid[] {
-  const { rivers } = dungeon.floor;
+  const { rivers, lakes } = dungeon.floor;
   if (!rivers?.length) return [];
   const { originCell: o, cellsWide, cellsHigh } = mapLayout(dungeon.model, 1, view);
   const frame = rectPoly({ x: o.x, y: o.y, w: cellsWide, h: cellsHigh });
-  return riverStretches(rivers).flatMap(({ rings, flow }) =>
-    withHoles(intersectRings(rings, [frame])).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }), flow })));
+  return waterStretches(rivers, lakes).flatMap(({ rings, flow }) =>
+    withHoles(intersectRings(rings, [frame])).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }), ...(flow && { flow }) })));
 }
 
 /** The way the stream that fills most of a pool runs, where it fills at least `STREAM_SHARE` of it. */

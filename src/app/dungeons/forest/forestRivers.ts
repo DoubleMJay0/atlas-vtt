@@ -1,68 +1,80 @@
 import { cellKey, holdsStairs } from '../geometry';
-import type { CellPoint, DungeonFloor, DungeonRiver, DungeonRiverBridge, DungeonRoom } from '../model';
+import type { CellPoint, DungeonFloor, DungeonLake, DungeonRiver, DungeonRiverBridge, DungeonRoom } from '../model';
 import { floorStream, type Rng } from '../rng';
 import { fractalNoise } from '../water/noise';
 import { floorCells } from '../water/wetGrid';
-import { normalAt, riverField } from './riverShape';
+import { lakeOutline } from './lakeShape';
+import { COURSE_STEP, riverCourse } from './riverCourse';
+import { bends, normalAt, waterField } from './riverShape';
 
 /**
- * A Forest's rivers. The main river enters beyond one edge of the map and leaves beyond the
- * opposite one, passing through one or two of the largest clearings on the way, so it shapes the
- * fight; between them it meanders through the woods, where the trees part for it. It widens and
- * narrows as it goes; sometimes a narrower tributary comes in from a side and joins it. Where a
- * river crosses a clearing deep enough to stop a walk, a bridge carries the way over it; where it
- * runs shallow, it is a ford. Pure, deterministic in the seed.
+ * A Forest's water, laid as rivers lie. The main river comes in beyond one edge of the map and
+ * leaves beyond the other, meandering (`riverCourse`) through one or two of the largest clearings,
+ * so it shapes the fight. Its width holds steady along a reach, a little wider in its bends and
+ * wider again below a confluence. Now and then it flows into a lake, which the river drains again
+ * on the far side or does not; now and then a narrower tributary joins it from a side, meeting it
+ * at an acute angle that points downstream, as rivers join. Where a river too deep to wade crosses
+ * a clearing, a footbridge spans its straightest reach there, where rivers are bridged; shallower
+ * water is forded. Pure, deterministic in the seed.
  */
 
 type Vec = CellPoint;
 
 /** How far beyond the rooms a river begins and ends, so it runs off the map's edge. */
 const BEYOND = 10;
-/** The spacing of a river's points, in cells. */
-const STEP = 0.4;
-/** A stretch this wide or wider cannot be waded: a clearing it crosses gets a bridge. */
+/** A river this wide or wider cannot be waded: a clearing it crosses gets a bridge. */
 const DEEP = 1.3;
 /** A bridge reaches this far onto the banks on either side. */
 const BRIDGE_REACH = 0.6;
 /** Two bridges stand at least this far apart, in cells. */
 const BRIDGES_APART = 10;
+/** How many courses are tried before a floor goes without water: one that floods stairs or a way down is refused. */
+const TRIES = 6;
+/** Water keeps this far from stairs and the ways down, in cells. */
+const CLEAR = 1;
+/** How much wider a river runs below where a tributary joins it. */
+const BELOW_CONFLUENCE = 1.15;
 
-/** What the tags ask of the water: no river, the usual chance of one, or always one, and how wide. */
-interface RiverPlan {
-  width: number;
-  /** The chance of a tributary. */
-  tributary: number;
+/** A Forest floor's rivers (the main river first) and the lakes they flow into. */
+export interface ForestWater {
+  rivers: DungeonRiver[];
+  lakes: DungeonLake[];
 }
 
-function riverPlan(tags: ReadonlySet<string>, rng: Rng): RiverPlan | null {
+interface WaterPlan {
+  width: number;
+  /** The swing of the main river's heading at a bend's crossing, in radians. */
+  swing: number;
+  /** The chances of a tributary and of a lake. */
+  tributary: number;
+  lake: number;
+}
+
+/** What the tags ask of the water: no river, the usual chance of one, or always one, and how wide. */
+function waterPlan(tags: ReadonlySet<string>, rng: Rng): WaterPlan | null {
   if (tags.has('dry')) return null;
   const flooded = tags.has('flooded');
   const wet = flooded || tags.has('wet');
   if (!wet && rng() > 0.75) return null;
-  const width = flooded ? 2.4 + rng() * 1.2 : wet ? 1.5 + rng() * 1.3 : 0.9 + rng() * 1.6;
-  return { width, tributary: wet ? 0.6 : 0.4 };
+  const width = flooded ? 2.2 + rng() * 1.2 : wet ? 1.4 + rng() * 1.2 : 0.9 + rng() * 1.3;
+  return { width, swing: 0.9 + rng() * 0.7, tributary: wet ? 0.6 : 0.4, lake: flooded ? 0.6 : wet ? 0.45 : 0.3 };
 }
-
-/** How many courses are tried before a floor goes without a river: one that floods stairs or a way down is refused. */
-const TRIES = 6;
-/** A river keeps this far from stairs and the ways down, in cells. */
-const CLEAR = 1;
 
 type RiverFloor = Pick<DungeonFloor, 'rooms' | 'stairs' | 'terrain' | 'waterCells'>;
 
-export function forestRivers(floor: RiverFloor, seed: number, tags: ReadonlySet<string>): DungeonRiver[] {
-  const plan = riverPlan(tags, floorStream(seed, 'water', 0, 'river'));
-  if (!plan || floor.rooms.length === 0) return [];
+export function forestWater(floor: RiverFloor, seed: number, tags: ReadonlySet<string>): ForestWater {
+  const plan = waterPlan(tags, floorStream(seed, 'water', 0, 'river'));
+  if (!plan || floor.rooms.length === 0) return { rivers: [], lakes: [] };
   const kept = keptCells(floor);
   for (let k = 0; k < TRIES; k++) {
-    const rivers = course(floor, plan, floorStream(seed, 'water', 0, `river-${k}`));
-    const field = riverField(rivers);
-    if (kept.every((c) => field.distance(c.x, c.y) > CLEAR)) return withBridges(rivers, floor);
+    const water = course(floor, plan, floorStream(seed, 'water', 0, `river-${k}`));
+    const field = waterField(water.rivers, water.lakes);
+    if (kept.every((c) => field.distance(c.x, c.y) > CLEAR)) return { ...water, rivers: withBridges(water, floor) };
   }
-  return [];
+  return { rivers: [], lakes: [] };
 }
 
-/** The middles of the cells no river may cover: stairs and the ways down to the caves. */
+/** The middles of the cells no water may cover: stairs and the ways down to the caves. */
 function keptCells(floor: RiverFloor): Vec[] {
   const cells: Vec[] = [];
   for (const s of floor.stairs) for (let y = s.y; y < s.y + s.h; y++) for (let x = s.x; x < s.x + s.w; x++) cells.push({ x: x + 0.5, y: y + 0.5 });
@@ -70,7 +82,7 @@ function keptCells(floor: RiverFloor): Vec[] {
   return cells;
 }
 
-function course(floor: RiverFloor, plan: RiverPlan, rng: Rng): DungeonRiver[] {
+function course(floor: RiverFloor, plan: WaterPlan, rng: Rng): ForestWater {
   const bounds = boundsOf(floor.rooms);
   const across = bounds.maxX - bounds.minX >= bounds.maxY - bounds.minY;
   const clearings = largest(floor.rooms, floor.stairs).slice(0, 4);
@@ -84,17 +96,77 @@ function course(floor: RiverFloor, plan: RiverPlan, rng: Rng): DungeonRiver[] {
   const last = ways[ways.length - 1]!;
   const start = across ? { x: bounds.minX - BEYOND, y: first.y + (rng() - 0.5) * 10 } : { x: first.x + (rng() - 0.5) * 10, y: bounds.minY - BEYOND };
   const end = across ? { x: bounds.maxX + BEYOND, y: last.y + (rng() - 0.5) * 10 } : { x: last.x + (rng() - 0.5) * 10, y: bounds.maxY + BEYOND };
-  const main = shaped([start, ...ways, end], plan.width, rng);
-  const rivers: DungeonRiver[] = [main];
-  if (rng() < plan.tributary) {
-    const join = main.points[Math.floor(main.points.length * (0.3 + rng() * 0.4))]!;
-    const side = rng() < 0.5 ? -1 : 1;
-    const from = across
-      ? { x: join.x + (rng() - 0.5) * 16, y: side < 0 ? bounds.minY - BEYOND : bounds.maxY + BEYOND }
-      : { x: side < 0 ? bounds.minX - BEYOND : bounds.maxX + BEYOND, y: join.y + (rng() - 0.5) * 16 };
-    rivers.push(shaped([from, join], Math.max(0.6, plan.width * 0.5), rng));
+  let line = riverCourse([start, ...ways, end], plan, rng);
+  const lakes: DungeonLake[] = [];
+  if (rng() < plan.lake) {
+    const lake = lakeOn(line, plan.width, rng);
+    lakes.push({ outline: lake.outline });
+    // A lake no river drains: the river ends a little way into it.
+    if (!lake.drained) line = line.slice(0, lake.mouth);
   }
-  return rivers;
+  const widths = widthsAlong(line, plan.width, rng);
+  const rivers: DungeonRiver[] = [{ points: line, widths, bridges: [] }];
+  if (rng() < plan.tributary) {
+    const joining = tributary(line, widths, plan, bounds, rng);
+    if (joining) {
+      rivers.push(joining.river);
+      // Below the confluence the river carries both: wider, over a few cells.
+      for (let i = joining.at; i < widths.length; i++) widths[i] = widths[i]! * (1 + (BELOW_CONFLUENCE - 1) * Math.min(1, (i - joining.at) / 16));
+    }
+  }
+  return { rivers, lakes };
+}
+
+/** The way a line runs at its point `i`, in radians. */
+function headingAt(line: readonly Vec[], i: number): number {
+  const n = normalAt(line, i);
+  return Math.atan2(-n.x, n.y);
+}
+
+/** A lake on the river's lower course, longest the way the river runs; where the river ends in it (`mouth`, a point a little inside) and whether the river flows on out of it. */
+function lakeOn(line: readonly Vec[], width: number, rng: Rng): { outline: Vec[]; mouth: number; drained: boolean } {
+  const at = Math.floor(line.length * (0.55 + rng() * 0.25));
+  const length = (5 + rng() * 5) * (0.75 + width * 0.2);
+  const breadth = length * (0.55 + rng() * 0.25);
+  // The river reaches the lake's near end at `at`: its middle lies on downstream.
+  const centre = line[Math.min(line.length - 1, at + Math.round((length * 0.45) / COURSE_STEP))]!;
+  const outline = lakeOutline(centre, headingAt(line, at), length, breadth, rng);
+  return { outline, mouth: Math.min(line.length, at + Math.round((width + 1) / COURSE_STEP)), drained: rng() < 0.5 };
+}
+
+/** A river's widths: steady along a reach with a slow drift, a little wider where it bends. */
+function widthsAlong(line: readonly Vec[], width: number, rng: Rng): number[] {
+  const drift = fractalNoise(rng, 2, 0.5, 30);
+  const bent = bends(line);
+  return line.map((_, i) => width * (1 + 0.18 * drift(i * COURSE_STEP, 3.1)) * (1 + 0.2 * Math.min(1, Math.abs(bent[i]!) * width * 2)));
+}
+
+/**
+ * A tributary joining the river on its upper half: it leaves the confluence upstream at 35° to 60°
+ * off the river's own way, towards a side of the map, and is laid from there to beyond the map's
+ * edge, then turned round to flow down into the river. None where it would cross the river first.
+ */
+function tributary(line: readonly Vec[], widths: readonly number[], plan: WaterPlan, bounds: Bounds, rng: Rng): { river: DungeonRiver; at: number } | null {
+  const at = Math.floor(line.length * (0.25 + rng() * 0.3));
+  const join = line[at]!;
+  const side = rng() < 0.5 ? -1 : 1;
+  const upstream = headingAt(line, at) + Math.PI + side * ((35 + rng() * 25) * Math.PI) / 180;
+  const reach = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) + BEYOND;
+  const source = { x: join.x + Math.cos(upstream) * reach, y: join.y + Math.sin(upstream) * reach };
+  const width = Math.max(0.6, plan.width * (0.45 + rng() * 0.2));
+  const points = riverCourse([join, source], { width, swing: plan.swing * 0.9 }, rng, upstream).reverse();
+  // It meets the river once, where it joins it.
+  const main = waterField([{ points: [...line], widths: [...widths], bridges: [] }]);
+  const clear = points.length - Math.ceil((widths[at]! + width) / COURSE_STEP);
+  if (points.slice(0, clear).some((p) => main.distance(p.x, p.y) < 0.4)) return null;
+  return { river: { points, widths: widthsAlong(points, width, rng), bridges: [] }, at };
+}
+
+interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
 }
 
 /** The rooms that hold no stairs, largest first: a river's clearings. */
@@ -102,7 +174,7 @@ function largest(rooms: readonly DungeonRoom[], stairs: DungeonFloor['stairs']):
   return rooms.filter((room) => room.w >= 5 && room.h >= 5 && !holdsStairs(room, stairs)).sort((a, b) => b.w * b.h - a.w * a.h);
 }
 
-function boundsOf(rooms: readonly DungeonRoom[]): { minX: number; minY: number; maxX: number; maxY: number } {
+function boundsOf(rooms: readonly DungeonRoom[]): Bounds {
   return {
     minX: Math.min(...rooms.map((r) => r.x)),
     minY: Math.min(...rooms.map((r) => r.y)),
@@ -111,79 +183,24 @@ function boundsOf(rooms: readonly DungeonRoom[]): { minX: number; minY: number; 
   };
 }
 
-/** A river through `ways`: walked in small steps, swung from side to side by slow noise, smoothed, and of a width that wanders round `width`. */
-function shaped(ways: readonly Vec[], width: number, rng: Rng): DungeonRiver {
-  const line: Vec[] = [];
-  for (let k = 0; k + 1 < ways.length; k++) {
-    const a = ways[k]!;
-    const b = ways[k + 1]!;
-    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.5));
-    for (let i = 0; i < n; i++) line.push({ x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n });
-  }
-  line.push(ways[ways.length - 1]!);
-  const swing = fractalNoise(rng, 3, 0.45, 12);
-  const amount = 2.2 + width * 0.8;
-  let s = 0;
-  const meandering = line.map((p, i) => {
-    if (i > 0) s += Math.hypot(p.x - line[i - 1]!.x, p.y - line[i - 1]!.y);
-    const n = normalAt(line, i);
-    // Held at its ends, so a tributary still meets the river where it joins it.
-    const hold = Math.min(1, i / 6, (line.length - 1 - i) / 6);
-    const off = swing(s, 0) * amount * hold;
-    return { x: p.x + n.x * off, y: p.y + n.y * off };
-  });
-  const points = resampled(chaikin(chaikin(chaikin(meandering))), STEP);
-  const breadth = fractalNoise(rng, 2, 0.5, 14);
-  const widths = points.map((_, i) => Math.max(0.55, width * Math.max(0.6, Math.min(1.45, 1 + 1.1 * breadth(i * STEP, 7.3)))));
-  return { points, widths, bridges: [] };
-}
-
-/** Chaikin's corner cutting, ends kept. */
-function chaikin(points: readonly Vec[]): Vec[] {
-  const out: Vec[] = [points[0]!];
-  for (let i = 0; i + 1 < points.length; i++) {
-    const a = points[i]!;
-    const b = points[i + 1]!;
-    out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
-  }
-  out.push(points[points.length - 1]!);
-  return out;
-}
-
-/** Points every `step` cells along the line. */
-function resampled(points: readonly Vec[], step: number): Vec[] {
-  const out: Vec[] = [points[0]!];
-  let carry = 0;
-  for (let i = 0; i + 1 < points.length; i++) {
-    const a = points[i]!;
-    const b = points[i + 1]!;
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    let d = step - carry;
-    while (d <= len) {
-      out.push({ x: a.x + ((b.x - a.x) * d) / len, y: a.y + ((b.y - a.y) * d) / len });
-      d += step;
-    }
-    carry = len - (d - step);
-  }
-  return out;
-}
-
 /**
  * The rivers with their bridges: where a river too deep to wade runs through a clearing, a bridge
- * in the middle of that stretch, both its ends on the clearing's dry ground (never in a pool or
- * another river's water), and bridges well apart. Shallower stretches are fords.
+ * on the straightest reach of that stretch, both its ends on the clearing's dry ground (never in a
+ * pool, a lake or another river's water), and bridges well apart. Shallower stretches are fords.
  */
-function withBridges(rivers: readonly DungeonRiver[], floor: RiverFloor): DungeonRiver[] {
+function withBridges({ rivers, lakes }: ForestWater, floor: RiverFloor): DungeonRiver[] {
   const ground = new Set(floorCells(floor.rooms).map((c) => cellKey(c.x, c.y)));
   for (const c of floor.waterCells) ground.delete(cellKey(c.x, c.y));
   const dry = (p: Vec): boolean => ground.has(cellKey(Math.floor(p.x), Math.floor(p.y)));
-  const field = riverField(rivers);
+  const field = waterField(rivers, lakes);
   const placed: Vec[] = [];
   return rivers.map((river) => {
+    const bent = bends(river.points);
     const bridges: DungeonRiverBridge[] = [];
     for (const run of dryRuns(river.points, dry)) {
-      const usable = run.map((i) => bridgeAt(river, i, dry, field)).filter((bridge): bridge is DungeonRiverBridge => bridge !== null);
-      const bridge = usable[Math.floor(usable.length / 2)];
+      // Away from the run's ends, on its straightest point that takes a bridge.
+      const middle = run.slice(Math.floor(run.length * 0.2), Math.ceil(run.length * 0.8)).sort((a, b) => Math.abs(bent[a]!) - Math.abs(bent[b]!));
+      const bridge = middle.map((i) => bridgeAt(river, i, dry, field)).find((found): found is DungeonRiverBridge => found !== null);
       if (!bridge || placed.some((p) => Math.hypot(p.x - bridge.at.x, p.y - bridge.at.y) < BRIDGES_APART)) continue;
       bridges.push(bridge);
       placed.push(bridge.at);
@@ -192,14 +209,14 @@ function withBridges(rivers: readonly DungeonRiver[], floor: RiverFloor): Dungeo
   });
 }
 
-/** The runs of a line's points that lie on dry ground, as lists of their indices. */
+/** The runs of a line's points that lie on dry ground, as lists of their indices: two cells and longer. */
 function dryRuns(points: readonly Vec[], dry: (p: Vec) => boolean): number[][] {
   const runs: number[][] = [[]];
   points.forEach((p, i) => {
     if (dry(p)) runs[runs.length - 1]!.push(i);
     else if (runs[runs.length - 1]!.length) runs.push([]);
   });
-  return runs.filter((run) => run.length > 0);
+  return runs.filter((run) => run.length * COURSE_STEP >= 2);
 }
 
 /** A bridge across the river at its point `i`, where the river is too deep to wade there and both ends of the bridge stand on dry ground. */

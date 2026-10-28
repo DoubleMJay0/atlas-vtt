@@ -9,7 +9,7 @@ import { propsAsDrawn } from '../render/propsAsDrawn';
 import { loneTrees, type LoneTree } from '../render/forest/loneTrees';
 import type { VisibleDungeon } from '../render/visibleDungeon';
 import type { DungeonView } from '../style';
-import { deckOf, riverRings, riverStretches } from '../forest/riverShape';
+import { deckOf, floorWater, waterStretches } from '../forest/riverShape';
 import { intersectRings, subtractRings } from '../render/clipShapes';
 import { pointsBounds, signedArea2 } from '../render/geometry';
 import { cellOutlines } from './cellOutline';
@@ -146,7 +146,7 @@ function treeDrafts(trees: readonly LoneTree[]): Draft[] {
 }
 
 /**
- * A Forest's rivers where they run through the clearings: the water difficult ground stretch by
+ * A Forest's rivers and lakes where they reach into the clearings: the water difficult ground stretch by
  * stretch (a river is waded; a feature holds `MAX_FEATURE_CORNERS`, which a river's whole course
  * would not keep to its banks), and each footbridge a feature of its own, taken out of the water,
  * so whoever crosses on it crosses dry. Islands stay in the water: a feature has no holes.
@@ -156,15 +156,15 @@ function riverDrafts(dungeon: VisibleDungeon): Draft[] {
   if (!rivers.length) return [];
   const decks = rivers.flatMap(river => river.bridges.map(deckOf));
   // The rivers within the clearings, clipped once; each stretch then only meets that.
-  const played = subtractRings(intersectRings(rivers.flatMap(river => riverRings(river)), floorRingsOf(dungeon)), decks);
+  const played = subtractRings(intersectRings(floorWater(rivers, dungeon.floor.lakes), floorRingsOf(dungeon)), decks);
   const bridges = decks.map((polygon): Draft => ({ polygon, name: t('dungeonScene.feature.footbridge') }));
   if (!played.length) return bridges;
   const reach = pointsBounds(played.flat());
-  const water = riverStretches(rivers)
+  const water = waterStretches(rivers, dungeon.floor.lakes)
     .filter(({ rings }) => { const b = pointsBounds(rings.flat()); return b.minX <= reach.maxX && reach.minX <= b.maxX && b.minY <= reach.maxY && reach.minY <= b.maxY; })
-    .flatMap(({ rings }) => intersectRings(rings, played))
-    .filter(ring => signedArea2(ring) > 0.1)
-    .map((ring): Draft => ({ polygon: fitCorners([ring], MAX_FEATURE_CORNERS)[0]!, name: t('dungeonScene.feature.river'), terrain: { difficult: true } }));
+    .flatMap(({ rings, flow }) => intersectRings(rings, played)
+      .filter(ring => signedArea2(ring) > 0.1)
+      .map((ring): Draft => ({ polygon: fitCorners([ring], MAX_FEATURE_CORNERS)[0]!, name: t(flow ? 'dungeonScene.feature.river' : 'dungeonScene.feature.lake'), terrain: { difficult: true } })));
   return [...water, ...bridges];
 }
 
