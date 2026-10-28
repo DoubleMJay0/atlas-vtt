@@ -20,7 +20,7 @@ export const settings: Translation = {
   'settings.lighting.highHint': '完整细节，光照会在墙和地面反射，火焰会闪烁。',
   'settings.lighting.quality': '光照质量',
   'settings.lighting.saver': '省电',
-  'settings.lighting.saverHint': '火焰稳定，没有反射光，柔和阴影的边缘粗糙，大地图上的光照更粗。地图静止时不再重绘，以节省电量。',
+  'settings.lighting.saverHint': '对显卡要求最低：火焰稳定，没有反射光，光不会绕过拐角，墙的边缘保持暗色。地图静止时不再重绘，以节省电量。',
   'settings.navigation.heading': '导航',
   'settings.navigation.inputDevice': '输入设备',
   'settings.navigation.mouse': '鼠标',
