@@ -150,7 +150,7 @@ export function LightingToolGroup({ activeTool, selectTool, menuOpen, toggleMenu
           icon={Gauge}
           label={t('graphics.open')}
           onClick={() => {
-            setCommandPaletteOpen(true, 'graphics')
+            setCommandPaletteOpen(true, 'graphics-settings')
             closeMenu()
           }}
         />

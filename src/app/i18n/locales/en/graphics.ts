@@ -2,10 +2,10 @@ import type { Message } from '../../types';
 
 /** The Graphics page, worded as a game's video options: one plain sentence per setting, who it is for or what it costs, choices from Low to High. */
 export const graphics = {
-  'graphics.title': 'Graphics',
-  'graphics.command': 'Graphics',
+  'graphics.title': 'Graphics Settings',
+  'graphics.command': 'Graphics settings',
   'graphics.commandHint': 'Quality presets and settings',
-  'graphics.open': 'Graphics…',
+  'graphics.open': 'Graphics settings…',
   'graphics.preset': 'Quality',
   'graphics.presetLabel': 'Preset',
   'graphics.presetHint': 'A preset sets everything below.',
