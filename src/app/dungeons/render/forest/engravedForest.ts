@@ -3,7 +3,6 @@ import { viewBounds } from '../art/artScene';
 import { engravedHand } from '../engraved/hand';
 import { pensOf } from '../engraved/pens';
 import { paintWater } from '../engraved/water';
-import { pathBounds } from '../art/paths';
 import { traceShape } from '../grounds/crowns';
 import { engravedGroundsPaint } from '../grounds/engravedPaint';
 import { mapLayout } from '../layoutSize';
@@ -13,12 +12,12 @@ import { forestLookOf } from '../../forestLooks';
 import { colourIn, strokeLimbs } from './forestPaint';
 import { drawForest, massShare } from './drawForest';
 
-/** How much of the woods' colour the paper takes, and how strongly its grain shows. */
-const WOODS_TINT = 0.35;
+/** How much of the woods' colour the paper takes, and how strongly its grain shows: the woods a flat tone beyond the trees, as stone's are, never one hatch over the whole frame. */
+const WOODS_TINT = 0.7;
 const WOODS_GRAIN = 1.5;
 
 /**
- * Engraved's forest: the woods cut in the hatch the shade is cut in, as dark as it goes; each clump of
+ * Engraved's forest: the woods a tone of the paper beyond the trees; each clump of
  * the mass paper with an ink outline that lightens into the mass, the lit part's edge cut at the
  * clearing; then the whole mass hatched the deeper it stands, so it sinks into the woods.
  */
@@ -42,13 +41,11 @@ export function paintEngravedForest(scene: ArtScene): void {
       ctx.scale(1 / env.pxPerCell, 1 / env.pxPerCell);
       drawVellum(ctx, mixColours(pens.floor, look.woods, WOODS_TINT), layout, dungeon.model.seed, !scene.raster, 1, true, WOODS_GRAIN);
       ctx.restore();
-      hand.tone(() => 0.85, b, null, 'shade');
     },
-    // Worn ground in the path's tone, cut in the hatch the shade is: a road reads in ink alone.
-    trail: (path, fade) => {
-      colourIn(scene, path, look.path, (x, y) => 0.8 * fade({ x, y }));
-      const box = pathBounds(path);
-      if (box) hand.tone((x, y) => 0.4 * fade({ x, y }), box, path, 'shade');
+    // Worn ground in a light tone of the path's, its edges inked: a road an engraver draws as its outline.
+    trail: (path, fade, edges) => {
+      colourIn(scene, path, look.path, (x, y) => 0.5 * fade({ x, y }));
+      hand.line(edges, 'fine', true);
     },
     bare: (entry) => strokeLimbs(ctx, entry, pens.ink, hand.weight('fine') * 2),
     clump: ({ clump, depth }) => {

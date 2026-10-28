@@ -27,8 +27,8 @@ export interface ForestArt {
   ground: GroundsPaint;
   colours: { water: string; cloth: string };
   woods(): void;
-  /** A trail's worn ground over `path`, as strong as `fade` says where it lies (0..1). */
-  trail(path: PathFn, fade: (p: Vec) => number): void;
+  /** Worn ground (a trail's, a road's, a road's ruts) over `path`, its outline `edges`, as strong as `fade` says where it lies (0..1). */
+  trail(path: PathFn, fade: (p: Vec) => number, edges: readonly Vec[][]): void;
   clump(entry: WoodsClump): void;
   /** A bare tree's limbs (`bareLimbs`), standing over the mass. */
   bare(entry: WoodsClump): void;
@@ -54,10 +54,12 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const { hand } = art;
   const view = viewBounds(scene.frame, 1);
   const { dungeon } = scene.env;
-  const trails = dungeon.ways.map(trailRing);
   const { rivers = [], lakes } = dungeon.floor;
   const riverWater = floorWater(rivers, lakes);
   const roads = dungeon.floor.roads ?? [];
+  // A trail a road runs in by is that road: drawn twice, half a cell apart, the two never met.
+  const ways = dungeon.ways.filter((way) => !roads.some((road) => road.points.some((p) => Math.hypot(p.x - way.mouth.at.x, p.y - way.mouth.at.y) < ROAD_TAKES_TRAIL)));
+  const trails = ways.map(trailRing);
   // The ground runs on under the mass along a river, round a lake and either side of a road as along a clearing; one union, so no band's winding cancels another's.
   const verges = roads.map((r) => roadBand(r, r.width / 2 + MASS_DEPTH));
   const banks = riverWater.length || verges.length ? unionRings([...(riverWater.length ? grownRings(riverWater, MASS_DEPTH) : []), ...verges]) : [];
@@ -76,7 +78,7 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const road = roadField(roads);
   const outsideAt = (x: number, y: number): number => {
     let best = Math.min(scene.sdfAt(x, y), field.distance(x, y) - RIVER_BANK);
-    for (const way of dungeon.ways) best = Math.min(best, trailDistance(way, { x, y }) + TRAIL_OVERHANG);
+    for (const way of ways) best = Math.min(best, trailDistance(way, { x, y }) + TRAIL_OVERHANG);
     best = Math.min(best, road.distance(x, y) - ROAD_VERGE);
     return best;
   };
@@ -89,12 +91,12 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   if (worn.length) {
     art.trail(polysPath(worn), (p) => {
       let wear = road.distance(p.x, p.y) < 0 ? ROAD_WEAR : 0;
-      for (const way of dungeon.ways) if (trailDistance(way, p) < 0) wear = Math.max(wear, trailFade(way, wayFrameOf(way, p).u));
+      for (const way of ways) if (trailDistance(way, p) < 0) wear = Math.max(wear, trailFade(way, wayFrameOf(way, p).u));
       return wear;
-    });
+    }, worn);
   }
   const ruts = rutRings(roads);
-  if (ruts.length) art.trail(polysPath(ruts), () => RUT_WEAR);
+  if (ruts.length) art.trail(polysPath(ruts), () => RUT_WEAR, ruts);
   const drawn = scene.env.view.water ? drawWater(scene, art, riverWater, field) : riverWater;
   // The bars on the insides of the bends, where no other water (a pool, another river) lies over them, and the islands.
   const bars = riverWater.length ? [...subtractRings(rivers.flatMap(riverBars), drawn), ...riverIslands(rivers)] : [];
@@ -161,6 +163,9 @@ function drawWater(scene: ArtScene, art: ForestArt, riverWater: readonly Vec[][]
   ctx.restore();
   return water;
 }
+
+/** A road that passes this near an entrance takes over its trail, in cells. */
+const ROAD_TAKES_TRAIL = 2.5;
 
 /** How far the mass reaches over a trail's sides, in cells. */
 const TRAIL_OVERHANG = 0.1;
