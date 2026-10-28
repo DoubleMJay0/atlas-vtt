@@ -1,3 +1,4 @@
+import { glyphPainterOf } from '../../style';
 import type { GlyphPen } from '../glyphPen';
 import type { GlyphFit, PropGlyph } from '../propShapes';
 import { glyphSolid } from './glyphLight';
@@ -40,7 +41,7 @@ export function drawGlyph(hand: Hand, place: GlyphPlace, glyph: PropGlyph, water
     scale: place.scale,
     paint: material => hand.paint(material),
   };
-  glyph[style.direction](pen, fit);
+  glyph[glyphPainterOf(style.direction)](pen, fit);
   const { silhouette } = glyph;
   if (silhouette) hand.grain(path => silhouette(path, fit), glyph.material);
   if (silhouette && glyph.dome) glyphSolid(pen, path => silhouette(path, fit), { x: 0, y: 0 }, glyph.radius, 0.9);

@@ -60,6 +60,7 @@ export const dungeon = {
   'dungeon.room.showHidden': 'Show hidden secret rooms',
 
   'dungeon.style': 'Style',
+  'dungeon.style.crayon': 'Crayon',
   'dungeon.style.parchment': 'Scriptorium',
   'dungeon.style.masonry': 'Keep',
   'dungeon.style.print': 'Ink',

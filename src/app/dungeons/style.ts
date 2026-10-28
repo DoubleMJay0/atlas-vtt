@@ -6,12 +6,21 @@
  */
 
 /**
- * The two ways a look draws its floors, walls, props and terrain. Stone & shadow paints the plan as
+ * The three ways a look draws its floors, walls, props and terrain. Stone & shadow paints the plan as
  * built: a course of dressed wall blocks, flagstones and one light casting every shadow. Engraved
- * cuts it as a copperplate: burin lines whose width carries the tone, in two colours. The rock round
- * the walls is the look's own (`DungeonSurround`) in either.
+ * cuts it as a copperplate: burin lines whose width carries the tone, in two colours. Crayon draws
+ * Engraved's lines in graphite on vellum and colours them in with wax crayon, as the Reprieve map of
+ * the Lockwood Manor collection is drawn. The rock round the walls is the look's own
+ * (`DungeonSurround`) in each.
  */
-export type ArtDirection = 'stone' | 'engraved';
+export type ArtDirection = 'stone' | 'engraved' | 'crayon';
+
+/** The two drawings a piece has (`PropGlyph`): Crayon draws Engraved's, in its own hand. */
+export type GlyphPainter = 'stone' | 'engraved';
+
+export function glyphPainterOf(direction: ArtDirection): GlyphPainter {
+  return direction === 'stone' ? 'stone' : 'engraved';
+}
 
 /**
  * How the floor is laid: irregular flagstones on the cell lines, long ashlar courses, rounded

@@ -23,6 +23,8 @@ import { createInMemoryApp } from '../mocks/inMemoryVault';
 vi.mock('../../src/app/pixi/mapImage/prebuildMapImage', () => ({ prebuildMapImageAt: vi.fn() }));
 
 const run = import.meta.env.VITE_PERF_GEN === '1';
+/** Draws every case in one look instead of its own, to compare looks: `VITE_PERF_STYLE=crayon`. */
+const lookOverride = import.meta.env.VITE_PERF_STYLE as DungeonStyleId | undefined;
 const req = (seed: number, tags: string[], floors = 1): DungeonRequest => ({ seed, tags: tags as DungeonTag[], floors });
 /** The most a cave's or a house's scene may take, from the click to the files written, in ms. */
 const LIMITS: Readonly<Record<string, number>> = { 'medium mansion': 3000, 'large 3 floors mansion with cellar overgrown': 7000, 'cavern medium': 3000, 'cavern large 3 floors lava overgrown': 7000, 'cavern underdark 3 floors flooded': 7000 };
@@ -81,7 +83,7 @@ describe.skipIf(!run)('what creating a dungeon scene costs', () => {
         thumbnails: new AssetThumbnailService(vault.app, assetService),
       };
       const model = generateDungeon(request);
-      const result = await createDungeonSceneWith(deps, { name: `Perf Gen ${name}`, request, model, style: dungeonStyle(styleId), view: DEFAULT_VIEW, collectionId: 'Perf' });
+      const result = await createDungeonSceneWith(deps, { name: `Perf Gen ${name}`, request, model, style: dungeonStyle(lookOverride ?? styleId), view: DEFAULT_VIEW, collectionId: 'Perf' });
       const total = at();
       observer.disconnect();
       if (!result.ok) throw new Error(result.problem);

@@ -8,6 +8,7 @@ import type { DungeonStyle } from './style';
  */
 
 export type DungeonStyleId =
+  | 'crayon'
   | 'parchment'
   | 'masonry'
   | 'print'
@@ -32,6 +33,19 @@ export interface DungeonStyleEntry {
 
 /** In the order the gallery shows them. */
 export const DUNGEON_STYLES: readonly DungeonStyleEntry[] = [
+  {
+    // Graphite on vellum, coloured in with wax crayon, as the Reprieve map of the Lockwood Manor collection.
+    id: 'crayon',
+    style: {
+      direction: 'crayon',
+      colors: { ink: '#2c1d12', rock: '#efe5cd', water: '#5d94b8', floor: '#f4ecda', paper: '#efe5cd' },
+      strokes: { thin: 0.5, normal: 1.2, thick: 1.9 },
+      shadow: { color: '#2c1d12', strength: 0.6 },
+      surround: { mode: 'hatching', strokes: 3, size: 0.3, reach: 0.5, stroke: 0.8 },
+      floor: 'flagstone',
+      grid: { weight: 0.8, strength: 0.35 },
+    },
+  },
   {
     id: 'parchment',
     style: {
@@ -230,7 +244,7 @@ export const DUNGEON_STYLES: readonly DungeonStyleEntry[] = [
   },
 ];
 
-export const DEFAULT_STYLE_ID: DungeonStyleId = 'parchment';
+export const DEFAULT_STYLE_ID: DungeonStyleId = 'crayon';
 
 const BY_ID = new Map(DUNGEON_STYLES.map(entry => [entry.id, entry.style] as const));
 

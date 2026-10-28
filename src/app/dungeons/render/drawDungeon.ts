@@ -1,12 +1,13 @@
 import { buildArtScene, type ArtFrame, type ArtScene } from './art/artScene';
 import { standsOf } from './art/stands';
+import { paintCrayon } from './crayon/painter';
 import { paintEngraved } from './engraved/painter';
 import type { RenderEnv } from './renderEnv';
 import { isDarkColour } from './stone/colours';
 import { paintStone } from './stone/painter';
 import type { ArtDirection } from '../style';
 
-const PAINTERS: Record<ArtDirection, (scene: ArtScene) => void> = { stone: paintStone, engraved: paintEngraved };
+const PAINTERS: Record<ArtDirection, (scene: ArtScene) => void> = { stone: paintStone, engraved: paintEngraved, crayon: paintCrayon };
 
 /**
  * The floor plan of one floor in the look's direction (`DungeonStyle.direction`): the scene's

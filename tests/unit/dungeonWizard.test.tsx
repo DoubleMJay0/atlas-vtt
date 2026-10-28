@@ -499,7 +499,7 @@ describe('the style gallery', () => {
     const radios = within(group).getAllByRole('radio');
     expect(radios).toHaveLength(DUNGEON_STYLES.length);
     const chosen = within(group).getByRole('radio', { checked: true });
-    expect(chosen.textContent).toBe('Scriptorium');
+    expect(chosen.textContent).toBe('Crayon');
     // Tab reaches only the chosen card
     expect(radios.filter((radio) => radio.tabIndex === 0)).toEqual([chosen]);
   });
@@ -514,7 +514,7 @@ describe('the style gallery', () => {
 
   it('moves the choice with the arrow keys, Home and End', () => {
     renderPanel(vi.fn(), 'Sunken Vault', 'Style');
-    const first = screen.getByRole('radio', { name: 'Scriptorium' });
+    const first = screen.getByRole('radio', { name: 'Crayon' });
     fireEvent.keyDown(first, { key: 'ArrowRight' });
     const second = DUNGEON_STYLES[1]!.id;
     expect(settings.getDungeonGenerator().style).toBe(second);

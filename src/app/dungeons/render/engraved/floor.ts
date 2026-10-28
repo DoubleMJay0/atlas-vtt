@@ -9,13 +9,21 @@ import type { Pens } from './pens';
 
 /** The floor, and the joints of its stones as faint engraved lines, broken where worn, kept light so tokens stand out. */
 export function drawFloor(scene: ArtScene, pens: Pens): void {
-  const { ctx, dungeon, style } = scene.env;
-  const seed = dungeon.model.seed;
+  const { ctx } = scene.env;
   ctx.save();
   ctx.beginPath();
   traceShapes(ctx, scene.floors);
   ctx.fillStyle = pens.floor;
   ctx.fill();
+  ctx.restore();
+  drawFloorJoints(scene, pens);
+}
+
+/** The joints of the floor's stones alone, over whatever the floor is. */
+export function drawFloorJoints(scene: ArtScene, pens: Pens): void {
+  const { ctx, dungeon, style } = scene.env;
+  const seed = dungeon.model.seed;
+  ctx.save();
   clipFloors(scene);
   ctx.beginPath();
   const stones = floorStones(style.floor, viewBounds(scene.frame, 1), seed, (x, y) => dungeon.field.distance(x, y) < 0.9);

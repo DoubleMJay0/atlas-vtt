@@ -2,6 +2,11 @@
   "version": "0.10.3-beta.0",
   "releases": [
     {
+      "version": "0.10.3-beta.0",
+      "title": "Coming in 0.10.3",
+      "markdown": "## New\n- Generated dungeons, caves and manors have a new default style, Crayon: pencil lines and hatching on vellum, coloured in with wax crayon like the village map of the Lockwood Manor collection"
+    },
+    {
       "version": "0.10.2",
       "date": "2026-10-28",
       "title": "Token numbers, dark maps and the main window",
