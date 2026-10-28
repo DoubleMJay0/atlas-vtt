@@ -42,13 +42,55 @@ describe('a Forest’s rivers', () => {
     expect(sinuous).toBeGreaterThan(20);
   });
 
+  it('come in every size, widen below the streams that join them, and part round islands now and then', () => {
+    const ends: number[] = [];
+    let islands = 0;
+    for (const seed of SEEDS) {
+      const rivers = forest(seed, seed % 2 ? ['wet'] : []).floors[0]!.rivers ?? [];
+      const [main, ...streams] = rivers;
+      if (!main) continue;
+      ends.push(main.widths[main.widths.length - 1]!);
+      islands += main.islands?.length ?? 0;
+      for (const stream of streams) {
+        // A stream carries a share of the river below it: narrower than the river, which is narrower above the confluence.
+        const end = stream.points[stream.points.length - 1]!;
+        const at = main.points.findIndex((p) => Math.hypot(p.x - end.x, p.y - end.y) < 0.01);
+        expect(at).toBeGreaterThan(0);
+        expect(stream.widths[stream.widths.length - 1]!).toBeLessThan(main.widths[Math.min(main.widths.length - 1, at + 20)]!);
+        expect(main.widths[Math.max(0, at - 4)]!).toBeLessThan(main.widths[Math.min(main.widths.length - 1, at + 20)]! * 1.05);
+      }
+    }
+    expect(Math.min(...ends)).toBeLessThan(1);
+    expect(Math.max(...ends)).toBeGreaterThan(2.4);
+    expect(islands).toBeGreaterThan(1);
+  });
+
+  it('have meadows along their banks: open ground no room holds, beside the water, inside the rooms\' extent', () => {
+    let meadows = 0;
+    for (const seed of SEEDS.slice(0, 16)) {
+      const floor = forest(seed, ['wet']).floors[0]!;
+      if (!floor.rivers) continue;
+      const field = waterField(floor.rivers, floor.lakes);
+      const minX = Math.min(...floor.rooms.map((r) => r.x));
+      const maxX = Math.max(...floor.rooms.map((r) => r.x + r.w));
+      meadows += floor.meadow?.length ?? 0;
+      for (const c of floor.meadow ?? []) {
+        expect(field.distance(c.x + 0.5, c.y + 0.5)).toBeLessThanOrEqual(3.6);
+        expect(c.x).toBeGreaterThanOrEqual(minX);
+        expect(c.x).toBeLessThan(maxX);
+      }
+    }
+    expect(meadows).toBeGreaterThan(400);
+  });
+
   it('vary in width, fork now and then, and a tributary ends in the river it joins', () => {
     let forks = 0;
     for (const seed of SEEDS) {
       const rivers = forest(seed, ['wet']).floors[0]!.rivers ?? [];
       for (const river of rivers) {
         expect(river.widths).toHaveLength(river.points.length);
-        expect(Math.max(...river.widths) / Math.min(...river.widths)).toBeGreaterThan(1.2);
+        // Steady along a reach as rivers are, but never one width from end to end.
+        expect(Math.max(...river.widths) / Math.min(...river.widths)).toBeGreaterThan(1.08);
       }
       const [main, ...tributaries] = rivers;
       for (const tributary of tributaries) {

@@ -6,7 +6,7 @@ import { castShadow, type Hand } from '../art/hand';
 import { polysPath, rectPoly, type Field, type PathFn } from '../art/paths';
 import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolShores } from '../art/pools';
 import { grownRings, intersectRings, subtractRings, unionRings } from '../clipShapes';
-import { floorWater, riverBars, waterField } from '../../forest/riverShape';
+import { floorWater, riverBars, riverIslands, waterField } from '../../forest/riverShape';
 import { bridgeApproaches, bridgeSpan, drawRiverBridges } from './riverBridges';
 import { pointSegmentDistance, pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
 import { wayCentre, wayFrameOf, wayHalf, type WayOut } from '../cave/mouth/wayOut';
@@ -80,9 +80,9 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   // Each trail worn into the ground, fading where it leaves into the woods.
   for (const [k, way] of dungeon.ways.entries()) art.trail(polysPath([trails[k]!]), (p) => trailFade(way, wayFrameOf(way, p).u));
   for (const { ring, fade } of approaches) art.trail(polysPath([ring]), fade);
-  if (scene.env.view.water) drawWater(scene, art, riverWater, field);
-  // The bars on the insides of the bends, where no other water lies over them.
-  const bars = riverWater.length ? subtractRings(rivers.flatMap(riverBars), riverWater) : [];
+  const drawn = scene.env.view.water ? drawWater(scene, art, riverWater, field) : riverWater;
+  // The bars on the insides of the bends, where no other water (a pool, another river) lies over them, and the islands.
+  const bars = riverWater.length ? [...subtractRings(rivers.flatMap(riverBars), drawn), ...riverIslands(rivers)] : [];
   if (bars.length) art.ground.gravel(polysPath(bars), cellsOf(pointsBounds(bars.flat())));
   drawTerrainGround(hand, art.colours);
   const mass = woodsMass(view, (p) => outsideAt(p.x, p.y), dungeon.model.seed);
@@ -103,21 +103,27 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   drawTerrainOpenings(hand);
 }
 
+/** How far the notches where a pool meets a river are rounded, in cells. */
+const SHORE_WEAR = 0.35;
+
 /** How far past the frame the water is painted, in cells: its depth near the frame is its own, never that of a shore the cut makes. */
 const WATER_MARGIN = 3;
 
 /**
- * The floor's pools, rivers and lakes as one water, painted together as the direction paints a
+ * The floor's pools, rivers and lakes as one water (returned as drawn), painted together as the direction paints a
  * pool, so no shore crosses another's water: off the floor's built water, as far as the picture
  * reaches. A river or lake is deep where it lies far from its shores; a pool where the cave's deep
  * water lies.
  */
-function drawWater(scene: ArtScene, art: ForestArt, riverWater: readonly Vec[][], field: { distance(x: number, y: number): number }): void {
+function drawWater(scene: ArtScene, art: ForestArt, riverWater: readonly Vec[][], field: { distance(x: number, y: number): number }): Vec[][] {
   const pools = poolShores(poolOutlines(scene));
-  if (!pools.length && !riverWater.length) return;
+  if (!pools.length && !riverWater.length) return [];
   const b = viewBounds(scene.frame, WATER_MARGIN);
-  const water = intersectRings(unionRings([...riverWater, ...pools]), [rectPoly({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY })]);
-  if (!water.length) return;
+  const joined = unionRings([...riverWater, ...pools]);
+  // Where a pool meets a river or a lake their shores meet at a sharp notch: rounded as water would wear it.
+  const worn = riverWater.length && pools.length ? grownRings(grownRings(joined, SHORE_WEAR), -SHORE_WEAR) : joined;
+  const water = intersectRings(worn, [rectPoly({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY })]);
+  if (!water.length) return [];
   const trace = polysPath(water);
   // The painters clip to the floor, which a river or a lake leaves for the woods.
   const waterScene: ArtScene = riverWater.length ? { ...scene, floorRings: unionRings([...scene.floorRings, ...water]) } : scene;
@@ -129,6 +135,7 @@ function drawWater(scene: ArtScene, art: ForestArt, riverWater: readonly Vec[][]
   clipOutBuiltWater(scene, ctx);
   art.water(waterScene, trace, water, depth, deepness);
   ctx.restore();
+  return water;
 }
 
 /** How far the mass reaches over a trail's sides, in cells. */

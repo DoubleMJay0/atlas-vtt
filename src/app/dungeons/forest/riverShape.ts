@@ -133,9 +133,16 @@ export function floorWater(rivers: readonly DungeonRiver[] | undefined, lakes: r
   if (!rivers?.length) return [];
   const kept = watersOf.get(rivers);
   if (kept) return kept;
-  const water = unionRings([...rivers.map(riverWater), ...(lakes ?? []).map((lake) => wound([...lake.outline]))]);
+  const whole = unionRings([...rivers.map(riverWater), ...(lakes ?? []).map((lake) => wound([...lake.outline]))]);
+  const islands = riverIslands(rivers);
+  const water = islands.length ? subtractRings(whole, islands) : whole;
   watersOf.set(rivers, water);
   return water;
+}
+
+/** The islands the rivers part round, wound as outlines. */
+export function riverIslands(rivers: readonly DungeonRiver[]): Vec[][] {
+  return rivers.flatMap((river) => (river.islands ?? []).map((island) => wound([...island])));
 }
 
 /** A point on a bridge: `u` cells along it from its first end, `v` across it. */
@@ -173,9 +180,12 @@ export function waterStretches(rivers: readonly DungeonRiver[] | undefined, lake
   const kept = stretchesOf.get(rivers);
   if (kept) return kept;
   const pieces: WaterStretch[] = [];
-  const earlier: { rings: Vec[][]; bounds: Bounds }[] = [];
+  // The islands first: no water lies on them.
+  const earlier: { rings: Vec[][]; bounds: Bounds }[] = riverIslands(rivers).map((island) => ({ rings: [island], bounds: pointsBounds(island) }));
+  const islands = earlier.flatMap((island) => island.rings);
   for (const lake of lakes ?? []) {
-    const rings = [wound([...lake.outline])];
+    const shore = [wound([...lake.outline])];
+    const rings = islands.length ? subtractRings(shore, islands) : shore;
     pieces.push({ rings });
     earlier.push({ rings, bounds: pointsBounds(lake.outline) });
   }
@@ -239,12 +249,12 @@ export function waterField(rivers: readonly DungeonRiver[] | undefined, lakes?: 
       segments.push(a.x, a.y, b.x, b.y, 0);
     });
   }
-  const field = bucketField(segments, lakes ?? []);
+  const field = bucketField(segments, lakes ?? [], riverIslands(rivers));
   fields.set(rivers, field);
   return field;
 }
 
-function bucketField(segments: readonly number[], lakes: readonly DungeonLake[]): WaterField {
+function bucketField(segments: readonly number[], lakes: readonly DungeonLake[], islands: readonly Vec[][]): WaterField {
   const count = segments.length / 5;
   const cell = (k: number): [number, number] => [Math.floor((segments[k * 5]! + segments[k * 5 + 2]!) / 2 / BUCKET), Math.floor((segments[k * 5 + 1]! + segments[k * 5 + 3]!) / 2 / BUCKET)];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -263,6 +273,7 @@ function bucketField(segments: readonly number[], lakes: readonly DungeonLake[])
   for (let k = 0; k < count; k++) { const [bx, by] = cell(k); order[filled[(by - y0) * cols + (bx - x0)]!++] = k; }
   const flat = Float64Array.from(segments);
   const lakeBounds = lakes.map((lake) => pointsBounds(lake.outline));
+  const islandBounds = islands.map(pointsBounds);
   return {
     distance: (x, y) => {
       const bx = Math.floor(x / BUCKET) - x0;
@@ -280,6 +291,11 @@ function bucketField(segments: readonly number[], lakes: readonly DungeonLake[])
           const ey = y - ay - dy * t;
           best = Math.min(best, Math.sqrt(ex * ex + ey * ey) - flat[o + 4]!);
         }
+      }
+      // An island is dry ground in the river: a little way out of the water.
+      for (let k = 0; k < islands.length; k++) {
+        const b = islandBounds[k]!;
+        if (x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY && pointInPolygon(islands[k]!, x, y)) return 0.05;
       }
       // A lake's shore is measured from both sides: inside the lake the distance counts as in the water.
       for (let k = 0; k < lakes.length; k++) {

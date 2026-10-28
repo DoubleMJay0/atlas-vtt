@@ -1,20 +1,22 @@
 import { holdsStairs } from '../geometry';
 import type { CellPoint, DungeonFloor, DungeonLake, DungeonRiver, DungeonRoom } from '../model';
 import { floorStream, type Rng } from '../rng';
-import { fractalNoise } from '../water/noise';
 import { lakeOutline } from './lakeShape';
-import { COURSE_STEP, riverCourse } from './riverCourse';
 import { pathBridges } from './pathCrossings';
-import { bends, normalAt, waterField } from './riverShape';
+import { COURSE_STEP, riverCourse } from './riverCourse';
+import { withIsland } from './riverIslands';
+import { confluencesOn, flowWidths, streamInto } from './riverNetwork';
+import { normalAt, waterField } from './riverShape';
 
 /**
  * A Forest's water, laid as rivers lie. The main river comes in beyond one edge of the map and
- * leaves beyond the other, meandering (`riverCourse`) through one or two of the largest clearings,
- * so it shapes the fight. Its width holds steady along a reach, a little wider in its bends and
- * wider again below a confluence. Now and then it flows into a lake, which the river drains again
- * on the far side or does not; now and then a narrower tributary joins it from a side, meeting it
- * at an acute angle that points downstream, as rivers join. Bridges stand only where a path
- * crosses a river (`pathCrossings.ts`). Pure, deterministic in the seed.
+ * leaves beyond the other through one or two of the largest clearings, so it shapes the fight.
+ * Each map's river is its own: a brook, a stream, a river or a broad river, barely wandering or
+ * meandering hard (`riverCourse`), fed by up to two streams that join it on the map, above which
+ * it is the narrower (`riverNetwork`); a wide one may part round an island of gravel
+ * (`riverIslands`). Now and then it flows into a lake, which it drains again on the far side or
+ * does not. Bridges stand only where a path crosses a river (`pathCrossings`). Pure, deterministic
+ * in the seed.
  */
 
 type Vec = CellPoint;
@@ -25,32 +27,54 @@ const BEYOND = 10;
 const TRIES = 6;
 /** Water keeps this far from stairs and the ways down, in cells. */
 const CLEAR = 1;
-/** How much wider a river runs below where a tributary joins it. */
-const BELOW_CONFLUENCE = 1.15;
 
-/** A Forest floor's rivers (the main river first) and the lakes they flow into. */
+/** A Forest floor's rivers (the main river first, then the streams that join it) and the lakes they flow into. */
 export interface ForestWater {
   rivers: DungeonRiver[];
   lakes: DungeonLake[];
 }
 
 interface WaterPlan {
+  /** The main river's width where it leaves the map, in cells. */
   width: number;
   /** The swing of the main river's heading at a bend's crossing, in radians. */
   swing: number;
-  /** The chances of a tributary and of a lake. */
-  tributary: number;
+  /** How many streams join it. */
+  streams: number;
+  /** The chances of an island and of a lake. */
+  island: number;
   lake: number;
 }
 
-/** What the tags ask of the water: no river, the usual chance of one, or always one, and how wide. */
+/** The sizes a river may be, as its width where it leaves the map, in cells: a brook, a stream, a river, a broad river. */
+const SIZES = [[0.6, 0.9], [0.9, 1.4], [1.4, 2.4], [2.4, 3.4]] as const;
+/** How likely each size is: plain, wet and flooded woods. */
+const SIZE_ODDS = { plain: [0.3, 0.35, 0.25, 0.1], wet: [0.1, 0.3, 0.4, 0.2], flooded: [0, 0.1, 0.5, 0.4] } as const;
+/** How a river may wind: barely, wandering, meandering hard; the swing of its heading and how likely each is. */
+const WINDINGS = [{ swing: [0.6, 0.85], odds: 0.3 }, { swing: [0.85, 1.2], odds: 0.45 }, { swing: [1.2, 1.55], odds: 0.25 }] as const;
+
+/** What the tags ask of the water: no river, the usual chance of one, or always one, and of what kind. */
 function waterPlan(tags: ReadonlySet<string>, rng: Rng): WaterPlan | null {
   if (tags.has('dry')) return null;
   const flooded = tags.has('flooded');
   const wet = flooded || tags.has('wet');
   if (!wet && rng() > 0.75) return null;
-  const width = flooded ? 2.2 + rng() * 1.2 : wet ? 1.4 + rng() * 1.2 : 0.9 + rng() * 1.3;
-  return { width, swing: 0.9 + rng() * 0.7, tributary: wet ? 0.6 : 0.4, lake: flooded ? 0.6 : wet ? 0.45 : 0.3 };
+  const [least, most] = SIZES[picked(SIZE_ODDS[flooded ? 'flooded' : wet ? 'wet' : 'plain'], rng)]!;
+  const width = least + rng() * (most - least);
+  const [calm, wild] = WINDINGS[picked(WINDINGS.map((w) => w.odds), rng)]!.swing;
+  const swing = calm + rng() * (wild - calm);
+  const streams = (rng() < (wet ? 0.7 : 0.55) ? 1 : 0) + (width >= 0.9 && rng() < (wet ? 0.45 : 0.3) ? 1 : 0);
+  return { width, swing, streams, island: wet ? 0.45 : 0.35, lake: flooded ? 0.6 : wet ? 0.45 : 0.3 };
+}
+
+/** An index picked by the odds given. */
+function picked(odds: readonly number[], rng: Rng): number {
+  let roll = rng() * odds.reduce((sum, o) => sum + o, 0);
+  for (let i = 0; i < odds.length; i++) {
+    roll -= odds[i]!;
+    if (roll < 0) return i;
+  }
+  return odds.length - 1;
 }
 
 type RiverFloor = Pick<DungeonFloor, 'rooms' | 'stairs' | 'terrain'>;
@@ -97,17 +121,13 @@ function course(floor: RiverFloor, plan: WaterPlan, rng: Rng): ForestWater {
     // A lake no river drains: the river ends a little way into it.
     if (!lake.drained) line = line.slice(0, lake.mouth);
   }
-  const widths = widthsAlong(line, plan.width, rng);
-  const rivers: DungeonRiver[] = [{ points: line, widths, bridges: [] }];
-  if (rng() < plan.tributary) {
-    const joining = tributary(line, widths, plan, bounds, rng);
-    if (joining) {
-      rivers.push(joining.river);
-      // Below the confluence the river carries both: wider, over a few cells.
-      for (let i = joining.at; i < widths.length; i++) widths[i] = widths[i]! * (1 + (BELOW_CONFLUENCE - 1) * Math.min(1, (i - joining.at) / 16));
-    }
-  }
-  return { rivers, lakes };
+  const confluences = confluencesOn(line, line.length, plan.streams, rng);
+  const main: DungeonRiver = { points: line, widths: flowWidths(line, plan.width, confluences, rng), bridges: [] };
+  const streams = confluences.map((c) => streamInto(main, c, plan.swing, bounds, rng)).filter((stream): stream is DungeonRiver => stream !== null);
+  // An island where the river is seen, and away from where a stream joins it.
+  const joins = streams.map((stream) => stream.points[stream.points.length - 1]!);
+  const open = (p: Vec): boolean => p.x > bounds.minX + 2 && p.x < bounds.maxX - 2 && p.y > bounds.minY + 2 && p.y < bounds.maxY - 2 && joins.every((j) => Math.hypot(p.x - j.x, p.y - j.y) > 6);
+  return { rivers: [rng() < plan.island ? withIsland(main, open, rng) : main, ...streams], lakes };
 }
 
 /** The way a line runs at its point `i`, in radians. */
@@ -125,34 +145,6 @@ function lakeOn(line: readonly Vec[], width: number, rng: Rng): { outline: Vec[]
   const centre = line[Math.min(line.length - 1, at + Math.round((length * 0.45) / COURSE_STEP))]!;
   const outline = lakeOutline(centre, headingAt(line, at), length, breadth, rng);
   return { outline, mouth: Math.min(line.length, at + Math.round((width + 1) / COURSE_STEP)), drained: rng() < 0.5 };
-}
-
-/** A river's widths: steady along a reach with a slow drift, a little wider where it bends. */
-function widthsAlong(line: readonly Vec[], width: number, rng: Rng): number[] {
-  const drift = fractalNoise(rng, 2, 0.5, 30);
-  const bent = bends(line);
-  return line.map((_, i) => width * (1 + 0.18 * drift(i * COURSE_STEP, 3.1)) * (1 + 0.2 * Math.min(1, Math.abs(bent[i]!) * width * 2)));
-}
-
-/**
- * A tributary joining the river on its upper half: it leaves the confluence upstream at 35° to 60°
- * off the river's own way, towards a side of the map, and is laid from there to beyond the map's
- * edge, then turned round to flow down into the river. None where it would cross the river first.
- */
-function tributary(line: readonly Vec[], widths: readonly number[], plan: WaterPlan, bounds: Bounds, rng: Rng): { river: DungeonRiver; at: number } | null {
-  const at = Math.floor(line.length * (0.25 + rng() * 0.3));
-  const join = line[at]!;
-  const side = rng() < 0.5 ? -1 : 1;
-  const upstream = headingAt(line, at) + Math.PI + side * ((35 + rng() * 25) * Math.PI) / 180;
-  const reach = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) + BEYOND;
-  const source = { x: join.x + Math.cos(upstream) * reach, y: join.y + Math.sin(upstream) * reach };
-  const width = Math.max(0.6, plan.width * (0.45 + rng() * 0.2));
-  const points = riverCourse([join, source], { width, swing: plan.swing * 0.9 }, rng, upstream).reverse();
-  // It meets the river once, where it joins it.
-  const main = waterField([{ points: [...line], widths: [...widths], bridges: [] }]);
-  const clear = points.length - Math.ceil((widths[at]! + width) / COURSE_STEP);
-  if (points.slice(0, clear).some((p) => main.distance(p.x, p.y) < 0.4)) return null;
-  return { river: { points, widths: widthsAlong(points, width, rng), bridges: [] }, at };
 }
 
 interface Bounds {

@@ -175,6 +175,8 @@ export interface DungeonRiver {
   /** Bank to bank, by point, in cells; the water is narrower where a bar lies on the inside of a bend (`riverShape.ts`). */
   widths: number[];
   bridges: DungeonRiverBridge[];
+  /** Islands of gravel the river parts round, each an outline, in cells. */
+  islands?: CellPoint[][];
 }
 
 /** A lake a Forest's river flows into, and out of again where another river leaves it: its shore. */
@@ -211,6 +213,8 @@ export interface DungeonFloor {
   rivers?: DungeonRiver[];
   /** The lakes its rivers flow into. */
   lakes?: DungeonLake[];
+  /** Open ground no room holds, traced with the rooms' floor: a Forest's meadows along its rivers and round its lakes (`forest/riverMeadow.ts`). */
+  meadow?: CellPoint[];
   /** Set on every floor of a house: walls on the edges between cells (`houseModel.ts`); unset, rooms are walled by whole cells. */
   walls?: FloorWalls;
   /** A house's windows, in its outer walls. */

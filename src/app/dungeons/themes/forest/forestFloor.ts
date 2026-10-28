@@ -2,6 +2,7 @@ import type { DungeonFloor, DungeonProp } from '../../model';
 import type { PropKind } from '../../props/propKinds';
 import type { DungeonTerrain, TerrainKind } from '../../terrainModel';
 import { forestWater } from '../../forest/forestRivers';
+import { riverMeadow } from '../../forest/riverMeadow';
 import { waterField } from '../../forest/riverShape';
 
 /** What a clearing may hold of what the Cavern placed: what grows or lies in a wood, a camp's fire. */
@@ -21,13 +22,16 @@ const RIVER_CLEAR = 0.8;
  * cave's; without what only a cave holds (calcite, crusts, carved rock, columns, cracks, climbers).
  */
 export function forestFloor(floor: DungeonFloor, seed: number, tags: ReadonlySet<string>): DungeonFloor {
-  const { rivers, lakes } = forestWater(floor, seed, tags);
+  const water = forestWater(floor, seed, tags);
+  const { rivers, lakes } = water;
   const field = waterField(rivers, lakes);
+  const meadow = riverMeadow(floor, water, seed);
   return {
     ...floor,
     forest: true,
     ...(rivers.length > 0 && { rivers }),
     ...(lakes.length > 0 && { lakes }),
+    ...(meadow.length > 0 && { meadow }),
     // A wood's ground is level: a cave's steps between chambers are open ground.
     doors: floor.doors.map((door) => (door.kind === 'steps' ? { ...door, kind: 'opening' as const } : door)),
     props: fewBoulders(floor.props.filter((prop) => FOREST_PROPS.has(prop.kind) && field.distance(prop.x, prop.y) > RIVER_CLEAR)),
