@@ -1,6 +1,6 @@
 import { isRecord } from '../utils/guards';
 import { FLICKER_INTERVAL_MS, MAX_TEXELS, TILE_RAYS } from './lightingConstants';
-import { LIGHTING_QUALITY_LEVELS, isLightingQualityLevel, type LightingQuality, type LightingQualityLevel } from './lightingQuality';
+import { LIGHTING_QUALITY, LIGHTING_QUALITY_LEVELS, isLightingQualityLevel, type LightingQuality, type LightingQualityLevel } from './lightingQuality';
 
 /** The lighting picture: traced on the graphics device, or the rules' polygons filled. */
 export type PictureChoice = 'traced' | 'polygons';
@@ -62,11 +62,27 @@ const RAYS: Record<ShadowsChoice, number> = { fine: TILE_RAYS, medium: 16, coars
 /** The knobs that only the traced picture reads: the polygon picture has no bounce, flicker or traced shadows. */
 export const TRACED_KNOBS: readonly GraphicsKnob[] = ['bounce', 'flames', 'shadows'];
 
-/** The lighting quality `knobs` describe, in the shape the engine, the liquids and the composite read. */
+/** The qualities of mixes of knobs made so far, by their knobs: the same knobs give the same object, as a preset gives `LIGHTING_QUALITY`'s. */
+const MIXES = new Map<string, LightingQuality>();
+
+/**
+ * The lighting quality `knobs` describe, in the shape the engine, the liquids and the composite
+ * read: a preset's own object (`LIGHTING_QUALITY`), else one object per mix for as long as Atlas
+ * runs, so whoever compares qualities by identity sees a change only when the knobs changed.
+ */
 export function qualityOf(knobs: GraphicsKnobs): LightingQuality {
-  const screen = knobs.litMap === 'standard' ? { compositePixelRatio: 1 } : {};
-  if (knobs.picture === 'polygons') return { picture: 'polygons', maxTexels: TEXELS[knobs.detail], liquidFps: knobs.liquids, ...screen };
-  return { maxTexels: TEXELS[knobs.detail], bounceMaxSide: BOUNCE_SIDE[knobs.bounce], flickerMs: FLICKER[knobs.flames], tileRays: RAYS[knobs.shadows], liquidFps: knobs.liquids, ...screen };
+  const preset = presetOf(knobs);
+  if (preset !== null) return LIGHTING_QUALITY[preset];
+  const key = GRAPHICS_KNOBS.map((knob) => String(knobs[knob])).join('|');
+  let quality = MIXES.get(key);
+  if (!quality) {
+    const screen = knobs.litMap === 'standard' ? { compositePixelRatio: 1 } : {};
+    quality = knobs.picture === 'polygons'
+      ? { picture: 'polygons', maxTexels: TEXELS[knobs.detail], liquidFps: knobs.liquids, ...screen }
+      : { maxTexels: TEXELS[knobs.detail], bounceMaxSide: BOUNCE_SIDE[knobs.bounce], flickerMs: FLICKER[knobs.flames], tileRays: RAYS[knobs.shadows], liquidFps: knobs.liquids, ...screen };
+    MIXES.set(key, quality);
+  }
+  return quality;
 }
 
 /** The preset `knobs` are, or null where they are a mix of their own. */

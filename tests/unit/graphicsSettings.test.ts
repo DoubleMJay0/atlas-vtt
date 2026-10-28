@@ -4,7 +4,9 @@ import { LIGHTING_QUALITY, LIGHTING_QUALITY_LEVELS } from '../../src/app/lightin
 
 describe('the Graphics page\'s choices', () => {
   it('describe each preset exactly as the lighting quality table has it', () => {
-    for (const level of LIGHTING_QUALITY_LEVELS) expect(qualityOf(GRAPHICS_PRESETS[level])).toEqual(LIGHTING_QUALITY[level]);
+    for (const level of LIGHTING_QUALITY_LEVELS) expect(qualityOf(GRAPHICS_PRESETS[level])).toBe(LIGHTING_QUALITY[level]);
+    const mix = { ...GRAPHICS_PRESETS.high, liquids: 10 as const };
+    expect(qualityOf(mix)).toBe(qualityOf({ ...mix }));
   });
 
   it('name the preset a set of knobs is, and none for a mix of its own', () => {
