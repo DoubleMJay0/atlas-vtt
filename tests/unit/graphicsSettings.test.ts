@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { GRAPHICS_KNOBS, GRAPHICS_PRESETS, knobsOf, parseGraphicsChoice, presetOf, qualityOf, withKnob } from '../../src/app/lighting/graphicsSettings';
-import { LIGHTING_QUALITY, LIGHTING_QUALITY_LEVELS } from '../../src/app/lighting/lightingQuality';
+import { choicesOf, GRAPHICS_KNOBS, GRAPHICS_PRESETS, knobsOf, parseGraphicsChoice, presetOf, qualityOf, withKnob } from '../../src/app/lighting/graphicsSettings';
+import { LIGHTING_QUALITY, LIGHTING_QUALITY_LEVELS, type TracedQuality } from '../../src/app/lighting/lightingQuality';
+import { liquidDetail, liquidFps } from '../../src/app/pixi/liquids/viewLiquids';
 
 describe('the Graphics page\'s choices', () => {
   it('describe each preset exactly as the lighting quality table has it', () => {
@@ -33,5 +34,19 @@ describe('the Graphics page\'s choices', () => {
     expect(parseGraphicsChoice('high')).toBeNull();
     expect(parseGraphicsChoice({ preset: 'high' })).toEqual({ preset: 'high', overrides: {} });
     expect(GRAPHICS_KNOBS).toHaveLength(7);
+  });
+
+  it('turn every knob into the engine field it names, each value another', () => {
+    const traced = (knobs: Partial<typeof GRAPHICS_PRESETS.high>): TracedQuality => qualityOf({ ...GRAPHICS_PRESETS.high, ...knobs }) as TracedQuality;
+    expect(choicesOf('detail').map((detail) => traced({ detail }).maxTexels)).toEqual([1024, 2048, LIGHTING_QUALITY.high.maxTexels]);
+    expect(choicesOf('bounce').map((bounce) => traced({ bounce }).bounceMaxSide)).toEqual([0, 6144, Infinity]);
+    expect(choicesOf('flames').map((flames) => traced({ flames }).flickerMs)).toEqual([66, LIGHTING_QUALITY.high.flickerMs]);
+    expect(choicesOf('shadows').map((shadows) => traced({ shadows }).tileRays)).toEqual([8, 16, LIGHTING_QUALITY.high.tileRays]);
+    expect(choicesOf('litMap').map((litMap) => traced({ litMap }).compositePixelRatio)).toEqual([1, undefined]);
+    expect(choicesOf('picture').map((picture) => qualityOf({ ...GRAPHICS_PRESETS.high, picture }).picture)).toEqual(['polygons', undefined]);
+    // Liquids: the frames a second the layer plays at on an ordinary cell, and the detail it is drawn at.
+    const fps = choicesOf('liquids').map((liquids) => liquidFps(traced({ liquids }).liquidFps, 70));
+    expect(fps).toEqual([10, 15, 30]);
+    expect(new Set(choicesOf('liquids').map((liquids) => liquidDetail(traced({ liquids }).liquidFps))).size).toBeGreaterThan(1);
   });
 });

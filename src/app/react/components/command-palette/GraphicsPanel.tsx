@@ -4,32 +4,11 @@ import { SegmentedControl, type SegmentedOption } from '../../../packages/compon
 import { t } from '../../../i18n';
 import { useAtlasSettings } from '../../../keyboard/useMapHotkeys';
 import { lightingQualityChoices, presetLabel } from '../../../lighting/lightingQualityChoices';
-import { choicesOf, knobsOf, presetOf, TRACED_KNOBS, withKnob, type DetailChoice, type GraphicsKnob, type GraphicsKnobs, type LiquidsChoice, type ShadowsChoice } from '../../../lighting/graphicsSettings';
+import { knobsOf, presetOf, withKnob } from '../../../lighting/graphicsSettings';
 import { isLightingQualityLevel, type LightingQualityLevel } from '../../../lighting/lightingQuality';
 import type { SettingsService } from '../../../services/SettingsService';
+import { GraphicsKnobRows, graphicsGroupHeading, type GraphicsGroup } from './GraphicsKnobRows';
 import { SettingChoiceRow } from './SettingRows';
-
-/** A knob's row: under which heading it stands, how it is named and explained, and what each of its choices is called. */
-interface KnobRow<K extends GraphicsKnob> {
-  readonly knob: K;
-  readonly group: 'lighting' | 'animated' | 'screen';
-  readonly label: () => string;
-  readonly hint: () => string;
-  readonly name: (value: GraphicsKnobs[K]) => string;
-}
-
-const LEVEL_NAMES: Record<'coarse' | 'medium' | 'fine', () => string> = { coarse: () => t('graphics.low'), medium: () => t('graphics.medium'), fine: () => t('graphics.highChoice') };
-const LIQUID_NAMES: Record<LiquidsChoice, () => string> = { 10: () => t('graphics.low'), 15: () => t('graphics.medium'), 30: () => t('graphics.highChoice') };
-
-const KNOB_ROWS: readonly KnobRow<GraphicsKnob>[] = [
-  { knob: 'picture', group: 'lighting', label: () => t('graphics.picture'), hint: () => t('graphics.pictureHint'), name: (value) => (value === 'traced' ? t('graphics.traced') : t('graphics.polygons')) },
-  { knob: 'detail', group: 'lighting', label: () => t('graphics.detail'), hint: () => t('graphics.detailHint'), name: (value) => LEVEL_NAMES[value as DetailChoice]() },
-  { knob: 'bounce', group: 'lighting', label: () => t('graphics.bounce'), hint: () => t('graphics.bounceHint'), name: (value) => (value === 'all' ? t('graphics.bounceAll') : value === 'smaller' ? t('graphics.bounceSmaller') : t('graphics.bounceOff')) },
-  { knob: 'flames', group: 'lighting', label: () => t('graphics.flames'), hint: () => t('graphics.flamesHint'), name: (value) => (value === 'lively' ? t('graphics.highChoice') : t('graphics.low')) },
-  { knob: 'shadows', group: 'lighting', label: () => t('graphics.shadows'), hint: () => t('graphics.shadowsHint'), name: (value) => LEVEL_NAMES[value as ShadowsChoice]() },
-  { knob: 'liquids', group: 'animated', label: () => t('graphics.liquids'), hint: () => t('graphics.liquidsHint'), name: (value) => LIQUID_NAMES[value as LiquidsChoice]() },
-  { knob: 'litMap', group: 'screen', label: () => t('graphics.litMap'), hint: () => t('graphics.litMapHint'), name: (value) => (value === 'sharp' ? t('graphics.full') : t('graphics.reduced')) },
-] as readonly KnobRow<GraphicsKnob>[];
 
 type PresetTab = LightingQualityLevel | 'custom';
 
@@ -40,9 +19,8 @@ function presetOptions(custom: boolean): SegmentedOption<PresetTab>[] {
 
 /**
  * The Graphics page of the command palette: the three presets as tabs, and below them every choice
- * a preset makes, each its own row, so one thing can be set away from a preset (`GraphicsChoice`).
- * The knobs only the traced picture reads stay in place, disabled, while the picture is polygons.
- * The choice is this device's (`SettingsService.getGraphics`).
+ * a preset makes, each its own row (`GraphicsKnobRows`), so one thing can be set away from a preset
+ * (`GraphicsChoice`). The choice is this device's (`SettingsService.getGraphics`).
  */
 export function GraphicsPanel(): React.ReactElement {
   const settings = useAtlasSettings();
@@ -55,25 +33,12 @@ function GraphicsRows({ settings }: { settings: SettingsService }): React.ReactE
   const knobs = knobsOf(choice);
   const preset = presetOf(knobs);
   const picked = settings.isLightingQualityPicked();
-  const polygons = knobs.picture === 'polygons';
-  const rows = (group: KnobRow<GraphicsKnob>['group']): React.ReactElement[] => KNOB_ROWS.filter((row) => row.group === group).map((row) => {
-    const inert = polygons && TRACED_KNOBS.includes(row.knob);
-    const options = choicesOf(row.knob).map((value): SegmentedOption<string> => ({ value: String(value), label: row.name(value) }));
-    return (
-      <SettingChoiceRow key={row.knob} label={row.label()} hint={inert ? t('graphics.tracedOnly') : row.hint()}>
-        <SegmentedControl<string>
-          value={String(knobs[row.knob])}
-          options={options}
-          ariaLabel={row.label()}
-          disabled={inert}
-          onChange={(value) => {
-            const chosen = choicesOf(row.knob).find((candidate) => String(candidate) === value);
-            if (chosen !== undefined) settings.setGraphics(withKnob(choice, row.knob, chosen));
-          }}
-        />
-      </SettingChoiceRow>
-    );
-  });
+  const group = (name: GraphicsGroup): React.ReactElement => (
+    <>
+      <h3 className="atlas-command-palette-panel-heading">{graphicsGroupHeading(name)}</h3>
+      <GraphicsKnobRows knobs={knobs} group={name} onKnob={(knob, value) => settings.setGraphics(withKnob(choice, knob, value))} />
+    </>
+  );
   return (
     <div className="atlas-command-palette-panel atlas-graphics">
       <div className="atlas-command-palette-panel-column">
@@ -91,14 +56,11 @@ function GraphicsRows({ settings }: { settings: SettingsService }): React.ReactE
             ? <span className="atlas-setting-hint">{t('graphics.picked', { level: presetLabel(preset) })}</span>
             : <Button variant="ghost" size="sm" onClick={() => settings.resetGraphics()}>{t('graphics.reset')}</Button>}
         </div>
-        <h3 className="atlas-command-palette-panel-heading">{t('graphics.animated')}</h3>
-        {rows('animated')}
-        <h3 className="atlas-command-palette-panel-heading">{t('graphics.screen')}</h3>
-        {rows('screen')}
+        {group('animated')}
+        {group('screen')}
       </div>
       <div className="atlas-command-palette-panel-column">
-        <h3 className="atlas-command-palette-panel-heading">{t('graphics.lighting')}</h3>
-        {rows('lighting')}
+        {group('lighting')}
       </div>
     </div>
   );
