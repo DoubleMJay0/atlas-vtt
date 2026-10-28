@@ -1,5 +1,5 @@
 ## New
-- The dungeon generator makes forests: clearings in the woods joined by trails, drawn as one mass of treetops along every clearing, with lone trees that give cover, brooks, streams and broad rivers that wander or meander through meadows along their banks, widen where streams join them, part round gravel islands, now and then flow into a lake, and are bridged only where a path crosses them, and caves on the levels below
+- The dungeon generator makes forests: clearings in the woods joined by trails, drawn as one mass of treetops along every clearing, with lone trees that give cover, brooks, streams and broad rivers that wander or meander through meadows along their banks, widen where streams join them, part round gravel islands, now and then flow into a lake, and are bridged only where a road crosses them; a cart road or footpath runs through the map's entrances from one edge to another, through the clearings and round the lakes, and now and then a footpath branches off it, and caves on the levels below
 - Generated dungeons, caves and manors have a new default style, Crayon: pencil lines and hatching on vellum, coloured in with wax crayon like the village map of the Lockwood Manor collection. Its water, lava and acid move as hand-drawn crayon strokes that fade in and out on their own
 
 ## Improved

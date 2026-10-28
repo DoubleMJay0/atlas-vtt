@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { generateDungeon } from '../../../../src/app/dungeons/generate';
 import type { DungeonModel } from '../../../../src/app/dungeons/model';
-import { trailLine } from '../../../../src/app/dungeons/forest/pathCrossings';
+import { roadField } from '../../../../src/app/dungeons/forest/forestRoads';
 import { bends, floorWater, waterField, waterStretches } from '../../../../src/app/dungeons/forest/riverShape';
-import { signedArea2 } from '../../../../src/app/dungeons/render/geometry';
+import { pointInPolygon, signedArea2 } from '../../../../src/app/dungeons/render/geometry';
 import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
 import { loneTrees } from '../../../../src/app/dungeons/render/forest/loneTrees';
 import { visibleDungeon } from '../../../../src/app/dungeons/render/visibleDungeon';
@@ -73,9 +73,11 @@ describe('a Forest’s rivers', () => {
       const field = waterField(floor.rivers, floor.lakes);
       const minX = Math.min(...floor.rooms.map((r) => r.x));
       const maxX = Math.max(...floor.rooms.map((r) => r.x + r.w));
-      meadows += floor.meadow?.length ?? 0;
-      for (const c of floor.meadow ?? []) {
-        expect(field.distance(c.x + 0.5, c.y + 0.5)).toBeLessThanOrEqual(3.6);
+      meadows += floor.openGround?.length ?? 0;
+      const road = roadField(floor.roads);
+      for (const c of floor.openGround ?? []) {
+        // Beside the water, or on a road's ground.
+        expect(Math.min(field.distance(c.x + 0.5, c.y + 0.5) - 3.6, road.distance(c.x + 0.5, c.y + 0.5) - 1.3)).toBeLessThanOrEqual(0);
         expect(c.x).toBeGreaterThanOrEqual(minX);
         expect(c.x).toBeLessThan(maxX);
       }
@@ -113,27 +115,57 @@ describe('a Forest’s rivers', () => {
     }
   });
 
-  it('are bridged only where a path crosses them, two bridges at most on a map, each on dry ground off the water', () => {
+  it('are crossed by roads that lead from edge to edge, on the map\'s only bridges, two at most, never through a lake', () => {
+    let roads = 0;
     let bridges = 0;
     for (const seed of SEEDS) {
-      const model = forest(seed, ['wet']);
-      const floor = model.floors[0]!;
-      const field = waterField(floor.rivers, floor.lakes);
-      const shown = visibleDungeon(model, DEFAULT_VIEW, 0);
-      const lane = floor.cave?.lane ?? [];
+      const floor = forest(seed, ['wet']).floors[0]!;
+      const minX = Math.min(...floor.rooms.map((r) => r.x));
+      const maxX = Math.max(...floor.rooms.map((r) => r.x + r.w));
+      const minY = Math.min(...floor.rooms.map((r) => r.y));
+      const maxY = Math.max(...floor.rooms.map((r) => r.y + r.h));
+      const beyond = (p: { x: number; y: number }): boolean => p.x < minX - 3 || p.x > maxX + 3 || p.y < minY - 3 || p.y > maxY + 3;
       const all = (floor.rivers ?? []).flatMap((river) => river.bridges);
       expect(all.length).toBeLessThanOrEqual(2);
       bridges += all.length;
-      for (const { at, along, length } of all) {
-        // On a trail, or on the lane the layout leads through the clearings (a bridge may move a cell and a half along the river for a straighter reach).
-        const onPath = shown.ways.some((way) => trailLine(way).some((p) => Math.hypot(p.x - at.x, p.y - at.y) < 2.5))
-          || lane.some((c) => Math.hypot(c.x + 0.5 - at.x, c.y + 0.5 - at.y) < 2);
-        expect(onPath).toBe(true);
-        for (const side of [-1, 1]) expect(field.distance(at.x + (along.x * side * length) / 2, at.y + (along.y * side * length) / 2)).toBeGreaterThan(0);
+      const [main, ...branches] = floor.roads ?? [];
+      if (main) {
+        roads += 1;
+        // A road leads somewhere: off the map at both ends; a branch leaves the map at its one end and meets the road at its other.
+        expect(beyond(main.points[0]!)).toBe(true);
+        expect(beyond(main.points[main.points.length - 1]!)).toBe(true);
+        for (const branch of branches) expect(beyond(branch.points[0]!) || beyond(branch.points[branch.points.length - 1]!)).toBe(true);
       }
-      all.forEach((a, i) => all.slice(i + 1).forEach((b) => expect(Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y)).toBeGreaterThanOrEqual(8)));
+      const water = waterField(floor.rivers, floor.lakes);
+      for (const road of floor.roads ?? []) {
+        for (const p of road.points) {
+          for (const lake of floor.lakes ?? []) expect(pointInPolygon(lake.outline, p.x, p.y)).toBe(false);
+          // In a river only on a bridge.
+          if (water.distance(p.x, p.y) < -0.2) expect(all.some((b) => Math.hypot(p.x - b.at.x, p.y - b.at.y) <= b.length / 2 + 0.3)).toBe(true);
+        }
+      }
+      for (const bridge of all) expect((floor.roads ?? []).some((road) => road.points.some((p) => Math.hypot(p.x - bridge.at.x, p.y - bridge.at.y) < road.width))).toBe(true);
     }
+    expect(roads).toBeGreaterThan(SEEDS.length * 0.6);
     expect(bridges).toBeGreaterThan(5);
+  });
+
+  it('lead their trails somewhere: every map with entrances has a road, through its entrances and on to the map\'s edge', () => {
+    let reached = 0;
+    let total = 0;
+    for (const seed of SEEDS) {
+      const model = forest(seed, seed % 2 ? ['wet'] : []);
+      const ways = visibleDungeon(model, DEFAULT_VIEW, 0).ways;
+      if (!ways.length) continue;
+      const roads = model.floors[0]!.roads ?? [];
+      expect(roads.length).toBeGreaterThan(0);
+      // Every entrance's trail is a road's, as far as a road can be laid within two bridges.
+      // (Where rivers lie between the entrances so that reaching both would take a third bridge, the road keeps to two and a trail may stay its own.)
+      const led = ways.filter(({ mouth }) => roads.some((road) => road.points.some((p) => Math.hypot(p.x - mouth.at.x, p.y - mouth.at.y) < 2.5)));
+      reached += led.length;
+      total += ways.length;
+    }
+    expect(reached / total).toBeGreaterThan(0.9);
   });
 
   it('flow in stretches that hold all their water once', () => {
@@ -167,7 +199,7 @@ describe('a Forest’s rivers', () => {
       const features = Object.values(parts.scene.mapFeatures ?? {});
       for (const water of features.filter((f) => f.name === 'River' || f.name === 'Lake')) expect(water.terrain?.difficult).toBe(true);
       const decks = model.floors[0]!.rivers!.flatMap((river) => river.bridges).length;
-      expect(features.filter((f) => f.name === 'Footbridge')).toHaveLength(decks);
+      expect(features.filter((f) => f.name === 'Bridge')).toHaveLength(decks);
     }
     expect(rivers).toBeGreaterThan(8);
   });

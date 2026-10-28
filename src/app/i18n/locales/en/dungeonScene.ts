@@ -52,7 +52,7 @@ export const dungeonScene = {
   'dungeonScene.feature.tree': 'Tree',
   'dungeonScene.feature.river': 'River',
   'dungeonScene.feature.lake': 'Lake',
-  'dungeonScene.feature.footbridge': 'Footbridge',
+  'dungeonScene.feature.riverBridge': 'Bridge',
 
   'dungeonScene.terrain': 'Terrain: {list}.',
   'dungeonScene.growth': 'Growing here: {list}.',

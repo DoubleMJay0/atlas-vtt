@@ -7,8 +7,10 @@ import { polysPath, rectPoly, type Field, type PathFn } from '../art/paths';
 import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolShores } from '../art/pools';
 import { grownRings, intersectRings, subtractRings, unionRings } from '../clipShapes';
 import { floorWater, riverBars, riverIslands, waterField } from '../../forest/riverShape';
-import { bridgeApproaches, bridgeSpan, drawRiverBridges } from './riverBridges';
-import { pointSegmentDistance, pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
+import { drawRiverBridges } from './riverBridges';
+import { roadBand, roadSurfaces } from './roads';
+import { roadField } from '../../forest/forestRoads';
+import { pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
 import { wayCentre, wayFrameOf, wayHalf, type WayOut } from '../cave/mouth/wayOut';
 import { drawGrid } from '../grid';
 import type { GroundsPaint } from '../grounds/paint';
@@ -35,8 +37,8 @@ export interface ForestArt {
 
 /** How far the mass keeps off a river's water, in cells: the trees stand on its banks and lean over it a little. */
 const RIVER_BANK = 0.3;
-/** How far the mass keeps off a bridge's middle line, in cells: the deck and a little either side. */
-const BRIDGE_CLEAR = 0.7;
+/** How far the mass keeps off a road's edge, in cells: a verge either side. */
+const ROAD_VERGE = 0.35;
 
 /**
  * A Forest's entry floor, as Watabou's Glade view and Reprieve draw woods, bottom to top: the woods'
@@ -52,8 +54,10 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const trails = dungeon.ways.map(trailRing);
   const { rivers = [], lakes } = dungeon.floor;
   const riverWater = floorWater(rivers, lakes);
-  // The ground runs on under the mass along a river and round a lake as along a clearing.
-  const banks = riverWater.length ? grownRings(riverWater, MASS_DEPTH) : [];
+  const roads = dungeon.floor.roads ?? [];
+  // The ground runs on under the mass along a river, round a lake and either side of a road as along a clearing; one union, so no band's winding cancels another's.
+  const verges = roads.map((r) => roadBand(r, r.width / 2 + MASS_DEPTH));
+  const banks = riverWater.length || verges.length ? unionRings([...(riverWater.length ? grownRings(riverWater, MASS_DEPTH) : []), ...verges]) : [];
   const ground = (path: CanvasPath): void => {
     traceShapes(path, scene.floors, MASS_DEPTH, MASS_DEPTH);
     for (const ring of trails) tracePolygon(path, ring);
@@ -65,13 +69,12 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const field = waterField(rivers, lakes);
   // The bridges, with worn paths onto the ends no trail reaches: the woods keep off them too.
   const bridges = scene.env.view.water ? rivers.flatMap((river) => river.bridges) : [];
-  const onTrail = (p: Vec): boolean => dungeon.ways.some((way) => trailDistance(way, p) < 0.3);
-  const approaches = bridgeApproaches(bridges, onTrail);
-  const spans = bridges.map((bridge) => bridgeSpan(bridge, onTrail));
+  // The roads run on to the map's edge through the woods, which part for them.
+  const road = roadField(roads);
   const outsideAt = (x: number, y: number): number => {
     let best = Math.min(scene.sdfAt(x, y), field.distance(x, y) - RIVER_BANK);
     for (const way of dungeon.ways) best = Math.min(best, trailDistance(way, { x, y }) + TRAIL_OVERHANG);
-    for (const [a, b] of spans) best = Math.min(best, pointSegmentDistance({ x, y }, a, b) - BRIDGE_CLEAR);
+    best = Math.min(best, road.distance(x, y) - ROAD_VERGE);
     return best;
   };
   // The woods first and the ground over them, never the woods cut out of the frame: an even-odd cut turns back where two clearings' reaches overlap.
@@ -79,7 +82,7 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   art.ground.lawn(ground, cellsOf(view));
   // Each trail worn into the ground, fading where it leaves into the woods.
   for (const [k, way] of dungeon.ways.entries()) art.trail(polysPath([trails[k]!]), (p) => trailFade(way, wayFrameOf(way, p).u));
-  for (const { ring, fade } of approaches) art.trail(polysPath([ring]), fade);
+  for (const { path, wear } of roadSurfaces(roads)) art.trail(path, () => wear);
   const drawn = scene.env.view.water ? drawWater(scene, art, riverWater, field) : riverWater;
   // The bars on the insides of the bends, where no other water (a pool, another river) lies over them, and the islands.
   const bars = riverWater.length ? [...subtractRings(rivers.flatMap(riverBars), drawn), ...riverIslands(rivers)] : [];

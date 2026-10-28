@@ -162,11 +162,19 @@ export interface DungeonWater {
   outline: CellPoint[];
 }
 
-/** A bridge over a river: its middle, the way its deck runs (across the river, a unit vector) and its length, in cells. */
+/** A bridge that carries a road over a river: its middle, the way its deck runs (across the river, a unit vector), its length and its deck's breadth, in cells. */
 export interface DungeonRiverBridge {
   at: CellPoint;
   along: CellPoint;
   length: number;
+  breadth: number;
+}
+
+/** A road through a Forest, from beyond one edge of the map to beyond another: its middle line and width in cells, and whether carts have worn ruts in it (a cart road) or not (a footpath). */
+export interface DungeonRoad {
+  points: CellPoint[];
+  width: number;
+  ruts: boolean;
 }
 
 /** A river of a Forest: its middle line from where it enters to where it ends, its width there, and its bridges. */
@@ -213,8 +221,10 @@ export interface DungeonFloor {
   rivers?: DungeonRiver[];
   /** The lakes its rivers flow into. */
   lakes?: DungeonLake[];
-  /** Open ground no room holds, traced with the rooms' floor: a Forest's meadows along its rivers and round its lakes (`forest/riverMeadow.ts`). */
-  meadow?: CellPoint[];
+  /** A Forest's roads (`forest/forestRoads.ts`): its only bridges are where they cross a river. */
+  roads?: DungeonRoad[];
+  /** Open ground no room holds, traced with the rooms' floor: a Forest's meadows along its water and the ground its roads run on. */
+  openGround?: CellPoint[];
   /** Set on every floor of a house: walls on the edges between cells (`houseModel.ts`); unset, rooms are walled by whole cells. */
   walls?: FloorWalls;
   /** A house's windows, in its outer walls. */

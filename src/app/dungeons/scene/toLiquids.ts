@@ -133,7 +133,7 @@ function terrainOver(floor: DungeonFloor, view: DungeonView, piece: DungeonTerra
 /**
  * What the map draws over its water: stairwells, every piece of terrain that is no liquid (bridges
  * among them; rimstone as its dams, none where the water lies over it and the map draws only their
- * lips), props, columns and a Forest river's footbridges. Cut out of the surfaces, so the motion never runs over them.
+ * lips), props, columns and a Forest road's bridges. Cut out of the surfaces, so the motion never runs over them.
  */
 function drawnOver(dungeon: VisibleDungeon, view: DungeonView): Vec[][] {
   const { floor, roomShapes } = dungeon;

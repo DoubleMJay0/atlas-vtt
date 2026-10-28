@@ -1,6 +1,7 @@
 import type { CellPoint, DungeonLake, DungeonRiver, DungeonRiverBridge } from '../model';
 import { subtractRings, unionRings } from '../render/clipShapes';
-import { pointInPolygon, pointsBounds, signedArea2, type Bounds } from '../render/geometry';
+import { pointsBounds, signedArea2, type Bounds } from '../render/geometry';
+import { lineField, type LineField } from './lineField';
 
 /**
  * A Forest's rivers and lakes as shapes, in cells, shared by their drawing and their scene. A
@@ -13,8 +14,6 @@ import { pointInPolygon, pointsBounds, signedArea2, type Bounds } from '../rende
 
 type Vec = CellPoint;
 
-/** Half a bridge's deck across its length (the deck is a cell wide), in cells. */
-export const DECK_HALF = 0.5;
 /** The widest a bar is, as a share of the river's width. */
 const BAR_SHARE = 0.34;
 /** No bar lies in a river narrower than this, in cells: a brook's bends hold none worth drawing. */
@@ -154,7 +153,8 @@ export function bridgePoint(bridge: DungeonRiverBridge, u: number, v: number): V
 /** The four corners of a bridge's deck. */
 export function deckOf(bridge: DungeonRiverBridge): Vec[] {
   const { length } = bridge;
-  return [bridgePoint(bridge, 0, -DECK_HALF), bridgePoint(bridge, length, -DECK_HALF), bridgePoint(bridge, length, DECK_HALF), bridgePoint(bridge, 0, DECK_HALF)];
+  const half = bridge.breadth / 2;
+  return [bridgePoint(bridge, 0, -half), bridgePoint(bridge, length, -half), bridgePoint(bridge, length, half), bridgePoint(bridge, 0, half)];
 }
 
 /** How many of a river's points one stretch of it holds: about four cells, short enough that a bend's water flows round it. */
@@ -216,19 +216,14 @@ function overlaps(a: Bounds, b: Bounds): boolean {
 }
 
 /** How far a point lies from the water, bank to bank and lake shore, in cells: negative in it. */
-export interface WaterField {
-  distance(x: number, y: number): number;
-}
+export type WaterField = LineField;
 
-/** The size of the buckets the water's edges are filed in, in cells; a point is measured against its own bucket and those round it. */
-const BUCKET = 4;
 const NONE: WaterField = { distance: () => Infinity };
 const fields = new WeakMap<readonly DungeonRiver[], WaterField>();
 
 /**
- * The rivers' and lakes' field, kept for the list: the drawing asks it a few million times, so the
- * rivers' middle lines (with their half widths) and the lakes' shores lie in a grid of buckets in
- * flat arrays. Beyond a bucket from all water it answers Infinity.
+ * The rivers' and lakes' field, kept for the list: the drawing asks it a few million times. Inside
+ * a lake it is negative; on an island in a river, a little way out of the water.
  */
 export function waterField(rivers: readonly DungeonRiver[] | undefined, lakes?: readonly DungeonLake[]): WaterField {
   if (!rivers?.length) return NONE;
@@ -249,60 +244,7 @@ export function waterField(rivers: readonly DungeonRiver[] | undefined, lakes?: 
       segments.push(a.x, a.y, b.x, b.y, 0);
     });
   }
-  const field = bucketField(segments, lakes ?? [], riverIslands(rivers));
+  const field = lineField(segments, (lakes ?? []).map((lake) => lake.outline), riverIslands(rivers));
   fields.set(rivers, field);
   return field;
-}
-
-function bucketField(segments: readonly number[], lakes: readonly DungeonLake[], islands: readonly Vec[][]): WaterField {
-  const count = segments.length / 5;
-  const cell = (k: number): [number, number] => [Math.floor((segments[k * 5]! + segments[k * 5 + 2]!) / 2 / BUCKET), Math.floor((segments[k * 5 + 1]! + segments[k * 5 + 3]!) / 2 / BUCKET)];
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (let k = 0; k < count; k++) {
-    const [bx, by] = cell(k);
-    x0 = Math.min(x0, bx); y0 = Math.min(y0, by); x1 = Math.max(x1, bx); y1 = Math.max(y1, by);
-  }
-  const cols = x1 - x0 + 1;
-  const rows = y1 - y0 + 1;
-  // Buckets as offsets into one list of segment indices.
-  const starts = new Int32Array(cols * rows + 1);
-  for (let k = 0; k < count; k++) { const [bx, by] = cell(k); starts[(by - y0) * cols + (bx - x0) + 1]! += 1; }
-  for (let b = 0; b < cols * rows; b++) starts[b + 1]! += starts[b]!;
-  const filled = starts.slice(0, cols * rows);
-  const order = new Int32Array(count);
-  for (let k = 0; k < count; k++) { const [bx, by] = cell(k); order[filled[(by - y0) * cols + (bx - x0)]!++] = k; }
-  const flat = Float64Array.from(segments);
-  const lakeBounds = lakes.map((lake) => pointsBounds(lake.outline));
-  const islandBounds = islands.map(pointsBounds);
-  return {
-    distance: (x, y) => {
-      const bx = Math.floor(x / BUCKET) - x0;
-      const by = Math.floor(y / BUCKET) - y0;
-      let best = Infinity;
-      for (let j = Math.max(0, by - 1); j <= Math.min(rows - 1, by + 1); j++) for (let i = Math.max(0, bx - 1); i <= Math.min(cols - 1, bx + 1); i++) {
-        const bucket = j * cols + i;
-        for (let n = starts[bucket]!; n < starts[bucket + 1]!; n++) {
-          const o = order[n]! * 5;
-          const ax = flat[o]!, ay = flat[o + 1]!;
-          const dx = flat[o + 2]! - ax;
-          const dy = flat[o + 3]! - ay;
-          const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
-          const ex = x - ax - dx * t;
-          const ey = y - ay - dy * t;
-          best = Math.min(best, Math.sqrt(ex * ex + ey * ey) - flat[o + 4]!);
-        }
-      }
-      // An island is dry ground in the river: a little way out of the water.
-      for (let k = 0; k < islands.length; k++) {
-        const b = islandBounds[k]!;
-        if (x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY && pointInPolygon(islands[k]!, x, y)) return 0.05;
-      }
-      // A lake's shore is measured from both sides: inside the lake the distance counts as in the water.
-      for (let k = 0; k < lakes.length; k++) {
-        const b = lakeBounds[k]!;
-        if (x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY && pointInPolygon(lakes[k]!.outline, x, y)) return -Math.abs(best);
-      }
-      return best;
-    },
-  };
 }

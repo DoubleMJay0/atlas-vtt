@@ -2,7 +2,6 @@ import { holdsStairs } from '../geometry';
 import type { CellPoint, DungeonFloor, DungeonLake, DungeonRiver, DungeonRoom } from '../model';
 import { floorStream, type Rng } from '../rng';
 import { lakeOutline } from './lakeShape';
-import { pathBridges } from './pathCrossings';
 import { COURSE_STEP, riverCourse } from './riverCourse';
 import { withIsland } from './riverIslands';
 import { confluencesOn, flowWidths, streamInto } from './riverNetwork';
@@ -15,8 +14,8 @@ import { normalAt, waterField } from './riverShape';
  * meandering hard (`riverCourse`), fed by up to two streams that join it on the map, above which
  * it is the narrower (`riverNetwork`); a wide one may part round an island of gravel
  * (`riverIslands`). Now and then it flows into a lake, which it drains again on the far side or
- * does not. Bridges stand only where a path crosses a river (`pathCrossings`). Pure, deterministic
- * in the seed.
+ * does not. Its only bridges carry the roads over it (`forestRoads`). Pure, deterministic in the
+ * seed.
  */
 
 type Vec = CellPoint;
@@ -86,7 +85,7 @@ export function forestWater(floor: DungeonFloor, seed: number, tags: ReadonlySet
   for (let k = 0; k < TRIES; k++) {
     const water = course(floor, plan, floorStream(seed, 'water', 0, `river-${k}`));
     const field = waterField(water.rivers, water.lakes);
-    if (kept.every((c) => field.distance(c.x, c.y) > CLEAR)) return { ...water, rivers: pathBridges(water, floor, seed) };
+    if (kept.every((c) => field.distance(c.x, c.y) > CLEAR)) return water;
   }
   return { rivers: [], lakes: [] };
 }

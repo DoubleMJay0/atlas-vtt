@@ -148,7 +148,7 @@ function treeDrafts(trees: readonly LoneTree[]): Draft[] {
 /**
  * A Forest's rivers and lakes where they reach into the clearings: the water difficult ground stretch by
  * stretch (a river is waded; a feature holds `MAX_FEATURE_CORNERS`, which a river's whole course
- * would not keep to its banks), and each footbridge a feature of its own, taken out of the water,
+ * would not keep to its banks), and each road's bridge a feature of its own, taken out of the water,
  * so whoever crosses on it crosses dry. Islands stay in the water: a feature has no holes.
  */
 function riverDrafts(dungeon: VisibleDungeon): Draft[] {
@@ -157,7 +157,7 @@ function riverDrafts(dungeon: VisibleDungeon): Draft[] {
   const decks = rivers.flatMap(river => river.bridges.map(deckOf));
   // The rivers within the clearings, clipped once; each stretch then only meets that.
   const played = subtractRings(intersectRings(floorWater(rivers, dungeon.floor.lakes), floorRingsOf(dungeon)), decks);
-  const bridges = decks.map((polygon): Draft => ({ polygon, name: t('dungeonScene.feature.footbridge') }));
+  const bridges = decks.map((polygon): Draft => ({ polygon, name: t('dungeonScene.feature.riverBridge') }));
   if (!played.length) return bridges;
   const reach = pointsBounds(played.flat());
   const water = waterStretches(rivers, dungeon.floor.lakes)
@@ -171,7 +171,7 @@ function riverDrafts(dungeon: VisibleDungeon): Draft[] {
 /**
  * The map features of one floor as shown, in world px on `level` (unset in a scene of one floor),
  * with ids beginning `id`: the first `MAX_MAP_FEATURES` of its terrain, a Forest's rivers and
- * footbridges, props (where the view shows them), columns and lone trees, in that order, and under them as much vegetation as fits. Only rooms
+ * bridges, props (where the view shows them), columns and lone trees, in that order, and under them as much vegetation as fits. Only rooms
  * the view shows have any. No feature names what a room was built for.
  */
 export function floorFeatures(dungeon: VisibleDungeon, view: Pick<DungeonView, 'props'>, placement: DungeonPlacement, id: string, level?: string): Record<string, MapFeature> {
