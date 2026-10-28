@@ -21,7 +21,7 @@ export const settings = {
   'settings.lighting.highHint': 'Full detail, with light that bounces off walls and floors and flames that flicker.',
   'settings.lighting.quality': 'Lighting quality',
   'settings.lighting.saver': 'Saver',
-  'settings.lighting.saverHint': 'Steady flames, no bounced light, rough soft shadow edges, and coarser light on large maps. On a high-resolution screen the lit map is a little softer. A map at rest is not redrawn, which saves battery.',
+  'settings.lighting.saverHint': 'The lightest on the graphics: steady flames, no bounced light or light round corners, and walls that stay dark at their edges. On a high-resolution screen the lit map is a little softer. A map at rest is not redrawn, which saves battery.',
   'settings.maps.animate': 'Animate maps',
   'settings.maps.animateHint': 'Video maps play. Off, they show their first frame.',
   'settings.maps.heading': 'Maps',
