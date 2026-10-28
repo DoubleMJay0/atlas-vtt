@@ -123,8 +123,8 @@ class LightLayer {
     if (!item) return;
     const { light, polygon } = item;
     const shadows = item.shadows ?? polygon;
-    // A moving light's shadows stay hard until it rests (as the traced picture's quick tile): a drag step works out no wedges.
-    const penumbra = light.moving ? 0 : Math.max(light.flame, MIN_PENUMBRA_TEXELS * this.texel);
+    // A moving light keeps its soft shadows: hard ones showed the texel grid's steps through every door and window of a drag, and the wedges of a reach cost a drag step well under a millisecond.
+    const penumbra = Math.max(light.flame, MIN_PENUMBRA_TEXELS * this.texel);
     if (slot.polygon !== polygon || slot.shadows !== shadows || slot.penumbra !== penumbra) {
       const origin = { x: light.x, y: light.y };
       const previous = slot.mesh.geometry;
