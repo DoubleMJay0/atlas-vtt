@@ -43,8 +43,9 @@ describe('what players hear of the uploads', () => {
     store.publisher.resend('cleo');
     expect(store.sent).toEqual([]);
     store.hand(shared, 'cleo');
+    // Handed a stored asset, she hears its share at once; a resend names it again, to her alone.
     store.publisher.resend('cleo');
-    expect(store.sent.map(({ body, to }) => [to, Object.keys(body.t === 'asset-progress' ? body.shares : {})])).toEqual([['cleo', [shared.id]]]);
+    expect(store.sent.map(({ body, to }) => [to, Object.keys(body.t === 'asset-progress' ? body.shares : {})])).toEqual([['cleo', [shared.id]], ['cleo', [shared.id]]]);
   });
 
   it('tells everyone at once what everyone was sent', async () => {
@@ -52,6 +53,8 @@ describe('what players hear of the uploads', () => {
     store.players = ['ana', 'bo'];
     const shared = await store.publisher.storing.refOf(bytesOf(100, 1), 'image/webp', ASSET_USES.map);
     store.hand(shared);
+    // The hand-over itself tells each player at once; what moves after that goes to everyone in one message.
+    store.sent.length = 0;
     await store.advance(2000);
     expect(new Set(store.sent.map(({ to }) => to))).toEqual(new Set(['*']));
   });
