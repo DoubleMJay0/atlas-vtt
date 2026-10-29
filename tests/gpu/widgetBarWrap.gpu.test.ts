@@ -30,12 +30,15 @@ const mapUi = (count: number): string => `
   <div class="atlas-vtt-plugin atlas-react-ui-container" style="position: absolute; inset: 0">
     <div class="atlas-ui" style="position: relative; width: 100%; height: 100%">
       <div class="atlas-top-bar-row">
-        <div class="atlas-scene-tab-bar">
-          <div class="atlas-scene-tab-bar__strip">
-            <div class="atlas-scene-tab atlas-scene-tab--active"><span class="atlas-scene-tab__name">Blue Mouth Caves</span></div>
-            <div class="atlas-scene-tab atlas-scene-tab--loaded"><span class="atlas-scene-tab__name">The Citadel</span></div>
+        <div class="atlas-top-bar-start">
+          <div class="atlas-scene-tab-bar">
+            <div class="atlas-scene-tab-bar__strip">
+              <div class="atlas-scene-tab atlas-scene-tab--active"><span class="atlas-scene-tab__name">Blue Mouth Caves</span></div>
+              <div class="atlas-scene-tab atlas-scene-tab--loaded"><span class="atlas-scene-tab__name">The Citadel</span></div>
+            </div>
+            <button type="button" class="atlas-scene-tab atlas-scene-tab-bar__button atlas-scene-tab-bar__add">+</button>
           </div>
-          <button type="button" class="atlas-scene-tab atlas-scene-tab-bar__button atlas-scene-tab-bar__add">+</button>
+          <div class="atlas-top-bar-start__below"></div>
         </div>
         <div class="atlas-top-bar-end">
           ${bar(count)}
