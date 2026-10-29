@@ -165,9 +165,12 @@ export interface WaterStretch {
   /** As clipping gives them: outlines and holes (islands). */
   rings: Vec[][];
   flow?: Vec;
+  /** The river's middle the water flows along, downstream; only where the piece is a whole river. */
+  course?: Vec[];
 }
 
 const stretchesOf = new WeakMap<readonly DungeonRiver[], WaterStretch[]>();
+const coursesOf = new WeakMap<readonly DungeonRiver[], WaterStretch[]>();
 
 /**
  * The floor's water in pieces that each move one way: every lake whole and still, then each river
@@ -179,6 +182,27 @@ export function waterStretches(rivers: readonly DungeonRiver[] | undefined, lake
   if (!rivers?.length) return [];
   const kept = stretchesOf.get(rivers);
   if (kept) return kept;
+  const pieces = waterPieces(rivers, lakes, STRETCH);
+  stretchesOf.set(rivers, pieces);
+  return pieces;
+}
+
+/**
+ * The floor's water as `waterStretches` gives it, but each river whole, flowing along its course:
+ * the water a moving surface follows round every bend, so it is cut nowhere but where it meets a
+ * lake or the river it joins.
+ */
+export function waterCourses(rivers: readonly DungeonRiver[] | undefined, lakes: readonly DungeonLake[] | undefined): WaterStretch[] {
+  if (!rivers?.length) return [];
+  const kept = coursesOf.get(rivers);
+  if (kept) return kept;
+  const pieces = waterPieces(rivers, lakes, Infinity);
+  coursesOf.set(rivers, pieces);
+  return pieces;
+}
+
+/** Lakes whole, then each river in pieces of `stretch` of its points, giving way to the water before it. */
+function waterPieces(rivers: readonly DungeonRiver[], lakes: readonly DungeonLake[] | undefined, stretch: number): WaterStretch[] {
   const pieces: WaterStretch[] = [];
   // The islands first: no water lies on them.
   const earlier: { rings: Vec[][]; bounds: Bounds }[] = riverIslands(rivers).map((island) => ({ rings: [island], bounds: pointsBounds(island) }));
@@ -192,8 +216,9 @@ export function waterStretches(rivers: readonly DungeonRiver[] | undefined, lake
   for (const river of rivers) {
     const own: typeof earlier = [];
     const last = river.points.length - 1;
-    for (let a = 0; a < last; a += STRETCH) {
-      const b = Math.min(last, a + STRETCH);
+    const whole = stretch >= last;
+    for (let a = 0; a < last; a += stretch) {
+      const b = Math.min(last, a + stretch);
       const band = waterBetween(river, a, b);
       const bounds = pointsBounds(band);
       const before = earlier.filter((piece) => overlaps(piece.bounds, bounds)).flatMap((piece) => piece.rings);
@@ -202,12 +227,11 @@ export function waterStretches(rivers: readonly DungeonRiver[] | undefined, lake
       const dx = river.points[b]!.x - river.points[a]!.x;
       const dy = river.points[b]!.y - river.points[a]!.y;
       const len = Math.hypot(dx, dy) || 1;
-      pieces.push({ rings, flow: { x: dx / len, y: dy / len } });
+      pieces.push({ rings, flow: { x: dx / len, y: dy / len }, ...(whole && { course: river.points }) });
       own.push({ rings, bounds });
     }
     earlier.push(...own);
   }
-  stretchesOf.set(rivers, pieces);
   return pieces;
 }
 

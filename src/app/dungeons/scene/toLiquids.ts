@@ -11,9 +11,10 @@ import { cellsToUnits, type SceneUnit } from './gameUnits';
 import { liquidColours } from './liquidColours';
 import { isBuiltWater, isNaturalDeepWater, isSubmergedRimstone, naturalDeepRings } from '../render/art/pools';
 import { rimstoneShelves } from '../render/terrain/caveStones';
-import { deckOf, floorWater, waterStretches } from '../forest/riverShape';
+import { deckOf, floorWater, waterCourses } from '../forest/riverShape';
 import { rectPoly } from '../render/art/paths';
 import { mapLayout } from '../render/layoutSize';
+import { courseOn, openEdgesOf } from './liquidReach';
 import { fitCorners, floorRingsOf } from './sceneRings';
 import { propPolygon } from './toFeatures';
 import type { DungeonPlacement } from './toWalls';
@@ -31,6 +32,8 @@ interface Liquid {
   /** Islands and what stands in it, in cells. */
   holes?: Vec[][];
   flow?: Vec;
+  /** The line it flows along, in cells: a river's middle. */
+  course?: Vec[];
   lavaLight?: string;
 }
 
@@ -95,17 +98,24 @@ function poolLiquids(dungeon: VisibleDungeon): Liquid[] {
   });
 }
 
+/** The map's image in cells: what of a Forest's rivers lies on it is drawn (they rise and end beyond it). */
+function mapFrame(dungeon: VisibleDungeon, view: DungeonView): Vec[] {
+  const { originCell: o, cellsWide, cellsHigh } = mapLayout(dungeon.model, 1, view);
+  return rectPoly({ x: o.x, y: o.y, w: cellsWide, h: cellsHigh });
+}
+
 /**
- * A Forest's lakes, still, and its rivers in stretches, each flowing the way the river runs there,
- * on what of them lies on the map's image (they rise and end beyond it).
+ * A Forest's lakes, still, and each of its rivers whole, flowing along its course round every bend,
+ * on what of them lies on the map's image.
  */
 function riverLiquids(dungeon: VisibleDungeon, view: DungeonView): Liquid[] {
   const { rivers, lakes } = dungeon.floor;
   if (!rivers?.length) return [];
-  const { originCell: o, cellsWide, cellsHigh } = mapLayout(dungeon.model, 1, view);
-  const frame = rectPoly({ x: o.x, y: o.y, w: cellsWide, h: cellsHigh });
-  return waterStretches(rivers, lakes).flatMap(({ rings, flow }) =>
-    withHoles(intersectRings(rings, [frame])).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }), ...(flow && { flow }) })));
+  const frame = mapFrame(dungeon, view);
+  return waterCourses(rivers, lakes).flatMap(({ rings, flow, course }) => {
+    const kept = course && courseOn(course, frame);
+    return withHoles(intersectRings(rings, [frame])).map(({ ring, holes }): Liquid => ({ liquid: 'water', ring, ...(holes.length && { holes }), ...(flow && { flow }), ...(kept && { course: kept }) }));
+  });
 }
 
 /** The way the stream that fills most of a pool runs, where it fills at least `STREAM_SHARE` of it. */
@@ -223,9 +233,19 @@ export function floorLiquids(
   const world = (p: Vec): Vec => ({ x: (p.x - originCell.x) * pxPerCell, y: (p.y - originCell.y) * pxPerCell });
   const units = (cells: number): number => cellsToUnits(cells, view, unit);
   const liquids: Record<string, LiquidSurface> = {};
-  cutOut(whole, drawnOver(dungeon, view)).forEach(({ liquid, ring, holes, flow, lavaLight }, index) => {
+  const cut = cutOut(whole, drawnOver(dungeon, view));
+  const open = openEdgesOf(cut, mapFrame(dungeon, view));
+  cut.forEach(({ liquid, ring, holes, flow, course, lavaLight }, index) => {
     const liquidId = `liquid_${id}_${index + 1}`;
-    liquids[liquidId] = { id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world), ...(holes && { holes: holes.map(hole => hole.map(world)) }), ...(flow && { flow }), colors: colours[liquid], ...(style.direction !== 'stone' && { art: style.direction }), ...(lavaLight && { lavaLight }), ...(level && { level }) };
+    const openEdges = open[index]!;
+    liquids[liquidId] = {
+      id: liquidId, kind: 'liquid', liquid, polygon: ring.map(world),
+      ...(holes && { holes: holes.map(hole => hole.map(world)) }),
+      ...(flow && { flow }),
+      ...(course && { course: course.map(world) }),
+      ...(openEdges.length > 0 && { openEdges }),
+      colors: colours[liquid], ...(style.direction !== 'stone' && { art: style.direction }), ...(lavaLight && { lavaLight }), ...(level && { level }),
+    };
   });
   // The glow comes from the whole of the lava, under its bridges and what stands in it too
   const lights: Record<string, LightSource> = {};

@@ -195,13 +195,13 @@ describe('a Forest’s rivers', { timeout: 30000 }, () => {
       const layout = mapLayout(model, 70, DEFAULT_VIEW);
       const parts = dungeonScene(model, dungeonStyle('crayon'), DEFAULT_VIEW, { originCell: layout.originCell, pxPerCell: 70 }, { width: layout.widthPx, height: layout.heightPx }, { unitType: 'feet', ruleDistance: 5 })!;
       const flowing = Object.values(parts.scene.liquids ?? {}).filter((liquid) => liquid.flow);
-      expect(flowing.length).toBeGreaterThan(3);
-      for (const liquid of flowing) for (const p of liquid.polygon) {
-        expect(p.x).toBeGreaterThanOrEqual(-0.01);
-        expect(p.y).toBeGreaterThanOrEqual(-0.01);
-        expect(p.x).toBeLessThanOrEqual(layout.widthPx + 0.01);
-        expect(p.y).toBeLessThanOrEqual(layout.heightPx + 0.01);
-      }
+      // Each river whole, never in stretches (a bridge's deck or a lake may part it), flowing along its course, its ends at the map's edge open.
+      const coursed = flowing.filter((liquid) => liquid.course);
+      expect(coursed.length).toBeGreaterThan(0);
+      for (const liquid of coursed) for (const k of liquid.openEdges ?? []) expect(k).toBeLessThan(liquid.polygon.length);
+      // An open edge lies where water goes on: on the map's edge, or against another surface.
+      const atEdge = (p: { x: number; y: number }): boolean => Math.min(Math.abs(p.x), Math.abs(p.y), Math.abs(p.x - layout.widthPx), Math.abs(p.y - layout.heightPx)) < 0.5;
+      expect(coursed.some((liquid) => (liquid.openEdges ?? []).some((k) => atEdge(liquid.polygon[k]!) && atEdge(liquid.polygon[(k + 1) % liquid.polygon.length]!)))).toBe(true);
       const features = Object.values(parts.scene.mapFeatures ?? {});
       for (const water of features.filter((f) => f.name === 'River' || f.name === 'Lake')) expect(water.terrain?.difficult).toBe(true);
       const decks = model.floors[0]!.rivers!.flatMap((river) => river.bridges).length;

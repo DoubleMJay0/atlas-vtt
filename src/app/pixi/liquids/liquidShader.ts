@@ -33,6 +33,8 @@ in vec2 vWorld;
 out vec4 finalColor;
 
 uniform sampler2D uField;
+uniform sampler2D uCourse;
+uniform float uCoursed;
 uniform vec4 uFieldRect;
 uniform vec4 uFieldCode;
 uniform float uCell;
@@ -64,10 +66,25 @@ float shoreDistance() {
   return mix(near, max(near, far), smoothstep(0.9, 0.99, code.r));
 }
 
+/** Across and along the surface's course at this pixel, in cells: its frame texels, blended by hand (float textures need not filter). */
+vec2 courseAt() {
+  ivec2 size = textureSize(uCourse, 0);
+  vec2 at = (vWorld - uFieldRect.xy) / uFieldRect.zw * vec2(size) - 0.5;
+  vec2 base = floor(at);
+  vec2 f = at - base;
+  ivec2 i = ivec2(base);
+  ivec2 last = size - 1;
+  vec2 a = texelFetch(uCourse, clamp(i, ivec2(0), last), 0).rg;
+  vec2 b = texelFetch(uCourse, clamp(i + ivec2(1, 0), ivec2(0), last), 0).rg;
+  vec2 c = texelFetch(uCourse, clamp(i + ivec2(0, 1), ivec2(0), last), 0).rg;
+  vec2 d = texelFetch(uCourse, clamp(i + ivec2(1, 1), ivec2(0), last), 0).rg;
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 void main() {
   vec2 cells = vWorld / uCell;
-  // The surface's frame: across and along its flow, or the map's own axes.
-  vec2 q = vec2(dot(cells, uFrame.xy), dot(cells, uFrame.zw));
+  // The surface's frame: across and along its course or its flow, or the map's own axes.
+  vec2 q = uCoursed > 0.5 ? courseAt() : vec2(dot(cells, uFrame.xy), dot(cells, uFrame.zw));
   float px = max(length(fwidth(cells)) * 0.7071, 1e-5);
   float near = smoothstep(45.0, 120.0, 1.0 / px);
   float d = shoreDistance();
@@ -94,6 +111,8 @@ export interface LiquidUniforms {
   uKind: number;
   uFlowing: number;
   uFrame: Float32Array;
+  /** 1 where the surface flows along a course, its frame read from `uCourse`. */
+  uCoursed: number;
   uDriftA: Float32Array;
   uDriftB: Float32Array;
   uTime: number;
@@ -118,9 +137,11 @@ export interface LiquidShader {
 
 /**
  * The shader of one liquid surface. Atlas renders surfaces with WebGL only; without it the still
- * map shows (`LiquidLayer` builds nothing). The program is shared through PIXI's cache.
+ * map shows (`LiquidLayer` builds nothing). The program is shared through PIXI's cache. `course`
+ * is the surface's course frame (`courseFrame`); a surface without one binds its field there,
+ * which it never reads.
  */
-export function createLiquidShader(field: Texture): LiquidShader {
+export function createLiquidShader(field: Texture, course: Texture = field): LiquidShader {
   const group = new UniformGroup({
     uFieldRect: { value: new Float32Array(4), type: 'vec4<f32>' },
     uFieldCode: { value: new Float32Array(4), type: 'vec4<f32>' },
@@ -128,6 +149,7 @@ export function createLiquidShader(field: Texture): LiquidShader {
     uKind: { value: 0, type: 'f32' },
     uFlowing: { value: 0, type: 'f32' },
     uFrame: { value: new Float32Array([1, 0, 0, 1]), type: 'vec4<f32>' },
+    uCoursed: { value: 0, type: 'f32' },
     uDriftA: { value: new Float32Array(4), type: 'vec4<f32>' },
     uDriftB: { value: new Float32Array(4), type: 'vec4<f32>' },
     uTime: { value: 0, type: 'f32' },
@@ -141,6 +163,6 @@ export function createLiquidShader(field: Texture): LiquidShader {
     uLavaGlow: { value: 1, type: 'f32' },
   });
   const glProgram = GlProgram.from({ vertex, fragment, name: 'atlas-liquid-surface', preferredFragmentPrecision: HIGHP });
-  const shader = new Shader({ glProgram, resources: { liquid: group, uField: field.source } });
+  const shader = new Shader({ glProgram, resources: { liquid: group, uField: field.source, uCourse: course.source } });
   return { shader, uniforms: group.uniforms };
 }
