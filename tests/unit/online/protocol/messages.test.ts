@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ASSET_CHUNK_BYTES, CLOSE, MAX_CAMPAIGN_PLAYERS, FINAL_CLOSE_CODES, GATE_CLOSE_CODES, MAX_ASSET_BYTES, MAX_CURSOR_NUMBERS, MAX_LASER_SPAN_MS, MAX_LIVE_PATH, MAX_LIVE_TOKENS, MAX_BATCH_SENDS, MAX_PLAYER_NAME, MAX_PLAYERS, MAX_TOKEN_CONDITIONS, MAX_TOKENS, parseClientFrame, parseGmMessage, parsePlayerMessage, parseRelayFrame,
+  CLOSE, MAX_CAMPAIGN_PLAYERS, FINAL_CLOSE_CODES, GATE_CLOSE_CODES, MAX_CURSOR_NUMBERS, PART_BYTES, MAX_LASER_SPAN_MS, MAX_LIVE_PATH, MAX_LIVE_TOKENS, MAX_BATCH_SENDS, MAX_PLAYER_NAME, MAX_PLAYERS, MAX_TOKEN_CONDITIONS, MAX_TOKENS, parseClientFrame, parseGmMessage, parsePlayerMessage, parseRelayFrame,
   playerName,
 } from '../../../../src/app/online/protocol/index.ts';
 
@@ -134,23 +134,19 @@ describe('relay frames', () => {
 });
 
 describe('game messages', () => {
-  it('read a scene, no scene, a chunk and a refusal', () => {
-    const scene = { t: 'scene', scene: { id: 's', map: { hash: HASH, size: 10, mime: 'image/webp' }, lit: false } };
+  it('read a scene and no scene', () => {
+    const scene = { t: 'scene', scene: { id: 's', map: { hash: HASH, size: 10, mime: 'image/webp', id: 'e'.repeat(64) }, lit: false } };
     expect(parseGmMessage(scene)).toEqual(scene);
     expect(parseGmMessage({ t: 'scene', scene: null })).toEqual({ t: 'scene', scene: null });
-    expect(parseGmMessage({ t: 'asset-chunk', hash: HASH, index: 0, count: 1, data: 'AAAA' })).toEqual({ t: 'asset-chunk', hash: HASH, index: 0, count: 1, data: 'AAAA' });
-    expect(parseGmMessage({ t: 'asset-refused', hash: HASH })).toEqual({ t: 'asset-refused', hash: HASH });
   });
 
-  it('refuse a map of another type, a chunk past its count or larger than a chunk, and a bad hash', () => {
-    expect(parseGmMessage({ t: 'scene', scene: { id: 's', map: { hash: HASH, size: 10, mime: 'text/html' }, lit: false } })).toBeNull();
-    expect(parseGmMessage({ t: 'asset-chunk', hash: HASH, index: 1, count: 1, data: '' })).toBeNull();
-    expect(parseGmMessage({ t: 'asset-chunk', hash: HASH, index: 0, count: 1, data: 'A'.repeat((ASSET_CHUNK_BYTES / 3) * 4 + 4) })).toBeNull();
-    expect(parsePlayerMessage({ t: 'asset-request', hash: 'A'.repeat(64) })).toBeNull();
-    expect(parsePlayerMessage({ t: 'asset-request', hash: HASH })).toEqual({ t: 'asset-request', hash: HASH });
-    expect(parsePlayerMessage({ t: 'asset-request', hash: HASH, from: 0 })).toEqual({ t: 'asset-request', hash: HASH });
-    expect(parsePlayerMessage({ t: 'asset-request', hash: HASH, from: 5 })).toEqual({ t: 'asset-request', hash: HASH, from: 5 });
-    for (const from of [-1, 1.5, '3', null, Math.ceil(MAX_ASSET_BYTES / ASSET_CHUNK_BYTES)]) expect(parsePlayerMessage({ t: 'asset-request', hash: HASH, from })).toBeNull();
+  it('refuse a map of another type, and know nothing of assets sent over the socket', () => {
+    expect(parseGmMessage({ t: 'scene', scene: { id: 's', map: { hash: HASH, size: 10, mime: 'text/html', id: 'e'.repeat(64) }, lit: false } })).toBeNull();
+    expect(parseGmMessage({ t: 'asset-chunk', hash: HASH, index: 0, count: 1, data: 'AAAA' })).toBeNull();
+    expect(parseGmMessage({ t: 'asset-refused', hash: HASH })).toBeNull();
+    expect(parseGmMessage({ t: 'asset-variant', hash: HASH, maxSide: 1024, variant: { hash: HASH, size: 1, mime: 'image/png', id: 'e'.repeat(64) }, width: 2, height: 2 })).toBeNull();
+    expect(parsePlayerMessage({ t: 'asset-request', hash: HASH })).toBeNull();
+    expect(parseGmMessage({ t: 'part', id: 'p', index: 0, count: 1, data: 'A'.repeat((PART_BYTES / 3) * 4 + 4) })).toBeNull();
   });
 });
 
@@ -164,7 +160,7 @@ describe('mine', () => {
 });
 
 describe('token lists', () => {
-  const token = { id: '0'.repeat(24), x: 10, y: -20.5, size: 62, cells: 1.5, rotation: 90, art: { hash: HASH, size: 3, mime: 'image/webp' }, name: 'Bear', ring: { colour: '#aabbcc', size: 70 }, claim: 'open', badge: null, ui: null };
+  const token = { id: '0'.repeat(24), x: 10, y: -20.5, size: 62, cells: 1.5, rotation: 90, art: { hash: HASH, size: 3, mime: 'image/webp', id: 'e'.repeat(64) }, name: 'Bear', ring: { colour: '#aabbcc', size: 70 }, claim: 'open', badge: null, ui: null };
   const ui = {
     nameplate: true, downed: false,
     bars: [{ colour: '#dc2626', direction: 'drains', defeats: true, current: 4, max: 12 }, { colour: '#3b82f6', direction: 'static', defeats: false, current: 15, max: 15 }],
@@ -211,7 +207,7 @@ describe('token lists', () => {
   });
 
   it('refuse the whole list for one token with a GM id, a place that is no number, a colour or artwork it may not have', () => {
-    for (const bad of [{ id: 'gm-token-1' }, { x: Number.NaN }, { cells: 0 }, { cells: Number.POSITIVE_INFINITY }, { y: '1' }, { size: 0 }, { rotation: 400 }, { ring: { colour: 'red', size: 70 } }, { art: { hash: HASH, size: 3, mime: 'image/svg+xml' } }, { name: 'x'.repeat(201) }, { claim: 'mine' }, { claim: undefined }]) {
+    for (const bad of [{ id: 'gm-token-1' }, { x: Number.NaN }, { cells: 0 }, { cells: Number.POSITIVE_INFINITY }, { y: '1' }, { size: 0 }, { rotation: 400 }, { ring: { colour: 'red', size: 70 } }, { art: { hash: HASH, size: 3, mime: 'image/svg+xml', id: 'e'.repeat(64) } }, { name: 'x'.repeat(201) }, { claim: 'mine' }, { claim: undefined }]) {
       expect(parseGmMessage({ t: 'tokens', scene: 's', tokens: [token, { ...token, ...bad }], cell: 70, snap: null }), JSON.stringify(bad)).toBeNull();
     }
     expect(parseGmMessage({ t: 'tokens', scene: 's', tokens: Array.from({ length: MAX_TOKENS + 1 }, () => token), cell: 70, snap: null })).toBeNull();
@@ -267,7 +263,7 @@ describe('fog and lighting', () => {
     expect(parseGmMessage(lighting)).toEqual(lighting);
     expect(parseGmMessage(sight)).toEqual(sight);
     expect(parseGmMessage({ ...sight, blind: true })).toEqual({ ...sight, blind: true });
-    expect(parseGmMessage({ t: 'explored', scene: 's', mask: { hash: HASH, size: 3, mime: 'image/png' } })).not.toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene: 's', png: 'AAAA' })).toEqual({ t: 'explored', scene: 's', png: 'AAAA' });
     expect(parseGmMessage({ t: 'part', id: 'p', index: 1, count: 2, data: 'AAAA' })).toEqual({ t: 'part', id: 'p', index: 1, count: 2, data: 'AAAA' });
   });
 
@@ -279,7 +275,7 @@ describe('fog and lighting', () => {
     expect(parseGmMessage({ ...sight, tokens: [{ ...sight.tokens[0], id: 'gm-token' }] })).toBeNull();
     expect(parseGmMessage({ ...sight, tokens: [{ ...sight.tokens[0], effects: ['petrified'] }] })).toBeNull();
     expect(parseGmMessage({ ...sight, tokens: [{ ...sight.tokens[0], vision: { senses: [{ id: 'x', range: -1 }] } }] })).toBeNull();
-    expect(parseGmMessage({ t: 'explored', scene: 's', mask: { hash: HASH, size: 3, mime: 'image/webp' } })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene: 's', png: 'not base64!' })).toBeNull();
     expect(parseGmMessage({ t: 'part', id: 'p', index: 2, count: 2, data: 'AAAA' })).toBeNull();
   });
 });

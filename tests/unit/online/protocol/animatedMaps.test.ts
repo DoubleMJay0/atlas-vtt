@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MAX_SHARED_LIQUID_CORNERS, MAX_SHARED_LIQUID_TOTAL, MAX_SHARED_LIQUIDS, parseGmMessage, parseLiquids } from '../../../../src/app/online/protocol/index.ts';
 
 const HASH = 'a'.repeat(64);
-const MAP = { hash: HASH, size: 10, mime: 'image/png' };
-const VIDEO = { hash: 'b'.repeat(64), size: 5_000_000, mime: 'video/webm' };
+const MAP = { hash: HASH, size: 10, mime: 'image/png', id: 'e'.repeat(64) };
+const VIDEO = { hash: 'b'.repeat(64), size: 5_000_000, mime: 'video/webm', id: 'e'.repeat(64) };
 const scene = (extra: Record<string, unknown>, map: unknown = MAP): unknown => ({ t: 'scene', scene: { id: 's1', map, lit: false, ...extra } });
 
 const id = (n: number): string => n.toString(16).padStart(24, '0');
@@ -21,7 +21,7 @@ describe("an animated map's video beside its poster", () => {
   });
 
   it('is left out where malformed or of another type, and the poster still shows', () => {
-    const bad = [null, 'video.webm', { ...VIDEO, mime: 'image/png' }, { ...VIDEO, mime: 'video/quicktime' }, { ...VIDEO, hash: 'B'.repeat(64) }, { ...VIDEO, size: 64 * 1024 * 1024 + 1 }, { ...VIDEO, size: -1 }];
+    const bad = [null, 'video.webm', { ...VIDEO, mime: 'image/png' }, { ...VIDEO, mime: 'video/quicktime' }, { ...VIDEO, hash: 'B'.repeat(64) }, { ...VIDEO, size: 2 * 1024 ** 3 + 1 }, { ...VIDEO, size: -1 }, { hash: VIDEO.hash, size: VIDEO.size, mime: VIDEO.mime }];
     for (const video of bad) expect(parseGmMessage(scene({ video }))).toEqual({ t: 'scene', scene: { id: 's1', map: MAP, lit: false } });
   });
 

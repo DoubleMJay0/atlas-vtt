@@ -3,7 +3,7 @@ import { MAX_ROTATION_DEGREES, MAX_STRETCH_FACTOR, readMapStretch } from '../../
 import { readLevelAlignment } from '../../../../src/app/levels/levelAlignment';
 import { MAX_FIT_OFFSET, MAX_FIT_SCALE, MAX_MAP_ROTATION, MAX_MAP_STRETCH, MIN_FIT_SCALE, parseGmMessage, parseLevelFit, parseMapStretch } from '../../../../src/app/online/protocol/index.ts';
 
-const MAP = { hash: 'c'.repeat(64), size: 10, mime: 'image/png' };
+const MAP = { hash: 'c'.repeat(64), size: 10, mime: 'image/png', id: 'e'.repeat(64) };
 const FIT = { scale: 0.5, offset: { x: 140, y: 0 } };
 
 describe("a map's stretch", () => {

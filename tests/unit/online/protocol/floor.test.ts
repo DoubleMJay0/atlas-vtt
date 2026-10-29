@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseGmMessage, sameMapFloors } from '../../../../src/app/online/protocol/index.ts';
 
 const HASH = 'a'.repeat(64);
-const MAP = { hash: HASH, size: 10, mime: 'image/webp' };
+const MAP = { hash: HASH, size: 10, mime: 'image/webp', id: 'e'.repeat(64) };
 const scene = (extra: Record<string, unknown>): unknown => ({ t: 'scene', scene: { id: 's1', map: MAP, lit: true, ...extra } });
 
 describe('a floor of a scene with several', () => {

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ASSET_CAPS, GM_LEVEL, isAssetKind, MAX_ASSET_BYTES, MAX_PROGRESS_ENTRIES, MAX_STORED_BYTES, parseAsset, parseAssetProgress, parseGmMessage, parseVideoAsset } from '../../../../src/app/online/protocol/index.ts';
+import { ASSET_CAPS, GM_LEVEL, isAssetKind, MAX_PROGRESS_ENTRIES, MAX_STORED_BYTES, parseAsset, parseAssetProgress, parseGmMessage, parseVideoAsset } from '../../../../src/app/online/protocol/index.ts';
 import { EXPLORED_INLINE_BYTES } from '../../../../src/app/online/protocol/game.ts';
 
 const hash = 'a'.repeat(64);
 const id = 'b'.repeat(64);
 
 describe('an asset reference with its stored id', () => {
-  it('keeps the id of a reference from the asset store, and none where the GM serves it by hash', () => {
+  it('keeps the id of a reference from the asset store, and refuses a reference without one', () => {
     expect(parseAsset({ hash, size: 10, mime: 'image/png', id })).toEqual({ hash, size: 10, mime: 'image/png', id });
-    expect(parseAsset({ hash, size: 10, mime: 'image/png' })).toEqual({ hash, size: 10, mime: 'image/png' });
+    expect(parseAsset({ hash, size: 10, mime: 'image/png' })).toBeNull();
   });
 
   it('refuses an id that is no 64-character lowercase hex name', () => {
@@ -17,13 +17,12 @@ describe('an asset reference with its stored id', () => {
     expect(parseAsset({ hash, size: 10, mime: 'image/png', id: 7 })).toBeNull();
   });
 
-  it('bounds the size by the socket cap without an id and by the store cap with one', () => {
-    expect(parseVideoAsset({ hash, size: MAX_ASSET_BYTES + 1, mime: 'video/webm' })).toBeNull();
-    expect(parseVideoAsset({ hash, size: MAX_ASSET_BYTES + 1, mime: 'video/webm', id })).toEqual({ hash, size: MAX_ASSET_BYTES + 1, mime: 'video/webm', id });
+  it('bounds the size by the store\'s cap', () => {
+    expect(parseVideoAsset({ hash, size: 300 * 1024 * 1024, mime: 'video/webm', id })).toEqual({ hash, size: 300 * 1024 * 1024, mime: 'video/webm', id });
     expect(parseVideoAsset({ hash, size: MAX_STORED_BYTES + 1, mime: 'video/webm', id })).toBeNull();
   });
 
-  it('marks a map stored as a tile pyramid, only together with an id', () => {
+  it('marks a map stored as a tile pyramid', () => {
     expect(parseAsset({ hash, size: 10, mime: 'image/webp', id, tiles: true })).toEqual({ hash, size: 10, mime: 'image/webp', id, tiles: true });
     expect(parseAsset({ hash, size: 10, mime: 'image/webp', id, tiles: false })).toBeNull();
     expect(parseAsset({ hash, size: 10, mime: 'image/webp', tiles: true })).toBeNull();
@@ -57,11 +56,10 @@ describe('the explored memory comes inline', () => {
   const scene = 's1';
   const png = 'AAAA'.repeat(8);
 
-  it('reads an inline PNG beside or instead of the mask reference', () => {
-    expect(parseGmMessage({ t: 'explored', scene, mask: null, png })).toEqual({ t: 'explored', scene, mask: null, png });
-    const mask = { hash, size: 5, mime: 'image/png' };
-    expect(parseGmMessage({ t: 'explored', scene, mask, png })).toEqual({ t: 'explored', scene, mask, png });
-    expect(parseGmMessage({ t: 'explored', scene, mask: null })).toEqual({ t: 'explored', scene, mask: null });
+  it('reads an inline PNG, and none without one; a reference beside it is no part of the message', () => {
+    expect(parseGmMessage({ t: 'explored', scene, png })).toEqual({ t: 'explored', scene, png });
+    expect(parseGmMessage({ t: 'explored', scene })).toEqual({ t: 'explored', scene });
+    expect(parseGmMessage({ t: 'explored', scene, mask: { hash, size: 5, mime: 'image/png', id }, png })).toEqual({ t: 'explored', scene, png });
   });
 
   it('refuses a PNG that is no base64 or larger than the inline cap', () => {
@@ -73,7 +71,7 @@ describe('the explored memory comes inline', () => {
 });
 
 describe('the GM level', () => {
-  it('is 9: stored assets and the inline explored memory', () => {
+  it('is 9: stored assets and the inline explored memory, and no assets over the socket', () => {
     expect(GM_LEVEL).toBe(9);
   });
 });
