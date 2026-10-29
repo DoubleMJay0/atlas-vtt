@@ -1,17 +1,15 @@
 import { ASSET_CAPS, type AssetRef } from '../../protocol/index.ts';
 import { t, type MessageKey } from '../../../i18n';
-import type { Timers } from '../companionTimers.ts';
 import { AssetIds } from './assetIds.ts';
 import { FileHashes, type FileStat } from './fileHashes.ts';
-import { AssetProgress, type ProgressPorts } from './assetProgress.ts';
-import { AssetRefs, type PyramidSource, type Registration } from './assetRefs.ts';
+import { AssetProgress } from './assetProgress.ts';
+import { AssetRefs, type Registration } from './assetRefs.ts';
 import type { JobEnd } from './assetJob.ts';
 import type { OfferRefusal } from './assetRoutes.ts';
-import type { AssetSalt } from './assetSalt.ts';
-import type { UploadClient } from './assetUpload.ts';
+import type { AssetPublisherPorts } from './publisherPorts.ts';
 import { ASSET_RANKS } from './assetUses.ts';
-import type { AssetStoreClient } from './storeClient.ts';
-import { UploadQueue, type QueueEntry } from './uploadQueue.ts';
+import { PyramidPublishing } from './pyramidPublishing.ts';
+import { entryPyramid, UploadQueue, type QueueEntry } from './uploadQueue.ts';
 import { UploadRunner } from './uploadRunner.ts';
 
 /** How long new assets gather before they are offered, so a scene's go in one request. */
@@ -20,27 +18,7 @@ export const OFFER_DELAY_MS = 200;
 export const MAX_OFFER = 2000;
 
 export type { FileStat };
-
-export interface AssetPublisherPorts extends Pick<ProgressPorts, 'sendLive' | 'send' | 'connected'> {
-  readonly client: UploadClient & Pick<AssetStoreClient, 'offer' | 'putTiles'>;
-  /** This device's map pyramids; without them maps go as images. */
-  readonly pyramids?: PyramidSource | undefined;
-  readonly salt: Pick<AssetSalt, 'soon'>;
-  readonly timers: Timers;
-  /** A vault file's bytes as they are, or null where it cannot be read. */
-  readFile(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
-  stat(path: string): FileStat | null;
-  /** The players connected now, and the time the socket's last keep-alive took. */
-  connection(): { readonly players: number; readonly latencyMs: number | null };
-  /** Tells the GM something (Obsidian's `Notice`). */
-  notify(text: string): void;
-  /** The relay refused the account's token. */
-  signedOutByServer(): void;
-  /** Nothing is on its way any more: what the store holds may have changed. */
-  settled?(): void;
-  /** Assets players were handed with an id can no longer be stored: what names them may hand them again without one. */
-  withdrawn?(): void;
-}
+export type { AssetPublisherPorts };
 
 /**
  * Why the queue stands still: the account is out of room (what the store took already still goes up),
@@ -72,11 +50,24 @@ export class AssetPublisher {
   private stopped = false;
   /** Whether the store refused a pyramid for its kind (a relay without them): maps go as images from then on. */
   private noTiles = false;
+  private readonly pyramids: PyramidPublishing | undefined;
   /** How players are handed references, and how the scenes open beside the presented one are offered. */
   readonly storing: AssetRefs;
 
   constructor(private readonly ports: AssetPublisherPorts) {
     this.progress = new AssetProgress(ports);
+    this.pyramids = ports.pyramids === undefined ? undefined : new PyramidPublishing({
+      source: ports.pyramids,
+      timers: ports.timers,
+      entries: () => this.queue.all(),
+      ready: () => this.runner.pump(),
+      stage: (assets) => this.storing.stage(assets),
+      // Its pyramid failed: forgotten, and what handed it hands its map again, as an image.
+      withdraw: (entry) => {
+        this.queue.forget(entry.id);
+        this.withdraw([entry]);
+      },
+    });
     this.hashes = new FileHashes((path) => ports.stat(path));
     this.runner = new UploadRunner({
       queue: this.queue,
@@ -96,10 +87,11 @@ export class AssetPublisher {
       hashes: this.hashes,
       readFile: (path) => ports.readFile(path),
       stat: (path) => ports.stat(path),
-      pyramids: ports.pyramids,
+      pyramids: this.pyramids,
       register: (asset) => this.register(asset),
       release: (ref) => this.release(ref),
       tilesRefused: () => this.noTiles,
+      floorMaps: (maps) => this.pyramids?.floorMaps(maps),
     });
   }
 
@@ -147,6 +139,7 @@ export class AssetPublisher {
     this.stopped = true;
     this.progress.stop();
     this.runner.stop();
+    this.pyramids?.stop();
     if (this.offerTimer !== undefined) this.ports.timers.clearTimer(this.offerTimer);
     this.offerTimer = undefined;
   }
@@ -165,8 +158,7 @@ export class AssetPublisher {
     // While the store takes nothing, new assets, and any not stored once nothing goes up, go the old way.
     if (this.halted !== null && (known === undefined || (this.halted !== 'quota' && known.state !== 'stored'))) return undefined;
     const entry = this.queue.note({ id, hash, size, mime, kind: use.kind, rank: use.rank, handed, source });
-    // A pyramid whose overview went keeps its other levels behind the art players see.
-    if (entry.source !== null && 'plan' in entry.source && entry.source.plan.batches[entry.next]?.overview === false) entry.rank = Math.max(entry.rank, ASSET_RANKS.mapLevels);
+    this.pyramids?.noted(entry);
     if (entry.handed) this.progress.set(id, entry.state === 'stored' ? 1 : this.progress.share(id) ?? 0);
     if (entry.state === 'new') this.offerSoon();
     else this.runner.pump();
@@ -202,7 +194,10 @@ export class AssetPublisher {
     if (batch.length === 0) return this.runner.pump();
     this.offering = true;
     for (const entry of batch) entry.state = 'offered';
-    const answer = await this.ports.client.offer(batch.map(({ id, kind, size, source }) => ({ id, kind, size, ...(source !== null && 'plan' in source && { tiles: { levels: source.plan.levels, count: source.plan.count } }) })));
+    const answer = await this.ports.client.offer(batch.map((entry) => {
+      const pyramid = entryPyramid(entry);
+      return { id: entry.id, kind: entry.kind, size: entry.size, ...(pyramid !== null && { tiles: { levels: pyramid.levels, count: pyramid.count } }) };
+    }));
     this.offering = false;
     if (this.stopped) return;
     const now = this.ports.timers.now();
@@ -215,10 +210,13 @@ export class AssetPublisher {
     for (const entry of batch) {
       const outcome = this.queue.answered(entry, answer.value.get(entry.id), now);
       if (outcome === 'have') this.stored(entry);
+      else if (outcome === 'need') entryPyramid(entry)?.start();
       else if (outcome === 'quota' || outcome === 'restricted') this.halt(outcome);
       else if (outcome === 'too-large' && entry.rank === ASSET_RANKS.map) this.tell('too-large');
       else if (outcome === 'kind' && entry.kind === 'tiles') this.noTiles = true;
-      if (outcome !== null && outcome !== 'have' && outcome !== 'need') withdrawn.push(entry);
+      if (outcome === null || outcome === 'have' || outcome === 'need') continue;
+      withdrawn.push(entry);
+      entryPyramid(entry)?.stop();
     }
     this.withdraw(withdrawn);
     if (this.queue.toOffer(now).length > 0) this.offerSoon();
@@ -257,12 +255,13 @@ export class AssetPublisher {
   }
 
   private ended(entry: QueueEntry, end: JobEnd): void {
+    // Forgotten while it went up (its pyramid failed): nothing more of it.
+    if (this.queue.get(entry.id) !== entry) return;
     const now = this.ports.timers.now();
     if (end === 'stored') return this.stored(entry);
-    if (end === 'partial') {
+    if (end === 'waiting') {
       entry.state = 'queued';
-      entry.rank = Math.max(entry.rank, ASSET_RANKS.mapLevels);
-      return;
+      return this.pyramids?.rank(entry);
     }
     if (end === 'signed-out' || end === 'forbidden') {
       entry.state = 'queued';

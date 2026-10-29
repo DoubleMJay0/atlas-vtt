@@ -125,9 +125,15 @@ export function hostTileCore(createCore: CoreFactory, post: PostMessage): TileCo
       case 'clear-cache':
         reply({ type: 'cleared', id: request.id, bytes: await ready.clearCache() });
         return;
-      case 'pyramid-facts':
-        reply({ type: 'pyramid-facts', id: request.id, facts: await ready.pyramidFacts(request.hash) });
+      case 'level-ready': {
+        try {
+          const level = await ready.levelReady(request.id, request.hash, request.level);
+          if (level) reply({ type: 'level-ready', id: request.id, level });
+        } catch (error) {
+          reply({ type: 'error', id: request.id, message: message(error) });
+        }
         return;
+      }
       case 'tile-blobs': {
         const blobs = await ready.tileBlobs(request.hash, request.tiles);
         reply({ type: 'tile-blobs', id: request.id, blobs }, blobs.filter((blob): blob is ArrayBuffer => blob !== null));

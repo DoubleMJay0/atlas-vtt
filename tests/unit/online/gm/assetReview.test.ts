@@ -162,10 +162,11 @@ describe('the connection\'s pace', () => {
     void slots.take().then(() => granted.push(3));
     limit = 1;
     releases[0]?.();
-    await Promise.resolve();
+    // A turn given back is given out once its holder could ask again: a task later at the latest.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(granted).toEqual([]);
     releases[1]?.();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(granted).toEqual([3]);
   });
 

@@ -128,7 +128,8 @@ export class Slots {
       if (released) return;
       released = true;
       this.active -= 1;
-      this.drain();
+      // Given out once the holder had its chance to ask again: an upload asks for its next turn right after it gave one back, and the most urgent asker should win it.
+      queueMicrotask(() => this.drain());
     };
   }
 }

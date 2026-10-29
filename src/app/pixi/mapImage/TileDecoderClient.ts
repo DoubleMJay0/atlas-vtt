@@ -6,7 +6,7 @@ import { MapClosedError } from './tileErrors';
 import { openWithRetry, type BytesSource, type MainThreadDecode, type OpenExchange } from './tileOpenRequest';
 import type { ArtAlpha } from '../../levels/artRaster';
 import type { RoofPieces } from '../../levels/roofs';
-import type { PyramidFacts, TileSelection } from './tileBlobs';
+import type { StoredLevel, TileSelection } from './tileBlobs';
 import {
   isTileEvent,
   type FileIdentity,
@@ -116,18 +116,22 @@ export class TileDecoderClient {
     return { hash: reply.hash, complete: reply.complete };
   }
 
-  /** A complete cached pyramid's facts (`readPyramidFacts`), or null where the cache holds none whole. */
-  async pyramidFacts(hash: string): Promise<PyramidFacts | null> {
-    const reply = await this.request({ type: 'pyramid-facts', id: this.nextId++, hash }, []);
-    if (reply.type !== 'pyramid-facts') throw this.failure(reply);
-    return reply.facts;
-  }
-
   /** The stored WebP bytes of a cached pyramid's tiles, never decoded; null for a tile the cache misses. */
   async tileBlobs(hash: string, tiles: TileSelection): Promise<(ArrayBuffer | null)[]> {
     const reply = await this.request({ type: 'tile-blobs', id: this.nextId++, hash, tiles }, []);
     if (reply.type !== 'tile-blobs') throw this.failure(reply);
     return reply.blobs;
+  }
+
+  /**
+   * A level of a cached pyramid once every tile of it is stored, with each tile's stored size: at once
+   * where the cache holds it, else as a build (started elsewhere) stores it. Rejects once `signal`
+   * aborts, and when the worker stops: a new worker knows nothing of the wait, so ask again.
+   */
+  async levelReady(hash: string, level: number, signal?: AbortSignal): Promise<StoredLevel> {
+    const reply = await this.answer({ type: 'level-ready', id: this.nextId++, hash, level }, undefined, signal);
+    if (reply.type !== 'level-ready') throw this.failure(reply);
+    return reply.level;
   }
 
   /** A tile's bitmap; rejects with `MapClosedError` once its map is closed or was lost with a crashed worker. */
@@ -236,10 +240,10 @@ export class TileDecoderClient {
     return reply.bitmap;
   }
 
-  /** The reply to a request about an open map, which `signal` cancels in the worker too. */
+  /** The reply to a request (about the open map `handle`, if any), which `signal` cancels in the worker too. */
   private async answer(
-    message: Extract<TileRequest, { type: 'tile' | 'overview' | 'alpha-raster' | 'roof-pieces' }>,
-    handle: number,
+    message: Extract<TileRequest, { type: 'tile' | 'overview' | 'alpha-raster' | 'roof-pieces' | 'level-ready' }>,
+    handle: number | undefined,
     signal: AbortSignal | undefined,
   ): Promise<TileReply> {
     signal?.throwIfAborted();

@@ -1,10 +1,21 @@
-import { factsPyramid, type PyramidFacts, type StoredTileSize } from '../../../pixi/mapImage/tileBlobs';
-import { tileWorldRect, type Pyramid } from '../../../pixi/mapImage/pyramid';
+import { ASSET_CAPS } from '../../protocol/index.ts';
+import type { StoredTileSize } from '../../../pixi/mapImage/tileBlobs';
+import { pyramidTiles } from '../../../pixi/mapImage/tileBlobs';
+import { imageDimensions } from '../../../imageProcessing/imageDimensions';
+import { pyramidOf, TILE_SPEC, tileSourceRect, tileWorldRect, type Pyramid } from '../../../pixi/mapImage/pyramid';
 
 /** The most a batch of tiles carries: below the store's 8 MiB body, with room for the form's headers. */
 export const BATCH_BYTES = 7.5 * 1024 * 1024;
 /** The most tiles one batch carries. */
 export const BATCH_TILES = 32;
+/**
+ * The most a tile can take as lossless WebP, by its pixels: its raw RGBA and a margin for the
+ * entropy coding of noise, plus the container. A pyramid is offered at the sum before it is cut.
+ */
+const TILE_BYTES_PER_PIXEL = 4 * 1.03;
+const TILE_BYTES_HEADER = 1024;
+/** The most a manifest takes. */
+const MANIFEST_BYTES = 256;
 
 /** Where players look on the map, as shares of its width and height (0 to 1). */
 export interface MapFocus {
@@ -22,22 +33,42 @@ export interface TileBatch {
   readonly overview: boolean;
 }
 
-/** How a pyramid goes into the store: its manifest, its pieces and bytes, and its batches in order. */
-export interface PyramidPlan {
-  /** `manifest.json`: width, height, spec, levels and tile count, which a page reads the pyramid by. */
-  readonly manifest: Uint8Array<ArrayBuffer>;
-  readonly levels: number;
-  /** Its tiles, all levels together. */
-  readonly count: number;
-  /** Its tiles' stored bytes and the manifest's: what the store keeps of it. */
-  readonly bytes: number;
-  readonly batches: readonly TileBatch[];
-}
-
 /** The order levels go up in (ASD-41): the overview, then the others from coarse to fine, as a page expects them. */
 export function levelOrder(pyramid: Pyramid): number[] {
   const rest = pyramid.levels.map((level) => level.index).filter((index) => index !== pyramid.overview).reverse();
   return [pyramid.overview, ...rest];
+}
+
+/** Every tile of a pyramid, all levels together. */
+export const tileCount = (pyramid: Pyramid): number => pyramid.levels.reduce((sum, level) => sum + level.cols * level.rows, 0);
+
+/** The pyramid of an image as its header gives its size, read without decoding; null where the header cannot be read (SVG, AVIF). */
+export async function headerPyramid(bytes: Uint8Array<ArrayBuffer>): Promise<Pyramid | null> {
+  const size = await imageDimensions(new Blob([bytes]));
+  if (size === null) return null;
+  try {
+    return pyramidOf(size.width, size.height);
+  } catch {
+    return null;
+  }
+}
+
+/** `manifest.json`: width, height, spec, levels and tile count, which a page reads the pyramid by. */
+export function manifestOf(pyramid: Pyramid): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(JSON.stringify({ width: pyramid.width, height: pyramid.height, spec: TILE_SPEC, levels: pyramid.levels.length, count: tileCount(pyramid) })).slice();
+}
+
+/**
+ * The most the store can be asked to keep of a pyramid before it is cut (the store refuses tiles past
+ * the size offered and, once the pyramid is stored, keeps its true size): every tile at its bound and
+ * the manifest, within what the store keeps under one id.
+ */
+export function pyramidBound(pyramid: Pyramid): number {
+  const tiles = pyramidTiles(pyramid).reduce((sum, ref) => {
+    const rect = tileSourceRect(pyramid, ref);
+    return sum + Math.ceil(rect.width * rect.height * TILE_BYTES_PER_PIXEL) + TILE_BYTES_HEADER;
+  }, 0);
+  return Math.min(ASSET_CAPS.tiles, tiles + MANIFEST_BYTES);
 }
 
 /** A tile's distance from the focus, in shares of the map. */
@@ -47,37 +78,26 @@ function distance(pyramid: Pyramid, tile: StoredTileSize, focus: MapFocus): numb
 }
 
 /**
- * The upload of a complete pyramid: the manifest in the first batch, then the overview level, then the
- * levels from coarse to fine, within each level the tiles nearest `focus` first, in batches of at most
- * `BATCH_TILES` tiles and `BATCH_BYTES` bytes; the overview's batches end with it.
+ * The batches of one level's upload: its tiles nearest `focus` first, in batches of at most
+ * `BATCH_TILES` tiles and `BATCH_BYTES` bytes; the first carries the manifest where `manifest` names
+ * its bytes (the pyramid's first level to go up, the overview).
  */
-export function planPyramid(facts: PyramidFacts, focus: MapFocus = MAP_CENTRE): PyramidPlan {
-  const pyramid = factsPyramid(facts);
-  const manifest = new TextEncoder().encode(JSON.stringify({ width: facts.width, height: facts.height, spec: facts.spec, levels: pyramid.levels.length, count: facts.tiles.length })).slice();
+export function planLevel(pyramid: Pyramid, tiles: readonly StoredTileSize[], focus: MapFocus, manifest: Uint8Array | null): TileBatch[] {
+  const overview = tiles[0]?.level === pyramid.overview;
+  const sorted = tiles.map((tile) => ({ tile, away: distance(pyramid, tile, focus) })).sort((a, b) => a.away - b.away);
   const batches: TileBatch[] = [];
   let current: StoredTileSize[] = [];
-  let size = manifest.length;
-  let overview = true;
+  let size = manifest?.length ?? 0;
   const close = (): void => {
-    if (current.length === 0 && batches.length > 0) return;
-    batches.push({ tiles: current, manifest: batches.length === 0, overview });
+    batches.push({ tiles: current, manifest: manifest !== null && batches.length === 0, overview });
     current = [];
     size = 0;
   };
-  for (const index of levelOrder(pyramid)) {
-    const tiles = facts.tiles.filter((tile) => tile.level === index).map((tile) => ({ tile, away: distance(pyramid, tile, focus) }));
-    tiles.sort((a, b) => a.away - b.away);
-    for (const { tile } of tiles) {
-      if (current.length > 0 && (current.length >= BATCH_TILES || size + tile.bytes > BATCH_BYTES)) close();
-      current.push(tile);
-      size += tile.bytes;
-    }
-    if (overview) {
-      close();
-      overview = false;
-    }
+  for (const { tile } of sorted) {
+    if (current.length > 0 && (current.length >= BATCH_TILES || size + tile.bytes > BATCH_BYTES)) close();
+    current.push(tile);
+    size += tile.bytes;
   }
-  if (current.length > 0) close();
-  const bytes = manifest.length + facts.tiles.reduce((sum, tile) => sum + tile.bytes, 0);
-  return { manifest, levels: pyramid.levels.length, count: facts.tiles.length, bytes, batches };
+  if (current.length > 0 || batches.length === 0) close();
+  return batches;
 }

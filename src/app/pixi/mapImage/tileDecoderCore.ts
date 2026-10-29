@@ -6,7 +6,8 @@ import type { TileRef } from './pyramid';
 import type { TileGraphics } from './tileGraphics';
 import type { FileIdentity, OpenedPyramid, OpenFailure, TileEvent } from './tileProtocol';
 import { TileServer } from './tileServer';
-import { readPyramidFacts, readTileBlobs, type PyramidFacts, type TileSelection } from './tileBlobs';
+import { readStoredLevel, readTileBlobs, type StoredLevel, type TileSelection } from './tileBlobs';
+import { LevelWaits } from './levelWaits';
 import type { TileStore } from './tileStore';
 
 /**
@@ -47,15 +48,20 @@ export class TileDecoderCore {
   private readonly handles = new Map<number, MapEntry>();
   private readonly entries: MapEntries;
   private readonly server: TileServer;
+  private readonly levelWaits: LevelWaits;
   private nextHandle = 1;
   private disposed = false;
 
   constructor(private readonly deps: TileCoreDeps) {
     this.server = new TileServer(deps.store, deps.graphics);
+    this.levelWaits = new LevelWaits((hash, level) => this.pinned(hash, () => readStoredLevel(deps.store, hash, level)));
     this.entries = new MapEntries({
       store: deps.store,
       graphics: deps.graphics,
-      emit: deps.emit,
+      emit: (event) => {
+        deps.emit(event);
+        this.levelWaits.heard(event);
+      },
       yieldToRequests: () => this.yieldToRequests(),
       decodedBudget: deps.decodedBudget,
     });
@@ -120,6 +126,15 @@ export class TileDecoderCore {
 
   cancel(id: number): void {
     this.server.cancel(id);
+    this.levelWaits.cancel(id);
+  }
+
+  /**
+   * A level of a pyramid once the cache holds all its tiles (a build stores the coarsest level first),
+   * with each tile's stored size; null once cancelled. Waits across builds that stop and resume.
+   */
+  levelReady(id: number, hash: string, level: number): Promise<StoredLevel | null> {
+    return this.levelWaits.wait(id, hash, level);
   }
 
   /** Ends an open: its requests reject, its pyramid is unpinned, and its levels released once nothing needs them. */
@@ -138,13 +153,9 @@ export class TileDecoderCore {
     this.disposed = true;
     for (const handle of this.handles.keys()) this.server.cancelHandle(handle);
     this.handles.clear();
+    this.levelWaits.dispose();
     this.entries.dispose();
     await this.deps.store.close();
-  }
-
-  /** A complete cached pyramid's facts, read without decoding; null where the cache holds none whole. */
-  pyramidFacts(hash: string): Promise<PyramidFacts | null> {
-    return this.pinned(hash, () => readPyramidFacts(this.deps.store, hash));
   }
 
   /** The stored bytes of a cached pyramid's tiles, as they are; null for a tile the cache misses. */

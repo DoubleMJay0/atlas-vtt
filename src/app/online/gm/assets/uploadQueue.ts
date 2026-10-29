@@ -1,13 +1,16 @@
 import type { AssetKind } from '../../protocol/index.ts';
 import type { OfferAnswer, OfferRefusal, UploadWay } from './assetRoutes.ts';
-import type { PyramidPlan } from './pyramidPlan.ts';
+import type { LivePyramid } from './livePyramid.ts';
 import { retryMs } from './uploadPace.ts';
 
 /**
  * Where an upload reads an asset's bytes: kept in memory (a text, a poster, a drawing), a vault file
- * read again then, or a map's tile pyramid in this device's cache, uploaded as its plan says.
+ * read again then, or a map's tile pyramid in this device's cache, uploaded level by level as it is cut.
  */
-export type AssetSource = { readonly bytes: Uint8Array<ArrayBuffer> } | { readonly path: string } | { readonly plan: PyramidPlan };
+export type AssetSource = { readonly bytes: Uint8Array<ArrayBuffer> } | { readonly path: string } | { readonly pyramid: LivePyramid };
+
+/** The pyramid an entry uploads, if it is one. */
+export const entryPyramid = (entry: Pick<QueueEntry, 'source'>): LivePyramid | null => (entry.source !== null && 'pyramid' in entry.source ? entry.source.pyramid : null);
 
 /** An asset's way into the store: offered next, offered, waiting to go up, going up, stored, refused by the store, or given up. */
 export type EntryState = 'new' | 'offered' | 'queued' | 'uploading' | 'stored' | 'refused' | 'failed';
@@ -28,7 +31,7 @@ export interface QueueEntry {
   source: AssetSource | null;
   state: EntryState;
   upload: { readonly upload: UploadWay; readonly partBytes: number } | null;
-  /** A pyramid's next batch to send (`PyramidPlan.batches`); 0 for every other asset. */
+  /** A pyramid's next batch to send (`LivePyramid.batch`); 0 for every other asset. */
   next: number;
   /** Why the store refused it, while it is refused. */
   refusal: OfferRefusal | null;
@@ -87,11 +90,11 @@ export class UploadQueue {
     return [...this.entries.values()].filter((entry) => entry.state === 'new' && entry.retryAt <= now);
   }
 
-  /** The asset to upload next of those `allow` lets go, or undefined while none may go now. */
+  /** The asset to upload next of those `allow` lets go, or undefined while none may go now; a pyramid waits for its next level to be cut. */
   next(now: number, allow: (entry: QueueEntry) => boolean = () => true): QueueEntry | undefined {
     let best: QueueEntry | undefined;
     for (const entry of this.entries.values()) {
-      if (entry.state !== 'queued' || entry.retryAt > now || !allow(entry)) continue;
+      if (entry.state !== 'queued' || entry.retryAt > now || !allow(entry) || entryPyramid(entry)?.readyAt(entry.next) === false) continue;
       if (best === undefined || entry.rank < best.rank || (entry.rank === best.rank && entry.stamp > best.stamp)) best = entry;
     }
     return best;
@@ -119,14 +122,18 @@ export class UploadQueue {
     return answer.reason;
   }
 
-  /** Forgets an asset: asked for again, it starts afresh. */
+  /** Forgets an asset: asked for again, it starts afresh; a pyramid stops waiting for its levels. */
   forget(id: string): void {
+    const entry = this.entries.get(id);
+    if (entry === undefined) return;
     this.entries.delete(id);
+    entryPyramid(entry)?.stop();
   }
 
-  /** The asset is stored: its bytes are let go unless they are few. */
+  /** The asset is stored: its bytes are let go unless they are few; a pyramid stops waiting for its levels. */
   stored(entry: QueueEntry): void {
     entry.state = 'stored';
+    entryPyramid(entry)?.stop();
     entry.failures = 0;
     if (entry.source !== null && 'bytes' in entry.source && entry.source.bytes.length > KEPT_BYTES) entry.source = null;
     entry.next = 0;

@@ -4,6 +4,7 @@ import { isLit, LIGHTING_REFUSAL } from './atlasLighting.ts';
 import type { SceneState, SceneStore } from './atlasView.ts';
 import { imageMimeType, REPEAT_REQUEST_MS } from './assetServe.ts';
 import { FloorAudience } from './floorAudience.ts';
+import { floorMaps } from './floorMaps.ts';
 import { floorPorts, noticeOnce } from './floorPorts.ts';
 import { FloorShare } from './FloorShare.ts';
 import { FloorSight } from './floorSight.ts';
@@ -190,7 +191,7 @@ export class SceneShare {
     const levels = hasLevels(state.levels);
     const presented = levels ? resolveLevel(state.levels, this.ports.presentedLevel?.()) : null;
     const players = [...new Set([...(this.ports.seats?.onlinePlayers() ?? []), ...extra])];
-    const inputs = [state.objects.tokens, state.levels, presented, players.join('\n'), [...this.acting].join('\n')];
+    const inputs = [state.objects.tokens, state.levels, state.background, presented, players.join('\n'), [...this.acting].join('\n')];
     if (this.floors.size === 0 || extra.length > 0 || inputs.some((input, i) => input !== this.assigned[i])) {
       this.assigned = inputs;
       this.assigning = true;
@@ -207,6 +208,8 @@ export class SceneShare {
     const seats = this.ports.seats;
     const { floors, together } = playerFloors({ state, ownerOf: (id, token) => seats?.ownerOf(id, token), acting: this.acting, presented }, players);
     const before = this.audience.set(floors, together, presented);
+    // Ranked before the floors' shares hand their maps, so a map is never queued behind one nobody looks at
+    this.ports.stored?.floorMaps?.(floorMaps(state, floors, presented));
     const wanted = new Set([keyOf(presented), ...[...floors.values()].map(keyOf)]);
     for (const key of wanted) if (!this.floors.has(key)) this.open(key === '' ? null : key);
     for (const [player, floor] of floors) {
