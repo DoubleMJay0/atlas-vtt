@@ -3,9 +3,8 @@ import type { OfferAnswer, OfferedAsset, PartsSession } from '../../../../src/ap
 import { AssetPublisher, type FileStat } from '../../../../src/app/online/gm/assets/AssetPublisher.ts';
 import type { StoreResult, StoreTrouble } from '../../../../src/app/online/gm/assets/storeClient.ts';
 import { settled } from './settled.ts';
-import { pyramidOf } from '../../../../src/app/pixi/mapImage/pyramid';
-import { pyramidTiles, type PyramidFacts } from '../../../../src/app/pixi/mapImage/tileBlobs';
 import type { MapFocus } from '../../../../src/app/online/gm/assets/pyramidPlan.ts';
+import { FakeTileCache } from './fakeTileCache.ts';
 
 /*
  * The asset store as the GM's publisher sees it, for tests: a client that records every request and
@@ -45,11 +44,27 @@ export class FakeStoreClient {
   inFlight = 0;
   maxInFlight = 0;
 
-  offer(assets: readonly OfferedAsset[]): Promise<StoreResult<Map<string, OfferAnswer>>> {
+  /** The ids taken out of the store again. */
+  readonly removed: string[] = [];
+  /** While true, offers wait until `releaseOffers` lets them come back. */
+  holdOffers = false;
+  private readonly waitingOffers: (() => void)[] = [];
+
+  remove(id: string): Promise<StoreResult<null>> {
+    this.removed.push(id);
+    return Promise.resolve(ok(null));
+  }
+
+  releaseOffers(): void {
+    for (const resolve of this.waitingOffers.splice(0)) resolve();
+  }
+
+  async offer(assets: readonly OfferedAsset[]): Promise<StoreResult<Map<string, OfferAnswer>>> {
     this.offers.push([...assets]);
+    if (this.holdOffers) await new Promise<void>((resolve) => this.waitingOffers.push(resolve));
     for (const asset of assets) if (asset.tiles !== undefined) this.pieces.set(asset.id, asset.tiles.count + 1);
-    if (this.offerTrouble !== null) return Promise.resolve(failed(this.offerTrouble));
-    return Promise.resolve(ok(new Map(assets.map((asset) => [asset.id, this.answer(asset)]))));
+    if (this.offerTrouble !== null) return failed(this.offerTrouble);
+    return ok(new Map(assets.map((asset) => [asset.id, this.answer(asset)])));
   }
 
   putWhole(id: string, bytes: ArrayBuffer): Promise<StoreResult<null>> {
@@ -66,7 +81,7 @@ export class FakeStoreClient {
   }
 
   /** Batches of tiles that went up: each one's part names, in order. */
-  readonly batches: { readonly id: string; readonly names: string[]; readonly bytes: number }[] = [];
+  readonly batches: { readonly id: string; readonly names: string[]; readonly bytes: number; readonly text: string }[] = [];
   /** How a batch is answered: by default the store counts it and holds the pyramid once every piece is there. */
   tilesResult: ((batch: { readonly id: string; readonly names: string[] }) => StoreResult<{ stored: boolean; pieces: number; of: number }>) | null = null;
   /** The pieces offered for each pyramid (its tiles and the manifest), from its offer. */
@@ -76,7 +91,7 @@ export class FakeStoreClient {
   async putTiles(id: string, body: ArrayBuffer): Promise<StoreResult<{ stored: boolean; pieces: number; of: number }>> {
     const text = new TextDecoder().decode(body);
     const names = [...text.matchAll(/; name="([^"]+)"/g)].map((match) => match[1] ?? '');
-    this.batches.push({ id, names, bytes: body.byteLength });
+    this.batches.push({ id, names, bytes: body.byteLength, text });
     await this.call({ kind: 'tiles', id, bytes: body.byteLength });
     if (this.tilesResult !== null) return this.tilesResult({ id, names });
     const held = this.held.get(id) ?? new Set<string>();
@@ -126,8 +141,8 @@ export interface PublisherHarness {
   players: string[];
   /** Hands players a reference, as a message carrying it that went out to `to` (everyone by default). */
   hand(ref: { readonly id?: string | undefined }, to?: string): void;
-  /** The complete pyramids this device's cache holds, by map path. */
-  readonly pyramids: Map<string, PyramidFacts>;
+  /** This device's tile cache: map images by path and the levels of their pyramids stored so far. */
+  readonly cache: FakeTileCache;
   /** The tiles read from the cache for uploads, by batch. */
   readonly tileReads: string[][];
   /** Where players look on the map. */
@@ -164,7 +179,7 @@ export function publisherHarness(): PublisherHarness {
     connection: { players: 0, latencyMs: null },
     players: ['p1'],
     hand: (ref, to = '*') => harness.publisher.sent(JSON.stringify({ t: 'scene', scene: { map: ref } }), to),
-    pyramids: new Map(),
+    cache: new FakeTileCache(),
     tileReads: [],
     focus: null,
     salt: SALT,
@@ -191,15 +206,9 @@ export function publisherHarness(): PublisherHarness {
     client: harness.client,
     salt: { soon: () => Promise.resolve(harness.salt) },
     pyramids: {
-      ensure: (path) => Promise.resolve(harness.pyramids.get(path) ?? null),
-      blobs: (hash, tiles) => {
-        harness.tileReads.push(tiles.map((tile) => `${tile.level}/${tile.col}/${tile.row}`));
-        const facts = [...harness.pyramids.values()].find((candidate) => candidate.hash === hash);
-        return Promise.resolve(tiles.map((tile) => {
-          const stored = facts?.tiles.find((candidate) => candidate.level === tile.level && candidate.col === tile.col && candidate.row === tile.row);
-          return stored === undefined ? null : new Uint8Array(stored.bytes).fill(7).buffer;
-        }));
-      },
+      build: (path) => harness.cache.build(path),
+      level: (hash, level, signal) => harness.cache.level(hash, level, signal),
+      blobs: (hash, tiles) => harness.cache.blobs(hash, tiles),
       focus: () => harness.focus,
     },
     timers: {
@@ -226,6 +235,7 @@ export function publisherHarness(): PublisherHarness {
     withdrawn: () => void (harness.withdrawn += 1),
   });
   (harness as { publisher: AssetPublisher }).publisher = publisher;
+  (harness as { tileReads: string[][] }).tileReads = harness.cache.tileReads;
   return harness;
 }
 
@@ -241,9 +251,4 @@ export function sharesHeard(sent: PublisherHarness['sent']): Map<string, number>
   const shares = new Map<string, number>();
   for (const { body } of sent) if (body.t === 'asset-progress') for (const [id, share] of Object.entries(body.shares)) shares.set(id, share);
   return shares;
-}
-
-/** A complete pyramid of a `width` × `height` image of this hash, every tile `tileBytes` long. */
-export function pyramidFacts(hash: string, width: number, height: number, tileBytes = 1000, decodedScale = 1): PyramidFacts {
-  return { hash, width, height, spec: 2, decodedScale, tiles: pyramidTiles(pyramidOf(width, height, decodedScale)).map((ref) => ({ ...ref, bytes: tileBytes })) };
 }

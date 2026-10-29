@@ -1,20 +1,7 @@
-import { pyramidOf, TILE_SPEC, type Pyramid, type TileRef } from './pyramid';
-import type { TileStore } from './tileStore';
+import { pyramidOf, tileKey, type Pyramid, type TileRef } from './pyramid';
+import type { PyramidManifest, TileStore } from './tileStore';
 
-/**
- * A complete pyramid as the cache holds it, for whoever copies it elsewhere: its size, spec and
- * decoded scale (the pyramid they name), and the stored bytes of every tile, read without decoding.
- */
-export interface PyramidFacts {
-  hash: string;
-  width: number;
-  height: number;
-  spec: number;
-  decodedScale: number;
-  /** Each tile's stored WebP size in bytes, every level, in the pyramid's order (level, row, column). */
-  tiles: StoredTileSize[];
-}
-
+/** A tile and its stored WebP size in bytes. */
 export interface StoredTileSize extends TileRef {
   bytes: number;
 }
@@ -31,24 +18,8 @@ export function pyramidTiles(pyramid: Pyramid): TileRef[] {
   return refs;
 }
 
-/** The pyramid a stored complete pyramid's facts name. */
-export const factsPyramid = (facts: Pick<PyramidFacts, 'width' | 'height' | 'decodedScale'>): Pyramid => pyramidOf(facts.width, facts.height, facts.decodedScale);
-
-/**
- * The facts of a complete pyramid of this tile spec, or null where the cache holds none (not built,
- * built only in part, evicted, or of another spec) or misses one of its tiles.
- */
-export async function readPyramidFacts(store: TileStore, hash: string): Promise<PyramidFacts | null> {
-  const manifest = await store.readManifest(hash);
-  if (!manifest || !manifest.complete || manifest.spec !== TILE_SPEC) return null;
-  const tiles: StoredTileSize[] = [];
-  for (const ref of pyramidTiles(factsPyramid(manifest))) {
-    const blob = await store.getTile(hash, ref);
-    if (!blob) return null;
-    tiles.push({ ...ref, bytes: blob.size });
-  }
-  return { hash, width: manifest.width, height: manifest.height, spec: manifest.spec, decodedScale: manifest.decodedScale, tiles };
-}
+/** The pyramid a stored manifest names. */
+export const manifestPyramid = (manifest: Pick<PyramidManifest, 'width' | 'height' | 'decodedScale'>): Pyramid => pyramidOf(manifest.width, manifest.height, manifest.decodedScale);
 
 /** The tiles a selection names, checked against the pyramid; throws for one outside it. */
 export function selectedTiles(pyramid: Pyramid, selection: TileSelection): TileRef[] {
@@ -62,6 +33,37 @@ export function selectedTiles(pyramid: Pyramid, selection: TileSelection): TileR
 export async function readTileBlobs(store: TileStore, hash: string, selection: TileSelection): Promise<(ArrayBuffer | null)[]> {
   const manifest = await store.readManifest(hash);
   if (!manifest) return Array.isArray(selection) ? selection.map(() => null) : [];
-  const refs = selectedTiles(factsPyramid(manifest), selection);
+  const refs = selectedTiles(manifestPyramid(manifest), selection);
   return Promise.all(refs.map(async (ref) => (await store.getTile(hash, ref))?.arrayBuffer() ?? null));
+}
+
+/**
+ * A level of a cached pyramid whose every tile is stored: the size and decoded scale of the pyramid
+ * it belongs to (its manifest's), the level, and each of its tiles' stored bytes in the pyramid's order.
+ */
+export interface StoredLevel {
+  width: number;
+  height: number;
+  decodedScale: number;
+  level: number;
+  tiles: StoredTileSize[];
+}
+
+/**
+ * The level of a pyramid once the cache holds all its tiles, read without decoding; null while it
+ * holds none of the pyramid or misses a tile of the level. Throws for a level outside the pyramid.
+ */
+export async function readStoredLevel(store: TileStore, hash: string, level: number): Promise<StoredLevel | null> {
+  const manifest = await store.readManifest(hash);
+  if (!manifest) return null;
+  const refs = selectedTiles(manifestPyramid(manifest), { level });
+  const held = await store.existingTiles(hash);
+  if (refs.some((ref) => !held.has(tileKey(ref)))) return null;
+  const tiles: StoredTileSize[] = [];
+  for (const ref of refs) {
+    const blob = await store.getTile(hash, ref);
+    if (!blob) return null;
+    tiles.push({ ...ref, bytes: blob.size });
+  }
+  return { width: manifest.width, height: manifest.height, decodedScale: manifest.decodedScale, level, tiles };
 }

@@ -18,22 +18,28 @@ export interface JobDeps {
   readonly progress: (share: number) => void;
 }
 
-/** How a job ended; `partial`: a pyramid's overview went, its other levels wait their turn. */
-export type JobEnd = UploadEnd | 'partial';
+/** How a job ended; `waiting`: a pyramid's next level is not cut yet. */
+export type JobEnd = UploadEnd | 'waiting';
 
 /**
  * Runs one asset's upload as the store asked for it: a pyramid batch by batch from where it stopped
- * (`entry.next` follows), with only its overview while it has not gone yet, any other asset from its
- * bytes (kept, or read again from the vault).
+ * (`entry.next` follows) as far as its levels are cut, any other asset from its bytes (kept, or read
+ * again from the vault).
  */
 export async function runJob(entry: QueueEntry, deps: JobDeps): Promise<JobEnd> {
   const { upload, source } = entry;
   if (upload === null || source === null) return 'changed';
-  if ('plan' in source) {
+  if ('pyramid' in source) {
     if (deps.blobs === undefined || upload.upload !== 'tiles') return 'changed';
-    const overviewOnly = source.plan.batches[entry.next]?.overview === true;
-    const run = await uploadPyramid({ id: entry.id, hash: entry.hash, plan: source.plan, next: entry.next }, { client: deps.client, blobs: deps.blobs, slot: deps.slot, boundary: () => randomHex(16), progress: deps.progress, signal: deps.signal }, overviewOnly);
+    const { pyramid } = source;
+    // Its rank follows it batch by batch, so its next request waits behind the art players see once its overview went.
+    const sent = (next: number): void => {
+      entry.next = next;
+      entry.rank = pyramid.rankAt(next);
+    };
+    const run = await uploadPyramid({ id: entry.id, hash: entry.hash, batches: pyramid, next: entry.next }, { client: deps.client, blobs: deps.blobs, slot: deps.slot, boundary: () => randomHex(16), progress: deps.progress, sent, signal: deps.signal });
     entry.next = run.next;
+    entry.rank = pyramid.rankAt(run.next);
     return run.end;
   }
   if (upload.upload === 'tiles') return 'changed';

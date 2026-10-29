@@ -1,17 +1,16 @@
 import { ASSET_CAPS, type AssetRef } from '../../protocol/index.ts';
 import { t, type MessageKey } from '../../../i18n';
-import type { Timers } from '../companionTimers.ts';
 import { AssetIds } from './assetIds.ts';
 import { FileHashes, type FileStat } from './fileHashes.ts';
-import { AssetProgress, type ProgressPorts } from './assetProgress.ts';
-import { AssetRefs, type PyramidSource, type Registration } from './assetRefs.ts';
+import { AssetProgress } from './assetProgress.ts';
+import { AssetRefs, type Registration } from './assetRefs.ts';
 import type { JobEnd } from './assetJob.ts';
-import type { OfferRefusal } from './assetRoutes.ts';
-import type { AssetSalt } from './assetSalt.ts';
-import type { UploadClient } from './assetUpload.ts';
-import { ASSET_RANKS } from './assetUses.ts';
-import type { AssetStoreClient } from './storeClient.ts';
-import { UploadQueue, type QueueEntry } from './uploadQueue.ts';
+import type { OfferedAsset, OfferRefusal } from './assetRoutes.ts';
+import { answerOffer } from './offerRound.ts';
+import { roomRetryMs } from './uploadPace.ts';
+import type { AssetPublisherPorts } from './publisherPorts.ts';
+import { PyramidPublishing } from './pyramidPublishing.ts';
+import { entryPyramid, UploadQueue, type QueueEntry } from './uploadQueue.ts';
 import { UploadRunner } from './uploadRunner.ts';
 
 /** How long new assets gather before they are offered, so a scene's go in one request. */
@@ -20,43 +19,27 @@ export const OFFER_DELAY_MS = 200;
 export const MAX_OFFER = 2000;
 
 export type { FileStat };
+export type { AssetPublisherPorts };
 
-export interface AssetPublisherPorts extends Pick<ProgressPorts, 'sendLive' | 'send' | 'connected'> {
-  readonly client: UploadClient & Pick<AssetStoreClient, 'offer' | 'putTiles'>;
-  /** This device's map pyramids; without them maps go as images. */
-  readonly pyramids?: PyramidSource | undefined;
-  readonly salt: Pick<AssetSalt, 'soon'>;
-  readonly timers: Timers;
-  /** A vault file's bytes as they are, or null where it cannot be read. */
-  readFile(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
-  stat(path: string): FileStat | null;
-  /** The players connected now, and the time the socket's last keep-alive took. */
-  connection(): { readonly players: number; readonly latencyMs: number | null };
-  /** Tells the GM something (Obsidian's `Notice`). */
-  notify(text: string): void;
-  /** The relay refused the account's token. */
-  signedOutByServer(): void;
-  /** Nothing is on its way any more: what the store holds may have changed. */
-  settled?(): void;
-  /** Assets players were handed can no longer be stored: what names them hands them again, without them. */
-  withdrawn?(): void;
+/** Why the queue stands still: the account may not store, is signed out, or signs out now. */
+type Halt = 'restricted' | 'forbidden' | 'signed-out';
+
+const REFUSAL_TEXTS: Partial<Record<OfferRefusal | 'failed', MessageKey>> = { restricted: 'online.assetsRestricted', 'too-large': 'online.assetsMapTooLarge', failed: 'online.assetsFailed' };
+
+/** An asset as an offer names it: a pyramid with its levels and tile count. */
+function offeredAsset(entry: QueueEntry): OfferedAsset {
+  const pyramid = entryPyramid(entry);
+  return { id: entry.id, kind: entry.kind, size: entry.size, ...(pyramid !== null && { tiles: { levels: pyramid.levels, count: pyramid.count } }) };
 }
-
-/**
- * Why the queue stands still: the account is out of room (what the store took already still goes up),
- * may not store, is signed out, or signs out now.
- */
-type Halt = 'quota' | 'restricted' | 'forbidden' | 'signed-out';
-
-const REFUSAL_TEXTS: Partial<Record<OfferRefusal | 'failed', MessageKey>> = { quota: 'online.assetsQuota', restricted: 'online.assetsRestricted', 'too-large': 'online.assetsMapTooLarge', failed: 'online.assetsFailed' };
 
 /**
  * One table's way of keeping assets in the store for players (ASD-40 to ASD-44). Every share hands
  * players references through `storing`: with the asset's id where it can be stored, after which the
  * asset is offered (new ones gather for `OFFER_DELAY_MS`, so a scene's go in one request), uploaded in
  * priority order (`UploadRunner`), retried after 1, 2, 4 … 60 seconds and resumed where it stopped.
- * A full quota or an account that may not store stops the queue and tells the GM once. Each player
- * hears how far the assets they were sent references of have come (`AssetProgress`, fed by `sent`).
+ * An account that may not store stops the queue and tells the GM once; a map larger than the store
+ * keeps is shown to no one and the GM is told once. Each player hears how far the assets they were sent
+ * references of have come (`AssetProgress`, fed by `sent`).
  * Nothing goes over the table's socket but that and the references themselves.
  */
 export class AssetPublisher {
@@ -69,14 +52,32 @@ export class AssetPublisher {
   private readonly told = new Set<string>();
   private offering = false;
   private offerTimer: number | undefined;
+  private readonly retryTimers = new Set<number>();
   private stopped = false;
   /** Whether the store refused a pyramid for its kind (a relay without them): maps go as images from then on. */
   private noTiles = false;
+  private readonly pyramids: PyramidPublishing | undefined;
   /** How players are handed references, and how the scenes open beside the presented one are offered. */
   readonly storing: AssetRefs;
 
   constructor(private readonly ports: AssetPublisherPorts) {
     this.progress = new AssetProgress(ports);
+    this.pyramids = ports.pyramids === undefined ? undefined : new PyramidPublishing({
+      source: ports.pyramids,
+      timers: ports.timers,
+      entries: () => this.queue.all(),
+      ready: () => this.runner.pump(),
+      stage: (assets) => this.storing.stage(assets),
+      // Its pyramid was given up: forgotten, what handed it hands its map again as an image, and what the store reserved for it is released.
+      withdraw: (entry) => {
+        const reserved = entry.state === 'queued' || entry.state === 'uploading';
+        this.queue.forget(entry.id);
+        this.withdraw([entry]);
+        if (reserved) void this.ports.client.remove?.(entry.id);
+      },
+      settle: (entry) => void this.ports.client.offer([offeredAsset(entry)]),
+      offerSoon: () => this.offerSoon(),
+    });
     this.hashes = new FileHashes((path) => ports.stat(path));
     this.runner = new UploadRunner({
       queue: this.queue,
@@ -86,7 +87,7 @@ export class AssetPublisher {
       blobs: ports.pyramids?.blobs,
       unchanged: (path, hash) => this.hashes.kept(path) === hash,
       connection: () => ports.connection(),
-      mayUpload: () => this.halted === null || this.halted === 'quota',
+      mayUpload: () => this.halted === null,
       progress: (entry, share) => this.progress.set(entry.id, Math.min(share, 0.99)),
       ended: (entry, end) => this.ended(entry, end),
       tick: () => (this.queue.toOffer(ports.timers.now()).length > 0 ? void this.offer() : this.runner.pump()),
@@ -96,10 +97,11 @@ export class AssetPublisher {
       hashes: this.hashes,
       readFile: (path) => ports.readFile(path),
       stat: (path) => ports.stat(path),
-      pyramids: ports.pyramids,
+      pyramids: this.pyramids,
       register: (asset) => this.register(asset),
       release: (ref) => this.release(ref),
       tilesRefused: () => this.noTiles,
+      floorMaps: (maps) => this.pyramids?.floorMaps(maps),
     });
   }
 
@@ -133,25 +135,18 @@ export class AssetPublisher {
     this.runner.abort();
   }
 
-  /** The store was emptied (the GM removed the shared copies): everything is offered and uploaded again. */
-  emptied(): void {
-    this.queue.reoffer(true);
-    for (const entry of this.queue.all()) if (entry.handed && entry.state !== 'failed') this.progress.set(entry.id, 0);
-    // Its bytes were let go once stored: handed again, its share restores them.
-    this.withdraw([...this.queue.all()].filter((entry) => entry.state === 'failed'));
-    this.halted = null;
-    this.offerSoon();
-  }
-
   stop(): void {
     this.stopped = true;
     this.progress.stop();
     this.runner.stop();
+    this.pyramids?.stop();
     if (this.offerTimer !== undefined) this.ports.timers.clearTimer(this.offerTimer);
     this.offerTimer = undefined;
+    for (const timer of this.retryTimers) this.ports.timers.clearTimer(timer);
+    this.retryTimers.clear();
   }
 
-  /** Notes an asset and gives its id, or undefined where players are to fetch it from the GM. */
+  /** Notes an asset and gives its id, or undefined where the store will not keep it: players are then not shown it. */
   private async register({ key, hash, size, mime, use, source, handed }: Registration): Promise<string | undefined> {
     if (this.stopped || size <= 0 || size > ASSET_CAPS[use.kind]) return undefined;
     // The round trip before uploads begin is the resting one they are measured against.
@@ -162,11 +157,12 @@ export class AssetPublisher {
     const id = await this.ids.of(key);
     const known = this.queue.get(id);
     if (known?.state === 'refused' || (known?.state === 'failed' && known.source !== null)) return undefined;
-    // While the store takes nothing, new assets, and any not stored once nothing goes up, go the old way.
-    if (this.halted !== null && (known === undefined || (this.halted !== 'quota' && known.state !== 'stored'))) return undefined;
-    const entry = this.queue.note({ id, hash, size, mime, kind: use.kind, rank: use.rank, handed, source });
-    // A pyramid whose overview went keeps its other levels behind the art players see.
-    if (entry.source !== null && 'plan' in entry.source && entry.source.plan.batches[entry.next]?.overview === false) entry.rank = Math.max(entry.rank, ASSET_RANKS.mapLevels);
+    // While the store takes nothing, new assets, and any not stored once nothing goes up, are not shown.
+    if (this.halted !== null && known?.state !== 'stored') return undefined;
+    const entry = this.queue.note({ id, hash, size, mime, kind: use.kind, rank: use.rank, map: use.map, handed, source });
+    // Handed again long after its last offer: the store may have let it go, so it is offered first.
+    if (handed && this.queue.stale(entry, this.ports.timers.now())) this.progress.set(id, 0);
+    this.pyramids?.noted(entry);
     if (entry.handed) this.progress.set(id, entry.state === 'stored' ? 1 : this.progress.share(id) ?? 0);
     if (entry.state === 'new') this.offerSoon();
     else this.runner.pump();
@@ -182,7 +178,7 @@ export class AssetPublisher {
 
   private resume(): void {
     this.halted = null;
-    this.queue.reoffer(false);
+    this.queue.reoffer();
     this.runner.resetLatency();
     this.offerSoon();
   }
@@ -201,7 +197,8 @@ export class AssetPublisher {
     if (batch.length === 0) return this.runner.pump();
     this.offering = true;
     for (const entry of batch) entry.state = 'offered';
-    const answer = await this.ports.client.offer(batch.map(({ id, kind, size, source }) => ({ id, kind, size, ...(source !== null && 'plan' in source && { tiles: { levels: source.plan.levels, count: source.plan.count } }) })));
+    const offered = batch.map((entry) => ({ entry, size: entry.size }));
+    const answer = await this.ports.client.offer(batch.map(offeredAsset));
     this.offering = false;
     if (this.stopped) return;
     const now = this.ports.timers.now();
@@ -210,18 +207,30 @@ export class AssetPublisher {
       if (answer.trouble === 'signed-out' || answer.trouble === 'forbidden') this.halt(answer.trouble);
       return this.runner.pump();
     }
-    const withdrawn: QueueEntry[] = [];
-    for (const entry of batch) {
-      const outcome = this.queue.answered(entry, answer.value.get(entry.id), now);
-      if (outcome === 'have') this.stored(entry);
-      else if (outcome === 'quota' || outcome === 'restricted') this.halt(outcome);
-      else if (outcome === 'too-large' && entry.rank === ASSET_RANKS.map) this.tell('too-large');
-      else if (outcome === 'kind' && entry.kind === 'tiles') this.noTiles = true;
-      if (outcome !== null && outcome !== 'have' && outcome !== 'need') withdrawn.push(entry);
-    }
-    this.withdraw(withdrawn);
+    this.withdraw(answerOffer(offered, answer.value, now, {
+      queue: this.queue,
+      stored: (entry) => this.stored(entry),
+      restricted: () => this.halt('restricted'),
+      mapTooLarge: () => this.tell('too-large'),
+      noTiles: () => (this.noTiles = true),
+      settle: (entry) => void this.ports.client.offer([offeredAsset(entry)]),
+      remove: (id) => void this.ports.client.remove?.(id),
+      retryLater: (entry) => this.retryLater(entry, now),
+    }));
     if (this.queue.toOffer(now).length > 0) this.offerSoon();
     this.runner.pump();
+  }
+
+  /** Offers an asset again once the store has had a while to make room for it, at the next welcome or sign-in too. */
+  private retryLater(entry: QueueEntry, now: number): void {
+    entry.quotaRetries += 1;
+    const wait = roomRetryMs(entry.quotaRetries);
+    entry.retryAt = now + wait;
+    const timer = this.ports.timers.setTimer(() => {
+      this.retryTimers.delete(timer);
+      this.offerSoon();
+    }, wait);
+    this.retryTimers.add(timer);
   }
 
   private stored(entry: QueueEntry): void {
@@ -229,15 +238,12 @@ export class AssetPublisher {
     if (entry.handed) this.progress.set(entry.id, 1);
   }
 
-  /**
-   * The store takes no more: out of room, what it accepted still goes up; otherwise nothing will, so
-   * every asset players were handed that is not stored is taken from them.
-   */
+  /** The store takes nothing more: every asset players were handed that is not stored is taken from them. */
   private halt(reason: Halt): void {
     this.halted = reason;
     if (reason === 'signed-out') this.ports.signedOutByServer();
-    if (reason === 'quota' || reason === 'restricted') this.tell(reason);
-    if (reason !== 'quota') this.withdraw([...this.queue.all()].filter((entry) => entry.state !== 'stored'));
+    if (reason === 'restricted') this.tell(reason);
+    this.withdraw([...this.queue.all()].filter((entry) => entry.state !== 'stored'));
   }
 
   /** Tells the GM once per table. */
@@ -256,20 +262,22 @@ export class AssetPublisher {
   }
 
   private ended(entry: QueueEntry, end: JobEnd): void {
+    // Forgotten while it went up (its pyramid failed): nothing more of it.
+    if (this.queue.get(entry.id) !== entry) return;
     const now = this.ports.timers.now();
     if (end === 'stored') return this.stored(entry);
-    if (end === 'partial') {
+    if (end === 'waiting') {
       entry.state = 'queued';
-      entry.rank = Math.max(entry.rank, ASSET_RANKS.mapLevels);
-      return;
+      return this.pyramids?.rank(entry);
     }
     if (end === 'signed-out' || end === 'forbidden') {
       entry.state = 'queued';
       return this.halt(end);
     }
-    // The upload's row is gone (the store was emptied, or kept it too long): offered again, a pyramid from its manifest.
+    // The upload's row is gone (the store let it go, or kept it too long): offered again, a pyramid from its manifest.
     if (end === 'missing') {
       entry.next = 0;
+      this.pyramids?.rank(entry);
       return this.queue.failed(entry, now, 'new');
     }
     if (end === 'retry' || end === 'stopped') return this.queue.failed(entry, now, 'queued');

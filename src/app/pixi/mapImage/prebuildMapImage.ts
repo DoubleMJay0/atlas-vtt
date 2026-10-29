@@ -1,7 +1,6 @@
 import { TFile, type App } from 'obsidian';
-import { TileDecoderClient } from './TileDecoderClient';
+import { TileDecoderClient, TileOpenError } from './TileDecoderClient';
 import { requiredMainThreadDecode } from './mainThreadDecode';
-import type { PyramidFacts } from './tileBlobs';
 
 /**
  * Builds a freshly saved map image's tiles into this device's cache, so the
@@ -24,20 +23,18 @@ export function prebuildMapImageAt(app: App, path: string): void {
 }
 
 /**
- * The complete pyramid of the map image at `path`, built first where the cache lacks it (the build
- * an open map started is waited for), with every tile's stored size; null for a file that is not
- * there, one built on this thread (an SVG, a video's poster: its pyramid is no copy of its bytes),
- * one too large or undecodable, or a build that could not finish.
+ * Builds the pyramid of the map image at `path` where the cache lacks it (joining the build an open map
+ * started), resolving once the build has ended: the image's hash, whether its pyramid is complete
+ * now and how many of its tiles are stored. Null for a file that is not there, one built on this thread (an SVG, a video's poster: its
+ * pyramid is no copy of its bytes) and one too large or undecodable; rejects where the worker failed.
  */
-export async function ensureMapPyramid(app: App, path: string): Promise<PyramidFacts | null> {
+export async function buildMapPyramid(app: App, path: string): Promise<{ hash: string; complete: boolean; stored: number } | null> {
   const file = app.vault.getAbstractFileByPath(path);
   if (!(file instanceof TFile) || requiredMainThreadDecode(file) !== undefined) return null;
-  const client = TileDecoderClient.forApp(app);
   try {
-    const built = await client.ensurePyramid(() => app.vault.readBinary(file), { path: file.path, size: file.stat.size, mtime: file.stat.mtime });
-    return built.complete ? await client.pyramidFacts(built.hash) : null;
+    return await TileDecoderClient.forApp(app).ensurePyramid(() => app.vault.readBinary(file), { path: file.path, size: file.stat.size, mtime: file.stat.mtime });
   } catch (error) {
-    console.debug(`[Atlas] The tiles of ${file.path} could not be built`, error);
-    return null;
+    if (error instanceof TileOpenError) return null;
+    throw error;
   }
 }

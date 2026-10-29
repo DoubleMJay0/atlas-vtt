@@ -5,7 +5,11 @@ import type { UploadQueue, QueueEntry } from './uploadQueue.ts';
 
 /** How often the queue looks again while anything is on its way: players come and go, the round trip changes. */
 export const PUMP_MS = 1_000;
-/** The most uploads under way at once; how many requests they send at once is the connection's (`inFlight`). */
+/**
+ * The most uploads of whole assets under way at once; how many requests they send at once is the
+ * connection's (`inFlight`). Pyramids are not counted: between batches they only wait for a turn, which
+ * goes to the most urgent asker, so a pyramid nobody looks at never keeps a map players look at from starting.
+ */
 export const MAX_JOBS = 4;
 /** An asset at least this large holds its bytes in memory while it goes up: one such at a time. */
 export const LARGE_BYTES = 32 * 1024 * 1024;
@@ -28,9 +32,10 @@ export interface RunnerDeps extends Pick<JobDeps, 'client' | 'readFile' | 'blobs
 }
 
 /**
- * Runs the queue's uploads: up to `MAX_JOBS` assets at once (one of them large), their requests let out
- * as the connection allows (`inFlight`: four while nobody plays, two while players are connected, one
- * while the keep-alive takes more than twice its resting time) to the most urgent asset first, and
+ * Runs the queue's uploads: up to `MAX_JOBS` whole assets at once (one of them large) and every pyramid
+ * whose next level is cut, their requests let out as the connection allows (`inFlight`: four while
+ * nobody plays, one while players are connected or the keep-alive takes more than twice its resting
+ * time) to the most urgent asset first, and
  * stopped before their next request once `stop` or `abort` comes.
  */
 export class UploadRunner {
@@ -66,9 +71,11 @@ export class UploadRunner {
     if (this.stopped) return;
     this.slots.drain();
     const now = this.deps.timers.now();
-    while (this.deps.mayUpload() && this.running.size < MAX_JOBS) {
-      const large = [...this.running].some((entry) => entry.size >= LARGE_BYTES && entry.kind !== 'tiles');
-      const next = this.deps.queue.next(now, (entry) => !large || entry.size < LARGE_BYTES || entry.kind === 'tiles');
+    while (this.deps.mayUpload()) {
+      const whole = [...this.running].filter((entry) => entry.kind !== 'tiles');
+      const full = whole.length >= MAX_JOBS;
+      const large = whole.some((entry) => entry.size >= LARGE_BYTES);
+      const next = this.deps.queue.next(now, (entry) => entry.kind === 'tiles' || (!full && (!large || entry.size < LARGE_BYTES)));
       if (next === undefined) break;
       void this.run(next);
     }

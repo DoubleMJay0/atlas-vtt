@@ -6,9 +6,7 @@ import { isAssetId, isRecord, type AssetKind } from '../../protocol/index.ts';
  */
 export const ASSET_ROUTES = {
   offer: '/api/assets/offer',
-  usage: '/api/assets/usage',
   salt: '/api/assets/salt',
-  all: '/api/assets',
   whole: (id: string): string => `/api/assets/${id}`,
   parts: (id: string): string => `/api/assets/${id}/parts`,
   part: (id: string, part: number): string => `/api/assets/${id}/parts/${part}`,
@@ -28,15 +26,20 @@ export interface OfferedAsset {
 /** How an asset goes up: one body, parts, or batches of tiles. */
 export type UploadWay = 'single' | 'multipart' | 'tiles';
 
-/** Why the store will not take an asset: the account's quota, its kind or size, or an account that may not store now. */
-export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted';
-const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restricted'];
+/**
+ * Why the store will not take an asset: no room for it now (`retry`: the store makes room on its own,
+ * so it may later), its kind, its size (larger than one asset or all the account may keep), an
+ * account that may not store now, or another size than the one it holds part of the asset at
+ * (`changed`: a pyramid it settled at its true size, offered again at its bound).
+ */
+export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted' | 'changed';
+const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restricted', 'changed'];
 
 /** The store's answer for one asset. */
 export type OfferAnswer =
   | { readonly answer: 'have' }
   | { readonly answer: 'need'; readonly upload: UploadWay; readonly partBytes: number }
-  | { readonly answer: 'refused'; readonly reason: OfferRefusal };
+  | { readonly answer: 'refused'; readonly reason: OfferRefusal; readonly retry?: true };
 
 function answerOf(value: unknown): OfferAnswer | null {
   if (!isRecord(value)) return null;
@@ -47,7 +50,8 @@ function answerOf(value: unknown): OfferAnswer | null {
   }
   if (value.answer === 'refused') {
     const reason = REFUSALS.find((known) => known === value.reason);
-    return reason === undefined ? null : { answer: 'refused', reason };
+    if (reason === undefined) return null;
+    return reason === 'quota' && value.retry === true ? { answer: 'refused', reason, retry: true } : { answer: 'refused', reason };
   }
   return null;
 }
@@ -62,6 +66,19 @@ export function offerAnswers(json: unknown): Map<string, OfferAnswer> {
     if (isAssetId(id) && answer !== null) answers.set(id, answer);
   }
   return answers;
+}
+
+/** What the store let go of older copies to make room for an offer. */
+export interface OfferEviction {
+  readonly count: number;
+  readonly bytes: number;
+}
+
+/** An offer's `evicted`, read leniently: null where it is missing or malformed. */
+export function offerEvicted(json: unknown): OfferEviction | null {
+  const evicted = isRecord(json) ? json.evicted : undefined;
+  if (!isRecord(evicted) || !isBytes(evicted.count) || !isBytes(evicted.bytes)) return null;
+  return { count: evicted.count, bytes: evicted.bytes };
 }
 
 /** What a multipart upload under way holds: its id, and the parts (numbered from 1, as the store numbers them) that arrived. */
@@ -88,19 +105,7 @@ export function tilesProgressOf(json: unknown): TilesProgress | null {
   return { stored: json.stored, pieces: json.pieces, of: json.of };
 }
 
-/** What the GM's shared copies hold: bytes of the quota, and when the oldest leaves (ms since the epoch), null while none is kept. */
-export interface StoreUsage {
-  readonly bytes: number;
-  readonly quota: number;
-  readonly oldestLeavesAt: number | null;
-}
-
 const isBytes = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
-
-export function usageOf(json: unknown): StoreUsage | null {
-  if (!isRecord(json) || !isBytes(json.bytes) || !isBytes(json.quota)) return null;
-  return { bytes: json.bytes, quota: json.quota, oldestLeavesAt: isBytes(json.oldestLeavesAt) ? json.oldestLeavesAt : null };
-}
 
 /** Parts of a multipart upload: 16 MiB, the last shorter. */
 export const PART_BYTES = 16 * 1024 * 1024;

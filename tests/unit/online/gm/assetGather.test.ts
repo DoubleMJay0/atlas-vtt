@@ -4,9 +4,11 @@ import { stagedAssets } from '../../../../src/app/online/gm/assets/assetGather.t
 import { assetIdOf } from '../../../../src/app/online/gm/assets/assetIds.ts';
 import { ASSET_RANKS } from '../../../../src/app/online/gm/assets/assetUses.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
-import { bytesOf, publisherHarness, pyramidFacts, SALT } from './fakeAssetStore.ts';
+import { bytesOf, publisherHarness, SALT } from './fakeAssetStore.ts';
+import { pngOf } from './fakeTileCache.ts';
+import { pyramidOf } from '../../../../src/app/pixi/mapImage/pyramid';
 import { pyramidKey } from '../../../../src/app/online/gm/assets/assetRefs.ts';
-import { planPyramid } from '../../../../src/app/online/gm/assets/pyramidPlan.ts';
+import { pyramidBound } from '../../../../src/app/online/gm/assets/pyramidPlan.ts';
 import { sceneState, sequenced, shareHarness, token, type Sent } from './shareHarness.ts';
 
 const scenes = (sent: readonly Sent[]): (SharedScene | null)[] => sent.flatMap(({ body }) => (body.t === 'scene' ? [body.scene] : []));
@@ -98,19 +100,26 @@ describe('what the presented scene offers', () => {
     expect(sequenced(table.sent, 'tokens').at(-1)?.tokens[0]?.art).toBeNull();
   });
 
-  it('names a map this device holds the tile pyramid of as that pyramid, and its video beside it as before', async () => {
+  it('names a map as its tile pyramid at once, before a tile of it is cut, and its video beside it as before', async () => {
     const store = publisherHarness();
-    const map = bytesOf(400, 1);
+    const map = pngOf(3000, 2000);
     const hash = await sha256Hex(map);
-    store.pyramids.set('maps/cave.webp', pyramidFacts(hash, 3000, 2000));
+    store.cache.manual = true;
+    store.cache.add('maps/cave.webp', hash, 3000, 2000, { stored: [] });
     const table = shareHarness(sceneState(), new Map([['maps/cave.webp', map]]), undefined, undefined, store.publisher.storing);
     table.share.start();
     await table.settle();
     await store.idle();
     await table.settle();
-    const plan = planPyramid(pyramidFacts(hash, 3000, 2000));
-    expect(scenes(table.sent).at(-1)?.map).toEqual({ hash, size: plan.bytes, mime: 'image/webp', id: await assetIdOf(SALT, pyramidKey(hash, 2)), tiles: true });
+    const bound = pyramidBound(pyramidOf(3000, 2000));
+    // Sent while the build has not stored a level yet.
+    expect(store.cache.building('maps/cave.webp')).toBe(true);
+    expect(scenes(table.sent).at(-1)?.map).toEqual({ hash, size: bound, mime: 'image/webp', id: await assetIdOf(SALT, pyramidKey(hash, 2)), tiles: true });
     await store.advance(200);
-    expect(store.client.offers.flat()).toEqual([{ id: await assetIdOf(SALT, pyramidKey(hash, 2)), kind: 'tiles', size: plan.bytes, tiles: { levels: 4, count: 33 } }]);
+    expect(store.client.offers.flat()).toEqual([{ id: await assetIdOf(SALT, pyramidKey(hash, 2)), kind: 'tiles', size: bound, tiles: { levels: 4, count: 33 } }]);
+    expect(store.client.batches).toEqual([]);
+    store.cache.endBuild('maps/cave.webp');
+    await store.advance(5000);
+    expect(store.client.batches[0]?.names[0]).toBe('manifest.json');
   });
 });

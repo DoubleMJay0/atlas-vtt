@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian';
-import { ASSET_ROUTES, offerAnswers, partsSessionOf, tilesProgressOf, usageOf, type OfferAnswer, type OfferedAsset, type PartsSession, type StoreUsage, type TilesProgress } from './assetRoutes.ts';
+import { ASSET_ROUTES, offerAnswers, offerEvicted, partsSessionOf, tilesProgressOf, type OfferAnswer, type OfferedAsset, type OfferEviction, type PartsSession, type TilesProgress } from './assetRoutes.ts';
 
 /** A request to the store: a path on the relay's origin, never a token in it. */
 interface StoreRequest {
@@ -37,12 +37,16 @@ const failed = <T>(trouble: StoreTrouble): StoreResult<T> => ({ ok: false, troub
  * are: nothing is decoded or encoded. Never logs a token, an id or a hash.
  */
 export class AssetStoreClient {
-  /** `pause` waits between two calls of a removal the store answered in part (by default `REMOVAL_PAUSE_MS`). */
-  constructor(private readonly origin: string, private readonly token: () => string | null, private readonly pause: (ms: number) => Promise<void> = windowPause) {}
+  /** What the store let go to make room for the last offer, kept for diagnostics only: nothing shows or logs it. */
+  lastEvicted: OfferEviction | null = null;
+
+  constructor(private readonly origin: string, private readonly token: () => string | null) {}
 
   async offer(assets: readonly OfferedAsset[]): Promise<StoreResult<Map<string, OfferAnswer>>> {
     const response = await this.call({ path: ASSET_ROUTES.offer, method: 'POST', json: { assets } });
-    return response.status === 200 ? { ok: true, value: offerAnswers(response.json) } : failed(troubleOf(response.status));
+    if (response.status !== 200) return failed(troubleOf(response.status));
+    this.lastEvicted = offerEvicted(response.json);
+    return { ok: true, value: offerAnswers(response.json) };
   }
 
   /** A whole object in one body; a 412 (the same bytes stored meanwhile) is success. */
@@ -76,21 +80,10 @@ export class AssetStoreClient {
     return progress !== null ? { ok: true, value: progress } : failed(response.status === 200 ? 'retry' : troubleOf(response.status));
   }
 
-  /** Removes every shared copy of the account: asked again while the store answers that some are left (202), a few times at most. */
-  async deleteAll(): Promise<StoreResult<null>> {
-    for (let round = 0; round < MAX_DELETE_ROUNDS; round += 1) {
-      const response = await this.call({ path: ASSET_ROUTES.all, method: 'DELETE' });
-      if (response.status === 200 || response.status === 204) return { ok: true, value: null };
-      if (response.status !== 202) return failed(troubleOf(response.status));
-      await this.pause(REMOVAL_PAUSE_MS);
-    }
-    return failed('retry');
-  }
-
-  async usage(): Promise<StoreResult<StoreUsage>> {
-    const response = await this.call({ path: ASSET_ROUTES.usage, method: 'GET' });
-    const usage = response.status === 200 ? usageOf(response.json) : null;
-    return usage !== null ? { ok: true, value: usage } : failed(response.status === 200 ? 'rejected' : troubleOf(response.status));
+  /** Takes an asset out of the store (a pyramid given up), releasing what was kept for it. */
+  async remove(id: string): Promise<StoreResult<null>> {
+    const response = await this.call({ path: ASSET_ROUTES.whole(id), method: 'DELETE' });
+    return response.status === 200 || response.status === 204 || response.status === 404 ? { ok: true, value: null } : failed(troubleOf(response.status));
   }
 
   /** The account's salt, as base64 text; the caller reads it. */
@@ -120,12 +113,6 @@ export class AssetStoreClient {
     }
   }
 }
-
-/** How often one removal of every copy asks the store again before it gives up for now, and how long it waits between. */
-export const MAX_DELETE_ROUNDS = 20;
-export const REMOVAL_PAUSE_MS = 500;
-
-const windowPause = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const isStored = (status: number): boolean => (status >= 200 && status < 300) || status === 412;
 

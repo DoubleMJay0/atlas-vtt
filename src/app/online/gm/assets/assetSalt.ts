@@ -3,7 +3,7 @@ import type { StoreResult } from './storeClient.ts';
 
 /** How long a salt the relay did not hand out is not asked for again (a relay without the store answers 404). */
 export const SALT_RETRY_MS = 10 * 60 * 1000;
-/** How long building a reference waits for a salt still being fetched before it goes out without an id. */
+/** How long building a reference waits for a salt still being fetched before players are handed none. */
 export const SALT_WAIT_MS = 5_000;
 
 export interface AssetSaltPorts {
@@ -23,7 +23,7 @@ export interface AssetSaltPorts {
  * The GM's salt: kept in secret storage, fetched from the relay at sign-in and on first need while
  * signed in, the same for the account on every device (so earlier uploads stay deduplicated), and gone
  * on sign-out and on a 401. A relay that does not hand one out (an older relay, a failure) leaves the
- * GM without ids, quietly: references then go out without them and players fetch through the table.
+ * GM without ids, quietly: players are then shown no assets.
  */
 export class AssetSalt {
   private fetching: Promise<Uint8Array<ArrayBuffer> | null> | null = null;

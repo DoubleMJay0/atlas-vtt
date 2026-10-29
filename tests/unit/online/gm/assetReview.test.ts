@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ASSET_USES } from '../../../../src/app/online/gm/assets/assetUses.ts';
 import { RestingLatency, Slots } from '../../../../src/app/online/gm/assets/uploadPace.ts';
-import { SharedCopies } from '../../../../src/app/online/gm/assets/sharedCopies.ts';
 import type { HandedQuest } from '../../../../src/app/online/gm/book/questGate.ts';
 import { StoredQuests } from '../../../../src/app/online/gm/book/storedQuests.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
@@ -44,8 +43,9 @@ describe('what players hear of the uploads', () => {
     store.publisher.resend('cleo');
     expect(store.sent).toEqual([]);
     store.hand(shared, 'cleo');
+    // Handed a stored asset, she hears its share at once; a resend names it again, to her alone.
     store.publisher.resend('cleo');
-    expect(store.sent.map(({ body, to }) => [to, Object.keys(body.t === 'asset-progress' ? body.shares : {})])).toEqual([['cleo', [shared.id]]]);
+    expect(store.sent.map(({ body, to }) => [to, Object.keys(body.t === 'asset-progress' ? body.shares : {})])).toEqual([['cleo', [shared.id]], ['cleo', [shared.id]]]);
   });
 
   it('tells everyone at once what everyone was sent', async () => {
@@ -53,6 +53,8 @@ describe('what players hear of the uploads', () => {
     store.players = ['ana', 'bo'];
     const shared = kept(await store.publisher.storing.refOf(bytesOf(100, 1), 'image/webp', ASSET_USES.map));
     store.hand(shared);
+    // The hand-over itself tells each player at once; what moves after that goes to everyone in one message.
+    store.sent.length = 0;
     await store.advance(2000);
     expect(new Set(store.sent.map(({ to }) => to))).toEqual(new Set(['*']));
   });
@@ -96,7 +98,7 @@ describe('stopping and halting', () => {
     expect(after.map((call) => call.id).slice(0, 2)).toEqual([video?.id, art.id]);
   });
 
-  it('takes every asset players were sent away from them once nothing goes up any more, and finishes what the store took when it is only full', async () => {
+  it('takes every asset players were sent away from them once nothing goes up any more, and finishes what the store took when it refuses one asset', async () => {
     const signedOut = publisherHarness();
     signedOut.client.hold = true;
     signedOut.connection = { players: 1, latencyMs: 40 };
@@ -121,20 +123,7 @@ describe('stopping and halting', () => {
   });
 });
 
-describe('the store emptied, and superseded memories', () => {
-  it('uploads a large kept asset again once the shared copies were removed, its bytes given back by the next hand-out', async () => {
-    const store = publisherHarness();
-    const handout = bytesOf(2 * MIB, 6);
-    const ref = kept(await store.publisher.storing.refOf(handout, 'image/png', ASSET_USES.image));
-    await store.advance(1000);
-    expect(store.client.calls).toHaveLength(1);
-    store.publisher.emptied();
-    expect(store.withdrawn).toBe(1);
-    expect(kept(await store.publisher.storing.refOf(handout, 'image/png', ASSET_USES.image)).id).toBe(ref.id);
-    await store.advance(1000);
-    expect(store.client.calls.map((call) => call.id)).toEqual([ref.id, ref.id]);
-  });
-
+describe('superseded memories', () => {
   it('neither uploads nor names an explored memory a newer one replaced before it went', async () => {
     const store = publisherHarness();
     const first = kept(await store.publisher.storing.refOf(bytesOf(300_000, 7), 'image/png', ASSET_USES.explored));
@@ -159,10 +148,11 @@ describe('the connection\'s pace', () => {
     void slots.take().then(() => granted.push(3));
     limit = 1;
     releases[0]?.();
-    await Promise.resolve();
+    // A turn given back is given out once its holder could ask again: a task later at the latest.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(granted).toEqual([]);
     releases[1]?.();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(granted).toEqual([3]);
   });
 

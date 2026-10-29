@@ -12,6 +12,9 @@ export const IN_FLIGHT_SLOW = 1;
 export const RESTING_WINDOW_MS = 5 * 60 * 1000;
 /** The longest wait before a failed request is tried again. */
 export const MAX_RETRY_MS = 60_000;
+/** The first and the longest wait before an asset refused for room the store will make is offered again. */
+export const ROOM_RETRY_MS = 5 * 60_000;
+export const MAX_ROOM_RETRY_MS = 30 * 60_000;
 
 /**
  * How many upload requests may be in flight: four while no player is connected, one while players are
@@ -27,6 +30,11 @@ export function inFlight(players: number, latencyMs: number | null, restingMs: n
 /** The wait before the `failures`th try again: 1, 2, 4 … seconds, at most 60. */
 export function retryMs(failures: number): number {
   return Math.min(MAX_RETRY_MS, 1000 * 2 ** Math.max(0, failures - 1));
+}
+
+/** The wait before the `refusals`th offer again of an asset the store had no room for yet: 5, 10, 20, then 30 minutes. */
+export function roomRetryMs(refusals: number): number {
+  return Math.min(MAX_ROOM_RETRY_MS, ROOM_RETRY_MS * 2 ** Math.max(0, refusals - 1));
 }
 
 /** The socket's resting round trip: the least the keep-alive took within `RESTING_WINDOW_MS`. */
@@ -128,7 +136,8 @@ export class Slots {
       if (released) return;
       released = true;
       this.active -= 1;
-      this.drain();
+      // Given out once the holder had its chance to ask again: an upload asks for its next turn right after it gave one back, and the most urgent asker should win it.
+      queueMicrotask(() => this.drain());
     };
   }
 }

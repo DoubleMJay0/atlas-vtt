@@ -1,13 +1,19 @@
 import type { AssetKind } from '../../protocol/index.ts';
 import type { OfferAnswer, OfferRefusal, UploadWay } from './assetRoutes.ts';
-import type { PyramidPlan } from './pyramidPlan.ts';
+import type { LivePyramid } from './livePyramid.ts';
 import { retryMs } from './uploadPace.ts';
 
 /**
  * Where an upload reads an asset's bytes: kept in memory (a text, a poster, a drawing), a vault file
- * read again then, or a map's tile pyramid in this device's cache, uploaded as its plan says.
+ * read again then, or a map's tile pyramid in this device's cache, uploaded level by level as it is cut.
  */
-export type AssetSource = { readonly bytes: Uint8Array<ArrayBuffer> } | { readonly path: string } | { readonly plan: PyramidPlan };
+export type AssetSource = { readonly bytes: Uint8Array<ArrayBuffer> } | { readonly path: string } | { readonly pyramid: LivePyramid };
+
+/** Whether the store refused an entry for room it said it would make: it is offered again after a while. */
+const roomAgain = (entry: QueueEntry): boolean => entry.state === 'refused' && entry.refusal === 'quota' && entry.quotaRetries > 0;
+
+/** The pyramid an entry uploads, if it is one. */
+export const entryPyramid = (entry: Pick<QueueEntry, 'source'>): LivePyramid | null => (entry.source !== null && 'pyramid' in entry.source ? entry.source.pyramid : null);
 
 /** An asset's way into the store: offered next, offered, waiting to go up, going up, stored, refused by the store, or given up. */
 export type EntryState = 'new' | 'offered' | 'queued' | 'uploading' | 'stored' | 'refused' | 'failed';
@@ -15,11 +21,14 @@ export type EntryState = 'new' | 'offered' | 'queued' | 'uploading' | 'stored' |
 export interface QueueEntry {
   readonly id: string;
   readonly hash: string;
-  readonly size: number;
+  /** What the store is asked to keep of it: a pyramid's bound, lowered to its true size once it is cut (never raised). */
+  size: number;
   readonly mime: string;
   readonly kind: AssetKind;
   /** Its priority: the lower, the sooner (`ASSET_RANKS`). */
   rank: number;
+  /** The floor map (vault path) a map sent as one image is of: it ranks by who looks at that floor. */
+  readonly map?: string | undefined;
   /** When it was last asked for, by the queue's count: of one rank, the latest goes first. */
   stamp: number;
   /** Whether players were handed its id: only then is its progress told. */
@@ -28,7 +37,7 @@ export interface QueueEntry {
   source: AssetSource | null;
   state: EntryState;
   upload: { readonly upload: UploadWay; readonly partBytes: number } | null;
-  /** A pyramid's next batch to send (`PyramidPlan.batches`); 0 for every other asset. */
+  /** A pyramid's next batch to send (`LivePyramid.batch`); 0 for every other asset. */
   next: number;
   /** Why the store refused it, while it is refused. */
   refusal: OfferRefusal | null;
@@ -38,10 +47,17 @@ export interface QueueEntry {
   rejected: number;
   /** Not tried again before this time. */
   retryAt: number;
+  /** Refusals for want of room the store said would pass (it makes room on its own): offered again after a while. */
+  quotaRetries: number;
+  /** When the store last answered an offer of it that it holds or wants it: the store lets go of what is not offered for a day. */
+  offeredAt: number;
 }
 
 /** Bytes held for an asset after it was stored, so it can go up again once the store was emptied: texts and small drawings. */
 export const KEPT_BYTES = 1024 * 1024;
+
+/** How long a stored asset may go unoffered before handing it to players again offers it first (the store lets go after 24 hours). */
+export const REOFFER_AFTER_MS = 12 * 60 * 60 * 1000;
 
 /** The most assets the queue remembers; stored ones not handed to players go first. */
 export const MAX_ENTRIES = 4000;
@@ -64,7 +80,7 @@ export class UploadQueue {
   }
 
   /** Adds an asset, or asks for one known again: its rank rises where this use ranks higher, and it goes to the front of its rank. */
-  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'next' | 'refusal' | 'failures' | 'rejected' | 'retryAt'>): QueueEntry {
+  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'next' | 'refusal' | 'failures' | 'rejected' | 'retryAt' | 'quotaRetries' | 'offeredAt'>): QueueEntry {
     const known = this.entries.get(entry.id);
     this.count += 1;
     if (known !== undefined) {
@@ -76,22 +92,23 @@ export class UploadQueue {
       known.source ??= entry.source;
       return known;
     }
-    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, next: 0, refusal: null, failures: 0, rejected: 0, retryAt: 0 };
+    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, next: 0, refusal: null, failures: 0, rejected: 0, retryAt: 0, quotaRetries: 0, offeredAt: 0 };
     this.entries.set(entry.id, added);
     this.trim();
     return added;
   }
 
-  /** What waits to be offered now. */
+  /** What waits to be offered now, a refusal for room that was to pass among it once its wait is over. */
   toOffer(now: number): QueueEntry[] {
+    for (const entry of this.entries.values()) if (roomAgain(entry) && entry.retryAt <= now) entry.state = 'new';
     return [...this.entries.values()].filter((entry) => entry.state === 'new' && entry.retryAt <= now);
   }
 
-  /** The asset to upload next of those `allow` lets go, or undefined while none may go now. */
+  /** The asset to upload next of those `allow` lets go, or undefined while none may go now; a pyramid waits for its next level to be cut. */
   next(now: number, allow: (entry: QueueEntry) => boolean = () => true): QueueEntry | undefined {
     let best: QueueEntry | undefined;
     for (const entry of this.entries.values()) {
-      if (entry.state !== 'queued' || entry.retryAt > now || !allow(entry)) continue;
+      if (entry.state !== 'queued' || entry.retryAt > now || !allow(entry) || entryPyramid(entry)?.readyAt(entry.next) === false) continue;
       if (best === undefined || entry.rank < best.rank || (entry.rank === best.rank && entry.stamp > best.stamp)) best = entry;
     }
     return best;
@@ -108,8 +125,12 @@ export class UploadQueue {
       this.failed(entry, now, 'new');
       return null;
     }
-    if (answer.answer === 'have') return 'have';
+    if (answer.answer === 'have') {
+      entry.offeredAt = now;
+      return 'have';
+    }
     if (answer.answer === 'need') {
+      entry.offeredAt = now;
       entry.upload = { upload: answer.upload, partBytes: answer.partBytes };
       entry.state = 'queued';
       return 'need';
@@ -119,14 +140,28 @@ export class UploadQueue {
     return answer.reason;
   }
 
-  /** Forgets an asset: asked for again, it starts afresh. */
-  forget(id: string): void {
-    this.entries.delete(id);
+  /**
+   * A stored asset handed to players again: offered first where it was last offered `REOFFER_AFTER_MS`
+   * ago or longer, since the store may have let it go. Answers whether it is offered again.
+   */
+  stale(entry: QueueEntry, now: number): boolean {
+    if (entry.state !== 'stored' || now - entry.offeredAt < REOFFER_AFTER_MS) return false;
+    Object.assign(entry, { state: 'new', next: 0, failures: 0, rejected: 0, retryAt: 0 });
+    return true;
   }
 
-  /** The asset is stored: its bytes are let go unless they are few. */
+  /** Forgets an asset: asked for again, it starts afresh; a pyramid stops waiting for its levels. */
+  forget(id: string): void {
+    const entry = this.entries.get(id);
+    if (entry === undefined) return;
+    this.entries.delete(id);
+    entryPyramid(entry)?.stop();
+  }
+
+  /** The asset is stored: its bytes are let go unless they are few; a pyramid stops waiting for its levels. */
   stored(entry: QueueEntry): void {
     entry.state = 'stored';
+    entryPyramid(entry)?.stop();
     entry.failures = 0;
     if (entry.source !== null && 'bytes' in entry.source && entry.source.bytes.length > KEPT_BYTES) entry.source = null;
     entry.next = 0;
@@ -145,22 +180,20 @@ export class UploadQueue {
   }
 
   /**
-   * Offers again what is on its way and what was refused for want of room (or an account that may not
-   * store then); `all`: what was stored too (the store was emptied). An asset refused for its size or
-   * kind, or given up, stays as it is, and so does one stored whose bytes were let go.
+   * Offers again what is on its way, what was refused for an account that may not store then, and
+   * what was refused for room the store said it would make. An asset refused for its size or kind,
+   * or for room for good, or given up, stays as it is.
    */
-  reoffer(all: boolean): void {
+  reoffer(): void {
     for (const entry of this.entries.values()) {
       const waiting = entry.state === 'new' || entry.state === 'offered' || entry.state === 'queued';
-      const room = entry.state === 'refused' && (entry.refusal === 'quota' || entry.refusal === 'restricted');
-      const again = all && entry.state === 'stored';
-      if (!waiting && !room && !again) continue;
+      const restricted = entry.state === 'refused' && entry.refusal === 'restricted';
+      if (!waiting && !restricted && !roomAgain(entry)) continue;
       if (entry.source === null) {
         entry.state = 'failed';
         continue;
       }
       entry.state = 'new';
-      if (again) entry.next = 0;
       entry.refusal = null;
       entry.failures = 0;
       entry.retryAt = 0;

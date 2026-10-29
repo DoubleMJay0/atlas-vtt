@@ -25,7 +25,7 @@ export async function readFloorImages(readImage: (path: string) => Promise<Vault
   if (background === null) return { map: null, size: null, tooLarge: false };
   const image = await readImage(background);
   if (image === null) return null;
-  const map = stored === undefined ? null : isVideoMapPath(background) ? await stored.refOf(image.bytes, image.mime, ASSET_USES.map) : await stored.mapRef(image.bytes, image.mime, background);
+  const map = stored === undefined ? null : isVideoMapPath(background) ? await stored.refOf(image.bytes, image.mime, { ...ASSET_USES.map, map: background }) : await stored.mapRef(image.bytes, image.mime, background);
   const size = await imageDimensions(new Blob([image.bytes]));
   return { map, size, tooLarge: map === null && image.bytes.length > ASSET_CAPS.image };
 }

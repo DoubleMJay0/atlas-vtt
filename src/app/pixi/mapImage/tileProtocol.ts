@@ -1,7 +1,7 @@
 import type { ArtAlpha } from '../../levels/artRaster';
 import type { RoofPieces } from '../../levels/roofs';
 import type { Pyramid, TileRef } from './pyramid';
-import type { PyramidFacts, TileSelection } from './tileBlobs';
+import type { StoredLevel, TileSelection } from './tileBlobs';
 
 /**
  * Messages between `TileDecoderClient` (main thread) and the tile worker
@@ -45,33 +45,32 @@ export type TileRequest =
   | { type: 'alpha-raster'; id: number; handle: number; maxSide: number; threshold: number }
   /** The pieces of a roof image (`roofPieces`) over its overview fit within `maxSide`. */
   | { type: 'roof-pieces'; id: number; handle: number; maxSide: number }
-  /** Drops a tile, overview, alpha or roof request; nothing is answered for it. */
+  /** Drops a tile, overview, alpha, roof or level request; nothing is answered for it. */
   | { type: 'cancel'; id: number }
   /** Ends an open; its pending requests are answered with an `error`. */
   | { type: 'close'; handle: number }
   | { type: 'cache-size'; id: number }
   | { type: 'clear-cache'; id: number }
-  /** A complete cached pyramid's facts (its size and every tile's stored size), by its hash. */
-  | { type: 'pyramid-facts'; id: number; hash: string }
   /** The stored WebP bytes of a cached pyramid's tiles, by its hash, never decoded. */
-  | { type: 'tile-blobs'; id: number; hash: string; tiles: TileSelection };
+  | { type: 'tile-blobs'; id: number; hash: string; tiles: TileSelection }
+  /** Answered once every tile of a cached pyramid's level is stored, at once where it is; a build may still be cutting it. */
+  | { type: 'level-ready'; id: number; hash: string; level: number };
 
 export type TileReply =
   | { type: 'opened'; id: number; opened: OpenedPyramid }
   | { type: 'need-bytes'; id: number }
   | { type: 'open-failed'; id: number; failure: OpenFailure }
-  /** A prebuild ended: `complete` is false when it gave way to an open or could not write the cache. */
-  | { type: 'prebuilt'; id: number; hash: string; complete: boolean }
+  /** A prebuild ended: `complete` is false when it gave way to an open or could not write the cache; `stored`: its tiles in the cache now. */
+  | { type: 'prebuilt'; id: number; hash: string; complete: boolean; stored: number }
   | { type: 'bitmap'; id: number; bitmap: ImageBitmap }
   | { type: 'alpha-raster'; id: number; raster: ArtAlpha }
   | { type: 'roof-pieces'; id: number; pieces: RoofPieces }
   | { type: 'cache-size'; id: number; bytes: number }
   /** The cache was cleared except for the pyramids in use; `bytes` is what they still take. */
   | { type: 'cleared'; id: number; bytes: number }
-  /** Null where the cache holds no complete pyramid of the hash. */
-  | { type: 'pyramid-facts'; id: number; facts: PyramidFacts | null }
   /** In the order asked for; null for a tile the cache misses. The buffers are transferred. */
   | { type: 'tile-blobs'; id: number; blobs: (ArrayBuffer | null)[] }
+  | { type: 'level-ready'; id: number; level: StoredLevel }
   /** A tile or overview request that could not be answered (an unknown handle, a tile missing from a cleared cache). */
   | { type: 'error'; id: number; message: string };
 

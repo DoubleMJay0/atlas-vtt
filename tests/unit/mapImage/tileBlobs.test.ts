@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { MemoryTileBackend } from '../../../src/app/pixi/mapImage/memoryTileBackend';
-import { pyramidOf, TILE_SPEC } from '../../../src/app/pixi/mapImage/pyramid';
-import { pyramidTiles } from '../../../src/app/pixi/mapImage/tileBlobs';
+import { pyramidOf } from '../../../src/app/pixi/mapImage/pyramid';
 import { TileDecoderClient } from '../../../src/app/pixi/mapImage/TileDecoderClient';
 import type { CoreFactory } from '../../../src/app/pixi/mapImage/tileCoreHost';
 import { inThreadPort, type PortFactory } from '../../../src/app/pixi/mapImage/tilePorts';
@@ -33,16 +32,6 @@ describe('a cached pyramid read for copying', () => {
     let read = 0;
     expect(await client.ensurePyramid(() => (read += 1, Promise.resolve(fakePng(3000, 2000))), identity)).toEqual(built);
     expect(read).toBe(0);
-  });
-
-  it('tells its size, spec and every tile\'s stored size, in the pyramid\'s order', async () => {
-    const client = setup();
-    const { hash } = await client.ensurePyramid(() => Promise.resolve(fakePng(3000, 2000)), identity);
-    const facts = await client.pyramidFacts(hash);
-    expect(facts).toMatchObject({ hash, width: 3000, height: 2000, spec: TILE_SPEC, decodedScale: 1 });
-    expect(facts?.tiles.map(({ level, col, row }) => ({ level, col, row }))).toEqual(pyramidTiles(pyramidOf(3000, 2000)));
-    expect(facts?.tiles.every((tile) => tile.bytes > 0)).toBe(true);
-    expect(await client.pyramidFacts('f'.repeat(64))).toBeNull();
   });
 
   it('hands out tiles as they are stored, never decoded: a list, or a whole level', async () => {

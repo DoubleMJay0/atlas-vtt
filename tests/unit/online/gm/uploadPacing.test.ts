@@ -6,10 +6,17 @@ import { ASSET_USES } from '../../../../src/app/online/gm/assets/assetUses.ts';
 import type { StoreResult } from '../../../../src/app/online/gm/assets/storeClient.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { pyramidOf } from '../../../../src/app/pixi/mapImage/pyramid';
-import { pyramidTiles, type PyramidFacts } from '../../../../src/app/pixi/mapImage/tileBlobs';
+import { pyramidTiles, type StoredTileSize } from '../../../../src/app/pixi/mapImage/tileBlobs';
+import { pngOf } from './fakeTileCache.ts';
 import { FakeUplink, percentiles, type UplinkOptions } from './fakeUplink.ts';
 import { settled } from './settled.ts';
 import { kept } from './fakeStoring.ts';
+
+/** The map's pyramid as this device's cache holds it: every tile stored. */
+interface CachedPyramid {
+  readonly hash: string;
+  readonly tiles: readonly StoredTileSize[];
+}
 
 /*
  * How the uploads share the GM's uplink with the table's live frames, in the MODEL of `fakeUplink.ts`
@@ -129,7 +136,7 @@ function simTimers(): { now: () => number; setTimer: (run: () => void, ms: numbe
 const sizeOf = (body: GmMessage): number => JSON.stringify(body).length;
 
 /** Uploads the video and the pyramid over the model while the table's live lane runs; `paced`: the publisher hears players are connected. */
-async function simulate(bitsPerSecond: number, paced: boolean, video: Uint8Array<ArrayBuffer>, image: Uint8Array<ArrayBuffer>, facts: PyramidFacts): Promise<Run> {
+async function simulate(bitsPerSecond: number, paced: boolean, video: Uint8Array<ArrayBuffer>, image: Uint8Array<ArrayBuffer>, facts: CachedPyramid): Promise<Run> {
   const options: UplinkOptions = { bitsPerSecond, baseRttMs: 40, flowWindow: 256 * 1024, routerBuffer: 512 * 1024 };
   const uplink = new FakeUplink(options);
   const store = new UplinkStore(uplink);
@@ -147,7 +154,8 @@ async function simulate(bitsPerSecond: number, paced: boolean, video: Uint8Array
     notify: () => undefined,
     signedOutByServer: () => undefined,
     pyramids: {
-      ensure: () => Promise.resolve(facts),
+      build: () => Promise.resolve({ hash: facts.hash, complete: true }),
+      level: (_hash, level) => Promise.resolve({ width: 14_000, height: 9_200, decodedScale: 1, level, tiles: facts.tiles.filter((tile) => tile.level === level) }),
       blobs: (_hash, tiles) => Promise.resolve(tiles.map((tile) => new ArrayBuffer(facts.tiles.find((stored) => stored.level === tile.level && stored.col === tile.col && stored.row === tile.row)?.bytes ?? 0))),
       focus: () => null,
     },
@@ -178,10 +186,10 @@ async function simulate(bitsPerSecond: number, paced: boolean, video: Uint8Array
 describe('uploads sharing the GM\'s uplink with the live lane (a model)', () => {
   it('keep the live frames\' added delay low with players connected and the uploads close to their unpaced time', { timeout: 300_000 }, async () => {
     const video = new Uint8Array(VIDEO_BYTES);
-    const image = new Uint8Array([1, 2, 3, 4]);
+    const image = pngOf(14_000, 9_200);
     const pyramid = pyramidOf(14_000, 9_200);
     const tiles = pyramidTiles(pyramid);
-    const facts: PyramidFacts = { hash: await sha256Hex(image), width: 14_000, height: 9_200, spec: 2, decodedScale: 1, tiles: tiles.map((ref) => ({ ...ref, bytes: Math.floor(PYRAMID_BYTES / tiles.length) })) };
+    const facts: CachedPyramid = { hash: await sha256Hex(image), tiles: tiles.map((ref) => ({ ...ref, bytes: Math.floor(PYRAMID_BYTES / tiles.length) })) };
     const rows: string[] = [];
     const runs = new Map<string, Run>();
     for (const mbit of [10, 20]) {

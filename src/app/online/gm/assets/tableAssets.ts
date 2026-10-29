@@ -8,7 +8,7 @@ import { stagedSceneAssets } from './assetGather.ts';
 import { AssetPublisher } from './AssetPublisher.ts';
 import type { AssetRefs } from './assetRefs.ts';
 import type { MapFocus } from './pyramidPlan.ts';
-import { ensureMapPyramid } from '../../../pixi/mapImage/prebuildMapImage';
+import { buildMapPyramid } from '../../../pixi/mapImage/prebuildMapImage';
 import { TileDecoderClient } from '../../../pixi/mapImage/TileDecoderClient';
 import { call } from '../atlasView.ts';
 import { AssetStoreClient } from './storeClient.ts';
@@ -58,7 +58,8 @@ export function tablePublisher(deps: TablePublisherDeps): AssetPublisher {
   return new AssetPublisher({
     client: new AssetStoreClient(deps.origin, () => assets.token()),
     pyramids: {
-      ensure: (path) => ensureMapPyramid(app, path),
+      build: (path) => buildMapPyramid(app, path),
+      level: (hash, level, signal) => TileDecoderClient.forApp(app).levelReady(hash, level, signal),
       blobs: (hash, tiles) => TileDecoderClient.forApp(app).tileBlobs(hash, [...tiles]),
       focus: () => deps.focus(),
     },

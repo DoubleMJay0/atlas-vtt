@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Setting, ToggleComponent } from 'obsidian';
+import { Setting } from 'obsidian';
 import { describe, expect, it } from 'vitest';
 import { AccountControl } from '../../../../src/app/online/gm/account/AccountControl.ts';
 import type { HttpRequest, HttpResponse } from '../../../../src/app/online/gm/account/http.ts';
@@ -9,18 +9,20 @@ const MARA = { id: 'acc_mara', handle: 'mara', name: 'Mara' };
 
 describe('online play\'s settings data', () => {
   it('reports no errors until the GM switches it on', () => {
-    expect(DEFAULT_SETTINGS).toEqual({ reportErrors: false, deleteCopiesOnSignOut: false });
+    expect(DEFAULT_SETTINGS).toEqual({ reportErrors: false });
     expect(readSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(readSettings({ reportErrors: 'yes' })).toEqual(DEFAULT_SETTINGS);
-    expect(readSettings({ reportErrors: true })).toEqual({ reportErrors: true, deleteCopiesOnSignOut: false });
-    expect(readSettings({ deleteCopiesOnSignOut: 'yes' })).toEqual(DEFAULT_SETTINGS);
-    expect(readSettings({ deleteCopiesOnSignOut: true })).toEqual({ reportErrors: false, deleteCopiesOnSignOut: true });
+    expect(readSettings({ reportErrors: true })).toEqual({ reportErrors: true });
+  });
+
+  it('reads nothing of the switch that once deleted the players\' copies on sign-out', () => {
+    expect(readSettings({ deleteCopiesOnSignOut: true, reportErrors: true })).toEqual({ reportErrors: true });
   });
 
   it('keeps nothing of a key that made tables without an account', () => {
     const read = readSettings({ createKey: 'owner-key', reportErrors: false });
     expect(read).toEqual(DEFAULT_SETTINGS);
-    expect(Object.keys(read)).toEqual(['reportErrors', 'deleteCopiesOnSignOut']);
+    expect(Object.keys(read)).toEqual(['reportErrors']);
   });
 });
 
@@ -70,7 +72,7 @@ describe('online play\'s settings', () => {
   it('have the account and error reports, and neither a key that creates tables nor the relay\'s account data', () => {
     const drawn = draw(host({ status: 200, json: { account: MARA, access: null, reason: 'no-access' } }));
     expect(drawn.headings).toEqual(['Online account', 'Online diagnostics']);
-    expect(drawn.names).toEqual(['Atlas account', 'Delete shared copies on sign-out', 'Send error reports']);
+    expect(drawn.names).toEqual(['Atlas account', 'Send error reports']);
   });
 
   it('say in the account row why the account may not host, with the way to the account page', async () => {
@@ -94,17 +96,4 @@ describe('online play\'s settings', () => {
     expect(of.requests.map((request) => request.url)).toEqual(['https://play.atlas-vtt.dev/api/me']);
   });
 
-  it('keep shared copies on sign-out until the GM switches the row on, and save the switch', async () => {
-    const of = host({ status: 200, json: { account: MARA, access: null, reason: 'no-access' } });
-    const row = onlineSettingsSections(of).flatMap((section) => section.rows).find((candidate) => candidate.name === 'Delete shared copies on sign-out');
-    const setting = new Setting(document.body.createDiv());
-    const toggle = new ToggleComponent(document.body.createDiv());
-    setting.addToggle = (callback): Setting => (callback(toggle), setting);
-    row?.render(setting);
-    expect(toggle.toggleEl.classList.contains('is-enabled')).toBe(false);
-    toggle.setValue(true);
-    await Promise.resolve();
-    expect(of.settings.deleteCopiesOnSignOut).toBe(true);
-    expect(of.saved.at(-1)?.deleteCopiesOnSignOut).toBe(true);
-  });
 });

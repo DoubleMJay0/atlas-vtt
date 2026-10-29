@@ -34,6 +34,12 @@ vi.mock('obsidian', () => ({
 }));
 
 // The GM's marks draw with PIXI over Atlas's canvas; here they only record what was built and let go.
+// Node has no tile worker: a map's pyramid is still being cut for as long as the test runs, as on a slow device.
+vi.mock('../../../../src/app/pixi/mapImage/prebuildMapImage', async (original) => ({ ...(await original<typeof import('../../../../src/app/pixi/mapImage/prebuildMapImage')>()), buildMapPyramid: () => new Promise(() => undefined) }));
+vi.mock('../../../../src/app/pixi/mapImage/TileDecoderClient', async (original) => ({
+  ...(await original<typeof import('../../../../src/app/pixi/mapImage/TileDecoderClient')>()),
+  TileDecoderClient: { forApp: () => ({ levelReady: () => new Promise(() => undefined), tileBlobs: () => Promise.resolve([]) }), release: () => undefined },
+}));
 vi.mock('../../../../src/app/online/gm/gmMarks.ts', () => ({
   GmMarks: class {
     disposed = false;

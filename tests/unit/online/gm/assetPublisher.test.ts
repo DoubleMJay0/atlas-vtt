@@ -23,7 +23,9 @@ describe('the asset publisher', () => {
     }
     await store.advance(200);
     expect(store.client.offers).toHaveLength(1);
-    expect(store.client.offers[0]?.map((asset) => [asset.id, asset.kind, asset.size])).toEqual(refs.map((ref) => [ref.id, 'image', ref.size]));
+    // Ids are worked out side by side, so the offer may name the three in any order.
+    const byId = (a: readonly unknown[], b: readonly unknown[]): number => String(a[0]).localeCompare(String(b[0]));
+    expect(store.client.offers[0]?.map((asset) => [asset.id, asset.kind, asset.size]).sort(byId)).toEqual(refs.map((ref) => [ref.id, 'image', ref.size]).sort(byId));
   });
 
   it('hands no references and offers nothing while it has no salt', async () => {
@@ -139,22 +141,61 @@ describe('the asset publisher', () => {
     expect(store.client.calls.map((call) => call.kind)).toEqual(['whole']);
   });
 
-  it('stops at a full quota, tells the GM once, and hands no references to new assets', async () => {
+  it('shows players no map larger than the store keeps, tells the GM once in plain words, and goes on with everything else', async () => {
     const store = publisherHarness();
-    store.client.answer = () => ({ answer: 'refused', reason: 'quota' });
-    await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.art);
-    await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art);
+    const big = kept(await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.map));
+    const art = kept(await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art));
+    store.client.answer = (asset) => (asset.id === big.id ? { answer: 'refused', reason: 'too-large' } : { answer: 'need', upload: 'single', partBytes: 95 * MIB });
     await store.advance(200);
-    expect(store.notices).toHaveLength(1);
-    expect(store.notices[0]).toMatch(/full/);
-    expect(store.withdrawn).toBeGreaterThan(0);
-    expect(store.client.calls).toEqual([]);
-    expect(await store.publisher.storing.refOf(bytesOf(100, 3), 'image/png', ASSET_USES.art)).toBeNull();
-    // A reconnect asks again; still full, the GM is not told twice.
+    expect(store.notices).toEqual(['This map is too large to share with players.']);
+    expect(store.withdrawn).toBe(1);
+    expect(store.client.calls.map((call) => call.id)).toEqual([art.id]);
+    expect(await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.map)).toBeNull();
+    // New assets are still stored, and a reconnect neither offers the map again nor tells the GM twice.
+    expect(kept(await store.publisher.storing.refOf(bytesOf(100, 3), 'image/png', ASSET_USES.art)).id).toBeDefined();
     store.publisher.welcome();
     await store.advance(200);
-    expect(store.client.offers).toHaveLength(2);
+    expect(store.client.offers.flat().filter((offered) => offered.id === big.id)).toHaveLength(1);
     expect(store.notices).toHaveLength(1);
+  });
+
+  it('says nothing of other assets too large for the store, nor of a map the store has no room for', async () => {
+    const store = publisherHarness();
+    store.client.answer = (asset) => ({ answer: 'refused', reason: asset.size === 100 ? 'too-large' : 'quota' });
+    await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.art);
+    const map = kept(await store.publisher.storing.refOf(bytesOf(200, 2), 'image/png', ASSET_USES.map));
+    await store.advance(200);
+    expect(store.notices).toEqual([]);
+    expect(store.withdrawn).toBe(1);
+    // Handed again, the map is still shown to no one, and the store is not asked again.
+    expect(await store.publisher.storing.refOf(bytesOf(200, 2), 'image/png', ASSET_USES.map)).toBeNull();
+    store.publisher.welcome();
+    await store.advance(200);
+    expect(store.client.offers.flat().filter((offered) => offered.id === map.id)).toHaveLength(1);
+  });
+
+  it('offers again, after a while and at the next welcome, an asset the store said it would make room for, without a word to the GM', async () => {
+    const store = publisherHarness();
+    let room = false;
+    store.client.answer = () => (room ? { answer: 'need', upload: 'single', partBytes: 95 * MIB } : { answer: 'refused', reason: 'quota', retry: true });
+    const map = kept(await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.map));
+    await store.advance(200);
+    expect(store.withdrawn).toBe(1);
+    // Players are not shown it meanwhile.
+    expect(await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.map)).toBeNull();
+    await store.advance(4 * 60_000);
+    expect(store.client.offers).toHaveLength(1);
+    await store.advance(61_000);
+    expect(store.client.offers).toHaveLength(2);
+    // Still no room: the next wait is longer; a welcome asks at once.
+    await store.advance(9 * 60_000);
+    expect(store.client.offers).toHaveLength(2);
+    room = true;
+    store.publisher.welcome();
+    await store.advance(1000);
+    expect(store.client.offers).toHaveLength(3);
+    expect(store.client.calls.map((call) => call.id)).toEqual([map.id]);
+    expect(store.notices).toEqual([]);
   });
 
   it('sends players nothing but how far the assets they were handed have come', async () => {
@@ -203,14 +244,4 @@ describe('the asset publisher', () => {
     expect(store.client.calls).toHaveLength(1);
   });
 
-  it('uploads everything again once the shared copies were removed', async () => {
-    const store = publisherHarness();
-    const ref = kept(await store.publisher.storing.refOf(bytesOf(100), 'text/markdown', ASSET_USES.text));
-    await store.advance(1000);
-    expect(store.client.calls).toHaveLength(1);
-    store.publisher.emptied();
-    await store.advance(1000);
-    expect(store.client.offers).toHaveLength(2);
-    expect(store.client.calls.map((call) => call.id)).toEqual([ref.id, ref.id]);
-  });
 });
