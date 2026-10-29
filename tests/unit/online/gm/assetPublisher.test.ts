@@ -22,7 +22,9 @@ describe('the asset publisher', () => {
     }
     await store.advance(200);
     expect(store.client.offers).toHaveLength(1);
-    expect(store.client.offers[0]?.map((asset) => [asset.id, asset.kind, asset.size])).toEqual(refs.map((ref) => [ref.id, 'image', ref.size]));
+    // Ids are worked out side by side, so the offer may name the three in any order.
+    const byId = (a: readonly unknown[], b: readonly unknown[]): number => String(a[0]).localeCompare(String(b[0]));
+    expect(store.client.offers[0]?.map((asset) => [asset.id, asset.kind, asset.size]).sort(byId)).toEqual(refs.map((ref) => [ref.id, 'image', ref.size]).sort(byId));
   });
 
   it('hands references without ids and offers nothing while it has no salt', async () => {

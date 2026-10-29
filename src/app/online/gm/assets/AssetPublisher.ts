@@ -75,7 +75,8 @@ export class AssetPublisher {
         this.withdraw([entry]);
         if (reserved) void this.ports.client.remove?.(entry.id);
       },
-      sized: (entry, bytes) => this.sized(entry, bytes),
+      settle: (entry) => void this.ports.client.offer([offeredAsset(entry)]),
+      offerSoon: () => this.offerSoon(),
     });
     this.hashes = new FileHashes((path) => ports.stat(path));
     this.runner = new UploadRunner({
@@ -159,6 +160,8 @@ export class AssetPublisher {
     // While the store takes nothing, new assets, and any not stored once nothing goes up, go the old way.
     if (this.halted !== null && known?.state !== 'stored') return undefined;
     const entry = this.queue.note({ id, hash, size, mime, kind: use.kind, rank: use.rank, map: use.map, handed, source });
+    // Handed again long after its last offer: the store may have let it go, so it is offered first.
+    if (handed && this.queue.stale(entry, this.ports.timers.now())) this.progress.set(id, 0);
     this.pyramids?.noted(entry);
     if (entry.handed) this.progress.set(id, entry.state === 'stored' ? 1 : this.progress.share(id) ?? 0);
     if (entry.state === 'new') this.offerSoon();
@@ -217,13 +220,6 @@ export class AssetPublisher {
     }));
     if (this.queue.toOffer(now).length > 0) this.offerSoon();
     this.runner.pump();
-  }
-
-  /** A pyramid's true size is known: the store is asked to keep that, never more, at once where it holds room for it already. */
-  private sized(entry: QueueEntry, bytes: number): void {
-    if (bytes >= entry.size) return;
-    entry.size = bytes;
-    if (entry.state === 'queued' || entry.state === 'uploading') void this.ports.client.offer([offeredAsset(entry)]);
   }
 
   /** Offers an asset again once the store has had a while to make room for it, at the next welcome or sign-in too. */

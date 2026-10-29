@@ -28,11 +28,12 @@ export type UploadWay = 'single' | 'multipart' | 'tiles';
 
 /**
  * Why the store will not take an asset: no room for it now (`retry`: the store makes room on its own,
- * so it may later), its kind, its size (larger than one asset or all the account may keep), or an
- * account that may not store now.
+ * so it may later), its kind, its size (larger than one asset or all the account may keep), an
+ * account that may not store now, or another size than the one it holds part of the asset at
+ * (`changed`: a pyramid it settled at its true size, offered again at its bound).
  */
-export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted';
-const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restricted'];
+export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted' | 'changed';
+const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restricted', 'changed'];
 
 /** The store's answer for one asset. */
 export type OfferAnswer =

@@ -32,8 +32,10 @@ export interface PyramidPublishingPorts {
   stage: AssetRefs['stage'];
   /** No pyramid pages can draw comes of this entry: it is forgotten, and what names its map hands it again as an image. */
   withdraw(entry: QueueEntry): void;
-  /** Every level of the entry's pyramid is cut: what the store keeps of it is `bytes`. */
-  sized(entry: QueueEntry, bytes: number): void;
+  /** Offers the entry's pyramid again at its size now, so the store keeps no more room for it. */
+  settle(entry: QueueEntry): void;
+  /** Offers what waits to be offered, soon. */
+  offerSoon(): void;
 }
 
 /**
@@ -68,7 +70,7 @@ export class PyramidPublishing {
       focus: () => this.ports.source.focus?.() ?? MAP_CENTRE,
       ready: (pyramid) => {
         const entry = this.entryOf(pyramid);
-        if (entry !== undefined && pyramid.realBytes !== null) this.ports.sized(entry, pyramid.realBytes);
+        if (entry !== undefined && pyramid.realBytes !== null) this.sized(entry, pyramid.realBytes);
         this.ports.ready();
       },
       failed: (pyramid) => {
@@ -101,6 +103,21 @@ export class PyramidPublishing {
   rank(entry: QueueEntry): void {
     const pyramid = entryPyramid(entry);
     if (pyramid !== null) entry.rank = pyramid.rankAt(entry.next);
+  }
+
+  /**
+   * Every level of a pyramid is cut: the store is asked to keep its true size, never more, at once where
+   * it holds room for it already, and one refused for its bound because the store holds part of it at
+   * that size is offered again.
+   */
+  private sized(entry: QueueEntry, bytes: number): void {
+    if (bytes >= entry.size) return;
+    entry.size = bytes;
+    if (entry.state === 'queued' || entry.state === 'uploading') this.ports.settle(entry);
+    if (entry.state === 'refused' && entry.refusal === 'changed') {
+      Object.assign(entry, { state: 'new', refusal: null });
+      this.ports.offerSoon();
+    }
   }
 
   private entryOf(pyramid: LivePyramid): QueueEntry | undefined {

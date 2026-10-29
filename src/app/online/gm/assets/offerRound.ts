@@ -32,7 +32,8 @@ const isMap = (entry: QueueEntry): boolean => entry.kind === 'tiles' || entry.ma
 /**
  * Takes the store's answers to one offer: stored already, wanted (a pyramid starts, and is offered again
  * where its size was lowered meanwhile), or refused. A refusal for room that will pass is offered again
- * later; any other refusal leaves the asset to go the old way, and only a map players were handed that
+ * later; a pyramid refused for another size than the store holds part of it at is offered at its true
+ * size, now or once its levels are cut; any other refusal leaves the asset to go the old way, and only a map players were handed that
  * is too large for the store tells the GM, once. An entry forgotten while its offer was on its way (its
  * pyramid was given up) is taken out of the store again where the store reserved room for it. Answers
  * the entries players were handed that the store will not keep now.
@@ -56,11 +57,25 @@ export function answerOffer(offered: readonly Offered[], answers: ReadonlyMap<st
       if (entry.size < size) ports.settle(entry);
       continue;
     }
+    const pyramid = entryPyramid(entry);
+    // The store holds part of this pyramid at its true size: offered at that size, now or once its levels are cut.
+    if (outcome === 'changed' && pyramid !== null) {
+      if (pyramid.realBytes === null) continue;
+      // Refused at its true size already: the store holds part of another pyramid under this id, and no offer will do.
+      if (pyramid.realBytes >= size) {
+        pyramid.fail();
+        continue;
+      }
+      entry.size = Math.min(entry.size, pyramid.realBytes);
+      entry.state = 'new';
+      entry.refusal = null;
+      continue;
+    }
     if (outcome === 'restricted') ports.restricted();
     else if (outcome === 'quota' && answer?.answer === 'refused' && answer.retry === true) ports.retryLater(entry);
     else if (outcome === 'too-large' && entry.handed && isMap(entry)) ports.mapTooLarge();
     else if (outcome === 'kind' && entry.kind === 'tiles') ports.noTiles();
-    entryPyramid(entry)?.stop();
+    pyramid?.stop();
     if (entry.handed) refused.push(entry);
   }
   return refused;

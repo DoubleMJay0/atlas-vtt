@@ -49,10 +49,15 @@ export interface QueueEntry {
   retryAt: number;
   /** Refusals for want of room the store said would pass (it makes room on its own): offered again after a while. */
   quotaRetries: number;
+  /** When the store last answered an offer of it that it holds or wants it: the store lets go of what is not offered for a day. */
+  offeredAt: number;
 }
 
 /** Bytes held for an asset after it was stored, so it can go up again once the store was emptied: texts and small drawings. */
 export const KEPT_BYTES = 1024 * 1024;
+
+/** How long a stored asset may go unoffered before handing it to players again offers it first (the store lets go after 24 hours). */
+export const REOFFER_AFTER_MS = 12 * 60 * 60 * 1000;
 
 /** The most assets the queue remembers; stored ones not handed to players go first. */
 export const MAX_ENTRIES = 4000;
@@ -75,7 +80,7 @@ export class UploadQueue {
   }
 
   /** Adds an asset, or asks for one known again: its rank rises where this use ranks higher, and it goes to the front of its rank. */
-  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'next' | 'refusal' | 'failures' | 'rejected' | 'retryAt' | 'quotaRetries'>): QueueEntry {
+  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'next' | 'refusal' | 'failures' | 'rejected' | 'retryAt' | 'quotaRetries' | 'offeredAt'>): QueueEntry {
     const known = this.entries.get(entry.id);
     this.count += 1;
     if (known !== undefined) {
@@ -87,7 +92,7 @@ export class UploadQueue {
       known.source ??= entry.source;
       return known;
     }
-    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, next: 0, refusal: null, failures: 0, rejected: 0, retryAt: 0, quotaRetries: 0 };
+    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, next: 0, refusal: null, failures: 0, rejected: 0, retryAt: 0, quotaRetries: 0, offeredAt: 0 };
     this.entries.set(entry.id, added);
     this.trim();
     return added;
@@ -120,8 +125,12 @@ export class UploadQueue {
       this.failed(entry, now, 'new');
       return null;
     }
-    if (answer.answer === 'have') return 'have';
+    if (answer.answer === 'have') {
+      entry.offeredAt = now;
+      return 'have';
+    }
     if (answer.answer === 'need') {
+      entry.offeredAt = now;
       entry.upload = { upload: answer.upload, partBytes: answer.partBytes };
       entry.state = 'queued';
       return 'need';
@@ -129,6 +138,16 @@ export class UploadQueue {
     entry.state = 'refused';
     entry.refusal = answer.reason;
     return answer.reason;
+  }
+
+  /**
+   * A stored asset handed to players again: offered first where it was last offered `REOFFER_AFTER_MS`
+   * ago or longer, since the store may have let it go. Answers whether it is offered again.
+   */
+  stale(entry: QueueEntry, now: number): boolean {
+    if (entry.state !== 'stored' || now - entry.offeredAt < REOFFER_AFTER_MS) return false;
+    Object.assign(entry, { state: 'new', next: 0, failures: 0, rejected: 0, retryAt: 0 });
+    return true;
   }
 
   /** Forgets an asset: asked for again, it starts afresh; a pyramid stops waiting for its levels. */
