@@ -1,12 +1,13 @@
 import type { AssetKind, AssetRef } from '../../protocol/index.ts';
 
 /**
- * The order uploads go in (lower first): the presented floor's map (its pyramid's manifest and overview
- * level), the art of tokens players see, the presented map's finer levels, then the same two steps for
- * the floors a player stands on, then for the shared scene's other floors, then the video, handouts and
+ * The order uploads go in (lower first), a first picture for everyone before polish for anyone: the
+ * presented floor's map (its pyramid's manifest and overview level), the art of tokens players see,
+ * the overviews of the floors a player stands on, the presented map's finer levels, those floors'
+ * finer levels, then the shared scene's other floors (overview, finer), then the video, handouts and
  * texts, then the scenes open beside it.
  */
-export const ASSET_RANKS = { map: 0, art: 1, mapLevels: 2, floorMap: 3, floorLevels: 4, restMap: 5, restLevels: 6, video: 7, extra: 8, staged: 9 } as const;
+export const ASSET_RANKS = { map: 0, art: 1, floorMap: 2, mapLevels: 3, floorLevels: 4, restMap: 5, restLevels: 6, video: 7, extra: 8, staged: 9 } as const;
 
 /**
  * Who looks at a map: players on the presented floor, players standing on another floor, nobody (a

@@ -68,7 +68,7 @@ describe('the pyramids of a scene\'s floors', () => {
     expect(batchesSent(store, names)).toEqual(['ground:1*', 'ground:3', 'ground:2', 'ground:0']);
   });
 
-  it('go up in the order of who looks at them: the presented floor, the art players see, the floor a player stands on, then the floor nobody stands on', async () => {
+  it('go up a first picture for everyone before polish for anyone: the presented overview, the art players see, the overview of the floor a player stands on, the finer levels, then the floor nobody stands on', async () => {
     const { store, hashes } = await threeFloors();
     for (const path of FLOORS) store.cache.add(path, hashes.get(path)!, 3000, 2000);
     store.client.hold = true;
@@ -82,8 +82,9 @@ describe('the pyramids of a scene\'s floors', () => {
     const order = store.client.calls.map((call) => (call.kind === 'whole' ? (call.id === art.id ? 'art' : '?') : 'tiles'));
     expect(order.indexOf('art')).toBe(1);
     expect(batchesSent(store, names)).toEqual([
-      'ground:1*', 'ground:3', 'ground:2', 'ground:0',
-      'cellar:1*', 'cellar:3', 'cellar:2', 'cellar:0',
+      'ground:1*', 'cellar:1*',
+      'ground:3', 'ground:2', 'ground:0',
+      'cellar:3', 'cellar:2', 'cellar:0',
       'vault:1*', 'vault:3', 'vault:2', 'vault:0',
     ]);
   });
@@ -102,8 +103,9 @@ describe('the pyramids of a scene\'s floors', () => {
     const vault = store.client.offers.flat().find((offered) => offered.kind === 'tiles' && offered.id !== ground.id && offered.id !== cellar.id);
     const names = new Map([[ground.id!, 'ground'], [cellar.id!, 'cellar'], [vault?.id ?? '', 'vault']]);
     expect(batchesSent(store, names)).toEqual([
-      'ground:1*', 'ground:3', 'ground:2', 'ground:0',
-      'vault:1*', 'vault:3', 'vault:2', 'vault:0',
+      'ground:1*', 'vault:1*',
+      'ground:3', 'ground:2', 'ground:0',
+      'vault:3', 'vault:2', 'vault:0',
       'cellar:1*', 'cellar:3', 'cellar:2', 'cellar:0',
     ]);
   });
