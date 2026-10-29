@@ -59,12 +59,17 @@ function deadEndFade(deadEnds: readonly Vec[], p: Vec): number {
  * fades out. A road that leaves the map or runs into another keeps its wear to its end.
  */
 export function roadWear(roads: readonly DungeonRoad[], sdfAt: (p: Vec) => number): (p: Vec) => number {
+  const all = roadField(roads);
   const each = roads.map((r, k) => {
     const others = roadField(roads.filter((_, j) => j !== k));
     const deadEnds = [r.points[0]!, r.points[r.points.length - 1]!].filter((end) => sdfAt(end) < 0 && others.distance(end.x, end.y) >= 0);
     return { field: roadField([r]), deadEnds };
   });
+  const ends = each.flatMap((road) => road.deadEnds);
+  // Asked for every pixel of the worn ground: one look-up in all the roads' field, and the roads one by one only near a dead end.
   return (p) => {
+    if (all.distance(p.x, p.y) >= 0) return 0;
+    if (!ends.some((end) => Math.hypot(p.x - end.x, p.y - end.y) < END_FADE)) return ROAD_WEAR;
     let wear = 0;
     for (const { field, deadEnds } of each) if (field.distance(p.x, p.y) < 0) wear = Math.max(wear, ROAD_WEAR * deadEndFade(deadEnds, p));
     return wear;

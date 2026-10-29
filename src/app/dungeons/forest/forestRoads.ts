@@ -215,26 +215,30 @@ function edgeCell({ bounds }: Ground, side: number, rng: Rng): Vec {
 /**
  * A road through `legs`, or, for a branch, through them and on into the road `joins`, merging
  * with it (`mergedInto`); its crossings bridged, unless they would make more than `MOST_BRIDGES` on the map.
+ * The route and its bridges follow from the ground alone, so they are worked out once; only the
+ * line's wandering differs from try to try (each search of the route takes tens of milliseconds
+ * on a large map, and the same refused route was searched four times over).
  */
 function layRoad(ground: Ground, water: ForestWater, legs: readonly Vec[][], width: number, bridges: Bridged[], rng: Rng, joins?: DungeonRoad): Vec[] | null {
   const field = waterField(water.rivers, water.lakes);
+  const cells = joins ? branchRoute(ground, legs, joins.points) : throughRoute(ground, legs);
+  if (!cells) return null;
+  const crossings = crossingsOf(cells, field);
+  if (bridges.length + crossings.length > MOST_BRIDGES) return null;
+  const found = crossings.map((run) => bridgeFor(water.rivers, run, cells, width, field));
+  if (found.some((p) => p === null)) return null;
+  const placed = found as Bridged[];
+  // Never a bridge hard by another: a road that would cross back over the river it just crossed takes another way.
+  const all = [...bridges, ...placed].map((b) => b.bridge.at);
+  if (all.some((a, i) => all.slice(i + 1).some((b) => Math.hypot(a.x - b.x, a.y - b.y) < BRIDGES_APART))) return null;
+  const onBridge = (p: Vec): boolean => placed.some(({ bridge }) => Math.hypot(p.x - bridge.at.x, p.y - bridge.at.y) <= bridge.length / 2 + 0.2);
   for (let attempt = 0; attempt < (joins ? TRIES : 1); attempt++) {
-    const cells = joins ? branchRoute(ground, legs, joins.points) : throughRoute(ground, legs);
-    if (!cells) continue;
-    const crossings = crossingsOf(cells, field);
-    if (bridges.length + crossings.length > MOST_BRIDGES) continue;
-    const placed = crossings.map((run) => bridgeFor(water.rivers, run, cells, width, field));
-    if (placed.some((p) => p === null)) continue;
-    // Never a bridge hard by another: a road that would cross back over the river it just crossed takes another way.
-    const all = [...bridges, ...(placed as Bridged[])].map((b) => b.bridge.at);
-    if (all.some((a, i) => all.slice(i + 1).some((b) => Math.hypot(a.x - b.x, a.y - b.y) < BRIDGES_APART))) continue;
-    const laid = roadLine(cells, placed as Bridged[], rng, field);
+    const laid = roadLine(cells, placed, rng, field);
     const line = joins ? mergedInto(laid, joins.points, joins.width) : laid;
     // Its curves must keep out of the water everywhere but on its bridges.
-    const onBridge = (p: Vec): boolean => (placed as Bridged[]).some(({ bridge }) => Math.hypot(p.x - bridge.at.x, p.y - bridge.at.y) <= bridge.length / 2 + 0.2);
     if (line.some((p) => field.distance(p.x, p.y) < 0 && !onBridge(p))) continue;
     if (hairpin(line)) continue;
-    bridges.push(...(placed as Bridged[]));
+    bridges.push(...placed);
     return line;
   }
   return null;
