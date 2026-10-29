@@ -448,8 +448,10 @@ describe('whose pointer holds a dragged token', () => {
     expect(parseGmMessage({ t: 'live', scene: 's1', at: 1, tokens: [place] })).toEqual({ t: 'live', scene: 's1', at: 1, tokens: [place] });
   });
 
-  it('refuses anything that names no one', () => {
-    for (const bad of ['', 'GM', 'player', 'abcdefghijklmnopqrs1', 1, null, {}]) expect(parseGmMessage(live(bad)), JSON.stringify(bad)).toBeNull();
+  it('leaves out a holder it cannot name and keeps the place: a later GM may name holders of other kinds', () => {
+    for (const unknown of ['', 'GM', 'player', 'abcdefghijklmnopqrs1', 1, null, {}]) {
+      expect(parseGmMessage(live(unknown)), JSON.stringify(unknown)).toEqual({ t: 'live', scene: 's1', at: 1, tokens: [place] });
+    }
   });
 });
 

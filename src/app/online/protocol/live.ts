@@ -18,8 +18,8 @@ const MAX_LIVE_TIME = 2 ** 40;
  * each waypoint and the place the token would land on, snapped as Atlas's ruler snaps them (world
  * pixels). It comes only for a drag the players saw from its start; an older page reads none.
  * `by` is whose pointer holds it (`GM_MARKS` or a player's relay id), only while everyone sees
- * cursors: a receiver draws the token as far behind its messages as that cursor, so the two move as
- * one. Without it the token keeps its own pace.
+ * cursors, on the place that ends the drag too: a receiver draws the token as far behind its messages
+ * as that cursor, so the two move as one. Without it the token keeps its own pace.
  */
 export interface LivePlace {
   readonly id: string;
@@ -70,8 +70,9 @@ export function parseLive(value: Record<string, unknown>, scene: string): LiveMe
     if (!isRecord(token) || typeof token.id !== 'string' || !TOKEN_ID_PATTERN.test(token.id) || !isCoordinate(token.x) || !isCoordinate(token.y)) return null;
     if (token.end !== undefined && token.end !== true) return null;
     const path = token.path === undefined ? undefined : parsePath(token.path);
-    const by = token.by === undefined ? undefined : isHolder(token.by) ? token.by : null;
-    if (path === null || by === null) return null;
+    // A holder this version cannot name is left out, never the whole message: a later GM may name others.
+    const by = isHolder(token.by) ? token.by : undefined;
+    if (path === null) return null;
     places.push({ id: token.id, x: token.x, y: token.y, ...(token.end === true && { end: true as const }), ...(path !== undefined && { path }), ...(by !== undefined && { by }) });
   }
   return { t: 'live', scene, at, tokens: places };

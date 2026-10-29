@@ -57,11 +57,12 @@ export interface HeldPlayout {
 /** Who holds a token: this view's own pointer, someone else, or nobody. */
 export type TokenHolder = 'pointer' | 'elsewhere' | null;
 
-/** A held token's playout: its places, the last one given, and where it ends once let go of. */
+/** A held token's playout: its places, the last one given, where it ends once let go of, and its holder's cursor lag last read. */
 interface Follow {
   readonly track: PointerTrack;
   last: Point;
   ending: Point | null;
+  lag: number | null;
 }
 
 export interface TokenGlideDeps {
@@ -145,10 +146,10 @@ export class TokenGlide {
     this.targets.delete(tokenId);
     const now = this.now();
     if (known === undefined || known.ending !== null) {
-      const track = new PointerTrack({ interval: playout.interval, least: () => this.deps.heldPlayout?.()?.lag(tokenId) ?? 0 });
+      const follow: Follow = { track: new PointerTrack({ interval: playout.interval, least: () => this.holderLag(tokenId, follow) }), last: { x, y }, ending: null, lag: null };
       // It leaves from where it is drawn.
-      track.push([{ x: sprite.position.x, y: sprite.position.y }, { x, y }], undefined, now);
-      this.follows.set(tokenId, { track, last: { x, y }, ending: null });
+      follow.track.push([{ x: sprite.position.x, y: sprite.position.y }, { x, y }], undefined, now);
+      this.follows.set(tokenId, follow);
       this.note(tokenId, sprite.position.x, sprite.position.y);
     } else {
       known.track.push([{ x, y }], undefined, now);
@@ -217,6 +218,16 @@ export class TokenGlide {
       this.follows.delete(tokenId);
       this.place(tokenId, follow.last.x, follow.last.y);
     }
+  }
+
+  /**
+   * How far behind the cursor of a held token's holder is drawn. Once the token is let go of, the holder
+   * names it no more: its way to the drop is played out at the lag last read, as the cursor still is.
+   */
+  private holderLag(tokenId: string, follow: Follow): number {
+    const lag = this.deps.heldPlayout?.()?.lag(tokenId) ?? null;
+    if (lag !== null || (follow.ending === null && this.deps.heldBy?.(tokenId) === 'elsewhere')) follow.lag = lag;
+    return follow.lag ?? 0;
   }
 
   private start(ticker: Ticker): void {
