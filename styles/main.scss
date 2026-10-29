@@ -284,13 +284,16 @@
       // stand where they would without it. A scroller clips its shadows at the
       // padding, and `--shadow-l` reaches 120px down and 90px aside (Obsidian's
       // `0 30px 90px`), so below and left get all of it; above and right the
-      // view's edge is closer than that anyway.
+      // view's edge is closer than that anyway. The rows scroll by wheel and
+      // touch without a scrollbar: one would take its width from the padding
+      // at the right, and the cards would end short of the view's edge.
       > .atlas-widget-bar > .atlas-widget-container {
         $shadow-room: 120px;
 
         max-height: 50vh;
         overflow: hidden auto;
         overscroll-behavior: contain;
+        scrollbar-width: none;
         padding: $spacing-xl $spacing-xl $shadow-room $shadow-room;
         margin: (-$spacing-xl) (-$spacing-xl) (-$shadow-room) (-$shadow-room);
       }
