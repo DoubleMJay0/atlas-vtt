@@ -76,7 +76,8 @@ export class ImageShare {
     const turn = (this.turn += 1);
     const image = await read().catch(() => null);
     if (image === null) return 'unreadable';
-    if (image.bytes.length > ASSET_CAPS.image) return 'too-large';
+    // Larger than the store keeps, or than the GM serves itself where nothing is stored.
+    if (image.bytes.length > (this.ports.stored === undefined ? MAX_ASSET_BYTES : ASSET_CAPS.image)) return 'too-large';
     if (!IMAGE_MIME_TYPES.includes(image.mime)) return 'unreadable';
     const size = await imageDimensions(new Blob([image.bytes], { type: image.mime })).catch(() => null);
     if (size === null || !isSide(size.width) || !isSide(size.height)) return 'unreadable';
