@@ -60,8 +60,8 @@ export type TileReply =
   | { type: 'opened'; id: number; opened: OpenedPyramid }
   | { type: 'need-bytes'; id: number }
   | { type: 'open-failed'; id: number; failure: OpenFailure }
-  /** A prebuild ended: `complete` is false when it gave way to an open or could not write the cache. */
-  | { type: 'prebuilt'; id: number; hash: string; complete: boolean }
+  /** A prebuild ended: `complete` is false when it gave way to an open or could not write the cache; `stored`: its tiles in the cache now. */
+  | { type: 'prebuilt'; id: number; hash: string; complete: boolean; stored: number }
   | { type: 'bitmap'; id: number; bitmap: ImageBitmap }
   | { type: 'alpha-raster'; id: number; raster: ArtAlpha }
   | { type: 'roof-pieces'; id: number; pieces: RoofPieces }

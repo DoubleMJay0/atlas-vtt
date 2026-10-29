@@ -78,7 +78,7 @@ export function hostTileCore(createCore: CoreFactory, post: PostMessage): TileCo
       }
       case 'prebuild': {
         const outcome = await ready.prebuild(request.identity, request.bytes, request.decoded ?? null);
-        if (outcome.kind === 'prebuilt') reply({ type: 'prebuilt', id: request.id, hash: outcome.hash, complete: outcome.complete });
+        if (outcome.kind === 'prebuilt') reply({ type: 'prebuilt', id: request.id, hash: outcome.hash, complete: outcome.complete, stored: outcome.stored });
         else if (outcome.kind === 'need-bytes') reply({ type: 'need-bytes', id: request.id });
         else reply({ type: 'open-failed', id: request.id, failure: outcome.failure });
         return;

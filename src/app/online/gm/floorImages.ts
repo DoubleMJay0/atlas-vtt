@@ -30,7 +30,7 @@ async function sharedImage(readImage: (path: string) => Promise<VaultImage | nul
   const poster = isVideoMapPath(path);
   const ref = stored === undefined
     ? { hash: await sha256Hex(image.bytes), size: image.bytes.length, mime: image.mime }
-    : poster ? await stored.refOf(image.bytes, image.mime, ASSET_USES.map) : await stored.mapRef(image.bytes, image.mime, path);
+    : poster ? await stored.refOf(image.bytes, image.mime, { ...ASSET_USES.map, map: path }) : await stored.mapRef(image.bytes, image.mime, path);
   if (ref.tiles !== true && image.bytes.length > (ref.id === undefined ? MAX_ASSET_BYTES : ASSET_CAPS.image)) return 'too-large';
   return { hash: ref.hash, bytes: image.bytes, mime: image.mime, ref };
 }

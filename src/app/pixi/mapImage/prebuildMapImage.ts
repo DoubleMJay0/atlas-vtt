@@ -24,11 +24,11 @@ export function prebuildMapImageAt(app: App, path: string): void {
 
 /**
  * Builds the pyramid of the map image at `path` where the cache lacks it (joining the build an open map
- * started), resolving once the build has ended: the image's hash and whether its pyramid is complete
- * now. Null for a file that is not there, one built on this thread (an SVG, a video's poster: its
+ * started), resolving once the build has ended: the image's hash, whether its pyramid is complete
+ * now and how many of its tiles are stored. Null for a file that is not there, one built on this thread (an SVG, a video's poster: its
  * pyramid is no copy of its bytes) and one too large or undecodable; rejects where the worker failed.
  */
-export async function buildMapPyramid(app: App, path: string): Promise<{ hash: string; complete: boolean } | null> {
+export async function buildMapPyramid(app: App, path: string): Promise<{ hash: string; complete: boolean; stored: number } | null> {
   const file = app.vault.getAbstractFileByPath(path);
   if (!(file instanceof TFile) || requiredMainThreadDecode(file) !== undefined) return null;
   try {

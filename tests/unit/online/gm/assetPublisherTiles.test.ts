@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { assetIdOf } from '../../../../src/app/online/gm/assets/assetIds.ts';
 import { pyramidKey } from '../../../../src/app/online/gm/assets/assetRefs.ts';
 import { ASSET_USES } from '../../../../src/app/online/gm/assets/assetUses.ts';
-import { BATCH_TILES, pyramidBound } from '../../../../src/app/online/gm/assets/pyramidPlan.ts';
+import { BATCH_TILES, manifestOf, pyramidBound } from '../../../../src/app/online/gm/assets/pyramidPlan.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { pyramidOf } from '../../../../src/app/pixi/mapImage/pyramid';
 import { bytesOf, publisherHarness, SALT, sharesHeard } from './fakeAssetStore.ts';
@@ -25,7 +25,7 @@ async function withPyramid(tileBytes = 1000, decodedScale = 1): Promise<{ store:
 const levelOf = (name: string): number => Number(name.split('/')[0]);
 
 describe('a map published as its tile pyramid', () => {
-  it('is handed to players as the pyramid, by an id of its own, at the most its tiles can take, and offered as one', async () => {
+  it('is handed to players as the pyramid, by an id of its own, at the most its tiles can take, and offered as one at its true size where the cache holds it whole', async () => {
     const { store, hash } = await withPyramid();
     const ref = await store.publisher.storing.mapRef(MAP, 'image/png', PATH);
     expect(ref).toEqual({ hash, size: BOUND, mime: 'image/png', id: await assetIdOf(SALT, pyramidKey(hash, 2)), tiles: true });
@@ -33,7 +33,8 @@ describe('a map published as its tile pyramid', () => {
     // Every tile's raw pixels with a margin: above the four levels' pixels, within the store's cap.
     expect(BOUND).toBeGreaterThan(3000 * 2000 * 4 * (4 / 3));
     await store.advance(200);
-    expect(store.client.offers).toEqual([[{ id: ref.id, kind: 'tiles', size: BOUND, tiles: { levels: 4, count: 33 } }]]);
+    const real = manifestOf(pyramidOf(3000, 2000)).length + 33 * 1000;
+    expect(store.client.offers).toEqual([[{ id: ref.id, kind: 'tiles', size: real, tiles: { levels: 4, count: 33 } }]]);
   });
 
   it('goes up with the manifest first, then the overview level, then the levels from coarse to fine, nearest the players\' view first', async () => {

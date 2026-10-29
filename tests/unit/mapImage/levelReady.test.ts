@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryTileBackend } from '../../../src/app/pixi/mapImage/memoryTileBackend';
 import { pyramidOf } from '../../../src/app/pixi/mapImage/pyramid';
 import type { StoredLevel } from '../../../src/app/pixi/mapImage/tileBlobs';
+import { LevelWaits } from '../../../src/app/pixi/mapImage/levelWaits';
 import { TileDecoderClient } from '../../../src/app/pixi/mapImage/TileDecoderClient';
 import type { CoreFactory } from '../../../src/app/pixi/mapImage/tileCoreHost';
 import { inThreadPort, type PortFactory } from '../../../src/app/pixi/mapImage/tilePorts';
@@ -100,5 +101,33 @@ describe('a level of a pyramid waited for in the tile worker', () => {
     second.abort();
     await vi.waitFor(() => expect(cancel).toHaveBeenCalled());
     client.dispose();
+  });
+
+  it('waits for levels of two pyramids at once, each answered by its own news, and answers nothing once disposed', async () => {
+    const stored = new Map<string, Set<number>>([['a', new Set()], ['b', new Set()]]);
+    const reads: string[] = [];
+    const waits = new LevelWaits((hash, level) => {
+      reads.push(`${hash}/${level}`);
+      return Promise.resolve(stored.get(hash)?.has(level) === true ? { width: 10, height: 10, decodedScale: 1, level, tiles: [] } : null);
+    });
+    const answered: string[] = [];
+    void waits.wait(1, 'a', 0).then((level) => answered.push(`a:${level?.level ?? 'none'}`));
+    void waits.wait(2, 'b', 1).then((level) => answered.push(`b:${level?.level ?? 'none'}`));
+    const left = waits.wait(3, 'b', 0);
+    await vi.waitFor(() => expect(new Set(reads)).toEqual(new Set(['a/0', 'b/1', 'b/0'])));
+    stored.get('b')?.add(1);
+    waits.heard({ type: 'progress', hash: 'b', done: 1, total: 2 });
+    await vi.waitFor(() => expect(answered).toEqual(['b:1']));
+    // News of b reads b's waiters alone.
+    expect(reads.filter((read) => read.startsWith('a/'))).toEqual(['a/0']);
+    stored.get('a')?.add(0);
+    waits.heard({ type: 'complete', hash: 'a' });
+    await vi.waitFor(() => expect(answered).toEqual(['b:1', 'a:0']));
+    waits.dispose();
+    expect(await left).toBeNull();
+    stored.get('b')?.add(0);
+    waits.heard({ type: 'complete', hash: 'b' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(answered).toEqual(['b:1', 'a:0']);
   });
 });

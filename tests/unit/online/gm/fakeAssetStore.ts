@@ -65,11 +65,27 @@ export class FakeStoreClient {
   inFlight = 0;
   maxInFlight = 0;
 
-  offer(assets: readonly OfferedAsset[]): Promise<StoreResult<Map<string, OfferAnswer>>> {
+  /** The ids taken out of the store again. */
+  readonly removed: string[] = [];
+  /** While true, offers wait until `releaseOffers` lets them come back. */
+  holdOffers = false;
+  private readonly waitingOffers: (() => void)[] = [];
+
+  remove(id: string): Promise<StoreResult<null>> {
+    this.removed.push(id);
+    return Promise.resolve(ok(null));
+  }
+
+  releaseOffers(): void {
+    for (const resolve of this.waitingOffers.splice(0)) resolve();
+  }
+
+  async offer(assets: readonly OfferedAsset[]): Promise<StoreResult<Map<string, OfferAnswer>>> {
     this.offers.push([...assets]);
+    if (this.holdOffers) await new Promise<void>((resolve) => this.waitingOffers.push(resolve));
     for (const asset of assets) if (asset.tiles !== undefined) this.pieces.set(asset.id, asset.tiles.count + 1);
-    if (this.offerTrouble !== null) return Promise.resolve(failed(this.offerTrouble));
-    return Promise.resolve(ok(new Map(assets.map((asset) => [asset.id, this.answer(asset)]))));
+    if (this.offerTrouble !== null) return failed(this.offerTrouble);
+    return ok(new Map(assets.map((asset) => [asset.id, this.answer(asset)])));
   }
 
   putWhole(id: string, bytes: ArrayBuffer): Promise<StoreResult<null>> {
@@ -86,7 +102,7 @@ export class FakeStoreClient {
   }
 
   /** Batches of tiles that went up: each one's part names, in order. */
-  readonly batches: { readonly id: string; readonly names: string[]; readonly bytes: number }[] = [];
+  readonly batches: { readonly id: string; readonly names: string[]; readonly bytes: number; readonly text: string }[] = [];
   /** How a batch is answered: by default the store counts it and holds the pyramid once every piece is there. */
   tilesResult: ((batch: { readonly id: string; readonly names: string[] }) => StoreResult<{ stored: boolean; pieces: number; of: number }>) | null = null;
   /** The pieces offered for each pyramid (its tiles and the manifest), from its offer. */
@@ -96,7 +112,7 @@ export class FakeStoreClient {
   async putTiles(id: string, body: ArrayBuffer): Promise<StoreResult<{ stored: boolean; pieces: number; of: number }>> {
     const text = new TextDecoder().decode(body);
     const names = [...text.matchAll(/; name="([^"]+)"/g)].map((match) => match[1] ?? '');
-    this.batches.push({ id, names, bytes: body.byteLength });
+    this.batches.push({ id, names, bytes: body.byteLength, text });
     await this.call({ kind: 'tiles', id, bytes: body.byteLength });
     if (this.tilesResult !== null) return this.tilesResult({ id, names });
     const held = this.held.get(id) ?? new Set<string>();

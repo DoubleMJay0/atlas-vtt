@@ -9,6 +9,9 @@ import { retryMs } from './uploadPace.ts';
  */
 export type AssetSource = { readonly bytes: Uint8Array<ArrayBuffer> } | { readonly path: string } | { readonly pyramid: LivePyramid };
 
+/** Whether the store refused an entry for room it said it would make: it is offered again after a while. */
+const roomAgain = (entry: QueueEntry): boolean => entry.state === 'refused' && entry.refusal === 'quota' && entry.quotaRetries > 0;
+
 /** The pyramid an entry uploads, if it is one. */
 export const entryPyramid = (entry: Pick<QueueEntry, 'source'>): LivePyramid | null => (entry.source !== null && 'pyramid' in entry.source ? entry.source.pyramid : null);
 
@@ -18,11 +21,14 @@ export type EntryState = 'new' | 'offered' | 'queued' | 'uploading' | 'stored' |
 export interface QueueEntry {
   readonly id: string;
   readonly hash: string;
-  readonly size: number;
+  /** What the store is asked to keep of it: a pyramid's bound, lowered to its true size once it is cut (never raised). */
+  size: number;
   readonly mime: string;
   readonly kind: AssetKind;
   /** Its priority: the lower, the sooner (`ASSET_RANKS`). */
   rank: number;
+  /** The floor map (vault path) a map sent as one image is of: it ranks by who looks at that floor. */
+  readonly map?: string | undefined;
   /** When it was last asked for, by the queue's count: of one rank, the latest goes first. */
   stamp: number;
   /** Whether players were handed its id: only then is its progress told. */
@@ -41,6 +47,8 @@ export interface QueueEntry {
   rejected: number;
   /** Not tried again before this time. */
   retryAt: number;
+  /** Refusals for want of room the store said would pass (it makes room on its own): offered again after a while. */
+  quotaRetries: number;
 }
 
 /** Bytes held for an asset after it was stored, so it can go up again once the store was emptied: texts and small drawings. */
@@ -67,7 +75,7 @@ export class UploadQueue {
   }
 
   /** Adds an asset, or asks for one known again: its rank rises where this use ranks higher, and it goes to the front of its rank. */
-  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'next' | 'refusal' | 'failures' | 'rejected' | 'retryAt'>): QueueEntry {
+  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'next' | 'refusal' | 'failures' | 'rejected' | 'retryAt' | 'quotaRetries'>): QueueEntry {
     const known = this.entries.get(entry.id);
     this.count += 1;
     if (known !== undefined) {
@@ -79,14 +87,15 @@ export class UploadQueue {
       known.source ??= entry.source;
       return known;
     }
-    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, next: 0, refusal: null, failures: 0, rejected: 0, retryAt: 0 };
+    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, next: 0, refusal: null, failures: 0, rejected: 0, retryAt: 0, quotaRetries: 0 };
     this.entries.set(entry.id, added);
     this.trim();
     return added;
   }
 
-  /** What waits to be offered now. */
+  /** What waits to be offered now, a refusal for room that was to pass among it once its wait is over. */
   toOffer(now: number): QueueEntry[] {
+    for (const entry of this.entries.values()) if (roomAgain(entry) && entry.retryAt <= now) entry.state = 'new';
     return [...this.entries.values()].filter((entry) => entry.state === 'new' && entry.retryAt <= now);
   }
 
@@ -152,14 +161,15 @@ export class UploadQueue {
   }
 
   /**
-   * Offers again what is on its way and what was refused for an account that may not store then. An
-   * asset refused for its size or kind, or given up, stays as it is.
+   * Offers again what is on its way, what was refused for an account that may not store then, and
+   * what was refused for room the store said it would make. An asset refused for its size or kind,
+   * or for room for good, or given up, stays as it is.
    */
   reoffer(): void {
     for (const entry of this.entries.values()) {
       const waiting = entry.state === 'new' || entry.state === 'offered' || entry.state === 'queued';
       const restricted = entry.state === 'refused' && entry.refusal === 'restricted';
-      if (!waiting && !restricted) continue;
+      if (!waiting && !restricted && !roomAgain(entry)) continue;
       if (entry.source === null) {
         entry.state = 'failed';
         continue;

@@ -127,7 +127,7 @@ describe('the pyramids of a scene\'s floors', () => {
     expect(batchesSent(store, names).slice(2, 7)).toEqual(['cellar:1*', 'cellar:3', 'cellar:2', 'cellar:0', 'ground:2']);
   });
 
-  it('build a floor nobody stands on only once the floors players look at are built', async () => {
+  it('build one floor at a time, the presented one first, and a floor nobody stands on only once the floors players look at are built', async () => {
     const { store, hashes } = await threeFloors();
     store.cache.manual = true;
     for (const path of FLOORS) store.cache.add(path, hashes.get(path)!, 3000, 2000, { stored: [] });
@@ -135,7 +135,8 @@ describe('the pyramids of a scene\'s floors', () => {
     await mapRef(store, GROUND);
     await mapRef(store, CELLAR);
     await store.advance(1000);
-    expect(store.cache.builds).toEqual([GROUND, CELLAR]);
+    // One at a time, the presented floor first.
+    expect(store.cache.builds).toEqual([GROUND]);
     store.cache.endBuild(GROUND);
     await store.advance(1000);
     expect(store.cache.builds).toEqual([GROUND, CELLAR]);

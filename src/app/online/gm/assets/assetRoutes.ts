@@ -27,8 +27,9 @@ export interface OfferedAsset {
 export type UploadWay = 'single' | 'multipart' | 'tiles';
 
 /**
- * Why the store will not take an asset: larger than all the account may keep (the store makes room for
- * anything smaller itself), its kind or size, or an account that may not store now.
+ * Why the store will not take an asset: no room for it now (`retry`: the store makes room on its own,
+ * so it may later), its kind, its size (larger than one asset or all the account may keep), or an
+ * account that may not store now.
  */
 export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted';
 const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restricted'];
@@ -37,7 +38,7 @@ const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restri
 export type OfferAnswer =
   | { readonly answer: 'have' }
   | { readonly answer: 'need'; readonly upload: UploadWay; readonly partBytes: number }
-  | { readonly answer: 'refused'; readonly reason: OfferRefusal };
+  | { readonly answer: 'refused'; readonly reason: OfferRefusal; readonly retry?: true };
 
 function answerOf(value: unknown): OfferAnswer | null {
   if (!isRecord(value)) return null;
@@ -48,7 +49,8 @@ function answerOf(value: unknown): OfferAnswer | null {
   }
   if (value.answer === 'refused') {
     const reason = REFUSALS.find((known) => known === value.reason);
-    return reason === undefined ? null : { answer: 'refused', reason };
+    if (reason === undefined) return null;
+    return reason === 'quota' && value.retry === true ? { answer: 'refused', reason, retry: true } : { answer: 'refused', reason };
   }
   return null;
 }

@@ -7,6 +7,10 @@ import type { SeatSource } from '../../../../src/app/online/gm/seatSource.ts';
 import type { TokenEntity } from '../../../../src/app/types';
 import type { SceneLevel } from '../../../../src/app/types/sceneLevelTypes';
 import { sceneState, shareHarness, token } from './shareHarness.ts';
+import { assetIdOf } from '../../../../src/app/online/gm/assets/assetIds.ts';
+import { pyramidKey } from '../../../../src/app/online/gm/assets/assetRefs.ts';
+import { publisherHarness, SALT } from './fakeAssetStore.ts';
+import { pngOf } from './fakeTileCache.ts';
 
 const ANA = 'a'.repeat(20);
 const BEN = 'b'.repeat(20);
@@ -56,5 +60,27 @@ describe('the maps of the shared scene\'s floors, by who looks at them', () => {
     table.presented = 'cellar';
     await table.advance(2000);
     expect(reports.at(-1)).toEqual({ presented: 'maps/cellar.webp', watched: ['maps/ground.webp', 'maps/vault.webp'], rest: [] });
+  });
+
+  it('offer the map of a floor nobody stands on without ever naming it to a player', async () => {
+    const store = publisherHarness();
+    store.players = [ANA, BEN];
+    const images = new Map(LEVELS.map((level, n) => [level.background!, pngOf(3000, 2000, n + 1)]));
+    for (const [path, bytes] of images) {
+      store.files.set(path, bytes);
+      store.cache.add(path, await sha256Hex(bytes), 3000, 2000);
+    }
+    const table = shareHarness(scene('cellar'), images, seats, undefined, store.publisher.storing);
+    table.presented = 'ground';
+    table.share.start();
+    await table.advance(1000);
+    await store.idle();
+    await store.advance(5000);
+    await table.advance(1000);
+    const vault = await assetIdOf(SALT, pyramidKey(await sha256Hex(images.get('maps/vault.webp')!), 2));
+    expect(store.client.offers.flat().map((offered) => offered.id)).toContain(vault);
+    expect(store.client.batches.some((batch) => batch.id === vault)).toBe(true);
+    expect(JSON.stringify(table.sent)).not.toContain(vault);
+    expect(JSON.stringify(store.sent)).not.toContain(vault);
   });
 });

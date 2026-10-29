@@ -37,6 +37,8 @@ export interface FloorMaps {
 export interface AssetUse {
   readonly kind: AssetKind;
   readonly rank: number;
+  /** The floor map (vault path) a map sent as one image is of: it then ranks by who looks at that floor. */
+  readonly map?: string;
 }
 
 export const ASSET_USES = {

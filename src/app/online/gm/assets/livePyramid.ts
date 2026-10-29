@@ -1,15 +1,16 @@
 import { pyramidOf, type Pyramid } from '../../../pixi/mapImage/pyramid';
 import type { StoredLevel } from '../../../pixi/mapImage/tileBlobs';
+import { TileLevelError } from '../../../pixi/mapImage/tileErrors';
 import type { Timers } from '../companionTimers.ts';
 import { pyramidRank, type MapStanding } from './assetUses.ts';
 import { levelOrder, manifestOf, planLevel, pyramidBound, tileCount, type MapFocus, type TileBatch } from './pyramidPlan.ts';
 import { retryMs } from './uploadPace.ts';
 
-/** How often a wait for a level may fail (the worker stopped, or answered an error) before the pyramid is given up. */
+/** How often in a row a wait for a level may be lost with a stopped worker before the pyramid is given up. */
 export const MAX_LEVEL_TRIES = 6;
 
 export interface LivePyramidPorts {
-  /** A level once all its tiles are stored; rejects once `signal` aborts or the worker stops. */
+  /** A level once all its tiles are stored; rejects once `signal` aborts or the worker stops, with `TileLevelError` for a level it cannot answer for. */
   level(hash: string, level: number, signal: AbortSignal): Promise<StoredLevel>;
   /** Asks for the pyramid to be built, in its turn; `drop` takes the wish back. */
   want(pyramid: LivePyramid): void;
@@ -44,6 +45,8 @@ export class LivePyramid {
   private overviewBatches = 0;
   private pyramid: Pyramid | null = null;
   private manifestBytes: Uint8Array<ArrayBuffer> | null = null;
+  /** Its manifest's and every planned tile's bytes. */
+  private plannedBytes = 0;
   private waiting: AbortController | null = null;
   private waitFailures = 0;
   private active = false;
@@ -59,6 +62,11 @@ export class LivePyramid {
   /** `manifest.json`, once the first level told the pyramid's true size. */
   get manifest(): Uint8Array<ArrayBuffer> | null {
     return this.manifestBytes;
+  }
+
+  /** What the store keeps of it, once every level is planned: the manifest and every tile's stored bytes. */
+  get realBytes(): number | null {
+    return this.plannedLevels === this.order.length ? this.plannedBytes : null;
   }
 
   /** Whether it failed: nothing of it goes up any more. */
@@ -121,10 +129,12 @@ export class LivePyramid {
       this.waiting = null;
       this.waitFailures = 0;
       this.take(stored);
-    }, () => {
+    }, (error: unknown) => {
       if (this.waiting !== waiting) return;
       this.waiting = null;
-      // The worker stopped and forgot the wait (or could not answer it): built and waited for again.
+      // A level the cached pyramid does not have: no answer will ever come.
+      if (error instanceof TileLevelError) return this.fail();
+      // The worker stopped and forgot the wait: built and waited for again.
       if ((this.waitFailures += 1) >= MAX_LEVEL_TRIES) return this.fail();
       this.ports.timers.setTimer(() => {
         if (!this.active) return;
@@ -140,11 +150,13 @@ export class LivePyramid {
       if (real === null) return this.fail();
       this.pyramid = real;
       this.manifestBytes = manifestOf(real);
+      this.plannedBytes = this.manifestBytes.length;
     }
     const level = this.pyramid.levels[stored.level];
     if (level === undefined || stored.tiles.length !== level.cols * level.rows) return this.fail();
     const batches = planLevel(this.pyramid, stored.tiles, this.ports.focus(), this.plannedLevels === 0 ? this.manifestBytes : null);
     this.planned.push(...batches);
+    this.plannedBytes += stored.tiles.reduce((sum, tile) => sum + tile.bytes, 0);
     if (this.plannedLevels === 0) this.overviewBatches = batches.length;
     this.plannedLevels += 1;
     if (this.plannedLevels === this.order.length) this.ports.drop(this);

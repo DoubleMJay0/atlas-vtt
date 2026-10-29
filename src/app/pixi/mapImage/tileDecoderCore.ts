@@ -35,7 +35,7 @@ export type OpenOutcome =
   | { kind: 'failed'; failure: OpenFailure };
 
 export type PrebuildOutcome =
-  | { kind: 'prebuilt'; hash: string; complete: boolean }
+  | { kind: 'prebuilt'; hash: string; complete: boolean; stored: number }
   | { kind: 'need-bytes' }
   | { kind: 'failed'; failure: OpenFailure };
 
@@ -88,9 +88,11 @@ export class TileDecoderCore {
     if (found.kind !== 'entry') return found;
     const { entry } = found;
     const complete = entry.built ? (await entry.built) === 'complete' : entry.complete;
+    // How far it came, so a build that gave way after storing tiles is not taken for one that stores nothing.
+    const stored = (await this.deps.store.existingTiles(entry.hash).catch(() => new Set<string>())).size;
     this.deps.store.unpin(entry.hash);
     this.entries.dropIfUnused(entry);
-    return { kind: 'prebuilt', hash: entry.hash, complete };
+    return { kind: 'prebuilt', hash: entry.hash, complete, stored };
   }
 
   /** A tile's bitmap, or null when the request was cancelled meanwhile; rejects once its map closes. */

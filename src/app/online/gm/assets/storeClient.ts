@@ -80,6 +80,12 @@ export class AssetStoreClient {
     return progress !== null ? { ok: true, value: progress } : failed(response.status === 200 ? 'retry' : troubleOf(response.status));
   }
 
+  /** Takes an asset out of the store (a pyramid given up), releasing what was kept for it. */
+  async remove(id: string): Promise<StoreResult<null>> {
+    const response = await this.call({ path: ASSET_ROUTES.whole(id), method: 'DELETE' });
+    return response.status === 200 || response.status === 204 || response.status === 404 ? { ok: true, value: null } : failed(troubleOf(response.status));
+  }
+
   /** The account's salt, as base64 text; the caller reads it. */
   async salt(): Promise<StoreResult<unknown>> {
     const response = await this.call({ path: ASSET_ROUTES.salt, method: 'GET' });

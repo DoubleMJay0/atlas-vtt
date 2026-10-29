@@ -39,6 +39,7 @@ export async function runJob(entry: QueueEntry, deps: JobDeps): Promise<JobEnd> 
     };
     const run = await uploadPyramid({ id: entry.id, hash: entry.hash, batches: pyramid, next: entry.next }, { client: deps.client, blobs: deps.blobs, slot: deps.slot, boundary: () => randomHex(16), progress: deps.progress, sent, signal: deps.signal });
     entry.next = run.next;
+    entry.rank = pyramid.rankAt(run.next);
     return run.end;
   }
   if (upload.upload === 'tiles') return 'changed';

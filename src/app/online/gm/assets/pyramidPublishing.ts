@@ -2,7 +2,7 @@ import type { Pyramid } from '../../../pixi/mapImage/pyramid';
 import type { StoredLevel } from '../../../pixi/mapImage/tileBlobs';
 import type { Timers } from '../companionTimers.ts';
 import { imageMimeType } from '../assetServe.ts';
-import { ASSET_RANKS, type FloorMaps, type MapStanding } from './assetUses.ts';
+import { ASSET_RANKS, pyramidRank, type FloorMaps, type MapStanding } from './assetUses.ts';
 import type { AssetRefs } from './assetRefs.ts';
 import { LivePyramid } from './livePyramid.ts';
 import { PyramidBuilds, type BuiltPyramid } from './pyramidBuilds.ts';
@@ -32,6 +32,8 @@ export interface PyramidPublishingPorts {
   stage: AssetRefs['stage'];
   /** No pyramid pages can draw comes of this entry: it is forgotten, and what names its map hands it again as an image. */
   withdraw(entry: QueueEntry): void;
+  /** Every level of the entry's pyramid is cut: what the store keeps of it is `bytes`. */
+  sized(entry: QueueEntry, bytes: number): void;
 }
 
 /**
@@ -64,10 +66,14 @@ export class PyramidPublishing {
       want: (pyramid) => this.builds.want(pyramid),
       drop: (pyramid) => this.builds.drop(pyramid),
       focus: () => this.ports.source.focus?.() ?? MAP_CENTRE,
-      ready: () => this.ports.ready(),
+      ready: (pyramid) => {
+        const entry = this.entryOf(pyramid);
+        if (entry !== undefined && pyramid.realBytes !== null) this.ports.sized(entry, pyramid.realBytes);
+        this.ports.ready();
+      },
       failed: (pyramid) => {
         this.undrawable.add(pyramid.hash);
-        const entry = [...this.ports.entries()].find((candidate) => entryPyramid(candidate) === pyramid);
+        const entry = this.entryOf(pyramid);
         if (entry !== undefined) this.ports.withdraw(entry);
       },
       timers: this.ports.timers,
@@ -75,14 +81,17 @@ export class PyramidPublishing {
   }
 
   /**
-   * A pyramid noted in the queue (new, or asked for again): its standing (its floor's, else presented
-   * where players were handed it, staged where not) and rank, started unless the store holds it, so
-   * its levels are being cut while it is offered.
+   * A map noted in the queue (new, or asked for again): its standing (its floor's, else presented where
+   * players were handed it, staged where not) and rank; a pyramid is started unless the store holds it,
+   * so its levels are being cut while it is offered.
    */
   noted(entry: QueueEntry): void {
     const pyramid = entryPyramid(entry);
-    if (pyramid === null) return;
-    pyramid.standing = this.standings.get(pyramid.path) ?? (entry.handed ? 'presented' : 'staged');
+    const path = pyramid?.path ?? entry.map;
+    if (path === undefined) return;
+    const standing = this.standings.get(path) ?? (entry.handed ? 'presented' : 'staged');
+    if (pyramid === null) return void (entry.rank = pyramidRank(standing, false));
+    pyramid.standing = standing;
     this.rank(entry);
     if (entry.state === 'new' || entry.state === 'offered' || entry.state === 'queued' || entry.state === 'uploading') pyramid.start();
     this.builds.pump();
@@ -92,6 +101,10 @@ export class PyramidPublishing {
   rank(entry: QueueEntry): void {
     const pyramid = entryPyramid(entry);
     if (pyramid !== null) entry.rank = pyramid.rankAt(entry.next);
+  }
+
+  private entryOf(pyramid: LivePyramid): QueueEntry | undefined {
+    return [...this.ports.entries()].find((candidate) => entryPyramid(candidate) === pyramid);
   }
 
   /**
@@ -109,9 +122,14 @@ export class PyramidPublishing {
     this.standings = next;
     for (const entry of this.ports.entries()) {
       const pyramid = entryPyramid(entry);
-      if (pyramid === null || !(before.has(pyramid.path) || next.has(pyramid.path))) continue;
-      pyramid.standing = next.get(pyramid.path) ?? 'staged';
-      this.rank(entry);
+      const path = pyramid?.path ?? entry.map;
+      if (path === undefined || !(before.has(path) || next.has(path))) continue;
+      const standing = next.get(path) ?? 'staged';
+      if (pyramid === null) entry.rank = pyramidRank(standing, false);
+      else {
+        pyramid.standing = standing;
+        this.rank(entry);
+      }
     }
     this.builds.pump();
     this.ports.ready();

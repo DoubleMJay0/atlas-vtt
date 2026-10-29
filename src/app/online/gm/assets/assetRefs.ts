@@ -68,7 +68,7 @@ export class AssetRefs implements AssetStoring {
 
   async mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef> {
     const pyramid = await this.pyramid(await this.deps.hashes.of(bytes, path), bytes, mime, path, true);
-    return pyramid ?? this.refOf(bytes, mime, ASSET_USES.map, path);
+    return pyramid ?? this.refOf(bytes, mime, { ...ASSET_USES.map, map: path }, path);
   }
 
   floorMaps(maps: FloorMaps): void {
@@ -84,7 +84,7 @@ export class AssetRefs implements AssetStoring {
       if (bytes === null) continue;
       const hash = await this.deps.hashes.of(bytes, asset.path);
       if (asset.map === true && (await this.pyramid(hash, bytes, asset.mime, asset.path, false)) !== undefined) continue;
-      await this.deps.register({ key: hash, hash, size: bytes.length, mime: asset.mime, use: asset.use, source: { path: asset.path }, handed: false });
+      await this.deps.register({ key: hash, hash, size: bytes.length, mime: asset.mime, use: asset.map === true ? { ...asset.use, map: asset.path } : asset.use, source: { path: asset.path }, handed: false });
     }
   }
 

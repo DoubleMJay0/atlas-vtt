@@ -18,6 +18,14 @@ export function isMapClosed(error: unknown): boolean {
   return error instanceof MapClosedError;
 }
 
+/** A level of a pyramid the worker cannot answer for (it lies outside the cached pyramid): asking again changes nothing. */
+export class TileLevelError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TileLevelError';
+  }
+}
+
 /** A map image that cannot be shown; reported once per open. */
 export class TileOpenError extends Error {
   constructor(readonly failure: OpenFailure) {
