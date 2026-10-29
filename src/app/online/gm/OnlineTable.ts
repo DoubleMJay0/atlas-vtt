@@ -301,11 +301,6 @@ export class OnlineTable {
     this.watch.check();
   }
 
-  /** The GM removed every shared copy: what players are shown goes up again. */
-  assetsEmptied(): void {
-    this.assets?.emptied();
-  }
-
   /** The account signs out: nothing more goes into the store from this table. */
   suspendAssets(): void {
     this.assets?.suspend();

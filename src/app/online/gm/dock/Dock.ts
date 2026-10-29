@@ -17,7 +17,6 @@ import { DockSurface } from './dockSurface.ts';
 import { playerCodeCopier } from './playerCodes.ts';
 import { PANEL_WIDTH, panelView, renderPanel, type PanelActions } from './OnlinePanel.ts';
 import { badgeOf, isRunning, menuModel, tableTitle, tooltipOf, type OnlineSnapshot, type SceneFacts } from './panelModel.ts';
-import { sharedText } from '../assets/sharedCopies.ts';
 
 export type { DockDeps } from './dockDeps.ts';
 
@@ -128,7 +127,6 @@ export class Dock {
       if (keyStaysInControl(event)) event.stopPropagation();
     }, false);
     this.cleanups.push(this.deps.api.onChange(() => this.update()), this.deps.account.onChange(() => this.update()), this.deps.campaigns.onChange(() => this.update()));
-    if (this.deps.copies !== undefined) this.cleanups.push(this.deps.copies.onChange(() => this.update()));
     this.cleanups.push(this.store.subscribe((state) => {
       const view = viewFactsOf(state);
       if (makesWay(this.state.surface, this.view, view)) this.go(close(this.state), false);
@@ -173,7 +171,6 @@ export class Dock {
     const before = this.state.surface;
     this.state = next;
     if (before === 'closed' && next.surface !== 'closed') void this.deps.account.refresh(false); // a grant or sign-out made elsewhere shows
-    if (before !== 'panel' && next.surface === 'panel') void this.deps.copies?.refresh();
     if (closesDiceLog(before, next.surface, this.view)) (this.store.getState() as ViewStoreState).setDiceLogOpen?.(false);
     if (before === 'closed' && next.surface !== 'closed') this.deps.opened?.(this.leaf);
     this.update();
@@ -237,7 +234,7 @@ export class Dock {
   }
 
   private drawPanel(layer: HTMLElement, snapshot: OnlineSnapshot, scene: SceneFacts, fresh: boolean): string {
-    const view = panelView(snapshot, scene, this.feedback.view(), this.qr.isOpen, tableTitle(snapshot, this.pick()), sharedText(this.deps.copies?.current() ?? null, Date.now()));
+    const view = panelView(snapshot, scene, this.feedback.view(), this.qr.isOpen, tableTitle(snapshot, this.pick()));
     const key = JSON.stringify(view);
     if (fresh || key !== this.shownKey) renderPanel(layer, view, this.panelActions(scene));
     return key;
@@ -318,7 +315,6 @@ export class Dock {
       removeFromCampaign: (playerId) => api.removeFromCampaign(playerId),
       selected: () => (scene.isShared ? selectedTokenIds(this.store.getState()) : []),
       imageSrc: (path) => this.deps.imageSrc(path),
-      removeShared: () => void this.deps.copies?.removeAll(),
       ...this.feedback.actions,
     };
   }

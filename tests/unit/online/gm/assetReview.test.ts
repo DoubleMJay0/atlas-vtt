@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { BookQuest } from '../../../../src/app/online/protocol/index.ts';
 import { ASSET_USES } from '../../../../src/app/online/gm/assets/assetUses.ts';
 import { RestingLatency, Slots } from '../../../../src/app/online/gm/assets/uploadPace.ts';
-import { SharedCopies } from '../../../../src/app/online/gm/assets/sharedCopies.ts';
 import { StoredQuests } from '../../../../src/app/online/gm/book/storedQuests.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { bytesOf, publisherHarness } from './fakeAssetStore.ts';
@@ -98,7 +97,7 @@ describe('stopping and halting', () => {
     expect(after.map((call) => call.id).slice(0, 2)).toEqual([video?.id, art.id]);
   });
 
-  it('hands every asset players were sent again without its id once nothing goes up any more, and finishes what the store took when it is only full', async () => {
+  it('hands every asset players were sent again without its id once nothing goes up any more, and finishes what the store took when it refuses one asset', async () => {
     const signedOut = publisherHarness();
     signedOut.client.hold = true;
     signedOut.connection = { players: 1, latencyMs: 40 };
@@ -124,20 +123,7 @@ describe('stopping and halting', () => {
   });
 });
 
-describe('the store emptied, and superseded memories', () => {
-  it('uploads a large kept asset again once the shared copies were removed, its bytes given back by the next hand-out', async () => {
-    const store = publisherHarness();
-    const handout = bytesOf(2 * MIB, 6);
-    const ref = await store.publisher.storing.refOf(handout, 'image/png', ASSET_USES.image);
-    await store.advance(1000);
-    expect(store.client.calls).toHaveLength(1);
-    store.publisher.emptied();
-    expect(store.withdrawn).toBe(1);
-    expect((await store.publisher.storing.refOf(handout, 'image/png', ASSET_USES.image)).id).toBe(ref.id);
-    await store.advance(1000);
-    expect(store.client.calls.map((call) => call.id)).toEqual([ref.id, ref.id]);
-  });
-
+describe('superseded memories', () => {
   it('neither uploads nor names an explored memory a newer one replaced before it went', async () => {
     const store = publisherHarness();
     const first = await store.publisher.storing.refOf(bytesOf(300_000, 7), 'image/png', ASSET_USES.explored);
@@ -202,29 +188,4 @@ describe('quests when the store refused their ids', () => {
   });
 });
 
-describe('deleting the shared copies on sign-out', () => {
-  it('stops the table\'s uploads first, and shares nothing again after the copies went', async () => {
-    const store = publisherHarness();
-    store.client.hold = true;
-    await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.art);
-    await store.advance(200);
-    const order: string[] = [];
-    const copies = new SharedCopies({
-      client: { usage: () => (order.push('usage'), Promise.resolve({ ok: true, value: { bytes: 0, quota: 1, oldestLeavesAt: null } })), deleteAll: () => (order.push('delete'), Promise.resolve({ ok: true, value: null })) },
-      signedIn: () => true,
-      signedOutByServer: () => undefined,
-      emptied: () => (order.push('emptied'), store.publisher.emptied()),
-      notify: () => order.push('notice'),
-      now: () => 0,
-    });
-    // As the account's sign-out runs it: the table first, then the copies.
-    store.publisher.suspend();
-    await copies.removeAll(true);
-    expect(order).toEqual(['delete']);
-    store.client.release();
-    await store.advance(5000);
-    expect(store.client.offers).toHaveLength(1);
-    expect(store.client.calls).toHaveLength(1);
-  });
-});
 

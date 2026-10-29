@@ -8,7 +8,6 @@ import { closingOf, groupsOf, seatsNoteOf, selectionBarOf, statusOf, type Online
 import { renderPlayerList, type ListActions } from './playerList.ts';
 import { addPlayerRow, confirmPrompt, forgetGonePlayerPrompt, linkEntries, namePrompt, openPrompt, renderPlayerPrompt, type AddPlayerActions, type LinkActions } from './prompts.ts';
 import { renderSelectionBar, type SelectionActions } from './selectionBar.ts';
-import { renderSharedRow, type SharedRowActions } from './sharedRow.ts';
 
 /** The panel's width; it never grows wider than the row it hangs from. */
 export const PANEL_WIDTH = 340;
@@ -35,15 +34,13 @@ export interface PanelView {
   readonly players: readonly OnlinePlayer[];
   readonly bar: SelectionBar | null;
   readonly feedback: FeedbackView;
-  /** What the store keeps for the players (`sharedText`); null while nothing can be told. */
-  readonly shared: string | null;
 }
 
 /** What the panel shows of a snapshot, the map views, the feedback form and whether the QR card is open. */
-export function panelView(snapshot: OnlineSnapshot, scene: SceneFacts, feedback: FeedbackView, qr = false, title = 'Online table', shared: string | null = null): PanelView {
+export function panelView(snapshot: OnlineSnapshot, scene: SceneFacts, feedback: FeedbackView, qr = false, title = 'Online table'): PanelView {
   const groups = groupsOf(snapshot, scene);
   const players = groups.flatMap((group) => (group.player === null ? [] : [group.player]));
-  return { title, status: statusOf(snapshot), seatsNote: seatsNoteOf(snapshot), link: snapshot.link, qr, gate: gateRowsOf(snapshot.gate), imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true, groups, players, bar: selectionBarOf(snapshot, scene), feedback, shared };
+  return { title, status: statusOf(snapshot), seatsNote: seatsNoteOf(snapshot), link: snapshot.link, qr, gate: gateRowsOf(snapshot.gate), imageShown: snapshot.imageShown === true, closing: closingOf(snapshot), updateAfter: snapshot.updateAfter === true, groups, players, bar: selectionBarOf(snapshot, scene), feedback };
 }
 
 /** The campaign's players as the panel changes them, once the GM has answered. */
@@ -52,7 +49,7 @@ export interface CampaignActions {
   removeFromCampaign(playerId: string): void;
 }
 
-export interface PanelActions extends Omit<ListActions, 'askRename' | 'askRemoveFromCampaign' | 'playerPrompt'>, CampaignActions, AddPlayerActions, LinkActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions, SharedRowActions {
+export interface PanelActions extends Omit<ListActions, 'askRename' | 'askRemoveFromCampaign' | 'playerPrompt'>, CampaignActions, AddPlayerActions, LinkActions, SelectionActions, FeedbackActions, GateRowActions, ImageRowActions, ClosingRowActions {
   close(): void;
   stop(): void;
   copy(): Promise<boolean>;
@@ -125,7 +122,6 @@ export function renderPanel(layer: HTMLElement, view: PanelView, actions: PanelA
   renderCodeRow(layer, view.gate, actions);
   renderPlayerList(layer, view.groups, view.players, listActions(layer, actions, redraw));
   addPlayerRow(layer, actions, redraw);
-  renderSharedRow(layer, view.shared, actions, redraw);
   if (view.bar !== null) renderSelectionBar(layer, view.bar, view.players, actions, !hadBar);
   if (view.feedback.open) renderFeedback(layer, view.feedback, actions);
   restore(layer, kept);

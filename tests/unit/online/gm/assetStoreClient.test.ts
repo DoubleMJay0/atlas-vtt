@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestUrlParam } from 'obsidian';
-import { AssetStoreClient, MAX_DELETE_ROUNDS, REMOVAL_PAUSE_MS } from '../../../../src/app/online/gm/assets/storeClient.ts';
+import { AssetStoreClient } from '../../../../src/app/online/gm/assets/storeClient.ts';
 import { partSizes } from '../../../../src/app/online/gm/assets/assetRoutes.ts';
 import { RELAY_ORIGIN } from '../../../../src/app/online/gm/servers.ts';
 
@@ -26,10 +26,22 @@ describe('the asset store\'s client', () => {
 
   it('offers on the relay\'s origin with the account\'s token in the header, and reads the answers', async () => {
     seen.answer = { status: 200, json: { assets: { [ID]: { answer: 'need', upload: 'single', partBytes: 99 }, [SHA]: { answer: 'refused', reason: 'quota', free: 0 }, bad: { answer: 'have' } }, bytes: 1, quota: 2 } };
-    const result = await new AssetStoreClient(RELAY_ORIGIN, () => 'tok').offer([{ id: ID, kind: 'image', size: 10 }]);
+    const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok');
+    const result = await client.offer([{ id: ID, kind: 'image', size: 10 }]);
+    expect(client.lastEvicted).toBeNull();
     expect(seen.requests[0]).toMatchObject({ url: `${RELAY_ORIGIN}/api/assets/offer`, method: 'POST', headers: { Authorization: 'Bearer tok' }, contentType: 'application/json', throw: false });
     expect(JSON.parse(seen.requests[0]?.body as string)).toEqual({ assets: [{ id: ID, kind: 'image', size: 10 }] });
     expect(result).toEqual({ ok: true, value: new Map([[ID, { answer: 'need', upload: 'single', partBytes: 99 }], [SHA, { answer: 'refused', reason: 'quota' }]]) });
+  });
+
+  it('reads what the store let go to make room, leniently, and keeps it only for diagnostics', async () => {
+    const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok');
+    seen.answer = { status: 200, json: { assets: {}, evicted: { count: 3, bytes: 4096 } } };
+    await client.offer([]);
+    expect(client.lastEvicted).toEqual({ count: 3, bytes: 4096 });
+    seen.answer = { status: 200, json: { assets: {}, evicted: { count: 'many' } } };
+    expect(await client.offer([])).toEqual({ ok: true, value: new Map() });
+    expect(client.lastEvicted).toBeNull();
   });
 
   it('sends a whole object as its bytes, with its type and hash, and takes a 412 as stored', async () => {
@@ -59,7 +71,7 @@ describe('the asset store\'s client', () => {
     const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok');
     const trouble = async (status: number): Promise<unknown> => {
       seen.answer = { status, json: null };
-      const result = await client.usage();
+      const result = await client.salt();
       return result.ok ? null : result.trouble;
     };
     expect(await trouble(401)).toBe('signed-out');
@@ -69,7 +81,7 @@ describe('the asset store\'s client', () => {
     expect(await trouble(503)).toBe('retry');
     expect(await trouble(409)).toBe('retry');
     seen.answer = new Error('offline');
-    expect(await client.deleteAll()).toEqual({ ok: false, trouble: 'retry' });
+    expect(await client.offer([])).toEqual({ ok: false, trouble: 'retry' });
   });
 
   it('asks nothing while signed out', async () => {
@@ -77,30 +89,12 @@ describe('the asset store\'s client', () => {
     expect(seen.requests).toEqual([]);
   });
 
-  it('reads the shared copies\' usage and the salt', async () => {
-    seen.answer = { status: 200, json: { bytes: 5, quota: 10, oldestLeavesAt: 99 } };
+  it('reads the salt', async () => {
     const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok');
-    expect(await client.usage()).toEqual({ ok: true, value: { bytes: 5, quota: 10, oldestLeavesAt: 99 } });
     seen.answer = { status: 200, json: { salt: 'c2FsdA==' } };
     expect(await client.salt()).toEqual({ ok: true, value: 'c2FsdA==' });
-    expect(seen.requests.map((request) => `${request.method} ${request.url.replace(RELAY_ORIGIN, '')}`)).toEqual(['GET /api/assets/usage', 'GET /api/assets/salt']);
+    expect(seen.requests.map((request) => `${request.method} ${request.url.replace(RELAY_ORIGIN, '')}`)).toEqual(['GET /api/assets/salt']);
     expect(seen.requests.every((request) => !request.url.includes('tok'))).toBe(true);
   });
 
-  it('asks again to remove every copy while the store says some are left', async () => {
-    seen.queue.push({ status: 202, json: { done: false } }, { status: 202, json: { done: false } }, { status: 200, json: { done: true } });
-    const pauses: number[] = [];
-    const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok', (ms) => (pauses.push(ms), Promise.resolve()));
-    expect(await client.deleteAll()).toEqual({ ok: true, value: null });
-    expect(seen.requests.map((request) => `${request.method} ${request.url.replace(RELAY_ORIGIN, '')}`)).toEqual(['DELETE /api/assets', 'DELETE /api/assets', 'DELETE /api/assets']);
-    // A pause after each answer in part.
-    expect(pauses).toEqual([REMOVAL_PAUSE_MS, REMOVAL_PAUSE_MS]);
-  });
-
-  it('gives a removal up for now after a number of answers in part', async () => {
-    seen.answer = { status: 202, json: { done: false } };
-    const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok', () => Promise.resolve());
-    expect(await client.deleteAll()).toEqual({ ok: false, trouble: 'retry' });
-    expect(seen.requests).toHaveLength(MAX_DELETE_ROUNDS);
-  });
 });

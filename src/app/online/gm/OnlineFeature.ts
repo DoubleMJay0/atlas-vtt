@@ -38,7 +38,6 @@ import { DASHBOARD_VIEW_TYPE } from '../../dashboard-view';
 import { DEFAULT_SETTINGS, onlineSettingsSections, readSettings, type OnlineSettings } from './settings.ts';
 import { secretSaltStore } from './account/saltStore.ts';
 import { AssetSalt } from './assets/assetSalt.ts';
-import { SharedCopies } from './assets/sharedCopies.ts';
 import { AssetStoreClient } from './assets/storeClient.ts';
 import { RELAY_ORIGIN } from './servers.ts';
 import type { HostAccount } from './tableStart.ts';
@@ -62,8 +61,6 @@ export class OnlineFeature extends Component {
   readonly account: AccountControl;
   /** The salt the GM's asset ids are made with, kept beside the account's token. */
   private readonly salt: AssetSalt;
-  /** The copies the store keeps for the players. */
-  private readonly copies: SharedCopies;
   private readonly app: App;
   /** The running table as saved in this device's data, so a reload comes back to it. */
   private savedTable: SavedTable | null = null;
@@ -103,14 +100,6 @@ export class OnlineFeature extends Component {
       now: () => companionTimers().now(),
       sleep: (ms) => new Promise((resolve) => companionTimers().setTimer(resolve, ms)),
     });
-    this.copies = new SharedCopies({
-      client: store,
-      signedIn,
-      signedOutByServer: () => this.account.signedOutByServer(),
-      emptied: () => this.online.table?.assetsEmptied(),
-      notify: (text) => showNotice(text),
-      now: () => Date.now(),
-    });
     this.account = new AccountControl({
       http: obsidianHttp,
       timers: companionTimers(),
@@ -121,15 +110,9 @@ export class OnlineFeature extends Component {
         void this.salt.ensure(true);
         this.online.table?.signedIn();
       },
-      signedOut: () => {
-        this.salt.clear();
-        this.copies.clear();
-      },
-      beforeSignOut: async () => {
-        // The table uploads nothing more before the copies go, or it would store them again.
-        this.online.table?.suspendAssets();
-        if (this.settings.deleteCopiesOnSignOut) await this.copies.removeAll(true);
-      },
+      signedOut: () => this.salt.clear(),
+      // The table uploads nothing more once the account's token is gone.
+      beforeSignOut: () => Promise.resolve(this.online.table?.suspendAssets()),
     });
   }
 
@@ -139,7 +122,7 @@ export class OnlineFeature extends Component {
       token: () => this.account.token(),
       signedOutByServer: () => this.account.signedOutByServer(),
       refresh: (force) => this.account.refresh(force),
-      assets: { salt: this.salt, settled: () => void this.copies.refresh(true) },
+      assets: { salt: this.salt, settled: () => undefined },
     };
   }
 
@@ -219,7 +202,6 @@ export class OnlineFeature extends Component {
     const docks = new DockMounts(this.app.workspace, {
       api: onlineApi(this.online, () => images.hide()),
       account: this.account,
-      copies: this.copies,
       campaigns: appCampaignChoices(this.app),
       openCampaigns: () => void this.app.workspace.getLeaf(true).setViewState({ type: DASHBOARD_VIEW_TYPE, active: true }),
       imageSrc: (path) => this.app.vault.adapter.getResourcePath(path),

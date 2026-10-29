@@ -139,23 +139,31 @@ describe('the asset publisher', () => {
     expect(store.client.calls.map((call) => call.kind)).toEqual(['whole']);
   });
 
-  it('stops at a full quota, tells the GM once, and hands new assets without ids', async () => {
+  it('hands a map larger than the store keeps without its id and tells the GM once in plain words, and goes on with everything else', async () => {
+    const store = publisherHarness();
+    const big = await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.map);
+    const art = await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art);
+    store.client.answer = (asset) => (asset.id === big.id ? { answer: 'refused', reason: 'quota' } : { answer: 'need', upload: 'single', partBytes: 95 * MIB });
+    await store.advance(200);
+    expect(store.notices).toEqual(['This map is too large to share with players.']);
+    expect(store.withdrawn).toBe(1);
+    expect(store.client.calls.map((call) => call.id)).toEqual([art.id]);
+    expect((await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.map)).id).toBeUndefined();
+    // New assets are still stored, and a reconnect neither offers the map again nor tells the GM twice.
+    expect((await store.publisher.storing.refOf(bytesOf(100, 3), 'image/png', ASSET_USES.art)).id).toBeDefined();
+    store.publisher.welcome();
+    await store.advance(200);
+    expect(store.client.offers.flat().filter((offered) => offered.id === big.id)).toHaveLength(1);
+    expect(store.notices).toHaveLength(1);
+  });
+
+  it('says nothing of other assets the store will not keep', async () => {
     const store = publisherHarness();
     store.client.answer = () => ({ answer: 'refused', reason: 'quota' });
     await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.art);
-    await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art);
     await store.advance(200);
-    expect(store.notices).toHaveLength(1);
-    expect(store.notices[0]).toMatch(/full/);
-    expect(store.withdrawn).toBeGreaterThan(0);
-    expect(store.client.calls).toEqual([]);
-    const later = await store.publisher.storing.refOf(bytesOf(100, 3), 'image/png', ASSET_USES.art);
-    expect(later.id).toBeUndefined();
-    // A reconnect asks again; still full, the GM is not told twice.
-    store.publisher.welcome();
-    await store.advance(200);
-    expect(store.client.offers).toHaveLength(2);
-    expect(store.notices).toHaveLength(1);
+    expect(store.notices).toEqual([]);
+    expect(store.withdrawn).toBe(1);
   });
 
   it('sends players nothing but how far the assets they were handed have come', async () => {
@@ -204,14 +212,4 @@ describe('the asset publisher', () => {
     expect(store.client.calls).toHaveLength(1);
   });
 
-  it('uploads everything again once the shared copies were removed', async () => {
-    const store = publisherHarness();
-    const ref = await store.publisher.storing.refOf(bytesOf(100), 'text/markdown', ASSET_USES.text);
-    await store.advance(1000);
-    expect(store.client.calls).toHaveLength(1);
-    store.publisher.emptied();
-    await store.advance(1000);
-    expect(store.client.offers).toHaveLength(2);
-    expect(store.client.calls.map((call) => call.id)).toEqual([ref.id, ref.id]);
-  });
 });

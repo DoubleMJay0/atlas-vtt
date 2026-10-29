@@ -6,9 +6,7 @@ import { isAssetId, isRecord, type AssetKind } from '../../protocol/index.ts';
  */
 export const ASSET_ROUTES = {
   offer: '/api/assets/offer',
-  usage: '/api/assets/usage',
   salt: '/api/assets/salt',
-  all: '/api/assets',
   whole: (id: string): string => `/api/assets/${id}`,
   parts: (id: string): string => `/api/assets/${id}/parts`,
   part: (id: string, part: number): string => `/api/assets/${id}/parts/${part}`,
@@ -28,7 +26,10 @@ export interface OfferedAsset {
 /** How an asset goes up: one body, parts, or batches of tiles. */
 export type UploadWay = 'single' | 'multipart' | 'tiles';
 
-/** Why the store will not take an asset: the account's quota, its kind or size, or an account that may not store now. */
+/**
+ * Why the store will not take an asset: larger than all the account may keep (the store makes room for
+ * anything smaller itself), its kind or size, or an account that may not store now.
+ */
 export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted';
 const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restricted'];
 
@@ -64,6 +65,19 @@ export function offerAnswers(json: unknown): Map<string, OfferAnswer> {
   return answers;
 }
 
+/** What the store let go of older copies to make room for an offer. */
+export interface OfferEviction {
+  readonly count: number;
+  readonly bytes: number;
+}
+
+/** An offer's `evicted`, read leniently: null where it is missing or malformed. */
+export function offerEvicted(json: unknown): OfferEviction | null {
+  const evicted = isRecord(json) ? json.evicted : undefined;
+  if (!isRecord(evicted) || !isBytes(evicted.count) || !isBytes(evicted.bytes)) return null;
+  return { count: evicted.count, bytes: evicted.bytes };
+}
+
 /** What a multipart upload under way holds: its id, and the parts (numbered from 1, as the store numbers them) that arrived. */
 export interface PartsSession {
   readonly uploadId: string;
@@ -88,19 +102,7 @@ export function tilesProgressOf(json: unknown): TilesProgress | null {
   return { stored: json.stored, pieces: json.pieces, of: json.of };
 }
 
-/** What the GM's shared copies hold: bytes of the quota, and when the oldest leaves (ms since the epoch), null while none is kept. */
-export interface StoreUsage {
-  readonly bytes: number;
-  readonly quota: number;
-  readonly oldestLeavesAt: number | null;
-}
-
 const isBytes = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
-
-export function usageOf(json: unknown): StoreUsage | null {
-  if (!isRecord(json) || !isBytes(json.bytes) || !isBytes(json.quota)) return null;
-  return { bytes: json.bytes, quota: json.quota, oldestLeavesAt: isBytes(json.oldestLeavesAt) ? json.oldestLeavesAt : null };
-}
 
 /** Parts of a multipart upload: 16 MiB, the last shorter. */
 export const PART_BYTES = 16 * 1024 * 1024;

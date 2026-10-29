@@ -152,22 +152,19 @@ export class UploadQueue {
   }
 
   /**
-   * Offers again what is on its way and what was refused for want of room (or an account that may not
-   * store then); `all`: what was stored too (the store was emptied). An asset refused for its size or
-   * kind, or given up, stays as it is, and so does one stored whose bytes were let go.
+   * Offers again what is on its way and what was refused for an account that may not store then. An
+   * asset refused for its size or kind, or given up, stays as it is.
    */
-  reoffer(all: boolean): void {
+  reoffer(): void {
     for (const entry of this.entries.values()) {
       const waiting = entry.state === 'new' || entry.state === 'offered' || entry.state === 'queued';
-      const room = entry.state === 'refused' && (entry.refusal === 'quota' || entry.refusal === 'restricted');
-      const again = all && entry.state === 'stored';
-      if (!waiting && !room && !again) continue;
+      const restricted = entry.state === 'refused' && entry.refusal === 'restricted';
+      if (!waiting && !restricted) continue;
       if (entry.source === null) {
         entry.state = 'failed';
         continue;
       }
       entry.state = 'new';
-      if (again) entry.next = 0;
       entry.refusal = null;
       entry.failures = 0;
       entry.retryAt = 0;
