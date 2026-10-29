@@ -172,6 +172,47 @@ describe('a token someone else holds', () => {
     expect(new Map(h.shown.entries()).get('hero')?.x).toBe(h.sprite.position.x);
   });
 
+  it('never runs ahead of the cursor of a fast drag, through the drop and to its end', () => {
+    // Two pixels a millisecond for a second, then the player lets go where the hand stopped; their cursor stays shown.
+    const cursor = new PointerTrack({ interval: 100 });
+    const holder: { by: 'pointer' | 'elsewhere' | null } = { by: 'elsewhere' };
+    const h = held(() => (holder.by === 'elsewhere' ? cursor.lag(h.clock.now) : null), holder);
+    const speed = 2;
+    const stop = 1000;
+    let cursorSent = 0;
+    let dragSent = 0;
+    let waiting: { x: number; y: number }[] = [];
+    let dropped = false;
+    const ahead: number[] = [];
+    for (let now = 0; now <= 1600; now += FRAME) {
+      h.clock.now = now;
+      const hand = Math.min(now - 20, stop);
+      if (hand >= 0 && (hand < stop || waiting.length > 0 || !dropped)) {
+        if (hand < stop || waiting.at(-1)?.x !== hand * speed) waiting.push({ x: hand * speed, y: 0 });
+        if (hand - cursorSent >= 100 || (hand === stop && waiting.length > 0)) {
+          cursor.push(waiting, Math.round(hand - cursorSent), now);
+          cursorSent = hand;
+          waiting = [];
+        }
+        if (hand < stop && hand - dragSent >= 33) {
+          h.glide.follow('hero', hand * speed, 0);
+          dragSent = hand;
+        }
+        if (hand === stop && !dropped) {
+          dropped = true;
+          holder.by = null;
+          h.glide.to('hero', stop * speed, 0);
+        }
+      }
+      h.tick();
+      const drawn = cursor.at(now);
+      if (now > 300 && drawn !== null) ahead.push(h.sprite.position.x - drawn.x);
+    }
+    expect(h.sprite.position.x).toBe(stop * speed);
+    expect(h.steps.size).toBe(0);
+    expect(Math.max(...ahead)).toBeLessThan(speed);
+  });
+
   it('plays out its way to where it was put down, then is read where the store has it', () => {
     const holder: { by: 'pointer' | 'elsewhere' | null } = { by: 'elsewhere' };
     const h = held(() => 120, holder);

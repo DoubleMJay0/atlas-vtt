@@ -157,9 +157,13 @@ describe('whose pointer holds a drag, as players get it', () => {
     table.share.receive(ANA, { t: 'move', scene: sceneId(table), id: alias, x: 175, y: 35 });
     await table.advance(STEP_MS);
     expect(table.share.draggerOf('a')).toBeUndefined();
+    // The end names its holder too, so pages play the drop out with that cursor.
+    expect(places(table).at(-1)).toMatchObject({ id: alias, end: true, by: ANA });
     const before = places(table).length;
     await gmDrag(table, { steps: 2 });
-    expect(places(table).slice(before).filter((place) => place.end !== true).every((place) => place.by === 'gm')).toBe(true);
+    const gm = places(table).slice(before);
+    expect(gm.at(-1)).toMatchObject({ end: true, by: 'gm' });
+    expect(gm.every((place) => place.by === 'gm')).toBe(true);
   });
 
   it('names nobody while cursors are not shared', async () => {

@@ -160,7 +160,8 @@ export class LiveShare {
     // Every held token is in every message, so a newer one may replace a waiting one and lose nothing.
     const tokens: LivePlace[] = [...places].map(([id, { x, y, path, by }]) => ({ id, x, y, ...(path !== undefined && { path }), ...(by !== undefined && { by }) }));
     const dropped = this.droppedPlaces(ends.map(([, place]) => place.tokenId));
-    for (const [id, place] of ends) tokens.push({ id, ...(dropped.get(place.tokenId) ?? { x: place.x, y: place.y }), end: true });
+    // An end names who held the token, so pages play the drop out with that cursor.
+    for (const [id, place] of ends) tokens.push({ id, ...(dropped.get(place.tokenId) ?? { x: place.x, y: place.y }), end: true, ...(place.by !== undefined && { by: place.by }) });
     const now = this.ports.now();
     this.sent = places;
     // Telling a drag that rests again keeps it on the pages, not in the list's way: the list lands it.
