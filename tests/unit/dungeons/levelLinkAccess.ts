@@ -198,7 +198,10 @@ function linkCountProblems(model: DungeonModel): string[] {
   return problems;
 }
 
-function linkProblems(model: DungeonModel): string[] {
+/** The problems of every link of a dungeon generated for `request`, a dungeon short of its floors among them. */
+function linkProblems(request: DungeonRequest): string[] {
+  const model = generateDungeon(request);
+  const short = model.floors.length === request.floors ? [] : [`seed ${model.seed}: ${model.floors.length} of ${request.floors} floors`];
   const scene = sceneOf(model);
   const stack = stackOf(model);
   const access = model.floors.flatMap((floor, index) => {
@@ -207,7 +210,7 @@ function linkProblems(model: DungeonModel): string[] {
     const walk = new Walkable(scene, levelWalls(scene, level), index);
     return floor.stairs.flatMap((stair) => endProblems(scene, walk, level, stair, stairEnd(stack, index, stair.to)).map((problem) => `seed ${model.seed}, floor ${index}, link ${stair.link}: ${problem}`));
   });
-  return [...linkCountProblems(model), ...access];
+  return [...short, ...linkCountProblems(model), ...access];
 }
 
 /** Seeds per floor count; `VITE_LEVEL_LINK_SEEDS` runs more. */
@@ -238,13 +241,13 @@ export function describeLevelLinkAccess(theme: ThemeId): void {
   describe(`every level link of a ${theme} is reached across its front`, () => {
     for (const request of REGRESSIONS.filter((entry) => entry.theme === theme)) {
       it(`in the dungeon of seed ${request.seed} once found unreached`, () => {
-        expect(linkProblems(generateDungeon(request))).toEqual([]);
+        expect(linkProblems(request)).toEqual([]);
       });
     }
     for (const floors of [2, 3, 4]) {
       it(`on both floors it joins, over ${SEEDS} dungeons of ${floors} floors`, () => {
         const problems: string[] = [];
-        for (let k = 0; k < SEEDS; k++) problems.push(...linkProblems(generateDungeon(sweepRequest(theme, floors, k))));
+        for (let k = 0; k < SEEDS; k++) problems.push(...linkProblems(sweepRequest(theme, floors, k)));
         expect(problems).toEqual([]);
       }, 600_000);
     }
