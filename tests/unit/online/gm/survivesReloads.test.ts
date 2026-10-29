@@ -7,7 +7,7 @@ import { OnlineControl } from '../../../../src/app/online/gm/OnlineControl.ts';
 import { boundOwnership, fakeCampaigns } from './fakeSeats.ts';
 import { readSavedTable, type SavedTable } from '../../../../src/app/online/gm/savedTable.ts';
 import { closingText } from '../../../../src/app/online/gm/tableEnd.ts';
-import { app, atlasTab, FakeSocket, png, present, switchScene, workspace } from './fakeTable.ts';
+import { app, atlasTab, FakeSocket, png, present, switchScene, workspace, storedAccount } from './fakeTable.ts';
 import { fakeTokenSource } from './fakeTokenSource.ts';
 import { sceneState } from './shareHarness.ts';
 import { advanceSettled as advance } from './settled.ts';
@@ -68,12 +68,13 @@ workspace.files = new Map<string, Uint8Array>([['maps/cave.png', png(700, 700)],
 
 const caveScene = (x = 140, mapPath = MAP): SceneState => sceneState({ mapPath, background: 'maps/cave.png', objects: { ...sceneState().objects, tokens: { 'gm-ogre': ogre(x) } } });
 const lastScene = (socket: FakeSocket): unknown => socket.bodies().filter((body) => body.t === 'scene').at(-1)?.scene;
-const sentSince = (socket: FakeSocket, from: number): string[] => socket.bodies().slice(from).map((body) => body.t);
+/** The kinds of message sent since `from`, but how far uploads have come, which follows the store rather than the view. */
+const sentSince = (socket: FakeSocket, from: number): string[] => socket.bodies().slice(from).map((body) => body.t).filter((t) => t !== 'asset-progress');
 
 describe('the online table', () => {
   let saves: (SavedTable | null)[] = [];
   /** A signed-in GM: tables are asked for with the account's token, and nothing else. */
-  const signedIn = { token: (): string | null => 'account-token', signedOutByServer: vi.fn(), refresh: vi.fn(() => Promise.resolve()) };
+  const signedIn = { ...storedAccount(), token: (): string | null => 'account-token', signedOutByServer: vi.fn(), refresh: vi.fn(() => Promise.resolve()) };
   const control = (ownership = boundOwnership([]), players: Parameters<typeof fakeCampaigns>[0] = [], campaigns = fakeCampaigns(players)): OnlineControl =>
     new OnlineControl(app, ownership, campaigns, (table) => saves.push(table), signedIn);
 

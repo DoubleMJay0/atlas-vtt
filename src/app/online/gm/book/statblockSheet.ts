@@ -46,7 +46,7 @@ function sheetCard(template: StatblockTemplate, panelWidth: number | undefined, 
   };
 }
 
-/** A drawn statblock, and the whole texts it names by hash, for the player it is drawn for to fetch. */
+/** A drawn statblock, and the whole texts it names by their stored ids, for the player it is drawn for to fetch. */
 export interface DrawnStatblock {
   readonly statblock: BookStatblock | null;
   readonly texts: readonly SheetTextAsset[];
@@ -125,7 +125,7 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
   };
 }
 
-/** The statblock drawn with every whole text it names by hash (drawn twice: hashing takes a promise), and those texts to serve. */
+/** The statblock drawn with every whole text it names by hash (drawn twice: hashing takes a promise), and those texts to store. */
 export async function drawnStatblock(input: StatblockSheetInput, stored?: AssetStoring): Promise<DrawnStatblock> {
   const first = new SheetTexts();
   const statblock = statblockSheet(input, first);

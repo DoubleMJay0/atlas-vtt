@@ -9,6 +9,7 @@ import { pyramidOf } from '../../../../src/app/pixi/mapImage/pyramid';
 import { pyramidTiles, type PyramidFacts } from '../../../../src/app/pixi/mapImage/tileBlobs';
 import { FakeUplink, percentiles, type UplinkOptions } from './fakeUplink.ts';
 import { settled } from './settled.ts';
+import { kept } from './fakeStoring.ts';
 
 /*
  * How the uploads share the GM's uplink with the table's live frames, in the MODEL of `fakeUplink.ts`
@@ -154,7 +155,7 @@ async function simulate(bitsPerSecond: number, paced: boolean, video: Uint8Array
   // The keep-alive before anything goes up: the resting round trip.
   uplink.keepAlive();
   const videoRef = await publisher.storing.fileRef(VIDEO_PATH, 'video/webm', ASSET_USES.video);
-  const mapRef = await publisher.storing.mapRef(image, 'image/webp', MAP_PATH);
+  const mapRef = kept(await publisher.storing.mapRef(image, 'image/webp', MAP_PATH));
   expect(videoRef?.id).toBeDefined();
   expect(mapRef.tiles).toBe(true);
   let now = 0;

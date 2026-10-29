@@ -1,4 +1,4 @@
-import { ASSET_CAPS, type AssetRef } from '../../protocol/index.ts';
+import { ASSET_CAPS } from '../../protocol/index.ts';
 import { t, type MessageKey } from '../../../i18n';
 import type { Timers } from '../companionTimers.ts';
 import { AssetIds } from './assetIds.ts';
@@ -38,7 +38,7 @@ export interface AssetPublisherPorts extends Pick<ProgressPorts, 'sendLive' | 's
   signedOutByServer(): void;
   /** Nothing is on its way any more: what the store holds may have changed. */
   settled?(): void;
-  /** Assets players were handed with an id can no longer be stored: what names them may hand them again without one. */
+  /** Assets players were handed can no longer be stored: what names them hands them again, without them. */
   withdrawn?(): void;
 }
 
@@ -98,7 +98,6 @@ export class AssetPublisher {
       stat: (path) => ports.stat(path),
       pyramids: ports.pyramids,
       register: (asset) => this.register(asset),
-      release: (ref) => this.release(ref),
       tilesRefused: () => this.noTiles,
     });
   }
@@ -173,14 +172,6 @@ export class AssetPublisher {
     return id;
   }
 
-  /** A reference players hold no more (an explored memory a newer one replaced): it is not uploaded if it has not gone yet, and named no more. */
-  private release(ref: AssetRef): void {
-    if (ref.id === undefined) return;
-    const entry = this.queue.get(ref.id);
-    if (entry !== undefined && entry.state !== 'stored' && entry.state !== 'uploading') this.queue.forget(ref.id);
-    this.progress.delete(ref.id);
-  }
-
   private resume(): void {
     this.halted = null;
     this.queue.reoffer(false);
@@ -232,7 +223,7 @@ export class AssetPublisher {
 
   /**
    * The store takes no more: out of room, what it accepted still goes up; otherwise nothing will, so
-   * every asset players were handed that is not stored is handed again without its id.
+   * every asset players were handed that is not stored is taken from them.
    */
   private halt(reason: Halt): void {
     this.halted = reason;

@@ -1,7 +1,6 @@
 import { normalizePath, type App } from 'obsidian';
 import type { GmMessage } from '../../protocol/index.ts';
 import { setLootRecipientSource } from '../../../loot/lootRecipients';
-import { scaleInWindow } from '../assetVariants.ts';
 import type { ArmedCards } from '../armedCards.ts';
 import { companionTimers } from '../companionTimers.ts';
 import type { Ownership } from '../ownership.ts';
@@ -28,7 +27,7 @@ export interface TableBookPorts {
   /** The shared scene as the books read it, or null while none is shown. */
   scene(): BookScene | null;
   readImage(path: string): Promise<VaultImage | null>;
-  /** How players are handed assets the store keeps for them; without it they fetch every asset from the GM. */
+  /** How players are handed assets the store keeps for them; without it they are handed none. */
   readonly stored?: AssetStoring | undefined;
   randomId(): string;
   /** Where players' edits of their tokens in the shared scene are written; null while no scene is shared. */
@@ -59,7 +58,7 @@ export interface TableBook {
 export function tableBook(ports: TableBookPorts): TableBook {
   const { app, ownership } = ports;
   const timers = companionTimers();
-  const storedQuests = ports.stored === undefined ? null : new StoredQuests(ports.stored, gatedQuestAsset);
+  const storedQuests = new StoredQuests(ports.stored, gatedQuestAsset);
   const share = new BookShare({
     send: (body, to) => ports.send(body, to),
     now: () => timers.now(),
@@ -78,11 +77,7 @@ export function tableBook(ports: TableBookPorts): TableBook {
     },
     worldMap: () => gatedWorldMap(),
     notice: (text) => showNotice(text),
-    quests: async () => {
-      const quests = await gatedQuests();
-      return storedQuests === null ? quests : storedQuests.of(quests);
-    },
-    questAsset: (hash) => gatedQuestAsset(hash),
+    quests: async () => storedQuests.of(await gatedQuests()),
     editResource: (edit, answer) => {
       if (edit.kind === 'character') {
         const taken = writeCharacterValue(app, edit);
@@ -99,13 +94,12 @@ export function tableBook(ports: TableBookPorts): TableBook {
     rests: gatedRests,
     cards: ports.cards,
     cardsChanged: () => ports.cardsChanged(),
-    scaleImage: scaleInWindow,
   }, ports.shelf);
   let stops: (() => void)[] = [];
   return {
     share,
     refreshAssets: () => {
-      storedQuests?.clear();
+      storedQuests.clear();
       share.refreshAssets();
     },
     start: () => {

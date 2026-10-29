@@ -3,9 +3,8 @@ import type { ShownRollToken } from '../../services/playerRollSource';
 import { isLit, LIGHTING_REFUSAL } from './atlasLighting.ts';
 import type { SceneState, SceneStore } from './atlasView.ts';
 import { dragRulerPaths, PlayerDragRulers, type RulerPaths } from './dragRulers.ts';
-import { AssetAnswers } from './assetAnswers.ts';
-import { readFloorImages, type FloorImages } from './floorImages.ts';
-import { readFloorVideo, type SharedVideo } from './floorVideo.ts';
+import { readFloorImages } from './floorImages.ts';
+import { readFloorVideo } from './floorVideo.ts';
 import { floorPlacement, floorWorldSize } from './floorPlacement.ts';
 import { MineShare } from './mineShare.ts';
 import { mapRollDice, tokenRollDice } from './rollAdvantage.ts';
@@ -45,9 +44,6 @@ export class FloorShare {
   private readonly store: SceneStore;
   private readonly ports: FloorSharePorts;
   private scene: SharedScene | null = null;
-  private images: Pick<FloorImages, 'map'> = { map: null };
-  /** The map's video while the map is an animated one players may play in its poster's place. */
-  private video: SharedVideo | null = null;
   /** The floor map's size in world pixels (its image as Atlas draws it), by which players' moves are kept on it; null when it is unknown. */
   private mapSize: MapSize | null = null;
   /** The map path, floor, images and placement of the scene sent or being read: a change starts a new scene. */
@@ -55,7 +51,6 @@ export class FloorShare {
   private refusal: string | null = null;
   /** The id the next scene keeps: references made again (`refreshAssets`) are no new scene. */
   private keepId: string | null = null;
-  private readonly assets: AssetAnswers;
   readonly tokens: TokenShare;
   private readonly live: LiveShare | null;
   private readonly mine: MineShare | null;
@@ -109,12 +104,6 @@ export class FloorShare {
     });
     this.marks = new MarkShare({ ...ports, cursorsShown }, () => this.mapSize);
     this.dragRulers = new PlayerDragRulers((drags) => ports.showPlayerDrags?.(drags));
-    this.assets = new AssetAnswers({ send: (body, to) => ports.send(body, to), now: () => ports.now(), readImage: (path) => ports.readImage(path), scaleImage: ports.scaleImage, readVideo: ports.readVideo }, {
-      map: () => this.images.map,
-      video: () => this.video,
-      explored: (hash) => this.inputs.exploredBytes(hash),
-      artPath: (hash) => this.artPath(hash),
-    });
   }
 
   /** The id of the scene players were sent last, or null while none is shared. */
@@ -148,9 +137,8 @@ export class FloorShare {
     this.dragRulers.clear();
   }
 
-  /** The scene, its tokens and its inputs again, to one player or to all; sent to all, assets may be asked for again at once. */
+  /** The scene, its tokens and its inputs again, to one player or to all. */
   resend(to?: string): void {
-    if (to === undefined) this.assets.forget();
     this.ports.send({ t: 'scene', scene: this.scene }, to);
     this.tokens.resend(to);
     this.inputs.resend(to);
@@ -175,11 +163,9 @@ export class FloorShare {
   playerLeft(player: string): void {
     this.moves.playerLeft(player);
     this.marks.playerLeft(player);
-    // Chunks queued for them are dropped: when they come back, they may ask again at once.
-    this.assets.forget(player);
   }
 
-  /** Assets players were handed may no longer be stored: the map and the art are read again, and go out as they can be sent now. */
+  /** Assets players were handed may no longer be stored: the map and the art are read again, and what the store does not keep goes. */
   refreshAssets(): void {
     // The same scene, its references made again: players keep what they drew of it.
     this.keepId = this.scene?.id ?? null;
@@ -192,7 +178,7 @@ export class FloorShare {
   /** Withdraws the scene: players see none until a scene is shared again. */
   withdraw(): void {
     this.key = null;
-    this.publish(null, null, null);
+    this.publish(null, null);
   }
 
   /** The GM's canvas shows another floor now, or this one again: what it draws of players' marks starts afresh. */
@@ -203,16 +189,16 @@ export class FloorShare {
 
   /**
    * A player's message on this floor: a drag, drop or cancelled drag of their own token, a laser,
-   * measurement or cursor, a resync, or an asset request, answered only for the map, the
-   * explored memory or a token's artwork of the current picture.
+   * measurement or cursor, or a resync.
    */
   receive(from: string, message: PlayerMessage): void {
     if (message.t === 'move') return this.moves.receive(from, message);
     if (message.t === 'drag') return this.moves.drag(from, message);
     if (message.t === 'drag-cancel') return this.moves.dragCancel(from, message);
     if (message.t === 'laser' || message.t === 'measure' || message.t === 'cursor') return this.marks.receive(from, message);
-    if (message.t === 'resync') return message.of === 'tokens' ? this.tokens.resync(from, message.scene) : this.inputs.resync(from, message.scene, message.of);
-    if (message.t === 'asset-request') this.assets.answer(from, message);
+    if (message.t !== 'resync') return;
+    if (message.of === 'tokens') this.tokens.resync(from, message.scene);
+    else this.inputs.resync(from, message.scene, message.of);
   }
 
   /** The GM id of a token by the id players know it by in the list of `scene`, while that is the scene of the last list they were sent. */
@@ -224,11 +210,6 @@ export class FloorShare {
   shown(mapPath: string, tokenIds: readonly string[]): ReadonlyMap<string, ShownRollToken> {
     if (this.store.getState().mapPath !== mapPath) return new Map();
     return this.ports.tokenSource()?.playerRollTokens(mapPath, tokenIds) ?? new Map();
-  }
-
-  /** The vault path of artwork the players' current picture shows, by hash: a token's or an initiative portrait's. */
-  private artPath(hash: string): string | undefined {
-    return this.tokens.artPath(hash) ?? this.layers.artPath(hash) ?? this.ports.logArt?.(hash);
   }
 
   /** Looks again every `TOKEN_POLL_MS`: the map's measurement may change without a store change. */
@@ -276,24 +257,23 @@ export class FloorShare {
     this.layers.setScene(null);
     const built = await readFloorImages((path) => this.ports.readImage(path), background, this.ports.stored);
     if (this.key !== key) return;
-    if (typeof built === 'string') {
-      this.ports.notice(t(built === 'too-large' ? 'online.assetsMapTooLarge' : 'online.mapUnreadable'));
-      this.publish(null, null, null);
+    if (built === null) {
+      this.ports.notice(t('online.mapUnreadable'));
+      this.publish(null, null);
       return;
     }
-    const readVideo = this.ports.readVideo;
-    const video = built.map === null || readVideo === undefined ? null : await readFloorVideo(readVideo, background, this.ports.stored, videoMimeOf);
+    // A map the store does not keep is not shown: the scene goes without it, its tokens on its size.
+    if (built.tooLarge) this.ports.notice(t('online.assetsMapTooLarge'));
+    const video = built.map === null ? null : await readFloorVideo(this.ports.stored, background, videoMimeOf);
     if (this.key !== key) return;
-    const scene: SharedScene = { id: this.keepId ?? this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }), ...placement, ...(video !== null && { video: video.ref }) };
+    const scene: SharedScene = { id: this.keepId ?? this.ports.randomId(), map: built.map, lit, ...(floor !== undefined && { floor }), ...placement, ...(video !== null && { video: video.ref }) };
     this.keepId = null;
-    this.publish(scene, { map: built.map, size: built.size && floorWorldSize(state, level, built.size) }, video);
+    this.publish(scene, built.size && floorWorldSize(state, level, built.size));
   }
 
-  private publish(scene: SharedScene | null, built: FloorImages | null, video: SharedVideo | null): void {
+  private publish(scene: SharedScene | null, size: MapSize | null): void {
     this.scene = scene;
-    this.images = { map: built?.map ?? null };
-    this.video = video;
-    this.mapSize = built?.size ?? null;
+    this.mapSize = size;
     this.moves.sceneChanged();
     this.dragRulers.clear();
     this.tokens.setScene(null);

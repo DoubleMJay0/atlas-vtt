@@ -3,7 +3,6 @@ import type { App, WorkspaceLeaf } from 'obsidian';
 import { showNotice } from '../../ui/notice';
 import { randomHex } from '../../utils/randomHex';
 import { ArmedCards } from './armedCards.ts';
-import { scaleInWindow } from './assetVariants.ts';
 import { ATLAS_VIEW_TYPE, type SceneStore } from './atlasView.ts';
 import type { BookRests } from './book/bookRests.ts';
 import type { BookShelf } from './book/BookShelf.ts';
@@ -25,7 +24,7 @@ import { CoveredPages } from './coveredPages.ts';
 import { TableConnection, type TableStatus } from './TableConnection.ts';
 import { TableRoster } from './tableRoster.ts';
 import { closingText, tableEndOf, tableEndText, type TableEnd } from './tableEnd.ts';
-import { readVaultImage, readVaultVideo } from './vaultImage.ts';
+import { readVaultImage } from './vaultImage.ts';
 import { LOST_NOTICES, type OnlineTableEvents } from './tableEvents.ts';
 import type { AssetPublisher } from './assets/AssetPublisher.ts';
 import { OpenScenes, tablePublisher, viewFocus, type TableAssets } from './assets/tableAssets.ts';
@@ -124,16 +123,13 @@ export class OnlineTable {
       send: (body, to) => this.connection.send(body, to),
       now: () => timers.now(),
       randomId: () => randomHex(12),
-      scaleImage: scaleInWindow,
       changed: () => events.changed(),
       logShown: (shown, path) => this.log.imageShown(shown, path),
-      loggedFile: (hash) => this.log.artFile(hash),
-      readImage: (path) => readVaultImage(app, path),
       stored,
     });
     this.found = new FoundShare(this.log, {
       app, send: (body, to) => this.connection.send(body, to), now: () => timers.now(), nameOf: (player) => ownership.nameOf(player),
-      readImage: (path) => readVaultImage(app, path), scaleImage: scaleInWindow, layers: () => this.bound()?.share.layers ?? null, stored,
+      layers: () => this.bound()?.share.layers ?? null, stored,
     });
     this.books = tableBook({
       app, shelf, ownership, randomId: () => randomHex(12),
@@ -164,12 +160,10 @@ export class OnlineTable {
         send: (body, to) => this.connection.send(body, to),
         sendLive: (body, key, to) => this.covers.sendLive(body, key, to),
         readImage: (path) => readVaultImage(app, path),
-        readVideo: (path) => readVaultVideo(app, path),
         stored,
         isLive: (binding) => this.watch.isLive(binding),
         randomId: () => randomHex(12),
         logRoll: (roll) => this.log.rolled(roll),
-        logArt: (hash) => this.log.artFile(hash),
         rollRequest: (from, answer) => this.log.requestOf(from, answer),
         foundPin: (map, pin) => this.found.entryOf(map, pin),
         nameOf: (player) => ownership.nameOf(player),
@@ -204,15 +198,13 @@ export class OnlineTable {
       left: (player) => {
         this.covers.playerLeft(player);
         this.bound()?.share.playerLeft(player);
-        this.image.playerLeft(player);
         this.books.share.playerLeft(player);
-        this.found.playerLeft(player);
         this.assets?.playerLeft(player);
         ownership.left(player);
         this.log.left(player);
       },
-      // The log, the shown image and the books are the table's, so they hear players while no scene is shared too.
-      message: (from, body) => void (this.bound()?.share.heard(from, body), this.covers.receive(from, body) || this.log.receive(from, body) || this.image.receive(from, body) || this.found.receive(from, body) || this.books.share.receive(from, body) || this.bound()?.share.receive(from, body)),
+      // The log, the found pins and the books are the table's, so they hear players while no scene is shared too.
+      message: (from, body) => void (this.bound()?.share.heard(from, body), this.covers.receive(from, body) || this.log.receive(from, body) || this.found.receive(from, body) || this.books.share.receive(from, body) || this.bound()?.share.receive(from, body)),
       access: (closesAt) => this.setClosing(closesAt),
     }, this.gate);
     // Each player hears only how far the assets they were sent references of have come.
@@ -376,7 +368,7 @@ export class OnlineTable {
     this.openScenes?.check(this.app.workspace.getLeavesOfType(ATLAS_VIEW_TYPE), this.watch.mapPath);
   }
 
-  /** Assets players were handed can no longer be stored: the shares hand them again, without ids where the store will not keep them. */
+  /** Assets players were handed may no longer be stored: the shares read them again, and what the store will not keep is taken from players. */
   private refreshAssets(): void {
     this.bound()?.share.refreshAssets();
     void this.image.refreshAssets();

@@ -1,14 +1,13 @@
-import { MAX_ASSET_BYTES, type AssetRef } from '../protocol/index.ts';
-import { sha256Hex } from './assetServe.ts';
+import type { AssetRef } from '../protocol/index.ts';
 import { ASSET_USES, type AssetStoring } from './assets/assetUses.ts';
 import type { VaultImage } from './TokenShare.ts';
 
 type ArtEntry = AssetRef | null | 'reading';
 
 /**
- * Artwork by vault path as players are sent it: read and hashed once, in the background, with the id
- * the store keeps it under where it does (`stored`). A path asked for the first time is null until it
- * has been read; `read` hears when it has.
+ * Artwork by vault path as players are sent it: read and hashed once, in the background, by the id the
+ * store keeps it under (`stored`); none where the store does not. A path asked for the first time is
+ * null until it has been read; `read` hears when it has.
  */
 export class ArtRefs {
   private readonly art = new Map<string, ArtEntry>();
@@ -22,7 +21,7 @@ export class ArtRefs {
     this.stored = stored;
   }
 
-  /** The artwork at a path, or null while it is being read, missing or too large. */
+  /** The artwork at a path, or null while it is being read, missing, or not stored for players. */
   get(path: string): AssetRef | null {
     const entry = this.art.get(path);
     if (entry !== undefined) return entry === 'reading' ? null : entry;
@@ -43,9 +42,8 @@ export class ArtRefs {
   private async refOf(path: string): Promise<AssetRef | null> {
     try {
       const image = await this.readImage(path);
-      if (image === null || image.bytes.length > MAX_ASSET_BYTES) return null;
-      if (this.stored !== undefined) return await this.stored.refOf(image.bytes, image.mime, ASSET_USES.art, path);
-      return { hash: await sha256Hex(image.bytes), size: image.bytes.length, mime: image.mime };
+      if (image === null || this.stored === undefined) return null;
+      return await this.stored.refOf(image.bytes, image.mime, ASSET_USES.art, path);
     } catch {
       return null;
     }

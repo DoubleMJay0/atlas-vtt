@@ -2,7 +2,7 @@ import { parsePlayerMessage, type SharedFloor } from '../protocol/index.ts';
 import type { ShownRollToken } from '../../services/playerRollSource';
 import { isLit, LIGHTING_REFUSAL } from './atlasLighting.ts';
 import type { SceneState, SceneStore } from './atlasView.ts';
-import { imageMimeType, REPEAT_REQUEST_MS } from './assetServe.ts';
+import { imageMimeType } from './assetServe.ts';
 import { FloorAudience } from './floorAudience.ts';
 import { floorPorts, noticeOnce } from './floorPorts.ts';
 import { FloorShare } from './FloorShare.ts';
@@ -16,7 +16,7 @@ import type { SceneSharePorts } from './sceneSharePorts.ts';
 import { TOKEN_POLL_MS } from './TokenShare.ts';
 import { hasLevels, resolveLevel, viewedLevelId } from '../../levels/sceneLevels';
 
-export { imageMimeType, isLit, LIGHTING_REFUSAL, REPEAT_REQUEST_MS };
+export { imageMimeType, isLit, LIGHTING_REFUSAL };
 export type { SceneSharePorts };
 
 const DEFAULT_CELL = 70;

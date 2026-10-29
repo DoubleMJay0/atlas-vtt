@@ -45,7 +45,7 @@ function checkedEdit(inputs: EditInputs, message: StatblockEditMessage): Checked
 
 /**
  * The players' own characters' statblocks: each character's note drawn as its player is sent it,
- * the whole texts it names served to that player alone, and the player's edits of its values,
+ * the whole texts it names stored for that player alone, and the player's edits of its values,
  * lists and abilities checked against what they were last sent and what the note holds now, then
  * written into the note through Atlas's note writer. A statblock edit is never a step of the map's
  * undo history: it is the note's.
@@ -79,11 +79,6 @@ export class StatblockShare {
   /** The player left: what they were sent no longer counts. */
   left(player: string): void {
     this.sentTo.delete(player);
-  }
-
-  /** A whole text of the statblock this player was last sent, by hash; nothing for any other. */
-  text(hash: string, player: string): Uint8Array<ArrayBuffer> | undefined {
-    return this.sentTo.get(player)?.drawn.texts.find((asset) => asset.ref.hash === hash)?.bytes;
   }
 
   /** A note may read otherwise (every note for null): it is read again. */

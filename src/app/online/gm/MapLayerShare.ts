@@ -77,8 +77,6 @@ export class MapLayerShare {
   private annotationsSent: SharedAnnotations | null = null;
   private readonly liquids: SharedLiquids;
   private liquidsSent: readonly SharedLiquid[] | null = null;
-  /** Vault paths of the portraits the last initiative list shows, by hash. */
-  private shownArt = new Map<string, string>();
 
   constructor(store: SceneStore, ports: MapLayerSharePorts) {
     this.store = store;
@@ -99,7 +97,6 @@ export class MapLayerShare {
     this.annotationsSent = null;
     this.liquids.clear();
     this.liquidsSent = null;
-    this.shownArt = new Map();
     this.art.clear();
     this.pins.clear();
     this.fog.reset();
@@ -126,11 +123,6 @@ export class MapLayerShare {
     this.update();
   }
 
-  /** The vault path of a portrait the players' initiative list shows, by its hash. */
-  artPath(hash: string): string | undefined {
-    return this.shownArt.get(hash);
-  }
-
   stop(): void {
     this.setScene(null);
   }
@@ -150,19 +142,13 @@ export class MapLayerShare {
       this.annotationsSent = annotations;
       this.publish({ t: 'annotations', scene: scene.id, ...annotations });
     }
-    const art = new Map<string, string>();
     const list = sharedInitiative({
       state, shown: settings.showInitiative, showNames: settings.showNames, fromTurn: settings.initiativeFromTurn === true, rules: source.rules(),
       bannerOff: settings.turnBanner === false, movesOnTurn: settings.movesOnTurn === true, dock: settings.initiativeDock ?? 'right',
       badge: (tokenId) => this.ports.badgeOf?.(tokenId) ?? null,
       tokenAlias: (tokenId) => this.ports.tokenAlias?.(tokenId),
-      art: (path) => {
-        const ref = this.art.get(path);
-        if (ref !== null) art.set(ref.hash, path);
-        return ref;
-      },
+      art: (path) => this.art.get(path),
     });
-    this.shownArt = art;
     this.publish({ t: 'initiative', scene: scene.id, list });
     const pins = this.readablePins(state, source, fog);
     if (pins !== null) this.publish({ t: 'pins', scene: scene.id, pins: this.pins.shared(pins, (pinId) => this.ports.foundPin?.(state.mapPath ?? '', pinId) ?? null) });

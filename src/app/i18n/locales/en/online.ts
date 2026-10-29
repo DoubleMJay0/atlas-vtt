@@ -1,7 +1,7 @@
 import type { Message } from '../../types';
 
 export const online = {
-  'online.assetsQuota': 'Your shared copies for players are full. New files reach players from this Obsidian while it runs; remove shared copies in the table panel to make room.',
+  'online.assetsQuota': 'Your shared copies for players are full, so new files do not reach them. Remove shared copies in the table panel to make room.',
   'online.assetsRestricted': 'This account cannot share files with players right now.',
   'online.assetsMapTooLarge': 'This map is too large to share with players yet.',
   'online.mapUnreadable': 'This scene\'s map image cannot be sent to players.',

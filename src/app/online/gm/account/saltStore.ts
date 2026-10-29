@@ -29,7 +29,7 @@ const base64Of = (bytes: Uint8Array): string => btoa(String.fromCharCode(...byte
 /**
  * Obsidian's secret storage (1.11.4 and newer), as the account token is kept (`tokenStore.ts`). Its API
  * has no delete, so a cleared salt is an empty secret. Where secure storage is missing nothing is kept,
- * and refs go out without ids.
+ * and players are handed no assets.
  */
 export function secretSaltStore(app: App): SaltStore {
   // The version is written out: the lint rule that allows `secretStorage` reads it from this call.

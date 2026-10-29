@@ -4,6 +4,7 @@ import { ASSET_USES, ASSET_RANKS } from '../../../../src/app/online/gm/assets/as
 import { inFlight } from '../../../../src/app/online/gm/assets/uploadPace.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { bytesOf, publisherHarness, SALT, sharesHeard } from './fakeAssetStore.ts';
+import { kept } from './fakeStoring.ts';
 
 const MIB = 1024 * 1024;
 
@@ -12,10 +13,10 @@ describe('the asset publisher', () => {
     const store = publisherHarness();
     const map = bytesOf(2000, 1);
     const art = [bytesOf(300, 2), bytesOf(300, 3)];
-    const refs = await Promise.all([
+    const refs = (await Promise.all([
       store.publisher.storing.refOf(map, 'image/webp', ASSET_USES.map, 'maps/cave.webp'),
       ...art.map((bytes, n) => store.publisher.storing.refOf(bytes, 'image/png', ASSET_USES.art, `art/${n}.png`)),
-    ]);
+    ])).map(kept);
     for (const [n, bytes] of [map, ...art].entries()) {
       const hash = await sha256Hex(bytes);
       expect(refs[n]).toEqual({ hash, size: bytes.length, mime: n === 0 ? 'image/webp' : 'image/png', id: await assetIdOf(SALT, hash) });
@@ -25,11 +26,10 @@ describe('the asset publisher', () => {
     expect(store.client.offers[0]?.map((asset) => [asset.id, asset.kind, asset.size])).toEqual(refs.map((ref) => [ref.id, 'image', ref.size]));
   });
 
-  it('hands references without ids and offers nothing while it has no salt', async () => {
+  it('hands no references and offers nothing while it has no salt', async () => {
     const store = publisherHarness();
     store.salt = null;
-    const ref = await store.publisher.storing.refOf(bytesOf(100), 'image/png', ASSET_USES.art);
-    expect(ref.id).toBeUndefined();
+    expect(await store.publisher.storing.refOf(bytesOf(100), 'image/png', ASSET_USES.art)).toBeNull();
     await store.advance(2000);
     expect(store.client.offers).toEqual([]);
     expect(store.sent).toEqual([]);
@@ -43,9 +43,9 @@ describe('the asset publisher', () => {
     store.files.set('Scenes/other.webp', bytesOf(500, 9));
     store.files.set('maps/flood.webm', bytesOf(900, 8));
     await store.publisher.storing.stage([{ path: 'Scenes/other.webp', mime: 'image/webp', use: { kind: 'image', rank: ASSET_RANKS.staged } }]);
-    const text = await store.publisher.storing.refOf(bytesOf(50, 4), 'text/markdown', ASSET_USES.text);
-    const art = await store.publisher.storing.refOf(bytesOf(60, 5), 'image/png', ASSET_USES.art);
-    const map = await store.publisher.storing.refOf(bytesOf(70, 6), 'image/webp', ASSET_USES.map);
+    const text = kept(await store.publisher.storing.refOf(bytesOf(50, 4), 'text/markdown', ASSET_USES.text));
+    const art = kept(await store.publisher.storing.refOf(bytesOf(60, 5), 'image/png', ASSET_USES.art));
+    const map = kept(await store.publisher.storing.refOf(bytesOf(70, 6), 'image/webp', ASSET_USES.map));
     const video = await store.publisher.storing.fileRef('maps/flood.webm', 'video/webm', ASSET_USES.video);
     store.connection = { players: 1, latencyMs: 200 };
     await store.advance(200);
@@ -139,7 +139,7 @@ describe('the asset publisher', () => {
     expect(store.client.calls.map((call) => call.kind)).toEqual(['whole']);
   });
 
-  it('stops at a full quota, tells the GM once, and hands new assets without ids', async () => {
+  it('stops at a full quota, tells the GM once, and hands no references to new assets', async () => {
     const store = publisherHarness();
     store.client.answer = () => ({ answer: 'refused', reason: 'quota' });
     await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.art);
@@ -149,8 +149,7 @@ describe('the asset publisher', () => {
     expect(store.notices[0]).toMatch(/full/);
     expect(store.withdrawn).toBeGreaterThan(0);
     expect(store.client.calls).toEqual([]);
-    const later = await store.publisher.storing.refOf(bytesOf(100, 3), 'image/png', ASSET_USES.art);
-    expect(later.id).toBeUndefined();
+    expect(await store.publisher.storing.refOf(bytesOf(100, 3), 'image/png', ASSET_USES.art)).toBeNull();
     // A reconnect asks again; still full, the GM is not told twice.
     store.publisher.welcome();
     await store.advance(200);
@@ -163,9 +162,9 @@ describe('the asset publisher', () => {
     store.connection = { players: 2, latencyMs: 20 };
     store.files.set('Scenes/other.webp', bytesOf(500, 9));
     await store.publisher.storing.stage([{ path: 'Scenes/other.webp', mime: 'image/webp', use: { kind: 'image', rank: ASSET_RANKS.staged } }]);
-    const map = await store.publisher.storing.refOf(bytesOf(4000, 1), 'image/webp', ASSET_USES.map);
+    const map = kept(await store.publisher.storing.refOf(bytesOf(4000, 1), 'image/webp', ASSET_USES.map));
     store.client.answer = (asset) => (asset.id === map.id ? { answer: 'need', upload: 'single', partBytes: 95 * MIB } : { answer: 'have' });
-    const art = await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art);
+    const art = kept(await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art));
     store.hand(map);
     store.hand(art);
     await store.advance(2000);
@@ -206,7 +205,7 @@ describe('the asset publisher', () => {
 
   it('uploads everything again once the shared copies were removed', async () => {
     const store = publisherHarness();
-    const ref = await store.publisher.storing.refOf(bytesOf(100), 'text/markdown', ASSET_USES.text);
+    const ref = kept(await store.publisher.storing.refOf(bytesOf(100), 'text/markdown', ASSET_USES.text));
     await store.advance(1000);
     expect(store.client.calls).toHaveLength(1);
     store.publisher.emptied();

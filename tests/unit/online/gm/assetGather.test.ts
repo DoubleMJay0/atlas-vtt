@@ -1,4 +1,4 @@
-import { MAX_ASSET_BYTES, type SharedScene } from '../../../../src/app/online/protocol/index.ts';
+import type { SharedScene } from '../../../../src/app/online/protocol/index.ts';
 import { describe, expect, it } from 'vitest';
 import { stagedAssets } from '../../../../src/app/online/gm/assets/assetGather.ts';
 import { assetIdOf } from '../../../../src/app/online/gm/assets/assetIds.ts';
@@ -41,9 +41,9 @@ describe('what a scene open beside the presented one offers', () => {
 });
 
 describe('what the presented scene offers', () => {
-  it('is its map, the art of the tokens players see, and an animated map\'s video, larger than the GM serves itself, by id', async () => {
+  it('is its map, the art of the tokens players see, and an animated map\'s video, by id', async () => {
     const store = publisherHarness();
-    const video = bytesOf(MAX_ASSET_BYTES + 1024, 5);
+    const video = bytesOf(4096, 5);
     store.files.set('maps/falls.webm', video);
     const poster = bytesOf(400, 1);
     const art = bytesOf(200, 2);
@@ -64,23 +64,22 @@ describe('what the presented scene offers', () => {
     // The video is read from the vault to be hashed and again to go up, never kept in memory or sent through the table.
     expect(store.reads.get('maps/falls.webm')).toBe(2);
     expect(store.client.calls.filter((call) => call.bytes === video.length)).toHaveLength(1);
-    expect(table.sent.some(({ body }) => body.t === 'asset-chunk')).toBe(false);
   });
 
-  it('keeps the GM\'s own cap for a video players fetch from the GM', async () => {
+  it('shows players no map and no video while the store cannot name them', async () => {
     const store = publisherHarness();
     store.salt = null;
-    store.files.set('maps/falls.webm', bytesOf(MAX_ASSET_BYTES + 1024, 5));
+    store.files.set('maps/falls.webm', bytesOf(4096, 5));
     const table = shareHarness(sceneState({ background: 'maps/falls.webm' }), new Map([['maps/falls.webm', bytesOf(400, 1)]]), undefined, undefined, store.publisher.storing);
     table.share.start();
     await table.settle();
     await store.idle();
     await table.settle();
     expect(scenes(table.sent).at(-1)).not.toHaveProperty('video');
-    expect(scenes(table.sent).at(-1)?.map?.id).toBeUndefined();
+    expect(scenes(table.sent).at(-1)?.map).toBeNull();
   });
 
-  it('goes again without ids once the store will not keep it, so players fetch it from the GM', async () => {
+  it('is taken from players once the store will not keep it', async () => {
     const store = publisherHarness();
     store.client.answer = () => ({ answer: 'refused', reason: 'quota' });
     const table = shareHarness(sceneState({ objects: { ...sceneState().objects, tokens: { t1: token('t1') } } }), new Map([['maps/cave.webp', bytesOf(400, 1)], ['art/t1.webp', bytesOf(200, 2)]]), undefined, undefined, store.publisher.storing);
@@ -95,10 +94,8 @@ describe('what the presented scene offers', () => {
     await table.settle();
     await store.idle();
     await table.advance(1000);
-    expect(scenes(table.sent).at(-1)?.map).not.toHaveProperty('id');
-    const art = sequenced(table.sent, 'tokens').at(-1)?.tokens[0]?.art;
-    expect(art?.hash).toBeDefined();
-    expect(art).not.toHaveProperty('id');
+    expect(scenes(table.sent).at(-1)?.map).toBeNull();
+    expect(sequenced(table.sent, 'tokens').at(-1)?.tokens[0]?.art).toBeNull();
   });
 
   it('names a map this device holds the tile pyramid of as that pyramid, and its video beside it as before', async () => {

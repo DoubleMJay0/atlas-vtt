@@ -18,7 +18,7 @@ export interface HostAccount {
   signedOutByServer(): void;
   /** Asks the relay again what the account may host. */
   refresh(force: boolean): Promise<void>;
-  /** What a table needs to keep assets in the store for players; without it players fetch every asset from the GM. */
+  /** What a table needs to keep assets in the store for players; without it players are handed none. */
   readonly assets?: Pick<TableAssets, 'salt' | 'settled'>;
 }
 

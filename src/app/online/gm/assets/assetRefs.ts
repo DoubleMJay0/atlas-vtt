@@ -33,10 +33,8 @@ export interface AssetRefsDeps {
   readFile(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
   stat(path: string): FileStat | null;
   readonly pyramids?: PyramidSource | undefined;
-  /** Notes an asset; its id, or undefined where players are to fetch it from the GM. */
+  /** Notes an asset; its id, or undefined where the store will not keep it. */
   register(asset: Registration): Promise<string | undefined>;
-  /** Players hold a reference no more. */
-  release(ref: AssetRef): void;
   /** Whether the store takes no pyramids (a relay without them): maps then go as images. */
   tilesRefused(): boolean;
 }
@@ -51,11 +49,10 @@ const drawable = (facts: PyramidFacts | null, hash: string): facts is PyramidFac
 export class AssetRefs implements AssetStoring {
   constructor(private readonly deps: AssetRefsDeps) {}
 
-  async refOf(bytes: Uint8Array<ArrayBuffer>, mime: string, use: AssetUse, path?: string): Promise<AssetRef> {
+  async refOf(bytes: Uint8Array<ArrayBuffer>, mime: string, use: AssetUse, path?: string): Promise<AssetRef | null> {
     const hash = await this.deps.hashes.of(bytes, path);
-    const ref = { hash, size: bytes.length, mime };
     const id = await this.deps.register({ key: hash, hash, size: bytes.length, mime, use, source: path === undefined ? { bytes } : { path }, handed: true });
-    return id === undefined ? ref : { ...ref, id };
+    return id === undefined ? null : { hash, size: bytes.length, mime, id };
   }
 
   async fileRef(path: string, mime: string, use: AssetUse): Promise<AssetRef | null> {
@@ -69,14 +66,10 @@ export class AssetRefs implements AssetStoring {
     }
     const { size } = stat;
     const id = await this.deps.register({ key: hash, hash, size, mime, use, source: { path }, handed: true });
-    return { hash, size, mime, ...(id === undefined ? {} : { id }) };
+    return id === undefined ? null : { hash, size, mime, id };
   }
 
-  release(ref: AssetRef): void {
-    this.deps.release(ref);
-  }
-
-  async mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef> {
+  async mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef | null> {
     const pyramid = await this.pyramid(await this.deps.hashes.of(bytes, path), mime, path, ASSET_RANKS.map, true);
     return pyramid ?? this.refOf(bytes, mime, ASSET_USES.map, path);
   }

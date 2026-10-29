@@ -1,5 +1,4 @@
-import { ASSET_CHUNK_BYTES, MAX_ASSET_BYTES, type GmMessage, type SharedLiquid, type SharedScene } from '../../../../src/app/online/protocol/index.ts';
-import type { App } from 'obsidian';
+import type { GmMessage, SharedLiquid, SharedScene } from '../../../../src/app/online/protocol/index.ts';
 import type { SceneState } from '../../../../src/app/online/gm/atlasView.ts';
 import type { SeatSource } from '../../../../src/app/online/gm/seatSource.ts';
 import type { LiquidSurface } from '../../../../src/app/types/liquidTypes';
@@ -7,25 +6,17 @@ import type { SceneLevel } from '../../../../src/app/types/sceneLevelTypes';
 import { describe, expect, it } from 'vitest';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { MAP_LAYER_INTERVAL_MS } from '../../../../src/app/online/gm/MapLayerShare.ts';
-import { REPEAT_REQUEST_MS } from '../../../../src/app/online/gm/SceneShare.ts';
-import { readVaultVideo } from '../../../../src/app/online/gm/vaultImage.ts';
 import { fakeLayers } from './fakeAtlasTab.ts';
+import { fakeStoring, storedRef } from './fakeStoring.ts';
 import { GENERIC_SOURCE } from './gmLighting.ts';
 import { sceneState, shareHarness, token, type Sent, type ShareHarness } from './shareHarness.ts';
 
 const POSTER = new Uint8Array(40).map((_, index) => index);
-const VIDEO = new Uint8Array(ASSET_CHUNK_BYTES + 7).map((_, index) => (index * 7) % 256);
+const VIDEO = new Uint8Array(5000).map((_, index) => (index * 7) % 256);
 const IMAGE = new Uint8Array(30).map((_, index) => 200 - index);
 
 const scenes = (sent: readonly Sent[]): (SharedScene | null)[] => sent.flatMap(({ body }) => (body.t === 'scene' ? [body.scene] : []));
 const ofKind = <T extends GmMessage['t']>(sent: readonly Sent[], t: T): Extract<GmMessage, { t: T }>[] => sent.flatMap(({ body }) => (body.t === t ? [body as Extract<GmMessage, { t: T }>] : []));
-/** The bytes of the chunks of one asset sent, joined. */
-const joined = (sent: readonly Sent[], hash: string): Uint8Array => {
-  const parts = ofKind(sent, 'asset-chunk').filter((chunk) => chunk.hash === hash).map((chunk) => Uint8Array.from(atob(chunk.data), (char) => char.charCodeAt(0)));
-  const bytes = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  parts.reduce((offset, part) => (bytes.set(part, offset), offset + part.length), 0);
-  return bytes;
-};
 
 async function videoTable(background = 'maps/falls.webm'): Promise<ShareHarness> {
   const table = shareHarness(sceneState({ background }), new Map([['maps/falls.webm', POSTER], ['maps/still.webp', IMAGE]]));
@@ -36,70 +27,32 @@ async function videoTable(background = 'maps/falls.webm'): Promise<ShareHarness>
 }
 
 describe("an animated map's video", () => {
-  it('goes beside its poster, which stays the map', async () => {
+  it('goes beside its poster, which stays the map, both by the ids the store keeps them under', async () => {
     const table = await videoTable();
     expect(scenes(table.sent)).toEqual([{
       id: '000000000000000000000001', lit: false,
-      map: { hash: await sha256Hex(POSTER), size: POSTER.length, mime: 'image/png' },
-      video: { hash: await sha256Hex(VIDEO), size: VIDEO.length, mime: 'video/webm' },
+      map: await storedRef(POSTER, 'image/png'),
+      video: await storedRef(VIDEO, 'video/webm'),
     }]);
   });
 
-  it('is served by hash in chunks, whole whatever side is asked for, and not again at once', async () => {
+  it('leaves with its map', async () => {
     const table = await videoTable();
-    const hash = await sha256Hex(VIDEO);
-    table.share.receive('alice', { t: 'asset-request', hash, maxSide: 1024 });
-    await table.settle();
-    expect(ofKind(table.sent, 'asset-variant')).toEqual([]);
-    expect(ofKind(table.sent, 'asset-chunk').map((chunk) => [chunk.index, chunk.count])).toEqual([[0, 2], [1, 2]]);
-    expect(joined(table.sent, hash)).toEqual(VIDEO);
-    const sent = table.sent.length;
-    table.share.receive('alice', { t: 'asset-request', hash });
-    await table.settle();
-    expect(table.sent.length).toBe(sent);
-    await table.advance(REPEAT_REQUEST_MS);
-    table.share.receive('alice', { t: 'asset-request', hash, from: 1 });
-    await table.settle();
-    expect(ofKind(table.sent.slice(sent), 'asset-chunk').map((chunk) => chunk.index)).toEqual([1]);
-  });
-
-  it('is refused once the map is another, or once its file holds another video', async () => {
-    const table = await videoTable();
-    const hash = await sha256Hex(VIDEO);
-    table.videos.set('maps/falls.webm', VIDEO.map((value) => 255 - value));
-    table.share.receive('alice', { t: 'asset-request', hash });
-    await table.settle();
-    expect(ofKind(table.sent, 'asset-refused')).toEqual([{ t: 'asset-refused', hash }]);
-
-    table.videos.set('maps/falls.webm', VIDEO);
     await table.set(sceneState({ background: 'maps/still.webp' }));
     expect(scenes(table.sent).at(-1)).not.toHaveProperty('video');
-    table.share.receive('bob', { t: 'asset-request', hash });
-    await table.settle();
-    expect(ofKind(table.sent, 'asset-refused').at(-1)).toEqual({ t: 'asset-refused', hash });
-    expect(ofKind(table.sent, 'asset-chunk')).toEqual([]);
   });
 
-  it('leaves players the poster where it cannot be sent', async () => {
+  it('leaves players the poster where there is no video or the store does not keep it', async () => {
     const table = shareHarness(sceneState({ background: 'maps/falls.webm' }), new Map([['maps/falls.webm', POSTER]]));
     table.share.start();
     await table.settle();
-    expect(scenes(table.sent)).toEqual([{ id: '000000000000000000000001', lit: false, map: { hash: await sha256Hex(POSTER), size: POSTER.length, mime: 'image/png' } }]);
-  });
+    expect(scenes(table.sent)).toEqual([{ id: '000000000000000000000001', lit: false, map: await storedRef(POSTER, 'image/png') }]);
 
-  it('is read from the vault only for a video map no larger than an asset may be', async () => {
-    let reads = 0;
-    const app = (size: number): App => ({
-      vault: {
-        getFileByPath: (path: string) => (path === 'maps/falls.mp4' || path === 'maps/still.webp' ? { path, stat: { size } } : null),
-        readBinary: () => ((reads += 1), Promise.resolve(new Uint8Array([1, 2, 3]).buffer)),
-      },
-    }) as unknown as App;
-    expect(await readVaultVideo(app(3), 'maps/falls.mp4')).toEqual({ bytes: new Uint8Array([1, 2, 3]), mime: 'video/mp4' });
-    expect(await readVaultVideo(app(MAX_ASSET_BYTES + 1), 'maps/falls.mp4')).toBeNull();
-    expect(await readVaultVideo(app(3), 'maps/still.webp')).toBeNull();
-    expect(await readVaultVideo(app(3), 'maps/gone.webm')).toBeNull();
-    expect(reads).toBe(1);
+    const refused = await sha256Hex(VIDEO);
+    const kept = shareHarness(sceneState({ background: 'maps/falls.webm' }), new Map([['maps/falls.webm', POSTER]]), undefined, undefined, fakeStoring((hash) => hash === refused, () => VIDEO));
+    kept.share.start();
+    await kept.settle();
+    expect(scenes(kept.sent)).toEqual([{ id: '000000000000000000000001', lit: false, map: await storedRef(POSTER, 'image/png') }]);
   });
 });
 

@@ -1,13 +1,9 @@
 import type { App } from 'obsidian';
 import { isRecord, parsePlayerMessage, type GmMessage, type PlayerPinFound } from '../../protocol/index.ts';
-import { AssetAnswers } from '../assetAnswers.ts';
-import type { ScaleImage } from '../assetVariants.ts';
-import { bookPicture } from '../book/bookAssets.ts';
 import { viewOf } from '../log/logEntries.ts';
 import type { TableLog } from '../log/TableLog.ts';
 import { MoveRate } from '../moveCheck.ts';
 import type { MapLayerShare } from '../MapLayerShare.ts';
-import type { VaultImage } from '../TokenShare.ts';
 import { FoundTexts } from './FoundTexts.ts';
 import type { AssetStoring } from '../assets/assetUses.ts';
 
@@ -21,8 +17,6 @@ export interface FoundSharePorts {
   now(): number;
   /** The name a player goes by at the table, or null when they are not at it. */
   nameOf(player: string): string | null;
-  readImage(path: string): Promise<VaultImage | null>;
-  scaleImage?: ScaleImage;
   /** How players are handed a found note's text and images the store keeps for them. */
   readonly stored?: AssetStoring | undefined;
   /** The shared scene's map layers, while one is shared; null otherwise. */
@@ -34,22 +28,17 @@ export interface FoundSharePorts {
  * readable, in the players' picture of the shared scene, the player at the table) finds it the first
  * time: the log tells everyone who found it and holds its note to read (`TableLog.pinFound`). Later
  * opens, by anyone, find the same entry, which goes again to whoever opens it. The GM undoes a find
- * by deleting its entry. A found note's whole text and images are served by hash to players at the
- * table while its entry is in the log (`FoundTexts`), nothing else.
+ * by deleting its entry. A found note's whole text and images are stored for players and named by id
+ * in its entry (`FoundTexts`), nothing else.
  */
 export class FoundShare {
   private readonly rate = new MoveRate(FIND_BURST, FINDS_PER_SECOND);
   /** Pins being read for a first find, by map and pin: a second open meanwhile finds nothing new. */
   private readonly finding = new Set<string>();
   private readonly texts: FoundTexts;
-  private readonly answers: AssetAnswers;
 
   constructor(private readonly log: TableLog, private readonly ports: FoundSharePorts) {
     this.texts = new FoundTexts(ports.app, log, ports.stored);
-    this.answers = new AssetAnswers(
-      { send: (body, to) => ports.send(body, to), now: () => ports.now(), readImage: (path) => ports.readImage(path), scaleImage: ports.scaleImage },
-      bookPicture((hash, player) => this.assetOf(hash, player)),
-    );
   }
 
   start(): void {
@@ -70,22 +59,12 @@ export class FoundShare {
     return this.log.entries().find((entry) => entry.kind === 'found' && entry.pin?.map === mapPath && entry.pin.pin === pinId)?.id ?? null;
   }
 
-  /** A player's message: a pin they open, or a request for a found note's asset; false when it is neither, which the others then read. */
+  /** A player's message: a pin they open; false when it is none, which the others then read. */
   receive(from: string, body: unknown): boolean {
-    if (!isRecord(body) || (body.t !== 'pin-found' && body.t !== 'asset-request')) return false;
+    if (!isRecord(body) || body.t !== 'pin-found') return false;
     const message = parsePlayerMessage(body);
-    if (message?.t === 'asset-request') {
-      if (this.assetOf(message.hash, from) === undefined) return false;
-      this.answers.answer(from, message);
-      return true;
-    }
     if (message?.t === 'pin-found' && this.ports.nameOf(from) !== null && this.rate.take(from, this.ports.now())) void this.find(from, message);
     return true;
-  }
-
-  /** A player left the table: chunks queued for them are dropped, so they may ask again at once. */
-  playerLeft(player: string): void {
-    this.answers.forget(player);
   }
 
   private async find(from: string, message: PlayerPinFound): Promise<void> {
@@ -117,9 +96,5 @@ export class FoundShare {
     const entry = this.log.entries().find((logged) => logged.id === id);
     const view = entry === undefined ? null : viewOf(entry, to);
     if (view !== null) this.ports.send({ t: 'log-entry', entry: view }, to);
-  }
-
-  private assetOf(hash: string, player: string): ReturnType<FoundTexts['asset']> {
-    return this.ports.nameOf(player) === null ? undefined : this.texts.asset(hash);
   }
 }

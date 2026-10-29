@@ -9,6 +9,7 @@ import type { WallSegment } from '../../../../src/app/types/wallTypes';
 import { questVault } from '../../../mocks/questVault';
 import { fakeLayers } from './fakeAtlasTab.ts';
 import { GENERIC_SOURCE } from './gmLighting.ts';
+import { fakeStoring } from './fakeStoring.ts';
 import { sceneState, shareHarness, token, type Sent } from './shareHarness.ts';
 import { settled } from './settled.ts';
 
@@ -82,7 +83,7 @@ function setUp(pins: Record<string, NotePin>, lit: boolean): Table {
   log.welcome([{ id: ANA, name: 'Ana' }, { id: BEN, name: 'Ben' }]);
   const found = new FoundShare(log, {
     app: vault.app, send: (body, to) => void sent.push({ body, to }), now: () => 0, nameOf: (player) => NAMES[player] ?? null,
-    readImage: () => Promise.resolve(null), layers: () => harness.share.layers,
+    stored: fakeStoring(), layers: () => harness.share.layers,
   });
   harness.foundPin = (mapPath, pinId) => found.entryOf(mapPath, pinId);
   found.start();

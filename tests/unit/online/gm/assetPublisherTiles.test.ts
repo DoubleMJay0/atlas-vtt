@@ -5,6 +5,7 @@ import { ASSET_USES } from '../../../../src/app/online/gm/assets/assetUses.ts';
 import { BATCH_TILES, planPyramid } from '../../../../src/app/online/gm/assets/pyramidPlan.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { bytesOf, publisherHarness, pyramidFacts, SALT, sharesHeard } from './fakeAssetStore.ts';
+import { kept } from './fakeStoring.ts';
 
 // 3000 × 2000: level 0 is 6 × 4 tiles, level 1 (the overview) 3 × 2, level 2 2 × 1, level 3 one tile.
 const MAP = bytesOf(4000, 1);
@@ -24,7 +25,7 @@ const levelOf = (name: string): number => Number(name.split('/')[0]);
 describe('a map published as its tile pyramid', () => {
   it('is handed to players as the pyramid, by an id of its own, with the pyramid\'s bytes, and offered as one', async () => {
     const { store, hash } = await withPyramid();
-    const ref = await store.publisher.storing.mapRef(MAP, 'image/webp', PATH);
+    const ref = kept(await store.publisher.storing.mapRef(MAP, 'image/webp', PATH));
     const plan = planPyramid(pyramidFacts(hash, 3000, 2000));
     expect(ref).toEqual({ hash, size: plan.bytes, mime: 'image/webp', id: await assetIdOf(SALT, pyramidKey(hash, 2)), tiles: true });
     expect(ref.id).not.toBe(await assetIdOf(SALT, hash));
@@ -54,8 +55,8 @@ describe('a map published as its tile pyramid', () => {
     const { store } = await withPyramid();
     store.client.hold = true;
     store.connection = { players: 1, latencyMs: 40 };
-    const map = await store.publisher.storing.mapRef(MAP, 'image/webp', PATH);
-    const art = await store.publisher.storing.refOf(bytesOf(60, 5), 'image/png', ASSET_USES.art);
+    const map = kept(await store.publisher.storing.mapRef(MAP, 'image/webp', PATH));
+    const art = kept(await store.publisher.storing.refOf(bytesOf(60, 5), 'image/png', ASSET_USES.art));
     store.connection = { players: 1, latencyMs: 200 };
     await store.advance(200);
     for (let n = 0; n < 4; n += 1) {
@@ -69,7 +70,7 @@ describe('a map published as its tile pyramid', () => {
     const { store } = await withPyramid();
     store.connection = { players: 2, latencyMs: 20 };
     store.client.hold = true;
-    const ref = await store.publisher.storing.mapRef(MAP, 'image/webp', PATH);
+    const ref = kept(await store.publisher.storing.mapRef(MAP, 'image/webp', PATH));
     store.hand(ref);
     await store.advance(200);
     store.client.release(1);
@@ -86,7 +87,7 @@ describe('a map published as its tile pyramid', () => {
 
   it('goes as one image where this device has no pyramid of it, or none pages can draw', async () => {
     const noPyramid = publisherHarness();
-    const plain = await noPyramid.publisher.storing.mapRef(MAP, 'image/webp', PATH);
+    const plain = kept(await noPyramid.publisher.storing.mapRef(MAP, 'image/webp', PATH));
     expect(plain).toEqual({ hash: await sha256Hex(MAP), size: MAP.length, mime: 'image/webp', id: await assetIdOf(SALT, await sha256Hex(MAP)) });
     await noPyramid.advance(200);
     expect(noPyramid.client.offers.flat()).toEqual([{ id: plain.id, kind: 'image', size: MAP.length }]);
@@ -98,11 +99,11 @@ describe('a map published as its tile pyramid', () => {
   it('goes as one image once the store takes no pyramids, and what handed it hands it again', async () => {
     const { store } = await withPyramid();
     store.client.answer = (asset) => (asset.kind === 'tiles' ? { answer: 'refused', reason: 'kind' } : { answer: 'need', upload: 'single', partBytes: 95 * 1024 * 1024 });
-    const first = await store.publisher.storing.mapRef(MAP, 'image/webp', PATH);
+    const first = kept(await store.publisher.storing.mapRef(MAP, 'image/webp', PATH));
     expect(first.tiles).toBe(true);
     await store.advance(200);
     expect(store.withdrawn).toBe(1);
-    const again = await store.publisher.storing.mapRef(MAP, 'image/webp', PATH);
+    const again = kept(await store.publisher.storing.mapRef(MAP, 'image/webp', PATH));
     expect(again).not.toHaveProperty('tiles');
     expect(again.size).toBe(MAP.length);
     await store.advance(1000);

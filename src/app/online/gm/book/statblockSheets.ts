@@ -24,7 +24,7 @@ export interface StatblockSheetPorts {
   now(): number;
   /** The width of the GM's statblock panel, which the cards are laid out at; unset, a default. */
   panelWidth?(): number | undefined;
-  /** How players are handed the whole texts a statblock names; without it they fetch them from the GM. */
+  /** How players are handed the whole texts a statblock names; without it they get each text's opening alone. */
   readonly stored?: AssetStoring | undefined;
   /** The note at `path` was read or its statblock drawn anew: the books of its characters are looked at again. */
   changed(path: string): void;

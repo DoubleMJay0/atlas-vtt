@@ -4,7 +4,7 @@ import { questBody, withoutComments } from '../../../campaigns/quests/questText'
 import type { QuestImages } from '../../../plugin/questImages';
 import { headingSection } from '../../../services/noteHeadings';
 import { pinNoteLink } from '../../../tools/pinNoteLink';
-import { questTextParts, type QuestTextAsset } from '../book/questTexts.ts';
+import { questTextParts } from '../book/questTexts.ts';
 import { storedRefOf } from '../book/storedQuests.ts';
 import type { AssetStoring } from '../assets/assetUses.ts';
 
@@ -15,11 +15,10 @@ export interface NoteReading {
   readonly body: string;
 }
 
-/** A found note as players are sent it, and what its assets are served from: the whole text's bytes, the images' vault paths by hash. */
+/** A found note as players are sent it, and the vault images its text embeds (whose changes it follows). */
 export interface FoundHandout {
   readonly note: FoundNote;
-  readonly text: QuestTextAsset | null;
-  readonly images: ReadonlyMap<string, string>;
+  readonly images: ReadonlySet<string>;
 }
 
 /** The note a pin's link names, from the map it is on: a path as written, else as Obsidian resolves the link; only Markdown. */
@@ -56,27 +55,26 @@ function shownTitle(title: string): string {
 
 /**
  * A reading as players are sent it, as a quest's text is (`questTextParts`): its opening, the whole
- * text by hash where the opening is not all of it, and the vault images its text embeds, each read
- * from its bytes (`QuestImages`); each with the id the store keeps it under where `stored` does.
+ * text where the opening is not all of it, and the vault images its text embeds, each stored for
+ * players and named by its id; what the store does not keep is left out.
  */
 export async function foundHandout(reading: NoteReading, images: QuestImages, stored?: AssetStoring): Promise<FoundHandout> {
   const parts = await questTextParts(reading.body);
   const resolved = images.resolve(reading.path, parts.embeds);
-  const read = await Promise.all(resolved.map((embed) => images.refOf(embed.file)));
-  const refs = stored === undefined ? read : await Promise.all(read.map(async (ref, index) => (ref === null || ref === undefined ? ref : storedRefOf(stored, ref, { path: resolved[index]?.file.path ?? '' }, 'image'))));
-  const whole = parts.whole === null || stored === undefined ? parts.whole : { ...parts.whole, ref: await storedRefOf(stored, parts.whole.ref, { bytes: parts.whole.bytes }, 'text') };
+  const hashed = await Promise.all(resolved.map((embed) => images.refOf(embed.file)));
   const shown: QuestImage[] = [];
-  const paths = new Map<string, string>();
-  resolved.forEach(({ target, width, height, file }, index) => {
-    const image = refs[index];
-    if (image === null || image === undefined) return;
-    shown.push({ target, width, height, image });
-    paths.set(image.hash, file.path);
-  });
+  const paths = new Set<string>();
+  for (const [index, { target, width, height, file }] of resolved.entries()) {
+    const ref = hashed[index];
+    paths.add(file.path);
+    const image = ref === null || ref === undefined || stored === undefined ? null : await storedRefOf(stored, ref, { path: file.path }, 'image');
+    if (image !== null) shown.push({ target, width, height, image });
+  }
+  const text = parts.whole === null || stored === undefined ? null : await storedRefOf(stored, parts.whole.ref, { bytes: parts.whole.bytes }, 'text');
   const note: FoundNote = {
     title: shownTitle(reading.title), body: parts.opening,
-    ...(whole !== null && { text: whole.ref }),
+    ...(text !== null && { text }),
     ...(shown.length > 0 && { images: shown }),
   };
-  return { note, text: whole, images: paths };
+  return { note, images: paths };
 }

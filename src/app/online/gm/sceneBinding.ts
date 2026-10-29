@@ -1,4 +1,3 @@
-import { scaleInWindow } from './assetVariants.ts';
 import type { MeasureRules } from '../marks/index.ts';
 import { type App } from 'obsidian';
 import type { GridGeometry } from '../../grid/gridDistance';
@@ -44,9 +43,7 @@ export interface SceneBindingPorts {
   /** Sends a live message to all ahead of other frames; a newer one of the same key replaces it while it waits. */
   sendLive(body: GmMessage, key: string, to?: string): void;
   readImage(path: string): Promise<VaultImage | null>;
-  /** An animated map's video as players may be sent it beside its poster. */
-  readVideo(path: string): Promise<VaultImage | null>;
-  /** How players are handed assets the store keeps for them; without it they fetch every asset from the GM. */
+  /** How players are handed assets the store keeps for them; without it they are handed none. */
   readonly stored?: AssetStoring | undefined;
   /** Whether the binding is still the table's and its tab the same objects. */
   isLive(binding: SceneBinding): boolean;
@@ -55,8 +52,6 @@ export interface SceneBindingPorts {
   logRoll(roll: LoggedRoll): void;
   /** The name a player goes by at the table, or null when it is not known. */
   nameOf(player: string): string | null;
-  /** The vault path of a speaker's artwork the table's log shows, by hash. */
-  logArt(hash: string): string | undefined;
   /** The roll button of the table's log a player's roll answers, as they may roll it. */
   rollRequest(from: string, answer: RollRequestAnswer): RollRequest | null;
   /** The entry of the table's log that tells who found a readable pin of a map, or null while nobody has. */
@@ -121,9 +116,7 @@ export function bindScene(ports: SceneBindingPorts, tab: AtlasTab, presented: Pr
     showNames: () => atlasPlayerSettings(ports.app).showNames,
     tokenRules: () => tokenRulesOf(shownRenderer()),
     readImage: (path) => ports.readImage(path),
-    readVideo: (path) => ports.readVideo(path),
     stored: ports.stored,
-    scaleImage: scaleInWindow,
     send: (body, to) => live() && ports.send(body, to),
     sendLive: (body, key, to) => live() && ports.sendLive(body, key, to),
     drawnPlaces: (tokenIds) => drawnTokenPlaces(shownRenderer(), tokenIds),
@@ -131,7 +124,6 @@ export function bindScene(ports: SceneBindingPorts, tab: AtlasTab, presented: Pr
     seats: ports.seats,
     randomId: () => ports.randomId(),
     logRoll: (roll) => live() && ports.logRoll(roll),
-    logArt: (hash) => ports.logArt(hash),
     foundPin: (mapPath, pinId) => ports.foundPin(mapPath, pinId),
     presentedLevel: () => store.presentedLevel,
     rendererCurrent: () => shown() && showsViewedLevel(renderer, tab.store.getState()),

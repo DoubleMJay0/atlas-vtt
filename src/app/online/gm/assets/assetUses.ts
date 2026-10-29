@@ -17,8 +17,6 @@ export const ASSET_USES = {
   map: { kind: 'image', rank: ASSET_RANKS.map },
   /** The art of a token players see: on the map, in the initiative list, as a speaker in the log, on a sheet. */
   art: { kind: 'image', rank: ASSET_RANKS.art },
-  /** An explored memory too large to go inline: after the map, since a newer one may replace it every few seconds. */
-  explored: { kind: 'image', rank: ASSET_RANKS.mapLevels },
   /** An animated map's video. */
   video: { kind: 'video', rank: ASSET_RANKS.video },
   /** An image shown over the map, the world map, an image of a quest or a found note. */
@@ -27,25 +25,26 @@ export const ASSET_USES = {
   text: { kind: 'text', rank: ASSET_RANKS.extra },
 } as const satisfies Record<string, AssetUse>;
 
+/** An asset named by its content before it is stored: its hash, size and type, without the id players fetch it by. */
+export type HashedRef = Pick<AssetRef, 'hash' | 'size' | 'mime'>;
+
 /**
- * How a share hands players an asset the store keeps for them: the reference carries the id it is
- * stored under where the store can take it (the GM is signed in, it is within its kind's cap, the
- * store did not refuse it), and the asset is offered and uploaded. Without an id players ask the GM
- * for it by hash, as before.
+ * How a share hands players an asset the store keeps for them: the reference with the id it is
+ * stored under, after which the asset is offered and uploaded; null where the store cannot take it
+ * (the GM is not signed in, it is past its kind's cap, the store refused it): players are then not
+ * shown it.
  */
 export interface AssetStoring {
   /**
    * The reference of bytes read or made here. `path`: the vault file these bytes are exactly, read
    * again for the upload instead of being kept in memory.
    */
-  refOf(bytes: Uint8Array<ArrayBuffer>, mime: string, use: AssetUse, path?: string): Promise<AssetRef>;
+  refOf(bytes: Uint8Array<ArrayBuffer>, mime: string, use: AssetUse, path?: string): Promise<AssetRef | null>;
   /** The reference of a vault file without keeping its bytes (an animated map's video); null where it cannot be read. */
   fileRef(path: string, mime: string, use: AssetUse): Promise<AssetRef | null>;
   /**
    * The reference of a scene's map image at `path` (these `bytes`): its tile pyramid (`tiles: true`)
    * where this device can build one pages can draw, else the image, as `refOf` hands it.
    */
-  mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef>;
-  /** Players hold a reference no more (one a newer one replaced): it need not go up, and its share is named no more. */
-  release(ref: AssetRef): void;
+  mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef | null>;
 }
