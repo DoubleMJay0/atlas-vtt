@@ -11,8 +11,9 @@
  * 6: a player's roll may ask for advantage or disadvantage (`advantage`), rolled by the GM's dice set rules; the scene's rules and a player's tokens name the dice it rolls with (`dice`) (2026-10-22).
  * 7: a player sets the maximum of their character's resources, tracked numbers and Counters rows (`book-resource` with `max`, `SheetResource.maxEditable`) (2026-10-22).
  * 8: a player takes an item out of their character's book (`book-item-delete`) (2026-10-27).
+ * 9: assets are stored for players (`AssetRef.id`, `asset-progress`) and the explored memory comes inline (`explored.png`) (2026-10-29).
  */
-export const GM_LEVEL = 8;
+export const GM_LEVEL = 9;
 
 /** The level of a GM that names none: one from before levels, which serves level 1. */
 export const UNNAMED_GM_LEVEL = 1;

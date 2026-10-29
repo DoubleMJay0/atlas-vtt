@@ -1,4 +1,4 @@
-import { ASSET_CHUNK_BYTES, isCount, isHash, isMaxSide, MAX_ASSET_BYTES, parseAsset, parseAssetVariant, parseVideoAsset, type AssetRef, type AssetVariant } from './asset.ts';
+import { ASSET_CHUNK_BYTES, isCount, isHash, isMaxSide, MAX_ASSET_BYTES, parseAsset, parseAssetProgress, parseAssetVariant, parseVideoAsset, type AssetProgress, type AssetRef, type AssetVariant } from './asset.ts';
 import { isBookType, isPlayerBookType, parseBookCover, parseBookMessage, parseBookTokenMessage, parsePlayerBookMessage, type BookMessage, type BookTokenMessage, type PlayerBookCover, type PlayerBookMessage, type PlayerBookParts } from './book.ts';
 import { parseBookRestMessage, type BookRestMessage } from './bookRest.ts';
 import { isDeltaOf, parseDelta, parseSeq, type DeltaMessage, type DeltaOf } from './delta.ts';
@@ -44,6 +44,10 @@ export interface SharedScene extends SharedMapPlacement {
 /** Parts of one message a client puts together: at most this many, each as large as an asset chunk. */
 export const MAX_PARTS = 64;
 
+/** The largest explored memory (a PNG) that goes inline in an `explored` message; a larger one is stored like any asset. */
+export const EXPLORED_INLINE_BYTES = 200 * 1024;
+const EXPLORED_INLINE_BASE64 = 4 * Math.ceil(EXPLORED_INLINE_BYTES / 3);
+
 export type GmMessage =
   | { readonly t: 'scene'; readonly scene: SharedScene | null }
   /**
@@ -61,6 +65,8 @@ export type GmMessage =
   | { readonly t: 'asset-chunk'; readonly hash: string; readonly index: number; readonly count: number; readonly data: string }
   | { readonly t: 'asset-refused'; readonly hash: string }
   | AssetVariant
+  /** How far the GM's uploads to the asset store have come (a GM of level 9 or later). */
+  | AssetProgress
   /** The committed fog of the scene `scene`; `seq` numbers it for the deltas that follow. */
   | { readonly t: 'fog'; readonly scene: string; readonly seq?: number; readonly fog: SharedFog }
   | ({ readonly t: 'lighting'; readonly scene: string } & SharedLightingScene)
@@ -69,8 +75,11 @@ export type GmMessage =
   | DeltaMessage
   /** Where the tokens being dragged are now: the fast lane beside the token list, the latest wins. */
   | LiveMessage
-  /** The explored memory the GM last saved, a PNG fetched by hash like the map; null for none. */
-  | { readonly t: 'explored'; readonly scene: string; readonly mask: AssetRef | null }
+  /**
+   * The explored memory the GM last saved: a PNG inline as base64 (`png`, a GM of level 9 or later,
+   * at most `EXPLORED_INLINE_BYTES`), else fetched by `mask` like the map; `mask` null and no `png` is none.
+   */
+  | { readonly t: 'explored'; readonly scene: string; readonly mask: AssetRef | null; readonly png?: string }
   /**
    * One piece of a message too large for one frame: `data` is base64 of its JSON text's UTF-8
    * bytes; the pieces of one `id` joined in `index` order are that text.
@@ -128,6 +137,7 @@ const MAX_CHUNKS = Math.ceil(MAX_ASSET_BYTES / ASSET_CHUNK_BYTES);
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 const isSceneId = (value: unknown): value is string => typeof value === 'string' && value.length <= MAX_SCENE_ID;
+const isInlinePng = (value: unknown): value is string => typeof value === 'string' && value.length <= EXPLORED_INLINE_BASE64 && value.length % 4 === 0 && BASE64.test(value);
 const isBase64Chunk = (value: unknown): value is string => typeof value === 'string' && value.length <= (ASSET_CHUNK_BYTES / 3) * 4 && BASE64.test(value);
 
 /** A scene's floor where it is given and well formed; a malformed one is left out, so the scene still shows. */
@@ -170,9 +180,11 @@ function parseSceneInput(value: Record<string, unknown>, scene: string): GmMessa
     case 'live':
       return parseLive(value, scene);
     case 'explored': {
-      if (value.mask === null) return { t: 'explored', scene, mask: null };
+      if (value.png !== undefined && !isInlinePng(value.png)) return null;
+      const png = value.png === undefined ? {} : { png: value.png };
+      if (value.mask === null) return { t: 'explored', scene, mask: null, ...png };
       const mask = parseAsset(value.mask);
-      return mask === null || mask.mime !== 'image/png' ? null : { t: 'explored', scene, mask };
+      return mask === null || mask.mime !== 'image/png' ? null : { t: 'explored', scene, mask, ...png };
     }
     case 'liquids': {
       const liquids = parseLiquids(value.liquids);
@@ -252,6 +264,8 @@ export function parseGmMessage(value: unknown): GmMessage | null {
       return isHash(value.hash) ? { t: 'asset-refused', hash: value.hash } : null;
     case 'asset-variant':
       return parseAssetVariant(value);
+    case 'asset-progress':
+      return parseAssetProgress(value);
     case 'part':
       if (!isSceneId(value.id) || !isCount(value.count, MAX_PARTS) || value.count < 1 || !isCount(value.index, value.count - 1) || !isBase64Chunk(value.data)) return null;
       return { t: 'part', id: value.id, index: value.index, count: value.count, data: value.data };
