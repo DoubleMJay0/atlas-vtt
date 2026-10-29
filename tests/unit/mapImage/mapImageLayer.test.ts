@@ -22,7 +22,7 @@ interface Pending {
 const pyramid = pyramidOf(3000, 2000);
 const OVERVIEW = ['1/0/0', '1/1/0', '1/2/0', '1/0/1', '1/1/1', '1/2/1'];
 
-function harness(options: { camera?: TileView | null; drawAtOnce?: boolean; picture?: { width: number; height: number } } = {}): {
+function harness(options: { camera?: TileView | null; drawAtOnce?: boolean; picture?: { width: number; height: number }; finestSide?: number } = {}): {
   layer: MapImageLayer;
   cache: TileTextureCache;
   pending: Pending[];
@@ -41,6 +41,7 @@ function harness(options: { camera?: TileView | null; drawAtOnce?: boolean; pict
   const source: TileSource = {
     key: 'hash',
     pyramid,
+    ...(options.finestSide === undefined ? {} : { finestSide: options.finestSide }),
     requestTile: (ref, signal) => new Promise<ImageBitmap>((resolve, reject) => {
       all.push(tileKey(ref));
       signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
@@ -306,6 +307,16 @@ describe('MapImageLayer', () => {
     expect(layer.container.destroyed).toBe(true);
     expect(pending.every(p => p.signal.aborted)).toBe(true);
   });
+
+  it('never asks a source for a level finer than it serves, drawing the coarser one in its place', async () => {
+    const h = harness({ camera: level0({ x: 0, y: 0, width: 1200, height: 800 }), finestSide: 1500 });
+    await h.serve();
+    const levels = new Set(h.requested().map((key) => Number(key.split('/')[0])));
+    expect(Math.min(...levels)).toBe(1);
+    expect(sprites(h.layer).length).toBeGreaterThan(0);
+    expect(sprites(h.layer).every((sprite) => !sprite.label.startsWith('0/'))).toBe(true);
+    h.layer.destroy();
+  });
 });
 
 describe('viewportCamera', () => {
@@ -314,4 +325,5 @@ describe('viewportCamera', () => {
     expect(camera()).toEqual({ rect: { x: 100, y: 50, width: 400, height: 300 }, worldPerScreenPixel: 0.25 });
     expect(viewportCamera({ left: 0, top: 0, worldScreenWidth: 0, worldScreenHeight: 0, scale: { x: 1 } }, { resolution: 1 })()).toBeNull();
   });
+
 });

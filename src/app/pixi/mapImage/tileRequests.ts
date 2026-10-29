@@ -9,6 +9,8 @@ export interface TileSource {
   /** The pyramid's identity (the source's hash): tile textures are cached under it. */
   readonly key: string;
   readonly pyramid: Pyramid;
+  /** The longest side of the finest level this source serves; finer levels are never asked for (a coarser one is drawn scaled). Unset: every level. */
+  readonly finestSide?: number;
   /** The tile's bitmap (its source rect, overlap included); rejects with an `AbortError` once `signal` aborts. */
   requestTile(ref: TileRef, signal: AbortSignal): Promise<ImageBitmap>;
 }

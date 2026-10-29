@@ -6,6 +6,7 @@ import type { TileRef } from './pyramid';
 import type { TileGraphics } from './tileGraphics';
 import type { FileIdentity, OpenedPyramid, OpenFailure, TileEvent } from './tileProtocol';
 import { TileServer } from './tileServer';
+import { readPyramidFacts, readTileBlobs, type PyramidFacts, type TileSelection } from './tileBlobs';
 import type { TileStore } from './tileStore';
 
 /**
@@ -141,6 +142,16 @@ export class TileDecoderCore {
     await this.deps.store.close();
   }
 
+  /** A complete cached pyramid's facts, read without decoding; null where the cache holds none whole. */
+  pyramidFacts(hash: string): Promise<PyramidFacts | null> {
+    return this.pinned(hash, () => readPyramidFacts(this.deps.store, hash));
+  }
+
+  /** The stored bytes of a cached pyramid's tiles, as they are; null for a tile the cache misses. */
+  tileBlobs(hash: string, tiles: TileSelection): Promise<(ArrayBuffer | null)[]> {
+    return this.pinned(hash, () => readTileBlobs(this.deps.store, hash, tiles));
+  }
+
   cacheSize(): Promise<number> {
     return this.deps.store.totalBytes();
   }
@@ -148,6 +159,16 @@ export class TileDecoderCore {
   /** Deletes every pyramid no open map or running build uses; returns the bytes left. */
   clearCache(): Promise<number> {
     return this.deps.store.clear();
+  }
+
+  /** Runs a read of a pyramid with it pinned, so no eviction or clear takes it meanwhile. */
+  private async pinned<T>(hash: string, read: () => Promise<T>): Promise<T> {
+    this.deps.store.pin(hash);
+    try {
+      return await read();
+    } finally {
+      this.deps.store.unpin(hash);
+    }
   }
 
   private entryOf(handle: number): MapEntry {

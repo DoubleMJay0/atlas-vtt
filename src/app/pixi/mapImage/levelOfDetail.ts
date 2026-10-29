@@ -15,15 +15,24 @@ export interface TileView {
 
 /**
  * The finest level whose texels cover at least half a screen pixel:
- * `clamp(ceil(log2(0.5 × worldPerScreenPixel / decodedScale)), 0, last)`.
+ * `clamp(ceil(log2(0.5 × worldPerScreenPixel / decodedScale)), finest, last)`, where `finest` is the
+ * finest level a source serves (`finestLevel`).
  */
-export function levelFor(pyramid: Pyramid, worldPerScreenPixel: number): number {
+export function levelFor(pyramid: Pyramid, worldPerScreenPixel: number, finest = 0): number {
   const last = pyramid.levels.length - 1;
+  const floor = Math.min(last, Math.max(0, finest));
   // NaN and non-positive scales read as the finest level; Infinity reaches the last through the clamp.
-  if (!(worldPerScreenPixel > 0)) return 0;
+  if (!(worldPerScreenPixel > 0)) return floor;
   const decodedScale = pyramid.levels[0]?.scale ?? 1;
   const level = Math.ceil(Math.log2((MIN_TEXEL_SCREEN_PX * worldPerScreenPixel) / decodedScale) - LEVEL_EPSILON);
-  return Math.min(last, Math.max(0, level));
+  return Math.min(last, Math.max(floor, level));
+}
+
+/** The finest level whose longer side is at most `finestSide` (the last where none is); 0 without a side. */
+export function finestLevel(pyramid: Pyramid, finestSide: number | undefined): number {
+  if (finestSide === undefined) return 0;
+  const index = pyramid.levels.findIndex((level) => Math.max(level.width, level.height) <= finestSide);
+  return index === -1 ? pyramid.levels.length - 1 : index;
 }
 
 /**

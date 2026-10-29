@@ -1,6 +1,7 @@
 import type { ArtAlpha } from '../../levels/artRaster';
 import type { RoofPieces } from '../../levels/roofs';
 import type { Pyramid, TileRef } from './pyramid';
+import type { PyramidFacts, TileSelection } from './tileBlobs';
 
 /**
  * Messages between `TileDecoderClient` (main thread) and the tile worker
@@ -49,7 +50,11 @@ export type TileRequest =
   /** Ends an open; its pending requests are answered with an `error`. */
   | { type: 'close'; handle: number }
   | { type: 'cache-size'; id: number }
-  | { type: 'clear-cache'; id: number };
+  | { type: 'clear-cache'; id: number }
+  /** A complete cached pyramid's facts (its size and every tile's stored size), by its hash. */
+  | { type: 'pyramid-facts'; id: number; hash: string }
+  /** The stored WebP bytes of a cached pyramid's tiles, by its hash, never decoded. */
+  | { type: 'tile-blobs'; id: number; hash: string; tiles: TileSelection };
 
 export type TileReply =
   | { type: 'opened'; id: number; opened: OpenedPyramid }
@@ -63,6 +68,10 @@ export type TileReply =
   | { type: 'cache-size'; id: number; bytes: number }
   /** The cache was cleared except for the pyramids in use; `bytes` is what they still take. */
   | { type: 'cleared'; id: number; bytes: number }
+  /** Null where the cache holds no complete pyramid of the hash. */
+  | { type: 'pyramid-facts'; id: number; facts: PyramidFacts | null }
+  /** In the order asked for; null for a tile the cache misses. The buffers are transferred. */
+  | { type: 'tile-blobs'; id: number; blobs: (ArrayBuffer | null)[] }
   /** A tile or overview request that could not be answered (an unknown handle, a tile missing from a cleared cache). */
   | { type: 'error'; id: number; message: string };
 

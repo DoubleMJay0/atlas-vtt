@@ -6,6 +6,7 @@ import { MapClosedError } from './tileErrors';
 import { openWithRetry, type BytesSource, type MainThreadDecode, type OpenExchange } from './tileOpenRequest';
 import type { ArtAlpha } from '../../levels/artRaster';
 import type { RoofPieces } from '../../levels/roofs';
+import type { PyramidFacts, TileSelection } from './tileBlobs';
 import {
   isTileEvent,
   type FileIdentity,
@@ -105,9 +106,28 @@ export class TileDecoderClient {
 
   /** Builds a map's pyramid into the cache without opening it; true once it is complete. `decode` as for `open`. */
   async prebuild(source: BytesSource, identity: FileIdentity | null, decode?: MainThreadDecode): Promise<boolean> {
+    return (await this.ensurePyramid(source, identity, decode)).complete;
+  }
+
+  /** `prebuild`, answering the pyramid's hash too; rejects with `TileOpenError` where it cannot be built. */
+  async ensurePyramid(source: BytesSource, identity: FileIdentity | null, decode?: MainThreadDecode): Promise<{ hash: string; complete: boolean }> {
     const reply = await this.openLike('prebuild', source, identity, decode);
     if (reply.type !== 'prebuilt') throw new Error(`Unexpected reply to prebuild: ${reply.type}`);
-    return reply.complete;
+    return { hash: reply.hash, complete: reply.complete };
+  }
+
+  /** A complete cached pyramid's facts (`readPyramidFacts`), or null where the cache holds none whole. */
+  async pyramidFacts(hash: string): Promise<PyramidFacts | null> {
+    const reply = await this.request({ type: 'pyramid-facts', id: this.nextId++, hash }, []);
+    if (reply.type !== 'pyramid-facts') throw this.failure(reply);
+    return reply.facts;
+  }
+
+  /** The stored WebP bytes of a cached pyramid's tiles, never decoded; null for a tile the cache misses. */
+  async tileBlobs(hash: string, tiles: TileSelection): Promise<(ArrayBuffer | null)[]> {
+    const reply = await this.request({ type: 'tile-blobs', id: this.nextId++, hash, tiles }, []);
+    if (reply.type !== 'tile-blobs') throw this.failure(reply);
+    return reply.blobs;
   }
 
   /** A tile's bitmap; rejects with `MapClosedError` once its map is closed or was lost with a crashed worker. */

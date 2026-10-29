@@ -7,7 +7,7 @@
  */
 import { Container, Rectangle, UPDATE_PRIORITY, type Ticker } from 'pixi.js';
 import { destroyTree } from '../utils/destroyTree';
-import { levelFor, orderByPriority, pictureView, visibleTiles, type TileView } from './levelOfDetail';
+import { finestLevel, levelFor, orderByPriority, pictureView, visibleTiles, type TileView } from './levelOfDetail';
 import { tileContentFrame, tileKey, type TileRef } from './pyramid';
 import { coversView, tileCoverage, type TileKeySet } from './tileCoverage';
 import { TileRequests, type TileSource } from './tileRequests';
@@ -59,6 +59,8 @@ export class MapImageLayer {
   private lastCamera: TileView | null = null;
   private dirty = true;
   private destroyed = false;
+  /** The finest level the source serves: no view asks for a finer one. */
+  private readonly finest: number;
 
   constructor(private readonly options: MapImageLayerOptions) {
     const { pyramid } = options.source;
@@ -78,7 +80,8 @@ export class MapImageLayer {
       onOpaque: () => { this.dirty = true; },
     });
     const whole = { x: 0, y: 0, width: pyramid.width, height: pyramid.height };
-    const overview = pyramid.levels[pyramid.overview];
+    this.finest = finestLevel(pyramid, options.source.finestSide);
+    const overview = pyramid.levels[Math.max(pyramid.overview, this.finest)];
     this.overviewTiles = overview ? visibleTiles(pyramid, overview.index, whole, 0) : [];
     this.picture = options.picture ? pictureView(whole, options.picture) : null;
     this.requests = new TileRequests(options.source, { arrived: this.arrived, failed: this.failedTile }, options.maxInFlight);
@@ -115,7 +118,7 @@ export class MapImageLayer {
     if (this.destroyed) return noop;
     const { pyramid } = this.options.source;
     // As `update` covers a view, so a demand region's picture is the one its tiles were loaded for.
-    const tiles = visibleTiles(pyramid, levelFor(pyramid, view.worldPerScreenPixel), view.rect, PREFETCH_RING);
+    const tiles = visibleTiles(pyramid, levelFor(pyramid, view.worldPerScreenPixel, this.finest), view.rect, PREFETCH_RING);
     // The render shows each tile as it is now: one with no fade under way is opaque in it.
     const settled: TileKeySet = { has: key => this.sprites.isSettled(key) };
     return this.sprites.drawOnly(tileCoverage(pyramid, tiles, this.loaded, settled).draw);
@@ -180,7 +183,7 @@ export class MapImageLayer {
     const missing: TileRef[] = [];
     let shown = new Set<string>();
     const cover = (view: TileView): TileRef[] => {
-      const tiles = visibleTiles(pyramid, levelFor(pyramid, view.worldPerScreenPixel), view.rect, PREFETCH_RING);
+      const tiles = visibleTiles(pyramid, levelFor(pyramid, view.worldPerScreenPixel, this.finest), view.rect, PREFETCH_RING);
       wanted.push(...tiles);
       const coverage = tileCoverage(pyramid, tiles, this.loaded, this.sprites.opaqueKeys);
       draw.push(...coverage.draw);
@@ -206,7 +209,7 @@ export class MapImageLayer {
 
   private isReady(view: TileView): boolean {
     const { pyramid } = this.options.source;
-    const tiles = visibleTiles(pyramid, levelFor(pyramid, view.worldPerScreenPixel), view.rect, 0);
+    const tiles = visibleTiles(pyramid, levelFor(pyramid, view.worldPerScreenPixel, this.finest), view.rect, 0);
     return coversView(pyramid, tiles, [...this.sprites.opaqueTiles(), ...this.failed.values()], view.rect);
   }
 

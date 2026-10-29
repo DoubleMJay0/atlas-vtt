@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  finestLevel,
   levelFor,
   orderByPriority,
   tilePriority,
@@ -143,5 +144,28 @@ describe('load priority', () => {
     const tiles = [{ level: 0, col: 1, row: 1 }, { level: 0, col: 3, row: 1 }];
     expect(orderByPriority(p, tiles, [])).toEqual(tiles);
     expect(orderByPriority(p, tiles, [view])).toEqual(tiles);
+  });
+});
+
+describe('the finest level a source serves', () => {
+  // 3000 × 2000: levels of 3000, 1500, 750 and 375 px.
+  const p = pyramidOf(3000, 2000);
+
+  it('is the finest level whose longer side fits the side named, every level without one', () => {
+    expect(finestLevel(p, undefined)).toBe(0);
+    expect(finestLevel(p, 3000)).toBe(0);
+    expect(finestLevel(p, 2999)).toBe(1);
+    expect(finestLevel(p, 1000)).toBe(2);
+    expect(finestLevel(p, 10)).toBe(3);
+  });
+
+  it('bounds the level of detail, which stays as it was without it', () => {
+    expect(levelFor(p, 1)).toBe(0);
+    expect(levelFor(p, 1, 0)).toBe(0);
+    expect(levelFor(p, 1, 2)).toBe(2);
+    expect(levelFor(p, 8, 2)).toBe(2);
+    expect(levelFor(p, 16, 2)).toBe(3);
+    expect(levelFor(p, Number.NaN, 1)).toBe(1);
+    expect(levelFor(p, 1, 9)).toBe(3);
   });
 });
