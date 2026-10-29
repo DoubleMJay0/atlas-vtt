@@ -11,6 +11,8 @@ export interface GatheredAsset {
   readonly path: string;
   readonly mime: string;
   readonly use: AssetUse;
+  /** A map image, offered as its tile pyramid where it can be. */
+  readonly map?: true;
 }
 
 /** A scene as far as what it shows players goes: its maps by level, and its tokens. */
@@ -23,22 +25,21 @@ export interface GatherScene {
 const MAX_PATH = 1000;
 
 /** Each path once, of a type players can be sent. */
-function imagesOf(paths: readonly (string | null | undefined)[], use: AssetUse): GatheredAsset[] {
-  const seen = new Set<string>();
+function imagesOf(paths: readonly (string | null | undefined)[], use: AssetUse, map = false, seen = new Set<string>()): GatheredAsset[] {
   const gathered: GatheredAsset[] = [];
   for (const path of paths) {
     if (typeof path !== 'string' || path === '' || path.length > MAX_PATH || seen.has(path) || isVideoMapPath(path)) continue;
     const mime = imageMimeType(path);
     if (mime === null) continue;
     seen.add(path);
-    gathered.push({ path, mime, use });
+    gathered.push({ path, mime, use, ...(map && { map: true as const }) });
   }
   return gathered;
 }
 
 /**
  * What a scene that is open but not shown offers the store ahead of its turn (ASD-40): the map image of
- * every level and the art of every token on the map that is not hidden, all ranked after everything
+ * every level (as its tile pyramid) and the art of every token on the map that is not hidden, all ranked after everything
  * players see now. An animated map is left out (a poster is drawn from its video and the video may be
  * hundreds of megabytes): it goes once the scene is presented. The explored memory never goes this way.
  */
@@ -47,7 +48,8 @@ export function stagedAssets(scene: GatherScene): GatheredAsset[] {
   const maps = [scene.background, ...(scene.levels ?? []).map((level) => level.background)];
   const tokens = scene.objects?.tokens === undefined ? [] : Object.values(mapTokens({ tokens: scene.objects.tokens }));
   const art = tokens.filter((token) => token.isHidden !== true).map((token) => token.imagePath);
-  return imagesOf([...maps, ...art], staged);
+  const seen = new Set<string>();
+  return [...imagesOf(maps, staged, true, seen), ...imagesOf(art, staged, false, seen)];
 }
 
 /** What the scene file at `mapPath` offers ahead of its turn (`stagedAssets`); none for a file that cannot be read. */

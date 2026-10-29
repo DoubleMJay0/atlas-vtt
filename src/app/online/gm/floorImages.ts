@@ -20,15 +20,18 @@ export interface FloorImages {
 export type FloorImageProblem = 'unreadable' | 'too-large';
 
 /**
- * An image of the vault as players may be sent it: with an id where the store keeps it (up to its cap
- * for images), else within what the GM serves itself.
+ * An image of the vault as players may be sent it: as its tile pyramid where the store keeps one, else
+ * with an id where the store keeps the image (up to its cap for images), else within what the GM serves itself.
  */
 async function sharedImage(readImage: (path: string) => Promise<VaultImage | null>, path: string, stored: AssetStoring | undefined): Promise<SharedImage | FloorImageProblem> {
   const image = await readImage(path);
   if (image === null) return 'unreadable';
-  // A poster is drawn from its video, so it is kept rather than read again for the upload.
-  const ref = stored === undefined ? { hash: await sha256Hex(image.bytes), size: image.bytes.length, mime: image.mime } : await stored.refOf(image.bytes, image.mime, ASSET_USES.map, isVideoMapPath(path) ? undefined : path);
-  if (image.bytes.length > (ref.id === undefined ? MAX_ASSET_BYTES : ASSET_CAPS.image)) return 'too-large';
+  // A poster is drawn from its video, so it is kept rather than read again for the upload; an image goes as its tile pyramid where it can.
+  const poster = isVideoMapPath(path);
+  const ref = stored === undefined
+    ? { hash: await sha256Hex(image.bytes), size: image.bytes.length, mime: image.mime }
+    : poster ? await stored.refOf(image.bytes, image.mime, ASSET_USES.map) : await stored.mapRef(image.bytes, image.mime, path);
+  if (ref.tiles !== true && image.bytes.length > (ref.id === undefined ? MAX_ASSET_BYTES : ASSET_CAPS.image)) return 'too-large';
   return { hash: ref.hash, bytes: image.bytes, mime: image.mime, ref };
 }
 

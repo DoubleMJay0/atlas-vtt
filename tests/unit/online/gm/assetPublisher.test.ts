@@ -41,7 +41,7 @@ describe('the asset publisher', () => {
     store.connection = { players: 1, latencyMs: 40 };
     store.files.set('Scenes/other.webp', bytesOf(500, 9));
     store.files.set('maps/flood.webm', bytesOf(900, 8));
-    await store.publisher.stage([{ path: 'Scenes/other.webp', mime: 'image/webp', use: { kind: 'image', rank: ASSET_RANKS.staged } }]);
+    await store.publisher.storing.stage([{ path: 'Scenes/other.webp', mime: 'image/webp', use: { kind: 'image', rank: ASSET_RANKS.staged } }]);
     const text = await store.publisher.storing.refOf(bytesOf(50, 4), 'text/markdown', ASSET_USES.text);
     const art = await store.publisher.storing.refOf(bytesOf(60, 5), 'image/png', ASSET_USES.art);
     const map = await store.publisher.storing.refOf(bytesOf(70, 6), 'image/webp', ASSET_USES.map);
@@ -163,7 +163,7 @@ describe('the asset publisher', () => {
     const store = publisherHarness();
     store.connection = { players: 2, latencyMs: 20 };
     store.files.set('Scenes/other.webp', bytesOf(500, 9));
-    await store.publisher.stage([{ path: 'Scenes/other.webp', mime: 'image/webp', use: { kind: 'image', rank: ASSET_RANKS.staged } }]);
+    await store.publisher.storing.stage([{ path: 'Scenes/other.webp', mime: 'image/webp', use: { kind: 'image', rank: ASSET_RANKS.staged } }]);
     const map = await store.publisher.storing.refOf(bytesOf(4000, 1), 'image/webp', ASSET_USES.map);
     store.client.answer = (asset) => (asset.id === map.id ? { answer: 'need', upload: 'single', partBytes: 95 * MIB } : { answer: 'have' });
     const art = await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art);

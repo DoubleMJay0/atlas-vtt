@@ -1,9 +1,13 @@
 import type { AssetKind } from '../../protocol/index.ts';
-import type { OfferAnswer, OfferRefusal } from './assetRoutes.ts';
+import type { OfferAnswer, OfferRefusal, UploadWay } from './assetRoutes.ts';
+import type { PyramidPlan } from './pyramidPlan.ts';
 import { retryMs } from './uploadPace.ts';
 
-/** Where an upload reads an asset's bytes: kept in memory (a text, a poster, a drawing), or a vault file read again then. */
-export type AssetSource = { readonly bytes: Uint8Array<ArrayBuffer> } | { readonly path: string };
+/**
+ * Where an upload reads an asset's bytes: kept in memory (a text, a poster, a drawing), a vault file
+ * read again then, or a map's tile pyramid in this device's cache, uploaded as its plan says.
+ */
+export type AssetSource = { readonly bytes: Uint8Array<ArrayBuffer> } | { readonly path: string } | { readonly plan: PyramidPlan };
 
 /** An asset's way into the store: offered next, offered, waiting to go up, going up, stored, refused by the store, or given up. */
 export type EntryState = 'new' | 'offered' | 'queued' | 'uploading' | 'stored' | 'refused' | 'failed';
@@ -23,7 +27,9 @@ export interface QueueEntry {
   /** Where its bytes are read for the upload; bytes larger than `KEPT_BYTES` are let go once it is stored. */
   source: AssetSource | null;
   state: EntryState;
-  upload: { readonly upload: 'single' | 'multipart'; readonly partBytes: number } | null;
+  upload: { readonly upload: UploadWay; readonly partBytes: number } | null;
+  /** A pyramid's next batch to send (`PyramidPlan.batches`); 0 for every other asset. */
+  next: number;
   /** Why the store refused it, while it is refused. */
   refusal: OfferRefusal | null;
   /** Failed tries in a row, which set the wait before the next. */
@@ -58,7 +64,7 @@ export class UploadQueue {
   }
 
   /** Adds an asset, or asks for one known again: its rank rises where this use ranks higher, and it goes to the front of its rank. */
-  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'refusal' | 'failures' | 'rejected' | 'retryAt'>): QueueEntry {
+  note(entry: Omit<QueueEntry, 'stamp' | 'state' | 'upload' | 'next' | 'refusal' | 'failures' | 'rejected' | 'retryAt'>): QueueEntry {
     const known = this.entries.get(entry.id);
     this.count += 1;
     if (known !== undefined) {
@@ -68,7 +74,7 @@ export class UploadQueue {
       known.source ??= entry.source;
       return known;
     }
-    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, refusal: null, failures: 0, rejected: 0, retryAt: 0 };
+    const added: QueueEntry = { ...entry, stamp: this.count, state: 'new', upload: null, next: 0, refusal: null, failures: 0, rejected: 0, retryAt: 0 };
     this.entries.set(entry.id, added);
     this.trim();
     return added;
@@ -121,11 +127,17 @@ export class UploadQueue {
     return answer.reason;
   }
 
+  /** Forgets an asset: asked for again, it starts afresh. */
+  forget(id: string): void {
+    this.entries.delete(id);
+  }
+
   /** The asset is stored: its bytes are let go unless they are few. */
   stored(entry: QueueEntry): void {
     entry.state = 'stored';
     entry.failures = 0;
     if (entry.source !== null && 'bytes' in entry.source && entry.source.bytes.length > KEPT_BYTES) entry.source = null;
+    entry.next = 0;
   }
 
   /** A try failed for a reason that may pass: it waits 1, 2, 4 … 60 seconds, in `state`. */
@@ -156,6 +168,7 @@ export class UploadQueue {
         continue;
       }
       entry.state = 'new';
+      if (again) entry.next = 0;
       entry.refusal = null;
       entry.failures = 0;
       entry.retryAt = 0;

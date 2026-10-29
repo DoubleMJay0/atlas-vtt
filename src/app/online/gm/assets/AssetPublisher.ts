@@ -1,4 +1,4 @@
-import { ASSET_CAPS, type AssetRef } from '../../protocol/index.ts';
+import { ASSET_CAPS } from '../../protocol/index.ts';
 import { t, type MessageKey } from '../../../i18n';
 import type { Timers } from '../companionTimers.ts';
 import { AssetIds } from './assetIds.ts';
@@ -6,11 +6,13 @@ import { FileHashes, type FileStat } from './fileHashes.ts';
 import { AssetProgress, type ProgressPorts } from './assetProgress.ts';
 import type { OfferRefusal } from './assetRoutes.ts';
 import type { AssetSalt } from './assetSalt.ts';
-import { uploadAsset, type UploadClient, type UploadEnd } from './assetUpload.ts';
-import { ASSET_RANKS, type AssetStoring, type AssetUse } from './assetUses.ts';
+import { AssetRefs, type PyramidSource, type Registration } from './assetRefs.ts';
+import { runJob, type JobEnd } from './assetJob.ts';
+import type { UploadClient } from './assetUpload.ts';
+import { ASSET_RANKS } from './assetUses.ts';
 import type { AssetStoreClient } from './storeClient.ts';
 import { inFlight, RestingLatency, Slots } from './uploadPace.ts';
-import { UploadQueue, type AssetSource, type QueueEntry } from './uploadQueue.ts';
+import { UploadQueue, type QueueEntry } from './uploadQueue.ts';
 
 /** How long new assets gather before they are offered, so a scene's go in one request. */
 export const OFFER_DELAY_MS = 200;
@@ -22,7 +24,9 @@ export const MAX_OFFER = 2000;
 export type { FileStat };
 
 export interface AssetPublisherPorts extends Pick<ProgressPorts, 'sendLive' | 'send'> {
-  readonly client: UploadClient & Pick<AssetStoreClient, 'offer'>;
+  readonly client: UploadClient & Pick<AssetStoreClient, 'offer' | 'putTiles'>;
+  /** This device's map pyramids; without them maps go as images. */
+  readonly pyramids?: PyramidSource | undefined;
   readonly salt: Pick<AssetSalt, 'soon'>;
   readonly timers: Timers;
   /** A vault file's bytes as they are, or null where it cannot be read. */
@@ -68,28 +72,23 @@ export class AssetPublisher {
   private offerTimer: number | undefined;
   private pumpTimer: number | undefined;
   private stopped = false;
-  /** How players are handed references. */
-  readonly storing: AssetStoring;
+  /** Whether the store refused a pyramid for its kind (a relay without them): maps go as images from then on. */
+  private noTiles = false;
+  /** How players are handed references, and how the scenes open beside the presented one are offered. */
+  readonly storing: AssetRefs;
 
   constructor(private readonly ports: AssetPublisherPorts) {
     this.progress = new AssetProgress(ports);
     this.slots = new Slots(() => this.limit());
     this.hashes = new FileHashes((path) => ports.stat(path));
-    this.storing = {
-      refOf: (bytes, mime, use, path) => this.refOf(bytes, mime, use, path),
-      fileRef: (path, mime, use) => this.fileRef(path, mime, use),
-    };
-  }
-
-  /** Offers vault images players may be shown next (the other open scenes): uploaded last, never named to players. */
-  async stage(assets: readonly { readonly path: string; readonly mime: string; readonly use: AssetUse }[]): Promise<void> {
-    for (const asset of assets) {
-      const stat = this.ports.stat(asset.path);
-      if (stat === null || stat.size > ASSET_CAPS[asset.use.kind]) continue;
-      const bytes = await this.ports.readFile(asset.path).catch(() => null);
-      if (bytes === null || this.stopped) continue;
-      await this.register(await this.hashes.of(bytes, asset.path), bytes.length, asset.mime, asset.use, { path: asset.path }, false);
-    }
+    this.storing = new AssetRefs({
+      hashes: this.hashes,
+      readFile: (path) => ports.readFile(path),
+      stat: (path) => ports.stat(path),
+      pyramids: ports.pyramids,
+      register: (asset) => this.register(asset),
+      tilesRefused: () => this.noTiles,
+    });
   }
 
   /** The relay welcomed the table again: everything not stored is offered again (players hear every share through `resend`). */
@@ -123,41 +122,22 @@ export class AssetPublisher {
     this.pumpTimer = undefined;
   }
 
-  private async refOf(bytes: Uint8Array<ArrayBuffer>, mime: string, use: AssetUse, path?: string): Promise<AssetRef> {
-    const hash = await this.hashes.of(bytes, path);
-    const ref = { hash, size: bytes.length, mime };
-    const id = await this.register(hash, bytes.length, mime, use, path === undefined ? { bytes } : { path }, true);
-    return id === undefined ? ref : { ...ref, id };
-  }
-
-  private async fileRef(path: string, mime: string, use: AssetUse): Promise<AssetRef | null> {
-    const stat = this.ports.stat(path);
-    if (stat === null || stat.size > ASSET_CAPS[use.kind]) return null;
-    let hash = this.hashes.kept(path);
-    if (hash === undefined) {
-      const bytes = await this.ports.readFile(path).catch(() => null);
-      if (bytes === null) return null;
-      hash = await this.hashes.of(bytes, path);
-    }
-    const { size } = stat;
-    const id = await this.register(hash, size, mime, use, { path }, true);
-    return { hash, size, mime, ...(id === undefined ? {} : { id }) };
-  }
-
   /** Notes an asset and gives its id, or undefined where players are to fetch it from the GM. */
-  private async register(hash: string, size: number, mime: string, use: AssetUse, source: AssetSource, handed: boolean): Promise<string | undefined> {
+  private async register({ key, hash, size, mime, use, source, handed }: Registration): Promise<string | undefined> {
     if (this.stopped || size <= 0 || size > ASSET_CAPS[use.kind]) return undefined;
     // The round trip before uploads begin is the resting one they are measured against.
     this.limit();
     const salt = await this.ports.salt.soon();
     if (salt === null || this.stopped) return undefined;
     if (this.ids === null || !this.ids.isOf(salt)) this.ids = new AssetIds(salt);
-    const id = await this.ids.of(hash);
+    const id = await this.ids.of(key);
     const known = this.queue.get(id);
     if (known?.state === 'refused' || known?.state === 'failed') return undefined;
     // While the store takes nothing, new assets go the old way.
     if (known === undefined && this.halted !== null) return undefined;
     const entry = this.queue.note({ id, hash, size, mime, kind: use.kind, rank: use.rank, handed, source });
+    // A pyramid whose overview went keeps its other levels behind the art players see.
+    if (entry.source !== null && 'plan' in entry.source && entry.source.plan.batches[entry.next]?.overview === false) entry.rank = Math.max(entry.rank, ASSET_RANKS.mapLevels);
     if (entry.handed) this.progress.set(id, entry.state === 'stored' ? 1 : this.progress.share(id) ?? 0);
     if (entry.state === 'new') this.offerSoon();
     else this.pump();
@@ -185,7 +165,7 @@ export class AssetPublisher {
     if (batch.length === 0) return this.pump();
     this.offering = true;
     for (const entry of batch) entry.state = 'offered';
-    const answer = await this.ports.client.offer(batch.map(({ id, kind, size }) => ({ id, kind, size })));
+    const answer = await this.ports.client.offer(batch.map(({ id, kind, size, source }) => ({ id, kind, size, ...(source !== null && 'plan' in source && { tiles: { levels: source.plan.levels, count: source.plan.count } }) })));
     this.offering = false;
     if (this.stopped) return;
     const now = this.ports.timers.now();
@@ -200,6 +180,7 @@ export class AssetPublisher {
       if (outcome === 'have') this.stored(entry);
       else if (outcome === 'quota' || outcome === 'restricted') this.halt(outcome);
       else if (outcome === 'too-large' && entry.rank === ASSET_RANKS.map) this.tell('too-large');
+      else if (outcome === 'kind' && entry.kind === 'tiles') this.noTiles = true;
       if (outcome !== null && outcome !== 'have' && outcome !== 'need') withdrawn.push(entry);
     }
     this.withdraw(withdrawn);
@@ -260,15 +241,18 @@ export class AssetPublisher {
   }
 
   private async upload(entry: QueueEntry): Promise<void> {
-    const { upload, source } = entry;
-    if (upload === null || source === null) return void (entry.state = 'failed');
     entry.state = 'uploading';
     this.uploading += 1;
-    let end: UploadEnd;
+    let end: JobEnd;
     try {
-      const bytes = 'bytes' in source ? source.bytes : await this.ports.readFile(source.path).catch(() => null);
-      end = bytes === null ? 'changed' : await uploadAsset({ id: entry.id, hash: entry.hash, mime: entry.mime, ...upload }, bytes, this.ports.client, () => this.slots.take(), (share) => {
-        if (entry.handed) this.progress.set(entry.id, Math.min(share, 0.99));
+      end = await runJob(entry, {
+        client: this.ports.client,
+        readFile: (path) => this.ports.readFile(path),
+        blobs: this.ports.pyramids?.blobs,
+        slot: () => this.slots.take(),
+        progress: (share) => {
+          if (entry.handed) this.progress.set(entry.id, Math.min(share, 0.99));
+        },
       });
     } catch {
       end = 'retry';
@@ -280,19 +264,32 @@ export class AssetPublisher {
     if (!this.queue.busy && this.uploading === 0) this.ports.settled?.();
   }
 
-  private ended(entry: QueueEntry, end: UploadEnd): void {
+  private ended(entry: QueueEntry, end: JobEnd): void {
     const now = this.ports.timers.now();
     if (end === 'stored') return this.stored(entry);
+    if (end === 'partial') {
+      entry.state = 'queued';
+      entry.rank = Math.max(entry.rank, ASSET_RANKS.mapLevels);
+      return;
+    }
     if (end === 'signed-out' || end === 'forbidden') {
       entry.state = 'queued';
       return this.halt(end);
     }
     // The upload's row is gone (the store was emptied, or kept it too long): offered again.
-    if (end === 'missing') return this.queue.failed(entry, now, 'new');
+    if (end === 'missing') {
+      entry.next = 0;
+      return this.queue.failed(entry, now, 'new');
+    }
     if (end === 'retry') return this.queue.failed(entry, now, 'queued');
     // The bytes are not those offered (the file changed), or the store refused them twice.
     entry.rejected += 1;
     if (end === 'rejected' && entry.rejected < 2) return this.queue.failed(entry, now, 'queued');
+    // A pyramid the cache lost is built again when what names it hands it again.
+    if (end === 'changed' && entry.kind === 'tiles') {
+      this.queue.forget(entry.id);
+      return this.withdraw([entry]);
+    }
     entry.state = 'failed';
     this.tell('failed');
     this.withdraw([entry]);

@@ -1,7 +1,10 @@
 import type { AssetKind, AssetRef } from '../../protocol/index.ts';
 
-/** The order uploads go in: the map, the art of tokens players see, the video, handouts and texts, then the other open scenes. */
-export const ASSET_RANKS = { map: 0, art: 1, video: 2, extra: 3, staged: 4 } as const;
+/**
+ * The order uploads go in: the map (a pyramid's manifest and overview level), the art of tokens players
+ * see, the pyramid's other levels, the video, handouts and texts, then the other open scenes.
+ */
+export const ASSET_RANKS = { map: 0, art: 1, mapLevels: 2, video: 3, extra: 4, staged: 5 } as const;
 
 /** What an asset is for: the kind the store keeps it as, and its place in the upload order. */
 export interface AssetUse {
@@ -38,4 +41,9 @@ export interface AssetStoring {
   refOf(bytes: Uint8Array<ArrayBuffer>, mime: string, use: AssetUse, path?: string): Promise<AssetRef>;
   /** The reference of a vault file without keeping its bytes (an animated map's video); null where it cannot be read. */
   fileRef(path: string, mime: string, use: AssetUse): Promise<AssetRef | null>;
+  /**
+   * The reference of a scene's map image at `path` (these `bytes`): its tile pyramid (`tiles: true`)
+   * where this device can build one pages can draw, else the image, as `refOf` hands it.
+   */
+  mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef>;
 }

@@ -28,7 +28,7 @@ import { closingText, tableEndOf, tableEndText, type TableEnd } from './tableEnd
 import { readVaultImage, readVaultVideo } from './vaultImage.ts';
 import { LOST_NOTICES, type OnlineTableEvents } from './tableEvents.ts';
 import type { AssetPublisher } from './assets/AssetPublisher.ts';
-import { OpenScenes, tablePublisher, type TableAssets } from './assets/tableAssets.ts';
+import { OpenScenes, tablePublisher, viewFocus, type TableAssets } from './assets/tableAssets.ts';
 
 export type { OnlineTableEvents };
 import { FoundShare } from './pins/FoundShare.ts';
@@ -103,8 +103,9 @@ export class OnlineTable {
       sendLive: (body, key, to) => this.connection.sendLive(body, key, to),
       connection: () => ({ players: this.connection.connected.size, latencyMs: this.connection.stats().latencyMs }),
       withdrawn: () => this.refreshAssets(),
+      focus: () => viewFocus(this.watch.current?.renderer),
     });
-    this.openScenes = this.assets === null ? null : new OpenScenes(app, this.assets);
+    this.openScenes = this.assets === null ? null : new OpenScenes(app, this.assets.storing);
     const stored = this.assets?.storing;
     this.log = new TableLog({
       send: (body, to) => this.connection.send(body, to),

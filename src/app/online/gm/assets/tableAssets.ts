@@ -6,6 +6,11 @@ import { tabSourceOf } from '../presentedScene.ts';
 import type { AssetSalt } from './assetSalt.ts';
 import { stagedSceneAssets } from './assetGather.ts';
 import { AssetPublisher } from './AssetPublisher.ts';
+import type { AssetRefs } from './assetRefs.ts';
+import type { MapFocus } from './pyramidPlan.ts';
+import { ensureMapPyramid } from '../../../pixi/mapImage/prebuildMapImage';
+import { TileDecoderClient } from '../../../pixi/mapImage/TileDecoderClient';
+import { call } from '../atlasView.ts';
 import { AssetStoreClient } from './storeClient.ts';
 
 /** What a table needs of the account to keep assets in the store for players. */
@@ -31,6 +36,17 @@ export interface TablePublisherDeps {
   connection(): { readonly players: number; readonly latencyMs: number | null };
   /** Assets handed to players can no longer be stored: what names them hands them again. */
   withdrawn(): void;
+  /** Where the shared map is looked at now, as shares of it; null: its centre. */
+  focus(): MapFocus | null;
+}
+
+/** Where a tab's renderer looks on its map, as shares of the map image's world rect; null while it cannot say. */
+export function viewFocus(renderer: unknown): MapFocus | null {
+  const rect = call(renderer, 'getMapRect') as { x: number; y: number; width: number; height: number } | null | undefined;
+  const centre = (call(renderer, 'getViewportInstance') as { center?: { x: number; y: number } } | null | undefined)?.center;
+  if (rect === null || rect === undefined || centre === undefined || !(rect.width > 0) || !(rect.height > 0)) return null;
+  const share = (value: number): number => Math.min(1, Math.max(0, value));
+  return { x: share((centre.x - rect.x) / rect.width), y: share((centre.y - rect.y) / rect.height) };
 }
 
 /** A table's publisher, reading the vault as Obsidian has it: bytes with `readBinary`, never decoded. */
@@ -39,6 +55,11 @@ export function tablePublisher(deps: TablePublisherDeps): AssetPublisher {
   const fileOf = (path: string): ReturnType<App['vault']['getFileByPath']> => app.vault.getFileByPath(normalizePath(path));
   return new AssetPublisher({
     client: new AssetStoreClient(deps.origin, () => assets.token()),
+    pyramids: {
+      ensure: (path) => ensureMapPyramid(app, path),
+      blobs: (hash, tiles) => TileDecoderClient.forApp(app).tileBlobs(hash, [...tiles]),
+      focus: () => deps.focus(),
+    },
     salt: assets.salt,
     timers: deps.timers,
     readFile: async (path) => {
@@ -66,7 +87,7 @@ export function tablePublisher(deps: TablePublisherDeps): AssetPublisher {
 export class OpenScenes {
   private readonly staged = new Set<string>();
 
-  constructor(private readonly app: App, private readonly publisher: Pick<AssetPublisher, 'stage'>) {}
+  constructor(private readonly app: App, private readonly publisher: Pick<AssetRefs, 'stage'>) {}
 
   /** Looks at the open map tabs again: a scene opened since is offered. */
   check(leaves: readonly WorkspaceLeaf[], presented: string | null): void {

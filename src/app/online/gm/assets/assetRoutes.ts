@@ -13,6 +13,7 @@ export const ASSET_ROUTES = {
   parts: (id: string): string => `/api/assets/${id}/parts`,
   part: (id: string, part: number): string => `/api/assets/${id}/parts/${part}`,
   complete: (id: string): string => `/api/assets/${id}/complete`,
+  tiles: (id: string): string => `/api/assets/${id}/tiles`,
 } as const;
 
 /** An asset as an offer names it. */
@@ -20,7 +21,12 @@ export interface OfferedAsset {
   readonly id: string;
   readonly kind: AssetKind;
   readonly size: number;
+  /** A tile pyramid's levels and tile count (its pieces are those tiles and the manifest). */
+  readonly tiles?: { readonly levels: number; readonly count: number };
 }
+
+/** How an asset goes up: one body, parts, or batches of tiles. */
+export type UploadWay = 'single' | 'multipart' | 'tiles';
 
 /** Why the store will not take an asset: the account's quota, its kind or size, or an account that may not store now. */
 export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted';
@@ -29,13 +35,13 @@ const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restri
 /** The store's answer for one asset. */
 export type OfferAnswer =
   | { readonly answer: 'have' }
-  | { readonly answer: 'need'; readonly upload: 'single' | 'multipart'; readonly partBytes: number }
+  | { readonly answer: 'need'; readonly upload: UploadWay; readonly partBytes: number }
   | { readonly answer: 'refused'; readonly reason: OfferRefusal };
 
 function answerOf(value: unknown): OfferAnswer | null {
   if (!isRecord(value)) return null;
   if (value.answer === 'have') return { answer: 'have' };
-  if (value.answer === 'need' && (value.upload === 'single' || value.upload === 'multipart')) {
+  if (value.answer === 'need' && (value.upload === 'single' || value.upload === 'multipart' || value.upload === 'tiles')) {
     const partBytes = typeof value.partBytes === 'number' && Number.isSafeInteger(value.partBytes) && value.partBytes > 0 ? value.partBytes : PART_BYTES;
     return { answer: 'need', upload: value.upload, partBytes };
   }
@@ -68,6 +74,18 @@ export function partsSessionOf(json: unknown): PartsSession | null {
   if (!isRecord(json) || typeof json.uploadId !== 'string' || json.uploadId === '') return null;
   const arrived = Array.isArray(json.arrived) ? json.arrived.filter((part): part is number => Number.isSafeInteger(part) && (part as number) > 0) : [];
   return { uploadId: json.uploadId, arrived: new Set(arrived) };
+}
+
+/** Where a pyramid stands after a batch: stored whole, and how many of its pieces (tiles and manifest) the store holds. */
+export interface TilesProgress {
+  readonly stored: boolean;
+  readonly pieces: number;
+  readonly of: number;
+}
+
+export function tilesProgressOf(json: unknown): TilesProgress | null {
+  if (!isRecord(json) || typeof json.stored !== 'boolean' || !isBytes(json.pieces) || !isBytes(json.of)) return null;
+  return { stored: json.stored, pieces: json.pieces, of: json.of };
 }
 
 /** What the GM's shared copies hold: bytes of the quota, and when the oldest leaves (ms since the epoch), null while none is kept. */

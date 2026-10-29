@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian';
-import { ASSET_ROUTES, offerAnswers, partsSessionOf, usageOf, type OfferAnswer, type OfferedAsset, type PartsSession, type StoreUsage } from './assetRoutes.ts';
+import { ASSET_ROUTES, offerAnswers, partsSessionOf, tilesProgressOf, usageOf, type OfferAnswer, type OfferedAsset, type PartsSession, type StoreUsage, type TilesProgress } from './assetRoutes.ts';
 
 /** A request to the store: a path on the relay's origin, never a token in it. */
 interface StoreRequest {
@@ -66,6 +66,13 @@ export class AssetStoreClient {
   async complete(id: string, sha256: string): Promise<StoreResult<null>> {
     const response = await this.call({ path: ASSET_ROUTES.complete(id), method: 'POST', json: {}, headers: { 'X-Asset-SHA256': sha256 } });
     return isStored(response.status) ? { ok: true, value: null } : failed(troubleOf(response.status));
+  }
+
+  /** One batch of a pyramid's tiles as a `multipart/form-data` body (`multipartBody`); the first carries the manifest. */
+  async putTiles(id: string, body: ArrayBuffer, contentType: string): Promise<StoreResult<TilesProgress>> {
+    const response = await this.call({ path: ASSET_ROUTES.tiles(id), method: 'PUT', body, contentType });
+    const progress = response.status === 200 ? tilesProgressOf(response.json) : null;
+    return progress !== null ? { ok: true, value: progress } : failed(response.status === 200 ? 'retry' : troubleOf(response.status));
   }
 
   /** Removes every shared copy of the account: asked again while the store answers that some are left (202), a few times at most. */
