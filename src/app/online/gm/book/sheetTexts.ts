@@ -1,5 +1,6 @@
 import { bookText, MAX_ASSET_BYTES, MAX_SHEET_TEXT, TEXT_MIME_TYPE, type AssetRef, type SheetText } from '../../protocol/index.ts';
 import { sha256Hex } from '../assetServe.ts';
+import { ASSET_USES, type AssetStoring } from '../assets/assetUses.ts';
 import { openingOf } from './bookTexts.ts';
 
 /** A text of a sheet as players fetch it whole: its reference, and the bytes it is served as. */
@@ -32,14 +33,15 @@ export class SheetTexts {
     return whole === undefined ? { opening } : { opening, whole };
   }
 
-  /** The texts this drawing wanted whole, each hashed and ready to serve, by text; one of more than an asset holds is left out. */
-  async hashed(): Promise<Map<string, SheetTextAsset>> {
+  /** The texts this drawing wanted whole, each hashed and ready to serve (with its stored id where `stored` keeps it), by text; one of more than an asset holds is left out. */
+  async hashed(stored?: AssetStoring): Promise<Map<string, SheetTextAsset>> {
     const assets = new Map<string, SheetTextAsset>();
     for (const text of this.wanted) {
       // A copy the hash can take: `encode` names no particular buffer type.
       const bytes = new TextEncoder().encode(text).slice();
       if (bytes.length > MAX_ASSET_BYTES) continue;
-      assets.set(text, { ref: { hash: await sha256Hex(bytes), size: bytes.length, mime: TEXT_MIME_TYPE }, bytes });
+      const ref = stored === undefined ? { hash: await sha256Hex(bytes), size: bytes.length, mime: TEXT_MIME_TYPE } : await stored.refOf(bytes, TEXT_MIME_TYPE, ASSET_USES.text);
+      assets.set(text, { ref, bytes });
     }
     return assets;
   }

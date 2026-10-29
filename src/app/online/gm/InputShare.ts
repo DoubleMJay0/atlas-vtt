@@ -1,7 +1,8 @@
-import type { AssetRef, DeltaOf, GmMessage, SharedLightingScene } from '../protocol/index.ts';
+import { EXPLORED_INLINE_BYTES, type AssetRef, type DeltaOf, type GmMessage, type SharedLightingScene } from '../protocol/index.ts';
 import type { LightingSource } from './atlasLighting.ts';
 import type { SceneState, SceneStore } from './atlasView.ts';
-import { sha256Hex } from './assetServe.ts';
+import { sha256Hex, toBase64 } from './assetServe.ts';
+import { ASSET_USES, type AssetStoring } from './assets/assetUses.ts';
 import { Pacer, type PacerClock } from '../marks/index.ts';
 import { sharedFog, sharedLightingScene, sharedSight } from './sceneInputs.ts';
 import { SequencedList } from './sequencedList.ts';
@@ -17,6 +18,8 @@ export interface InputSharePorts extends PacerClock {
   tokenAlias(tokenId: string): string;
   /** Where the GM's lighting reads its rules and measurement, or null while it cannot be read. */
   lightingSource(): LightingSource | null;
+  /** How players are handed an explored memory too large to go inline. */
+  stored?: AssetStoring | undefined;
 }
 
 /** The shortest time between two sends of the scene's inputs, as for the token list. */
@@ -59,7 +62,7 @@ interface LightingKey {
  * The inputs players rebuild the scene's fog and lighting from, sent to all whenever they change
  * (fog and sight as deltas from the last where those are smaller), at most every `INPUT_INTERVAL_MS`: the committed fog of every shared scene and, for a lit
  * one, its walls, zones and senses (`lighting`), its lighting, lights and tokens (`sight`) and the
- * explored memory the GM last saved (`explored`, served by hash).
+ * explored memory the GM last saved (`explored`, inline where it is small, else by reference).
  */
 export class InputShare {
   private readonly store: SceneStore;
@@ -164,15 +167,23 @@ export class InputShare {
     return scene;
   }
 
+  /**
+   * The explored memory saved last: inline as a PNG where it is at most `EXPLORED_INLINE_BYTES` (with
+   * `mask` beside it for pages that fetch it by hash), else by `mask` alone, which then names the
+   * id the store keeps it under.
+   */
   private async flushExplored(): Promise<void> {
     const scene = this.scene;
     const source = levelExploredMask(this.store.getState());
     if (scene === null || !scene.lit || source === this.mask?.source) return;
     const bytes = maskBytes(source);
-    const ref: AssetRef | null = bytes === null ? null : { hash: await sha256Hex(bytes), size: bytes.length, mime: 'image/png' };
+    const inline = bytes !== null && bytes.length <= EXPLORED_INLINE_BYTES;
+    const stored = this.ports.stored;
+    let ref: AssetRef | null = null;
+    if (bytes !== null) ref = inline || stored === undefined ? { hash: await sha256Hex(bytes), size: bytes.length, mime: 'image/png' } : await stored.refOf(bytes, 'image/png', ASSET_USES.explored);
     if (this.scene !== scene) return;
     this.mask = { source, ref, bytes };
-    this.publish({ t: 'explored', scene: scene.id, mask: ref });
+    this.publish({ t: 'explored', scene: scene.id, mask: ref, ...(inline && { png: toBase64(bytes) }) });
   }
 
   /** Sends a message unless it says what the last of its kind said. */

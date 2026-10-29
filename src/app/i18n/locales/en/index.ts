@@ -98,6 +98,7 @@ import { wall } from './wall';
 import { sceneLight } from './sceneLight';
 import { graphics } from './graphics';
 import { vision } from './vision';
+import { online } from './online';
 import { videoMap } from './videoMap';
 import { uvttFloors } from './uvttFloors';
 import { uvtt } from './uvtt';
@@ -206,6 +207,7 @@ export const en = {
   ...sceneLight,
   ...graphics,
   ...vision,
+  ...online,
   ...videoMap,
   ...uvttFloors,
   ...uvtt,

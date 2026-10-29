@@ -3,6 +3,7 @@ import type { PlacedTokenSource } from '../../../characters/playerCharacters';
 import type { ResolvedStatblock } from '../../../statblocks/model/resolvedTypes';
 import type { NotePatch } from '../../../statblocks/notes/patchTypes';
 import type { ArmedCards } from '../armedCards.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
 import type { ScaleImage } from '../assetVariants.ts';
 import type { Timers } from '../companionTimers.ts';
 import type { KnownPlayer, OwnedToken } from '../ownership.ts';
@@ -29,6 +30,8 @@ export interface BookSharePorts extends Timers {
   /** The owner of a token of the shared scene (`Ownership.ownerOf`). */
   ownerOf(tokenId: string, token: OwnedToken | undefined): string | undefined;
   readImage(path: string): Promise<VaultImage | null>;
+  /** How players are handed assets the store keeps for them; without it they fetch every asset from the GM. */
+  stored?: AssetStoring | undefined;
   /** The file at a vault path as it is now, or null when there is none. */
   stat(path: string): FileStat | null;
   /** The world map players may be shown now with the maps it leads into, or null for none. */

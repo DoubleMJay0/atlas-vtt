@@ -1,0 +1,23 @@
+// The line of what the store keeps for the players: what it says on the text edge, the way to
+// remove every copy under it, laid out as the panel's other lines are.
+@use '../../../../../styles/tokens' as *;
+@use 'online' as *;
+
+.atlas-online-dock {
+  .atlas-online-shared {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $spacing-xs;
+
+    > .atlas-online-button {
+      flex: none;
+    }
+  }
+
+  .atlas-online-shared__text {
+    padding-left: $online-text-inset;
+    color: var(--text-muted);
+    font-size: $font-ui-small;
+  }
+}

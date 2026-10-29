@@ -117,6 +117,12 @@ export class SceneShare {
     this.acting.delete(player);
   }
 
+  /** Assets players were handed may no longer be stored: every floor reads its map and art again. */
+  refreshAssets(): void {
+    for (const share of this.floors.values()) share.refreshAssets();
+    this.dice.refreshArt();
+  }
+
   /** Withdraws the scene: players see none until a scene is shared again. */
   withdraw(): void {
     for (const share of this.floors.values()) share.withdraw();

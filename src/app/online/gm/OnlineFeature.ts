@@ -36,6 +36,12 @@ import { NO_ASSIGNMENTS, type TokenAssignments } from '../../campaigns/players/t
 import { appCampaignChoices } from './campaignChoices.ts';
 import { DASHBOARD_VIEW_TYPE } from '../../dashboard-view';
 import { DEFAULT_SETTINGS, onlineSettingsSections, readSettings, type OnlineSettings } from './settings.ts';
+import { secretSaltStore } from './account/saltStore.ts';
+import { AssetSalt } from './assets/assetSalt.ts';
+import { SharedCopies } from './assets/sharedCopies.ts';
+import { AssetStoreClient } from './assets/storeClient.ts';
+import { RELAY_ORIGIN } from './servers.ts';
+import type { HostAccount } from './tableStart.ts';
 
 /** How long a change of the table's log waits before the data file is written. */
 const LOG_SAVE_MS = 10_000;
@@ -54,6 +60,10 @@ export class OnlineFeature extends Component {
   online: OnlineControl;
   /** The GM's Atlas account, which tables are asked for with. */
   readonly account: AccountControl;
+  /** The salt the GM's asset ids are made with, kept beside the account's token. */
+  private readonly salt: AssetSalt;
+  /** The copies the store keeps for the players. */
+  private readonly copies: SharedCopies;
   private readonly app: App;
   /** The running table as saved in this device's data, so a reload comes back to it. */
   private savedTable: SavedTable | null = null;
@@ -83,13 +93,52 @@ export class OnlineFeature extends Component {
     this.app = plugin.app;
     const campaigns = this.campaigns();
     this.online = new OnlineControl(this.app, new Ownership(playedSeats(campaigns)), campaigns);
+    const store = new AssetStoreClient(RELAY_ORIGIN, () => this.account.token());
+    const signedIn = (): boolean => this.account.token() !== null;
+    this.salt = new AssetSalt({
+      store: secretSaltStore(this.app),
+      fetch: () => store.salt(),
+      signedIn,
+      signedOutByServer: () => this.account.signedOutByServer(),
+      now: () => companionTimers().now(),
+      sleep: (ms) => new Promise((resolve) => companionTimers().setTimer(resolve, ms)),
+    });
+    this.copies = new SharedCopies({
+      client: store,
+      signedIn,
+      signedOutByServer: () => this.account.signedOutByServer(),
+      emptied: () => this.online.table?.assetsEmptied(),
+      notify: (text) => showNotice(text),
+      now: () => Date.now(),
+    });
     this.account = new AccountControl({
       http: obsidianHttp,
       timers: companionTimers(),
       tokens: secretTokenStore(this.app),
       openUrl: (url) => void window.open(url),
       notify: (text) => showNotice(text),
+      signedIn: () => {
+        void this.salt.ensure(true);
+        this.online.table?.signedIn();
+      },
+      signedOut: () => {
+        this.salt.clear();
+        this.copies.clear();
+      },
+      beforeSignOut: async () => {
+        if (this.settings.deleteCopiesOnSignOut) await this.copies.removeAll(true);
+      },
     });
+  }
+
+  /** The account as tables are started with it, with what keeps assets in the store for players. */
+  private host(): HostAccount {
+    return {
+      token: () => this.account.token(),
+      signedOutByServer: () => this.account.signedOutByServer(),
+      refresh: (force) => this.account.refresh(force),
+      assets: { salt: this.salt, settled: () => void this.copies.refresh(true) },
+    };
   }
 
   /** The running table, or null. */
@@ -146,7 +195,7 @@ export class OnlineFeature extends Component {
     this.online = new OnlineControl(this.app, ownership, campaigns, (table) => {
       this.savedTable = table;
       void this.saveSettings();
-    }, this.account, { read: () => this.savedLog, write: (entries) => this.keepLog(entries) }, this.books);
+    }, this.host(), { read: () => this.savedLog, write: (entries) => this.keepLog(entries) }, this.books);
     // Atlas's "Display on player view" reaches the players online too, while a table runs.
     const images = new ImageTakeover<TFile>(() => atlasImageDisplay(this.app), {
       share: () => this.online.table?.image ?? null,
@@ -168,6 +217,7 @@ export class OnlineFeature extends Component {
     const docks = new DockMounts(this.app.workspace, {
       api: onlineApi(this.online, () => images.hide()),
       account: this.account,
+      copies: this.copies,
       campaigns: appCampaignChoices(this.app),
       openCampaigns: () => void this.app.workspace.getLeaf(true).setViewState({ type: DASHBOARD_VIEW_TYPE, active: true }),
       imageSrc: (path) => this.app.vault.adapter.getResourcePath(path),

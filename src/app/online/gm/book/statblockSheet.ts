@@ -16,6 +16,7 @@ import type { SheetBuild } from './sheetFields.ts';
 import { fittedNodes, sheetNodes, type SheetWalk } from './sheetNodes.ts';
 import { sheetHead } from './sheetSigils.ts';
 import { SheetTexts, type SheetTextAsset } from './sheetTexts.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
 
 /** What a player's own character's statblock is drawn from. */
 export interface StatblockSheetInput {
@@ -125,11 +126,11 @@ export function statblockSheet(input: StatblockSheetInput, texts: SheetTexts = n
 }
 
 /** The statblock drawn with every whole text it names by hash (drawn twice: hashing takes a promise), and those texts to serve. */
-export async function drawnStatblock(input: StatblockSheetInput): Promise<DrawnStatblock> {
+export async function drawnStatblock(input: StatblockSheetInput, stored?: AssetStoring): Promise<DrawnStatblock> {
   const first = new SheetTexts();
   const statblock = statblockSheet(input, first);
   if (statblock === null || first.wanted.size === 0) return { statblock, texts: [] };
-  const assets = await first.hashed();
+  const assets = await first.hashed(stored);
   const drawn = statblockSheet(input, new SheetTexts(new Map([...assets].map(([text, asset]) => [text, asset.ref]))));
   const named = new Set(namedTexts(drawn));
   return { statblock: drawn, texts: [...assets.values()].filter((asset) => named.has(asset.ref.hash)) };

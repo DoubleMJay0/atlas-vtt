@@ -4,6 +4,7 @@ import { QuestImages } from '../../../plugin/questImages';
 import type { QuestAsset } from '../book/questGate.ts';
 import type { FoundPin, GmLogEntry } from '../log/logEntries.ts';
 import type { TableLog } from '../log/TableLog.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
 import { foundHandout, readPinNote, type FoundHandout, type NoteReading } from './foundNotes.ts';
 
 type FoundEntry = Extract<GmLogEntry, { readonly kind: 'found' }>;
@@ -35,7 +36,7 @@ export class FoundTexts {
   private readonly reads = new Map<string, number>();
   private refs: { readonly vault: EventRef[]; readonly meta: EventRef[] } = { vault: [], meta: [] };
 
-  constructor(private readonly app: App, private readonly log: TableLog) {
+  constructor(private readonly app: App, private readonly log: TableLog, private readonly stored?: AssetStoring) {
     this.images = new QuestImages(app);
   }
 
@@ -54,7 +55,7 @@ export class FoundTexts {
   /** What players would read of a pin's note now, from the map it is on; null where it cannot be read. */
   async read(link: string, map: string): Promise<FoundRead | null> {
     const reading = await readPinNote(this.app, link, map).catch(() => null);
-    return reading === null ? null : { reading, handout: await foundHandout(reading, this.images) };
+    return reading === null ? null : { reading, handout: await foundHandout(reading, this.images, this.stored) };
   }
 
   /** Keeps the note of a new entry current and its assets served. */

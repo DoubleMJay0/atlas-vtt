@@ -1,4 +1,5 @@
 import { sha256Hex } from '../assetServe.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
 import type { VaultImage } from '../TokenShare.ts';
 import { AskedAnswer } from './askedAnswer.ts';
 import { MapImages, type FileStat, type MapImage, type MapImageProblem } from './mapImages.ts';
@@ -18,6 +19,8 @@ export interface WorldMapPorts {
   source(): Promise<WorldMapTree | null>;
   /** A map that was being looked up or read is known now. */
   read(): void;
+  /** How players are handed images the store keeps for them. */
+  readonly stored?: AssetStoring | undefined;
 }
 
 /** What the GM is told when the world map's image cannot be sent to players. */
@@ -55,7 +58,7 @@ export class WorldMaps {
 
   constructor(ports: WorldMapPorts) {
     this.tree = new AskedAnswer(async () => named(await ports.source()), null, () => ports.read());
-    this.images = new MapImages({ stat: (path) => ports.stat(path), readImage: (path) => ports.readImage(path), read: () => ports.read() });
+    this.images = new MapImages({ stat: (path) => ports.stat(path), readImage: (path) => ports.readImage(path), stored: ports.stored, read: () => ports.read() });
   }
 
   /** The world map: null for none, undefined while it is being looked up or read (`read` hears when it has been). */

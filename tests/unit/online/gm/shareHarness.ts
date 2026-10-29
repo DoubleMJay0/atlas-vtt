@@ -16,6 +16,7 @@ import { fakeTokenSource } from './fakeTokenSource.ts';
 import { GENERIC_SOURCE, PLAYER_SETTINGS } from './gmLighting.ts';
 import { settled } from './settled.ts';
 import { isVideoMapPath, videoMimeType } from '../../../../src/app/pixi/mapImage/video/videoMapFiles';
+import type { AssetStoring } from '../../../../src/app/online/gm/assets/assetUses.ts';
 
 export const GRID_SIZE = 70;
 
@@ -85,9 +86,10 @@ const counterId = (count: number): string => count.toString(16).padStart(24, '0'
 /**
  * A SceneShare over a fake store, renderer (`fakeTokenSource`), vault and clock; `images` are the
  * vault's image files by path; `seats` tells who plays, owns which token and may claim which; `real`
- * (Atlas's own view store) replaces the fake store, and is written through its own actions, not `set`.
+ * (Atlas's own view store) replaces the fake store, and is written through its own actions, not `set`;
+ * `stored` hands players assets the store keeps.
  */
-export function shareHarness(initial: SceneState, images: ReadonlyMap<string, Uint8Array<ArrayBuffer>>, seats?: SeatSource, real?: SceneStore): ShareHarness {
+export function shareHarness(initial: SceneState, images: ReadonlyMap<string, Uint8Array<ArrayBuffer>>, seats?: SeatSource, real?: SceneStore, stored?: AssetStoring): ShareHarness {
   let current = initial;
   const listeners: ((next: SceneState) => void)[] = [];
   const store: SceneStore = real ?? {
@@ -156,6 +158,7 @@ export function shareHarness(initial: SceneState, images: ReadonlyMap<string, Ui
       },
       clearTimer: (timer) => void timers.delete(timer),
       seats,
+      stored,
     }),
     state: () => store.getState(),
     set: async (next) => {

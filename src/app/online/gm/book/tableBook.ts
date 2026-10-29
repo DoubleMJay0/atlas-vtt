@@ -8,6 +8,8 @@ import type { Ownership } from '../ownership.ts';
 import type { VaultImage } from '../TokenShare.ts';
 import type { BookScene } from './bookScene.ts';
 import { BookShare } from './BookShare.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
+import { StoredQuests } from './storedQuests.ts';
 import { writeCharacterValue } from './characterValues.ts';
 import type { ResourceWrites } from './resourceWrites.ts';
 import { gatedQuestAsset, gatedQuests, onQuestsChange } from './questGate.ts';
@@ -26,6 +28,8 @@ export interface TableBookPorts {
   /** The shared scene as the books read it, or null while none is shown. */
   scene(): BookScene | null;
   readImage(path: string): Promise<VaultImage | null>;
+  /** How players are handed assets the store keeps for them; without it they fetch every asset from the GM. */
+  readonly stored?: AssetStoring | undefined;
   randomId(): string;
   /** Where players' edits of their tokens in the shared scene are written; null while no scene is shared. */
   tokenWrites(): ResourceWrites | null;
@@ -53,6 +57,7 @@ export interface TableBook {
 export function tableBook(ports: TableBookPorts): TableBook {
   const { app, ownership } = ports;
   const timers = companionTimers();
+  const storedQuests = ports.stored === undefined ? null : new StoredQuests(ports.stored, gatedQuestAsset);
   const share = new BookShare({
     send: (body, to) => ports.send(body, to),
     now: () => timers.now(),
@@ -64,13 +69,17 @@ export function tableBook(ports: TableBookPorts): TableBook {
     players: () => ownership.list(),
     ownerOf: (tokenId, token) => ownership.ownerOf(tokenId, token),
     readImage: (path) => ports.readImage(path),
+    stored: ports.stored,
     stat: (path) => {
       const file = app.vault.getFileByPath(normalizePath(path));
       return file === null ? null : { mtime: file.stat.mtime, size: file.stat.size };
     },
     worldMap: () => gatedWorldMap(),
     notice: (text) => showNotice(text),
-    quests: () => gatedQuests(),
+    quests: async () => {
+      const quests = await gatedQuests();
+      return storedQuests === null ? quests : storedQuests.of(quests);
+    },
     questAsset: (hash) => gatedQuestAsset(hash),
     editResource: (edit, answer) => {
       if (edit.kind === 'character') {

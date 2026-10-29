@@ -5,6 +5,8 @@ import type { QuestImages } from '../../../plugin/questImages';
 import { headingSection } from '../../../services/noteHeadings';
 import { pinNoteLink } from '../../../tools/pinNoteLink';
 import { questTextParts, type QuestTextAsset } from '../book/questTexts.ts';
+import { storedRefOf } from '../book/storedQuests.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
 
 /** What players read of a pin's note: the note's file, a title, and its text as Markdown. */
 export interface NoteReading {
@@ -55,12 +57,14 @@ function shownTitle(title: string): string {
 /**
  * A reading as players are sent it, as a quest's text is (`questTextParts`): its opening, the whole
  * text by hash where the opening is not all of it, and the vault images its text embeds, each read
- * from its bytes (`QuestImages`).
+ * from its bytes (`QuestImages`); each with the id the store keeps it under where `stored` does.
  */
-export async function foundHandout(reading: NoteReading, images: QuestImages): Promise<FoundHandout> {
+export async function foundHandout(reading: NoteReading, images: QuestImages, stored?: AssetStoring): Promise<FoundHandout> {
   const parts = await questTextParts(reading.body);
   const resolved = images.resolve(reading.path, parts.embeds);
-  const refs = await Promise.all(resolved.map((embed) => images.refOf(embed.file)));
+  const read = await Promise.all(resolved.map((embed) => images.refOf(embed.file)));
+  const refs = stored === undefined ? read : await Promise.all(read.map(async (ref, index) => (ref === null || ref === undefined ? ref : storedRefOf(stored, ref, { path: resolved[index]?.file.path ?? '' }, 'image'))));
+  const whole = parts.whole === null || stored === undefined ? parts.whole : { ...parts.whole, ref: await storedRefOf(stored, parts.whole.ref, { bytes: parts.whole.bytes }, 'text') };
   const shown: QuestImage[] = [];
   const paths = new Map<string, string>();
   resolved.forEach(({ target, width, height, file }, index) => {
@@ -71,8 +75,8 @@ export async function foundHandout(reading: NoteReading, images: QuestImages): P
   });
   const note: FoundNote = {
     title: shownTitle(reading.title), body: parts.opening,
-    ...(parts.whole !== null && { text: parts.whole.ref }),
+    ...(whole !== null && { text: whole.ref }),
     ...(shown.length > 0 && { images: shown }),
   };
-  return { note, text: parts.whole, images: paths };
+  return { note, text: whole, images: paths };
 }

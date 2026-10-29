@@ -13,6 +13,12 @@ export interface AccountPorts {
   readonly openUrl: (url: string) => void;
   /** Tells the GM something outside the dock (Obsidian's `Notice`). */
   readonly notify: (text: string) => void;
+  /** A sign-in finished and its token is kept. */
+  readonly signedIn?: () => void;
+  /** The token was forgotten (signed out here or by the server): what was kept with it goes too. */
+  readonly signedOut?: () => void;
+  /** Runs with the token before this device signs out, while it still counts (the shared copies removed, where the GM asked for it). */
+  readonly beforeSignOut?: () => Promise<void>;
 }
 
 /** The part of the account control the dock uses. */
@@ -89,6 +95,7 @@ export class AccountControl {
       }
       this.me = null;
       this.changed();
+      this.ports.signedIn?.();
       return this.refresh(true);
     }
     this.notice = end.kind === 'cancelled' ? null : end.kind;
@@ -107,6 +114,7 @@ export class AccountControl {
   /** Signs this device's session out at the account service and forgets the token. */
   async signOut(): Promise<void> {
     const token = this.token();
+    if (token !== null) await this.ports.beforeSignOut?.().catch(() => undefined);
     this.forget(null);
     if (token !== null) await signOutToken(this.ports.http, ACCOUNTS_ORIGIN, token);
   }
@@ -134,6 +142,7 @@ export class AccountControl {
 
   private forget(notice: SignedOutNotice): void {
     this.ports.tokens.clear();
+    this.ports.signedOut?.();
     this.me = null;
     this.notice = notice;
     this.changed();

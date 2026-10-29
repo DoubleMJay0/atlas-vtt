@@ -4,6 +4,7 @@ import { FogCoverageCache } from '../../fog/FogCoverageCache';
 import type { FogCoverage } from '../../fog/fogCoverage';
 import type { ViewState } from '../../types/viewState';
 import { ArtRefs } from './artRefs.ts';
+import type { AssetStoring } from './assets/assetUses.ts';
 import type { AtlasPlayerSettings } from './atlasLighting.ts';
 import type { MapLayerSource } from './atlasMapLayers.ts';
 import type { SceneState, SceneStore } from './atlasView.ts';
@@ -23,6 +24,8 @@ export interface MapLayerSharePorts extends PacerClock {
   mapLayers(): MapLayerSource | null;
   atlasSettings(): AtlasPlayerSettings;
   readImage(path: string): Promise<VaultImage | null>;
+  /** How players are handed assets the store keeps for them. */
+  stored?: AssetStoring | undefined;
   /** A new alias: 24 hex characters from the cryptographic source. */
   randomId(): string;
   /** The log entry that tells who found the pin `pinId` of the map `mapPath`, or null while nobody has. */
@@ -81,7 +84,7 @@ export class MapLayerShare {
     this.store = store;
     this.ports = ports;
     this.pacer = new Pacer(ports, MAP_LAYER_INTERVAL_MS, () => this.flush());
-    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update());
+    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update(), ports.stored);
     this.pins = new ReadablePins(() => ports.randomId());
     this.liquids = new SharedLiquids(() => ports.randomId());
     this.widgets = new WidgetShare(store, { ...ports, showWidgets: () => ports.atlasSettings().showWidgets });
@@ -115,6 +118,12 @@ export class MapLayerShare {
   resend(to?: string): void {
     for (const sent of this.last.values()) if (sent.scene === this.scene?.id) this.ports.send(sent.body, to);
     this.widgets.resend(to);
+  }
+
+  /** Reads every portrait again: its reference may go out another way now (without a stored id). */
+  refreshArt(): void {
+    this.art.clear();
+    this.update();
   }
 
   /** The vault path of a portrait the players' initiative list shows, by its hash. */

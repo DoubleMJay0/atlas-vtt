@@ -1,6 +1,8 @@
 import { IMAGE_MIME_TYPES, isSide, MAX_ASSET_BYTES, type AssetRef } from '../../protocol/index.ts';
 import { imageDimensions } from '../../../imageProcessing/imageDimensions';
 import { sha256Hex } from '../assetServe.ts';
+import { isVideoMapPath } from '../../../pixi/mapImage/video/videoMapFiles';
+import { ASSET_USES, type AssetStoring } from '../assets/assetUses.ts';
 import type { VaultImage } from '../TokenShare.ts';
 
 /** A vault file as it is now: when it was last written and how large it is. */
@@ -26,6 +28,8 @@ export interface MapImagePorts {
   readImage(path: string): Promise<VaultImage | null>;
   /** An image that was being read is known now. */
   read(): void;
+  /** How players are handed images the store keeps for them. */
+  readonly stored?: AssetStoring | undefined;
 }
 
 /**
@@ -92,7 +96,8 @@ export class MapImages {
       if (!IMAGE_MIME_TYPES.includes(image.mime)) return 'unreadable';
       const size = await imageDimensions(new Blob([image.bytes], { type: image.mime }));
       if (size === null || !isSide(size.width) || !isSide(size.height)) return 'unreadable';
-      return { image: { hash: await sha256Hex(image.bytes), size: image.bytes.length, mime: image.mime }, width: size.width, height: size.height };
+      const ref = this.ports.stored === undefined ? { hash: await sha256Hex(image.bytes), size: image.bytes.length, mime: image.mime } : await this.ports.stored.refOf(image.bytes, image.mime, ASSET_USES.image, isVideoMapPath(path) ? undefined : path);
+      return { image: ref, width: size.width, height: size.height };
     } catch {
       return 'unreadable';
     }

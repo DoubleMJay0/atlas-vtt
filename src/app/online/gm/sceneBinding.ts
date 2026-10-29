@@ -23,6 +23,7 @@ import { PresentedStore } from './presentedStore.ts';
 import { SceneShare } from './SceneShare.ts';
 import type { AtlasTab, TabBinding } from './sharedTab.ts';
 import type { VaultImage } from './TokenShare.ts';
+import type { AssetStoring } from './assets/assetUses.ts';
 import { showNotice } from '../../ui/notice';
 
 /** A shared view's scene and the GM's marks on it. */
@@ -45,6 +46,8 @@ export interface SceneBindingPorts {
   readImage(path: string): Promise<VaultImage | null>;
   /** An animated map's video as players may be sent it beside its poster. */
   readVideo(path: string): Promise<VaultImage | null>;
+  /** How players are handed assets the store keeps for them; without it they fetch every asset from the GM. */
+  readonly stored?: AssetStoring | undefined;
   /** Whether the binding is still the table's and its tab the same objects. */
   isLive(binding: SceneBinding): boolean;
   randomId(): string;
@@ -119,6 +122,7 @@ export function bindScene(ports: SceneBindingPorts, tab: AtlasTab, presented: Pr
     tokenRules: () => tokenRulesOf(shownRenderer()),
     readImage: (path) => ports.readImage(path),
     readVideo: (path) => ports.readVideo(path),
+    stored: ports.stored,
     scaleImage: scaleInWindow,
     send: (body, to) => live() && ports.send(body, to),
     sendLive: (body, key, to) => live() && ports.sendLive(body, key, to),

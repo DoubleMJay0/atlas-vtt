@@ -96,14 +96,15 @@ export class BookShare implements LootRecipientSource {
   constructor(ports: BookSharePorts, shelf: BookShelf) {
     this.ports = ports;
     this.shelf = shelf;
-    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update());
-    this.maps = new WorldMaps({ stat: (path) => ports.stat(path), readImage: (path) => ports.readImage(path), source: () => ports.worldMap(), read: () => this.update() });
+    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update(), ports.stored);
+    this.maps = new WorldMaps({ stat: (path) => ports.stat(path), readImage: (path) => ports.readImage(path), stored: ports.stored, source: () => ports.worldMap(), read: () => this.update() });
     this.owed = new OwedBooks(ports, (player) => this.sendBook(player));
     this.questList = new AskedAnswer(() => ports.quests(), NO_QUESTS, () => this.update());
     const panel = new SettledPanelWidth(() => ports.statblockPanelWidth?.(), () => ports.now());
     this.statblocks = new StatblockShare({
       read: (path) => ports.readStatblock(path), write: (path, patches) => ports.writeStatblock(path, patches), now: () => ports.now(),
       panelWidth: () => panel.get(),
+      stored: ports.stored,
       // What arrives once the table stopped is dropped: nothing more goes out.
       changed: (path) => this.whileRunning(() => this.passes.of(this.characters.playersOfNote(path))),
       answered: (player, asSent) => this.whileRunning(() => this.resendStatblock(player, asSent)),

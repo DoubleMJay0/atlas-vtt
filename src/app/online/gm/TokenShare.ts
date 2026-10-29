@@ -1,5 +1,6 @@
 import type { GmMessage, SharedToken, SnapGrid } from '../protocol/index.ts';
 import { ArtRefs } from './artRefs.ts';
+import type { AssetStoring } from './assets/assetUses.ts';
 import type { PlayerTokenSource, SceneStore } from './atlasView.ts';
 import type { ListedTokens } from './mineShare.ts';
 import type { SeatSource } from './seatSource.ts';
@@ -22,6 +23,8 @@ export interface TokenSharePorts {
   tokenSource(): PlayerTokenSource | null;
   /** The image at a vault path, or null when it is missing or of a type players cannot be sent. */
   readImage(path: string): Promise<VaultImage | null>;
+  /** How players are handed assets the store keeps for them; without it they fetch every asset from the GM. */
+  stored?: AssetStoring | undefined;
   send(body: GmMessage, to?: string): void;
   /** Whether players see token names (Atlas's nameplate setting for the player view). */
   showNames(): boolean;
@@ -93,7 +96,7 @@ export class TokenShare {
     this.listed = listed;
     this.list = new SequencedList('tokens', ports);
     this.aliases = ports.aliases ?? new Map<string, string>();
-    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update());
+    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update(), ports.stored);
   }
 
   /** The shared scene the tokens belong to; null sends none. A new scene reads its artwork afresh. */
@@ -163,6 +166,12 @@ export class TokenShare {
   /** The scene of the last list players were sent, or null while none is. */
   get listedScene(): string | null {
     return this.last?.scene === this.scene ? this.scene : null;
+  }
+
+  /** Reads every artwork again: its reference may go out another way now (without a stored id). */
+  refreshArt(): void {
+    this.art.clear();
+    this.update();
   }
 
   /** The vault path of artwork the players' current picture shows, by its hash. */

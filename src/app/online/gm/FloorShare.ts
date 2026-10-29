@@ -23,6 +23,11 @@ import { TOKEN_POLL_MS, TokenShare } from './TokenShare.ts';
 import { levelObjects } from '../../levels/levelObjects';
 import { levelBackground } from '../../levels/levelEdits';
 import { viewedLevelId } from '../../levels/sceneLevels';
+import { isVideoMapPath, videoMimeType } from '../../pixi/mapImage/video/videoMapFiles';
+import { t } from '../../i18n';
+
+/** The type of an animated map's video by its path, or null for a path that is no video map. */
+const videoMimeOf = (path: string): string | null => (isVideoMapPath(path) ? videoMimeType(path) : null);
 
 export interface FloorSharePorts extends SceneSharePorts {
   /** Which floor of its map this scene is, for players to tell; none for a map of one floor. */
@@ -172,6 +177,14 @@ export class FloorShare {
     this.assets.forget(player);
   }
 
+  /** Assets players were handed may no longer be stored: the map and the art are read again, and go out as they can be sent now. */
+  refreshAssets(): void {
+    this.key = null;
+    this.tokens.refreshArt();
+    this.layers.refreshArt();
+    void this.update(this.store.getState());
+  }
+
   /** Withdraws the scene: players see none until a scene is shared again. */
   withdraw(): void {
     this.key = null;
@@ -257,15 +270,15 @@ export class FloorShare {
     this.tokens.setScene(null);
     this.inputs.setScene(null);
     this.layers.setScene(null);
-    const built = await readFloorImages((path) => this.ports.readImage(path), background);
+    const built = await readFloorImages((path) => this.ports.readImage(path), background, this.ports.stored);
     if (this.key !== key) return;
-    if (built === null) {
-      this.ports.notice('Atlas Online cannot send this scene\'s map image.');
+    if (typeof built === 'string') {
+      this.ports.notice(built === 'too-large' ? t('online.assetsMapTooLarge') : 'Atlas Online cannot send this scene\'s map image.');
       this.publish(null, null, null);
       return;
     }
     const readVideo = this.ports.readVideo;
-    const video = built.map === null || readVideo === undefined ? null : await readFloorVideo(readVideo, background);
+    const video = built.map === null || readVideo === undefined ? null : await readFloorVideo(readVideo, background, this.ports.stored, videoMimeOf);
     if (this.key !== key) return;
     const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }), ...placement, ...(video !== null && { video: video.ref }) };
     this.publish(scene, { map: built.map, size: built.size && floorWorldSize(state, level, built.size) }, video);

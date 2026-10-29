@@ -9,6 +9,7 @@ import type { CheckedEdit, EditInputs } from './statblockChecks.ts';
 import type { StatblockWriteOutcome } from './statblockGate.ts';
 import type { DrawnStatblock } from './statblockSheet.ts';
 import { NO_STATBLOCK, StatblockSheets } from './statblockSheets.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
 
 export interface StatblockSharePorts {
   read(path: string): Promise<ResolvedStatblock | null>;
@@ -16,6 +17,8 @@ export interface StatblockSharePorts {
   now(): number;
   /** The width of the GM's statblock panel, which the players' cards are laid out at; unset, a default. */
   panelWidth?(): number | undefined;
+  /** How players are handed the whole texts a statblock names. */
+  readonly stored?: AssetStoring | undefined;
   /** The note at `path` was read or its statblock drawn anew, or an edit of it is under way: the books of its characters are looked at again. */
   changed(path: string): void;
   /**

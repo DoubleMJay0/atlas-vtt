@@ -9,6 +9,7 @@ import { MoveRate } from '../moveCheck.ts';
 import type { MapLayerShare } from '../MapLayerShare.ts';
 import type { VaultImage } from '../TokenShare.ts';
 import { FoundTexts } from './FoundTexts.ts';
+import type { AssetStoring } from '../assets/assetUses.ts';
 
 /** Pins a player may open: a burst of `FIND_BURST`, then one a second. */
 export const FIND_BURST = 5;
@@ -22,6 +23,8 @@ export interface FoundSharePorts {
   nameOf(player: string): string | null;
   readImage(path: string): Promise<VaultImage | null>;
   scaleImage?: ScaleImage;
+  /** How players are handed a found note's text and images the store keeps for them. */
+  readonly stored?: AssetStoring | undefined;
   /** The shared scene's map layers, while one is shared; null otherwise. */
   layers(): Pick<MapLayerShare, 'readablePin' | 'update'> | null;
 }
@@ -42,7 +45,7 @@ export class FoundShare {
   private readonly answers: AssetAnswers;
 
   constructor(private readonly log: TableLog, private readonly ports: FoundSharePorts) {
-    this.texts = new FoundTexts(ports.app, log);
+    this.texts = new FoundTexts(ports.app, log, ports.stored);
     this.answers = new AssetAnswers(
       { send: (body, to) => ports.send(body, to), now: () => ports.now(), readImage: (path) => ports.readImage(path), scaleImage: ports.scaleImage },
       bookPicture((hash, player) => this.assetOf(hash, player)),

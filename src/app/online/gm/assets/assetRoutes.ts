@@ -1,0 +1,94 @@
+import { isAssetId, isRecord, type AssetKind } from '../../protocol/index.ts';
+
+/**
+ * The asset store's routes on the relay, and what their answers mean: the one place that knows their
+ * shapes. Every route is on the relay's own origin, with the account's token in `Authorization`.
+ */
+export const ASSET_ROUTES = {
+  offer: '/api/assets/offer',
+  usage: '/api/assets/usage',
+  salt: '/api/assets/salt',
+  all: '/api/assets',
+  whole: (id: string): string => `/api/assets/${id}`,
+  parts: (id: string): string => `/api/assets/${id}/parts`,
+  part: (id: string, part: number): string => `/api/assets/${id}/parts/${part}`,
+  complete: (id: string): string => `/api/assets/${id}/complete`,
+} as const;
+
+/** An asset as an offer names it. */
+export interface OfferedAsset {
+  readonly id: string;
+  readonly kind: AssetKind;
+  readonly size: number;
+}
+
+/** Why the store will not take an asset: the account's quota, its kind or size, or an account that may not store now. */
+export type OfferRefusal = 'quota' | 'too-large' | 'kind' | 'restricted';
+const REFUSALS: readonly OfferRefusal[] = ['quota', 'too-large', 'kind', 'restricted'];
+
+/** The store's answer for one asset. */
+export type OfferAnswer =
+  | { readonly answer: 'have' }
+  | { readonly answer: 'need'; readonly upload: 'single' | 'multipart'; readonly partBytes: number }
+  | { readonly answer: 'refused'; readonly reason: OfferRefusal };
+
+function answerOf(value: unknown): OfferAnswer | null {
+  if (!isRecord(value)) return null;
+  if (value.answer === 'have') return { answer: 'have' };
+  if (value.answer === 'need' && (value.upload === 'single' || value.upload === 'multipart')) {
+    const partBytes = typeof value.partBytes === 'number' && Number.isSafeInteger(value.partBytes) && value.partBytes > 0 ? value.partBytes : PART_BYTES;
+    return { answer: 'need', upload: value.upload, partBytes };
+  }
+  if (value.answer === 'refused') {
+    const reason = REFUSALS.find((known) => known === value.reason);
+    return reason === undefined ? null : { answer: 'refused', reason };
+  }
+  return null;
+}
+
+/** The answers of an offer by id; an answer this version cannot read is left out (the asset is offered again later). */
+export function offerAnswers(json: unknown): Map<string, OfferAnswer> {
+  const answers = new Map<string, OfferAnswer>();
+  const assets = isRecord(json) ? json.assets : undefined;
+  if (!isRecord(assets)) return answers;
+  for (const [id, value] of Object.entries(assets)) {
+    const answer = answerOf(value);
+    if (isAssetId(id) && answer !== null) answers.set(id, answer);
+  }
+  return answers;
+}
+
+/** What a multipart upload under way holds: its id, and the parts (numbered from 1, as the store numbers them) that arrived. */
+export interface PartsSession {
+  readonly uploadId: string;
+  readonly arrived: ReadonlySet<number>;
+}
+
+export function partsSessionOf(json: unknown): PartsSession | null {
+  if (!isRecord(json) || typeof json.uploadId !== 'string' || json.uploadId === '') return null;
+  const arrived = Array.isArray(json.arrived) ? json.arrived.filter((part): part is number => Number.isSafeInteger(part) && (part as number) > 0) : [];
+  return { uploadId: json.uploadId, arrived: new Set(arrived) };
+}
+
+/** What the GM's shared copies hold: bytes of the quota, and when the oldest leaves (ms since the epoch), null while none is kept. */
+export interface StoreUsage {
+  readonly bytes: number;
+  readonly quota: number;
+  readonly oldestLeavesAt: number | null;
+}
+
+const isBytes = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+export function usageOf(json: unknown): StoreUsage | null {
+  if (!isRecord(json) || !isBytes(json.bytes) || !isBytes(json.quota)) return null;
+  return { bytes: json.bytes, quota: json.quota, oldestLeavesAt: isBytes(json.oldestLeavesAt) ? json.oldestLeavesAt : null };
+}
+
+/** Parts of a multipart upload: 16 MiB, the last shorter. */
+export const PART_BYTES = 16 * 1024 * 1024;
+
+/** The sizes of the parts of an object of `size` bytes, in parts of `partBytes`. */
+export function partSizes(size: number, partBytes: number = PART_BYTES): number[] {
+  const count = Math.max(1, Math.ceil(size / partBytes));
+  return Array.from({ length: count }, (_, index) => (index < count - 1 ? partBytes : size - partBytes * (count - 1)));
+}

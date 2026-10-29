@@ -3,6 +3,7 @@ import type { AccountApi } from '../account/AccountControl.ts';
 import type { CampaignChoices } from '../campaignChoices.ts';
 import type { CompanionFeedback } from '../companionReports.ts';
 import type { OnlineApi } from './panelModel.ts';
+import type { SharedCopies } from '../assets/sharedCopies.ts';
 
 /** What every control shares: online play, and what the plugin knows besides. */
 export interface DockDeps {
@@ -17,6 +18,8 @@ export interface DockDeps {
   imageSrc(path: string): string;
   /** Where the panel's feedback goes, and the switch for error reports. */
   readonly feedback: CompanionFeedback;
+  /** The copies the store keeps for the players: the panel's line, and the way to remove them. */
+  readonly copies?: Pick<SharedCopies, 'current' | 'refresh' | 'removeAll' | 'onChange'>;
   /** The control opened on a view, where the table's log may stand open: the log makes way. */
   opened?(leaf: WorkspaceLeaf): void;
 }

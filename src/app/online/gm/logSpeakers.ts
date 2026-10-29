@@ -1,6 +1,7 @@
 import { GM_AUTHOR, MAX_ASSET_BYTES, MAX_SPEAKER_NAME, shownLine, type AssetRef } from '../protocol/index.ts';
 import type { TokenEntity } from '../../types';
 import { sha256Hex } from './assetServe.ts';
+import { ASSET_USES, type AssetStoring } from './assets/assetUses.ts';
 import { tokenLabel } from './atlasView.ts';
 import type { SpokenAs } from './log/TableLog.ts';
 import { ringColour } from './scenePicture.ts';
@@ -28,7 +29,7 @@ const MAX_ART_PATH = 1000;
 export class LogSpeakers {
   private readonly art = new Map<string, Promise<AssetRef | null>>();
 
-  constructor(private readonly readImage: (path: string) => Promise<VaultImage | null>) {}
+  constructor(private readonly readImage: (path: string) => Promise<VaultImage | null>, private readonly stored?: AssetStoring) {}
 
   async speaker(who: string, key: string, scene: SpeakerScene): Promise<SpokenAs | null> {
     const tokenId = who === GM_AUTHOR ? (Object.hasOwn(scene.tokens, key) ? key : undefined) : scene.listedToken(key);
@@ -55,6 +56,7 @@ export class LogSpeakers {
     if (ref === undefined) {
       ref = this.readImage(path).then(async (image) => {
         if (image === null || image.bytes.length > MAX_ASSET_BYTES) return null;
+        if (this.stored !== undefined) return this.stored.refOf(image.bytes, image.mime, ASSET_USES.art, path);
         return { hash: await sha256Hex(image.bytes), size: image.bytes.length, mime: image.mime };
       }).catch(() => null);
       this.art.set(path, ref);

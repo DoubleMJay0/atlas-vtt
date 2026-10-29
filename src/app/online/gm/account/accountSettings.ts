@@ -1,4 +1,4 @@
-import type { AtlasSettingSection } from '../../../settings/settingSections';
+import type { AtlasSettingRow, AtlasSettingSection } from '../../../settings/settingSections';
 import type { AccountControl } from './AccountControl.ts';
 import { accessText, accountText, planText, UNREACHABLE_TEXT, type AccountView } from './accountView.ts';
 
@@ -18,9 +18,10 @@ const signedIn = (view: AccountView): boolean => view.kind === 'no-access' || vi
 
 /**
  * The settings' Account section: who is signed in, what the account may host or why it may not, and
- * the way to the account page, where invite keys are redeemed and the account's data is exported and deleted.
+ * the way to the account page, where invite keys are redeemed and the account's data is exported and deleted;
+ * `extra` rows follow.
  */
-export function accountSections(account: AccountControl): AtlasSettingSection[] {
+export function accountSections(account: AccountControl, extra: readonly AtlasSettingRow[] = []): AtlasSettingSection[] {
   return [{
     heading: 'Online account',
     rows: [{
@@ -43,6 +44,6 @@ export function accountSections(account: AccountControl): AtlasSettingSection[] 
         draw();
         return account.onChange(draw);
       },
-    }],
+    }, ...extra],
   }];
 }
