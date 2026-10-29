@@ -29,7 +29,7 @@ export function forestFloor(floor: DungeonFloor, seed: number, tags: ReadonlySet
   const field = waterField(water.rivers, lakes);
   const meadow = riverMeadow(floor, water, seed);
   // The roads take the meadows as open ground; their own ground joins them.
-  const { roads, rivers } = forestRoads({ ...floor, openGround: meadow }, water, seed, tags, below);
+  const { roads, rivers, entrances } = forestRoads({ ...floor, openGround: meadow }, water, seed, tags, below);
   const road = roadField(roads);
   const openGround = [...new Map([...meadow, ...roadGround(floor, roads)].map((c) => [`${c.x},${c.y}`, c])).values()];
   return {
@@ -39,8 +39,9 @@ export function forestFloor(floor: DungeonFloor, seed: number, tags: ReadonlySet
     ...(lakes.length > 0 && { lakes }),
     ...(roads.length > 0 && { roads }),
     ...(openGround.length > 0 && { openGround }),
-    // A wood's ground is level: a cave's steps between chambers are open ground.
-    doors: floor.doors.map((door) => (door.kind === 'steps' ? { ...door, kind: 'opening' as const } : door)),
+    // A wood's ground is level: a cave's steps between chambers are open ground. An entrance no road leads through is
+    // none: the woods close over it, so its scene is walled there and its note names no way out.
+    doors: floor.doors.filter((door) => door.from !== null || entrances.has(door)).map((door) => (door.kind === 'steps' ? { ...door, kind: 'opening' as const } : door)),
     props: fewBoulders(floor.props.filter((prop) => FOREST_PROPS.has(prop.kind) && field.distance(prop.x, prop.y) > RIVER_CLEAR && road.distance(prop.x, prop.y) > ROAD_CLEAR)),
     terrain: renumbered(floor.terrain.filter((piece) => piece.opening !== undefined || FOREST_TERRAIN.has(piece.kind))),
     columns: [],

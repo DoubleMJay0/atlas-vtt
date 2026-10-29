@@ -4,7 +4,9 @@ import type { CellPoint, DungeonModel, DungeonRoad } from '../../../../src/app/d
 import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
 import { pointInPolygon } from '../../../../src/app/dungeons/render/geometry';
 import { roadBand } from '../../../../src/app/dungeons/render/forest/roads';
-import { waterField } from '../../../../src/app/dungeons/forest/riverShape';
+import { dungeonWalls } from '../../../../src/app/dungeons/scene/toWalls';
+import { roomFacts } from '../../../../src/app/dungeons/scene/roomFacts';
+import { dungeonStyle } from '../../../../src/app/dungeons/styleCatalog';
 import type { DungeonTag } from '../../../../src/app/dungeons/tags';
 import { MASS_DEPTH } from '../../../../src/app/dungeons/render/forest/woodsMass';
 import { visibleDungeon, type VisibleDungeon } from '../../../../src/app/dungeons/render/visibleDungeon';
@@ -14,16 +16,14 @@ type Vec = CellPoint;
 
 /** Tag sets a GM asks a forest for: sizes, water, life, the layout's shapes. */
 const TAG_SETS: readonly DungeonTag[][] = [[], ['small'], ['medium'], ['large'], ['wet'], ['flooded'], ['dry'], ['inhabited'], ['overgrown'], ['large', 'wet'], ['winding'], ['spacious', 'flooded'], ['chaotic'], ['string'], ['deep'], ['crumbling', 'wet']];
-/** How many forests: every tag set in turn, one to three floors (caves below widen the map). `VITE_FOREST_ROAD_FORESTS=960` sweeps wider. */
+/** How many forests: every tag set in turn, one to three floors (caves below widen the map). `VITE_FOREST_ROAD_FORESTS=960` sweeps wider, `VITE_FOREST_ROAD_SEED` from other seeds. */
 const COUNT = Number(import.meta.env.VITE_FOREST_ROAD_FORESTS ?? 240);
+const FIRST_SEED = Number(import.meta.env.VITE_FOREST_ROAD_SEED ?? 5000);
 const CASES: { seed: number; tags: DungeonTag[]; floors: number }[] = Array.from({ length: COUNT }, (_, k) => ({
-  seed: 5000 + k,
+  seed: FIRST_SEED + k,
   tags: TAG_SETS[k % TAG_SETS.length]!,
   floors: 1 + (Math.floor(k / TAG_SETS.length) % 3),
 }));
-/** How near a river's or lake's water an end of a road may never lie unless it runs on (off the map or into another road), in cells. */
-const BANK = 3;
-
 interface Forest {
   model: DungeonModel;
   shown: VisibleDungeon;
@@ -38,6 +38,13 @@ const forests: Forest[] = CASES.map(({ seed, tags, floors }) => {
   const { x, y } = layout.originCell;
   return { model, shown: visibleDungeon(model, DEFAULT_VIEW, 0), roads: model.floors[0]!.roads ?? [], picture: { minX: x, minY: y, maxX: x + layout.cellsWide, maxY: y + layout.cellsHigh } };
 });
+
+function segmentDistance(p: Vec, a: Vec, b: Vec): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(p.x - a.x - dx * t, p.y - a.y - dy * t);
+}
 
 function nearestOnLine(line: readonly Vec[], p: Vec): { distance: number; index: number } {
   let best = { distance: Infinity, index: 0 };
@@ -70,11 +77,10 @@ function inRings(rings: readonly (readonly Vec[])[], p: Vec): boolean {
   return rings.filter((ring) => pointInPolygon(ring, p.x, p.y)).length % 2 === 1;
 }
 
-type EndKind = 'off the map' | 'merged' | 'at a destination';
+type EndKind = 'off the map' | 'merged';
 
 /** What a road's end does, or null where it ends in none of the ways a road may end. */
-function endOf(forest: Forest, road: DungeonRoad, atStart: boolean): EndKind | null {
-  const { roads, picture } = forest;
+function endOf({ roads, picture }: Forest, road: DungeonRoad, atStart: boolean): EndKind | null {
   const end = atStart ? road.points[0]! : road.points[road.points.length - 1]!;
   // Its worn ground (round at its end) lies wholly beyond the picture.
   if (outside(picture, end) > road.width / 2 + 1) return 'off the map';
@@ -87,19 +93,12 @@ function endOf(forest: Forest, road: DungeonRoad, atStart: boolean): EndKind | n
     const theirs = heading(other.points, on.index);
     return Math.abs(own.x * theirs.x + own.y * theirs.y) > Math.cos((35 * Math.PI) / 180) ? 'merged' : null;
   }
-  // Anywhere else only where something stands at its very end that it leads to, and never at a river's bank: a road
-  // reaching water crosses it or follows it. An entrance of an open clearing is no destination: nothing is drawn there.
-  const floor = forest.model.floors[0]!;
-  if (waterField(floor.rivers, floor.lakes).distance(end.x, end.y) < BANK) return null;
-  const near = (x: number, y: number): boolean => Math.hypot(x - end.x, y - end.y) < 1.5;
-  const drawn = floor.props.some((p) => near(p.x, p.y))
-    || floor.stairs.some((st) => end.x > st.x - 1 && end.x < st.x + st.w + 1 && end.y > st.y - 1 && end.y < st.y + st.h + 1)
-    || floor.terrain.some((piece) => piece.opening !== undefined && piece.cells.some((c) => near(c.x + 0.5, c.y + 0.5)));
-  return drawn ? 'at a destination' : null;
+  // Nowhere else: a forest's roads have no dead ends (nothing at an entrance or a river's bank to end at).
+  return null;
 }
 
 describe('a Forest’s roads', { timeout: 60000 }, () => {
-  it('end off the map, merge into another road along it, or end at something drawn they lead to, never at an entrance or a river’s bank', () => {
+  it('run off the map or merge into another road along it at both ends, never stopping at an entrance or a river’s bank', () => {
     const kinds = new Map<string, number>();
     const wrong: string[] = [];
     forests.forEach((forest, k) => {
@@ -136,13 +135,34 @@ describe('a Forest’s roads', { timeout: 60000 }, () => {
     }
   });
 
-  it('lead through most entrances, each a way in from the map’s edge', () => {
-    let entrances = 0;
-    let led = 0;
-    for (const { shown, roads } of forests) {
-      entrances += shown.ways.length;
-      led += shown.ways.filter(({ mouth }) => roads.some((road) => road.points.some((p) => Math.hypot(p.x - mouth.at.x, p.y - mouth.at.y) < 2.5))).length;
-    }
-    expect(led / entrances).toBeGreaterThan(0.9);
+  it('lead through every entrance a forest keeps, and it keeps at least one: the others are walled and named nowhere', () => {
+    const wrong: string[] = [];
+    forests.forEach(({ model, shown, roads }, k) => {
+      const at = JSON.stringify(CASES[k]);
+      const mouths = shown.ways.map((way) => way.mouth.at);
+      if (!mouths.length) wrong.push(`${at}: no way in`);
+      for (const m of mouths) if (!roads.some((road) => road.points.some((p) => Math.hypot(p.x - m.x, p.y - m.y) < 2.5))) wrong.push(`${at}: an entrance no road leads through`);
+      // The scene's walls are closed rings but at the entrances it keeps: every loose end of a wall lies at one.
+      const px = 10;
+      const layout = mapLayout(model, px, DEFAULT_VIEW);
+      const cell = (p: Vec): Vec => ({ x: p.x / px + layout.originCell.x, y: p.y / px + layout.originCell.y });
+      const degree = new Map<string, { p: Vec; n: number }>();
+      const walls = Object.values(dungeonWalls(model, dungeonStyle('parchment'), DEFAULT_VIEW, layout, 0).walls);
+      for (const wall of walls) {
+        for (const end of [wall.p1, wall.p2]) {
+          const key = `${Math.round(end.x * 100)},${Math.round(end.y * 100)}`;
+          degree.set(key, { p: cell(end), n: (degree.get(key)?.n ?? 0) + 1 });
+        }
+      }
+      const loose = [...degree.values()].filter((end) => end.n === 1).map((end) => end.p);
+      for (const end of loose) if (!mouths.some((m) => Math.hypot(m.x - end.x, m.y - end.y) < 1.5)) wrong.push(`${at}: a wall open at ${end.x.toFixed(1)},${end.y.toFixed(1)}, at no entrance`);
+      // And an entrance it keeps is open: walls end beside it, or none stands near it (a road's ground carries the floor on through it).
+      const open = (m: Vec): boolean => loose.some((end) => Math.hypot(m.x - end.x, m.y - end.y) < 1.5) || !walls.some((wall) => segmentDistance(m, cell(wall.p1), cell(wall.p2)) < 0.4);
+      for (const m of mouths) if (!open(m)) wrong.push(`${at}: an entrance walled`);
+      // The note names a way out for each entrance kept and no other.
+      const named = shown.rooms.map((room) => roomFacts(shown, room, DEFAULT_VIEW)).join(' ').split('opens to the outside').length - 1;
+      if (named !== mouths.length) wrong.push(`${at}: the note names ${named} ways out of ${mouths.length}`);
+    });
+    expect(wrong).toEqual([]);
   });
 });

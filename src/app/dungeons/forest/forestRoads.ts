@@ -1,14 +1,15 @@
 import { cellKey, doorCells, floorCellsOf } from '../geometry';
-import type { CellPoint, DungeonFloor, DungeonRiver, DungeonRiverBridge, DungeonRoad } from '../model';
+import type { CellPoint, DungeonDoor, DungeonFloor, DungeonRiver, DungeonRiverBridge, DungeonRoad } from '../model';
 import { pointInPolygon, type Bounds } from '../render/geometry';
 import { floorStream, type Rng } from '../rng';
-import { fractalNoise } from '../water/noise';
 import type { ForestWater } from './forestRivers';
 import { lineField, type LineField } from './lineField';
 import { wayCentre, wayOutsOf, wayPoint, type WayOut } from '../render/cave/mouth/wayOut';
 import { cheapestRoute, type CostGrid } from './roadRoute';
 import { roadFrame } from './roadFrame';
 import { mergedInto } from './roadMerge';
+import { APPROACH, hairpin, roadLine } from './roadLine';
+import { deckUnder } from './sharedBridges';
 import { bends, normalAt, waterField } from './riverShape';
 
 /**
@@ -39,23 +40,24 @@ const EDGE_PLANS = 6;
 /** What a cell within `BESIDE` cells of a laid road costs a path more, as a factor. */
 const BESIDE = 2.5;
 const BESIDE_COST = 6;
-/** Two bridges stand at least this far apart, in cells. */
+/** Two bridges stand at least this far apart, in cells; on a forest's last way in, as close as their straight approaches allow. */
 const BRIDGES_APART = 8;
+const BRIDGES_APART_RELAXED = 5;
 /** How many ways are tried for each road. */
 const TRIES = 4;
-/** A bridge reaches this far onto the banks on either side, and its approach runs straight this far beyond, in cells. */
+/** A bridge reaches this far onto the banks on either side, in cells. */
 const BRIDGE_REACH = 0.6;
-const APPROACH = 1.4;
-/** How many of the route's cells before and after a bridge's approach the route gives way to it. */
-const LEAD_IN = 2;
-/** How far a road's line wanders either way of the route, in cells. */
-const WANDER = 0.35;
 
-/** A Forest floor's roads, and its rivers with the bridges the roads cross them on. */
+/** A Forest floor's roads, its rivers with the bridges the roads cross them on, and the entrances a road leads through. */
 export interface ForestRoads {
   roads: DungeonRoad[];
   rivers: DungeonRiver[];
+  /** The entrances a road or footpath leads through: the only ways in a forest has. Any other is closed by the woods (`forestFloor`). */
+  entrances: ReadonlySet<DungeonDoor>;
 }
+
+/** A road passing this near an entrance's mouth leads through it, in cells. */
+const LEADS_THROUGH = 2.5;
 
 /** `below`: the floors under the entry floor, which share its map and so widen its picture. */
 export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: number, tags: ReadonlySet<string>, below: readonly DungeonFloor[] = []): ForestRoads {
@@ -63,7 +65,7 @@ export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: numbe
   // The trails out of the entrances, as the drawing lays them (`visibleDungeon`: the entry floor's seed is the dungeon's).
   const ways = wayOutsOf({ ...floor, forest: true }, floor.doors, seed);
   // A map with ways in always has a road through them: a trail must lead somewhere.
-  if (floor.rooms.length === 0 || rng() > (ways.length || tags.has('inhabited') ? 1 : 0.8)) return { roads: [], rivers: water.rivers };
+  if (floor.rooms.length === 0 || rng() > (ways.length || tags.has('inhabited') ? 1 : 0.8)) return { roads: [], rivers: water.rivers, entrances: new Set() };
   const ground = groundOf(floor, water, ways, roadFrame(floor, ways, below));
   const kinds = { cart: tags.has('inhabited') || rng() < 0.7 };
   const width = kinds.cart ? 1.3 + rng() * 0.4 : 0.65 + rng() * 0.2;
@@ -77,33 +79,79 @@ export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: numbe
     sides = plan.sides;
     if (main) break;
   }
+  const served = new Set<WayOut>();
+  const lay = (points: Vec[], road: Omit<DungeonRoad, 'points'>): DungeonRoad => {
+    const laid = { points, ...road };
+    roads.push(laid);
+    for (const way of ways) if (points.some((p) => Math.hypot(p.x - way.mouth.at.x, p.y - way.mouth.at.y) < LEADS_THROUGH)) served.add(way);
+    return laid;
+  };
   if (main) {
-    const mainRoad: DungeonRoad = { points: main, width, ruts: kinds.cart };
-    roads.push(mainRoad);
-    // Paths laid after the road meet it, never run beside it.
-    const beside = besideRoad(ground, main);
-    // An entrance the road does not pass gets a footpath through it: in from the map's edge along its trail, through the
+    const mainRoad = lay(main, { width, ruts: kinds.cart });
+    // Paths laid after a road meet it, never run beside it, nor beside one another.
+    let beside = besideRoad(ground, main);
+    // An entrance no road passes yet gets a footpath through it: in from the map's edge along its trail, through the
     // entrance and on into the road, else on to another edge. An entrance is no place a path can end: nothing stands
     // there but the clearing's edge, and a path that stopped there (or ran only from there to the road) led nowhere.
-    // An entrance no path can lead through keeps its trail.
-    const missed = ways.filter((way) => !main.some((p) => Math.hypot(p.x - way.mouth.at.x, p.y - way.mouth.at.y) < 2.5));
-    for (const way of missed) {
-      const { edge, side } = edgeBeyond(ground, way);
-      const legs = [[edge], [mouthCell(way)]];
-      const onward = [2, 1, 3].map((turn) => (side + turn) % 4);
-      let path = layRoad(beside, water, legs, 0.7, bridges, rng, mainRoad);
-      for (const far of onward) path ??= layRoad(beside, water, [...legs, [edgeCell(ground, far, rng)]], 0.7, bridges, rng);
-      if (path) roads.push({ points: path, width: 0.7, ruts: false });
+    // An entrance a path already passes needs none of its own; one no path can lead through is closed (`forestFloor`).
+    let missed = false;
+    for (const way of ways) {
+      if (served.has(way)) continue;
+      missed = true;
+      const path = throughEntrance(beside, water, way, 0.7, bridges, rng, mainRoad);
+      if (!path) continue;
+      lay(path, { width: 0.7, ruts: false });
+      beside = besideRoad(beside, path);
     }
     // A footpath off the road to an edge the road does not reach, now and then.
-    if (!missed.length && rng() < 0.35) {
+    if (!missed && rng() < 0.35) {
       const free = [0, 1, 2, 3].filter((side) => !sides.includes(side));
-      const branch = layRoad(beside, water, [[edgeCell(ground, free[Math.floor(rng() * free.length)]!, rng)]], 0.7, bridges, rng, mainRoad);
-      if (branch) roads.push({ points: branch, width: 0.7, ruts: false });
+      const branch = layRoad(beside, water, [[edgeCell(ground, free[Math.floor(rng() * free.length)]!, rng)]], 0.7, bridges, rng, { joins: mainRoad });
+      if (branch) lay(branch, { width: 0.7, ruts: false });
+    }
+  }
+  // A forest always keeps a way in: where no road could be laid through an entrance by the rules, the first that
+  // can be laid at all leads through one, over a third bridge, a bridge sooner after another or round a tight bend
+  // if it must, and from any edge. Where even that finds none (no sweep has met one), the first entrance stays open.
+  if (ways.length && !served.size) {
+    for (const way of ways) {
+      const joins = roads[0];
+      const road = joins ? { width: 0.7, ruts: false } : { width, ruts: kinds.cart };
+      const path = throughEntrance(ground, water, way, road.width, bridges, rng, joins, true);
+      if (!path) continue;
+      lay(path, road);
+      break;
     }
   }
   const rivers = water.rivers.map((river, k) => ({ ...river, bridges: bridges.filter((b) => b.river === k).map((b) => b.bridge) }));
-  return { roads, rivers };
+  const kept = served.size || !ways.length ? [...served] : [ways[0]!];
+  return { roads, rivers, entrances: new Set(kept.map((way) => way.mouth.door)) };
+}
+
+/**
+ * A footpath through an entrance: in from the edge beyond its trail and on into `joins`, else on through the clearings
+ * to another edge (the opposite first). A `relaxed` one (a forest's last way in) may also come in from any other edge,
+ * from the point of it nearest the entrance.
+ */
+function throughEntrance(ground: Ground, water: ForestWater, way: WayOut, width: number, bridges: Bridged[], rng: Rng, joins: DungeonRoad | undefined, relaxed = false): Vec[] | null {
+  const beyond = edgeBeyond(ground, way);
+  const mouth = mouthCell(way);
+  const starts = [beyond, ...(relaxed ? [0, 1, 2, 3].filter((side) => side !== beyond.side).map((side) => ({ edge: edgeNear(ground, side, mouth), side })) : [])];
+  for (const { edge, side } of starts) {
+    const legs = [[edge], [mouth]];
+    const through = way.mouth.at;
+    let path = joins ? layRoad(ground, water, legs, width, bridges, rng, { joins, relaxed, through }) : null;
+    for (const turn of [2, 1, 3]) path ??= layRoad(ground, water, [...legs, [edgeCell(ground, (side + turn) % 4, rng)]], width, bridges, rng, { relaxed, through });
+    if (path) return path;
+  }
+  return null;
+}
+
+/** The cell of an edge of the ground nearest `p`. */
+function edgeNear({ bounds }: Ground, side: number, p: Vec): Vec {
+  const x = Math.min(bounds.maxX - 1, Math.max(bounds.minX, p.x));
+  const y = Math.min(bounds.maxY - 1, Math.max(bounds.minY, p.y));
+  return side === 0 ? { x: bounds.minX, y } : side === 1 ? { x, y: bounds.minY } : side === 2 ? { x: bounds.maxX - 1, y } : { x, y: bounds.maxY - 1 };
 }
 
 /** A bridge and the river it spans. */
@@ -213,31 +261,43 @@ function edgeCell({ bounds }: Ground, side: number, rng: Rng): Vec {
 
 /**
  * A road through `legs`, or, for a branch, through them and on into the road `joins`, merging
- * with it (`mergedInto`); its crossings bridged, unless they would make more than `MOST_BRIDGES` on the map.
+ * with it (`mergedInto`); its crossings bridged, unless they would make more than `MOST_BRIDGES` on the map
+ * or it bends back on itself, both of which a `relaxed` road (a forest's last way in) may, as it may bridge
+ * a river again sooner after the last bridge. A road that must lead
+ * through an entrance (`through`, the mouth) is refused where its line, smoothed and bridged, passes it by.
  * The route and its bridges follow from the ground alone, so they are worked out once; only the
  * line's wandering differs from try to try (each search of the route takes tens of milliseconds
  * on a large map, and the same refused route was searched four times over).
  */
-function layRoad(ground: Ground, water: ForestWater, legs: readonly Vec[][], width: number, bridges: Bridged[], rng: Rng, joins?: DungeonRoad): Vec[] | null {
+function layRoad(ground: Ground, water: ForestWater, legs: readonly Vec[][], width: number, bridges: Bridged[], rng: Rng, { joins, relaxed = false, through }: { joins?: DungeonRoad; relaxed?: boolean; through?: Vec } = {}): Vec[] | null {
   const field = waterField(water.rivers, water.lakes);
   const cells = joins ? branchRoute(ground, legs, joins.points) : throughRoute(ground, legs);
   if (!cells) return null;
   const crossings = crossingsOf(cells, field);
-  if (bridges.length + crossings.length > MOST_BRIDGES) return null;
-  const found = crossings.map((run) => bridgeFor(water.rivers, run, cells, width, field));
+  // A crossing over a road's bridge takes that bridge; only the others are built.
+  const shared = crossings.flatMap((run) => deckUnder(bridges, cells, run) ?? []);
+  const fresh = crossings.filter((run) => !deckUnder(bridges, cells, run));
+  if (!relaxed && bridges.length + fresh.length > MOST_BRIDGES) return null;
+  const found = fresh.map((run) => bridgeFor(water.rivers, run, cells, width, field));
   if (found.some((p) => p === null)) return null;
-  const placed = found as Bridged[];
+  const built = found as Bridged[];
+  const placed = [...new Set(shared), ...built];
   // Never a bridge hard by another: a road that would cross back over the river it just crossed takes another way.
-  const all = [...bridges, ...placed].map((b) => b.bridge.at);
-  if (all.some((a, i) => all.slice(i + 1).some((b) => Math.hypot(a.x - b.x, a.y - b.y) < BRIDGES_APART))) return null;
+  const all = [...bridges, ...built].map((b) => b.bridge.at);
+  const apart = relaxed ? BRIDGES_APART_RELAXED : BRIDGES_APART;
+  if (all.some((a, i) => all.slice(i + 1).some((b) => Math.hypot(a.x - b.x, a.y - b.y) < apart))) return null;
   const onBridge = (p: Vec): boolean => placed.some(({ bridge }) => Math.hypot(p.x - bridge.at.x, p.y - bridge.at.y) <= bridge.length / 2 + 0.2);
   for (let attempt = 0; attempt < (joins ? TRIES : 1); attempt++) {
     const laid = roadLine(cells, placed, rng, field);
+    // The line runs the whole route: bridges whose straight approaches overlap would cut it short.
+    const last = cells[cells.length - 1]!;
+    if (Math.hypot(laid[laid.length - 1]!.x - last.x - 0.5, laid[laid.length - 1]!.y - last.y - 0.5) > 1) return null;
     const line = joins ? mergedInto(laid, joins.points, joins.width) : laid;
     // Its curves must keep out of the water everywhere but on its bridges.
     if (line.some((p) => field.distance(p.x, p.y) < 0 && !onBridge(p))) continue;
-    if (hairpin(line)) continue;
-    bridges.push(...placed);
+    if (!relaxed && hairpin(line)) continue;
+    if (through && !line.some((p) => Math.hypot(p.x - through.x, p.y - through.y) < LEADS_THROUGH)) continue;
+    bridges.push(...built);
     return line;
   }
   return null;
@@ -282,25 +342,6 @@ function branchRoute(ground: Ground, legs: readonly Vec[][], joins: readonly Vec
   const way = cheapestRoute(ground.grid, from, (x, y) => joins.some((p) => Math.abs(p.x - x - 0.5) < 1 && Math.abs(p.y - y - 0.5) < 1), to);
   const cells = way ? [...leg, ...way.slice(1)] : null;
   return cells && cells.length >= SHORTEST_BRANCH ? cells : null;
-}
-
-/** How far apart, in a road's points, two headings are compared, and how far a road may turn back over that stretch: no road doubles back on itself in a few cells (a road into an entrance and out again beside itself). */
-const HAIRPIN_SPAN = 20;
-const HAIRPIN_TURN = -0.35;
-
-function hairpin(line: readonly Vec[]): boolean {
-  const heading = (i: number): Vec => {
-    const a = line[Math.max(0, i - 2)]!;
-    const b = line[Math.min(line.length - 1, i + 2)]!;
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
-  };
-  for (let i = 0; i + HAIRPIN_SPAN < line.length; i += 2) {
-    const a = heading(i);
-    const b = heading(i + HAIRPIN_SPAN);
-    if (a.x * b.x + a.y * b.y < HAIRPIN_TURN) return true;
-  }
-  return false;
 }
 
 /** The ground with the cells beside a laid road dearer, so a path laid after it meets it rather than running along it. */
@@ -369,85 +410,6 @@ function bridgeFor(rivers: readonly DungeonRiver[], [a, b]: [number, number], ce
     if (dry) return { river, bridge: { at: p, along, length, breadth: width + 0.15 } };
   }
   return null;
-}
-
-/**
- * The road's line: the route's cells smoothed into gentle curves, wandering a little, and straight
- * over each bridge and its approaches, so it meets the bridge square.
- */
-function roadLine(cells: readonly Vec[], bridged: readonly Bridged[], rng: Rng, field: { distance(x: number, y: number): number }): Vec[] {
-  const route = cells.map((c) => ({ x: c.x + 0.5, y: c.y + 0.5 }));
-  // Each bridge cuts the route: the route up to it, the straight way over it, the route from it.
-  const fixed = bridged.map(({ bridge }) => {
-    const reach = bridge.length / 2 + APPROACH;
-    const start = { x: bridge.at.x - bridge.along.x * reach, y: bridge.at.y - bridge.along.y * reach };
-    const end = { x: bridge.at.x + bridge.along.x * reach, y: bridge.at.y + bridge.along.y * reach };
-    // The route gives way a couple of cells short of each approach, so the curve leads into it rather than doubling back.
-    return { start, end, from: Math.max(0, nearestIndex(route, start) - LEAD_IN), to: Math.min(route.length - 1, nearestIndex(route, end) + LEAD_IN) };
-  }).sort((a, b) => a.from - b.from);
-  const noise = fractalNoise(rng, 2, 0.5, 9);
-  // It never wanders towards water it passes near.
-  const wander = (x: number, y: number): number => noise(x, y) * Math.max(0, Math.min(1, field.distance(x, y) - 1));
-  const line: Vec[] = [];
-  let from = 0;
-  let begin = route[0]!;
-  for (const piece of fixed) {
-    line.push(...wandering(smooth([begin, ...route.slice(from + 1, Math.max(from + 1, piece.from)), piece.start]), wander));
-    line.push(...straight(piece.start, piece.end));
-    from = piece.to;
-    begin = piece.end;
-  }
-  // On to the route's end, past the map's edge, however near it the last bridge stands.
-  line.push(...wandering(smooth([begin, ...route.slice(Math.min(from + 1, route.length - 1))]), wander));
-  return line;
-}
-
-function nearestIndex(line: readonly Vec[], p: Vec): number {
-  let best = 0;
-  line.forEach((q, i) => { if (Math.hypot(q.x - p.x, q.y - p.y) < Math.hypot(line[best]!.x - p.x, line[best]!.y - p.y)) best = i; });
-  return best;
-}
-
-/** A route's corners cut until it runs in curves (Chaikin, ends kept), every quarter cell. */
-function smooth(points: readonly Vec[]): Vec[] {
-  let line = points.filter((p, i) => i === 0 || i === points.length - 1 || i % 2 === 0);
-  for (let round = 0; round < 4; round++) {
-    const next: Vec[] = [line[0]!];
-    for (let i = 0; i + 1 < line.length; i++) {
-      const a = line[i]!;
-      const b = line[i + 1]!;
-      next.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
-    }
-    next.push(line[line.length - 1]!);
-    line = next;
-  }
-  return everyQuarter(line);
-}
-
-/** Points about a quarter cell apart along a line. */
-function everyQuarter(line: readonly Vec[]): Vec[] {
-  const out: Vec[] = [line[0]!];
-  for (let i = 0; i + 1 < line.length; i++) {
-    const a = line[i]!;
-    const b = line[i + 1]!;
-    const n = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 0.25));
-    for (let k = 1; k <= n; k++) out.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
-  }
-  return out;
-}
-
-function straight(a: Vec, b: Vec): Vec[] {
-  return everyQuarter([a, b]).slice(1);
-}
-
-/** The line pushed a little either way of itself by slow noise, never at its ends, where it meets a bridge or the map's edge. */
-function wandering(line: readonly Vec[], wander: (x: number, y: number) => number): Vec[] {
-  return line.map((p, i) => {
-    const hold = Math.min(1, i / 8, (line.length - 1 - i) / 8);
-    const n = normalAt(line, i);
-    const off = wander(p.x, p.y) * 2 * WANDER * hold;
-    return { x: p.x + n.x * off, y: p.y + n.y * off };
-  });
 }
 
 /** The cells a road's ground covers: within its half width and a verge of its line, inside the rooms' extent (so the map keeps its size). */
