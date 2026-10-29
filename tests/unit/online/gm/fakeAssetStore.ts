@@ -12,6 +12,29 @@ import { settled } from './settled.ts';
 
 export const SALT = Uint8Array.from({ length: 32 }, (_, n) => n);
 
+const SIGNING = Symbol.for('atlas-online:hmac');
+
+/** HMACs under way (ids being worked out), watched as `settled` watches hashes, so `idle` waits for them however loaded the machine is. */
+const signing: Set<Promise<unknown>> = (() => {
+  const shared = globalThis as { [SIGNING]?: Set<Promise<unknown>> };
+  const known = shared[SIGNING];
+  if (known !== undefined) return known;
+  const running = new Set<Promise<unknown>>();
+  shared[SIGNING] = running;
+  const subtle = globalThis.crypto.subtle;
+  const watch = <T>(work: Promise<T>): Promise<T> => {
+    running.add(work);
+    const done = (): void => void running.delete(work);
+    work.then(done, done);
+    return work;
+  };
+  const sign = subtle.sign.bind(subtle);
+  const importKey = subtle.importKey.bind(subtle) as (...args: unknown[]) => Promise<CryptoKey>;
+  subtle.sign = (...args: Parameters<SubtleCrypto['sign']>): Promise<ArrayBuffer> => watch(sign(...args));
+  (subtle as { importKey: unknown }).importKey = (...args: unknown[]): Promise<CryptoKey> => watch(importKey(...args));
+  return running;
+})();
+
 const ok = <T>(value: T): StoreResult<T> => ({ ok: true, value });
 const failed = <T>(trouble: StoreTrouble): StoreResult<T> => ({ ok: false, trouble });
 
@@ -114,6 +137,7 @@ export function publisherHarness(): PublisherHarness {
     // Hashes, HMACs and the store's answers each take turns of their own.
     for (let turn = 0; turn < 40; turn += 1) {
       await settled();
+      if (signing.size > 0) await Promise.allSettled([...signing]);
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   };
