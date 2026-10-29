@@ -1,7 +1,11 @@
 /** Requests in flight while no player is connected: the uplink is the GM's alone. */
 export const IN_FLIGHT_ALONE = 4;
-/** Requests in flight while players are connected and their marks flow over the same uplink. */
-export const IN_FLIGHT_WITH_PLAYERS = 2;
+/**
+ * Requests in flight while players are connected and their marks flow over the same uplink. One flow's
+ * TCP window already keeps a home uplink busy; a second only doubles the queue the table's live frames
+ * wait behind, and the keep-alive (every 30 s) sees that too late to help (`uploadPacing.test.ts`).
+ */
+export const IN_FLIGHT_WITH_PLAYERS = 1;
 /** Requests in flight while the socket's keep-alive takes more than twice its resting time: the uplink is full. */
 export const IN_FLIGHT_SLOW = 1;
 /** How far back the resting round trip looks: the least of what the keep-alive took in that time. */
@@ -10,9 +14,9 @@ export const RESTING_WINDOW_MS = 5 * 60 * 1000;
 export const MAX_RETRY_MS = 60_000;
 
 /**
- * How many upload requests may be in flight: four while no player is connected, two while players are
- * (their marks and the table's frames share the GM's uplink), one while the keep-alive's round trip is
- * more than twice its resting value, the sign of an uplink the uploads fill.
+ * How many upload requests may be in flight: four while no player is connected, one while players are
+ * (their marks and the table's frames share the GM's uplink), and one while the keep-alive's round trip
+ * is more than twice its resting value, the sign of an uplink the uploads fill.
  */
 export function inFlight(players: number, latencyMs: number | null, restingMs: number | null): number {
   if (players === 0) return IN_FLIGHT_ALONE;

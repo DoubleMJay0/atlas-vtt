@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BookQuest } from '../../../../src/app/online/protocol/index.ts';
 import { ASSET_USES } from '../../../../src/app/online/gm/assets/assetUses.ts';
-import { Slots } from '../../../../src/app/online/gm/assets/uploadPace.ts';
+import { RestingLatency, Slots } from '../../../../src/app/online/gm/assets/uploadPace.ts';
 import { SharedCopies } from '../../../../src/app/online/gm/assets/sharedCopies.ts';
 import { StoredQuests } from '../../../../src/app/online/gm/book/storedQuests.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
@@ -166,17 +166,15 @@ describe('the connection\'s pace', () => {
     expect(granted).toEqual([3]);
   });
 
-  it('learns the resting round trip anew after a reconnect', async () => {
-    const store = publisherHarness();
-    store.client.hold = true;
-    store.connection = { players: 1, latencyMs: 40 };
-    await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.art);
-    store.publisher.welcome();
-    // A slower socket now: its round trip is the resting one, so two requests still go.
-    store.connection = { players: 1, latencyMs: 90 };
-    for (let n = 2; n < 5; n += 1) await store.publisher.storing.refOf(bytesOf(100, n), 'image/png', ASSET_USES.art);
-    await store.advance(300);
-    expect(store.client.inFlight).toBe(2);
+  it('learns the resting round trip anew after a reconnect', () => {
+    const resting = new RestingLatency();
+    resting.sample(40, 0);
+    resting.sample(90, 1000);
+    expect(resting.value()).toBe(40);
+    // A new socket (the publisher's `welcome`): what the old one measured counts no more.
+    resting.reset();
+    resting.sample(90, 2000);
+    expect(resting.value()).toBe(90);
   });
 });
 

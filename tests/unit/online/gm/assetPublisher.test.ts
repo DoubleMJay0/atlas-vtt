@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assetIdOf } from '../../../../src/app/online/gm/assets/assetIds.ts';
 import { ASSET_USES, ASSET_RANKS } from '../../../../src/app/online/gm/assets/assetUses.ts';
+import { inFlight } from '../../../../src/app/online/gm/assets/uploadPace.ts';
 import { sha256Hex } from '../../../../src/app/online/gm/assetServe.ts';
 import { bytesOf, publisherHarness, SALT, sharesHeard } from './fakeAssetStore.ts';
 
@@ -58,7 +59,7 @@ describe('the asset publisher', () => {
     }
   });
 
-  it('keeps four requests in flight while nobody plays, two while players are connected, one while the uplink is full', async () => {
+  it('keeps four requests in flight while nobody plays, one while players are connected', async () => {
     const alone = publisherHarness();
     alone.client.hold = true;
     for (let n = 0; n < 6; n += 1) await alone.publisher.storing.refOf(bytesOf(100, n + 10), 'image/png', ASSET_USES.art);
@@ -70,18 +71,15 @@ describe('the asset publisher', () => {
     playing.connection = { players: 3, latencyMs: 30 };
     for (let n = 0; n < 6; n += 1) await playing.publisher.storing.refOf(bytesOf(100, n + 20), 'image/png', ASSET_USES.art);
     await playing.advance(200);
-    expect(playing.client.inFlight).toBe(2);
-    // The keep-alive takes more than twice its resting time: the uploads fill the uplink.
-    playing.connection = { players: 3, latencyMs: 70 };
-    playing.client.release();
-    await playing.advance(1000);
     expect(playing.client.inFlight).toBe(1);
-    expect(playing.client.maxInFlight).toBe(2);
-    // Back at rest, two again.
-    playing.connection = { players: 3, latencyMs: 31 };
+    // Players gone: four again.
+    playing.connection = { players: 0, latencyMs: 30 };
     playing.client.release();
     await playing.advance(1000);
-    expect(playing.client.inFlight).toBe(2);
+    expect(playing.client.inFlight).toBe(4);
+    expect(inFlight(3, 70, 30)).toBe(1);
+    expect(inFlight(3, 31, 30)).toBe(1);
+    expect(inFlight(0, 70, 30)).toBe(4);
   });
 
   it('resumes a multipart upload where it stopped: parts that arrived never go again', async () => {
