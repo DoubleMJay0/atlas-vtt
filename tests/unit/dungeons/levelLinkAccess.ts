@@ -3,7 +3,7 @@ import { bottomUp, stackOf, stairEnd } from '../../../src/app/dungeons/floors/fl
 import { approachCells, spotRect, type StairEnd } from '../../../src/app/dungeons/floors/stairSpots';
 import { generateDungeon } from '../../../src/app/dungeons/generate';
 import { cellsOf, floorCellsOf } from '../../../src/app/dungeons/geometry';
-import type { CellPoint, DungeonModel, DungeonStair } from '../../../src/app/dungeons/model';
+import type { CellPoint, DungeonModel, DungeonRequest, DungeonStair } from '../../../src/app/dungeons/model';
 import { dungeonScene } from '../../../src/app/dungeons/scene/toScene';
 import { DEFAULT_PX_PER_CELL, mapLayout } from '../../../src/app/dungeons/render/layoutSize';
 import { DEFAULT_VIEW } from '../../../src/app/dungeons/style';
@@ -21,7 +21,9 @@ import { wallList } from '../../../src/app/vision/wallList';
  * Every level link of generated multi-floor dungeons, walked as a player's token is moved on the
  * online player page and checked by the GM (`landing`): its centre stops at the scene's walls of its
  * level as `movementWalls` makes them (sealing bridges and tall objects' outlines included) and at
- * the closed sides of walked stairs (`stairSides`). Doors count as opened, as players open them.
+ * the closed sides of walked stairs (`stairSides`). Doors count as opened, as players open them;
+ * secret doors stay shut (a cave's crawl is rock as drawn): a way is never placed in a secret wing
+ * (`holdsStairs`), so one reached only through a secret door is a way players cannot find, and fails.
  * On both floors of every link: each cell of the row it is entered from is walkable, reaches the
  * level's main walkable area, steps onto the stairs across their ground end (never blocked by their
  * own sides) and walks on along them to the row where the token changes level.
@@ -54,9 +56,9 @@ function sceneOf(model: DungeonModel): Scene {
   return { model, levels, levelIds, links: levelLinkList(parts.scene.levelLinks), walls: parts.scene.walls ?? {}, image, origin: layout.originCell, size: { w: layout.cellsWide, h: layout.cellsHigh } };
 }
 
-/** The walls a token on `level` stops at, every door open, with the closed sides of that level's stairs. */
+/** The walls a token on `level` stops at, every door open but the secret ones, with the closed sides of that level's stairs. */
 function levelWalls(scene: Scene, level: string): MoveWalls {
-  const own = Object.fromEntries(Object.entries(scene.walls).filter(([, wall]) => onLevel(wall, level, scene.levels)).map(([id, wall]) => [id, wall.type === 'wall' ? wall : { ...wall, closed: false }]));
+  const own = Object.fromEntries(Object.entries(scene.walls).filter(([, wall]) => onLevel(wall, level, scene.levels)).map(([id, wall]) => [id, wall.type === 'door' ? { ...wall, closed: false } : wall]));
   const walls = movementWalls(wallList(own), scene.image);
   const sides = moveWallsOf(flightSides(scene.links, level, scene.levels).map(([a, b]) => [a.x, a.y, b.x, b.y] as const), walls.gap);
   return withStairSides(walls, sides)!;
@@ -109,9 +111,9 @@ class Walkable {
       }
       count += 1;
     }
-    // The main area holds most of the floor's rooms.
+    // The main area holds most of the floor's open rooms: a secret wing, behind its secret door, is no part of it.
     const votes = new Map<number, number>();
-    for (const room of scene.model.floors[floor]!.rooms) for (const c of floorCellsOf(room)) {
+    for (const room of scene.model.floors[floor]!.rooms.filter((r) => r.wing === 'regular')) for (const c of floorCellsOf(room)) {
       const id = this.at(c);
       votes.set(id, (votes.get(id) ?? 0) + 1);
     }
@@ -176,33 +178,74 @@ function endProblems(scene: Scene, walk: Walkable, level: string, stair: Dungeon
   return problems;
 }
 
+/** Each link has its two ends on two floors, and the links join every floor to every other (a house's back stair may pass a floor). */
+function linkCountProblems(model: DungeonModel): string[] {
+  const ends = new Map<number, number[]>();
+  model.floors.forEach((floor, index) => {
+    for (const stair of floor.stairs) ends.set(stair.link, [...(ends.get(stair.link) ?? []), index]);
+  });
+  const problems = [...ends].filter(([, floors]) => floors.length !== 2 || floors[0] === floors[1]).map(([link, floors]) => `seed ${model.seed}: link ${link} ends on floors ${floors.join(', ')}`);
+  const reached = new Set([0]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [a, b] of [...ends.values()]) {
+      if (a === undefined || b === undefined || reached.has(a) === reached.has(b)) continue;
+      reached.add(a).add(b);
+      grew = true;
+    }
+  }
+  if (reached.size !== model.floors.length) problems.push(`seed ${model.seed}: the links join ${reached.size} of ${model.floors.length} floors`);
+  return problems;
+}
+
 function linkProblems(model: DungeonModel): string[] {
   const scene = sceneOf(model);
   const stack = stackOf(model);
-  return model.floors.flatMap((floor, index) => {
+  const access = model.floors.flatMap((floor, index) => {
     if (floor.stairs.length === 0) return [];
     const level = scene.levelIds[index]!;
     const walk = new Walkable(scene, levelWalls(scene, level), index);
     return floor.stairs.flatMap((stair) => endProblems(scene, walk, level, stair, stairEnd(stack, index, stair.to)).map((problem) => `seed ${model.seed}, floor ${index}, link ${stair.link}: ${problem}`));
   });
+  return [...linkCountProblems(model), ...access];
 }
 
 /** Seeds per floor count; `VITE_LEVEL_LINK_SEEDS` runs more. */
 const SEEDS = Number(import.meta.env.VITE_LEVEL_LINK_SEEDS ?? 30);
+/** Water levels sampled besides the tags' own (unset). */
+const WATER_LEVELS: readonly (number | undefined)[] = [undefined, 0, 0.3, 0.6, 1];
+
+/** The `k`th request of a sweep: tags, boss room and water level each turning on its own cycle. */
+function sweepRequest(theme: ThemeId, floors: number, k: number): DungeonRequest {
+  const water = WATER_LEVELS[k % WATER_LEVELS.length];
+  return {
+    seed: 104_729 * (k + 1) + floors,
+    tags: [...TAG_SETS[k % TAG_SETS.length]!],
+    floors,
+    theme,
+    ...(k % 3 === 2 && { bossRoom: false }),
+    ...(water !== undefined && { waterLevel: water }),
+  };
+}
+
+/** Dungeons whose links were once unreached (found in review), kept as fixed cases. */
+const REGRESSIONS: readonly DungeonRequest[] = [
+  { seed: 3_814_193, theme: 'forest', tags: ['wet', 'chaotic'], floors: 4 },
+  { seed: 14_968_014, theme: 'cavern', tags: ['medium'], floors: 2, bossRoom: false, waterLevel: 1 },
+];
 
 export function describeLevelLinkAccess(theme: ThemeId): void {
   describe(`every level link of a ${theme} is reached across its front`, () => {
+    for (const request of REGRESSIONS.filter((entry) => entry.theme === theme)) {
+      it(`in the dungeon of seed ${request.seed} once found unreached`, () => {
+        expect(linkProblems(generateDungeon(request))).toEqual([]);
+      });
+    }
     for (const floors of [2, 3, 4]) {
       it(`on both floors it joins, over ${SEEDS} dungeons of ${floors} floors`, () => {
         const problems: string[] = [];
-        let ends = 0;
-        for (let k = 0; k < SEEDS; k++) {
-          const model = generateDungeon({ seed: 104_729 * (k + 1) + floors, tags: [...TAG_SETS[k % TAG_SETS.length]!], floors, theme });
-          ends += model.floors.reduce((sum, floor) => sum + floor.stairs.length, 0);
-          problems.push(...linkProblems(model));
-        }
+        for (let k = 0; k < SEEDS; k++) problems.push(...linkProblems(generateDungeon(sweepRequest(theme, floors, k))));
         expect(problems).toEqual([]);
-        expect(ends).toBeGreaterThanOrEqual(SEEDS * (floors - 1) * 2);
       }, 600_000);
     }
   });

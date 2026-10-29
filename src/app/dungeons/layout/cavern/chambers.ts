@@ -152,19 +152,25 @@ function joinRound(grid: CaveGrid, room: DungeonRoom, kept: ReadonlySet<string>,
   return { joined, whole };
 }
 
+/** What a chamber grows from, and whether all of it could be joined into one piece. */
+export interface ChamberSeeds {
+  seeds: CellPoint[];
+  whole: boolean;
+}
+
 /**
  * What a chamber must keep, joined into one piece round its stairwells (`joinRound`): its core,
  * its kept cells, the lane in it and, for the boss, the arena's platform.
  */
-export function chamberSeeds(grid: CaveGrid, room: DungeonRoom, lane: ReadonlySet<string>): CellPoint[] {
+export function chamberSeeds(grid: CaveGrid, room: DungeonRoom, lane: ReadonlySet<string>): ChamberSeeds {
   const r = floorRect(room);
   // The core is kept already (`reserveCores`), with the rest the room needs.
   const seeds = new Set<string>(grid.required(room.id));
   for (const k of lane) if (inRect(r, unkey(k).x, unkey(k).y)) seeds.add(k);
   if (room.boss) for (const c of arenaSeeds(room)) if (mayTake(grid, room, c)) seeds.add(key(c));
-  const { joined } = joinRound(grid, room, seeds, grid.stairCells);
+  const { joined, whole } = joinRound(grid, room, seeds, grid.stairCells);
   for (const k of seeds) joined.add(k);
-  return [...joined].map(unkey).sort((a, b) => a.y - b.y || a.x - b.x);
+  return { seeds: [...joined].map(unkey).sort((a, b) => a.y - b.y || a.x - b.x), whole };
 }
 
 /**

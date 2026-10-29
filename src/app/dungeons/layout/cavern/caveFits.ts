@@ -29,11 +29,15 @@ function laidGrid(floor: CaveFloorPlan, from: LaneEnd, to: LaneEnd, index: numbe
   return reserveCores(grid, floor.rooms) ? grid : null;
 }
 
-export function caveFits(floor: CaveFloorPlan, from: LaneEnd, to: LaneEnd, index: number): boolean {
-  const grid = laidGrid(floor, from, to, index);
-  if (!grid) return false;
+/** Whether every chamber of the floor that holds a stairwell joins what it keeps round its stairwells on `grid` (`stairsJoinRound`). */
+export function stairsJoin(grid: CaveGrid, floor: CaveFloorPlan): boolean {
   const holders = new Set(floor.stairs.flatMap((spot) => chamberOf(floor.rooms, spot) ?? []));
   return [...holders].every((room) => stairsJoinRound(grid, room));
+}
+
+export function caveFits(floor: CaveFloorPlan, from: LaneEnd, to: LaneEnd, index: number): boolean {
+  const grid = laidGrid(floor, from, to, index);
+  return grid !== null && stairsJoin(grid, floor);
 }
 
 /**
@@ -48,7 +52,8 @@ export function furtherStairFits(floor: CaveFloorPlan, index: number, end: Stair
   return (spot) => {
     if (!clear(spot)) return false;
     const room = chamberOf(floor.rooms, spot);
-    if (!grid || !room) return true;
+    // A floor whose own main path or cores do not fit takes no further way: nothing could be checked.
+    if (!grid || !room) return false;
     return stairsJoinRound(grid, room, { cells: keysOf(cellsOf(spotRect(spot))), row: keysOf(approachCells(spot, end)) });
   };
 }

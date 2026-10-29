@@ -157,6 +157,8 @@ function nextFloor(seed: number, params: DungeonParams, earlier: FloorShape, ind
 interface NextFloor {
   layout: CompactLayout;
   sound: boolean;
+  /** Keeps the rules between floors (`BuiltFloor.linked`). */
+  linked: boolean;
   /** The stairwell's end on the floor before, and on this one. */
   from: DungeonStair;
   landing: DungeonStair;
@@ -174,7 +176,7 @@ function nextAcross(seed: number, params: DungeonParams, earlier: PlannedFloor, 
     if (!onward) break;
     const [from, landing] = stairPair(onward.spot, index - 1, link);
     const built = nextFloor(seed, params, { ...earlier, stairs: [...earlier.stairs, from] }, index, last, landing, boss, stack, passOver);
-    const next = built && { layout: built.layout, sound: built.sound, from, landing };
+    const next = built && { layout: built.layout, sound: built.sound, linked: built.linked, from, landing };
     if (next?.sound) return next;
     first ??= next;
   }
@@ -225,8 +227,9 @@ export function planFloors(seed: number, params: DungeonParams, count: number, b
     const last = index === count - 1;
     const next = nextAcross(seed, params, earlier, index, last, boss, stack, link++, index === 1 && fromEntrance, passOver.get(index) ?? 0);
     if (!next) break;
-    if (!next.sound && isStorey(stack, index) && regrown < MOST_REGROWN) {
-      // A storey that cannot keep every rule on the floor below has that floor grown anew, and then the one under it.
+    if (!next.sound && (isStorey(stack, index) || (params.cave !== undefined && !next.linked)) && regrown < MOST_REGROWN) {
+      // A storey that cannot keep every rule on the floor below has that floor grown anew, and then the one under it;
+      // so has a cave floor that breaks the rules between floors (a way whose row its chamber cannot join round it, `caveFits`).
       regrown += 1;
       const fails = (failsAt.get(index) ?? 0) + 1;
       failsAt.set(index, fails);
