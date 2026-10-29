@@ -8,7 +8,7 @@ export const MAX_MAP_SIDE = 16_383;
 /** Largest number of pixels a map image may have. */
 export const MAX_MAP_PIXELS = 144_000_000;
 /** Whole cells of paper around the floors: room for the hatching, its strokes and the exits. */
-const MAP_MARGIN_CELLS = 2;
+export const MAP_MARGIN_CELLS = 2;
 /**
  * A scene's map is drawn at this many pixels per cell (less where `SCENE_MAP_PIXELS` demands it):
  * the top of the 70–150 px a cell VTTs recommend for map art (Owlbear Rodeo). The map keeps its own

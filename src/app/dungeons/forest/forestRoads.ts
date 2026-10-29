@@ -1,12 +1,14 @@
 import { cellKey, doorCells, floorCellsOf } from '../geometry';
 import type { CellPoint, DungeonFloor, DungeonRiver, DungeonRiverBridge, DungeonRoad } from '../model';
-import { pointInPolygon } from '../render/geometry';
+import { pointInPolygon, type Bounds } from '../render/geometry';
 import { floorStream, type Rng } from '../rng';
 import { fractalNoise } from '../water/noise';
 import type { ForestWater } from './forestRivers';
 import { lineField, type LineField } from './lineField';
 import { wayCentre, wayOutsOf, wayPoint, type WayOut } from '../render/cave/mouth/wayOut';
 import { cheapestRoute, type CostGrid } from './roadRoute';
+import { roadFrame } from './roadFrame';
+import { mergedInto } from './roadMerge';
 import { bends, normalAt, waterField } from './riverShape';
 
 /**
@@ -23,8 +25,6 @@ import { bends, normalAt, waterField } from './riverShape';
 
 type Vec = CellPoint;
 
-/** How far beyond the rooms' extent a road begins and ends: past the map's margin, so it runs off the map. */
-const BEYOND = 5;
 /** What crossing a cell costs: an entrance's trail (a road keeps to it where water does not turn it aside), open ground, woods, the woods beyond the rooms' extent (a road only passes there to leave the map, never runs along its edge), the bank beside water (a road keeps a little off it), a pool, a river's water (bridged where crossed), a lake. */
 const COST = { trail: 0.4, open: 1, woods: 2.6, margin: 6, bank: 4, pool: 100, river: 90, lake: Infinity } as const;
 /** How near the water a cell's middle lies to hold water (any of it, so a brook between two cells' middles is crossed too) and to count as its bank, in cells: a road keeps far enough off that its curves never dip into a river it runs beside. */
@@ -59,13 +59,14 @@ export interface ForestRoads {
   rivers: DungeonRiver[];
 }
 
-export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: number, tags: ReadonlySet<string>): ForestRoads {
+/** `below`: the floors under the entry floor, which share its map and so widen its picture. */
+export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: number, tags: ReadonlySet<string>, below: readonly DungeonFloor[] = []): ForestRoads {
   const rng = floorStream(seed, 'water', 0, 'roads');
   // The trails out of the entrances, as the drawing lays them (`visibleDungeon`: the entry floor's seed is the dungeon's).
   const ways = wayOutsOf({ ...floor, forest: true }, floor.doors, seed);
   // A map with ways in always has a road through them: a trail must lead somewhere.
   if (floor.rooms.length === 0 || rng() > (ways.length || tags.has('inhabited') ? 1 : 0.8)) return { roads: [], rivers: water.rivers };
-  const ground = groundOf(floor, water, ways);
+  const ground = groundOf(floor, water, ways, roadFrame(floor, ways, below));
   const kinds = { cart: tags.has('inhabited') || rng() < 0.7 };
   const width = kinds.cart ? 1.3 + rng() * 0.4 : 0.65 + rng() * 0.2;
   const bridges: Bridged[] = [];
@@ -79,7 +80,8 @@ export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: numbe
     if (main) break;
   }
   if (main) {
-    roads.push({ points: main, width, ruts: kinds.cart });
+    const mainRoad: DungeonRoad = { points: main, width, ruts: kinds.cart };
+    roads.push(mainRoad);
     // Paths laid after the road meet it, never run beside it.
     const beside = besideRoad(ground, main);
     // An entrance the road does not pass gets a footpath of its own, from the map's edge along its trail on to the road.
@@ -90,13 +92,14 @@ export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: numbe
       const { edge } = edgeBeyond(ground, way);
       const sharesEdge = main.some((p) => Math.hypot(p.x - edge.x - 0.5, p.y - edge.y - 0.5) < SHARED_EDGE);
       const legs = sharesEdge ? [[mouthCell(way)]] : [[edge], [mouthCell(way)]];
-      const path = layRoad(beside, water, legs, 0.7, bridges, rng, main) ?? layRoad(beside, water, legs, 0.7, bridges, rng);
+      // A path from the entrance alone is nothing without the road it was to join.
+      const path = layRoad(beside, water, legs, 0.7, bridges, rng, mainRoad) ?? (legs.length > 1 ? layRoad(beside, water, legs, 0.7, bridges, rng) : null);
       if (path) roads.push({ points: path, width: 0.7, ruts: false });
     }
     // A footpath off the road to an edge the road does not reach, now and then.
     if (!missed.length && rng() < 0.35) {
       const free = [0, 1, 2, 3].filter((side) => !sides.includes(side));
-      const branch = layRoad(beside, water, [[edgeCell(ground, free[Math.floor(rng() * free.length)]!, rng)]], 0.7, bridges, rng, main);
+      const branch = layRoad(beside, water, [[edgeCell(ground, free[Math.floor(rng() * free.length)]!, rng)]], 0.7, bridges, rng, mainRoad);
       if (branch) roads.push({ points: branch, width: 0.7, ruts: false });
     }
   }
@@ -115,13 +118,10 @@ interface Ground {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
-/** What crossing each cell costs, over the rooms' extent and `BEYOND` round it. */
-function groundOf(floor: DungeonFloor, { rivers, lakes }: ForestWater, ways: readonly WayOut[]): Ground {
+/** What crossing each cell costs, over the cells of `frame` (`roadFrame`: past the map's picture all round). */
+function groundOf(floor: DungeonFloor, { rivers, lakes }: ForestWater, ways: readonly WayOut[], frame: Bounds): Ground {
   const inner = { minX: Math.min(...floor.rooms.map((r) => r.x)), minY: Math.min(...floor.rooms.map((r) => r.y)), maxX: Math.max(...floor.rooms.map((r) => r.x + r.w)), maxY: Math.max(...floor.rooms.map((r) => r.y + r.h)) };
-  const minX = inner.minX - BEYOND;
-  const minY = inner.minY - BEYOND;
-  const maxX = inner.maxX + BEYOND;
-  const maxY = inner.maxY + BEYOND;
+  const { minX, minY, maxX, maxY } = frame;
   const open = new Set([...floor.rooms.flatMap((room) => floorCellsOf(room)), ...floor.doors.flatMap(doorCells), ...(floor.openGround ?? [])].map((c) => cellKey(c.x, c.y)));
   const pools = new Set(floor.waterCells.map((c) => cellKey(c.x, c.y)));
   const blocked = new Set([...floor.stairs.flatMap((s) => Array.from({ length: s.w * s.h }, (_, k) => ({ x: s.x + (k % s.w), y: s.y + Math.floor(k / s.w) }))), ...floor.terrain.filter((p) => p.opening !== undefined).flatMap((p) => p.cells)].map((c) => cellKey(c.x, c.y)));
@@ -213,13 +213,13 @@ function edgeCell({ bounds }: Ground, side: number, rng: Rng): Vec {
 }
 
 /**
- * A road from the first of `ends` to the second, or, for a branch, from its one end to the road
- * `joins`; its crossings bridged, unless they would make more than `MOST_BRIDGES` on the map.
+ * A road through `legs`, or, for a branch, through them and on into the road `joins`, merging
+ * with it (`mergedInto`); its crossings bridged, unless they would make more than `MOST_BRIDGES` on the map.
  */
-function layRoad(ground: Ground, water: ForestWater, legs: readonly Vec[][], width: number, bridges: Bridged[], rng: Rng, joins?: readonly Vec[]): Vec[] | null {
+function layRoad(ground: Ground, water: ForestWater, legs: readonly Vec[][], width: number, bridges: Bridged[], rng: Rng, joins?: DungeonRoad): Vec[] | null {
   const field = waterField(water.rivers, water.lakes);
   for (let attempt = 0; attempt < (joins ? TRIES : 1); attempt++) {
-    const cells = joins ? branchRoute(ground, legs, joins) : throughRoute(ground, legs);
+    const cells = joins ? branchRoute(ground, legs, joins.points) : throughRoute(ground, legs);
     if (!cells) continue;
     const crossings = crossingsOf(cells, field);
     if (bridges.length + crossings.length > MOST_BRIDGES) continue;
@@ -228,7 +228,8 @@ function layRoad(ground: Ground, water: ForestWater, legs: readonly Vec[][], wid
     // Never a bridge hard by another: a road that would cross back over the river it just crossed takes another way.
     const all = [...bridges, ...(placed as Bridged[])].map((b) => b.bridge.at);
     if (all.some((a, i) => all.slice(i + 1).some((b) => Math.hypot(a.x - b.x, a.y - b.y) < BRIDGES_APART))) continue;
-    const line = roadLine(cells, placed as Bridged[], rng, field);
+    const laid = roadLine(cells, placed as Bridged[], rng, field);
+    const line = joins ? mergedInto(laid, joins.points, joins.width) : laid;
     // Its curves must keep out of the water everywhere but on its bridges.
     const onBridge = (p: Vec): boolean => (placed as Bridged[]).some(({ bridge }) => Math.hypot(p.x - bridge.at.x, p.y - bridge.at.y) <= bridge.length / 2 + 0.2);
     if (line.some((p) => field.distance(p.x, p.y) < 0 && !onBridge(p))) continue;

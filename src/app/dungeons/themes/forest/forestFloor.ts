@@ -23,13 +23,13 @@ const ROAD_CLEAR = 0.6;
  * and holes down (a sinkhole to the caves below), so the scene's walls, ways and levels stand as a
  * cave's; without what only a cave holds (calcite, crusts, carved rock, columns, cracks, climbers).
  */
-export function forestFloor(floor: DungeonFloor, seed: number, tags: ReadonlySet<string>): DungeonFloor {
+export function forestFloor(floor: DungeonFloor, seed: number, tags: ReadonlySet<string>, below: readonly DungeonFloor[] = []): DungeonFloor {
   const water = forestWater(floor, seed, tags);
   const { lakes } = water;
   const field = waterField(water.rivers, lakes);
   const meadow = riverMeadow(floor, water, seed);
   // The roads take the meadows as open ground; their own ground joins them.
-  const { roads, rivers } = forestRoads({ ...floor, openGround: meadow }, water, seed, tags);
+  const { roads, rivers } = forestRoads({ ...floor, openGround: meadow }, water, seed, tags, below);
   const road = roadField(roads);
   const openGround = [...new Map([...meadow, ...roadGround(floor, roads)].map((c) => [`${c.x},${c.y}`, c])).values()];
   return {

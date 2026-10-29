@@ -8,7 +8,7 @@ import { clipOutBuiltWater, deepnessField, depthField, poolOutlines, poolShores 
 import { grownRings, intersectRings, subtractRings, unionRings } from '../clipShapes';
 import { floorWater, riverBars, riverIslands, waterField } from '../../forest/riverShape';
 import { drawRiverBridges } from './riverBridges';
-import { ROAD_WEAR, RUT_WEAR, roadBand, rutRings } from './roads';
+import { RUT_WEAR, roadBand, roadWear, rutRings } from './roads';
 import { roadField } from '../../forest/forestRoads';
 import { pointsBounds, tracePolygon, traceShapes, type Vec } from '../geometry';
 import { wayCentre, wayFrameOf, wayHalf, type WayOut } from '../cave/mouth/wayOut';
@@ -61,7 +61,7 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   const ways = dungeon.ways.filter((way) => !roads.some((road) => road.points.some((p) => Math.hypot(p.x - way.mouth.at.x, p.y - way.mouth.at.y) < ROAD_TAKES_TRAIL)));
   const trails = ways.map(trailRing);
   // The ground runs on under the mass along a river, round a lake and either side of a road as along a clearing; one union, so no band's winding cancels another's.
-  const verges = roads.map((r) => roadBand(r, r.width / 2 + MASS_DEPTH));
+  const verges = roads.flatMap((r) => roadBand(r, r.width / 2 + MASS_DEPTH));
   const banks = riverWater.length || verges.length ? unionRings([...(riverWater.length ? grownRings(riverWater, MASS_DEPTH) : []), ...verges]) : [];
   const ground = (path: CanvasPath): void => {
     traceShapes(path, scene.floors, MASS_DEPTH, MASS_DEPTH);
@@ -87,10 +87,11 @@ export function drawForest(scene: ArtScene, art: ForestArt): void {
   art.ground.lawn(ground, cellsOf(view));
   // Each trail worn into the ground, fading where it leaves into the woods.
   // Trails and roads are one worn ground, painted once: two bands laid over each other show where each lies.
-  const worn = unionRings([...trails, ...roads.map((r) => roadBand(r, r.width / 2))]);
+  const worn = unionRings([...trails, ...roads.flatMap((r) => roadBand(r, r.width / 2))]);
   if (worn.length) {
+    const wearOf = roadWear(roads, (p) => scene.sdfAt(p.x, p.y));
     art.trail(polysPath(worn), (p) => {
-      let wear = road.distance(p.x, p.y) < 0 ? ROAD_WEAR : 0;
+      let wear = wearOf(p);
       for (const way of ways) if (trailDistance(way, p) < 0) wear = Math.max(wear, trailFade(way, wayFrameOf(way, p).u));
       return wear;
     }, worn);

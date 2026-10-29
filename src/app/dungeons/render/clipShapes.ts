@@ -1,4 +1,4 @@
-import { inflateShape, intersectShapes, subtractShapes, unionShapes } from '../../lighting/polygonClip';
+import { inflatePolyline, inflateShape, intersectShapes, subtractShapes, unionShapes } from '../../lighting/polygonClip';
 import type { QShape } from '../../types/shapeTypes';
 import type { Vec } from './geometry';
 
@@ -36,6 +36,15 @@ export function intersectRings(a: readonly (readonly Vec[])[], b: readonly (read
 /** Rings grown by `grow` cells (shrunk where negative), holes shrinking as the outer grows, with round or square corners. */
 export function grownRings(rings: readonly (readonly Vec[])[], grow: number, join: 'round' | 'miter' = 'round'): Rings {
   return fromQ(inflateShape(toQ(rings), Math.round(grow * SCALE), join));
+}
+
+/**
+ * Every point within `half` cells of a line, round at its ends and bends: a band that never folds
+ * where the line bends tighter than its half width, as offsetting each point along its normal does.
+ */
+export function lineRings(line: readonly Vec[], half: number): Rings {
+  if (line.length === 0 || half <= 0) return [];
+  return fromQ(inflatePolyline(line.flatMap(p => [Math.round(p.x * SCALE), Math.round(p.y * SCALE)]), Math.round(half * SCALE)));
 }
 
 /** What `a` covers and `b` does not. */
