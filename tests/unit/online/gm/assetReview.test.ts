@@ -121,7 +121,7 @@ describe('stopping and halting', () => {
   });
 });
 
-describe('the store emptied', () => {
+describe('the store emptied, and superseded memories', () => {
   it('uploads a large kept asset again once the shared copies were removed, its bytes given back by the next hand-out', async () => {
     const store = publisherHarness();
     const handout = bytesOf(2 * MIB, 6);
@@ -133,6 +133,20 @@ describe('the store emptied', () => {
     expect(kept(await store.publisher.storing.refOf(handout, 'image/png', ASSET_USES.image)).id).toBe(ref.id);
     await store.advance(1000);
     expect(store.client.calls.map((call) => call.id)).toEqual([ref.id, ref.id]);
+  });
+
+  it('neither uploads nor names an explored memory a newer one replaced before it went', async () => {
+    const store = publisherHarness();
+    const first = kept(await store.publisher.storing.refOf(bytesOf(300_000, 7), 'image/png', ASSET_USES.explored));
+    store.hand(first);
+    store.publisher.storing.release(first);
+    const second = kept(await store.publisher.storing.refOf(bytesOf(300_000, 8), 'image/png', ASSET_USES.explored));
+    store.hand(second);
+    await store.advance(2000);
+    expect(store.client.offers.flat().map((asset) => asset.id)).toEqual([second.id]);
+    store.sent.length = 0;
+    store.publisher.resend('p1');
+    expect(store.sent.flatMap(({ body }) => Object.keys(body.t === 'asset-progress' ? body.shares : {}))).toEqual([second.id]);
   });
 });
 
@@ -173,6 +187,7 @@ describe('quests when the store refused their texts', () => {
       refOf: (bytes, mime) => Promise.resolve(refused ? null : { hash, size: bytes.length, mime, id: 'a'.repeat(64) }),
       fileRef: () => Promise.resolve(null),
       mapRef: () => Promise.reject(new Error('not used')),
+      release: () => undefined,
     }, () => ({ bytes: text }));
     const quest: HandedQuest = { id: 'q1', kind: 'main', state: 'open', title: 'Q', body: '…', text: { hash, size: text.length, mime: 'text/markdown' }, place: null, xp: 0, rewards: [] } as unknown as HandedQuest;
     expect((await quests.of([quest]))[0]?.text?.id).toBe('a'.repeat(64));

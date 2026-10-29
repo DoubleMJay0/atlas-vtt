@@ -1,4 +1,4 @@
-import { ASSET_CAPS } from '../../protocol/index.ts';
+import { ASSET_CAPS, type AssetRef } from '../../protocol/index.ts';
 import { t, type MessageKey } from '../../../i18n';
 import type { Timers } from '../companionTimers.ts';
 import { AssetIds } from './assetIds.ts';
@@ -98,6 +98,7 @@ export class AssetPublisher {
       stat: (path) => ports.stat(path),
       pyramids: ports.pyramids,
       register: (asset) => this.register(asset),
+      release: (ref) => this.release(ref),
       tilesRefused: () => this.noTiles,
     });
   }
@@ -170,6 +171,13 @@ export class AssetPublisher {
     if (entry.state === 'new') this.offerSoon();
     else this.runner.pump();
     return id;
+  }
+
+  /** A reference players hold no more (an explored memory a newer one replaced): it is not uploaded if it has not gone yet, and named no more. */
+  private release(ref: AssetRef): void {
+    const entry = this.queue.get(ref.id);
+    if (entry !== undefined && entry.state !== 'stored' && entry.state !== 'uploading') this.queue.forget(ref.id);
+    this.progress.delete(ref.id);
   }
 
   private resume(): void {

@@ -172,6 +172,7 @@ export class FloorShare {
     this.key = null;
     this.tokens.refreshArt();
     this.layers.refreshArt();
+    this.inputs.refreshAssets();
     void this.update(this.store.getState());
   }
 

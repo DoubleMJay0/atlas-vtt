@@ -17,9 +17,9 @@ export async function storedRef(bytes: Uint8Array<ArrayBuffer>, mime: string): P
 
 /**
  * A store that keeps everything handed to it, but what `refuse` names (by hash); `file` gives the bytes
- * of a vault file it is handed by path (none by default).
+ * of a vault file it is handed by path (none by default); `released` hears of references let go.
  */
-export function fakeStoring(refuse: (hash: string) => boolean = () => false, file: (path: string) => Uint8Array<ArrayBuffer> | undefined = () => undefined): AssetStoring {
+export function fakeStoring(refuse: (hash: string) => boolean = () => false, file: (path: string) => Uint8Array<ArrayBuffer> | undefined = () => undefined, released: (ref: AssetRef) => void = () => undefined): AssetStoring {
   const refOf = async (bytes: Uint8Array<ArrayBuffer>, mime: string): Promise<AssetRef | null> => {
     const ref = await storedRef(bytes, mime);
     return refuse(ref.hash) ? null : ref;
@@ -31,6 +31,7 @@ export function fakeStoring(refuse: (hash: string) => boolean = () => false, fil
       return bytes === undefined ? Promise.resolve(null) : refOf(bytes, mime);
     },
     mapRef: (bytes, mime) => refOf(bytes, mime),
+    release: released,
   };
 }
 
