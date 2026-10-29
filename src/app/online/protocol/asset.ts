@@ -43,6 +43,8 @@ export interface AssetRef {
   readonly size: number;
   readonly mime: string;
   readonly id?: string;
+  /** The stored object is the map's tile pyramid (`t/<id>/manifest.json` and its tiles), not one image; only with an `id`. */
+  readonly tiles?: true;
 }
 
 export const isHash = (value: unknown): value is string => typeof value === 'string' && HASH_PATTERN.test(value);
@@ -54,7 +56,8 @@ function parseRef(value: unknown, mimes: readonly string[]): AssetRef | null {
   if (value.id !== undefined && !isAssetId(value.id)) return null;
   if (!isCount(value.size, value.id === undefined ? MAX_ASSET_BYTES : MAX_STORED_BYTES)) return null;
   if (typeof value.mime !== 'string' || !mimes.includes(value.mime)) return null;
-  return { hash: value.hash, size: value.size, mime: value.mime, ...(value.id === undefined ? {} : { id: value.id }) };
+  if (value.tiles !== undefined && (value.tiles !== true || value.id === undefined)) return null;
+  return { hash: value.hash, size: value.size, mime: value.mime, ...(value.id === undefined ? {} : { id: value.id }), ...(value.tiles === true ? { tiles: true as const } : {}) };
 }
 
 /** An image's reference, or null for anything malformed or of a type players are not sent. */

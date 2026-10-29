@@ -23,6 +23,12 @@ describe('an asset reference with its stored id', () => {
     expect(parseVideoAsset({ hash, size: MAX_STORED_BYTES + 1, mime: 'video/webm', id })).toBeNull();
   });
 
+  it('marks a map stored as a tile pyramid, only together with an id', () => {
+    expect(parseAsset({ hash, size: 10, mime: 'image/webp', id, tiles: true })).toEqual({ hash, size: 10, mime: 'image/webp', id, tiles: true });
+    expect(parseAsset({ hash, size: 10, mime: 'image/webp', id, tiles: false })).toBeNull();
+    expect(parseAsset({ hash, size: 10, mime: 'image/webp', tiles: true })).toBeNull();
+  });
+
   it('names the caps of every kind the store holds', () => {
     expect(Object.keys(ASSET_CAPS).sort()).toEqual(['audio', 'book', 'image', 'text', 'tiles', 'video']);
     expect(ASSET_CAPS.video).toBe(500 * 1024 * 1024);
