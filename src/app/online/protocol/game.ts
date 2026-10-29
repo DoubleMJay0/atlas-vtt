@@ -74,8 +74,12 @@ export type GmMessage =
   | DeltaMessage
   /** Where the tokens being dragged are now: the fast lane beside the token list, the latest wins. */
   | LiveMessage
-  /** The explored memory the GM last saved: a PNG inline as base64 (`png`, at most `EXPLORED_INLINE_BYTES`); no `png` is none. */
-  | { readonly t: 'explored'; readonly scene: string; readonly png?: string }
+  /**
+   * The explored memory the GM last saved, a PNG: inline as base64 (`png`, at most
+   * `EXPLORED_INLINE_BYTES`), else stored and fetched by its id like any image (`mask`); at most one
+   * of the two, and neither is none.
+   */
+  | { readonly t: 'explored'; readonly scene: string; readonly png?: string; readonly mask?: AssetRef }
   /**
    * One piece of a message too large for one frame: `data` is base64 of its JSON text's UTF-8
    * bytes; the pieces of one `id` joined in `index` order are that text.
@@ -165,7 +169,9 @@ function parseSceneInput(value: Record<string, unknown>, scene: string): GmMessa
       return parseLive(value, scene);
     case 'explored': {
       if (value.png !== undefined && !isInlinePng(value.png)) return null;
-      return { t: 'explored', scene, ...(value.png === undefined ? {} : { png: value.png }) };
+      if (value.mask === undefined) return { t: 'explored', scene, ...(value.png === undefined ? {} : { png: value.png }) };
+      const mask = parseAsset(value.mask);
+      return mask === null || mask.mime !== 'image/png' || value.png !== undefined ? null : { t: 'explored', scene, mask };
     }
     case 'liquids': {
       const liquids = parseLiquids(value.liquids);

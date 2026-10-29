@@ -52,26 +52,35 @@ describe('the GM reports how far its uploads have come', () => {
   });
 });
 
-describe('the explored memory comes inline', () => {
+describe('the explored memory', () => {
   const scene = 's1';
   const png = 'AAAA'.repeat(8);
 
-  it('reads an inline PNG, and none without one; a reference beside it is no part of the message', () => {
+  it('reads an inline PNG, a stored one by its id, and none without either', () => {
+    const mask = { hash, size: 5, mime: 'image/png', id };
     expect(parseGmMessage({ t: 'explored', scene, png })).toEqual({ t: 'explored', scene, png });
+    expect(parseGmMessage({ t: 'explored', scene, mask })).toEqual({ t: 'explored', scene, mask });
     expect(parseGmMessage({ t: 'explored', scene })).toEqual({ t: 'explored', scene });
-    expect(parseGmMessage({ t: 'explored', scene, mask: { hash, size: 5, mime: 'image/png', id }, png })).toEqual({ t: 'explored', scene, png });
+  });
+
+  it('refuses both at once, a stored one without its id, and one that is no PNG', () => {
+    const mask = { hash, size: 5, mime: 'image/png', id };
+    expect(parseGmMessage({ t: 'explored', scene, mask, png })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene, mask: { hash, size: 5, mime: 'image/png' } })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene, mask: { ...mask, mime: 'image/webp' } })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene, mask: null })).toBeNull();
   });
 
   it('refuses a PNG that is no base64 or larger than the inline cap', () => {
-    expect(parseGmMessage({ t: 'explored', scene, mask: null, png: 'AAA' })).toBeNull();
-    expect(parseGmMessage({ t: 'explored', scene, mask: null, png: 'A!AA' })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene, png: 'AAA' })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene, png: 'A!AA' })).toBeNull();
     const tooLong = 'A'.repeat(4 * Math.ceil(EXPLORED_INLINE_BYTES / 3) + 4);
-    expect(parseGmMessage({ t: 'explored', scene, mask: null, png: tooLong })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene, png: tooLong })).toBeNull();
   });
 });
 
 describe('the GM level', () => {
-  it('is 9: stored assets and the inline explored memory, and no assets over the socket', () => {
+  it('is 9: stored assets, the explored memory inline or stored, and no assets over the socket', () => {
     expect(GM_LEVEL).toBe(9);
   });
 });
