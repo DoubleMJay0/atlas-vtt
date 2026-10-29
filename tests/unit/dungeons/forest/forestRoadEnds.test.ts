@@ -3,20 +3,26 @@ import { generateDungeon } from '../../../../src/app/dungeons/generate';
 import type { CellPoint, DungeonModel, DungeonRoad } from '../../../../src/app/dungeons/model';
 import { mapLayout } from '../../../../src/app/dungeons/render/layoutSize';
 import { pointInPolygon } from '../../../../src/app/dungeons/render/geometry';
-import { roadBand, roadWear } from '../../../../src/app/dungeons/render/forest/roads';
+import { roadBand } from '../../../../src/app/dungeons/render/forest/roads';
+import { waterField } from '../../../../src/app/dungeons/forest/riverShape';
+import type { DungeonTag } from '../../../../src/app/dungeons/tags';
 import { MASS_DEPTH } from '../../../../src/app/dungeons/render/forest/woodsMass';
 import { visibleDungeon, type VisibleDungeon } from '../../../../src/app/dungeons/render/visibleDungeon';
 import { DEFAULT_VIEW } from '../../../../src/app/dungeons/style';
 
 type Vec = CellPoint;
 
-/** Forests of every kind: plain, wet (rivers and bridges), large, and with caves below that widen the map. */
-const CASES: { seed: number; tags: string[]; floors: number }[] = [
-  ...Array.from({ length: 50 }, (_, k) => ({ seed: k + 1, tags: [], floors: 1 })),
-  ...Array.from({ length: 40 }, (_, k) => ({ seed: k + 101, tags: ['wet'], floors: 1 })),
-  ...Array.from({ length: 25 }, (_, k) => ({ seed: k + 201, tags: ['large'], floors: 1 })),
-  ...Array.from({ length: 15 }, (_, k) => ({ seed: k + 301, tags: ['wet'], floors: 2 })),
-];
+/** Tag sets a GM asks a forest for: sizes, water, life, the layout's shapes. */
+const TAG_SETS: readonly DungeonTag[][] = [[], ['small'], ['medium'], ['large'], ['wet'], ['flooded'], ['dry'], ['inhabited'], ['overgrown'], ['large', 'wet'], ['winding'], ['spacious', 'flooded'], ['chaotic'], ['string'], ['deep'], ['crumbling', 'wet']];
+/** How many forests: every tag set in turn, one to three floors (caves below widen the map). `VITE_FOREST_ROAD_FORESTS=960` sweeps wider. */
+const COUNT = Number(import.meta.env.VITE_FOREST_ROAD_FORESTS ?? 240);
+const CASES: { seed: number; tags: DungeonTag[]; floors: number }[] = Array.from({ length: COUNT }, (_, k) => ({
+  seed: 5000 + k,
+  tags: TAG_SETS[k % TAG_SETS.length]!,
+  floors: 1 + (Math.floor(k / TAG_SETS.length) % 3),
+}));
+/** How near a river's or lake's water an end of a road may never lie unless it runs on (off the map or into another road), in cells. */
+const BANK = 3;
 
 interface Forest {
   model: DungeonModel;
@@ -64,10 +70,11 @@ function inRings(rings: readonly (readonly Vec[])[], p: Vec): boolean {
   return rings.filter((ring) => pointInPolygon(ring, p.x, p.y)).length % 2 === 1;
 }
 
-type EndKind = 'off the map' | 'merged' | 'at its entrance';
+type EndKind = 'off the map' | 'merged' | 'at a destination';
 
 /** What a road's end does, or null where it ends in none of the ways a road may end. */
-function endOf({ shown, roads, picture }: Forest, road: DungeonRoad, atStart: boolean): EndKind | null {
+function endOf(forest: Forest, road: DungeonRoad, atStart: boolean): EndKind | null {
+  const { roads, picture } = forest;
   const end = atStart ? road.points[0]! : road.points[road.points.length - 1]!;
   // Its worn ground (round at its end) lies wholly beyond the picture.
   if (outside(picture, end) > road.width / 2 + 1) return 'off the map';
@@ -80,13 +87,19 @@ function endOf({ shown, roads, picture }: Forest, road: DungeonRoad, atStart: bo
     const theirs = heading(other.points, on.index);
     return Math.abs(own.x * theirs.x + own.y * theirs.y) > Math.cos((35 * Math.PI) / 180) ? 'merged' : null;
   }
-  // A footpath to an entrance the road could not reach ends at that entrance, in its clearing.
-  const atMouth = shown.ways.some((way) => Math.hypot(way.mouth.at.x - end.x, way.mouth.at.y - end.y) < 1);
-  return atMouth && shown.field.distance(end.x, end.y) < -0.25 ? 'at its entrance' : null;
+  // Anywhere else only where something stands at its very end that it leads to, and never at a river's bank: a road
+  // reaching water crosses it or follows it. An entrance of an open clearing is no destination: nothing is drawn there.
+  const floor = forest.model.floors[0]!;
+  if (waterField(floor.rivers, floor.lakes).distance(end.x, end.y) < BANK) return null;
+  const near = (x: number, y: number): boolean => Math.hypot(x - end.x, y - end.y) < 1.5;
+  const drawn = floor.props.some((p) => near(p.x, p.y))
+    || floor.stairs.some((st) => end.x > st.x - 1 && end.x < st.x + st.w + 1 && end.y > st.y - 1 && end.y < st.y + st.h + 1)
+    || floor.terrain.some((piece) => piece.opening !== undefined && piece.cells.some((c) => near(c.x + 0.5, c.y + 0.5)));
+  return drawn ? 'at a destination' : null;
 }
 
 describe('a Forest’s roads', { timeout: 60000 }, () => {
-  it('end off the map, merge into another road along it, or end in the clearing of the entrance they serve', () => {
+  it('end off the map, merge into another road along it, or end at something drawn they lead to, never at an entrance or a river’s bank', () => {
     const kinds = new Map<string, number>();
     const wrong: string[] = [];
     forests.forEach((forest, k) => {
@@ -99,10 +112,9 @@ describe('a Forest’s roads', { timeout: 60000 }, () => {
       }
     });
     expect(wrong).toEqual([]);
-    // Each kind of end comes up, so none of the checks above passes for want of cases.
-    expect(kinds.get('off the map')).toBeGreaterThan(200);
-    expect(kinds.get('merged')).toBeGreaterThan(25);
-    expect(kinds.get('at its entrance')).toBeGreaterThan(5);
+    // Both kinds of end a road network is made of come up, so the checks above do not pass for want of cases.
+    expect(kinds.get('off the map')).toBeGreaterThan(COUNT * 2);
+    expect(kinds.get('merged')).toBeGreaterThan(COUNT / 4);
   });
 
   it('lay their ground whole along their line and either side of it, without a cut or a hole where they bend', () => {
@@ -124,22 +136,13 @@ describe('a Forest’s roads', { timeout: 60000 }, () => {
     }
   });
 
-  it('wear their ground without a hard cut: it never jumps along a road, and fades out at an end in a clearing', () => {
-    let deadEnds = 0;
-    for (const forest of forests) {
-      const { roads, picture, shown } = forest;
-      const wear = roadWear(roads, (p) => shown.field.distance(p.x, p.y));
-      for (const road of roads) {
-        const inPicture = road.points.filter((p) => outside(picture, p) === 0);
-        inPicture.slice(1).forEach((p, i) => expect(Math.abs(wear(p) - wear(inPicture[i]!))).toBeLessThan(0.15));
-        for (const atStart of [true, false]) {
-          if (endOf(forest, road, atStart) !== 'at its entrance') continue;
-          deadEnds += 1;
-          const end = atStart ? road.points[0]! : road.points[road.points.length - 1]!;
-          expect(wear(end)).toBeLessThan(0.05);
-        }
-      }
+  it('lead through most entrances, each a way in from the map’s edge', () => {
+    let entrances = 0;
+    let led = 0;
+    for (const { shown, roads } of forests) {
+      entrances += shown.ways.length;
+      led += shown.ways.filter(({ mouth }) => roads.some((road) => road.points.some((p) => Math.hypot(p.x - mouth.at.x, p.y - mouth.at.y) < 2.5))).length;
     }
-    expect(deadEnds).toBeGreaterThan(5);
+    expect(led / entrances).toBeGreaterThan(0.9);
   });
 });

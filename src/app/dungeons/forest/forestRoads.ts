@@ -36,8 +36,6 @@ const SHORTEST_BRANCH = 8;
 const MOST_BRIDGES = 2;
 /** How many edge-to-edge ways are tried after the ways through the entrances. */
 const EDGE_PLANS = 6;
-/** A road that leaves the map this near an entrance's edge serves that entrance's way out too, in cells. */
-const SHARED_EDGE = 5;
 /** What a cell within `BESIDE` cells of a laid road costs a path more, as a factor. */
 const BESIDE = 2.5;
 const BESIDE_COST = 6;
@@ -84,16 +82,17 @@ export function forestRoads(floor: DungeonFloor, water: ForestWater, seed: numbe
     roads.push(mainRoad);
     // Paths laid after the road meet it, never run beside it.
     const beside = besideRoad(ground, main);
-    // An entrance the road does not pass gets a footpath of its own, from the map's edge along its trail on to the road.
+    // An entrance the road does not pass gets a footpath through it: in from the map's edge along its trail, through the
+    // entrance and on into the road, else on to another edge. An entrance is no place a path can end: nothing stands
+    // there but the clearing's edge, and a path that stopped there (or ran only from there to the road) led nowhere.
+    // An entrance no path can lead through keeps its trail.
     const missed = ways.filter((way) => !main.some((p) => Math.hypot(p.x - way.mouth.at.x, p.y - way.mouth.at.y) < 2.5));
-    // Where it cannot join the road without doubling back, it ends at the entrance: the clearings beyond lead on.
     for (const way of missed) {
-      // Where the road already leaves the map by this trail's edge, the path only runs from the entrance to the road.
-      const { edge } = edgeBeyond(ground, way);
-      const sharesEdge = main.some((p) => Math.hypot(p.x - edge.x - 0.5, p.y - edge.y - 0.5) < SHARED_EDGE);
-      const legs = sharesEdge ? [[mouthCell(way)]] : [[edge], [mouthCell(way)]];
-      // A path from the entrance alone is nothing without the road it was to join.
-      const path = layRoad(beside, water, legs, 0.7, bridges, rng, mainRoad) ?? (legs.length > 1 ? layRoad(beside, water, legs, 0.7, bridges, rng) : null);
+      const { edge, side } = edgeBeyond(ground, way);
+      const legs = [[edge], [mouthCell(way)]];
+      const onward = [2, 1, 3].map((turn) => (side + turn) % 4);
+      let path = layRoad(beside, water, legs, 0.7, bridges, rng, mainRoad);
+      for (const far of onward) path ??= layRoad(beside, water, [...legs, [edgeCell(ground, far, rng)]], 0.7, bridges, rng);
       if (path) roads.push({ points: path, width: 0.7, ruts: false });
     }
     // A footpath off the road to an edge the road does not reach, now and then.

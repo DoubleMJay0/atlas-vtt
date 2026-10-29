@@ -1,5 +1,4 @@
 import type { DungeonRoad } from '../../model';
-import { roadField } from '../../forest/forestRoads';
 import { normalAt } from '../../forest/riverShape';
 import { lineRings, unionRings } from '../clipShapes';
 import type { Vec } from '../geometry';
@@ -38,40 +37,4 @@ function beside(road: DungeonRoad, offset: number): Vec[] {
     const n = normalAt(road.points, i);
     return { x: p.x + n.x * offset, y: p.y + n.y * offset };
   });
-}
-
-/** How far a road that ends in a clearing fades out before its end, in cells: worn ground thins out where the walkers spread. */
-const END_FADE = 2.2;
-
-/** How much of a road's wear shows at `p` near its dead ends: 1 away from them, falling smoothly to nothing at the end itself. */
-function deadEndFade(deadEnds: readonly Vec[], p: Vec): number {
-  let fade = 1;
-  for (const end of deadEnds) {
-    const t = Math.min(1, Math.hypot(p.x - end.x, p.y - end.y) / END_FADE);
-    fade = Math.min(fade, t * t * (3 - 2 * t));
-  }
-  return fade;
-}
-
-/**
- * How worn the roads' ground is at `p`: the wear of the most worn road there, each whole but near
- * its dead ends (an end in a clearing, `sdfAt` below 0, that runs into no other road), where it
- * fades out. A road that leaves the map or runs into another keeps its wear to its end.
- */
-export function roadWear(roads: readonly DungeonRoad[], sdfAt: (p: Vec) => number): (p: Vec) => number {
-  const all = roadField(roads);
-  const each = roads.map((r, k) => {
-    const others = roadField(roads.filter((_, j) => j !== k));
-    const deadEnds = [r.points[0]!, r.points[r.points.length - 1]!].filter((end) => sdfAt(end) < 0 && others.distance(end.x, end.y) >= 0);
-    return { field: roadField([r]), deadEnds };
-  });
-  const ends = each.flatMap((road) => road.deadEnds);
-  // Asked for every pixel of the worn ground: one look-up in all the roads' field, and the roads one by one only near a dead end.
-  return (p) => {
-    if (all.distance(p.x, p.y) >= 0) return 0;
-    if (!ends.some((end) => Math.hypot(p.x - end.x, p.y - end.y) < END_FADE)) return ROAD_WEAR;
-    let wear = 0;
-    for (const { field, deadEnds } of each) if (field.distance(p.x, p.y) < 0) wear = Math.max(wear, ROAD_WEAR * deadEndFade(deadEnds, p));
-    return wear;
-  };
 }
