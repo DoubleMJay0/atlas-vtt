@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RequestUrlParam } from 'obsidian';
-import { AssetStoreClient } from '../../../../src/app/online/gm/assets/storeClient.ts';
+import { AssetStoreClient, MAX_DELETE_ROUNDS, REMOVAL_PAUSE_MS } from '../../../../src/app/online/gm/assets/storeClient.ts';
 import { partSizes } from '../../../../src/app/online/gm/assets/assetRoutes.ts';
 import { RELAY_ORIGIN } from '../../../../src/app/online/gm/servers.ts';
 
@@ -89,7 +89,18 @@ describe('the asset store\'s client', () => {
 
   it('asks again to remove every copy while the store says some are left', async () => {
     seen.queue.push({ status: 202, json: { done: false } }, { status: 202, json: { done: false } }, { status: 200, json: { done: true } });
-    expect(await new AssetStoreClient(RELAY_ORIGIN, () => 'tok').deleteAll()).toEqual({ ok: true, value: null });
+    const pauses: number[] = [];
+    const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok', (ms) => (pauses.push(ms), Promise.resolve()));
+    expect(await client.deleteAll()).toEqual({ ok: true, value: null });
     expect(seen.requests.map((request) => `${request.method} ${request.url.replace(RELAY_ORIGIN, '')}`)).toEqual(['DELETE /api/assets', 'DELETE /api/assets', 'DELETE /api/assets']);
+    // A pause after each answer in part.
+    expect(pauses).toEqual([REMOVAL_PAUSE_MS, REMOVAL_PAUSE_MS]);
+  });
+
+  it('gives a removal up for now after a number of answers in part', async () => {
+    seen.answer = { status: 202, json: { done: false } };
+    const client = new AssetStoreClient(RELAY_ORIGIN, () => 'tok', () => Promise.resolve());
+    expect(await client.deleteAll()).toEqual({ ok: false, trouble: 'retry' });
+    expect(seen.requests).toHaveLength(MAX_DELETE_ROUNDS);
   });
 });

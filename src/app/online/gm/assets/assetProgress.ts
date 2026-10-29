@@ -1,17 +1,21 @@
-import { MAX_PROGRESS_ENTRIES, type GmMessage } from '../../protocol/index.ts';
+import { ALL_PLAYERS, MAX_PROGRESS_ENTRIES, type GmMessage } from '../../protocol/index.ts';
 import type { Timers } from '../companionTimers.ts';
 
 /** How often players hear how far the uploads came, at most. */
 export const PROGRESS_INTERVAL_MS = 500;
 /** How long an asset that reached 1 stays in the paced messages, so a message the live lane replaced before it left loses no completion. */
 export const DONE_KEPT_MS = 5_000;
-/** The key the paced messages share in the live lane: a newer one replaces one that still waits. */
+/** The key the paced messages share in the live lane (per recipient): a newer one replaces one that still waits. */
 const LIVE_KEY = 'asset-progress';
+/** An asset id where a message names one: a reference's `id` (64 hex; random ids are 24). */
+const REF_ID = /"id":"([0-9a-f]{64})"/g;
 
 export interface ProgressPorts {
   /** Sends ahead of other frames, the newest of a key replacing one that waits. */
   sendLive(body: GmMessage, key: string, to?: string): void;
   send(body: GmMessage, to?: string): void;
+  /** The players connected now. */
+  connected(): readonly string[];
   readonly timers: Timers;
 }
 
@@ -24,15 +28,23 @@ function messagesOf(entries: readonly (readonly [string, number])[]): GmMessage[
   return messages;
 }
 
+/** The asset ids a message sent to players names in its references. */
+export function refIdsIn(text: string): string[] {
+  return [...text.matchAll(REF_ID)].map((match) => match[1] ?? '');
+}
+
 /**
- * How far each asset players were handed has come on its way into the store (0 to 1, where 1 means it
- * can be fetched), told to every player (`asset-progress`): paced at `PROGRESS_INTERVAL_MS` through the
- * live lane while anything moves, with a last message saying 1, and every share again, whole, after a
- * reconnect and to a player who joins. Only ids players were handed are ever named: an id is the right
- * to read the object.
+ * How far each asset has come on its way into the store (0 to 1, where 1 means it can be fetched),
+ * told to each player only for the ids they were sent references of (`handed`: an id is the right to
+ * read the object, and a player's book holds what nobody else may read). Paced at
+ * `PROGRESS_INTERVAL_MS` through the live lane while anything moves, with a last message saying 1;
+ * every share a player holds again, whole, after a reconnect and when they join. Players who hold the
+ * same ids are told in one message, all of them at once where everyone holds them.
  */
 export class AssetProgress {
   private readonly shares = new Map<string, number>();
+  /** The ids each player was sent references of. */
+  private readonly handed = new Map<string, Set<string>>();
   /** When each asset reached 1, while it is still named in the paced messages. */
   private readonly doneAt = new Map<string, number>();
   private readonly changed = new Set<string>();
@@ -41,7 +53,7 @@ export class AssetProgress {
 
   constructor(private readonly ports: ProgressPorts) {}
 
-  /** Sets an asset's share; told to players within `PROGRESS_INTERVAL_MS` where it changed. */
+  /** Sets an asset's share; told to whoever holds it within `PROGRESS_INTERVAL_MS` where it changed. */
   set(id: string, share: number): void {
     const clamped = Math.min(1, Math.max(0, share));
     if (this.shares.get(id) === clamped) return;
@@ -56,16 +68,34 @@ export class AssetProgress {
     return this.shares.get(id);
   }
 
-  /** Forgets an asset: it is named no more. */
+  /** A message went to `to` (a player, or everyone connected): the ids its references name are theirs to hear of from now on. */
+  sent(text: string, to: string): void {
+    const ids = refIdsIn(text).filter((id) => this.shares.has(id));
+    if (ids.length === 0) return;
+    for (const player of to === ALL_PLAYERS ? this.ports.connected() : [to]) {
+      const held = this.handed.get(player) ?? new Set<string>();
+      for (const id of ids) held.add(id);
+      this.handed.set(player, held);
+    }
+  }
+
+  /** A player left: what they were handed is forgotten (they are sent it again when they come back). */
+  playerLeft(player: string): void {
+    this.handed.delete(player);
+  }
+
+  /** Forgets an asset: it is named no more, to anyone. */
   delete(id: string): void {
     this.shares.delete(id);
     this.doneAt.delete(id);
     this.changed.delete(id);
+    for (const held of this.handed.values()) held.delete(id);
   }
 
-  /** Every share, whole, to one player or to all. */
+  /** Every share a player holds, whole, to that player; to everyone, each their own. */
   resend(to?: string): void {
-    for (const message of messagesOf([...this.shares])) this.ports.send(message, to);
+    const players = to === undefined || to === ALL_PLAYERS ? this.ports.connected() : [to];
+    this.tell(players, () => true, (body, recipient) => this.ports.send(body, recipient));
   }
 
   stop(): void {
@@ -89,9 +119,31 @@ export class AssetProgress {
     this.lastAt = now;
     this.changed.clear();
     for (const [id, at] of [...this.doneAt]) if (now - at > DONE_KEPT_MS) this.doneAt.delete(id);
-    const moving = [...this.shares].filter(([id, share]) => share < 1 || this.doneAt.has(id));
-    const [first, ...rest] = messagesOf(moving);
-    if (first !== undefined) this.ports.sendLive(first, LIVE_KEY);
-    for (const message of rest) this.ports.send(message);
+    const moving = (id: string, share: number): boolean => share < 1 || this.doneAt.has(id);
+    this.tell(this.ports.connected(), moving, (body, recipient, first) => {
+      if (first) this.ports.sendLive(body, LIVE_KEY, recipient);
+      else this.ports.send(body, recipient);
+    });
+  }
+
+  /** Tells each player the shares of their ids that `include` lets through, players holding the same in one message. */
+  private tell(players: readonly string[], include: (id: string, share: number) => boolean, send: (body: GmMessage, to: string, first: boolean) => void): void {
+    const groups = new Map<string, { readonly entries: [string, number][]; readonly players: string[] }>();
+    for (const player of players) {
+      const entries = [...(this.handed.get(player) ?? [])].flatMap((id): [string, number][] => {
+        const share = this.shares.get(id);
+        return share !== undefined && include(id, share) ? [[id, share]] : [];
+      }).sort(([a], [b]) => a.localeCompare(b));
+      if (entries.length === 0) continue;
+      const key = entries.map(([id]) => id).join(',');
+      const group = groups.get(key) ?? { entries, players: [] };
+      group.players.push(player);
+      groups.set(key, group);
+    }
+    const everyone = this.ports.connected().length;
+    for (const { entries, players: holders } of groups.values()) {
+      const recipients = holders.length === everyone && everyone > 1 ? [ALL_PLAYERS] : holders;
+      for (const recipient of recipients) messagesOf(entries).forEach((body, index) => send(body, recipient, index === 0));
+    }
   }
 }

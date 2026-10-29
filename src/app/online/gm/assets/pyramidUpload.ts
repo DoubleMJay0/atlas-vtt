@@ -21,7 +21,7 @@ export interface PyramidJob {
  * no longer holds a tile (`changed`), or a trouble of the store; `next` is the batch to send next.
  */
 export interface PyramidRun {
-  readonly end: 'stored' | 'partial' | 'changed' | StoreTrouble;
+  readonly end: 'stored' | 'partial' | 'changed' | 'stopped' | StoreTrouble;
   readonly next: number;
 }
 
@@ -31,23 +31,26 @@ const partName = (tile: TileRef): string => `${tile.level}/${tile.col}_${tile.ro
 /**
  * Uploads a pyramid's batches from `job.next` on, one after another (a page takes the tiles stored to be
  * the first of the plan's order): the manifest with the first, then the tiles read from the cache.
- * With `overviewOnly` it stops once the overview's batches went. `progress` hears the share of pieces
- * the store holds (the manifest and the tiles).
+ * With `overviewOnly` it stops once the overview's batches went, and once `signal` stops it before the
+ * next batch. `progress` hears the share of pieces the store holds (the manifest and the tiles).
  */
-export async function uploadPyramid(job: PyramidJob, deps: { client: Pick<AssetStoreClient, 'putTiles'>; blobs: TileBlobs; slot: TakeSlot; boundary: () => string; progress: (share: number) => void }, overviewOnly: boolean): Promise<PyramidRun> {
+export async function uploadPyramid(job: PyramidJob, deps: { client: Pick<AssetStoreClient, 'putTiles'>; blobs: TileBlobs; slot: TakeSlot; boundary: () => string; progress: (share: number) => void; signal: AbortSignal }, overviewOnly: boolean): Promise<PyramidRun> {
   const { batches, manifest } = job.plan;
   for (let next = job.next; next < batches.length; next += 1) {
     const batch = batches[next];
     if (batch === undefined) break;
     if (overviewOnly && !batch.overview) return { end: 'partial', next };
-    const blobs = await deps.blobs(job.hash, batch.tiles);
-    if (blobs.length !== batch.tiles.length || blobs.some((blob) => blob === null)) return { end: 'changed', next };
-    const parts: FormPart[] = batch.tiles.map((tile, index) => ({ name: partName(tile), bytes: new Uint8Array(blobs[index] ?? new ArrayBuffer(0)), type: 'image/webp' }));
-    if (batch.manifest) parts.unshift({ name: 'manifest.json', bytes: manifest, type: 'application/json' });
-    const { body, contentType } = multipartBody(parts, deps.boundary());
+    // The turn is taken first, so the map keeps its place among what waits while its tiles are read.
     const release = await deps.slot();
     let put: Awaited<ReturnType<AssetStoreClient['putTiles']>>;
     try {
+      if (deps.signal.aborted) return { end: 'stopped', next };
+      const blobs = await deps.blobs(job.hash, batch.tiles);
+      if (blobs.length !== batch.tiles.length || blobs.some((blob) => blob === null)) return { end: 'changed', next };
+      const parts: FormPart[] = batch.tiles.map((tile, index) => ({ name: partName(tile), bytes: new Uint8Array(blobs[index] ?? new ArrayBuffer(0)), type: 'image/webp' }));
+      if (batch.manifest) parts.unshift({ name: 'manifest.json', bytes: manifest, type: 'application/json' });
+      const { body, contentType } = multipartBody(parts, deps.boundary());
+      if (deps.signal.aborted) return { end: 'stopped', next };
       put = await deps.client.putTiles(job.id, body, contentType);
     } finally {
       release();

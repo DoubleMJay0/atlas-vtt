@@ -60,6 +60,11 @@ export class FoundShare {
     this.texts.stop();
   }
 
+  /** The found notes' references may go another way now: their notes are read again, and changed entries go out. */
+  refreshAssets(): void {
+    this.texts.refreshAll();
+  }
+
   /** The log entry that tells who found the pin `pinId` of the map `mapPath`, or null while nobody has. */
   entryOf(mapPath: string, pinId: string): string | null {
     return this.log.entries().find((entry) => entry.kind === 'found' && entry.pin?.map === mapPath && entry.pin.pin === pinId)?.id ?? null;

@@ -34,6 +34,8 @@ export interface TablePublisherDeps {
   sendLive(body: GmMessage, key: string, to?: string): void;
   /** The players connected now, and the time the socket's last keep-alive took. */
   connection(): { readonly players: number; readonly latencyMs: number | null };
+  /** The ids of the players connected now. */
+  connected(): readonly string[];
   /** Assets handed to players can no longer be stored: what names them hands them again. */
   withdrawn(): void;
   /** Where the shared map is looked at now, as shares of it; null: its centre. */
@@ -71,6 +73,7 @@ export function tablePublisher(deps: TablePublisherDeps): AssetPublisher {
       return file === null ? null : { mtime: file.stat.mtime, size: file.stat.size };
     },
     connection: () => deps.connection(),
+    connected: () => deps.connected(),
     send: (body, to) => deps.send(body, to),
     sendLive: (body, key, to) => deps.sendLive(body, key, to),
     notify: (text) => showNotice(text),

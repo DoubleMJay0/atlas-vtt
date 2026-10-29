@@ -102,6 +102,7 @@ export class OnlineTable {
       send: (body, to) => this.connection.send(body, to),
       sendLive: (body, key, to) => this.connection.sendLive(body, key, to),
       connection: () => ({ players: this.connection.connected.size, latencyMs: this.connection.stats().latencyMs }),
+      connected: () => [...this.connection.connected],
       withdrawn: () => this.refreshAssets(),
       focus: () => viewFocus(this.watch.current?.renderer),
     });
@@ -206,6 +207,7 @@ export class OnlineTable {
         this.image.playerLeft(player);
         this.books.share.playerLeft(player);
         this.found.playerLeft(player);
+        this.assets?.playerLeft(player);
         ownership.left(player);
         this.log.left(player);
       },
@@ -213,6 +215,8 @@ export class OnlineTable {
       message: (from, body) => void (this.bound()?.share.heard(from, body), this.covers.receive(from, body) || this.log.receive(from, body) || this.image.receive(from, body) || this.found.receive(from, body) || this.books.share.receive(from, body) || this.bound()?.share.receive(from, body)),
       access: (closesAt) => this.setClosing(closesAt),
     }, this.gate);
+    // Each player hears only how far the assets they were sent references of have come.
+    this.connection.onSent = (text, to) => this.assets?.sent(text, to);
     this.roster = new TableRoster(seats, this.connection, { kick: (player) => this.kick(player), turnAway: (player) => this.connection.kick(player), joinCode: () => this.gate.settings.code });
     this.stopOwnership = ownership.onChange(() => this.bound()?.share.ownersChanged());
   }
@@ -302,6 +306,11 @@ export class OnlineTable {
     this.assets?.emptied();
   }
 
+  /** The account signs out: nothing more goes into the store from this table. */
+  suspendAssets(): void {
+    this.assets?.suspend();
+  }
+
   /** The GM signed in again: what waits for the store is offered again. */
   signedIn(): void {
     this.assets?.signedIn();
@@ -371,6 +380,8 @@ export class OnlineTable {
   private refreshAssets(): void {
     this.bound()?.share.refreshAssets();
     void this.image.refreshAssets();
+    this.books.refreshAssets();
+    this.found.refreshAssets();
   }
 
   private stopWatch(): void {

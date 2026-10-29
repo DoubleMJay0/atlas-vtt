@@ -143,6 +143,10 @@ export interface PublisherHarness {
   /** How many file reads there were, by path. */
   readonly reads: Map<string, number>;
   connection: { players: number; latencyMs: number | null };
+  /** The ids of the players connected, who hear progress. */
+  players: string[];
+  /** Hands players a reference, as a message carrying it that went out to `to` (everyone by default). */
+  hand(ref: { readonly id?: string | undefined }, to?: string): void;
   /** The complete pyramids this device's cache holds, by map path. */
   readonly pyramids: Map<string, PyramidFacts>;
   /** The tiles read from the cache for uploads, by batch. */
@@ -180,6 +184,8 @@ export function publisherHarness(): PublisherHarness {
     stats: new Map(),
     reads: new Map(),
     connection: { players: 0, latencyMs: null },
+    players: ['p1'],
+    hand: (ref, to = '*') => harness.publisher.sent(JSON.stringify({ t: 'scene', scene: { map: ref } }), to),
     pyramids: new Map(),
     tileReads: [],
     focus: null,
@@ -233,6 +239,7 @@ export function publisherHarness(): PublisherHarness {
     },
     stat: (path) => harness.stats.get(path) ?? (harness.files.has(path) ? { mtime: 1, size: harness.files.get(path)?.length ?? 0 } : null),
     connection: () => harness.connection,
+    connected: () => harness.players,
     send: (body, to) => harness.sent.push({ body, to, live: false }),
     sendLive: (body, _key, to) => harness.sent.push({ body, to, live: true }),
     notify: (text) => harness.notices.push(text),

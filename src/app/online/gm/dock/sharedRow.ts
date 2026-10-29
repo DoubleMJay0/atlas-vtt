@@ -13,8 +13,8 @@ export interface SharedRowActions {
  */
 export function renderSharedRow(layer: HTMLElement, text: string | null, actions: SharedRowActions, redraw: () => void): void {
   if (text === null) return;
-  const row = layer.createDiv({ cls: 'atlas-online-shared', attr: { role: 'status' } });
-  row.createSpan({ cls: 'atlas-online-shared__text', text });
+  const row = layer.createDiv({ cls: 'atlas-online-shared' });
+  row.createSpan({ cls: 'atlas-online-shared__text', text, attr: { role: 'status' } });
   const ask = (): void => openPrompt(layer, confirmPrompt('remove-shared', t('online.removeSharedTitle'), t('online.removeSharedQuestion'), t('online.removeSharedAction'), () => actions.removeShared(), { warning: true }), redraw);
   textButton(row, t('online.removeShared'), ask, 'ghost').dataset.focusKey = 'remove-shared';
 }

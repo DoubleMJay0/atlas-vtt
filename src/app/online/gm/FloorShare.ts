@@ -53,6 +53,8 @@ export class FloorShare {
   /** The map path, floor, images and placement of the scene sent or being read: a change starts a new scene. */
   private key: string | null = null;
   private refusal: string | null = null;
+  /** The id the next scene keeps: references made again (`refreshAssets`) are no new scene. */
+  private keepId: string | null = null;
   private readonly assets: AssetAnswers;
   readonly tokens: TokenShare;
   private readonly live: LiveShare | null;
@@ -179,6 +181,8 @@ export class FloorShare {
 
   /** Assets players were handed may no longer be stored: the map and the art are read again, and go out as they can be sent now. */
   refreshAssets(): void {
+    // The same scene, its references made again: players keep what they drew of it.
+    this.keepId = this.scene?.id ?? null;
     this.key = null;
     this.tokens.refreshArt();
     this.layers.refreshArt();
@@ -273,14 +277,15 @@ export class FloorShare {
     const built = await readFloorImages((path) => this.ports.readImage(path), background, this.ports.stored);
     if (this.key !== key) return;
     if (typeof built === 'string') {
-      this.ports.notice(built === 'too-large' ? t('online.assetsMapTooLarge') : 'Atlas Online cannot send this scene\'s map image.');
+      this.ports.notice(t(built === 'too-large' ? 'online.assetsMapTooLarge' : 'online.mapUnreadable'));
       this.publish(null, null, null);
       return;
     }
     const readVideo = this.ports.readVideo;
     const video = built.map === null || readVideo === undefined ? null : await readFloorVideo(readVideo, background, this.ports.stored, videoMimeOf);
     if (this.key !== key) return;
-    const scene: SharedScene = { id: this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }), ...placement, ...(video !== null && { video: video.ref }) };
+    const scene: SharedScene = { id: this.keepId ?? this.ports.randomId(), map: built.map?.ref ?? null, lit, ...(floor !== undefined && { floor }), ...placement, ...(video !== null && { video: video.ref }) };
+    this.keepId = null;
     this.publish(scene, { map: built.map, size: built.size && floorWorldSize(state, level, built.size) }, video);
   }
 

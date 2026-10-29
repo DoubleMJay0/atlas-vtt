@@ -42,6 +42,8 @@ export interface TableBookPorts {
 /** A running table's books, and what they hang on while it runs. */
 export interface TableBook {
   readonly share: BookShare;
+  /** References the books hand out may go another way now (the store refused ids): they are made again. */
+  refreshAssets(): void;
   start(): void;
   stop(): void;
 }
@@ -102,6 +104,10 @@ export function tableBook(ports: TableBookPorts): TableBook {
   let stops: (() => void)[] = [];
   return {
     share,
+    refreshAssets: () => {
+      storedQuests?.clear();
+      share.refreshAssets();
+    },
     start: () => {
       if (stops.length > 0) return;
       stops = [

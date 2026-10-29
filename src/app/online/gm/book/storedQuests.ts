@@ -10,9 +10,14 @@ import type { QuestAsset } from './questGate.ts';
  * gained none (no salt yet) is handed on as it came.
  */
 export class StoredQuests {
-  private readonly done = new WeakMap<BookQuest, BookQuest>();
+  private done = new WeakMap<BookQuest, BookQuest>();
 
   constructor(private readonly stored: AssetStoring, private readonly assetOf: (hash: string) => QuestAsset | undefined) {}
+
+  /** Forgets every quest made: its references are asked for again. */
+  clear(): void {
+    this.done = new WeakMap();
+  }
 
   async of(quests: readonly BookQuest[]): Promise<readonly BookQuest[]> {
     const made = await Promise.all(quests.map((quest) => this.quest(quest)));

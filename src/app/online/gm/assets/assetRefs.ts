@@ -35,6 +35,8 @@ export interface AssetRefsDeps {
   readonly pyramids?: PyramidSource | undefined;
   /** Notes an asset; its id, or undefined where players are to fetch it from the GM. */
   register(asset: Registration): Promise<string | undefined>;
+  /** Players hold a reference no more. */
+  release(ref: AssetRef): void;
   /** Whether the store takes no pyramids (a relay without them): maps then go as images. */
   tilesRefused(): boolean;
 }
@@ -68,6 +70,10 @@ export class AssetRefs implements AssetStoring {
     const { size } = stat;
     const id = await this.deps.register({ key: hash, hash, size, mime, use, source: { path }, handed: true });
     return { hash, size, mime, ...(id === undefined ? {} : { id }) };
+  }
+
+  release(ref: AssetRef): void {
+    this.deps.release(ref);
   }
 
   async mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef> {

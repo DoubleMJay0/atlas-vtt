@@ -100,6 +100,7 @@ export class InputShare {
     this.fogOf = undefined;
     this.fogAliases.clear();
     this.lighting = null;
+    this.releaseMask();
     this.mask = null;
     this.pacer.cancel();
     this.exploredPacer.cancel();
@@ -182,8 +183,16 @@ export class InputShare {
     let ref: AssetRef | null = null;
     if (bytes !== null) ref = inline || stored === undefined ? { hash: await sha256Hex(bytes), size: bytes.length, mime: 'image/png' } : await stored.refOf(bytes, 'image/png', ASSET_USES.explored);
     if (this.scene !== scene) return;
+    // The memory it replaces need not go up any more, nor be told of.
+    if (this.mask?.ref?.id !== ref?.id) this.releaseMask();
     this.mask = { source, ref, bytes };
     this.publish({ t: 'explored', scene: scene.id, mask: ref, ...(inline && { png: toBase64(bytes) }) });
+  }
+
+  /** Lets go of the stored explored memory players were sent last. */
+  private releaseMask(): void {
+    const ref = this.mask?.ref;
+    if (ref?.id !== undefined) this.ports.stored?.release(ref);
   }
 
   /** Sends a message unless it says what the last of its kind said. */

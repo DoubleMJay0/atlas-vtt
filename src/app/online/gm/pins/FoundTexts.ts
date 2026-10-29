@@ -58,6 +58,11 @@ export class FoundTexts {
     return reading === null ? null : { reading, handout: await foundHandout(reading, this.images, this.stored) };
   }
 
+  /** Reads every kept note again: its references may go another way now (the store refused ids). */
+  refreshAll(): void {
+    for (const [id, kept] of this.kept) void this.refresh(id, kept.path + headingPart(kept.pin.link), kept.pin);
+  }
+
   /** Keeps the note of a new entry current and its assets served. */
   keep(id: string, read: FoundRead, pin: FoundPin): void {
     this.kept.set(id, { path: read.reading.path, pin, handout: read.handout });

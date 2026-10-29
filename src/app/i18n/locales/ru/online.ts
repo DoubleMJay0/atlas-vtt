@@ -4,6 +4,7 @@ export const online: Translation = {
   'online.assetsQuota': 'Место для копий файлов для игроков закончилось. Новые файлы игроки получают из этого Obsidian, пока он открыт; удалите копии в панели стола, чтобы освободить место.',
   'online.assetsRestricted': 'Этой учётной записи сейчас нельзя делиться файлами с игроками.',
   'online.assetsMapTooLarge': 'Эта карта пока слишком велика, чтобы показать её игрокам.',
+  'online.mapUnreadable': 'Изображение карты этой сцены нельзя передать игрокам.',
   'online.assetsFailed': 'Не удалось передать файл игрокам.',
   'online.sharedUsage': 'Для игроков хранится: {used} из {quota}',
   'online.sharedUsageLeaves': {

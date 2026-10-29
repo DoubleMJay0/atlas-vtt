@@ -17,8 +17,8 @@ export const ASSET_USES = {
   map: { kind: 'image', rank: ASSET_RANKS.map },
   /** The art of a token players see: on the map, in the initiative list, as a speaker in the log, on a sheet. */
   art: { kind: 'image', rank: ASSET_RANKS.art },
-  /** An explored memory too large to go inline. */
-  explored: { kind: 'image', rank: ASSET_RANKS.art },
+  /** An explored memory too large to go inline: after the map, since a newer one may replace it every few seconds. */
+  explored: { kind: 'image', rank: ASSET_RANKS.mapLevels },
   /** An animated map's video. */
   video: { kind: 'video', rank: ASSET_RANKS.video },
   /** An image shown over the map, the world map, an image of a quest or a found note. */
@@ -46,4 +46,6 @@ export interface AssetStoring {
    * where this device can build one pages can draw, else the image, as `refOf` hands it.
    */
   mapRef(bytes: Uint8Array<ArrayBuffer>, mime: string, path: string): Promise<AssetRef>;
+  /** Players hold a reference no more (one a newer one replaced): it need not go up, and its share is named no more. */
+  release(ref: AssetRef): void;
 }

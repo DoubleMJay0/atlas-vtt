@@ -47,16 +47,37 @@ export class RestingLatency {
   }
 }
 
-/** Turns for requests, as many at once as `limit` says now; a turn given back lets the next out. */
+/** How urgent a request is: its asset's rank (lower first), then how recently the asset was asked for (later first). */
+export interface SlotPriority {
+  readonly rank: number;
+  readonly stamp: number;
+}
+
+interface Waiter {
+  readonly priority: () => SlotPriority;
+  /** The order it came in: of one asset, parts go in order. */
+  readonly order: number;
+  readonly grant: () => void;
+}
+
+/**
+ * Turns for requests, as many at once as `limit` says now, given to the most urgent waiter first, by its
+ * asset's priority as it is when a turn frees (presenting another scene puts its assets ahead of parts
+ * of a video already waiting); a turn given back lets the next out. Closed, every waiter and every
+ * later request is let through at once, for the caller to see that its work was stopped.
+ */
 export class Slots {
   private active = 0;
-  private readonly waiting: (() => void)[] = [];
+  private waiting: Waiter[] = [];
+  private count = 0;
+  private closed = false;
 
   constructor(private readonly limit: () => number) {}
 
-  take(): Promise<() => void> {
+  take(priority: () => SlotPriority = () => ({ rank: 0, stamp: 0 })): Promise<() => void> {
     return new Promise((resolve) => {
-      this.waiting.push(() => resolve(this.releaser()));
+      if (this.closed) return resolve(() => undefined);
+      this.waiting.push({ priority, order: (this.count += 1), grant: () => resolve(this.releaser()) });
       this.drain();
     });
   }
@@ -64,13 +85,37 @@ export class Slots {
   /** Lets out whoever waits where the limit grew. */
   drain(): void {
     while (this.waiting.length > 0 && this.active < this.limit()) {
+      const next = this.mostUrgent();
+      this.waiting = this.waiting.filter((waiter) => waiter !== next);
       this.active += 1;
-      this.waiting.shift()?.();
+      next.grant();
     }
+  }
+
+  /** Lets every waiter through, and every later request at once. */
+  close(): void {
+    this.closed = true;
+    const waiting = this.waiting;
+    this.waiting = [];
+    for (const waiter of waiting) waiter.grant();
   }
 
   get busy(): number {
     return this.active;
+  }
+
+  private mostUrgent(): Waiter {
+    let best = this.waiting[0]!;
+    let bestPriority = best.priority();
+    for (const waiter of this.waiting.slice(1)) {
+      const priority = waiter.priority();
+      const before = priority.rank !== bestPriority.rank ? priority.rank < bestPriority.rank : priority.stamp !== bestPriority.stamp ? priority.stamp > bestPriority.stamp : waiter.order < best.order;
+      if (before) {
+        best = waiter;
+        bestPriority = priority;
+      }
+    }
+    return best;
   }
 
   private releaser(): () => void {

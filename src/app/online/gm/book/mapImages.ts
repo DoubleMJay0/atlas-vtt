@@ -72,6 +72,11 @@ export class MapImages {
     return this.problems.get(path) ?? null;
   }
 
+  /** Forgets every image: each is read again (its reference may go out another way now). */
+  clear(): void {
+    this.known.clear();
+  }
+
   /** Forgets every image but those at `paths`: the maps players may be shown now. */
   keepOnly(paths: ReadonlySet<string>): void {
     for (const path of [...this.known.keys()]) if (!paths.has(path)) this.known.delete(path);

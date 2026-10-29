@@ -9,7 +9,7 @@ import { sceneState, shareHarness } from './shareHarness.ts';
 type Explored = Extract<GmMessage, { t: 'explored' }>;
 
 /** A lit scene whose explored memory is `mask`, shared with a store; the explored messages players got. */
-async function exploredSent(mask: Uint8Array<ArrayBuffer>): Promise<{ readonly sent: Explored[]; readonly store: ReturnType<typeof publisherHarness> }> {
+async function exploredSent(mask: Uint8Array<ArrayBuffer>): Promise<{ readonly sent: Explored[]; readonly store: ReturnType<typeof publisherHarness>; readonly table: ReturnType<typeof shareHarness> }> {
   const store = publisherHarness();
   const table = shareHarness(sceneState({ lighting: { enabled: true, ambient: 0.2 }, exploredMask: `data:image/png;base64,${toBase64(mask)}` }), new Map([['maps/cave.webp', bytesOf(300, 1)]]), undefined, undefined, store.publisher.storing);
   table.share.start();
@@ -18,7 +18,7 @@ async function exploredSent(mask: Uint8Array<ArrayBuffer>): Promise<{ readonly s
   await store.idle();
   await table.settle();
   await store.advance(200);
-  return { sent: table.sent.flatMap(({ body }) => (body.t === 'explored' ? [body] : [])), store };
+  return { sent: table.sent.flatMap(({ body }) => (body.t === 'explored' ? [body] : [])), store, table };
 }
 
 describe('the explored memory', () => {
@@ -37,10 +37,15 @@ describe('the explored memory', () => {
 
   it('goes by reference alone where it is larger than goes inline, stored under its id', async () => {
     const mask = bytesOf(EXPLORED_INLINE_BYTES + 1, 4);
-    const { sent, store } = await exploredSent(mask);
+    const { sent, store, table } = await exploredSent(mask);
     const hash = await sha256Hex(mask);
     expect(sent.at(-1)?.mask).toEqual({ hash, size: mask.length, mime: 'image/png', id: await assetIdOf(SALT, hash) });
     expect(sent.at(-1)).not.toHaveProperty('png');
     expect(store.client.offers.flat()).toContainEqual({ id: await assetIdOf(SALT, hash), kind: 'image', size: mask.length });
+    // A page that fetches it by hash from the GM still gets it.
+    table.sent.length = 0;
+    table.share.receive('p1', { t: 'asset-request', hash });
+    await table.settle();
+    expect(table.sent.some(({ body, to }) => body.t === 'asset-chunk' && body.hash === hash && to === 'p1')).toBe(true);
   });
 });

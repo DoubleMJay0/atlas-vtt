@@ -126,6 +126,8 @@ export class OnlineFeature extends Component {
         this.copies.clear();
       },
       beforeSignOut: async () => {
+        // The table uploads nothing more before the copies go, or it would store them again.
+        this.online.table?.suspendAssets();
         if (this.settings.deleteCopiesOnSignOut) await this.copies.removeAll(true);
       },
     });

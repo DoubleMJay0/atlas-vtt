@@ -37,7 +37,8 @@ const failed = <T>(trouble: StoreTrouble): StoreResult<T> => ({ ok: false, troub
  * are: nothing is decoded or encoded. Never logs a token, an id or a hash.
  */
 export class AssetStoreClient {
-  constructor(private readonly origin: string, private readonly token: () => string | null) {}
+  /** `pause` waits between two calls of a removal the store answered in part (by default `REMOVAL_PAUSE_MS`). */
+  constructor(private readonly origin: string, private readonly token: () => string | null, private readonly pause: (ms: number) => Promise<void> = windowPause) {}
 
   async offer(assets: readonly OfferedAsset[]): Promise<StoreResult<Map<string, OfferAnswer>>> {
     const response = await this.call({ path: ASSET_ROUTES.offer, method: 'POST', json: { assets } });
@@ -81,6 +82,7 @@ export class AssetStoreClient {
       const response = await this.call({ path: ASSET_ROUTES.all, method: 'DELETE' });
       if (response.status === 200 || response.status === 204) return { ok: true, value: null };
       if (response.status !== 202) return failed(troubleOf(response.status));
+      await this.pause(REMOVAL_PAUSE_MS);
     }
     return failed('retry');
   }
@@ -119,8 +121,11 @@ export class AssetStoreClient {
   }
 }
 
-/** How often one removal of every copy asks the store again before it gives up for now. */
-const MAX_DELETE_ROUNDS = 20;
+/** How often one removal of every copy asks the store again before it gives up for now, and how long it waits between. */
+export const MAX_DELETE_ROUNDS = 20;
+export const REMOVAL_PAUSE_MS = 500;
+
+const windowPause = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const isStored = (status: number): boolean => (status >= 200 && status < 300) || status === 412;
 

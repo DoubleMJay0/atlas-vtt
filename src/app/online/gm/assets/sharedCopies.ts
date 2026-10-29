@@ -63,11 +63,15 @@ export class SharedCopies {
     return this.asking;
   }
 
-  /** Removes every shared copy; whether the store did. `quiet`: the GM is told nothing (signing out). */
-  async removeAll(quiet = false): Promise<boolean> {
+  /**
+   * Removes every shared copy; whether the store did. Asked by the GM, the GM is told and a running table
+   * shares what players see again; signing out (`signingOut`), nothing more is said or shared.
+   */
+  async removeAll(signingOut = false): Promise<boolean> {
     const removed = await this.ports.client.deleteAll();
     if (!removed.ok && removed.trouble === 'signed-out') this.ports.signedOutByServer();
-    if (!quiet) this.ports.notify(t(removed.ok ? 'online.removedShared' : 'online.removeSharedFailed'));
+    if (signingOut) return removed.ok;
+    this.ports.notify(t(removed.ok ? 'online.removedShared' : 'online.removeSharedFailed'));
     if (!removed.ok) return false;
     this.ports.emptied();
     await this.refresh(true);

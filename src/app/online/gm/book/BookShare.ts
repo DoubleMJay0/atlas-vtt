@@ -140,6 +140,15 @@ export class BookShare implements LootRecipientSource {
     this.update();
   }
 
+  /** References the books hand out may go another way now (the store refused ids): art, maps, quests and statblocks are read again. */
+  refreshAssets(): void {
+    this.art.clear();
+    this.maps.forgetImages();
+    this.maps.forget();
+    this.questList.forget();
+    this.statblockChanged(null);
+  }
+
   /** The quests may be others now (the campaign played, a quest note written, added or gone): they are asked for anew. */
   questsChanged(): void {
     this.questList.forget();

@@ -71,6 +71,8 @@ export class UploadQueue {
       known.rank = Math.min(known.rank, entry.rank);
       known.stamp = this.count;
       known.handed ||= entry.handed;
+      // Given up only for want of its bytes (let go once stored, then the store was emptied): it goes up again.
+      if (known.state === 'failed' && known.source === null) Object.assign(known, { state: 'new', failures: 0, rejected: 0, retryAt: 0 });
       known.source ??= entry.source;
       return known;
     }
@@ -85,24 +87,14 @@ export class UploadQueue {
     return [...this.entries.values()].filter((entry) => entry.state === 'new' && entry.retryAt <= now);
   }
 
-  /** The asset to upload next, or undefined while none may go now. */
-  next(now: number): QueueEntry | undefined {
+  /** The asset to upload next of those `allow` lets go, or undefined while none may go now. */
+  next(now: number, allow: (entry: QueueEntry) => boolean = () => true): QueueEntry | undefined {
     let best: QueueEntry | undefined;
     for (const entry of this.entries.values()) {
-      if (entry.state !== 'queued' || entry.retryAt > now) continue;
+      if (entry.state !== 'queued' || entry.retryAt > now || !allow(entry)) continue;
       if (best === undefined || entry.rank < best.rank || (entry.rank === best.rank && entry.stamp > best.stamp)) best = entry;
     }
     return best;
-  }
-
-  /** When the earliest asset that waits for a retry may go, or null while none waits. */
-  nextRetry(now: number): number | null {
-    let soonest: number | null = null;
-    for (const entry of this.entries.values()) {
-      if ((entry.state !== 'queued' && entry.state !== 'new') || entry.retryAt <= now) continue;
-      soonest = soonest === null ? entry.retryAt : Math.min(soonest, entry.retryAt);
-    }
-    return soonest;
   }
 
   /**

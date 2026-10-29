@@ -91,6 +91,7 @@ describe('the asset publisher', () => {
     store.files.set('maps/river.webm', video);
     const ref = await store.publisher.storing.fileRef('maps/river.webm', 'video/webm', ASSET_USES.video);
     expect(ref?.id).toBeDefined();
+    store.hand(ref ?? {});
     store.client.arrived.set(ref?.id ?? '', [1, 3]);
     store.connection = { players: 1, latencyMs: 20 };
     await store.advance(200);
@@ -167,6 +168,8 @@ describe('the asset publisher', () => {
     const map = await store.publisher.storing.refOf(bytesOf(4000, 1), 'image/webp', ASSET_USES.map);
     store.client.answer = (asset) => (asset.id === map.id ? { answer: 'need', upload: 'single', partBytes: 95 * MIB } : { answer: 'have' });
     const art = await store.publisher.storing.refOf(bytesOf(100, 2), 'image/png', ASSET_USES.art);
+    store.hand(map);
+    store.hand(art);
     await store.advance(2000);
     expect(store.sent.every(({ body }) => body.t === 'asset-progress')).toBe(true);
     expect(store.sent.some(({ live }) => live)).toBe(true);
@@ -184,7 +187,9 @@ describe('the asset publisher', () => {
     const store = publisherHarness();
     store.files.set('art/a.png', bytesOf(100, 1));
     await store.publisher.storing.refOf(bytesOf(100, 1), 'image/png', ASSET_USES.art, 'art/a.png');
+    // Written again: its time changed, so it is hashed again before it goes.
     store.files.set('art/a.png', bytesOf(100, 2));
+    store.stats.set('art/a.png', { mtime: 2, size: 100 });
     await store.advance(200);
     expect(store.reads.get('art/a.png')).toBe(1);
     expect(store.client.calls).toEqual([]);

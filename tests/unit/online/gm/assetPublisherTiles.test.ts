@@ -70,6 +70,7 @@ describe('a map published as its tile pyramid', () => {
     store.connection = { players: 2, latencyMs: 20 };
     store.client.hold = true;
     const ref = await store.publisher.storing.mapRef(MAP, 'image/webp', PATH);
+    store.hand(ref);
     await store.advance(200);
     store.client.release(1);
     await store.idle();

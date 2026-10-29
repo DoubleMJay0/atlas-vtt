@@ -88,6 +88,11 @@ export class WorldMaps {
     return root === undefined ? null : this.images.problemOf(root.image);
   }
 
+  /** Reads every image again: its reference may go out another way now (without a stored id). */
+  forgetImages(): void {
+    this.images.clear();
+  }
+
   /** Asks again which maps are shown: the campaign, its world map, a scene's pins or a map's artwork may be another now. A file already read is not read again. */
   forget(): void {
     this.tree.forget();
