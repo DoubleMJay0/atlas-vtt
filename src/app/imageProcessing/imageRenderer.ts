@@ -192,22 +192,29 @@ function fitsAsItIs(bitmap: ImageBitmap, layout: ImageLayout): boolean {
 }
 
 /**
- * A source the browser cannot decode, read in bands at an eighth of its size for the thumbnail
- * and preview; the image itself is kept as it is, since the band decoders read only what fits a
- * map without scaling.
+ * A source the browser cannot decode, read in bands at an eighth of its size. A map it fits as it
+ * is (the layout is a map's) is kept, its thumbnail and preview made from the eighth; anything
+ * smaller (a thumbnail of a vault image, a cover, token art) is fit from the eighth, which holds
+ * every pixel such a fit needs, and encoded like any scaled picture.
  */
 async function renderBandJob(job: ImageJob, band: { format: string }): Promise<ImageJobResult> {
-  if (!(job.source instanceof Blob)) throw new Error('A band job needs the image bytes.');
+  if (!(job.source instanceof Blob) || job.layout.kind !== 'fit') throw new Error('A band job needs the image bytes and a fit.');
   const decoder = bandDecoderFor(band.format);
   if (!decoder) throw new Error(`No band decoder reads ${band.format}.`);
   const bytes = new Uint8Array(await job.source.arrayBuffer());
-  const { width, height } = reducedSize(decoder.inspect(bytes), 8);
+  const natural = decoder.inspect(bytes);
+  const { width, height } = reducedSize(natural, 8);
   const pixels = new Uint8ClampedArray(width * height * 4);
   await decoder.decode(bytes, { reduce: 8, onBand: (rows) => { pixels.set(rows.data.subarray(0, rows.rows * width * 4), rows.y * width * 4); } });
   const reduced = await createImageBitmap(new ImageData(pixels, width, height));
   try {
     const sourcePreview = await renderCopy(reduced, job.sourcePreview);
-    return { image: job.source, sourcePreview, ...await renderCopies(reduced, job) };
+    const target = fitSize(natural, job.layout);
+    const kept = target.width === natural.width && target.height === natural.height;
+    if (kept && !job.webpOnly) return { image: job.source, sourcePreview, ...await renderCopies(reduced, job) };
+    if (target.width > width || target.height > height) throw new Error(`A fit of ${target.width} × ${target.height} needs more than an eighth of the image.`);
+    const canvas = renderFit(reduced, target);
+    return { image: await encode(canvas, job.quality), sourcePreview, ...await renderCopies(canvas, job), scaledDown: scaleDown(job.layout, natural, canvas) };
   } finally {
     reduced.close();
   }

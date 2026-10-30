@@ -91,7 +91,8 @@ export function readJpegHeader(bytes: Uint8Array): JpegHeader {
     } else if (marker === 0xdc) corrupt('A DNL segment before the scan.');
     else if (marker >= 0xe0 && marker <= 0xef) {
       readAppSegment(bytes, marker, start, end, app);
-      if (app.orientation !== undefined && app.orientation !== 1) {
+      // Values outside 1 to 8 are no orientation; browsers show such a file as stored.
+      if (app.orientation !== undefined && app.orientation !== 1 && app.orientation >= 2 && app.orientation <= 8) {
         throw new BandUnsupportedError('orientation', `EXIF orientation ${app.orientation} turns or mirrors the stored rows.`);
       }
     }

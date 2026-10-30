@@ -1,6 +1,7 @@
 import { type App, type TFile } from 'obsidian';
 import { t } from '../../i18n';
 import { describeError } from '../../utils/errors';
+import { unsupportedMessage } from '../../imageProcessing/band/unsupportedMessage';
 import { decodeImageOnMainThread, requiredMainThreadDecode } from './mainThreadDecode';
 import { TileDecoderClient, TileOpenError, type OpenedMap } from './TileDecoderClient';
 import { OVERVIEW_MAX_SIDE, type TileRef } from './pyramid';
@@ -139,7 +140,7 @@ function reasonOf(error: unknown): string {
   }
   if (error instanceof TileOpenError && error.failure.kind === 'unsupported') {
     const { width, height, reason } = error.failure;
-    return t('image.unsupported', { width, height, advice: t(`image.unsupported.${reason}`) });
+    return unsupportedMessage(width, height, reason);
   }
   return describeError(error);
 }

@@ -75,7 +75,7 @@ describe('the tile core reading a map in bands', () => {
     let stops = 0;
     const decoder = fakeBandDecoder({ width, height, bandRows: 400 });
     // Room for the band build alone, not for it and the second map's decoded levels together.
-    const h = coreHarness({ bandDecoderOf: () => Promise.resolve(decoder), decodedBudget: bandBuildCost(width) + decodedSizeCost(300, 200) - 1 });
+    const h = coreHarness({ bandDecoderOf: () => Promise.resolve(decoder), decodedBudget: bandBuildCost(width, 32) + decodedSizeCost(300, 200) - 1 });
     const identity = { path: 'huge.png', size: 32, mtime: 1 };
     const prebuilt = h.core.prebuild(identity, fakePng(width, height));
     // A second map opening makes the prebuild, which nobody shows, give way.

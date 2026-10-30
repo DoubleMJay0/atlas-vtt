@@ -1,5 +1,6 @@
 import { bandDecodable } from '../../imageProcessing/band/bandDecoders';
 import { BandUnsupportedError, type BandDecoder } from '../../imageProcessing/band/bandTypes';
+import { BAND_FORMATS, BAND_MAX_PIXELS, DECODER_MAX_SIDE, decodable } from '../../imageProcessing/decodeLimits';
 import { imageHeader } from '../../imageProcessing/imageDimensions';
 import { BandBuild, bandBuildCost } from './band/bandBuild';
 import { DecodeBudget } from './decodeBudget';
@@ -156,6 +157,10 @@ export class MapEntries {
     if (!decoded) {
       const banded = await (this.deps.bandDecoderOf ?? bandDecodable)(blob);
       if (banded) return this.prepareBands(entry, bytes, banded);
+      const header = await imageHeader(blob);
+      if (header && !decodable(header) && BAND_FORMATS.has(header.format)) {
+        throw new OpenError({ kind: 'too-large', width: header.width, height: header.height, maxSide: DECODER_MAX_SIDE, maxPixels: BAND_MAX_PIXELS });
+      }
     }
     try {
       if (decoded) checkDecodable(decoded);
@@ -195,21 +200,24 @@ export class MapEntries {
       }
       throw error;
     }
-    entry.releaseBudget = await this.budget.acquire({ bytes: bandBuildCost(pyramid.width), urgent: () => this.shown(entry) });
     entry.pyramid = pyramid;
-    if (this.disposed || (!this.shown(entry) && this.budget.pressured)) {
-      this.releaseLevels(entry);
-      if (this.entries.get(entry.hash) === entry) this.entries.delete(entry.hash);
-      return;
-    }
+    // Made before the wait for memory, so a tile asked for meanwhile waits for the build instead of missing.
     const build = new BandBuild(entry.hash, pyramid, source, decoder, {
       store: this.deps.store,
       graphics: this.deps.graphics,
       yieldToRequests: this.deps.yieldToRequests,
       emit: this.deps.emit,
     });
-    entry.build = build;
     entry.whenStored = (ref) => build.whenStored(ref);
+    entry.releaseBudget = await this.budget.acquire({ bytes: bandBuildCost(pyramid.width, source.byteLength), urgent: () => this.shown(entry) });
+    if (this.disposed || (!this.shown(entry) && this.budget.pressured)) {
+      build.abandon();
+      entry.whenStored = null;
+      this.releaseLevels(entry);
+      if (this.entries.get(entry.hash) === entry) this.entries.delete(entry.hash);
+      return;
+    }
+    entry.build = build;
     entry.built = build.run();
     void entry.built.then((outcome) => this.bandBuildEnded(entry, bytes, decoder, outcome));
   }

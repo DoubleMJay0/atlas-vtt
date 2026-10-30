@@ -33,11 +33,12 @@ export function bandPasses(pyramid: Pyramid): Pass[] {
 }
 
 /**
- * Bytes a band build holds at most: each level's rows of one tile row (`BandPyramid`), halved
- * level by level, plus the decoder's working rows; well under the levels a decoded image holds.
+ * Bytes a band build holds at most: the file, each level's rows of one tile row (`BandPyramid`,
+ * halved level by level: twice the base level's), the bitmap of the band being encoded, and the
+ * decoder's working rows; well under the levels a decoded image holds.
  */
-export function bandBuildCost(width: number): number {
-  return width * 4 * (512 * 2 + 128);
+export function bandBuildCost(width: number, sourceBytes: number): number {
+  return sourceBytes + width * 4 * (512 * 2 + 512 + 128);
 }
 
 class StoppedError extends Error {}
@@ -66,6 +67,12 @@ export class BandBuild {
   /** Ends the build before its next band; what was written stays and a later build resumes from it. */
   stop(): void {
     this.controller.abort(new StoppedError('The build was stopped.'));
+  }
+
+  /** A build that never runs: whoever waits for a tile is told so. */
+  abandon(): void {
+    this.stop();
+    this.end('stopped');
   }
 
   /** Resolves once the tile is in the cache; rejects once the build ended without writing it. */

@@ -48,6 +48,14 @@ export class MissingTileError extends Error {}
 
 const CLOSED = Symbol('closed');
 
+/** Resolves once `signal` aborts; never while it does not. */
+function aborted(signal: AbortSignal): Promise<undefined> {
+  return new Promise((resolve) => {
+    if (signal.aborted) resolve(undefined);
+    else signal.addEventListener('abort', () => resolve(undefined), { once: true });
+  });
+}
+
 /** The coarsest level whose longer side is at least `maxSide`; level 0 when none is. */
 export function overviewSourceLevel(pyramid: Pyramid, maxSide: number): PyramidLevel {
   for (let index = pyramid.levels.length - 1; index > 0; index--) {
@@ -132,13 +140,13 @@ export class TileServer {
     }
   }
 
-  /** Runs `wait` with the request marked as waiting for the build, so the build does not wait for it in turn. */
-  private async whileWaiting<T>(id: number, wait: () => Promise<T>): Promise<T> {
+  /** Runs `wait` with the request marked as waiting for the build, so the build does not wait for it in turn; an abort ends the wait at once. */
+  private async whileWaiting<T>(id: number, wait: () => Promise<T>, signal: AbortSignal): Promise<T | undefined> {
     const request = this.requests.get(id);
     if (request) request.waiting += 1;
     this.settleIdle();
     try {
-      return await wait();
+      return await Promise.race([wait(), aborted(signal)]);
     } finally {
       if (request) request.waiting -= 1;
     }
@@ -149,8 +157,9 @@ export class TileServer {
     if (cropped) return cropped;
     if (signal.aborted) return null;
     // A band build writes the map row by row: a tile it has not reached is waited for, not missing.
+    // A build that ended without it rejects; the cache is then asked, which may hold it from an earlier build.
     const { whenStored } = source;
-    if (whenStored) await this.whileWaiting(id, () => whenStored(ref));
+    if (whenStored) await this.whileWaiting(id, () => whenStored(ref), signal).catch(() => undefined);
     if (signal.aborted) return null;
     const bytes = await this.store.getTile(source.hash, ref);
     if (!bytes) throw new MissingTileError(`Tile ${tileKey(ref)} of map image ${source.hash} is not in the cache.`);

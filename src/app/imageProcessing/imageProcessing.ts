@@ -1,6 +1,7 @@
 import { t } from '../i18n';
 import { BAND_FORMATS, BAND_MAX_PIXELS, bandDecodable, DECODED_MAX_PIXELS, DECODER_MAX_SIDE, decodable, scaledJpegDecodeSize } from './decodeLimits';
 import type { BandUnsupportedReason } from './band/bandTypes';
+import { unsupportedMessage } from './band/unsupportedMessage';
 import type { FramePlacement, ImageJob, ImageJobResult, ImageLayout, ThumbnailSpec } from './imageJob';
 import { imageHeader, type ImageHeader } from './imageDimensions';
 import { withDecodedImage } from './imageElement';
@@ -150,7 +151,7 @@ export class ImageTooLargeError extends Error {
 /** Raised for a source larger than the browser decodes that the band decoders refuse, with a message that says what to export. */
 export class ImageUnsupportedError extends Error {
   constructor(readonly size: Size, readonly reason: BandUnsupportedReason) {
-    super(t('image.unsupported', { width: size.width, height: size.height, advice: t(`image.unsupported.${reason}`) }));
+    super(unsupportedMessage(size.width, size.height, reason));
   }
 }
 
@@ -158,13 +159,12 @@ const UNSUPPORTED_REASONS: ReadonlySet<string> = new Set<BandUnsupportedReason>(
 const isUnsupportedReason = (reason: string): reason is BandUnsupportedReason => UNSUPPORTED_REASONS.has(reason);
 
 /**
- * Whether an upload the browser cannot decode goes to a band decoder: its header must fit the fit
- * layout as it is, since bands cannot be scaled down to a smaller whole.
+ * Whether an upload the browser cannot decode goes to a band decoder: a fit of a JPEG or PNG within
+ * the band decoders' cap. One that fits the layout as it is is kept; a smaller fit (a thumbnail, a
+ * cover, token art) is made from the decode at an eighth.
  */
 function bandJobOf(header: ImageHeader | null, layout: ImageLayout): ImageJob['band'] {
-  if (!header || layout.kind !== 'fit' || !bandDecodable(header)) return undefined;
-  const fits = header.width <= layout.maxWidth && header.height <= layout.maxHeight && header.width * header.height <= (layout.maxPixels ?? Infinity);
-  return fits ? { format: header.format } : undefined;
+  return header && layout.kind === 'fit' && bandDecodable(header) ? { format: header.format } : undefined;
 }
 
 /** A JPEG larger than a fit keeps is decoded at the smallest eighth of its size that still has every pixel the fit keeps. */
@@ -180,8 +180,8 @@ async function process(source: Blob, job: Omit<ImageJob, 'source'>, options: Pro
   const band = bandJobOf(header, job.layout);
   if (header && !decodable(header) && !band) throw new ImageTooLargeError(header, header.format);
   const scaledDecode = band ? undefined : scaledDecodeOf(header, job.layout);
-  // A band decode holds an eighth of the image and the decoder's rows: far less than a decode.
-  const cost = band ? jobCost({ width: Math.ceil(header!.width / 8), height: Math.ceil(header!.height / 8) }) : jobCost(scaledDecode?.decoded ?? header);
+  // A band decode holds the file's bytes, an eighth of the image and the decoder's rows: far less than a decode.
+  const cost = band ? source.size + (jobCost({ width: Math.ceil(header!.width / 8), height: Math.ceil(header!.height / 8) }) ?? 0) : jobCost(scaledDecode?.decoded ?? header);
   const run: ImageJobOptions = { signal: options.signal, background: options.background ?? false, cost };
   const withCopies = { ...job, thumbnail: options.thumbnail, preview: options.preview, sourcePreview: options.sourcePreview, webpOnly: options.webpOnly, band };
   // One pool for both attempts: after unload it refuses the fallback and frees its bitmap

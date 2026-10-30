@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { DECODED_MAX_PIXELS, WEBP_MAX_SIDE } from '../decodeLimits';
 import { imageHeader } from '../imageDimensions';
-import { disposeImageProcessing, IMAGE_PRESETS, ImageTooLargeError, MAP_MAX_PIXELS, MAP_MAX_SIDE, optimizeImage } from '../imageProcessing';
+import { disposeImageProcessing, IMAGE_PRESETS, ImageTooLargeError, MAP_MAX_PIXELS, MAP_MAX_SIDE, optimizeImage, renderThumbnail } from '../imageProcessing';
 import type { Size } from '../imageLayout';
 import { grayJpeg } from './grayJpeg';
 
@@ -86,6 +86,14 @@ describe('importing maps with the real workers', () => {
     expect(thumbnail.size).toEqual({ width: 256, height: 256 });
     // The parchment colour the map was painted with, read through the band decoder's eighth.
     expect(thumbnail.luminanceAt(128, 128)).toBeCloseTo(0.299 * 0xe9 + 0.587 * 0xdc + 0.114 * 0xc0, -1);
+  }, 120_000);
+
+  it('makes a thumbnail of a PNG the browser cannot decode from the eighth, as the asset cards need', async () => {
+    const upload = await png(16384, 16384);
+
+    const thumbnail = await renderThumbnail(upload, { size: 256, quality: 0.8 });
+
+    expect(await imageHeader(new Blob([thumbnail]))).toMatchObject({ format: 'webp', width: 256, height: 256 });
   }, 120_000);
 
   it('fits a map with more pixels than the band decoders take to 400 megapixels only where the browser can decode it', async () => {

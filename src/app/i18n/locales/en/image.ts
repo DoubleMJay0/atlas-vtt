@@ -20,4 +20,5 @@ export const image = {
   'image.unsupported.coding': 'Save it as a plain 8-bit JPEG and import it again.',
   'image.unsupported.components': 'Save it as an RGB JPEG and import it again.',
   'image.unsupported.corrupt': 'The file could not be read; export it again.',
+  'image.unreadable': 'This image is {width} × {height} px, more than Obsidian opens at once, and its file could not be read. Export it again and import it again.',
 } as const satisfies Record<string, Message>;

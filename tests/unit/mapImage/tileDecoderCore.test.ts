@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { BAND_MAX_PIXELS } from '../../../src/app/imageProcessing/decodeLimits';
-import { MAX_SOURCE_PIXELS } from '../../../src/app/pixi/mapImage/decodedLevels';
 import { MemoryTileBackend } from '../../../src/app/pixi/mapImage/memoryTileBackend';
 import { inThreadPort } from '../../../src/app/pixi/mapImage/tilePorts';
 import type { TileMessage } from '../../../src/app/pixi/mapImage/tileProtocol';
@@ -310,7 +309,8 @@ describe('TileDecoderCore', () => {
     const h = coreHarness();
     const side = Math.ceil(Math.sqrt(BAND_MAX_PIXELS)) + 1;
     const outcome = await h.core.open(identity, fakePng(side, side));
-    expect(outcome).toMatchObject({ kind: 'failed', failure: { kind: 'too-large', width: side, height: side, maxPixels: MAX_SOURCE_PIXELS } });
+    // A PNG is a band format: the limit named is the band decoders', not the browser's.
+    expect(outcome).toMatchObject({ kind: 'failed', failure: { kind: 'too-large', width: side, height: side, maxPixels: BAND_MAX_PIXELS } });
     expect(h.graphics.decodes).toHaveLength(0);
   });
 
