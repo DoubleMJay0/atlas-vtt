@@ -76,6 +76,13 @@ export class InputShare {
   private readonly fogAliases = new Map<string, string>();
   /** The saved explored memory players were sent last (a data URL), with its stored reference where it went by one; null before one was. */
   private mask: { readonly source: string | null; readonly ref: AssetRef | null } | null = null;
+  /** The count of edits by hand (`exploredEdits`) and the explored memory saved, as last looked at; null before. */
+  private seen: { readonly edits: number; readonly source: string | null } | null = null;
+  /**
+   * The GM took memory away by hand on this floor (an edit, its undo or redo): `edited` until the
+   * save that holds it, then `saved` until that went to players, as one that replaces theirs.
+   */
+  private cut: 'none' | 'edited' | 'saved' = 'none';
   private readonly pacer: Pacer;
   private readonly exploredPacer: Pacer;
   /** The fog and sight inputs sent: whole for a new scene, a joiner or a player who asks, else as deltas. */
@@ -103,6 +110,8 @@ export class InputShare {
     this.lighting = null;
     this.releaseMask();
     this.mask = null;
+    this.seen = null;
+    this.cut = 'none';
     this.pacer.cancel();
     this.exploredPacer.cancel();
     this.update();
@@ -112,7 +121,24 @@ export class InputShare {
   update(): void {
     if (this.scene === null) return;
     this.pacer.request();
-    if (this.scene.lit && levelExploredMask(this.store.getState()) !== this.mask?.source) this.exploredPacer.request();
+    if (!this.scene.lit) return;
+    const state = this.store.getState();
+    this.watchCuts(state);
+    if (levelExploredMask(state) !== this.mask?.source) this.exploredPacer.request();
+  }
+
+  /**
+   * Notes an edit by hand of this floor's memory, made while the GM's view shows it, and the save
+   * after it. Sight only ever adds to the memory; a save that holds an edit may have taken some away.
+   */
+  private watchCuts(state: SceneState): void {
+    const seen = this.seen;
+    const source = levelExploredMask(state);
+    this.seen = { edits: state.exploredEdits, source };
+    if (seen === null) return;
+    if (state.exploredEdits !== seen.edits) {
+      if (this.store.shown?.() ?? true) this.cut = 'edited';
+    } else if (this.cut === 'edited' && source !== seen.source) this.cut = 'saved';
   }
 
   /** The last inputs again, whole, to one player or to all. */
@@ -180,6 +206,8 @@ export class InputShare {
     const scene = this.scene;
     const source = levelExploredMask(this.store.getState());
     if (scene === null || !scene.lit || source === this.mask?.source) return;
+    // A memory forgotten while it could not be written goes as none (`ExploredMemory.reset`).
+    const replace = this.cut === 'saved' || (source === null && (this.mask?.source ?? null) !== null);
     const bytes = maskBytes(source);
     const inline = bytes !== null && bytes.length <= EXPLORED_INLINE_BYTES;
     const ref = bytes === null || inline ? null : ((await this.ports.stored?.refOf(bytes, 'image/png', ASSET_USES.explored)) ?? null);
@@ -191,7 +219,8 @@ export class InputShare {
     // The memory it replaces need not go up any more, nor be told of.
     if (this.mask?.ref?.id !== ref?.id) this.releaseMask();
     this.mask = { source, ref };
-    this.publish({ t: 'explored', scene: scene.id, ...(inline ? { png: toBase64(bytes) } : ref !== null && { mask: ref }) });
+    if (this.cut === 'saved') this.cut = 'none';
+    this.publish({ t: 'explored', scene: scene.id, ...(inline ? { png: toBase64(bytes) } : ref !== null && { mask: ref }), ...(replace && { replace: true }) });
   }
 
   /** Lets go of the stored explored memory players were sent last. */

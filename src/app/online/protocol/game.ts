@@ -48,6 +48,8 @@ export const MAX_PARTS = 64;
 
 /** The largest explored memory (a PNG) that goes inline in an `explored` message; a larger one is stored like any asset. */
 export const EXPLORED_INLINE_BYTES = 200 * 1024;
+/** The first GM level whose explored memories say when they replace the players' (`replace`): an older GM's always replace it. */
+export const EXPLORED_MERGE_GM_LEVEL = 10;
 const EXPLORED_INLINE_BASE64 = 4 * Math.ceil(EXPLORED_INLINE_BYTES / 3);
 
 export type GmMessage =
@@ -77,9 +79,11 @@ export type GmMessage =
   /**
    * The explored memory the GM last saved, a PNG: inline as base64 (`png`, at most
    * `EXPLORED_INLINE_BYTES`), else stored and fetched by its id like any image (`mask`); at most one
-   * of the two, and neither is none.
+   * of the two, and neither is none. With `replace` the GM took memory away by hand since the last
+   * one (forgot, erased, undid): this one replaces the players' memory. Without it the players keep
+   * what they have seen since and add this one, which may be older. Added later (level 10).
    */
-  | { readonly t: 'explored'; readonly scene: string; readonly png?: string; readonly mask?: AssetRef }
+  | { readonly t: 'explored'; readonly scene: string; readonly png?: string; readonly mask?: AssetRef; readonly replace?: true }
   /**
    * One piece of a message too large for one frame: `data` is base64 of its JSON text's UTF-8
    * bytes; the pieces of one `id` joined in `index` order are that text.
@@ -169,9 +173,10 @@ function parseSceneInput(value: Record<string, unknown>, scene: string): GmMessa
       return parseLive(value, scene);
     case 'explored': {
       if (value.png !== undefined && !isInlinePng(value.png)) return null;
-      if (value.mask === undefined) return { t: 'explored', scene, ...(value.png === undefined ? {} : { png: value.png }) };
+      const replace = value.replace === true ? { replace: true as const } : {};
+      if (value.mask === undefined) return { t: 'explored', scene, ...(value.png === undefined ? {} : { png: value.png }), ...replace };
       const mask = parseAsset(value.mask);
-      return mask === null || mask.mime !== 'image/png' || value.png !== undefined ? null : { t: 'explored', scene, mask };
+      return mask === null || mask.mime !== 'image/png' || value.png !== undefined ? null : { t: 'explored', scene, mask, ...replace };
     }
     case 'liquids': {
       const liquids = parseLiquids(value.liquids);

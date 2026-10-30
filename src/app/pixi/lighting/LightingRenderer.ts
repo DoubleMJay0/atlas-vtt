@@ -290,6 +290,11 @@ export class LightingRenderer implements SceneLightingView {
     return this.memory.edit(edit);
   }
 
+  /** Takes in a memory of the level shown saved elsewhere (`ExploredMemory.take`): a player's page takes the GM's. */
+  takeExplored(mask: string | null, replace: boolean): void {
+    this.run(() => this.memory.take(mask, replace));
+  }
+
   /** Before the map unloads: save the scene's pending memory into it, then start the next scene blank. */
   beforeMapUnload(): void {
     this.run(() => {
