@@ -1,15 +1,17 @@
 import { MAX_FIELD_TEXT, sheetBase, type BookFieldMessage, type SheetRaw } from '../../protocol/index.ts';
 import { fieldPatches } from '../../../statblocks/editor/statblock-pane/valuePatches';
 import { fieldByKey } from '../../../statblocks/model/fieldKeys';
+import { trimmedRow } from '../../../statblocks/model/tableGrid';
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
 import type { FieldValue, TemplateField } from '../../../statblocks/model/templateTypes';
 import { picksChoice } from '../../../statblocks/values/choicePicks';
+import { noteTable, tableValue } from '../../../statblocks/values/tableValues';
 import { textProblem, valueMisfit } from '../../../statblocks/values/valueFit';
 import { countersAfterEdit } from './counterEdit.ts';
 import { playerAccess } from './playerAccess.ts';
 import { noteMaxRoute } from './resourceMax.ts';
 import {
-  amongOptions, clears, editableTemplate, inOptionOrder, isDice, isLine, isPlainList, isScalar, playerReferences, referencesSafeIn, sentFields, writtenValue,
+  amongOptions, clears, editableTemplate, inOptionOrder, isDice, isLine, isPlainList, playerReferences, referencesSafeIn, sentFields, writtenValue,
   type CheckedEdit, type EditInputs, type PlayerReferences,
 } from './statblockChecks.ts';
 
@@ -43,16 +45,25 @@ function fitsField(field: TemplateField, value: SheetRaw, references: PlayerRefe
   }
 }
 
-/** A table with one cell set: a stored list of lists is its rows, a flat list one row; undefined for any other shape or a cell it does not have. */
-function withCell(stored: FieldValue | undefined, [row, column]: readonly [number, number], value: SheetRaw): FieldValue[] | undefined {
-  if (!Array.isArray(stored) || !(value === null || isNumber(value) || isLine(value))) return undefined;
-  const set = (cells: readonly FieldValue[]): FieldValue[] | undefined => (column < cells.length && cells.every(isScalar) ? cells.map((cell, at) => (at === column ? value : cell)) : undefined);
-  if (stored.every((cells) => Array.isArray(cells))) {
-    const cells = stored[row];
-    const next = Array.isArray(cells) ? set(cells) : undefined;
-    return next === undefined ? undefined : stored.map((cells, at) => (at === row ? next : cells));
+/**
+ * A table with one cell set, read and written as the note's panel does (`noteTable`, `tableValue`):
+ * a table the note does not hold yet starts as the template's, cells a stored row leaves out are
+ * blank, and the note's shape is kept. Undefined clears the key; null where the value is no cell or
+ * the table has no such cell.
+ */
+function withCell(field: TemplateField, stored: FieldValue | undefined, [row, column]: readonly [number, number], value: SheetRaw): { readonly value: FieldValue | undefined } | null {
+  // A value the card shows as written, not as a table, has no cells.
+  if (!(value === null || isNumber(value) || isLine(value)) || (stored !== undefined && valueMisfit(field, stored) !== null)) return null;
+  const grid = noteTable(stored, field);
+  if (row >= grid.rows.length || column >= grid.columns.length) return null;
+  const rows = grid.rows.map((cells, at) => (at === row ? cells.map((cell, place) => (place === column ? value : cell)) : cells));
+  // A list is the one row of its own unnamed columns: it stays a list.
+  const [only] = rows;
+  if (field.type === 'list' && only !== undefined && rows.length === 1) {
+    const list = trimmedRow(only);
+    return { value: list.length === 0 ? undefined : list };
   }
-  return row === 0 ? set(stored) : undefined;
+  return { value: tableValue({ ...grid, rows }, field, stored) };
 }
 
 /** The value a field holds once the edit is in (undefined: its key is deleted), or null where the edit does not fit it. */
@@ -64,9 +75,10 @@ function newValue(field: TemplateField, stored: FieldValue | undefined, message:
   }
   if (message.cell !== undefined) {
     if (!TABLED.has(field.type)) return null;
-    const value = withCell(stored, message.cell, message.value);
+    const next = withCell(field, stored, message.cell, message.value);
     // The whole new value is checked as any other: a cell may not make it something the field does not hold.
-    return value === undefined || !fitsField(field, value, references) ? null : { value };
+    if (next === null || next.value === undefined) return next;
+    return fitsField(field, next.value, references) ? next : null;
   }
   if (clears(message.value)) return { value: undefined };
   return fitsField(field, message.value, references) ? { value: message.value as FieldValue } : null;
