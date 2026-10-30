@@ -1,19 +1,17 @@
-import type { DungeonRoom } from '../../model';
-import type { RoomTypeId } from '../../themes/roomTypes';
 import { viewBounds, type ArtScene } from '../art/artScene';
-import { floorStones } from '../art/floorStones';
 import { hash2 } from '../art/noise';
 import { clipFloors, traceRings } from '../art/outline';
-import { polyPath, polysPath, runsPath, type PathFn } from '../art/paths';
+import { polyPath, polysPath, runsPath, type Field, type PathFn } from '../art/paths';
 import { engravedWayOut, groundsOf, wayGroundRing } from '../cave/mouth/wayOutGround';
 import { engravedFractures } from '../cave/ground/floor';
-import { drawFloorJoints } from '../engraved/floor';
+import { drawFloorJoints, floorStonesOf } from '../engraved/floor';
 import type { Pens } from '../engraved/pens';
-import { shapeBounds, traceShapes, type FloorShape } from '../geometry';
+import { shapeBounds, traceShapes, type Bounds, type FloorShape } from '../geometry';
 import { withAlpha } from '../palette';
 import { boardPlanks, boardSeams, boardsRunAlongX } from './boards';
 import type { CrayonBox } from './crayonBox';
-import { CRAYON_GROUNDS, colourGround, fadedFields, groundFields } from './ground';
+import { floorsByMaterial } from './floorMaterials';
+import { CRAYON_GROUNDS, colourGround, fadedFields, groundFields, type GroundPattern } from './ground';
 
 /**
  * Crayon's floors, every one coloured in as the forest's clearings are (`ground.ts`), each in its
@@ -22,50 +20,10 @@ import { CRAYON_GROUNDS, colourGround, fadedFields, groundFields } from './groun
  * scullery, bathroom and cellar flagged in stone), and a cave's bare rock with its faults.
  */
 
-type FloorMaterial = 'stone' | 'earth' | 'boards';
-
-/** Rooms of a house laid with flagstones, where water is used or things are stored cool; the rest are boarded. */
-const FLAGGED_IN_A_HOUSE: ReadonlySet<RoomTypeId> = new Set(['kitchen', 'scullery', 'laundry', 'bathroom', 'servery', 'wine-cellar', 'conservatory', 'buttery', 'storeroom']);
-/** Rooms of a built floor whose floor is packed earth. */
-const EARTHEN: ReadonlySet<RoomTypeId> = new Set(['stable', 'gaol']);
-
 /** How much darker a darker flagstone or board is: one light coat of its own. */
 const SHADE = { cover: 0.22, passes: 1 } as const;
 /** The share of stones and boards a shade darker. */
 const SHADED = 0.38;
-
-/** A house's cellar floors are flagged throughout: they lie below its entrance floor. */
-function isCellar(scene: ArtScene): boolean {
-  const { model, index } = scene.env.dungeon;
-  return index >= model.floors.length - (model.below ?? 0);
-}
-
-function materialOf(room: DungeonRoom, house: boolean, cellar: boolean): FloorMaterial {
-  const type = room.type;
-  if (house) return cellar || (type !== undefined && FLAGGED_IN_A_HOUSE.has(type)) ? 'stone' : 'boards';
-  return type !== undefined && EARTHEN.has(type) ? 'earth' : 'stone';
-}
-
-/** The floor's shapes by material; door cells and doorways take what the floor is mostly laid with. */
-function floorsByMaterial(scene: ArtScene): Map<FloorMaterial, FloorShape[]> {
-  const { dungeon } = scene.env;
-  const house = dungeon.house !== undefined;
-  const cellar = house && isCellar(scene);
-  const byShape = new Map<FloorShape, FloorMaterial>();
-  for (const room of dungeon.rooms) {
-    const shape = dungeon.roomShapes.get(room.id);
-    if (shape) byShape.set(shape, materialOf(room, house, cellar));
-  }
-  const between: FloorMaterial = house && !cellar ? 'boards' : 'stone';
-  const out = new Map<FloorMaterial, FloorShape[]>();
-  for (const shape of scene.floors) {
-    const material = byShape.get(shape) ?? between;
-    const list = out.get(material);
-    if (list) list.push(shape);
-    else out.set(material, [shape]);
-  }
-  return out;
-}
 
 /** A built floor or a house's: the vellum, each material's ground and its joints or seams. */
 export function crayonFloor(scene: ArtScene, pens: Pens, box: CrayonBox): void {
@@ -82,20 +40,21 @@ export function crayonFloor(scene: ArtScene, pens: Pens, box: CrayonBox): void {
 }
 
 /** Some flagstones a shade darker, so the floor reads as stones laid side by side; then the joints. */
-function shadeFlagstones(scene: ArtScene, pens: Pens, box: CrayonBox, shapes: readonly FloorShape[], b: ReturnType<typeof viewBounds>): void {
-  const { ctx, dungeon, style } = scene.env;
-  const stones = floorStones(style.floor, b, dungeon.model.seed, (x, y) => dungeon.field.distance(x, y) < 0.9).filter((stone) => stone.tone < SHADED);
-  if (stones.length) {
+function shadeFlagstones(scene: ArtScene, pens: Pens, box: CrayonBox, shapes: readonly FloorShape[], b: Bounds): void {
+  const { ctx } = scene.env;
+  const stones = floorStonesOf(scene);
+  const darker = stones.filter((stone) => stone.tone < SHADED).map((stone) => stone.poly);
+  if (darker.length) {
     ctx.save();
     clip(scene, shapes);
-    box.colourIn(polysPath(stones.map((stone) => stone.poly)), { colour: CRAYON_GROUNDS.stone[0].colour, ...SHADE }, undefined, b);
+    box.colourIn(polysPath(darker), { colour: CRAYON_GROUNDS.stone[0].colour, ...SHADE }, undefined, b);
     ctx.restore();
   }
-  drawFloorJoints(scene, pens, shapes);
+  drawFloorJoints(scene, pens, shapes, stones);
 }
 
 /** Boards along each room's longer side, coloured along their grain, some a shade darker, their seams pencilled. */
-function drawBoards(scene: ArtScene, pens: Pens, box: CrayonBox, shapes: readonly FloorShape[], fields: ReturnType<typeof groundFields>, b: ReturnType<typeof viewBounds>): void {
+function drawBoards(scene: ArtScene, pens: Pens, box: CrayonBox, shapes: readonly FloorShape[], fields: Record<GroundPattern, Field>, b: Bounds): void {
   const { ctx, dungeon } = scene.env;
   const seed = dungeon.model.seed;
   for (const alongX of [true, false]) {

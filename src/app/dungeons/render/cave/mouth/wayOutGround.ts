@@ -31,7 +31,6 @@ export interface WayGround {
   strength: (p: Vec) => number;
   bounds: Bounds;
 }
-type Ground = WayGround;
 
 /** The ring round all of a way out's ground, out to where it fades to nothing. */
 export function wayGroundRing(scene: ArtScene, way: WayOut): Vec[] {
@@ -39,7 +38,7 @@ export function wayGroundRing(scene: ArtScene, way: WayOut): Vec[] {
 }
 
 /** The ground of every way out of the floor on show. */
-export function groundsOf(scene: ArtScene): Ground[] {
+export function groundsOf(scene: ArtScene): WayGround[] {
   const { dungeon } = scene.env;
   const distance = groundDistance(dungeon.field);
   return dungeon.ways.map((way) => ({
@@ -53,7 +52,7 @@ export function groundsOf(scene: ArtScene): Ground[] {
  * Lays what `painter` draws over the ground's bounds onto the map through the ground's fade: whole
  * at the mouth, gone at its far end. Without pictures, the fade's rings in steps of the colour.
  */
-function throughFade(scene: ArtScene, ground: Ground, colour: string, painter?: (layer: Canvas2D) => void): void {
+function throughFade(scene: ArtScene, ground: WayGround, colour: string, painter?: (layer: Canvas2D) => void): void {
   const { ctx, dungeon } = scene.env;
   if (!scene.raster) {
     ctx.save();
@@ -103,7 +102,7 @@ function wornRuns(way: WayOut): Vec[][] {
 }
 
 /** Grit on the way: candidate points on a jittered lattice of `spacing` cells, each kept by `keep` of its strength. */
-function grit(ground: Ground, spacing: number, keep: (strength: number, roll: number) => boolean): Vec[] {
+function grit(ground: WayGround, spacing: number, keep: (strength: number, roll: number) => boolean): Vec[] {
   const { bounds, way } = ground;
   const out: Vec[] = [];
   for (let j = Math.floor(bounds.minY / spacing); j <= bounds.maxY / spacing; j++) {

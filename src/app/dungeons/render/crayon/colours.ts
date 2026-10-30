@@ -34,13 +34,12 @@ export interface CrayonFill {
   angle?: number;
 }
 
-/**
- * A piece's or terrain's surface of floor (a slab, a mosaic's field, a pit's bottom) in the grey of
- * the floors' flagstones; the floors themselves are coloured in by their ground (`floors.ts`,
- * `ground.ts`), never one even coat, which shows the hand's lines as bands over a large area.
- */
+/** How heavily a surface of floor (a slab, a mosaic's field, a pit's bottom, a greenhouse's bed) is coloured in the ground of the floor it lies on (`crayonHand`). */
+export const FLOOR_SURFACE = { cover: 0.34, passes: 2 } as const;
+
+/** How a material is coloured in; floor by its ground, so none here. */
 export const MATERIAL_CRAYONS: Readonly<Record<Material, CrayonFill | null>> = {
-  floor: { colour: CRAYONS.stone, cover: 0.34, passes: 2 },
+  floor: null,
   stone: { colour: CRAYONS.earth, cover: 0.8, passes: 2 },
   dressed: { colour: CRAYONS.earth, cover: 0.9, passes: 3 },
   rock: { colour: CRAYONS.slate, cover: 0.85, passes: 2 },
