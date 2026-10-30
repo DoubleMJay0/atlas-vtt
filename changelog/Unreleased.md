@@ -4,6 +4,7 @@
 - Fog: Cloud reveal in the fog tool's menu shows players the fog as clouds in a colour you pick, which part over what you reveal and drift in over what you cover. While you paint or erase fog, players keep seeing the fog from before, and your changes reach them at once when you switch to another tool, at an online table too. Contributed by ISorokaI
 
 ## Improved
+- Russian translation of the dice lab, the initiative tracker's new options, the encounter builder, statblock counters and other newer texts. Contributed by ISorokaI
 - Graphics settings, a page in the command palette (also behind Graphics settings… in the lighting tool's menu): the three quality presets as tabs, with what each draws on hover, and below them every choice a preset makes, so one thing can be set away from a preset: the lighting picture, its detail, bounced light, flames, shadow softness, how often water and lava move, and the lit map's resolution on a high-resolution screen. The settings page's Lighting row is gone
 - Atlas asks the computer for its faster graphics chip where there are two, as Foundry and Owlbear Rodeo do
 - Saver lighting quality draws each light from the area it lights instead of tracing it on the graphics card, so a lit map runs smoothly on weak and software graphics; shadows keep a soft edge

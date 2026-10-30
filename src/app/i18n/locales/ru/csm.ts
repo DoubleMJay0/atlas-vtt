@@ -105,4 +105,9 @@ export const csm: Translation = {
   'csm.widgets.timer': 'Таймер',
   'csm.widgets.timerDesc': 'Обратный отсчёт для стычек на время или перерывов',
   'csm.loot.views': { one: '{count} представление', few: '{count} представления', many: '{count} представлений', other: '{count} представления' },
+  'csm.playedCampaign': 'Пока идёт кампания {name}, все карты используют её игровую систему.',
+  'csm.playedCampaignEdit': 'Изменить правила кампании',
+  'csm.filters.templateFilters': 'Из шаблонов статблоков',
+  'csm.filters.templateFiltersHint': 'Каждое поле шаблонов статблоков этой коллекции с числом, рейтингом, выбором или списком становится фильтром.',
+  'csm.statblockFieldChips': 'Поля в статблоках этой коллекции',
 };

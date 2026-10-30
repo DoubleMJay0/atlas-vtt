@@ -55,4 +55,9 @@ export const settings: Translation = {
   'settings.updates.update': 'Обновить',
   'settings.updates.viewChangelog': 'Открыть список изменений',
   'settings.updates.whatsNew': 'Что нового',
+  'settings.storage.clear': 'Очистить',
+  'settings.storage.heading': 'Данные на устройстве',
+  'settings.storage.mapImageCache': 'Кэш изображений карт',
+  'settings.storage.mapImageCacheInfo': 'Хранит фрагменты каждой карты на этом устройстве, чтобы карты открывались быстро. Всё очищенное строится заново, когда понадобится карте.',
+  'settings.storage.unavailable': 'Недоступно',
 };
