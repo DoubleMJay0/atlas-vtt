@@ -17,8 +17,9 @@ import type { MapFeature } from '../types/mapFeatureTypes';
 import type { LiquidSurface } from '../types/liquidTypes';
 import type { LevelLink, LevelSurface, SceneLevel } from '../types/sceneLevelTypes';
 import { sceneFileVersion } from '../levels/levelFile';
+import { t } from '../i18n';
 
-export const COLLECTION_GONE = 'The collection no longer exists. Choose another collection and try again.';
+export const COLLECTION_GONE = t('uvtt.collectionGone');
 
 /** What a scene file takes of a map Atlas made or imported: a grid that fits its image, and what stands on it, in world pixels. */
 export interface MapSceneParts {

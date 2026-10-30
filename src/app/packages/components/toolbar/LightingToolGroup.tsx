@@ -23,9 +23,9 @@ type RowIcon = DropdownMenuItemProps['icon']
 const SUB_MODES: readonly { value: WallToolSubMode; icon: RowIcon; label: string }[] = [
   { value: 'draw', icon: BrickWall, label: t('toolbar.drawWalls') },
   { value: 'place-light', icon: Lightbulb, label: t('toolbar.placeLights') },
-  { value: 'light-zone', icon: SunMoon, label: 'Light zones' },
+  { value: 'light-zone', icon: SunMoon, label: t('sceneLight.mode.zones') },
   { value: 'level-surface', icon: ArrowDownToDot, label: t('openings.mode') },
-  { value: 'explored-memory', icon: Footprints, label: 'Explored memory' },
+  { value: 'explored-memory', icon: Footprints, label: t('sceneLight.mode.memory') },
 ]
 
 

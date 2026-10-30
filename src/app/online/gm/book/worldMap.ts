@@ -5,6 +5,7 @@ import { AskedAnswer } from './askedAnswer.ts';
 import { MapImages, type FileStat, type MapImage, type MapImageProblem } from './mapImages.ts';
 import type { WorldMapTree } from './worldMapGate.ts';
 import { worldMapOf, type WorldMapFile } from './worldMapLevels.ts';
+import { t } from '../../../i18n';
 
 export type { FileStat, MapImageProblem } from './mapImages.ts';
 export type { WorldMapFile } from './worldMapLevels.ts';
@@ -25,10 +26,10 @@ export interface WorldMapPorts {
 
 /** What the GM is told when the world map's image cannot be sent to players. */
 export const WORLD_MAP_PROBLEM_TEXT: Readonly<Record<MapImageProblem, string>> = {
-  missing: 'Atlas Online cannot send the world map: its image file is missing.',
-  'too-large': 'Atlas Online cannot send the world map: its image is larger than 95 MB.',
-  unreadable: 'Atlas Online cannot send the world map: its image is not a PNG, JPEG, WebP, GIF or AVIF that players can open.',
-  unstored: 'Atlas Online cannot send the world map: its image could not be stored online.',
+  missing: t('online.worldMap.missing'),
+  'too-large': t('online.worldMap.tooLarge'),
+  unreadable: t('online.worldMap.unreadable'),
+  unstored: t('online.worldMap.unstored'),
 };
 
 /** The tree Atlas answered, with the id players know each of its maps by. */

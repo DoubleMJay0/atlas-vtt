@@ -5,6 +5,7 @@ import { DeviceSignIn } from './deviceFlow.ts';
 import type { Http } from './http.ts';
 import { RelayAccount, signOutToken, type AccountAnswer } from './relayAccount.ts';
 import type { TokenStore } from './tokenStore.ts';
+import { t } from '../../../i18n';
 
 export interface AccountPorts {
   readonly http: Http;
@@ -89,7 +90,7 @@ export class AccountControl {
       try {
         this.ports.tokens.set(end.token);
       } catch {
-        this.ports.notify('Obsidian cannot keep the sign-in on this device: its secure storage is not available.');
+        this.ports.notify(t('online.account.noStorage'));
         void signOutToken(this.ports.http, ACCOUNTS_ORIGIN, end.token);
         return this.changed();
       }
