@@ -1,5 +1,6 @@
 import type { GmMessage, SharedToken, SnapGrid } from '../protocol/index.ts';
 import { ArtRefs } from './artRefs.ts';
+import type { AssetStoring } from './assets/assetUses.ts';
 import type { PlayerTokenSource, SceneStore } from './atlasView.ts';
 import type { ListedTokens } from './mineShare.ts';
 import type { SeatSource } from './seatSource.ts';
@@ -22,6 +23,8 @@ export interface TokenSharePorts {
   tokenSource(): PlayerTokenSource | null;
   /** The image at a vault path, or null when it is missing or of a type players cannot be sent. */
   readImage(path: string): Promise<VaultImage | null>;
+  /** How players are handed assets the store keeps for them; without it they are handed none. */
+  stored?: AssetStoring | undefined;
   send(body: GmMessage, to?: string): void;
   /** Whether players see token names (Atlas's nameplate setting for the player view). */
   showNames(): boolean;
@@ -57,7 +60,7 @@ export const TOKEN_POLL_MS = 1000;
 /**
  * The tokens the players see in the shared scene, sent to all whenever they change (as deltas from
  * the last list where those are smaller), at most every `TOKEN_INTERVAL_MS`. Only tokens the players' frame shows are read; players know them by
- * random ids. Artwork is named by hash and served only while a token in the list shows it.
+ * random ids. Artwork is named by the id the asset store keeps it under; none the store does not keep.
  */
 export class TokenShare {
   private readonly store: SceneStore;
@@ -75,8 +78,6 @@ export class TokenShare {
   private poll: number | undefined;
   private readonly aliases: Map<string, string>;
   private readonly art: ArtRefs;
-  /** Vault paths of the artwork the last list shows, by hash. */
-  private shownArt = new Map<string, string>();
   /** The GM's look-alike numbers of the tokens players see, as the last list read them. */
   private numbers: ReadonlyMap<string, number> = new Map();
   /** Where the last list put each token, by the id players know it by. */
@@ -93,7 +94,7 @@ export class TokenShare {
     this.listed = listed;
     this.list = new SequencedList('tokens', ports);
     this.aliases = ports.aliases ?? new Map<string, string>();
-    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update());
+    this.art = new ArtRefs((path) => ports.readImage(path), () => this.update(), ports.stored);
   }
 
   /** The shared scene the tokens belong to; null sends none. A new scene reads its artwork afresh. */
@@ -102,7 +103,6 @@ export class TokenShare {
     this.scene = scene;
     this.last = null;
     this.list.reset();
-    this.shownArt = new Map();
     this.listedIds = new Map();
     this.listedAliases = new Map();
     this.listedPlaces = new Map();
@@ -165,9 +165,10 @@ export class TokenShare {
     return this.last?.scene === this.scene ? this.scene : null;
   }
 
-  /** The vault path of artwork the players' current picture shows, by its hash. */
-  artPath(hash: string): string | undefined {
-    return this.shownArt.get(hash);
+  /** Reads every artwork again: its reference may go out another way now (without a stored id). */
+  refreshArt(): void {
+    this.art.clear();
+    this.update();
   }
 
   /** The GM ids of the tokens the players see now, or null while the scene loads or the tab has no renderer. */
@@ -205,12 +206,11 @@ export class TokenShare {
     const scene = this.scene;
     const built = this.build();
     if (scene === null || built === null) return;
-    const { tokens, cell, snap, art, aliases } = built;
+    const { tokens, cell, snap, aliases } = built;
     const text = JSON.stringify([tokens, cell, snap]);
     if (this.last?.scene === scene && this.last.text === text) return;
     this.last = { scene, text };
     this.lastAt = this.ports.now();
-    this.shownArt = art;
     this.listedIds = new Map([...aliases].map(([id, alias]) => [alias, id]));
     this.listedAliases = aliases;
     this.listedPlaces = new Map(tokens.map((token) => [token.id, { x: token.x, y: token.y }]));
@@ -219,16 +219,15 @@ export class TokenShare {
   }
 
   /**
-   * The list now with the vault paths of its artwork by hash and the players' ids of its tokens by
-   * GM id, or null while the scene loads or the tab has no renderer.
+   * The list now with the players' ids of its tokens by GM id, or null while the scene loads or the
+   * tab has no renderer.
    */
-  private build(): { readonly tokens: SharedToken[]; readonly cell: number; readonly snap: SnapGrid | null; readonly art: Map<string, string>; readonly aliases: Map<string, string> } | null {
+  private build(): { readonly tokens: SharedToken[]; readonly cell: number; readonly snap: SnapGrid | null; readonly aliases: Map<string, string> } | null {
     const state = this.store.getState();
     const source = this.ports.tokenSource();
     if (!state.mapLoaded || state.isMapLoading || state.mapPath === null || source === null) return null;
     const gridSize = source.getGridOptions()?.size ?? state.grid?.size;
     if (gridSize === undefined || !(gridSize > 0)) return null;
-    const art = new Map<string, string>();
     const gmIds = new Map<string, string>();
     const { mapPath } = state;
     const seats = this.ports.seats;
@@ -259,11 +258,7 @@ export class TokenShare {
       badge: (id) => numbers.get(id) ?? null,
       turn,
       held,
-      art: (path) => {
-        const ref = this.art.get(path);
-        if (ref !== null) art.set(ref.hash, path);
-        return ref;
-      },
+      art: (path) => this.art.get(path),
       alias: (id) => {
         const alias = this.alias(id);
         gmIds.set(alias, id);
@@ -274,7 +269,7 @@ export class TokenShare {
       const id = gmIds.get(token.id);
       return id === undefined ? [] : [[id, token.id]];
     }));
-    return { tokens: this.heldWhereListed(tokens, state.heldTokens), cell: gridSize, snap: snapGridOf(state.grid), art, aliases };
+    return { tokens: this.heldWhereListed(tokens, state.heldTokens), cell: gridSize, snap: snapGridOf(state.grid), aliases };
   }
 
   /**

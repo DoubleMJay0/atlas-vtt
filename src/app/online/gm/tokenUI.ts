@@ -2,7 +2,7 @@ import { MAX_CONDITION_TEXT, MAX_TOKEN_CONDITIONS, MAX_TOKEN_VALUE, type SharedB
 import { resolveActiveConditions, type ActiveCondition } from '../../utils/activeConditions';
 import { isTokenDowned } from '../../pixi/token-renderer/isTokenDowned';
 import type { ResourceDefinition } from '../../resources/resourceTypes';
-import { shapeOf, visibleResources } from '../../resources/visibleResources';
+import { visibleResources } from '../../resources/visibleResources';
 import type { TokenEntity } from '../../types';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
 import { instanceBadgeNumbers } from '../../initiative/cardInstanceNumber';
@@ -22,15 +22,15 @@ const hexColour = (colour: number): string => `#${(colour & 0xffffff).toString(1
 const finiteValue = (value: number): boolean => Number.isFinite(value) && Math.abs(value) <= MAX_TOKEN_VALUE;
 
 /**
- * The bars Atlas's player window draws below a token: the resources players see
- * (`visibleResources` for the viewer `player`) whose socket is a bar. Wheels never show there,
- * and nothing of a resource players may not see is read.
+ * The resources of the token Atlas's player window draws, bars below it and wheels beside it
+ * (`visibleResources` for the viewer `player`), each with its socket. Nothing of a resource
+ * players may not see is read.
  */
 function barsOf(token: TokenEntity, rules: TokenRules): SharedBar[] {
   return visibleResources(token, rules.resources, 'player').flatMap(({ definition, value, slot }): SharedBar[] => {
     const colour = definition.color.toLowerCase();
-    if (shapeOf(slot) !== 'bar' || !HEX_COLOUR.test(colour) || !finiteValue(value.current) || !finiteValue(value.max)) return [];
-    return [{ colour, direction: definition.direction, defeats: definition.defeatedWhenSpent === true, current: value.current, max: value.max }];
+    if (!HEX_COLOUR.test(colour) || !finiteValue(value.current) || !finiteValue(value.max)) return [];
+    return [{ colour, direction: definition.direction, defeats: definition.defeatedWhenSpent === true, current: value.current, max: value.max, slot }];
   });
 }
 

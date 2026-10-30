@@ -5,7 +5,7 @@ import {
 
 const HASH = 'a'.repeat(64);
 const ID = '0123456789abcdef01234567';
-const ART = { hash: HASH, size: 10, mime: 'image/webp' };
+const ART = { hash: HASH, size: 10, mime: 'image/webp', id: 'e'.repeat(64) };
 const ITEM: BookItem = { id: ID, name: 'Rope', type: 'Gear', rarity: 'Common', tone: 'common', price: '1 gold', description: 'Fifty feet.\nHemp.', properties: [{ label: 'Weight', value: '5' }], at: 12 };
 const QUEST_ID = 'fedcba9876543210fedcba98';
 const QUEST: BookQuest = { id: QUEST_ID, kind: 'main', state: 'active', title: 'The crown under the root', body: 'The Horned King wants it back.', place: { x: 0.25, y: 0.5 }, xp: 1200, rewards: ['Favour of the King'] };
@@ -109,7 +109,7 @@ describe('book messages to a player', () => {
       { ...BOOK, items: [ITEM, ITEM] },
       { ...BOOK, items: [{ ...ITEM, tone: 'shiny' }] },
       { ...BOOK, character: { ...BOOK.character, ring: 'red' } },
-      { ...BOOK, character: { ...BOOK.character, art: { hash: HASH, size: 1, mime: 'text/html' } } },
+      { ...BOOK, character: { ...BOOK.character, art: { hash: HASH, size: 1, mime: 'text/html', id: 'e'.repeat(64) } } },
       { ...BOOK, character: { ...BOOK.character, resources: [{ name: 'HP', colour: '#aa0000', direction: 'drains', current: 1, max: 0 }] } },
       { ...BOOK, worldMap: { image: ART, width: 0, height: 10 } },
       { ...BOOK, pins: [{ ...BOOK.pins[0], x: 1.2 }] },
