@@ -96,3 +96,25 @@ describe('the tile core reading a map in bands', () => {
     expect(stops).toBeLessThanOrEqual(1);
   }, 60_000);
 });
+
+describe('a window of a map read from the tile core', () => {
+  useReadableBlobs();
+
+  it('is composed from the tiles of the finest level that shows it within the side asked for', async () => {
+    const [width, height] = [4100, 3000];
+    const decoder = fakeBandDecoder({ width, height, bandRows: 400 });
+    const h = coreHarness({ bandDecoderOf: () => Promise.resolve(decoder) });
+    const opened = await h.core.open({ path: 'huge.png', size: 32, mtime: 1 }, fakePng(width, height));
+    if (opened.kind !== 'opened') throw new Error(opened.kind);
+
+    // 1,000 × 600 at level 0 fits 1,024: level 0, five tiles across the content boundary at 510 and 1,020, two rows.
+    const bitmap = await h.core.window(9, opened.opened.handle, { x: 600, y: 400, width: 1000, height: 600 }, 1024);
+    expect(bitmap && [bitmap.width, bitmap.height]).toEqual([1000, 600]);
+    expect(h.graphics.composes.at(-1)).toEqual({ width: 1000, height: 600, parts: 6 });
+    // 4,100 × 3,000 within 1,024: two halvings leave 1,025 px, one too many, so three: level 3, 513 × 375 pixels.
+    const whole = await h.core.window(10, opened.opened.handle, { x: 0, y: 0, width, height }, 1024);
+    expect(whole && [whole.width, whole.height]).toEqual([513, 375]);
+    await h.completed(opened.opened.hash);
+    h.core.close(opened.opened.handle);
+  }, 60_000);
+});

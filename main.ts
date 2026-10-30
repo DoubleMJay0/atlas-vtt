@@ -84,6 +84,8 @@ import { AtlasErrorLog } from './src/app/support/errorLog';
 import { IssueReporter } from './src/app/support/IssueReporter';
 import { runInBackground } from './src/app/utils/backgroundTask';
 import { TileDecoderClient } from './src/app/pixi/mapImage/TileDecoderClient';
+import { MapProcessing } from './src/app/pixi/mapImage/mapProcessing';
+import { registerMapProcessingStatus } from './src/app/plugin/mapProcessingStatus';
 import { DungeonWorkerClient } from './src/app/dungeons/worker/DungeonWorkerClient';
 import { MapImageService } from './src/app/pixi/mapImage/MapImageService';
 
@@ -167,6 +169,7 @@ export default class AtlasVTTPlugin extends Plugin {
     // whose folder renames reach map files only through these vault events.
     registerVaultSync(this);
     registerDiceStageRelease(this);
+    registerMapProcessingStatus(this);
     registerAccentColorSync(this);
     // Views first, so workspace restore can resolve persisted Atlas tabs
     // before the slower startup path finishes.
@@ -278,6 +281,7 @@ export default class AtlasVTTPlugin extends Plugin {
     releaseMapPictures(this.app);
     CreatureIndex.release(this.app);
     TemplateLibrary.release(this.app);
+    MapProcessing.release(this.app);
     TileDecoderClient.release(this.app);
     DungeonWorkerClient.release(this.app);
     MapImageService.release(this.app);

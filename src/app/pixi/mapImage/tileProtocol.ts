@@ -1,7 +1,7 @@
 import type { BandUnsupportedReason } from '../../imageProcessing/band/bandTypes';
 import type { ArtAlpha } from '../../levels/artRaster';
 import type { RoofPieces } from '../../levels/roofs';
-import type { Pyramid, TileRef } from './pyramid';
+import type { PixelRect, Pyramid, TileRef } from './pyramid';
 import type { StoredLevel, TileSelection } from './tileBlobs';
 
 /**
@@ -44,6 +44,8 @@ export type TileRequest =
   | { type: 'open' | 'prebuild'; id: number; identity: FileIdentity | null; bytes: ArrayBuffer | null; decoded?: ImageBitmap | null }
   | { type: 'tile'; id: number; handle: number; ref: TileRef }
   | { type: 'overview'; id: number; handle: number; maxSide: number }
+  /** A part of the map (`rect` in the image's pixels) fit within `maxSide`, from the finest level that shows it so (`windowLevel`). */
+  | { type: 'window'; id: number; handle: number; rect: PixelRect; maxSide: number }
   /** Which pixels of the overview fit within `maxSide` hold art: alpha above `threshold` (of 255). */
   | { type: 'alpha-raster'; id: number; handle: number; maxSide: number; threshold: number }
   /** The pieces of a roof image (`roofPieces`) over its overview fit within `maxSide`. */
@@ -77,12 +79,12 @@ export type TileReply =
   /** A tile or overview request that could not be answered (an unknown handle, a tile missing from a cleared cache). */
   | { type: 'error'; id: number; message: string };
 
-/** Unrequested news from the worker. */
+/** Unrequested news from the worker; `path` names the file the map was opened or prebuilt from, where one was. */
 export type TileEvent =
-  | { type: 'progress'; hash: string; done: number; total: number }
-  | { type: 'complete'; hash: string }
+  | { type: 'progress'; hash: string; done: number; total: number; path?: string }
+  | { type: 'complete'; hash: string; path?: string }
   /** A build stopped writing the cache (storage full, encoding unsupported); the open map keeps showing. */
-  | { type: 'build-failed'; hash: string; message: string };
+  | { type: 'build-failed'; hash: string; message: string; path?: string };
 
 /** Sent once after `init`, when the core is up: a worker that fails before it never started. */
 export interface TileReady {

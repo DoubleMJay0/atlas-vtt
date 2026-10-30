@@ -140,6 +140,8 @@ export const am = {
   'am.card.select': 'Select {name}',
   'am.card.statblockLinked': 'Statblock linked – click to open',
   'am.card.animated': 'Animated map',
+  'am.card.processing': 'Processing',
+  'am.card.processingProgress': 'Processing · {percent}%',
   'am.card.decrease': 'Decrease spawn count',
   'am.card.increase': 'Increase spawn count',
   'am.card.spawn': { one: 'Spawn {count} token', other: 'Spawn {count} tokens' },

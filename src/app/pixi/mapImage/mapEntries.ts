@@ -30,6 +30,8 @@ export interface MapEntry extends MapSource {
   /** Settles when the running build has ended; null without one. */
   built: Promise<BuildOutcome> | null;
   releaseBudget: (() => void) | null;
+  /** The file it was first asked for by, named in its events for whoever shows progress. */
+  path: string | null;
 }
 
 /** A bitmap decoded on the main thread, until a build takes it over. */
@@ -67,12 +69,12 @@ export class MapEntries {
    * The entry of `hash` once it can serve, referenced once more for an open (`opens`); an entry
    * that waited without bytes is tried again with them.
    */
-  async ready(hash: string, bytes: ArrayBuffer | null, held: HeldBitmap, opens: boolean): Promise<MapEntry> {
+  async ready(hash: string, bytes: ArrayBuffer | null, held: HeldBitmap, opens: boolean, path: string | null = null): Promise<MapEntry> {
     try {
-      return await this.join(this.entryFor(hash, bytes, held), opens);
+      return await this.join(this.entryFor(hash, bytes, held, path), opens);
     } catch (error) {
       if (!(error instanceof NeedBytes) || !bytes) throw error;
-      return this.join(this.entryFor(hash, bytes, held), opens);
+      return this.join(this.entryFor(hash, bytes, held, path), opens);
     }
   }
 
@@ -117,11 +119,15 @@ export class MapEntries {
     }
   }
 
-  private entryFor(hash: string, bytes: ArrayBuffer | null, held: HeldBitmap): MapEntry {
+  private entryFor(hash: string, bytes: ArrayBuffer | null, held: HeldBitmap, path: string | null): MapEntry {
     const existing = this.entries.get(hash);
-    if (existing) return existing;
+    if (existing) {
+      existing.path ??= path;
+      return existing;
+    }
     const entry: MapEntry = {
       hash,
+      path,
       // Replaced by `prepare` before the entry serves anything.
       pyramid: PENDING_PYRAMID,
       complete: false,
@@ -206,7 +212,7 @@ export class MapEntries {
       store: this.deps.store,
       graphics: this.deps.graphics,
       yieldToRequests: this.deps.yieldToRequests,
-      emit: this.deps.emit,
+      emit: (event) => this.emitFor(entry, event),
     });
     entry.whenStored = (ref) => build.whenStored(ref);
     entry.releaseBudget = await this.budget.acquire({ bytes: bandBuildCost(pyramid.width, source.byteLength), urgent: () => this.shown(entry) });
@@ -231,7 +237,7 @@ export class MapEntries {
       entry.releaseBudget?.();
       entry.releaseBudget = null;
       void this.prepareBands(entry, bytes, decoder).catch((error: unknown) => {
-        this.deps.emit({ type: 'build-failed', hash: entry.hash, message: error instanceof Error ? error.message : String(error) });
+        this.emitFor(entry, { type: 'build-failed', hash: entry.hash, message: error instanceof Error ? error.message : String(error) });
       });
       return;
     }
@@ -251,11 +257,11 @@ export class MapEntries {
       store: this.deps.store,
       graphics: this.deps.graphics,
       yieldToRequests: this.deps.yieldToRequests,
-      emit: this.deps.emit,
+      emit: (event) => this.emitFor(entry, event),
     });
     entry.build = build;
     entry.built = levels.ready().then(() => build.run(), (error: unknown) => {
-      this.deps.emit({ type: 'build-failed', hash: entry.hash, message: error instanceof Error ? error.message : String(error) });
+      this.emitFor(entry, { type: 'build-failed', hash: entry.hash, message: error instanceof Error ? error.message : String(error) });
       return 'failed' as const;
     });
     void entry.built.then((outcome) => this.buildEnded(entry, outcome));
@@ -279,6 +285,11 @@ export class MapEntries {
     if (outcome === 'complete') entry.complete = true;
     this.releaseLevels(entry);
     this.dropIfUnused(entry);
+  }
+
+  /** Hands an event on with the file the entry was asked for by, so whoever shows progress can name the map. */
+  private emitFor(entry: MapEntry, event: TileEvent): void {
+    this.deps.emit(entry.path === null ? event : { ...event, path: entry.path });
   }
 
   /** Whether a view shows the map or is opening it. */

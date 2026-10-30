@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import type { TileRef } from './pyramid';
+import type { PixelRect, TileRef } from './pyramid';
 import { TilePortKeeper, type TileWorkerCrash } from './tilePortKeeper';
 import { workerPort, type PortFactory } from './tilePorts';
 import { MapClosedError, TileLevelError } from './tileErrors';
@@ -150,6 +150,13 @@ export class TileDecoderClient {
     return this.bitmap({ type: 'overview', id: this.nextId++, handle: target, maxSide }, handle, signal);
   }
 
+  /** A part of the map (`rect` in the image's pixels) fit within `maxSide`, composed in the worker from the finest level that shows it so; rejects as `tile` does. */
+  window(handle: number, rect: PixelRect, maxSide: number, signal?: AbortSignal): Promise<ImageBitmap> {
+    const target = this.handles.get(handle);
+    if (target === undefined) return Promise.reject(new MapClosedError());
+    return this.bitmap({ type: 'window', id: this.nextId++, handle: target, rect, maxSide }, handle, signal);
+  }
+
   /** Which pixels of the map's overview fit within `maxSide` hold art (alpha above `threshold`), read in the worker; rejects as `tile` does. */
   async alphaRaster(handle: number, maxSide: number, threshold: number, signal?: AbortSignal): Promise<ArtAlpha> {
     const target = this.handles.get(handle);
@@ -233,7 +240,7 @@ export class TileDecoderClient {
   }
 
   private async bitmap(
-    message: Extract<TileRequest, { type: 'tile' | 'overview' }>,
+    message: Extract<TileRequest, { type: 'tile' | 'overview' | 'window' }>,
     handle: number,
     signal: AbortSignal | undefined,
   ): Promise<ImageBitmap> {
@@ -244,7 +251,7 @@ export class TileDecoderClient {
 
   /** The reply to a request (about the open map `handle`, if any), which `signal` cancels in the worker too. */
   private async answer(
-    message: Extract<TileRequest, { type: 'tile' | 'overview' | 'alpha-raster' | 'roof-pieces' | 'level-ready' }>,
+    message: Extract<TileRequest, { type: 'tile' | 'overview' | 'window' | 'alpha-raster' | 'roof-pieces' | 'level-ready' }>,
     handle: number | undefined,
     signal: AbortSignal | undefined,
   ): Promise<TileReply> {

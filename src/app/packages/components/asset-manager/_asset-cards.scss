@@ -212,6 +212,33 @@
   @include atlas-statblock-badge(22px);
 }
 
+// A map image still being cut into tiles: a quiet pill on the artwork's bottom-right corner,
+// a ring in the accent that fills as tiles land (`ProcessingRing`) and the word beside it. The map works meanwhile.
+.atlas-asset-processing {
+  position: absolute;
+  right: $spacing-s;
+  bottom: $spacing-s;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  max-width: calc(100% - 2 * #{$spacing-s});
+  padding: $spacing-xs;
+  border: $border-width-s solid color-mix(in oklch, var(--mono-100) $border-opacity-default, transparent);
+  border-radius: $radius-full;
+  background: color-mix(in oklch, var(--background-primary) 82%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: $shadow-sm;
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+  line-height: 1;
+}
+
+.atlas-asset-processing__label {
+  min-width: 0;
+  @include atlas-truncate;
+}
+
 .atlas-asset-spawn-badge {
   position: absolute;
   top: $spacing-s;

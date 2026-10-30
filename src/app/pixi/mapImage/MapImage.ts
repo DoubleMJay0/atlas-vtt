@@ -152,6 +152,12 @@ export class MapImage {
     return pending ? pending.catch(nullWhenClosed) : Promise.resolve(null);
   }
 
+  /** A part of the image (`rect` in its pixels) fit within `maxSide`, read like `overview`; null without an image, also once it is closed meanwhile. */
+  window(rect: PixelRect, maxSide: number): Promise<ImageBitmap | null> {
+    const pending = this.shown?.tiles?.window(rect, maxSide);
+    return pending ? pending.catch(nullWhenClosed) : Promise.resolve(null);
+  }
+
   /** A mipmapped texture of the overview for the lighting; null until it is made, then `onChange('albedo')`. */
   albedoTexture(): Texture | null {
     const tiles = this.shown?.tiles;

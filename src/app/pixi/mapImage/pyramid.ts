@@ -170,3 +170,24 @@ export function childTiles(p: Pyramid, t: TileRef): TileRef[] {
   }
   return children;
 }
+
+/**
+ * The finest level whose pixels show `rect` (level-0 pixels) within `maxSide` a side: level 0
+ * where the rect fits as it is, else as many halvings as it takes. A window of a huge map is read
+ * at that level, so grid detection sees cells at their size where the whole map, fit within the
+ * same side, would show them a few pixels wide.
+ */
+export function windowLevel(p: Pyramid, rect: PixelRect, maxSide: number): PyramidLevel {
+  const halvings = Math.max(0, Math.ceil(Math.log2(Math.max(rect.width, rect.height) / maxSide)));
+  return p.levels[Math.min(halvings, p.levels.length - 1)]!;
+}
+
+/** `rect` (level-0 pixels) in the pixels of `level`, rounded outward and clamped to the level. */
+export function rectAtLevel(level: PyramidLevel, rect: PixelRect): PixelRect {
+  const factor = 2 ** level.index;
+  const x = Math.max(0, Math.floor(rect.x / factor));
+  const y = Math.max(0, Math.floor(rect.y / factor));
+  const right = Math.min(level.width, Math.ceil((rect.x + rect.width) / factor));
+  const bottom = Math.min(level.height, Math.ceil((rect.y + rect.height) / factor));
+  return { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
+}

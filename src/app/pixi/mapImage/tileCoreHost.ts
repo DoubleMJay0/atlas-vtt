@@ -84,11 +84,14 @@ export function hostTileCore(createCore: CoreFactory, post: PostMessage): TileCo
         return;
       }
       case 'tile':
-      case 'overview': {
+      case 'overview':
+      case 'window': {
         try {
           const bitmap = request.type === 'tile'
             ? await ready.tile(request.id, request.handle, request.ref)
-            : await ready.overview(request.id, request.handle, request.maxSide);
+            : request.type === 'window'
+              ? await ready.window(request.id, request.handle, request.rect, request.maxSide)
+              : await ready.overview(request.id, request.handle, request.maxSide);
           if (bitmap) reply({ type: 'bitmap', id: request.id, bitmap }, [bitmap]);
         } catch (error) {
           reply({ type: 'error', id: request.id, message: message(error) });

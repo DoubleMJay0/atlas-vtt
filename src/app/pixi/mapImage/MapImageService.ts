@@ -4,7 +4,7 @@ import { describeError } from '../../utils/errors';
 import { unsupportedMessage } from '../../imageProcessing/band/unsupportedMessage';
 import { decodeImageOnMainThread, requiredMainThreadDecode } from './mainThreadDecode';
 import { TileDecoderClient, TileOpenError, type OpenedMap } from './TileDecoderClient';
-import { OVERVIEW_MAX_SIDE, type TileRef } from './pyramid';
+import { OVERVIEW_MAX_SIDE, type PixelRect, type TileRef } from './pyramid';
 import { OPEN_ALPHA_BYTE, type ArtAlpha, type LevelArt } from '../../levels/artRaster';
 import type { RoofPieces } from '../../levels/roofs';
 import { RecentReads } from './recentReads';
@@ -97,6 +97,11 @@ export class MapImageService {
 
   overview(handle: number, maxSide: number, signal?: AbortSignal): Promise<ImageBitmap> {
     return this.client.overview(handle, maxSide, signal);
+  }
+
+  /** A part of the map fit within `maxSide` (`TileDecoderClient.window`). */
+  window(handle: number, rect: PixelRect, maxSide: number, signal?: AbortSignal): Promise<ImageBitmap> {
+    return this.client.window(handle, rect, maxSide, signal);
   }
 
   close(handle: number): void {

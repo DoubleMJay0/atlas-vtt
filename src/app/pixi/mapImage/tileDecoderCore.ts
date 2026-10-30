@@ -3,7 +3,7 @@ import type { ArtAlpha } from '../../levels/artRaster';
 import { roofPieces, type RoofPieces } from '../../levels/roofs';
 import { OpenError } from './decodedLevels';
 import { MapEntries, NeedBytes, type HeldBitmap, type MapEntry } from './mapEntries';
-import type { TileRef } from './pyramid';
+import type { PixelRect, TileRef } from './pyramid';
 import type { TileGraphics } from './tileGraphics';
 import type { FileIdentity, OpenedPyramid, OpenFailure, TileEvent } from './tileProtocol';
 import { TileServer } from './tileServer';
@@ -106,6 +106,11 @@ export class TileDecoderCore {
 
   async overview(id: number, handle: number, maxSide: number): Promise<ImageBitmap | null> {
     return this.server.overview(id, handle, this.entryOf(handle), maxSide);
+  }
+
+  /** A part of the map fit within `maxSide` (`TileServer.window`), or null when the request was cancelled meanwhile. */
+  async window(id: number, handle: number, rect: PixelRect, maxSide: number): Promise<ImageBitmap | null> {
+    return this.server.window(id, handle, this.entryOf(handle), rect, maxSide);
   }
 
   /** Which pixels of the overview fit within `maxSide` hold art (`opaquePixels`), or null when the request was cancelled meanwhile. */
@@ -214,7 +219,7 @@ export class TileDecoderCore {
       }
       pinned = hash!;
       store.pin(pinned);
-      return { kind: 'entry', entry: await this.entries.ready(pinned, bytes, held, opens) };
+      return { kind: 'entry', entry: await this.entries.ready(pinned, bytes, held, opens, identity?.path ?? null) };
     } catch (error) {
       if (pinned) store.unpin(pinned);
       return error instanceof NeedBytes ? { kind: 'need-bytes' } : { kind: 'failed', failure: failureOf(error) };

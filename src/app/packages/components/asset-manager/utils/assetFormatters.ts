@@ -212,7 +212,12 @@ export function formatServiceAsset(
       };
     }
     case 'scene':
-      return { ...base, type: 'scenes', thumbnailUrl: sceneThumbnailUrl(app, asset.data?.mapPath) };
+      return {
+        ...base,
+        type: 'scenes',
+        thumbnailUrl: sceneThumbnailUrl(app, asset.data?.mapPath),
+        ...(asset.data?.mapPath && { scenePath: asset.data.mapPath }),
+      };
     case 'encounter': {
       // Older encounters keep these only inside their JSON payload.
       const description = asset.data?.description;

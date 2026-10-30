@@ -1,6 +1,6 @@
 import { drawMissingAssetImage, MISSING_ASSET_SIZE } from '../../services/AssetValidationService';
 import { fitWithin } from '../../imageProcessing/imageLayout';
-import { pyramidOf, type TileRef } from './pyramid';
+import { pyramidOf, type PixelRect, type TileRef } from './pyramid';
 import type { OpenedMap } from './TileDecoderClient';
 import type { TileSource } from './tileRequests';
 
@@ -11,6 +11,8 @@ export interface MapTiles {
   readonly cacheable: boolean;
   /** The whole image fit within `maxSide` pixels. */
   overview(maxSide: number): Promise<ImageBitmap>;
+  /** A part of the image (`rect` in its pixels) fit within `maxSide`, from the finest level that shows it so. */
+  window(rect: PixelRect, maxSide: number): Promise<ImageBitmap>;
   /** Ends the open; requests still under way are cancelled. */
   close(): void;
 }
@@ -19,6 +21,7 @@ export interface MapTiles {
 export interface TileReader {
   tile(handle: number, ref: TileRef, signal?: AbortSignal): Promise<ImageBitmap>;
   overview(handle: number, maxSide: number, signal?: AbortSignal): Promise<ImageBitmap>;
+  window(handle: number, rect: PixelRect, maxSide: number, signal?: AbortSignal): Promise<ImageBitmap>;
   close(handle: number): void;
 }
 
@@ -29,6 +32,7 @@ export function decoderTiles(reader: TileReader, opened: OpenedMap): MapTiles {
     source: { key: hash, pyramid, requestTile: (ref, signal) => reader.tile(handle, ref, signal) },
     cacheable: true,
     overview: (maxSide) => reader.overview(handle, maxSide),
+    window: (rect, maxSide) => reader.window(handle, rect, maxSide),
     close: () => reader.close(handle),
   };
 }
@@ -58,6 +62,7 @@ export function placeholderTiles(): MapTiles {
     },
     cacheable: false,
     overview: (maxSide) => bitmap(fitWithin(pyramid, maxSide, maxSide)),
+    window: (rect, maxSide) => bitmap(fitWithin(rect, maxSide, maxSide)),
     close: () => undefined,
   };
 }

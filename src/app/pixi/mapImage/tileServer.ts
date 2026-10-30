@@ -2,10 +2,14 @@ import type { DecodedLevels } from './decodedLevels';
 import { fitWithin } from '../../imageProcessing/imageLayout';
 import {
   levelOf,
+  rectAtLevel,
+  TILE_CONTENT,
   tileContentFrame,
   tileContentRect,
   tileKey,
   tileSourceRect,
+  windowLevel,
+  type PixelRect,
   type Pyramid,
   type PyramidLevel,
   type TileRef,
@@ -106,6 +110,19 @@ export class TileServer {
     return this.track(id, handle, (signal) => this.composeOverview(id, source, maxSide, signal));
   }
 
+  /**
+   * A part of the map, `rect` in the image's pixels, fit within `maxSide`: composed from the tiles
+   * of the finest level that shows it so (`windowLevel`), which a band build still cutting is
+   * waited for. Null when cancelled meanwhile; rejects with `MapClosedError` once its map closes.
+   */
+  async window(id: number, handle: number, source: MapSource, rect: PixelRect, maxSide: number): Promise<ImageBitmap | null> {
+    if (!(maxSide >= 1)) throw new RangeError(`A window needs a side of at least 1 pixel, got ${maxSide}`);
+    const level = windowLevel(source.pyramid, rect, maxSide);
+    const part = rectAtLevel(level, rect);
+    if (part.width < 1 || part.height < 1) throw new RangeError(`The window ${JSON.stringify(rect)} lies outside the map`);
+    return this.track(id, handle, (signal) => this.composePart(id, source, level, part, signal));
+  }
+
   /** Drops a request: it answers null. */
   cancel(id: number): void {
     this.requests.get(id)?.controller.abort();
@@ -196,10 +213,19 @@ export class TileServer {
   }
 
   /** A level drawn whole from its tiles' content. */
-  private async composeLevel(id: number, source: MapSource, level: PyramidLevel, signal: AbortSignal): Promise<ImageBitmap | null> {
+  private composeLevel(id: number, source: MapSource, level: PyramidLevel, signal: AbortSignal): Promise<ImageBitmap | null> {
+    return this.composePart(id, source, level, { x: 0, y: 0, width: level.width, height: level.height }, signal);
+  }
+
+  /** `part` of a level (its pixels) drawn from the content of the tiles that cover it. */
+  private async composePart(id: number, source: MapSource, level: PyramidLevel, part: PixelRect, signal: AbortSignal): Promise<ImageBitmap | null> {
     const refs: TileRef[] = [];
-    for (let row = 0; row < level.rows; row++) {
-      for (let col = 0; col < level.cols; col++) refs.push({ level: level.index, col, row });
+    const firstCol = Math.floor(part.x / TILE_CONTENT);
+    const lastCol = Math.min(level.cols - 1, Math.floor((part.x + part.width - 1) / TILE_CONTENT));
+    const firstRow = Math.floor(part.y / TILE_CONTENT);
+    const lastRow = Math.min(level.rows - 1, Math.floor((part.y + part.height - 1) / TILE_CONTENT));
+    for (let row = firstRow; row <= lastRow; row++) {
+      for (let col = firstCol; col <= lastCol; col++) refs.push({ level: level.index, col, row });
     }
     const settled = await Promise.allSettled(refs.map((ref) => this.tileBitmap(id, source, ref, signal)));
     const bitmaps = settled.map((result) => (result.status === 'fulfilled' ? result.value : null));
@@ -207,12 +233,23 @@ export class TileServer {
       const failed = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected');
       if (failed) throw failed.reason;
       if (signal.aborted || bitmaps.some((bitmap) => !bitmap)) return null;
-      const parts: ComposedPart[] = refs.map((ref, index) => ({
-        source: bitmaps[index]!,
-        from: tileContentFrame(source.pyramid, ref),
-        to: tileContentRect(source.pyramid, ref),
-      }));
-      return this.graphics.compose(level.width, level.height, parts);
+      // Each tile's content, clipped to the part, drawn where it lies within the part.
+      const parts: ComposedPart[] = [];
+      refs.forEach((ref, index) => {
+        const frame = tileContentFrame(source.pyramid, ref);
+        const content = tileContentRect(source.pyramid, ref);
+        const x = Math.max(content.x, part.x);
+        const y = Math.max(content.y, part.y);
+        const width = Math.min(content.x + content.width, part.x + part.width) - x;
+        const height = Math.min(content.y + content.height, part.y + part.height) - y;
+        if (width <= 0 || height <= 0) return;
+        parts.push({
+          source: bitmaps[index]!,
+          from: { x: frame.x + (x - content.x), y: frame.y + (y - content.y), width, height },
+          to: { x: x - part.x, y: y - part.y, width, height },
+        });
+      });
+      return this.graphics.compose(part.width, part.height, parts);
     } finally {
       for (const bitmap of bitmaps) bitmap?.close();
     }

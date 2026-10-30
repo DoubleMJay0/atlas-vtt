@@ -68,7 +68,8 @@ describe('TileDecoderCore', () => {
     expect(levelWidths[0]).toBe(375);
     expect(h.graphics.encodes).toHaveLength(TOTAL_TILES);
     const progress = h.events.filter((event) => event.type === 'progress');
-    expect(progress.at(-1)).toEqual({ type: 'progress', hash: map.hash, done: TOTAL_TILES, total: TOTAL_TILES });
+    // Named for whoever shows progress by the file the map was opened by.
+    expect(progress.at(-1)).toEqual({ type: 'progress', hash: map.hash, done: TOTAL_TILES, total: TOTAL_TILES, path: identity.path });
     expect((await h.store.readManifest(map.hash))?.complete).toBe(true);
   });
 

@@ -17,6 +17,7 @@ import { squareLattice } from './squareLattice';
 import { CellNumberLabels, type CellNumberView } from './cellNumberLabels';
 import { destroyTree } from '../pixi/utils/destroyTree';
 import { applyGridMark, createMarkBacking, type GridMarkColor, type UnlitGrid } from './gridLightingMark';
+import { cellsOf, drawnPerCell, drawRegionFor, marksIn, MAX_GRID_MARKS, MAX_NUMBERED_CELLS, needsRedraw, type WorldRect } from './gridDrawRegion';
 import type { MapImageView } from '../pixi/mapImage/mapImageView';
 import type { PixelRect } from '../pixi/mapImage/pyramid';
 
@@ -73,6 +74,17 @@ export class GridSystem implements UnlitGrid {
   private readonly onViewportZoomed = (): void => {
     this.cellNumberLabels?.setView(this.numberView());
   };
+  /** The part of the map a per-cell style (dashed, dotted) was drawn for, and the zoom it was drawn at; null where the whole grid is drawn. */
+  private drawnRegion: GridBounds | null = null;
+  private drawnZoom = 1;
+  /** What the last drawing covers and the style it was drawn in, for whoever checks the drawing (tests). */
+  private drawnGrid: { bounds: GridBounds; lineType: GridLineType } | null = null;
+  /** Every frame: a view that left the drawn region, or zoomed away from it, has the region drawn again. */
+  private readonly followView = (): void => {
+    if (!this.drawnRegion || this.isDestroying || !this.options.enabled) return;
+    const view = this.visibleWorld();
+    if (view && needsRedraw(this.drawnRegion, this.drawnZoom, view, this.viewport.scale.x)) this.createGrid();
+  };
   /** The map the grid overlays: its world rect bounds the grid, and the grid lies just above its layer. */
   private map: MapImageView;
   private stopFollowingMap: () => void;
@@ -126,7 +138,20 @@ export class GridSystem implements UnlitGrid {
     };
 
     this.viewport.on('zoomed', this.onViewportZoomed);
+    this.app.ticker?.add(this.followView);
     this.createGrid();
+  }
+
+  /** The bounds the grid was last drawn for and the style it was drawn in; null before the first drawing. */
+  get drawing(): { bounds: GridBounds; lineType: GridLineType } | null {
+    return this.drawnGrid;
+  }
+
+  /** What the viewport shows, in world units; null for a viewport that cannot say (a test's). */
+  private visibleWorld(): WorldRect | null {
+    if (typeof this.viewport.getVisibleBounds !== 'function') return null;
+    const { x, y, width, height } = this.viewport.getVisibleBounds();
+    return width > 0 && height > 0 ? { x, y, width, height } : null;
   }
 
   private createGrid(): void {
@@ -159,22 +184,30 @@ export class GridSystem implements UnlitGrid {
 
     // One cell of padding around the map; the mask clips the overflow.
     const padding = hexLayout ? Math.max(hexCellExtent(hexLayout).width, hexCellExtent(hexLayout).height) : size;
-    const bounds: GridBounds = {
+    const whole: GridBounds = {
       minX: mapX - padding,
       minY: mapY - padding,
       maxX: mapX + mapWidth + padding,
       maxY: mapY + mapHeight + padding,
     };
+    // A style drawn per cell is drawn for the view alone, and solid where even the view holds too many marks.
+    const view = drawnPerCell(lineType) ? this.visibleWorld() : null;
+    const region = view ? drawRegionFor(whole, view) : null;
+    const drawnType: GridLineType = region && marksIn(region, size, lineType) > MAX_GRID_MARKS ? 'solid' : lineType;
+    const bounds = region && drawnType !== 'solid' ? region : whole;
+    this.drawnRegion = bounds === whole ? null : bounds;
+    this.drawnZoom = this.viewport.scale.x;
+    this.drawnGrid = { bounds, lineType: drawnType };
 
     const lines = new GridLines({
-      lineType,
+      lineType: drawnType,
       lineWidth: lineWidth!,
       color: gridColor,
       alpha: isAligning ? Math.min(alpha! * 1.5, 1) : alpha!,
       markerArm: gridMarkerArmLength(size),
       trace: (path, thickness, arm) => {
-        if (hexLayout) drawHexGrid(path, bounds, hexLayout, lineType, thickness, arm);
-        else drawSquareGrid(path, bounds, size, offsetX, offsetY, lineType, thickness, arm);
+        if (hexLayout) drawHexGrid(path, bounds, hexLayout, drawnType, thickness, arm);
+        else drawSquareGrid(path, bounds, size, offsetX, offsetY, drawnType, thickness, arm);
       },
     });
 
@@ -182,8 +215,9 @@ export class GridSystem implements UnlitGrid {
     grid.addChild(lines.graphics);
     grid.position.set(bounds.minX, bounds.minY);
 
+    // A text per cell: a map of more cells than `MAX_NUMBERED_CELLS` shows none, since the numbers could not be read at a zoom that showed them anyway.
     const cellNumbers = this.options.cellNumbers;
-    if (cellNumbers) {
+    if (cellNumbers && cellsOf(mapWidth, mapHeight, size) <= MAX_NUMBERED_CELLS) {
       const lattice: CellLattice = hexLayout ? hexLattice(hexLayout) : squareLattice(size, offsetX, offsetY);
       this.cellNumberLabels = new CellNumberLabels(
         numberCells(lattice, mapRect, cellNumbers.format),
@@ -381,6 +415,7 @@ export class GridSystem implements UnlitGrid {
     this.isDestroying = true;
     this.stopFollowingMap();
     this.viewport.off('zoomed', this.onViewportZoomed);
+    this.app.ticker?.remove(this.followView);
     this.destroyGridResources();
   }
 
