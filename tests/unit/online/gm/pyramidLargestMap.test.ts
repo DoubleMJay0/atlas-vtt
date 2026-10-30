@@ -9,7 +9,7 @@ const RELAY_MAX_TILES = 65_536;
 const RELAY_MAX_LEVELS = 32;
 
 describe('the largest map an import keeps, in the online store', () => {
-  const square = Math.sqrt(MAP_MAX_PIXELS);
+  const square = Math.floor(Math.sqrt(MAP_MAX_PIXELS));
   const shapes = [
     pyramidOf(square, square),
     pyramidOf(MAP_MAX_SIDE, Math.floor(MAP_MAX_PIXELS / MAP_MAX_SIDE)),

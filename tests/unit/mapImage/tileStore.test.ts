@@ -122,14 +122,14 @@ describe('TileStore', () => {
     expect(await store.readManifest('missing')).toBeNull();
   });
 
-  it('budgets the smaller of 2 GiB and a tenth of the quota', () => {
+  it('budgets the smaller of 4 GiB and a tenth of the quota', () => {
     expect(tileCacheBudget(null)).toBe(TILE_CACHE_MAX_BYTES);
     expect(tileCacheBudget(0)).toBe(TILE_CACHE_MAX_BYTES);
-    expect(tileCacheBudget(100 * GIB)).toBe(2 * GIB);
+    expect(tileCacheBudget(100 * GIB)).toBe(4 * GIB);
     expect(tileCacheBudget(10_000)).toBe(1000);
   });
 
-  it('reads the budget as 2 GiB when the quota cannot be estimated', async () => {
+  it('reads the budget as 4 GiB when the quota cannot be estimated', async () => {
     const store = new TileStore({ backend: new MemoryTileBackend(), estimateQuota: () => Promise.reject(new Error('no')) });
     expect(await store.budget()).toBe(TILE_CACHE_MAX_BYTES);
   });

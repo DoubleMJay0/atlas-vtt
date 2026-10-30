@@ -48,7 +48,9 @@ describe('the tile worker’s limit on a source', () => {
     expect(bandDecodable({ format: 'png', width: 20000, height: 20000 })).toBe(true);
     expect(bandDecodable({ format: 'jpeg', width: 16383, height: 16383 })).toBe(false);
     expect(bandDecodable({ format: 'webp', width: 20000, height: 20000 })).toBe(false);
-    expect(bandDecodable({ format: 'png', width: 20001, height: 20000 })).toBe(false);
+    expect(bandDecodable({ format: 'png', width: 31622, height: 31622 })).toBe(true);
+    expect(bandDecodable({ format: 'png', width: 31623, height: 31623 })).toBe(false);
+    expect(bandDecodable({ format: 'jpeg', width: 65536, height: 100 })).toBe(false);
     expect(maxPixels).toBe(BAND_MAX_PIXELS);
     expect(maxWidth).toBeLessThanOrEqual(DECODER_MAX_SIDE);
   });

@@ -28,19 +28,17 @@ export interface ImagePreset {
 }
 
 /**
- * The most pixels a map may have: 400 megapixels, nearly three times Owlbear Rodeo's largest maps
- * (144 MP). Below `DECODED_MAX_PIXELS` the browser decodes a map; from there Atlas' own band
- * decoders read a plain JPEG or a PNG in rows (`BAND_MAX_PIXELS`), kept as uploaded. The tile
- * pyramid draws any size at any zoom, and the online store sends players only the tiles they
- * look at.
+ * The most pixels a map may have: a gigapixel, seven times Owlbear Rodeo's largest maps (144 MP).
+ * Below `DECODED_MAX_PIXELS` the browser decodes a map; from there Atlas' own band decoders read a
+ * plain JPEG or a PNG in rows (`BAND_MAX_PIXELS`), kept as uploaded. The tile pyramid draws any
+ * size at any zoom, and the online store sends players only the tiles they look at.
  */
 export const MAP_MAX_PIXELS = BAND_MAX_PIXELS;
 /**
- * The longest side a map may have, for very wide or tall maps within `MAP_MAX_PIXELS`: half of
- * what the decoders and canvases take, so every level of its pyramid and every canvas drawn from
- * it stays well within them. A map wider than a WebP can be is written as PNG.
+ * The longest side a map may have, for very wide or tall maps within `MAP_MAX_PIXELS`: what the
+ * decoders, a canvas and a JPEG take. A map wider than a WebP can be is written as PNG.
  */
-export const MAP_MAX_SIDE = 32767;
+export const MAP_MAX_SIDE = DECODER_MAX_SIDE;
 
 export const IMAGE_PRESETS = {
   token: { maxWidth: 400, maxHeight: 400, quality: 0.85 },

@@ -68,10 +68,12 @@ describe('importing maps with the real workers', () => {
   });
 
   it('fits a map wider than the limit to its side and reports what it lost', async () => {
-    const result = await optimizeImage(await png(40000, 400), IMAGE_PRESETS.map);
+    // A canvas cannot paint a map wider than the side a map may have, so the limit is lowered for the test.
+    const result = await optimizeImage(await png(40000, 400), { ...IMAGE_PRESETS.map, maxWidth: 32767 });
 
-    expect(result.scaledDown).toEqual({ from: { width: 40000, height: 400 }, to: { width: MAP_MAX_SIDE, height: 328 } });
-    expect((await decoded(result.image)).size).toEqual({ width: MAP_MAX_SIDE, height: 328 });
+    expect(result.scaledDown).toEqual({ from: { width: 40000, height: 400 }, to: { width: 32767, height: 328 } });
+    expect((await decoded(result.image)).size).toEqual({ width: 32767, height: 328 });
+    expect(MAP_MAX_SIDE).toBe(65535);
   });
 
   it('keeps a PNG the browser cannot decode as it is and reads its thumbnail in bands', async () => {
@@ -120,14 +122,14 @@ describe('importing maps with the real workers', () => {
   });
 
   it('decodes a large JPEG at a smaller scale and fits it as a whole decode would', async () => {
-    // 240 MP, wider than a map may be: decoded at 7/8 (35000 px), the smallest decode that covers the fit.
-    const result = await optimizeImage(grayJpeg(40000, 6000), IMAGE_PRESETS.map);
+    // 240 MP, wider than the side allowed here: decoded at 7/8 (35000 px), the smallest decode that covers the fit.
+    const result = await optimizeImage(grayJpeg(40000, 6000), { ...IMAGE_PRESETS.map, maxWidth: 32767 });
     const map = await decoded(result.image);
 
-    expect(map.size).toEqual({ width: MAP_MAX_SIDE, height: 4915 });
-    expect(result.scaledDown).toEqual({ from: { width: 40000, height: 6000 }, to: { width: MAP_MAX_SIDE, height: 4915 } });
+    expect(map.size).toEqual({ width: 32767, height: 4915 });
+    expect(result.scaledDown).toEqual({ from: { width: 40000, height: 6000 }, to: { width: 32767, height: 4915 } });
     expect((await imageHeader(result.image))?.format).toBe('png');
-    expect(map.luminanceAt(MAP_MAX_SIDE / 2, 2457)).toBeCloseTo(128, -1);
+    expect(map.luminanceAt(16383, 2457)).toBeCloseTo(128, -1);
   });
 
   it('keeps a JPEG map the browser could decode byte for byte and reads it back', async () => {
@@ -140,14 +142,14 @@ describe('importing maps with the real workers', () => {
     expect(await imageHeader(result.thumbnail!)).toMatchObject({ format: 'webp', width: 256, height: 256 });
   });
 
-  it('refuses an image the browser would die decoding, naming its size', async () => {
-    // Only the header is read: a PNG signature and an IHDR of 30000 × 30000.
-    const header = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0x75, 0x30, 0, 0, 0x75, 0x30, 8, 6, 0, 0, 0]);
+  it('refuses an image past a gigapixel, naming its size', async () => {
+    // Only the header is read: a PNG signature and an IHDR of 40000 × 30000.
+    const header = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0x9c, 0x40, 0, 0, 0x75, 0x30, 8, 6, 0, 0, 0]);
     const png = optimizeImage(new Blob([header], { type: 'image/png' }), IMAGE_PRESETS.map);
     await expect(png).rejects.toBeInstanceOf(ImageTooLargeError);
-    await expect(png).rejects.toThrow(/30,000 × 30,000 px/);
-    await expect(png).rejects.toThrow(/400 megapixels/);
-    await expect(optimizeImage(grayJpeg(20001, 20000), IMAGE_PRESETS.map)).rejects.toBeInstanceOf(ImageTooLargeError);
+    await expect(png).rejects.toThrow(/40,000 × 30,000 px/);
+    await expect(png).rejects.toThrow(/1,000 megapixels/);
+    await expect(optimizeImage(grayJpeg(31623, 31624), IMAGE_PRESETS.map)).rejects.toBeInstanceOf(ImageTooLargeError);
   });
 
   it('reads a JPEG the browser cannot decode in bands: kept as it is, its thumbnail from the DC terms', async () => {
