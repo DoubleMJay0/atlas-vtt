@@ -1,12 +1,19 @@
 import type { Size } from './imageLayout';
 
 /**
- * What Chromium can decode and encode, read from its source and confirmed in
- * the browser tests. Pure: shared by the main thread and the image workers.
+ * What Chromium can decode and encode, read from its source, confirmed in the
+ * browser tests and measured in Chrome 156 and Electron 43 (Chromium 150) on
+ * 2026-10-30. Pure: shared by the main thread and the image workers.
  */
 
-/** Every Blink image decoder refuses an image whose 8-bit RGBA pixels would take more bytes than this. */
-export const DECODER_MAX_BYTES = 2 ** 31 - 1;
+/**
+ * Pixels an image must stay below to be decoded at all. From Chromium 156 an image of this many
+ * pixels (1 GiB of RGBA) ends the renderer process, not the promise, in every decoder
+ * (`createImageBitmap`, `<img>`, WebCodecs), also when asked for a scaled-down JPEG; Chromium 150
+ * still decoded 484 megapixels. Obsidian's installers move on to newer Electrons, so nothing may
+ * try.
+ */
+export const DECODED_MAX_PIXELS = 2 ** 28;
 /** Longest side any decoder or canvas takes. */
 export const DECODER_MAX_SIDE = 65535;
 /** `convertToBlob` silently crops a WebP's sides to this. */
@@ -21,7 +28,7 @@ const JPEG_SCALE_STEPS = 8;
  * oversized JPEG even when asked for an eighth of it.
  */
 export function decodable(size: Size): boolean {
-  return size.width <= DECODER_MAX_SIDE && size.height <= DECODER_MAX_SIDE && size.width * size.height * 4 <= DECODER_MAX_BYTES;
+  return size.width <= DECODER_MAX_SIDE && size.height <= DECODER_MAX_SIDE && size.width * size.height < DECODED_MAX_PIXELS;
 }
 
 /** The size `ImageDecoder` decodes a JPEG at for `eighths` / 8: each side rounded up, the only sizes it accepts. */

@@ -69,7 +69,10 @@ export interface ScaleDown {
 }
 
 export interface ImageJobResult {
-  /** WebP bytes, or the source itself where a PNG, JPEG or WebP needed no scaling (`webpOnly`: only a WebP). */
+  /**
+   * WebP bytes (PNG for a picture wider or taller than a WebP can be), or the source itself where a
+   * PNG, JPEG or WebP needed no scaling (`webpOnly`: only a WebP).
+   */
   image: Blob;
   thumbnail: Blob | null;
   preview: Blob | null;

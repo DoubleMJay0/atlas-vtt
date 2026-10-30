@@ -1,5 +1,5 @@
 import { t } from '../i18n';
-import { DECODER_MAX_BYTES, DECODER_MAX_SIDE, decodable, scaledJpegDecodeSize } from './decodeLimits';
+import { DECODED_MAX_PIXELS, DECODER_MAX_SIDE, decodable, scaledJpegDecodeSize } from './decodeLimits';
 import type { FramePlacement, ImageJob, ImageJobResult, ImageLayout, ThumbnailSpec } from './imageJob';
 import { imageHeader, type ImageHeader } from './imageDimensions';
 import { withDecodedImage } from './imageElement';
@@ -25,14 +25,27 @@ export interface ImagePreset {
   quality: number;
 }
 
+/**
+ * The most pixels a map may have: the largest square below what the browser decodes at all
+ * (`DECODED_MAX_PIXELS`), 16383 × 16383, nearly twice Owlbear Rodeo's largest maps (144 MP) and
+ * more than one GPU texture holds. The tile pyramid draws it at any zoom, and the online store
+ * sends players only the tiles they look at.
+ */
+export const MAP_MAX_PIXELS = 16383 ** 2;
+/**
+ * The longest side a map may have, for very wide or tall maps within `MAP_MAX_PIXELS`: half of
+ * what the decoders and canvases take, so every level of its pyramid and every canvas drawn from
+ * it stays well within them. A map wider than a WebP can be is written as PNG.
+ */
+export const MAP_MAX_SIDE = 32767;
+
 export const IMAGE_PRESETS = {
   token: { maxWidth: 400, maxHeight: 400, quality: 0.85 },
   /**
-   * Owlbear Rodeo's largest maps (144 MP), within the sides a WebP can have. A map that fits is
-   * kept as uploaded; one that is scaled down is written losslessly, since lossy WebP blurs fine
-   * lines and halves the resolution of colour.
+   * A map that fits is kept as uploaded; one that is scaled down is written losslessly (WebP, or
+   * PNG beyond WebP's sides), since lossy WebP blurs fine lines and halves the resolution of colour.
    */
-  map: { maxWidth: 16383, maxHeight: 16383, maxPixels: 144_000_000, quality: 1 },
+  map: { maxWidth: MAP_MAX_SIDE, maxHeight: MAP_MAX_SIDE, maxPixels: MAP_MAX_PIXELS, quality: 1 },
 } as const satisfies Record<string, ImagePreset>;
 
 export interface ProcessOptions {
@@ -50,7 +63,8 @@ export interface ProcessOptions {
 const MAX_WORKERS = 6;
 /**
  * Decoded pixels all running jobs may hold together. Token art runs in
- * parallel; a huge map (150 megapixels hold 1.2 GB while converting) runs alone.
+ * parallel; a huge map (150 megapixels hold 1.2 GB while converting, the
+ * largest 2.1 GB) runs alone.
  */
 export const MEMORY_BUDGET_BYTES = 1024 ** 3;
 /** Side assumed for an image that reports no size of its own, such as an SVG without dimensions. */
@@ -124,7 +138,7 @@ export class ImageTooLargeError extends Error {
     super(t('image.tooLarge', {
       width: size.width,
       height: size.height,
-      megapixels: Math.floor(DECODER_MAX_BYTES / 4 / 1e6),
+      megapixels: Math.floor(DECODED_MAX_PIXELS / 1e6),
       side: DECODER_MAX_SIDE,
     }));
   }

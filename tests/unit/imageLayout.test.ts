@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WEBP_MAX_SIDE } from '../../src/app/imageProcessing/decodeLimits';
+import { DECODED_MAX_PIXELS, WEBP_MAX_SIDE } from '../../src/app/imageProcessing/decodeLimits';
 import { IMAGE_PRESETS } from '../../src/app/imageProcessing/imageProcessing';
 import { fitSize, fitWithin, frameImageRect, frameSize, scaleDown, vectorRasterSize } from '../../src/app/imageProcessing/imageLayout';
 import { renderedImageRect, TOKEN_CROP_FRACTION, tokenCropPlacement } from '../../src/app/packages/components/asset-manager/token-creator/cropMath';
@@ -35,19 +35,30 @@ describe('fitWithin', () => {
 });
 
 describe('fitSize', () => {
-  it('fits a map within 16383 px a side and 144 MP', () => {
-    const map = { kind: 'fit', ...IMAGE_PRESETS.map } as const;
-    expect(fitSize({ width: 20000, height: 9000 }, map)).toEqual({ width: 16383, height: 7372 });
-    expect(fitSize({ width: 13000, height: 13000 }, map)).toEqual({ width: 12000, height: 12000 });
-    expect(fitSize({ width: 16383, height: 8000 }, map)).toEqual({ width: 16383, height: 8000 });
-    // 144.17 MP, just over the limit
-    expect(fitSize({ width: 16383, height: 8800 }, map)).toEqual({ width: 16373, height: 8794 });
+  const map = { kind: 'fit', ...IMAGE_PRESETS.map } as const;
+
+  it('fits a map within 32767 px a side and 16383 × 16383 pixels', () => {
+    expect(fitSize({ width: 20000, height: 9000 }, map)).toEqual({ width: 20000, height: 9000 });
+    expect(fitSize({ width: 16383, height: 16383 }, map)).toEqual({ width: 16383, height: 16383 });
+    expect(fitSize({ width: 16384, height: 16384 }, map)).toEqual({ width: 16383, height: 16383 });
+    expect(fitSize({ width: 20000, height: 20000 }, map)).toEqual({ width: 16383, height: 16383 });
+    expect(fitSize({ width: 40000, height: 2000 }, map)).toEqual({ width: 32767, height: 1638 });
+    // 300 MP, over the limit
+    expect(fitSize({ width: 30000, height: 10000 }, map)).toEqual({ width: 28376, height: 9458 });
   });
 
-  it('never makes a side longer than a WebP can have, whatever the layout allows', () => {
+  it('keeps every map below what the browser decodes', () => {
+    for (const size of [{ width: 16384, height: 16384 }, { width: 32767, height: 8192 }, { width: 65535, height: 65535 }]) {
+      const fitted = fitSize(size, map);
+      expect(fitted.width * fitted.height).toBeLessThan(DECODED_MAX_PIXELS);
+      expect(fitted.width * fitted.height).toBeLessThanOrEqual(IMAGE_PRESETS.map.maxPixels);
+    }
+  });
+
+  it('lets a fit go past a WebP side; the renderer writes such a picture as PNG', () => {
     const generous = { kind: 'fit', maxWidth: 40000, maxHeight: 40000 } as const;
-    expect(fitSize({ width: 30000, height: 100 }, generous)).toEqual({ width: WEBP_MAX_SIDE, height: 55 });
-    expect(fitSize({ width: 100, height: 20000 }, generous)).toEqual({ width: 82, height: WEBP_MAX_SIDE });
+    expect(fitSize({ width: 30000, height: 100 }, generous)).toEqual({ width: 30000, height: 100 });
+    expect(fitSize({ width: 100, height: 20000 }, generous)).toEqual({ width: 100, height: 20000 });
   });
 });
 
@@ -77,8 +88,8 @@ describe('vectorRasterSize', () => {
 
   it('fills a map within its area limit', () => {
     const map = { kind: 'fit', ...IMAGE_PRESETS.map } as const;
-    expect(vectorRasterSize({ width: 400, height: 200 }, map)).toEqual({ width: 16383, height: 8192 });
-    expect(vectorRasterSize({ width: 100, height: 100 }, map)).toEqual({ width: 12000, height: 12000 });
+    expect(vectorRasterSize({ width: 400, height: 200 }, map)).toEqual({ width: 23168, height: 11584 });
+    expect(vectorRasterSize({ width: 100, height: 100 }, map)).toEqual({ width: 16383, height: 16383 });
   });
 
   it('gives a frame enough pixels to crop from', () => {

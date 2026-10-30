@@ -64,11 +64,27 @@ describe('map images without lossy compression', () => {
   it('writes a map it must scale down as lossless WebP', async () => {
     const upload = await drawMap(16500, 64).convertToBlob({ type: 'image/png' });
 
-    const { image, scaledDown } = await optimizeImage(upload, IMAGE_PRESETS.map);
+    const { image, scaledDown } = await optimizeImage(upload, { ...IMAGE_PRESETS.map, maxWidth: 16383 });
 
     expect(scaledDown).toBeDefined();
     expect(await imageHeader(image)).toMatchObject({ format: 'webp', width: 16383 });
     expect(await webpBitstream(image)).toBe('VP8L');
+  });
+
+  it('writes a map scaled down to a side wider than a WebP can be as PNG, which is lossless', async () => {
+    const upload = await drawMap(40000, 64).convertToBlob({ type: 'image/png' });
+
+    const { image, scaledDown } = await optimizeImage(upload, IMAGE_PRESETS.map);
+
+    expect(scaledDown).toEqual({ from: { width: 40000, height: 64 }, to: { width: 32767, height: 52 } });
+    expect(await imageHeader(image)).toMatchObject({ format: 'png', width: 32767, height: 52 });
+    // The scaled picture, read back exactly: PNG has no lossy mode.
+    const written = await pixels(image, 32767, 52);
+    const expected = await pixels(await createImageBitmap(upload, { resizeWidth: 32767, resizeHeight: 52, resizeQuality: 'high' }), 32767, 52);
+    expect(written.length).toBe(expected.length);
+    let differing = 0;
+    for (let i = 0; i < written.length; i++) if (Math.abs(written[i]! - expected[i]!) > 8) differing++;
+    expect(differing / written.length).toBeLessThan(0.02);
   });
 
   it('encodes cache tiles losslessly: a tile decodes to the very pixels it was cut from', async () => {
