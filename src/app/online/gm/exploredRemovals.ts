@@ -31,6 +31,15 @@ export class ExploredRemovals {
     return this.count;
   }
 
+  /**
+   * The scene last shared comes back under its id (`refreshAssets`), and players keep what they drew of
+   * it. They may have missed a removal meanwhile, since nothing was sent: it counts as one. What was
+   * under way stays under way: a save still to come may hold an edit made before.
+   */
+  sharedAgain(): void {
+    this.count++;
+  }
+
   /** Another scene is shared: nothing of the one before compares. */
   reset(): void {
     this.seen = null;

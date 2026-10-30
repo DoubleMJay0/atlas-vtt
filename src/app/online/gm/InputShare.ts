@@ -82,6 +82,8 @@ export class InputShare {
   private mask: { readonly source: string | null; readonly ref: AssetRef | null; readonly serial: number } | null = null;
   /** The times the GM took memory away from this floor, sent with every explored memory. */
   private readonly removals: ExploredRemovals;
+  /** The id of the scene last shared, which stays while none is. */
+  private sharedId: string | null = null;
   private readonly pacer: Pacer;
   private readonly exploredPacer: Pacer;
   /** The fog and sight inputs sent: whole for a new scene, a joiner or a player who asks, else as deltas. */
@@ -110,7 +112,11 @@ export class InputShare {
     this.lighting = null;
     this.releaseMask();
     this.mask = null;
-    this.removals.reset();
+    if (scene !== null) {
+      if (scene.id === this.sharedId) this.removals.sharedAgain();
+      else this.removals.reset();
+      this.sharedId = scene.id;
+    }
     this.pacer.cancel();
     this.exploredPacer.cancel();
     this.update();
@@ -129,7 +135,7 @@ export class InputShare {
 
   /** The scene's map is loading: nothing goes out, and what the load ends with is compared with what was before it. */
   mapLoading(): void {
-    if (this.scene?.lit === true) this.removals.loading();
+    this.removals.loading();
   }
 
   /** Whether the memory saved, or the count of removals, is another than players were sent last. */

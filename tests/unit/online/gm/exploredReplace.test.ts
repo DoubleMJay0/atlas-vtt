@@ -102,6 +102,53 @@ describe('an explored memory the GM saves', () => {
     expect(serials(table)).toEqual([0, 0]);
   });
 
+  describe('where the scene comes back under its id, its references made again (`refreshAssets`)', () => {
+    /** Players kept what they drew of the scene: the memory after AB must replace theirs, or they keep B. */
+    const expectReplaced = (table: ShareHarness): void => {
+      const sent = explored(table);
+      const [before, after] = [sent.findLast((body) => body.png === btoa('AB')), sent.findLast((body) => body.png === btoa('A'))];
+      expect(new Set(sent.map(({ scene }) => scene)).size).toBe(1);
+      expect(after?.serial).toBeGreaterThan(before?.serial ?? Infinity);
+    };
+
+    it('counts a removal for an edit before it and the save after it', async () => {
+      const table = await shared(sceneState({ ...LIT, exploredMask: mask('AB') }));
+      await table.set({ ...table.state(), exploredEdits: 1 });
+      table.share.refreshAssets();
+      await table.settle();
+      await then(table, { exploredMask: mask('A') });
+      expectReplaced(table);
+    });
+
+    it('counts a removal for an edit and its save while the map is read again', async () => {
+      const table = await shared(sceneState({ ...LIT, exploredMask: mask('AB') }));
+      table.share.refreshAssets();
+      void table.set({ ...table.state(), exploredEdits: 1 });
+      await then(table, { exploredMask: mask('A') });
+      expectReplaced(table);
+    });
+
+    it('counts a removal for a snapshot load it falls into', async () => {
+      const table = await shared(sceneState({ ...LIT, exploredMask: mask('AB') }));
+      await then(table, { isMapLoading: true, exploredMask: null, exploredEdits: 0 });
+      table.share.refreshAssets();
+      await table.settle();
+      await then(table, { isMapLoading: false, exploredMask: mask('A') });
+      expectReplaced(table);
+    });
+
+    it('still counts the save of an edit made before it, where the memory it first sends is the old one', async () => {
+      const table = await shared(sceneState({ ...LIT, exploredMask: mask('AB') }));
+      await table.set({ ...table.state(), exploredEdits: 1 });
+      table.share.refreshAssets();
+      await table.advance(EXPLORED_INTERVAL_MS + 100);
+      const resent = explored(table).at(-1);
+      expect(resent?.png).toBe(btoa('AB'));
+      await then(table, { exploredMask: mask('A') });
+      expect(explored(table).at(-1)?.serial).toBeGreaterThan(resent?.serial ?? Infinity);
+    });
+  });
+
   it('is not counted by an edit of a floor the players are not on', async () => {
     const levels: SceneLevel[] = [
       { id: 'ground', name: 'Ground', elevation: { bottom: 0, top: 10 }, background: 'maps/cave.webp' },
