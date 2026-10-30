@@ -468,7 +468,7 @@ export class PixiRendererOrchestrator { // Renamed class
         bounds: () => this.getMapRect(),
         albedo: () => this.mapImage?.albedoTexture() ?? null,
         grid: () => this.gridSystem ?? null,
-        fogCoverage: () => this.fogRenderer!.getPlayersCoverage(),
+        fogCoverage: () => this.fogRenderer!.getCommittedCoverage(),
         shown: this.shownPlaces,
         ...(this.roofs && { roofs: this.roofs }),
         below: createBelowLevelsHost({
@@ -476,7 +476,7 @@ export class PixiRendererOrchestrator { // Renamed class
           app: this.pixiAppManager.app,
           viewport,
           store: this.store,
-          viewedFog: () => this.fogRenderer?.getPlayersCoverage(),
+          viewedFog: () => this.fogRenderer?.getCommittedCoverage(),
           viewedRoof: () => {
             const roofs = this.roofs;
             return roofs ? (point) => roofs.covers(point) : null;
@@ -1110,7 +1110,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.tokenRenderer.setPlacementGuard(() => this.tokenPlacer?.active ?? false);
 
     if (this.fogRenderer) {
-      this.tokenRenderer.setFogCoverageProvider(() => this.fogRenderer!.getPlayersCoverage());
+      this.tokenRenderer.setFogCoverageProvider(() => this.fogRenderer!.getCommittedCoverage());
       this.tokenRenderer.setFogHitTestProvider(
         (x, y) => this.fogRenderer!.hitTestFog(x, y)
       );
