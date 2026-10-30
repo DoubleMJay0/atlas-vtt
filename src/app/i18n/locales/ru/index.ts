@@ -31,6 +31,7 @@ import { lpv } from './lpv';
 import { map } from './map';
 import { menu } from './menu';
 import { notice } from './notice';
+import { online } from './online';
 import { palette } from './palette';
 import { picker } from './picker';
 import { settings } from './settings';
@@ -103,7 +104,6 @@ import { openings } from './openings';
 import { uvtt } from './uvtt';
 import { uvttFloors } from './uvttFloors';
 import { videoMap } from './videoMap';
-import { online } from './online';
 
 export const ru: Translation = {
   ...align,
@@ -138,6 +138,7 @@ export const ru: Translation = {
   ...map,
   ...menu,
   ...notice,
+  ...online,
   ...palette,
   ...picker,
   ...settings,
@@ -212,5 +213,4 @@ export const ru: Translation = {
   ...uvtt,
   ...uvttFloors,
   ...videoMap,
-  ...online,
 };

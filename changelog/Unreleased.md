@@ -4,6 +4,7 @@
 - Fog: Cloud reveal in the fog tool's menu shows players the fog as clouds in a colour you pick, which part over what you reveal and drift in over what you cover. While you paint or erase fog, players keep seeing the fog from before, and your changes reach them at once when you switch to another tool, at an online table too. Contributed by ISorokaI
 
 ## Improved
+- Russian translation of the GM's side of online play: the online panel on the map, the online account, the table's commands and notices. Contributed by ISorokaI
 - Russian translation of native statblocks: the statblock beside a note, creating statblocks, the template gallery, Fantasy Statblocks imports and the collection's Statblocks tab. Contributed by ISorokaI
 - Russian translation of the statblock template editor. Contributed by ISorokaI
 - Russian translation of random tables, campaigns, quests, recovery actions, initiative rules and dynamic lighting. Contributed by ISorokaI
