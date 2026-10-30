@@ -16,8 +16,8 @@ import { destroyTree } from '../pixi/utils/destroyTree';
 import { applyGridMark, createMarkBacking, type GridMarkColor, type UnlitGrid } from './gridLightingMark';
 import { GridMesh } from './shader/GridMesh';
 import type { GridShaderLook } from './shader/gridShader';
-import type { MapImageView } from '../pixi/mapImage/mapImageView';
-import type { PixelRect } from '../pixi/mapImage/pyramid';
+import type { MosaicCanvasView } from '../pixi/mosaicCanvas/mosaicCanvasView';
+import type { PixelRect } from '../pixi/mosaicCanvas/pyramid';
 
 export type GridType = 'square' | 'hex-horizontal' | 'hex-vertical';
 
@@ -79,7 +79,7 @@ export class GridSystem implements UnlitGrid {
     if (!this.isDestroying && this.options.enabled) this.cellNumberLabels?.setView(this.numberView());
   };
   /** The map the grid overlays: its world rect bounds the grid, and the grid lies just above its layer. */
-  private map: MapImageView;
+  private map: MosaicCanvasView;
   private stopFollowingMap: () => void;
   /** Counts the images shown, so a colour read from one is never applied to the next. */
   private mapGeneration = 0;
@@ -110,7 +110,7 @@ export class GridSystem implements UnlitGrid {
   constructor(
     app: Application,
     viewport: Viewport,
-    map: MapImageView,
+    map: MosaicCanvasView,
     options: GridOptions,
   ) {
     this.app = app;
@@ -282,7 +282,7 @@ export class GridSystem implements UnlitGrid {
   }
 
   /** Follows `map` to every image it shows; returns the function that stops. */
-  private follow(map: MapImageView): () => void {
+  private follow(map: MosaicCanvasView): () => void {
     return map.onChange((change) => {
       if (change === 'image') this.mapImageChanged();
     });
@@ -411,7 +411,7 @@ export class GridSystem implements UnlitGrid {
   }
 
   /** Draws over another map image from now on, as when the view's map image was replaced. */
-  public setMapImage(map: MapImageView): void {
+  public setMapImage(map: MosaicCanvasView): void {
     if (map === this.map) return;
     this.stopFollowingMap();
     this.map = map;

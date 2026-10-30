@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { IMAGE_PRESETS, MAP_MAX_PIXELS, MAP_MAX_SIDE } from '../../../../src/app/imageProcessing/imageProcessing';
 import { manifestOf, pyramidBound, tileCount } from '../../../../src/app/online/gm/assets/pyramidPlan';
 import { ASSET_CAPS } from '../../../../src/app/online/protocol/index.ts';
-import { pyramidOf } from '../../../../src/app/pixi/mapImage/pyramid';
+import { pyramidOf } from '../../../../src/app/pixi/mosaicCanvas/pyramid';
 
 /** The relay's limits on one stored pyramid (`apps/relay/src/assets/assetLimits.ts`), which the page reads it within. */
 const RELAY_MAX_TILES = 65_536;

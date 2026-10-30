@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BAND_MAX_PIXELS, bandDecodable, DECODED_MAX_PIXELS, DECODER_MAX_SIDE, decodable, jpegScaledSize, scaledJpegDecodeSize } from '../../src/app/imageProcessing/decodeLimits';
 import { IMAGE_PRESETS } from '../../src/app/imageProcessing/imageProcessing';
-import { decodedSizeCost, MAX_DECODED_LEVELS_BYTES, MAX_SOURCE_PIXELS } from '../../src/app/pixi/mapImage/decodedLevels';
+import { decodedSizeCost, MAX_DECODED_LEVELS_BYTES, MAX_SOURCE_PIXELS } from '../../src/app/pixi/mosaicCanvas/decodedLevels';
 
 describe('decodable', () => {
   it('takes images below 2^28 pixels, where Chromium 156 ends the renderer', () => {
@@ -38,7 +38,7 @@ describe('scaled JPEG decoding', () => {
   });
 });
 
-describe('the tile worker’s limit on a source', () => {
+describe('the tessera worker’s limit on a source', () => {
   it('decodes every map the browser can, refuses what the decoders would die on, and leaves the rest to the band decoders', () => {
     const { maxPixels, maxWidth } = IMAGE_PRESETS.map;
     expect(MAX_SOURCE_PIXELS).toBe(DECODED_MAX_PIXELS - 1);

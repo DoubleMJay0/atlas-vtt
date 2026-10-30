@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { App } from 'obsidian';
-import { processingPercent, type MapProcessing } from '../../../pixi/mapImage/mapProcessing';
+import { processingPercent, type MapProcessing } from '../../../pixi/mosaicCanvas/mapProcessing';
 import { sceneImagePathsOf } from '../../../services/sceneImagePaths';
 
 const NONE: readonly string[] = [];

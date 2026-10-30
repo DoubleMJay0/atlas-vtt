@@ -12,7 +12,7 @@ import { folderIdOf } from './assetFolders';
 import { ENCOUNTER_PREVIEW_COUNT } from './encounterPreviewLayout';
 import { mapThumbnailPath } from '../../../../utils/dataFileMigration';
 import { isPlayerCharacter } from '../../../../characters/playerCharacters';
-import { isVideoMapPath } from '../../../../pixi/mapImage/video/videoMapFiles';
+import { isVideoMapPath } from '../../../../pixi/mosaicCanvas/video/videoMapFiles';
 
 /** The stored asset types the asset manager shows, one per tab. */
 export type TabServiceAsset = AssetOfType<'token' | 'map' | 'scene' | 'encounter'>;

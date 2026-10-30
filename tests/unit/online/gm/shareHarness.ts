@@ -15,7 +15,7 @@ import type { GmRuler } from '../../../../src/app/online/gm/dragRulers.ts';
 import { fakeTokenSource } from './fakeTokenSource.ts';
 import { GENERIC_SOURCE, PLAYER_SETTINGS } from './gmLighting.ts';
 import { settled } from './settled.ts';
-import { isVideoMapPath } from '../../../../src/app/pixi/mapImage/video/videoMapFiles';
+import { isVideoMapPath } from '../../../../src/app/pixi/mosaicCanvas/video/videoMapFiles';
 import type { AssetStoring } from '../../../../src/app/online/gm/assets/assetUses.ts';
 import { fakeStoring } from './fakeStoring.ts';
 

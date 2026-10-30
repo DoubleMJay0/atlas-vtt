@@ -1,8 +1,8 @@
 import type { AlignmentResult } from '../gridAlignmentMath';
-import type { PixelRect } from '../mapImage/pyramid';
+import type { PixelRect } from '../mosaicCanvas/pyramid';
 import { MAX_ANALYSIS_SIDE, pictureOf, type DetectableMap, type ImageSize, type MapPicture } from './detectGrid';
 import { NO_GRID, type DetectionOutcome, type LineEnergy } from './detectionJob';
-import type { MapPixels as MapReader } from '../mapImage/mapImageView';
+import type { MapPixels as MapReader } from '../mosaicCanvas/mosaicCanvasView';
 import type { DetectOptions, MapPixels } from './SpectralEngineClient';
 
 /**

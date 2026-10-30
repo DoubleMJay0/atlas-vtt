@@ -10,7 +10,7 @@ import type { Point } from '../../types/visionTypes';
 import { MOTION_SLOW_MS, prefersReducedMotion } from '../../utils/motion';
 import { NO_SIGHT, type AmbientZone } from '../../vision/sight';
 import type { MapBounds } from '../../vision/visibility';
-import type { TileView } from '../mapImage/levelOfDetail';
+import type { TesseraView } from '../mosaicCanvas/levelOfDetail';
 import { createRoofHost } from '../lighting/belowLevelsHost';
 import type { SceneFrame } from '../lighting/engine/types';
 import { levelRoof, Roof, type RoofHost, type RoofLighting, type RoofScene } from '../lighting/levels/Roof';
@@ -108,11 +108,11 @@ export class ViewRoofs {
     }
   }
 
-  drawFor(view: TileView): () => void {
+  drawFor(view: TesseraView): () => void {
     return this.roof.drawFor(view);
   }
 
-  addDemandRegion(view: TileView): () => void {
+  addDemandRegion(view: TesseraView): () => void {
     return this.roof.addDemandRegion(view);
   }
 

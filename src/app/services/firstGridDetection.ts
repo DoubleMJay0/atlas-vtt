@@ -1,5 +1,5 @@
 import type { PixiRendererOrchestrator } from '../PixiRendererOrchestrator';
-import type { MapProcessing } from '../pixi/mapImage/mapProcessing';
+import type { MapProcessing } from '../pixi/mosaicCanvas/mapProcessing';
 import { readMapStretch, sameStretch } from '../grid/mapStretch';
 import type { MapStretch } from '../grid/mapStretch';
 import { fitMapRect } from '../pixi/fitMapRect';
@@ -11,7 +11,7 @@ import { createGridScan } from './gridScan';
 export interface FirstGridDetection {
   store: ViewAtlasStore;
   renderer: PixiRendererOrchestrator;
-  /** Which map images are still being cut into tiles: the search waits for the scene's. */
+  /** Which map images are still being cut into tesserae: the search waits for the scene's. */
   processing: MapProcessing;
   /** False once another scene is being loaded: nothing of this detection may show or be written then. */
   isCurrent: () => boolean;
@@ -27,8 +27,8 @@ export interface FirstGridDetection {
 export function detectGridOfNewScene({ store, renderer, processing, isCurrent, refitCamera }: FirstGridDetection): () => void {
   const asked = new AbortController();
   let endScan: (() => void) | null = null;
-  // A window of a map whose tiles are still being cut waits for the build to reach its rows, the finest
-  // level's last: the search would stand still for minutes. It begins once the tiles are there.
+  // A window of a map whose tesserae are still being cut waits for the build to reach its rows, the finest
+  // level's last: the search would stand still for minutes. It begins once the tesserae are there.
   const { background } = store.getState();
   const tilesReady = background ? processing.whenDone(background, asked.signal) : Promise.resolve();
   void tilesReady.then(() => {

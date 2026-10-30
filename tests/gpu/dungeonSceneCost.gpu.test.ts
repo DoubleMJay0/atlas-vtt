@@ -16,11 +16,11 @@ import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 /**
  * What creating a dungeon scene costs, from the click to the files written, with the real dungeon
- * worker and image workers: printed to `out/perf-gen/`, asked for with `VITE_PERF_GEN=1`. The tiles
+ * worker and image workers: printed to `out/perf-gen/`, asked for with `VITE_PERF_GEN=1`. The tesserae
  * are built after the scene is written and are left out.
  */
 
-vi.mock('../../src/app/pixi/mapImage/prebuildMapImage', () => ({ prebuildMapImageAt: vi.fn() }));
+vi.mock('../../src/app/pixi/mosaicCanvas/prebuildMosaicCanvas', () => ({ prebuildMosaicCanvasAt: vi.fn() }));
 
 const run = import.meta.env.VITE_PERF_GEN === '1';
 /** Draws every case in one look instead of its own, to compare looks: `VITE_PERF_STYLE=crayon`. */

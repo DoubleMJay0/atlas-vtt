@@ -22,7 +22,7 @@ import { TOKEN_POLL_MS, TokenShare } from './TokenShare.ts';
 import { levelObjects } from '../../levels/levelObjects';
 import { levelBackground } from '../../levels/levelEdits';
 import { viewedLevelId } from '../../levels/sceneLevels';
-import { isVideoMapPath, videoMimeType } from '../../pixi/mapImage/video/videoMapFiles';
+import { isVideoMapPath, videoMimeType } from '../../pixi/mosaicCanvas/video/videoMapFiles';
 import { t } from '../../i18n';
 
 /** The type of an animated map's video by its path, or null for a path that is no video map. */

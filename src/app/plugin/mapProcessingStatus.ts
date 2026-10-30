@@ -2,7 +2,7 @@ import type { Plugin } from 'obsidian';
 import { t } from '../i18n';
 import { levelBackground } from '../levels/levelEdits';
 import { viewedLevelId } from '../levels/sceneLevels';
-import { MapProcessing, processingPercent } from '../pixi/mapImage/mapProcessing';
+import { MapProcessing, processingPercent } from '../pixi/mosaicCanvas/mapProcessing';
 import type { ViewAtlasStore } from '../storeFactory';
 import { getLoadedAtlasView } from './atlasLeaves';
 
@@ -15,8 +15,8 @@ const shownImage = (state: ReturnType<ViewAtlasStore['getState']>): string | nul
 
 /**
  * "Processing map · 43%" in Obsidian's status bar while the image of the scene the Atlas view
- * shows is still being cut into tiles: the scene opens and works meanwhile, only softer until its
- * tiles land. One item, since only one Atlas view exists, in the main window. Gone once done.
+ * shows is still being cut into tesserae: the scene opens and works meanwhile, only softer until its
+ * tesserae land. One item, since only one Atlas view exists, in the main window. Gone once done.
  */
 export function registerMapProcessingStatus(plugin: Plugin): void {
   const { app } = plugin;

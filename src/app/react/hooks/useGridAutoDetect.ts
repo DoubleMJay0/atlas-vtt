@@ -11,7 +11,7 @@ import type { AlignmentResult } from '../../pixi/gridAlignmentMath';
 import { NO_GRID } from '../../pixi/spectralEngine/detectionJob';
 import type { DetectionEvent, DetectionOutcome } from '../../pixi/spectralEngine/detectionJob';
 import { detectGridOfMap } from '../../pixi/spectralEngine/spectralEngineService';
-import { MapProcessing, processingPercent } from '../../pixi/mapImage/mapProcessing';
+import { MapProcessing, processingPercent } from '../../pixi/mosaicCanvas/mapProcessing';
 import { describeGridType } from './useGridAlignmentEffects';
 import { t } from '../../i18n';
 
@@ -79,12 +79,13 @@ export function useGridAutoDetect(view: AtlasView | null, controller: RefObject<
 }
 
 /**
- * Resolves once the view's map image has all its tiles, saying how far they are meanwhile: a
+ * Resolves once the view's map image has all its tesserae, saying how far they are meanwhile: a
  * window of a map still being cut waits for the build to reach its rows, the finest level's last.
  */
 function tilesReady(view: AtlasView, signal: AbortSignal, say: (percent: number) => void): Promise<void> {
-  const processing = MapProcessing.forApp(view.app);
-  const path = view.getStore().getState().background;
+  const processing = MapProcessing.existing(view.app);
+  if (!processing) return Promise.resolve();
+  const path = view.atlasStore.getState().background;
   if (!path || processing.stateOf(path) === null) return Promise.resolve();
   const tell = (): void => {
     const state = processing.stateOf(path);

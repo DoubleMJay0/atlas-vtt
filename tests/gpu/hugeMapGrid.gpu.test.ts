@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DECODED_MAX_PIXELS } from '../../src/app/imageProcessing/decodeLimits';
-import { MemoryTileBackend } from '../../src/app/pixi/mapImage/memoryTileBackend';
-import { TileDecoderCore } from '../../src/app/pixi/mapImage/tileDecoderCore';
-import { browserGraphicsPrimitives, createTileGraphics } from '../../src/app/pixi/mapImage/tileGraphics';
-import type { TileEvent } from '../../src/app/pixi/mapImage/tileProtocol';
-import { TileStore } from '../../src/app/pixi/mapImage/tileStore';
+import { MemoryTesseraBackend } from '../../src/app/pixi/mosaicCanvas/memoryTesseraBackend';
+import { TesseraDecoderCore } from '../../src/app/pixi/mosaicCanvas/tesseraDecoderCore';
+import { browserGraphicsPrimitives, createTesseraGraphics } from '../../src/app/pixi/mosaicCanvas/tesseraGraphics';
+import type { TesseraEvent } from '../../src/app/pixi/mosaicCanvas/tesseraProtocol';
+import { TesseraStore } from '../../src/app/pixi/mosaicCanvas/tesseraStore';
 import { MAX_ANALYSIS_SIDE, pictureOf, type DetectableMap } from '../../src/app/pixi/spectralEngine/detectGrid';
 import { detectGridInGray, detectGridOfMap, disposeSpectralEngine } from '../../src/app/pixi/spectralEngine/spectralEngineService';
 import { sha256 } from '../../src/app/utils/hashing';
@@ -34,9 +34,9 @@ describe('grid detection on a huge map', () => {
     canvas.width = 0;
     canvas.height = 0;
 
-    const store = new TileStore({ backend: new MemoryTileBackend(), estimateQuota: () => Promise.resolve(null) });
-    const events: TileEvent[] = [];
-    const core = new TileDecoderCore({ store, graphics: createTileGraphics(browserGraphicsPrimitives()), sha256, yieldToMessages: () => new Promise((resolve) => setTimeout(resolve, 0)), emit: (event) => { events.push(event); } });
+    const store = new TesseraStore({ backend: new MemoryTesseraBackend(), estimateQuota: () => Promise.resolve(null) });
+    const events: TesseraEvent[] = [];
+    const core = new TesseraDecoderCore({ store, graphics: createTesseraGraphics(browserGraphicsPrimitives()), sha256, yieldToMessages: () => new Promise((resolve) => setTimeout(resolve, 0)), emit: (event) => { events.push(event); } });
     const opened = await core.open({ path: 'corner-grid.png', size: bytes.byteLength, mtime: 1 }, bytes);
     if (opened.kind !== 'opened') throw new Error(JSON.stringify(opened));
     const { handle } = opened.opened;

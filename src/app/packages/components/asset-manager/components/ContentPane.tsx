@@ -21,7 +21,7 @@ import { useSpawnCountTyping } from '../hooks/useSpawnCountTyping';
 import { useAssetStatblockPreview } from '../hooks/useAssetStatblockPreview';
 import { useRememberedScroll, type ScrollMemory } from '../hooks/useRememberedScroll';
 import { useScrollbarGutter } from '../../primitives/useScrollbarGutter';
-import { MapProcessing } from '../../../../pixi/mapImage/mapProcessing';
+import { MapProcessing } from '../../../../pixi/mosaicCanvas/mapProcessing';
 import { MapProcessingContext, type MapProcessingLookup } from './mapProcessingContext';
 import { Button } from '../../primitives/button';
 import { t } from '../../../../i18n';

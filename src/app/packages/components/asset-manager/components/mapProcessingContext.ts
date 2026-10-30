@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { App } from 'obsidian';
-import type { MapProcessing } from '../../../../pixi/mapImage/mapProcessing';
+import type { MapProcessing } from '../../../../pixi/mosaicCanvas/mapProcessing';
 
 /** Which map images are being processed, and the app to read scene files from; null shows no processing sign. */
 export interface MapProcessingLookup {

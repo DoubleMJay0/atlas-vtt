@@ -1,26 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { grayJpeg } from '../../src/app/imageProcessing/__tests__/grayJpeg';
 import { DECODED_MAX_PIXELS } from '../../src/app/imageProcessing/decodeLimits';
-import { MemoryTileBackend } from '../../src/app/pixi/mapImage/memoryTileBackend';
-import { pyramidOf, tileContentFrame, tileWorldRect, type TileRef } from '../../src/app/pixi/mapImage/pyramid';
-import { TileDecoderCore } from '../../src/app/pixi/mapImage/tileDecoderCore';
-import { browserGraphicsPrimitives, createTileGraphics } from '../../src/app/pixi/mapImage/tileGraphics';
-import type { TileEvent } from '../../src/app/pixi/mapImage/tileProtocol';
-import { TileStore } from '../../src/app/pixi/mapImage/tileStore';
+import { MemoryTesseraBackend } from '../../src/app/pixi/mosaicCanvas/memoryTesseraBackend';
+import { pyramidOf, tesseraContentFrame, tesseraWorldRect, type TesseraRef } from '../../src/app/pixi/mosaicCanvas/pyramid';
+import { TesseraDecoderCore } from '../../src/app/pixi/mosaicCanvas/tesseraDecoderCore';
+import { browserGraphicsPrimitives, createTesseraGraphics } from '../../src/app/pixi/mosaicCanvas/tesseraGraphics';
+import type { TesseraEvent } from '../../src/app/pixi/mosaicCanvas/tesseraProtocol';
+import { TesseraStore } from '../../src/app/pixi/mosaicCanvas/tesseraStore';
 import { sha256 } from '../../src/app/utils/hashing';
 
 /**
- * Maps the browser cannot decode (2^28 pixels or more) tiled by the real tile core through the band
- * decoders, in the browser: a 400 megapixel JPEG and a PNG painted on a canvas, whose tiles must hold
+ * Maps the browser cannot decode (2^28 pixels or more) tiled by the real tessera core through the band
+ * decoders, in the browser: a 400 megapixel JPEG and a PNG painted on a canvas, whose tesserae must hold
  * the very pixels painted.
  */
 
-function harness(): { core: TileDecoderCore; store: TileStore; events: TileEvent[] } {
-  const store = new TileStore({ backend: new MemoryTileBackend(), estimateQuota: () => Promise.resolve(null) });
-  const events: TileEvent[] = [];
-  const core = new TileDecoderCore({
+function harness(): { core: TesseraDecoderCore; store: TesseraStore; events: TesseraEvent[] } {
+  const store = new TesseraStore({ backend: new MemoryTesseraBackend(), estimateQuota: () => Promise.resolve(null) });
+  const events: TesseraEvent[] = [];
+  const core = new TesseraDecoderCore({
     store,
-    graphics: createTileGraphics(browserGraphicsPrimitives()),
+    graphics: createTesseraGraphics(browserGraphicsPrimitives()),
     sha256,
     yieldToMessages: () => new Promise((resolve) => setTimeout(resolve, 0)),
     emit: (event) => { events.push(event); },
@@ -35,8 +35,8 @@ async function pixelsOf(bitmap: ImageBitmap): Promise<Uint8ClampedArray> {
   return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
 }
 
-describe('maps read in bands by the tile core', () => {
-  it('tiles a 400 megapixel JPEG without ever decoding it whole, the overview first', async () => {
+describe('maps read in bands by the tessera core', () => {
+  it('tesserae a 400 megapixel JPEG without ever decoding it whole, the overview first', async () => {
     const [width, height] = [20000, 20000];
     const { core, store, events } = harness();
     const bytes = await grayJpeg(width, height).arrayBuffer();
@@ -55,21 +55,21 @@ describe('maps read in bands by the tile core', () => {
 
     await new Promise<void>((resolve) => { const look = (): void => { if (events.some((e) => e.type === 'complete')) resolve(); else setTimeout(look, 200); }; look(); });
     const totalMs = performance.now() - started;
-    const tiles = await store.existingTiles(opened.opened.hash);
-    expect(tiles.size).toBe(pyramidOf(width, height).levels.reduce((sum, level) => sum + level.cols * level.rows, 0));
-    const corner: TileRef = { level: 0, col: 39, row: 39 };
-    const tile = await core.tile(2, opened.opened.handle, corner);
-    expect({ width: tile!.width, height: tile!.height }).toEqual({ width: tileWorldRect(opened.opened.pyramid, corner).width + 1, height: tileWorldRect(opened.opened.pyramid, corner).height + 1 });
-    const tilePixels = await pixelsOf(tile!);
+    const tesserae = await store.existingTesserae(opened.opened.hash);
+    expect(tesserae.size).toBe(pyramidOf(width, height).levels.reduce((sum, level) => sum + level.cols * level.rows, 0));
+    const corner: TesseraRef = { level: 0, col: 39, row: 39 };
+    const tessera = await core.tessera(2, opened.opened.handle, corner);
+    expect({ width: tessera!.width, height: tessera!.height }).toEqual({ width: tesseraWorldRect(opened.opened.pyramid, corner).width + 1, height: tesseraWorldRect(opened.opened.pyramid, corner).height + 1 });
+    const tilePixels = await pixelsOf(tessera!);
     expect(tilePixels[0]).toBeGreaterThan(120);
     expect(tilePixels[0]).toBeLessThan(136);
-    tile!.close();
+    tessera!.close();
     core.close(opened.opened.handle);
-    console.log(`[bandMaps] 400 MP JPEG: overview after ${Math.round(overviewMs)} ms, every tile after ${Math.round(totalMs)} ms`);
+    console.log(`[bandMaps] 400 MP JPEG: overview after ${Math.round(overviewMs)} ms, every tessera after ${Math.round(totalMs)} ms`);
     expect(events.filter((e) => e.type === 'build-failed')).toEqual([]);
   }, 600_000);
 
-  it('tiles a PNG of 2^28 pixels with the very pixels painted on it', async () => {
+  it('tesserae a PNG of 2^28 pixels with the very pixels painted on it', async () => {
     const side = 16384;
     expect(side * side).toBe(DECODED_MAX_PIXELS);
     const canvas = new OffscreenCanvas(side, side);
@@ -93,11 +93,11 @@ describe('maps read in bands by the tile core', () => {
     const pyramid = opened.opened.pyramid;
     const at = async (x: number, y: number): Promise<number[]> => {
       const ref = { level: 0, col: Math.floor(x / 510), row: Math.floor(y / 510) };
-      const tile = await core.tile(x * 7 + y, opened.opened.handle, ref);
-      const frame = tileContentFrame(pyramid, ref);
-      const pixels = await pixelsOf(tile!);
-      const px = (y - ref.row * 510 + frame.y) * tile!.width + (x - ref.col * 510 + frame.x);
-      tile!.close();
+      const tessera = await core.tessera(x * 7 + y, opened.opened.handle, ref);
+      const frame = tesseraContentFrame(pyramid, ref);
+      const pixels = await pixelsOf(tessera!);
+      const px = (y - ref.row * 510 + frame.y) * tessera!.width + (x - ref.col * 510 + frame.x);
+      tessera!.close();
       return [...pixels.subarray(px * 4, px * 4 + 4)];
     };
 
