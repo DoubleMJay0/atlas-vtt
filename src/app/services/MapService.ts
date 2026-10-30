@@ -6,6 +6,7 @@ import type { ViewAtlasStore } from '../storeFactory';
 import type { MapFile } from './MapPersistence';
 import { getHistoryStore } from '../stores/history';
 import { detectGridOfNewScene } from './firstGridDetection';
+import { MapProcessing } from '../pixi/mapImage/mapProcessing';
 import { revealNewDungeon } from './dungeonSceneReveal';
 import { describeError } from '../utils/errors';
 import { sceneNameOf } from '../utils/sceneName';
@@ -219,7 +220,7 @@ export class MapService {
         getHistoryStore(this.store)?.getState().resume();
 
         if (detectsGrid && renderer) {
-          this.endGridDetection = detectGridOfNewScene({ store: this.store, renderer, isCurrent: () => !isSuperseded(), refitCamera: camera === null });
+          this.endGridDetection = detectGridOfNewScene({ store: this.store, renderer, processing: MapProcessing.forApp(this.app), isCurrent: () => !isSuperseded(), refitCamera: camera === null });
         }
       };
       const hideLoadingScreen = (): void => {

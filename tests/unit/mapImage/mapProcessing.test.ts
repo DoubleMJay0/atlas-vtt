@@ -48,6 +48,25 @@ describe('MapProcessing', () => {
     expect(processing.busy()).toBe(false);
   });
 
+  it('answers whenDone at once for a map not being processed, once its build ends otherwise, and never after an abort', async () => {
+    await expect(processing.whenDone(CRYPT)).resolves.toBeUndefined();
+    source.emit(progress(10, CRYPT));
+    let done = false;
+    const waited = processing.whenDone(CRYPT).then(() => { done = true; });
+    source.emit(progress(50, CRYPT));
+    await Promise.resolve();
+    expect(done).toBe(false);
+    source.emit({ type: 'complete', hash: 'a' });
+    await waited;
+    expect(done).toBe(true);
+
+    source.emit(progress(10, CRYPT, 'b'));
+    const asked = new AbortController();
+    const aborted = processing.whenDone(CRYPT, asked.signal);
+    asked.abort();
+    await expect(aborted).rejects.toThrow('ended');
+  });
+
   it('keeps builds of several maps apart', () => {
     source.emit(progress(10, 'maps/One.png', 'one'));
     source.emit(progress(70, 'maps/Two.png', 'two'));

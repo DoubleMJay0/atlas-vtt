@@ -68,6 +68,30 @@ export class MapProcessing {
     return this.progress.get(path) ?? null;
   }
 
+  /** Resolves once no pyramid of the map image at `path` is being cut, at once where none is; rejects once `signal` aborts. */
+  whenDone(path: string, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const ended = (): Error => new Error("The wait for the map's tiles was ended");
+      if (signal?.aborted) return reject(ended());
+      const check = (): void => {
+        if (this.stateOf(path) !== null) return;
+        stop();
+        resolve();
+      };
+      const abort = (): void => {
+        stop();
+        reject(ended());
+      };
+      const unsubscribe = this.subscribe(check);
+      const stop = (): void => {
+        unsubscribe();
+        signal?.removeEventListener('abort', abort);
+      };
+      signal?.addEventListener('abort', abort);
+      check();
+    });
+  }
+
   /** Whether any map image is being processed. */
   busy(): boolean {
     return this.progress.size > 0;

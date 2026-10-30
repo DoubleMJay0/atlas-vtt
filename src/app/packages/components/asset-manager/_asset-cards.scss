@@ -223,7 +223,8 @@
   align-items: center;
   gap: $spacing-xs;
   max-width: calc(100% - 2 * #{$spacing-s});
-  padding: $spacing-xs;
+  // The ring's round end keeps its own distance from the capsule's curve; the text's straight end needs it given.
+  padding: $spacing-xs $spacing-s $spacing-xs $spacing-xs;
   border: $border-width-s solid color-mix(in oklch, var(--mono-100) $border-opacity-default, transparent);
   border-radius: $radius-full;
   background: color-mix(in oklch, var(--background-primary) 82%, transparent);
