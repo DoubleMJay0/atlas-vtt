@@ -8,6 +8,7 @@ import { sharedFog, sharedLightingScene, sharedSight } from './sceneInputs.ts';
 import { SequencedList } from './sequencedList.ts';
 import { levelObjects } from '../../levels/levelObjects';
 import { levelExploredMask } from '../../levels/sceneLevels';
+import { playersFog } from '../../fog/playersFog';
 
 export interface InputSharePorts extends PacerClock {
   send(body: GmMessage, to?: string): void;
@@ -135,9 +136,10 @@ export class InputShare {
     const scene = this.scene;
     const state = this.store.getState();
     if (scene === null || !state.mapLoaded || state.isMapLoading) return;
-    if (levelObjects(state).fog !== this.fogOf) {
-      this.fogOf = levelObjects(state).fog;
-      this.fog.publish(scene.id, { fog: sharedFog(levelObjects(state).fog, (key) => this.fogAlias(key)) });
+    const fog = playersFog(state);
+    if (fog !== this.fogOf) {
+      this.fogOf = fog;
+      this.fog.publish(scene.id, { fog: sharedFog(fog, (key) => this.fogAlias(key)) });
     }
     if (!scene.lit) return;
     const source = this.ports.lightingSource();
