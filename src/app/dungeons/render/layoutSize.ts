@@ -3,9 +3,9 @@ import type { DungeonView } from '../style';
 import { DEFAULT_VIEW } from '../style';
 import { dungeonBounds } from './visibleDungeon';
 
-/** Largest side a map image may have (WebP's limit, as for imported maps). */
+/** Largest side a generated map image may have: WebP's limit, since a dungeon's map is written as WebP. */
 export const MAX_MAP_SIDE = 16_383;
-/** Largest number of pixels a map image may have. */
+/** Largest number of pixels a generated map image may have (an imported map may have more, `MAP_MAX_PIXELS`). */
 export const MAX_MAP_PIXELS = 144_000_000;
 /** Whole cells of paper around the floors: room for the hatching, its strokes and the exits. */
 export const MAP_MARGIN_CELLS = 2;

@@ -1,5 +1,5 @@
 import type { ImageJob, ImageJobResult, ImageLayout, ThumbnailSpec } from './imageJob';
-import { WEBP_MAX_SIDE } from './decodeLimits';
+import { decodable, WEBP_MAX_SIDE } from './decodeLimits';
 import { fitSize, frameImageRect, frameSize, scaleDown, type Size } from './imageLayout';
 import { imageHeader, type ImageFormat } from './imageDimensions';
 
@@ -12,6 +12,7 @@ const KEPT_FORMATS: ReadonlySet<ImageFormat> = new Set(['png', 'jpeg', 'webp']);
  */
 
 const WEBP = 'image/webp';
+const PNG = 'image/png';
 
 /** Raised when the worker cannot read the source format, so the main thread can decode it instead. */
 export class SourceDecodeError extends Error {}
@@ -40,6 +41,8 @@ async function decodeScaledJpeg(source: Blob, size: Size): Promise<ImageBitmap |
 async function decode(job: ImageJob): Promise<ImageBitmap> {
   const { source, scaledDecode } = job;
   if (source instanceof ImageBitmap) return source;
+  // The main thread refuses such a source before it gets here; a decoder asked anyway would end the process.
+  if (scaledDecode && !decodable(scaledDecode.source)) throw new Error('The image is too large to decode.');
   try {
     return (scaledDecode && await decodeScaledJpeg(source, scaledDecode.decoded)) ?? await createImageBitmap(source);
   } catch (error) {
@@ -61,13 +64,15 @@ function context(canvas: OffscreenCanvas): OffscreenCanvasRenderingContext2D {
   return ctx;
 }
 
+/**
+ * `canvas` as WebP at `quality`. A picture wider or taller than a WebP can be (`convertToBlob` would
+ * crop it without a word) is written as PNG, lossless as the lossless WebP it stands in for; only
+ * maps scaled down to a long side ever are.
+ */
 async function encode(canvas: OffscreenCanvas, quality: number): Promise<Blob> {
-  // Larger sides would be cropped without an error; every layout keeps within it, this makes sure.
-  if (canvas.width > WEBP_MAX_SIDE || canvas.height > WEBP_MAX_SIDE) {
-    throw new Error(`A WebP image can be at most ${WEBP_MAX_SIDE} pixels a side, not ${canvas.width} × ${canvas.height}.`);
-  }
-  const blob = await canvas.convertToBlob({ type: WEBP, quality });
-  if (blob.type !== WEBP) throw new Error('This system cannot encode WebP images.');
+  const type = canvas.width > WEBP_MAX_SIDE || canvas.height > WEBP_MAX_SIDE ? PNG : WEBP;
+  const blob = await canvas.convertToBlob(type === WEBP ? { type, quality } : { type });
+  if (blob.type !== type) throw new Error(`This system cannot encode ${type === WEBP ? 'WebP' : 'PNG'} images.`);
   return blob;
 }
 

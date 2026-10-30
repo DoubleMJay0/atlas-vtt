@@ -38,9 +38,9 @@ export function fitWithin(size: Size, maxWidth: number, maxHeight: number, maxPi
   return { width: Math.max(1, Math.floor(size.width * scale)), height: Math.max(1, Math.floor(size.height * scale)) };
 }
 
-/** What a fit layout makes of `size`, never wider or taller than a WebP can be encoded. */
+/** What a fit layout makes of `size`; a side longer than a WebP can have is written as PNG (`imageRenderer.ts`). */
 export function fitSize(size: Size, layout: FitLayout): Size {
-  return fitWithin(size, Math.min(layout.maxWidth, WEBP_MAX_SIDE), Math.min(layout.maxHeight, WEBP_MAX_SIDE), layout.maxPixels);
+  return fitWithin(size, layout.maxWidth, layout.maxHeight, layout.maxPixels);
 }
 
 /** What a fit took from `source`, or undefined when `output` keeps every pixel. */

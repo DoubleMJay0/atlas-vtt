@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { decodable, jpegScaledSize, scaledJpegDecodeSize } from '../../src/app/imageProcessing/decodeLimits';
+import { DECODED_MAX_PIXELS, decodable, jpegScaledSize, scaledJpegDecodeSize } from '../../src/app/imageProcessing/decodeLimits';
 import { IMAGE_PRESETS } from '../../src/app/imageProcessing/imageProcessing';
 import { decodedSizeCost, MAX_DECODED_LEVELS_BYTES, MAX_SOURCE_PIXELS } from '../../src/app/pixi/mapImage/decodedLevels';
 
 describe('decodable', () => {
-  it('takes images whose RGBA pixels fit in 2 GiB less a byte', () => {
-    expect(decodable({ width: 23170, height: 23170 })).toBe(true);
-    expect(decodable({ width: 23171, height: 23171 })).toBe(false);
-    expect(decodable({ width: 30000, height: 17000 })).toBe(true);
+  it('takes images below 2^28 pixels, where Chromium 156 ends the renderer', () => {
+    expect(DECODED_MAX_PIXELS).toBe(268_435_456);
+    expect(decodable({ width: 16383, height: 16383 })).toBe(true);
+    expect(decodable({ width: 16384, height: 16383 })).toBe(true);
+    expect(decodable({ width: 16384, height: 16384 })).toBe(false);
+    expect(decodable({ width: 30000, height: 8947 })).toBe(true);
+    expect(decodable({ width: 30000, height: 8948 })).toBe(false);
   });
 
   it('refuses sides over 65535', () => {
@@ -36,12 +39,12 @@ describe('scaled JPEG decoding', () => {
 });
 
 describe('the tile worker’s limit on a source', () => {
-  it('opens every map an import writes, and refuses less than the decoders take', () => {
-    const { maxPixels } = IMAGE_PRESETS.map;
-    expect(decodedSizeCost(maxPixels, 1)).toBeLessThan(MAX_DECODED_LEVELS_BYTES / 2);
-    expect(MAX_SOURCE_PIXELS).toBeGreaterThan(maxPixels);
-    expect(decodable({ width: 20000, height: 20000 })).toBe(true);
-    expect(20000 * 20000).toBeLessThanOrEqual(MAX_SOURCE_PIXELS);
+  it('opens every map an import writes, and refuses what the decoders would die on', () => {
+    const { maxPixels, maxWidth } = IMAGE_PRESETS.map;
+    expect(decodedSizeCost(maxPixels, 1)).toBeLessThan(MAX_DECODED_LEVELS_BYTES);
+    expect(MAX_SOURCE_PIXELS).toBeGreaterThanOrEqual(maxPixels);
+    expect(MAX_SOURCE_PIXELS).toBeLessThan(DECODED_MAX_PIXELS);
+    expect(decodable({ width: maxWidth, height: Math.floor(maxPixels / maxWidth) })).toBe(true);
     expect(decodedSizeCost(MAX_SOURCE_PIXELS, 1)).toBeLessThanOrEqual(MAX_DECODED_LEVELS_BYTES);
   });
 });
