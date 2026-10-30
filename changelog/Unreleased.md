@@ -12,6 +12,7 @@
 ## Fixed
 - Online play: room pins of a generated dungeon that you make readable by players now show on the players' page, so they can open the room's notes
 - Create scenes from several selected maps at once: each map gets a scene of its own, named like the map. A deleted scene no longer comes back in the asset manager
+- Online play: in a browser that cannot use WebGL, lit scenes stay hidden and players are told why, instead of showing and then vanishing once a magical darkness is placed
 - Generated caves and forests: every way up or down can be walked onto from its front, also when players move their own tokens online; before, its front could lie in a pocket reached only past the way's sides, or behind a lone tree
 - Online play: players see the resource wheels beside a token that are shown to them, as Atlas's player window shows them; before, the browser drew only the bars
 - Several lights together no longer wash the map out to white: the brightest light at a spot shows as it always did, and every further torch adds less and less
