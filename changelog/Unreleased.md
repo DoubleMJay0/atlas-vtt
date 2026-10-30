@@ -29,3 +29,4 @@
 - Dragging a token that sees no longer builds new graphics objects for its sight every frame, so each step of a drag costs less on large generated dungeons
 - A pinned statblock scrolled down can be moved up again: it no longer stops at an invisible edge where its scrolled-away name would be. Contributed by ISorokaI
 - Menus in Edit Token, such as Add sense, open at their button instead of at the top left of the window. Contributed by ISorokaI
+- Online play: areas players have explored no longer black out now and then while they move on; what they have seen stays remembered until the GM forgets or erases it

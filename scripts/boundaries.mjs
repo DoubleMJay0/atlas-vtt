@@ -90,6 +90,7 @@ export const BOUNDARIES = {
       "src/app/pixi/lighting/levels/**/*.ts",
       "src/app/pixi/mapImage/levelOfDetail.ts",
       "src/app/pixi/lighting/ExploredMemory.ts",
+      "src/app/pixi/lighting/exploredMemoryDeps.ts",
       "src/app/pixi/lighting/ExploredSaveScheduler.ts",
       "src/app/pixi/lighting/ExploredSteps.ts",
       "src/app/pixi/lighting/ExploredTexture.ts",
