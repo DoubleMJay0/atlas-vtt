@@ -30,7 +30,7 @@ export interface SharedLiquidColours {
  * unit direction it flows (absent: it stands still), `course` the line flowing water follows round its
  * bends (flat, downstream: a river's middle; `flow` is then its general way), `openEdges` the edges of
  * `polygon` (by the index of their first corner) that are no shore because the water goes on past them,
- * `art` the engraved looks' ink, and `glow` an alias the pieces of lava that glow with one light share,
+ * `art` the engraved looks' ink or Crayon's strokes, and `glow` an alias the pieces of lava that glow with one light share,
  * so they smoulder as one.
  */
 export interface SharedLiquid {
@@ -42,7 +42,7 @@ export interface SharedLiquid {
   readonly course?: readonly number[];
   readonly openEdges?: readonly number[];
   readonly colours: SharedLiquidColours;
-  readonly art?: 'engraved';
+  readonly art?: 'engraved' | 'crayon';
   readonly glow?: string;
 }
 
@@ -121,7 +121,7 @@ function parseLiquid(value: unknown): SharedLiquid | null {
     ...(course !== undefined && { course }),
     ...(openEdges.length > 0 && { openEdges }),
     colours,
-    ...(value.art === 'engraved' && { art: 'engraved' as const }),
+    ...((value.art === 'engraved' || value.art === 'crayon') && { art: value.art }),
     ...(liquid === 'lava' && typeof value.glow === 'string' && TOKEN_ID_PATTERN.test(value.glow) && { glow: value.glow }),
   };
 }

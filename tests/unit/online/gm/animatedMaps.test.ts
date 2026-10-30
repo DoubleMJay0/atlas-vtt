@@ -100,6 +100,11 @@ describe('the liquids that move on the map', () => {
     expect(lake?.course).toBeUndefined();
   });
 
+  it('go to players in the look the GM\'s map draws them, a Crayon map\'s as Crayon\'s strokes', async () => {
+    const table = await liquidTable(withLiquids({ liquid_lava: surface('liquid_lava', { liquid: 'lava', colors: LAVA, art: 'crayon' }) }));
+    expect(ofKind(table.sent, 'liquids')[0]?.liquids[0]?.art).toBe('crayon');
+  });
+
   it('go to players as Atlas reads them, under aliases, with no id of the GM\'s scene', async () => {
     const table = await liquidTable(withLiquids(POOLS));
     const [message] = ofKind(table.sent, 'liquids');
