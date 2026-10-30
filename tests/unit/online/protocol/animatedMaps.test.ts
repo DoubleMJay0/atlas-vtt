@@ -38,6 +38,14 @@ describe('the liquids of a floor', () => {
     });
   });
 
+  it('keep the two looks a surface may be drawn in, and only those', () => {
+    const arts = ['engraved', 'crayon', 'oil'].map((art) => {
+      const message = parseGmMessage({ t: 'liquids', scene: 's1', liquids: [{ id: '0'.repeat(24), liquid: 'water', polygon: [0, 0, 100, 0, 100, 100], colours: { surface: '#102030', deep: '#102030', glint: '#102030' }, art }] });
+      return message?.t === 'liquids' ? message.liquids[0]?.art : null;
+    });
+    expect(arts).toEqual(['engraved', 'crayon', undefined]);
+  });
+
   it('pass over a surface that is no area, of no kind, without colours or with an id that is no alias', () => {
     const bad = [
       pool(2, { polygon: [0, 0, 100, 0] }),

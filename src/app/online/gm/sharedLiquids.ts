@@ -59,7 +59,7 @@ export class SharedLiquids {
       ...(course !== undefined && { course }),
       ...(surface.openEdges !== undefined && { openEdges: [...surface.openEdges] }),
       colours: { surface: surface.colors.surface, deep: surface.colors.deep, glint: surface.colors.glint },
-      ...(surface.art === 'engraved' && { art: 'engraved' as const }),
+      ...(surface.art !== undefined && { art: surface.art }),
       ...(surface.liquid === 'lava' && surface.lavaLight !== undefined && { glow: this.alias(this.glows, surface.lavaLight) }),
     };
   }
