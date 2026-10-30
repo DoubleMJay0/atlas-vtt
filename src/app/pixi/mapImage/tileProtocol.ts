@@ -1,3 +1,4 @@
+import type { BandUnsupportedReason } from '../../imageProcessing/band/bandTypes';
 import type { ArtAlpha } from '../../levels/artRaster';
 import type { RoofPieces } from '../../levels/roofs';
 import type { Pyramid, TileRef } from './pyramid';
@@ -20,6 +21,8 @@ export interface FileIdentity {
 export type OpenFailure =
   | { kind: 'decode-failed'; message: string }
   | { kind: 'too-large'; width: number; height: number; maxSide: number; maxPixels: number }
+  /** Larger than the browser decodes and not an image Atlas can read in bands: `reason` says what to export instead. */
+  | { kind: 'unsupported'; width: number; height: number; reason: BandUnsupportedReason }
   | { kind: 'failed'; message: string };
 
 export interface OpenedPyramid {

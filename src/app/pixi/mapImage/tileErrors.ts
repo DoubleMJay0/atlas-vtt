@@ -1,3 +1,4 @@
+import { openFailureMessage } from './decodedLevels';
 import type { OpenFailure } from './tileProtocol';
 
 /** What `TileDecoderClient` rejects with, besides the errors of the worker's replies. */
@@ -29,6 +30,6 @@ export class TileLevelError extends Error {
 /** A map image that cannot be shown; reported once per open. */
 export class TileOpenError extends Error {
   constructor(readonly failure: OpenFailure) {
-    super(failure.kind === 'too-large' ? `The image is too large to decode (${failure.width} × ${failure.height}).` : failure.message);
+    super(openFailureMessage(failure));
   }
 }

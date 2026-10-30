@@ -3,7 +3,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import type { PixelRect } from '../../../src/app/pixi/mapImage/pyramid';
 import type { ComposedPart, TileGraphics } from '../../../src/app/pixi/mapImage/tileGraphics';
 import { MemoryTileBackend } from '../../../src/app/pixi/mapImage/memoryTileBackend';
-import { TileDecoderCore } from '../../../src/app/pixi/mapImage/tileDecoderCore';
+import { TileDecoderCore, type TileCoreDeps } from '../../../src/app/pixi/mapImage/tileDecoderCore';
 import type { TileEvent } from '../../../src/app/pixi/mapImage/tileProtocol';
 import { TileStore } from '../../../src/app/pixi/mapImage/tileStore';
 import { sha256 } from '../../../src/app/utils/hashing';
@@ -15,7 +15,7 @@ export function useReadableBlobs(): void {
 }
 
 /** Where a fake bitmap came from, so tests can tell a crop from a cached tile. */
-export type BitmapOrigin = 'source' | 'resized' | 'crop' | 'cache' | 'composed';
+export type BitmapOrigin = 'source' | 'resized' | 'crop' | 'cache' | 'composed' | 'pixels';
 
 export class FakeBitmap implements ImageBitmap {
   closed = false;
@@ -93,6 +93,11 @@ export class FakeTileGraphics implements TileGraphics {
     return this.make(rect.width, rect.height, 'crop');
   }
 
+  fromPixels(data: Uint8ClampedArray, width: number, height: number): Promise<ImageBitmap> {
+    if (data.length !== width * height * 4) throw new Error(`${data.length} bytes are no ${width} × ${height} RGBA image`);
+    return Promise.resolve(this.make(width, height, 'pixels'));
+  }
+
   encodeTile(source: ImageBitmap, rect: PixelRect): Promise<Blob> {
     this.encodes.push({ source: asFake(source), rect });
     return Promise.resolve(new Blob([JSON.stringify({ width: rect.width, height: rect.height })], { type: 'image/webp' }));
@@ -143,6 +148,8 @@ export interface CoreHarnessOptions {
   backend?: MemoryTileBackend;
   /** Also receives every event the core emits. */
   forward?: (event: TileEvent) => void;
+  /** The band decoder for a source the browser cannot decode; the real lookup by default. */
+  bandDecoderOf?: TileCoreDeps['bandDecoderOf'];
 }
 
 export function coreHarness(options: CoreHarnessOptions = {}): CoreHarness {
@@ -163,6 +170,7 @@ export function coreHarness(options: CoreHarnessOptions = {}): CoreHarness {
       for (const waiter of waiters.filter((w) => w.hash === event.hash)) waiter.resolve();
     },
     ...(options.decodedBudget === undefined ? {} : { decodedBudget: options.decodedBudget }),
+    ...(options.bandDecoderOf === undefined ? {} : { bandDecoderOf: options.bandDecoderOf }),
   });
   const completed = (hash: string): Promise<void> => new Promise((resolve) => {
     if (events.some((event) => event.type === 'complete' && event.hash === hash)) resolve();

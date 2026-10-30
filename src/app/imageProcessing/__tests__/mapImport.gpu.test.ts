@@ -5,8 +5,6 @@ import { disposeImageProcessing, IMAGE_PRESETS, ImageTooLargeError, MAP_MAX_PIXE
 import type { Size } from '../imageLayout';
 import { grayJpeg } from './grayJpeg';
 
-/** The square a map of `MAP_MAX_PIXELS` is. */
-const MAP_SQUARE = Math.sqrt(MAP_MAX_PIXELS);
 
 /** The pixels of an encoded image, as the map loader decodes it. */
 async function decoded(image: Blob): Promise<{ size: Size; luminanceAt: (x: number, y: number) => number }> {
@@ -45,8 +43,8 @@ describe('importing maps with the real workers', () => {
     const result = await optimizeImage(svg, IMAGE_PRESETS.map);
     const map = await decoded(result.image);
 
-    expect(map.size).toEqual({ width: 23168, height: 11584 });
-    expect(map.size.width * map.size.height).toBeLessThanOrEqual(MAP_MAX_PIXELS);
+    expect(map.size).toEqual({ width: 23170, height: 11585 });
+    expect(map.size.width * map.size.height).toBeLessThan(DECODED_MAX_PIXELS);
     expect(result.scaledDown).toBeUndefined();
     const lineY = map.size.height / 2;
     const darkest = Math.min(...[-1, 0, 1].map((dy) => map.luminanceAt(map.size.width / 2, lineY + dy)));
@@ -76,13 +74,25 @@ describe('importing maps with the real workers', () => {
     expect((await decoded(result.image)).size).toEqual({ width: MAP_MAX_SIDE, height: 328 });
   });
 
-  it('fits a map with more pixels than the limit to 16383 × 16383, below what the browser decodes', async () => {
-    const result = await optimizeImage(await png(16384, 16383), IMAGE_PRESETS.map);
-    const { size } = await decoded(result.image);
+  it('keeps a PNG the browser cannot decode as it is and reads its thumbnail in bands', async () => {
+    const upload = await png(16384, 16384);
+    expect(16384 * 16384).toBe(DECODED_MAX_PIXELS);
 
-    expect(size).toEqual({ width: MAP_SQUARE, height: MAP_SQUARE });
-    expect(size.width * size.height).toBeLessThan(DECODED_MAX_PIXELS);
-    expect(result.scaledDown?.from).toEqual({ width: 16384, height: 16383 });
+    const result = await optimizeImage(upload, IMAGE_PRESETS.map, { thumbnail: { size: 256, quality: 0.8 } });
+
+    expect(new Uint8Array(await result.image.arrayBuffer())).toEqual(new Uint8Array(await upload.arrayBuffer()));
+    expect(result.scaledDown).toBeUndefined();
+    const thumbnail = await decoded(result.thumbnail!);
+    expect(thumbnail.size).toEqual({ width: 256, height: 256 });
+    // The parchment colour the map was painted with, read through the band decoder's eighth.
+    expect(thumbnail.luminanceAt(128, 128)).toBeCloseTo(0.299 * 0xe9 + 0.587 * 0xdc + 0.114 * 0xc0, -1);
+  }, 120_000);
+
+  it('fits a map with more pixels than the band decoders take to 400 megapixels only where the browser can decode it', async () => {
+    const result = await optimizeImage(await png(16000, 16000), IMAGE_PRESETS.map);
+
+    expect((await decoded(result.image)).size).toEqual({ width: 16000, height: 16000 });
+    expect(result.scaledDown).toBeUndefined();
   });
 
   it('writes a scaled picture wider than a WebP can be as PNG, keeping every pixel it has', async () => {
@@ -112,8 +122,8 @@ describe('importing maps with the real workers', () => {
     expect(map.luminanceAt(MAP_MAX_SIDE / 2, 2457)).toBeCloseTo(128, -1);
   });
 
-  it('keeps a JPEG map of the largest allowed square byte for byte and reads it back', async () => {
-    const upload = grayJpeg(MAP_SQUARE, MAP_SQUARE);
+  it('keeps a JPEG map the browser could decode byte for byte and reads it back', async () => {
+    const upload = grayJpeg(16383, 16383);
     const result = await optimizeImage(upload, IMAGE_PRESETS.map, { thumbnail: { size: 256, quality: 0.8 } });
 
     // The worker hands the source back; a structured clone, so compare bytes.
@@ -128,8 +138,18 @@ describe('importing maps with the real workers', () => {
     const png = optimizeImage(new Blob([header], { type: 'image/png' }), IMAGE_PRESETS.map);
     await expect(png).rejects.toBeInstanceOf(ImageTooLargeError);
     await expect(png).rejects.toThrow(/30,000 × 30,000 px/);
-    await expect(png).rejects.toThrow(/268 megapixels/);
-    // DCT scaling does not help: Chromium 156 ends the process for the source's size, not the size it is asked for.
-    await expect(optimizeImage(grayJpeg(16384, 16384), IMAGE_PRESETS.map)).rejects.toBeInstanceOf(ImageTooLargeError);
+    await expect(png).rejects.toThrow(/400 megapixels/);
+    await expect(optimizeImage(grayJpeg(20001, 20000), IMAGE_PRESETS.map)).rejects.toBeInstanceOf(ImageTooLargeError);
   });
+
+  it('reads a JPEG the browser cannot decode in bands: kept as it is, its thumbnail from the DC terms', async () => {
+    const upload = grayJpeg(20000, 20000);
+    const result = await optimizeImage(upload, IMAGE_PRESETS.map, { thumbnail: { size: 128, quality: 0.8 } });
+
+    expect(result.image.size).toBe(upload.size);
+    expect(result.scaledDown).toBeUndefined();
+    const thumbnail = await decoded(result.thumbnail!);
+    expect(thumbnail.size).toEqual({ width: 128, height: 128 });
+    expect(thumbnail.luminanceAt(64, 64)).toBeCloseTo(128, -1);
+  }, 120_000);
 });

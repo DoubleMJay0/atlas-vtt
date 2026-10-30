@@ -1,3 +1,4 @@
+import type { BandDecoder } from '../../imageProcessing/band/bandTypes';
 import type { ArtAlpha } from '../../levels/artRaster';
 import { roofPieces, type RoofPieces } from '../../levels/roofs';
 import { OpenError } from './decodedLevels';
@@ -27,6 +28,8 @@ export interface TileCoreDeps {
   emit: (event: TileEvent) => void;
   /** Bytes of decoded levels all builds may hold together. */
   decodedBudget?: number;
+  /** The decoder that reads a source the browser cannot decode in bands, or null; the real lookup when unset. */
+  bandDecoderOf?: (blob: Blob) => Promise<BandDecoder | null>;
 }
 
 export type OpenOutcome =
@@ -64,6 +67,7 @@ export class TileDecoderCore {
       },
       yieldToRequests: () => this.yieldToRequests(),
       decodedBudget: deps.decodedBudget,
+      bandDecoderOf: deps.bandDecoderOf,
     });
   }
 

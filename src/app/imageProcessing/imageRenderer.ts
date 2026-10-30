@@ -1,4 +1,6 @@
 import type { ImageJob, ImageJobResult, ImageLayout, ThumbnailSpec } from './imageJob';
+import { bandDecoderFor } from './band/bandDecoders';
+import { reducedSize } from './band/bandTypes';
 import { decodable, WEBP_MAX_SIDE } from './decodeLimits';
 import { fitSize, frameImageRect, frameSize, scaleDown, type Size } from './imageLayout';
 import { imageHeader, type ImageFormat } from './imageDimensions';
@@ -189,7 +191,30 @@ function fitsAsItIs(bitmap: ImageBitmap, layout: ImageLayout): boolean {
   return fitted.width === bitmap.width && fitted.height === bitmap.height;
 }
 
+/**
+ * A source the browser cannot decode, read in bands at an eighth of its size for the thumbnail
+ * and preview; the image itself is kept as it is, since the band decoders read only what fits a
+ * map without scaling.
+ */
+async function renderBandJob(job: ImageJob, band: { format: string }): Promise<ImageJobResult> {
+  if (!(job.source instanceof Blob)) throw new Error('A band job needs the image bytes.');
+  const decoder = bandDecoderFor(band.format);
+  if (!decoder) throw new Error(`No band decoder reads ${band.format}.`);
+  const bytes = new Uint8Array(await job.source.arrayBuffer());
+  const { width, height } = reducedSize(decoder.inspect(bytes), 8);
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  await decoder.decode(bytes, { reduce: 8, onBand: (rows) => { pixels.set(rows.data.subarray(0, rows.rows * width * 4), rows.y * width * 4); } });
+  const reduced = await createImageBitmap(new ImageData(pixels, width, height));
+  try {
+    const sourcePreview = await renderCopy(reduced, job.sourcePreview);
+    return { image: job.source, sourcePreview, ...await renderCopies(reduced, job) };
+  } finally {
+    reduced.close();
+  }
+}
+
 export async function renderImageJob(job: ImageJob): Promise<ImageJobResult> {
+  if (job.band) return renderBandJob(job, job.band);
   const bitmap = await decode(job);
   try {
     if (job.source instanceof ImageBitmap && fitsAsItIs(bitmap, job.layout)) return await encodeAsItIs(bitmap, job);

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
+import { BAND_MAX_PIXELS } from '../../../src/app/imageProcessing/decodeLimits';
 import { MAX_SOURCE_PIXELS } from '../../../src/app/pixi/mapImage/decodedLevels';
 import { MemoryTileBackend } from '../../../src/app/pixi/mapImage/memoryTileBackend';
 import { inThreadPort } from '../../../src/app/pixi/mapImage/tilePorts';
@@ -305,9 +306,9 @@ describe('TileDecoderCore', () => {
     expect(h.graphics.encodes.every((call) => call.source.width !== 3001 && call.source.width !== 1501)).toBe(true);
   });
 
-  it('refuses a source whose decoded levels would not fit in the worker, before decoding it', async () => {
+  it('refuses a source too large for the browser and for the band decoders, before decoding it', async () => {
     const h = coreHarness();
-    const side = Math.ceil(Math.sqrt(MAX_SOURCE_PIXELS)) + 1;
+    const side = Math.ceil(Math.sqrt(BAND_MAX_PIXELS)) + 1;
     const outcome = await h.core.open(identity, fakePng(side, side));
     expect(outcome).toMatchObject({ kind: 'failed', failure: { kind: 'too-large', width: side, height: side, maxPixels: MAX_SOURCE_PIXELS } });
     expect(h.graphics.decodes).toHaveLength(0);

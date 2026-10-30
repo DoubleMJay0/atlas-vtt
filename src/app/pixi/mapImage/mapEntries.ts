@@ -1,5 +1,9 @@
+import { bandDecodable } from '../../imageProcessing/band/bandDecoders';
+import { BandUnsupportedError, type BandDecoder } from '../../imageProcessing/band/bandTypes';
+import { imageHeader } from '../../imageProcessing/imageDimensions';
+import { BandBuild, bandBuildCost } from './band/bandBuild';
 import { DecodeBudget } from './decodeBudget';
-import { checkDecodable, DecodedLevels, decodeSource, decodedLevelsCost, decodedSizeCost } from './decodedLevels';
+import { checkDecodable, DecodedLevels, decodeSource, decodedLevelsCost, decodedSizeCost, OpenError } from './decodedLevels';
 import { PyramidBuild, type BuildOutcome } from './pyramidBuilder';
 import { pyramidOf, type Pyramid } from './pyramid';
 import type { TileGraphics } from './tileGraphics';
@@ -21,7 +25,7 @@ export interface MapEntry extends MapSource {
   refs: number;
   /** Opens of it under way: they count as shown, so its build and budget request do not give way. */
   opening: number;
-  build: PyramidBuild | null;
+  build: PyramidBuild | BandBuild | null;
   /** Settles when the running build has ended; null without one. */
   built: Promise<BuildOutcome> | null;
   releaseBudget: (() => void) | null;
@@ -43,6 +47,8 @@ export interface MapEntriesDeps {
   yieldToRequests: () => Promise<void>;
   /** Bytes of decoded levels all builds may hold together. */
   decodedBudget?: number | undefined;
+  /** The decoder that reads a source the browser cannot decode in bands, or null; `bandDecodable` when unset. */
+  bandDecoderOf?: ((blob: Blob) => Promise<BandDecoder | null>) | undefined;
 }
 
 const PENDING_PYRAMID: Pyramid = pyramidOf(1, 1);
@@ -119,6 +125,7 @@ export class MapEntries {
       pyramid: PENDING_PYRAMID,
       complete: false,
       levels: null,
+      whenStored: null,
       ready: Promise.resolve(),
       refs: 0,
       opening: 0,
@@ -146,6 +153,10 @@ export class MapEntries {
     const decoded = held.bitmap;
     held.bitmap = null;
     const blob = new Blob([bytes]);
+    if (!decoded) {
+      const banded = await (this.deps.bandDecoderOf ?? bandDecodable)(blob);
+      if (banded) return this.prepareBands(entry, bytes, banded);
+    }
     try {
       if (decoded) checkDecodable(decoded);
       const cost = decoded ? decodedSizeCost(decoded.width, decoded.height) : await decodedLevelsCost(blob);
@@ -164,6 +175,61 @@ export class MapEntries {
       throw error;
     }
     this.startBuild(entry, entry.levels);
+  }
+
+  /**
+   * An image the browser cannot decode whole, read in bands by Atlas' own decoder: its pyramid
+   * comes from the header, the build holds rows instead of levels, and tiles are served from the
+   * cache as the build writes them (`whenStored`).
+   */
+  private async prepareBands(entry: MapEntry, bytes: ArrayBuffer, decoder: BandDecoder): Promise<void> {
+    const source = new Uint8Array(bytes);
+    let pyramid: Pyramid;
+    try {
+      const info = decoder.inspect(source);
+      pyramid = pyramidOf(info.width, info.height);
+    } catch (error) {
+      if (error instanceof BandUnsupportedError) {
+        const header = await imageHeader(new Blob([bytes]));
+        throw new OpenError({ kind: 'unsupported', width: header?.width ?? 0, height: header?.height ?? 0, reason: error.reason });
+      }
+      throw error;
+    }
+    entry.releaseBudget = await this.budget.acquire({ bytes: bandBuildCost(pyramid.width), urgent: () => this.shown(entry) });
+    entry.pyramid = pyramid;
+    if (this.disposed || (!this.shown(entry) && this.budget.pressured)) {
+      this.releaseLevels(entry);
+      if (this.entries.get(entry.hash) === entry) this.entries.delete(entry.hash);
+      return;
+    }
+    const build = new BandBuild(entry.hash, pyramid, source, decoder, {
+      store: this.deps.store,
+      graphics: this.deps.graphics,
+      yieldToRequests: this.deps.yieldToRequests,
+      emit: this.deps.emit,
+    });
+    entry.build = build;
+    entry.whenStored = (ref) => build.whenStored(ref);
+    entry.built = build.run();
+    void entry.built.then((outcome) => this.bandBuildEnded(entry, bytes, decoder, outcome));
+  }
+
+  /** A band build that gave way while a view still shows the map starts again; it skips what it wrote. */
+  private bandBuildEnded(entry: MapEntry, bytes: ArrayBuffer, decoder: BandDecoder, outcome: BuildOutcome): void {
+    entry.build = null;
+    entry.built = null;
+    entry.whenStored = null;
+    if (outcome === 'stopped' && this.shown(entry) && !this.disposed) {
+      entry.releaseBudget?.();
+      entry.releaseBudget = null;
+      void this.prepareBands(entry, bytes, decoder).catch((error: unknown) => {
+        this.deps.emit({ type: 'build-failed', hash: entry.hash, message: error instanceof Error ? error.message : String(error) });
+      });
+      return;
+    }
+    if (outcome === 'complete') entry.complete = true;
+    this.releaseLevels(entry);
+    this.dropIfUnused(entry);
   }
 
   private startBuild(entry: MapEntry, levels: DecodedLevels): void {

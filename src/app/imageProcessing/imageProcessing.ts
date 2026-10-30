@@ -1,10 +1,11 @@
 import { t } from '../i18n';
-import { DECODED_MAX_PIXELS, DECODER_MAX_SIDE, decodable, scaledJpegDecodeSize } from './decodeLimits';
+import { BAND_FORMATS, BAND_MAX_PIXELS, bandDecodable, DECODED_MAX_PIXELS, DECODER_MAX_SIDE, decodable, scaledJpegDecodeSize } from './decodeLimits';
+import type { BandUnsupportedReason } from './band/bandTypes';
 import type { FramePlacement, ImageJob, ImageJobResult, ImageLayout, ThumbnailSpec } from './imageJob';
 import { imageHeader, type ImageHeader } from './imageDimensions';
 import { withDecodedImage } from './imageElement';
 import { fitSize, vectorRasterSize, type Size } from './imageLayout';
-import { ImageDecodeError, ImageWorkerPool, type ImageJobOptions } from './ImageWorkerPool';
+import { BandRefusedError, ImageDecodeError, ImageWorkerPool, type ImageJobOptions } from './ImageWorkerPool';
 import ImageWorker from './imageWorker?worker&inline';
 
 export type { FramePlacement, ThumbnailSpec, ImageJobResult as ProcessedImage } from './imageJob';
@@ -26,12 +27,13 @@ export interface ImagePreset {
 }
 
 /**
- * The most pixels a map may have: the largest square below what the browser decodes at all
- * (`DECODED_MAX_PIXELS`), 16383 × 16383, nearly twice Owlbear Rodeo's largest maps (144 MP) and
- * more than one GPU texture holds. The tile pyramid draws it at any zoom, and the online store
- * sends players only the tiles they look at.
+ * The most pixels a map may have: 400 megapixels, nearly three times Owlbear Rodeo's largest maps
+ * (144 MP). Below `DECODED_MAX_PIXELS` the browser decodes a map; from there Atlas' own band
+ * decoders read a plain JPEG or a PNG in rows (`BAND_MAX_PIXELS`), kept as uploaded. The tile
+ * pyramid draws any size at any zoom, and the online store sends players only the tiles they
+ * look at.
  */
-export const MAP_MAX_PIXELS = 16383 ** 2;
+export const MAP_MAX_PIXELS = BAND_MAX_PIXELS;
 /**
  * The longest side a map may have, for very wide or tall maps within `MAP_MAX_PIXELS`: half of
  * what the decoders and canvases take, so every level of its pyramid and every canvas drawn from
@@ -132,16 +134,37 @@ function jobCost(size: Size | null): number | undefined {
   return size ? size.width * size.height * 4 * 2 : undefined;
 }
 
-/** Raised for a source larger than the browser can decode, with a message to show. */
+/** Raised for a source larger than Atlas can read, with a message to show: the band decoders' cap for their formats, the browser's for the rest. */
 export class ImageTooLargeError extends Error {
-  constructor(readonly size: Size) {
+  constructor(readonly size: Size, format?: string) {
+    const banded = format !== undefined && BAND_FORMATS.has(format);
     super(t('image.tooLarge', {
       width: size.width,
       height: size.height,
-      megapixels: Math.floor(DECODED_MAX_PIXELS / 1e6),
-      side: DECODER_MAX_SIDE,
+      megapixels: Math.floor((banded ? BAND_MAX_PIXELS : DECODED_MAX_PIXELS) / 1e6),
+      side: banded ? MAP_MAX_SIDE : DECODER_MAX_SIDE,
     }));
   }
+}
+
+/** Raised for a source larger than the browser decodes that the band decoders refuse, with a message that says what to export. */
+export class ImageUnsupportedError extends Error {
+  constructor(readonly size: Size, readonly reason: BandUnsupportedReason) {
+    super(t('image.unsupported', { width: size.width, height: size.height, advice: t(`image.unsupported.${reason}`) }));
+  }
+}
+
+const UNSUPPORTED_REASONS: ReadonlySet<string> = new Set<BandUnsupportedReason>(['progressive', 'interlaced', 'scans', 'coding', 'components', 'orientation', 'corrupt']);
+const isUnsupportedReason = (reason: string): reason is BandUnsupportedReason => UNSUPPORTED_REASONS.has(reason);
+
+/**
+ * Whether an upload the browser cannot decode goes to a band decoder: its header must fit the fit
+ * layout as it is, since bands cannot be scaled down to a smaller whole.
+ */
+function bandJobOf(header: ImageHeader | null, layout: ImageLayout): ImageJob['band'] {
+  if (!header || layout.kind !== 'fit' || !bandDecodable(header)) return undefined;
+  const fits = header.width <= layout.maxWidth && header.height <= layout.maxHeight && header.width * header.height <= (layout.maxPixels ?? Infinity);
+  return fits ? { format: header.format } : undefined;
 }
 
 /** A JPEG larger than a fit keeps is decoded at the smallest eighth of its size that still has every pixel the fit keeps. */
@@ -154,15 +177,19 @@ function scaledDecodeOf(header: ImageHeader | null, layout: ImageLayout): ImageJ
 
 async function process(source: Blob, job: Omit<ImageJob, 'source'>, options: ProcessOptions): Promise<ImageJobResult> {
   const header = await imageHeader(source);
-  if (header && !decodable(header)) throw new ImageTooLargeError(header);
-  const scaledDecode = scaledDecodeOf(header, job.layout);
-  const run: ImageJobOptions = { signal: options.signal, background: options.background ?? false, cost: jobCost(scaledDecode?.decoded ?? header) };
-  const withCopies = { ...job, thumbnail: options.thumbnail, preview: options.preview, sourcePreview: options.sourcePreview, webpOnly: options.webpOnly };
+  const band = bandJobOf(header, job.layout);
+  if (header && !decodable(header) && !band) throw new ImageTooLargeError(header, header.format);
+  const scaledDecode = band ? undefined : scaledDecodeOf(header, job.layout);
+  // A band decode holds an eighth of the image and the decoder's rows: far less than a decode.
+  const cost = band ? jobCost({ width: Math.ceil(header!.width / 8), height: Math.ceil(header!.height / 8) }) : jobCost(scaledDecode?.decoded ?? header);
+  const run: ImageJobOptions = { signal: options.signal, background: options.background ?? false, cost };
+  const withCopies = { ...job, thumbnail: options.thumbnail, preview: options.preview, sourcePreview: options.sourcePreview, webpOnly: options.webpOnly, band };
   // One pool for both attempts: after unload it refuses the fallback and frees its bitmap
   const workers = workerPool();
   try {
     return await workers.run({ ...withCopies, source, scaledDecode }, run);
   } catch (error) {
+    if (error instanceof BandRefusedError && header && isUnsupportedReason(error.reason)) throw new ImageUnsupportedError(header, error.reason);
     if (!(error instanceof ImageDecodeError)) throw error;
     return afterEarlierRasters(async () => {
       options.signal?.throwIfAborted();

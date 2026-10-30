@@ -60,6 +60,11 @@ export interface ImageJob {
    * scaling is encoded too instead of kept. A WebP source is still kept.
    */
   webpOnly?: boolean | undefined;
+  /**
+   * The source is larger than the browser decodes and is read in bands by Atlas' own decoder of
+   * `format` instead: it is kept as it is, and its copies come from a decode at an eighth.
+   */
+  band?: { format: string } | undefined;
 }
 
 /** Pixel sizes of a source and of the smaller image a fit made of it. */
@@ -88,5 +93,8 @@ export interface ImageJobRequest {
 
 export type ImageJobResponse =
   | { id: number; ok: true; result: ImageJobResult }
-  /** `decodeFailed` means the worker could not read the source format; the main thread may decode it instead. */
-  | { id: number; ok: false; message: string; decodeFailed: boolean };
+  /**
+   * `decodeFailed` means the worker could not read the source format; the main thread may decode it
+   * instead. `unsupported` names why a band decoder refused the source (`BandUnsupportedReason`).
+   */
+  | { id: number; ok: false; message: string; decodeFailed: boolean; unsupported?: string | undefined };

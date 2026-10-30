@@ -31,7 +31,8 @@ function primitives(blobType = 'image/webp'): { graphics: ReturnType<typeof crea
     },
     transferToImageBitmap: () => new FakeBitmap(width, height, 'composed'),
   });
-  return { graphics: createTileGraphics({ createImageBitmap, createCanvas }), recorded };
+  const createImageData = (data: Uint8ClampedArray, width: number, height: number): ImageData => ({ data, width, height, colorSpace: 'srgb' } as ImageData);
+  return { graphics: createTileGraphics({ createImageBitmap, createCanvas, createImageData }), recorded };
 }
 
 describe('createTileGraphics', () => {

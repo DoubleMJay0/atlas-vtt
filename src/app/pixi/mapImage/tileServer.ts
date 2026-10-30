@@ -25,11 +25,15 @@ export interface MapSource {
   pyramid: Pyramid;
   complete: boolean;
   levels: DecodedLevels | null;
+  /** Set while a band build writes the map: resolves once the tile is stored, rejects once the build ended without it. */
+  whenStored: ((ref: TileRef) => Promise<void>) | null;
 }
 
 interface PendingRequest {
   handle: number;
   controller: AbortController;
+  /** Waits for a band build to write a tile under way (an overview waits for many at once): not a request the build must let through first. */
+  waiting: number;
 }
 
 /** A request whose map was closed while it ran; answered with an error so no awaiter hangs. */
@@ -62,16 +66,27 @@ export class TileServer {
     private readonly graphics: TileGraphics,
   ) {}
 
-  /** Resolves once no request is pending. */
+  /** Resolves once no request is pending, apart from those waiting for the build itself. */
   idle(): Promise<void> {
-    if (this.requests.size === 0) return Promise.resolve();
+    if (this.active() === 0) return Promise.resolve();
     return new Promise((resolve) => this.idleWaiters.push(resolve));
+  }
+
+  private active(): number {
+    let count = 0;
+    for (const request of this.requests.values()) if (request.waiting === 0) count += 1;
+    return count;
+  }
+
+  private settleIdle(): void {
+    if (this.active() > 0) return;
+    for (const resolve of this.idleWaiters.splice(0)) resolve();
   }
 
   /** A tile's bitmap, or null when the request was cancelled meanwhile; rejects with `MapClosedError` once its map closes. */
   async tile(id: number, handle: number, source: MapSource, ref: TileRef): Promise<ImageBitmap | null> {
     levelOf(source.pyramid, ref);
-    return this.track(id, handle, (signal) => this.tileBitmap(source, ref, signal));
+    return this.track(id, handle, (signal) => this.tileBitmap(id, source, ref, signal));
   }
 
   /**
@@ -80,7 +95,7 @@ export class TileServer {
    */
   async overview(id: number, handle: number, source: MapSource, maxSide: number): Promise<ImageBitmap | null> {
     if (!(maxSide >= 1)) throw new RangeError(`An overview needs a side of at least 1 pixel, got ${maxSide}`);
-    return this.track(id, handle, (signal) => this.composeOverview(source, maxSide, signal));
+    return this.track(id, handle, (signal) => this.composeOverview(id, source, maxSide, signal));
   }
 
   /** Drops a request: it answers null. */
@@ -97,7 +112,7 @@ export class TileServer {
 
   private async track(id: number, handle: number, run: (signal: AbortSignal) => Promise<ImageBitmap | null>): Promise<ImageBitmap | null> {
     const controller = new AbortController();
-    this.requests.set(id, { handle, controller });
+    this.requests.set(id, { handle, controller, waiting: 0 });
     const { signal } = controller;
     const whenAborted = (): null => {
       if (signal.reason === CLOSED) throw new MapClosedError(handle);
@@ -113,15 +128,29 @@ export class TileServer {
       throw error;
     } finally {
       this.requests.delete(id);
-      if (this.requests.size === 0) {
-        for (const resolve of this.idleWaiters.splice(0)) resolve();
-      }
+      this.settleIdle();
     }
   }
 
-  private async tileBitmap(source: MapSource, ref: TileRef, signal: AbortSignal): Promise<ImageBitmap | null> {
+  /** Runs `wait` with the request marked as waiting for the build, so the build does not wait for it in turn. */
+  private async whileWaiting<T>(id: number, wait: () => Promise<T>): Promise<T> {
+    const request = this.requests.get(id);
+    if (request) request.waiting += 1;
+    this.settleIdle();
+    try {
+      return await wait();
+    } finally {
+      if (request) request.waiting -= 1;
+    }
+  }
+
+  private async tileBitmap(id: number, source: MapSource, ref: TileRef, signal: AbortSignal): Promise<ImageBitmap | null> {
     const cropped = await source.levels?.use(ref.level, (level) => this.graphics.crop(level, tileSourceRect(source.pyramid, ref)));
     if (cropped) return cropped;
+    if (signal.aborted) return null;
+    // A band build writes the map row by row: a tile it has not reached is waited for, not missing.
+    const { whenStored } = source;
+    if (whenStored) await this.whileWaiting(id, () => whenStored(ref));
     if (signal.aborted) return null;
     const bytes = await this.store.getTile(source.hash, ref);
     if (!bytes) throw new MissingTileError(`Tile ${tileKey(ref)} of map image ${source.hash} is not in the cache.`);
@@ -129,14 +158,14 @@ export class TileServer {
     return this.graphics.decode(bytes);
   }
 
-  private async composeOverview(source: MapSource, maxSide: number, signal: AbortSignal): Promise<ImageBitmap | null> {
+  private async composeOverview(id: number, source: MapSource, maxSide: number, signal: AbortSignal): Promise<ImageBitmap | null> {
     const level = overviewSourceLevel(source.pyramid, maxSide);
     // Fit from the full size, not the level's: a level's sides are rounded up, which can shift the shorter side by a pixel.
     const { width, height } = fitWithin(source.pyramid, maxSide, maxSide);
     // A level is never handed out itself: transferring it would take it from the build.
     const direct = await source.levels?.use(level.index, (bitmap) => this.graphics.resize(bitmap, width, height));
     if (direct) return direct;
-    const whole = await this.composeCached(source, level.index, signal);
+    const whole = await this.composeCached(id, source, level.index, signal);
     if (!whole || (whole.width === width && whole.height === height)) return whole;
     try {
       return await this.graphics.resize(whole, width, height);
@@ -146,11 +175,11 @@ export class TileServer {
   }
 
   /** The level `index` drawn whole from the cache, else the finest coarser level the cache holds whole. */
-  private async composeCached(source: MapSource, index: number, signal: AbortSignal): Promise<ImageBitmap | null> {
+  private async composeCached(id: number, source: MapSource, index: number, signal: AbortSignal): Promise<ImageBitmap | null> {
     const { levels } = source.pyramid;
     for (let next = index; ; next++) {
       try {
-        return await this.composeLevel(source, levels[next]!, signal);
+        return await this.composeLevel(id, source, levels[next]!, signal);
       } catch (error) {
         if (!(error instanceof MissingTileError) || next === levels.length - 1) throw error;
       }
@@ -158,12 +187,12 @@ export class TileServer {
   }
 
   /** A level drawn whole from its tiles' content. */
-  private async composeLevel(source: MapSource, level: PyramidLevel, signal: AbortSignal): Promise<ImageBitmap | null> {
+  private async composeLevel(id: number, source: MapSource, level: PyramidLevel, signal: AbortSignal): Promise<ImageBitmap | null> {
     const refs: TileRef[] = [];
     for (let row = 0; row < level.rows; row++) {
       for (let col = 0; col < level.cols; col++) refs.push({ level: level.index, col, row });
     }
-    const settled = await Promise.allSettled(refs.map((ref) => this.tileBitmap(source, ref, signal)));
+    const settled = await Promise.allSettled(refs.map((ref) => this.tileBitmap(id, source, ref, signal)));
     const bitmaps = settled.map((result) => (result.status === 'fulfilled' ? result.value : null));
     try {
       const failed = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected');

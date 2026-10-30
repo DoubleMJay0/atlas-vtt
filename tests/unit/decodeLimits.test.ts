@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DECODED_MAX_PIXELS, decodable, jpegScaledSize, scaledJpegDecodeSize } from '../../src/app/imageProcessing/decodeLimits';
+import { BAND_MAX_PIXELS, bandDecodable, DECODED_MAX_PIXELS, DECODER_MAX_SIDE, decodable, jpegScaledSize, scaledJpegDecodeSize } from '../../src/app/imageProcessing/decodeLimits';
 import { IMAGE_PRESETS } from '../../src/app/imageProcessing/imageProcessing';
 import { decodedSizeCost, MAX_DECODED_LEVELS_BYTES, MAX_SOURCE_PIXELS } from '../../src/app/pixi/mapImage/decodedLevels';
 
@@ -39,12 +39,17 @@ describe('scaled JPEG decoding', () => {
 });
 
 describe('the tile worker’s limit on a source', () => {
-  it('opens every map an import writes, and refuses what the decoders would die on', () => {
+  it('decodes every map the browser can, refuses what the decoders would die on, and leaves the rest to the band decoders', () => {
     const { maxPixels, maxWidth } = IMAGE_PRESETS.map;
-    expect(decodedSizeCost(maxPixels, 1)).toBeLessThan(MAX_DECODED_LEVELS_BYTES);
-    expect(MAX_SOURCE_PIXELS).toBeGreaterThanOrEqual(maxPixels);
-    expect(MAX_SOURCE_PIXELS).toBeLessThan(DECODED_MAX_PIXELS);
-    expect(decodable({ width: maxWidth, height: Math.floor(maxPixels / maxWidth) })).toBe(true);
+    expect(MAX_SOURCE_PIXELS).toBe(DECODED_MAX_PIXELS - 1);
     expect(decodedSizeCost(MAX_SOURCE_PIXELS, 1)).toBeLessThanOrEqual(MAX_DECODED_LEVELS_BYTES);
+    expect(decodable({ width: 16383, height: 16383 })).toBe(true);
+    expect(bandDecodable({ format: 'jpeg', width: 16384, height: 16384 })).toBe(true);
+    expect(bandDecodable({ format: 'png', width: 20000, height: 20000 })).toBe(true);
+    expect(bandDecodable({ format: 'jpeg', width: 16383, height: 16383 })).toBe(false);
+    expect(bandDecodable({ format: 'webp', width: 20000, height: 20000 })).toBe(false);
+    expect(bandDecodable({ format: 'png', width: 20001, height: 20000 })).toBe(false);
+    expect(maxPixels).toBe(BAND_MAX_PIXELS);
+    expect(maxWidth).toBeLessThanOrEqual(DECODER_MAX_SIDE);
   });
 });

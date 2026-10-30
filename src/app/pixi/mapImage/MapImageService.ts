@@ -137,5 +137,9 @@ function reasonOf(error: unknown): string {
     const { width, height, maxPixels, maxSide } = error.failure;
     return t('image.tooLarge', { width, height, megapixels: Math.floor(maxPixels / 1e6), side: maxSide });
   }
+  if (error instanceof TileOpenError && error.failure.kind === 'unsupported') {
+    const { width, height, reason } = error.failure;
+    return t('image.unsupported', { width, height, advice: t(`image.unsupported.${reason}`) });
+  }
   return describeError(error);
 }

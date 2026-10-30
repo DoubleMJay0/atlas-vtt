@@ -16,6 +16,13 @@ import type { Size } from './imageLayout';
 export const DECODED_MAX_PIXELS = 2 ** 28;
 /** Longest side any decoder or canvas takes. */
 export const DECODER_MAX_SIDE = 65535;
+/**
+ * The most pixels an image read in bands may have (`band/`): a baseline JPEG or a non-interlaced
+ * PNG past `DECODED_MAX_PIXELS` is tiled from rows by Atlas' own decoders, which hold no whole
+ * picture, so the bound is time and the tile count, not memory: 400 megapixels is about 2,000
+ * tiles of the finest level and under a minute of decoding on a current machine.
+ */
+export const BAND_MAX_PIXELS = 400_000_000;
 /** `convertToBlob` silently crops a WebP's sides to this. */
 export const WEBP_MAX_SIDE = 16383;
 
@@ -29,6 +36,18 @@ const JPEG_SCALE_STEPS = 8;
  */
 export function decodable(size: Size): boolean {
   return size.width <= DECODER_MAX_SIDE && size.height <= DECODER_MAX_SIDE && size.width * size.height < DECODED_MAX_PIXELS;
+}
+
+/** Formats the band decoders read. */
+export const BAND_FORMATS: ReadonlySet<string> = new Set(['jpeg', 'png']);
+
+/**
+ * Whether an image the browser cannot decode (`decodable` false) can be read in bands instead:
+ * by its header alone; the decoder may still refuse it (progressive, interlaced, turned).
+ */
+export function bandDecodable(header: Size & { format: string }): boolean {
+  return !decodable(header) && BAND_FORMATS.has(header.format)
+    && header.width <= DECODER_MAX_SIDE && header.height <= DECODER_MAX_SIDE && header.width * header.height <= BAND_MAX_PIXELS;
 }
 
 /** The size `ImageDecoder` decodes a JPEG at for `eighths` / 8: each side rounded up, the only sizes it accepts. */

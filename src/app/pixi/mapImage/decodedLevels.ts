@@ -13,7 +13,15 @@ import type { OpenFailure } from './tileProtocol';
 /** A failure to report for the open, once. */
 export class OpenError extends Error {
   constructor(readonly failure: OpenFailure) {
-    super(failure.kind === 'too-large' ? `The image is too large to decode (${failure.width} × ${failure.height}).` : failure.message);
+    super(openFailureMessage(failure));
+  }
+}
+
+export function openFailureMessage(failure: OpenFailure): string {
+  switch (failure.kind) {
+    case 'too-large': return `The image is too large to decode (${failure.width} × ${failure.height}).`;
+    case 'unsupported': return `The image (${failure.width} × ${failure.height}) is too large for the browser and cannot be read in bands: ${failure.reason}.`;
+    default: return failure.message;
   }
 }
 

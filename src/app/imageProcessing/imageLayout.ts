@@ -1,4 +1,4 @@
-import { WEBP_MAX_SIDE } from './decodeLimits';
+import { DECODED_MAX_PIXELS, WEBP_MAX_SIDE } from './decodeLimits';
 import type { FramePlacement, ImageLayout, ScaleDown, Size } from './imageJob';
 
 export type { Size } from './imageJob';
@@ -56,7 +56,8 @@ export function scaleDown(layout: ImageLayout, source: Size, output: Size): Scal
 export function vectorRasterSize(natural: Size, layout: ImageLayout): Size {
   if (layout.kind === 'fit') {
     const fill = Math.min(layout.maxWidth / natural.width, layout.maxHeight / natural.height);
-    return fitSize(scaled(natural, fill), layout);
+    // Drawn on a canvas and held as one bitmap, so never as many pixels as the browser dies on, whatever a map may hold.
+    return fitSize(scaled(natural, fill), { ...layout, maxPixels: Math.min(layout.maxPixels ?? Infinity, DECODED_MAX_PIXELS - 1) });
   }
   return scaled(natural, VECTOR_FRAME_SOURCE / Math.max(natural.width, natural.height));
 }

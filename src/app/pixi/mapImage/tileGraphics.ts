@@ -35,6 +35,8 @@ export interface TileCanvas {
 export interface GraphicsPrimitives {
   createImageBitmap: CreateBitmap;
   createCanvas: (width: number, height: number) => TileCanvas;
+  /** `ImageData` over RGBA bytes with straight alpha, `width * height * 4` of them. */
+  createImageData: (data: Uint8ClampedArray, width: number, height: number) => ImageData;
 }
 
 /** One piece of a composed picture: `source`'s rect `from` drawn into `to`. */
@@ -49,6 +51,8 @@ export interface TileGraphics {
   /** `source` resized; `medium`, since `high` has a known Chromium quality bug. */
   resize(source: ImageBitmap, width: number, height: number): Promise<ImageBitmap>;
   crop(source: ImageBitmap, rect: PixelRect): Promise<ImageBitmap>;
+  /** A bitmap of decoded rows: RGBA with straight alpha, `width * height * 4` bytes. */
+  fromPixels(data: Uint8ClampedArray, width: number, height: number): Promise<ImageBitmap>;
   /** `source`'s rect encoded as a WebP tile. */
   encodeTile(source: ImageBitmap, rect: PixelRect): Promise<Blob>;
   compose(width: number, height: number, parts: readonly ComposedPart[]): ImageBitmap;
@@ -65,11 +69,12 @@ function context(canvas: TileCanvas): TileContext {
 }
 
 export function createTileGraphics(primitives: GraphicsPrimitives): TileGraphics {
-  const { createImageBitmap: bitmapOf, createCanvas } = primitives;
+  const { createImageBitmap: bitmapOf, createCanvas, createImageData } = primitives;
   return {
     decode: (blob) => bitmapOf(blob),
     resize: (source, width, height) => bitmapOf(source, { resizeWidth: width, resizeHeight: height, resizeQuality: 'medium' }),
     crop: (source, rect) => bitmapOf(source, rect.x, rect.y, rect.width, rect.height),
+    fromPixels: (data, width, height) => bitmapOf(createImageData(data, width, height)),
     async encodeTile(source, rect) {
       const canvas = createCanvas(rect.width, rect.height);
       context(canvas).drawImage(source, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
@@ -108,5 +113,6 @@ export function browserGraphicsPrimitives(): GraphicsPrimitives {
   return {
     createImageBitmap: createImageBitmap.bind(self),
     createCanvas: (width, height) => new OffscreenCanvas(width, height),
+    createImageData: (data, width, height) => new ImageData(data, width, height),
   };
 }

@@ -37,22 +37,21 @@ describe('fitWithin', () => {
 describe('fitSize', () => {
   const map = { kind: 'fit', ...IMAGE_PRESETS.map } as const;
 
-  it('fits a map within 32767 px a side and 16383 × 16383 pixels', () => {
+  it('fits a map within 32767 px a side and 400 megapixels', () => {
     expect(fitSize({ width: 20000, height: 9000 }, map)).toEqual({ width: 20000, height: 9000 });
-    expect(fitSize({ width: 16383, height: 16383 }, map)).toEqual({ width: 16383, height: 16383 });
-    expect(fitSize({ width: 16384, height: 16384 }, map)).toEqual({ width: 16383, height: 16383 });
-    expect(fitSize({ width: 20000, height: 20000 }, map)).toEqual({ width: 16383, height: 16383 });
+    expect(fitSize({ width: 20000, height: 20000 }, map)).toEqual({ width: 20000, height: 20000 });
     expect(fitSize({ width: 40000, height: 2000 }, map)).toEqual({ width: 32767, height: 1638 });
-    // 300 MP, over the limit
-    expect(fitSize({ width: 30000, height: 10000 }, map)).toEqual({ width: 28376, height: 9458 });
+    // 500 MP, over the limit
+    expect(fitSize({ width: 25000, height: 20000 }, map)).toEqual({ width: 22360, height: 17888 });
   });
 
-  it('keeps every map below what the browser decodes', () => {
-    for (const size of [{ width: 16384, height: 16384 }, { width: 32767, height: 8192 }, { width: 65535, height: 65535 }]) {
+  it('keeps every map within the band decoders\' cap, and a scaled one below what the browser decodes', () => {
+    for (const size of [{ width: 25000, height: 20000 }, { width: 32767, height: 32767 }, { width: 65535, height: 65535 }]) {
       const fitted = fitSize(size, map);
-      expect(fitted.width * fitted.height).toBeLessThan(DECODED_MAX_PIXELS);
       expect(fitted.width * fitted.height).toBeLessThanOrEqual(IMAGE_PRESETS.map.maxPixels);
     }
+    // A source the browser decodes is scaled on a canvas, which holds up to 2^28 pixels, as a bitmap of it does.
+    expect(DECODED_MAX_PIXELS).toBeLessThan(IMAGE_PRESETS.map.maxPixels);
   });
 
   it('lets a fit go past a WebP side; the renderer writes such a picture as PNG', () => {
@@ -88,7 +87,7 @@ describe('vectorRasterSize', () => {
 
   it('fills a map within its area limit', () => {
     const map = { kind: 'fit', ...IMAGE_PRESETS.map } as const;
-    expect(vectorRasterSize({ width: 400, height: 200 }, map)).toEqual({ width: 23168, height: 11584 });
+    expect(vectorRasterSize({ width: 400, height: 200 }, map)).toEqual({ width: 23170, height: 11585 });
     expect(vectorRasterSize({ width: 100, height: 100 }, map)).toEqual({ width: 16383, height: 16383 });
   });
 
