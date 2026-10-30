@@ -19,10 +19,14 @@ const FIELDS: TemplateField[] = [
   { key: 'name', label: 'Name', type: 'text' },
   { key: 'heritage', label: 'Heritage', type: 'scores', slots: ['Type', 'Description', 'Feature'] },
   { key: 'gear', label: 'Inventory', type: 'scores', slots: ['Item', 'Qty'], rows: [['Rope', 1], ['Torch', 2]] },
+  { key: 'stats', label: 'Stats', type: 'scores', slots: ['A', 'B'] },
+  { key: 'named', label: 'Named', type: 'scores', slots: ['A'] },
 ];
 const BLOCKS: TemplateBlock[] = [
   { id: 'heritage', type: 'scores', field: 'heritage', orientation: 'row' },
   { id: 'gear0000', type: 'scores', field: 'gear', orientation: 'row' },
+  { id: 'stats000', type: 'scores', field: 'stats', orientation: 'row' },
+  { id: 'named000', type: 'scores', field: 'named', orientation: 'row' },
 ];
 const TEMPLATE = templateOf(FIELDS, BLOCKS);
 const NOTE = '---\nstatblock: true\natlas-template: test-template-abc123\nname: Ana\n---\n';
@@ -82,5 +86,28 @@ describe('a player typing into a cell of a Table of text', () => {
     const base = tableOf(inputs.sent, 'heritage').field?.base ?? '';
     expect(checkFieldEdit(inputs, { t: 'book-field', key: 'heritage', base, value: 'x', cell: [0, 3] })).toBeNull();
     expect(checkFieldEdit(inputs, { t: 'book-field', key: 'heritage', base, value: 'x', cell: [1, 0] })).toBeNull();
+  });
+
+  it('refuses a cell of a table that would not come back as the note holds it, whatever the player never saw', () => {
+    const refused = (yaml: string, key: string, base: SheetRaw, cell: [number, number], value: SheetRaw = 9): void => {
+      const inputs = inputsOf(NOTE.replace('name: Ana\n', `name: Ana\n${yaml}\n`));
+      expect(checkFieldEdit(inputs, { t: 'book-field', key, base: sheetBase(base), value, cell }), yaml).toBeNull();
+    };
+    // More cells in a row than a table takes: the last would be cut.
+    const wide = Array.from({ length: 14 }, (_, at) => `c${at}`);
+    refused(`heritage:\n  - [${wide.join(', ')}]`, 'heritage', [wide], [0, 0]);
+    // Cells that are no number or text would come back as their text.
+    refused('heritage:\n  - [1, { x: 2 }, z]', 'heritage', [[1, { x: 2 }, 'z']], [0, 2]);
+    refused('heritage:\n  - [true, 4, z]', 'heritage', [[true, 4, 'z']], [0, 2]);
+    // A row by name, or a list of pairs, holding a key outside the columns: clearing the cell would take it along.
+    refused('named: { a: 1, note: hi }', 'named', { a: 1, note: 'hi' }, [0, 0], null);
+    refused('named:\n  - { a: 1 }\n  - { note: hi }', 'named', [{ a: 1 }, { note: 'hi' }], [0, 0], null);
+    // A flat list longer than the template's columns would become a table of columns of its own, which `stats.0` no longer reads.
+    refused('stats: [1, 2, 3]', 'stats', [1, 2, 3], [0, 0]);
+  });
+
+  it('still takes a cell of a row by name or a flat list that the table holds whole', () => {
+    expect(propertiesOf(withCellTyped(NOTE.replace('name: Ana\n', 'name: Ana\nnamed: { a: 1 }\n'), 'named', [0, 0], 4))?.named).toEqual({ a: 4 });
+    expect(propertiesOf(withCellTyped(NOTE.replace('name: Ana\n', 'name: Ana\nstats: [1, 2]\n'), 'stats', [0, 1], 5))?.stats).toEqual([1, 5]);
   });
 });

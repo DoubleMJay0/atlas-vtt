@@ -1,15 +1,14 @@
 import { MAX_FIELD_TEXT, sheetBase, type BookFieldMessage, type SheetRaw } from '../../protocol/index.ts';
 import { fieldPatches } from '../../../statblocks/editor/statblock-pane/valuePatches';
 import { fieldByKey } from '../../../statblocks/model/fieldKeys';
-import { trimmedRow } from '../../../statblocks/model/tableGrid';
 import { withHeaderFields } from '../../../statblocks/model/templateHeader';
 import type { FieldValue, TemplateField } from '../../../statblocks/model/templateTypes';
 import { picksChoice } from '../../../statblocks/values/choicePicks';
-import { noteTable, tableValue } from '../../../statblocks/values/tableValues';
 import { textProblem, valueMisfit } from '../../../statblocks/values/valueFit';
 import { countersAfterEdit } from './counterEdit.ts';
 import { playerAccess } from './playerAccess.ts';
 import { noteMaxRoute } from './resourceMax.ts';
+import { withCell } from './tableCellEdit.ts';
 import {
   amongOptions, clears, editableTemplate, inOptionOrder, isDice, isLine, isPlainList, playerReferences, referencesSafeIn, sentFields, writtenValue,
   type CheckedEdit, type EditInputs, type PlayerReferences,
@@ -43,27 +42,6 @@ function fitsField(field: TemplateField, value: SheetRaw, references: PlayerRefe
     case 'scores': case 'pairs': return typeof value === 'object' && value !== null && valueMisfit(field, value as FieldValue) === null;
     default: return false;
   }
-}
-
-/**
- * A table with one cell set, read and written as the note's panel does (`noteTable`, `tableValue`):
- * a table the note does not hold yet starts as the template's, cells a stored row leaves out are
- * blank, and the note's shape is kept. Undefined clears the key; null where the value is no cell or
- * the table has no such cell.
- */
-function withCell(field: TemplateField, stored: FieldValue | undefined, [row, column]: readonly [number, number], value: SheetRaw): { readonly value: FieldValue | undefined } | null {
-  // A value the card shows as written, not as a table, has no cells.
-  if (!(value === null || isNumber(value) || isLine(value)) || (stored !== undefined && valueMisfit(field, stored) !== null)) return null;
-  const grid = noteTable(stored, field);
-  if (row >= grid.rows.length || column >= grid.columns.length) return null;
-  const rows = grid.rows.map((cells, at) => (at === row ? cells.map((cell, place) => (place === column ? value : cell)) : cells));
-  // A list is the one row of its own unnamed columns: it stays a list.
-  const [only] = rows;
-  if (field.type === 'list' && only !== undefined && rows.length === 1) {
-    const list = trimmedRow(only);
-    return { value: list.length === 0 ? undefined : list };
-  }
-  return { value: tableValue({ ...grid, rows }, field, stored) };
 }
 
 /** The value a field holds once the edit is in (undefined: its key is deleted), or null where the edit does not fit it. */
