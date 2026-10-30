@@ -37,16 +37,16 @@ describe('fitWithin', () => {
 describe('fitSize', () => {
   const map = { kind: 'fit', ...IMAGE_PRESETS.map } as const;
 
-  it('fits a map within 32767 px a side and 400 megapixels', () => {
+  it('fits a map within 65535 px a side and a gigapixel', () => {
     expect(fitSize({ width: 20000, height: 9000 }, map)).toEqual({ width: 20000, height: 9000 });
-    expect(fitSize({ width: 20000, height: 20000 }, map)).toEqual({ width: 20000, height: 20000 });
-    expect(fitSize({ width: 40000, height: 2000 }, map)).toEqual({ width: 32767, height: 1638 });
-    // 500 MP, over the limit
-    expect(fitSize({ width: 25000, height: 20000 }, map)).toEqual({ width: 22360, height: 17888 });
+    expect(fitSize({ width: 25000, height: 20000 }, map)).toEqual({ width: 25000, height: 20000 });
+    expect(fitSize({ width: 70000, height: 1000 }, map)).toEqual({ width: 65535, height: 936 });
+    // 1.12 gigapixels, over the limit
+    expect(fitSize({ width: 35000, height: 32000 }, map)).toEqual({ width: 33072, height: 30237 });
   });
 
   it('keeps every map within the band decoders\' cap, and a scaled one below what the browser decodes', () => {
-    for (const size of [{ width: 25000, height: 20000 }, { width: 32767, height: 32767 }, { width: 65535, height: 65535 }]) {
+    for (const size of [{ width: 35000, height: 32000 }, { width: 32767, height: 32767 }, { width: 65535, height: 65535 }]) {
       const fitted = fitSize(size, map);
       expect(fitted.width * fitted.height).toBeLessThanOrEqual(IMAGE_PRESETS.map.maxPixels);
     }

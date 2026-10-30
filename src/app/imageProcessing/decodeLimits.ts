@@ -19,10 +19,11 @@ export const DECODER_MAX_SIDE = 65535;
 /**
  * The most pixels an image read in bands may have (`band/`): a baseline JPEG or a non-interlaced
  * PNG past `DECODED_MAX_PIXELS` is tiled from rows by Atlas' own decoders, which hold no whole
- * picture, so the bound is time and the tile count, not memory: 400 megapixels is about 2,000
- * tiles of the finest level and under a minute of decoding on a current machine.
+ * picture, so the bound is time and the tiles, not memory: a gigapixel is about 5,300 tiles,
+ * some 1.3 GB of them, and under a minute of decoding on a current machine. Online, what a plan
+ * takes of it is the store's rule.
  */
-export const BAND_MAX_PIXELS = 400_000_000;
+export const BAND_MAX_PIXELS = 1_000_000_000;
 /** `convertToBlob` silently crops a WebP's sides to this. */
 export const WEBP_MAX_SIDE = 16383;
 

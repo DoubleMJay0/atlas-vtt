@@ -72,8 +72,8 @@ export interface TileStoreOptions {
   now?: () => number;
 }
 
-/** The cache never grows past this, whatever the quota. */
-export const TILE_CACHE_MAX_BYTES = 2 * 1024 ** 3;
+/** The cache never grows past this, whatever the quota: room for a few gigapixel maps' lossless tiles (about 1.3 GB each). */
+export const TILE_CACHE_MAX_BYTES = 4 * 1024 ** 3;
 /** Share of the origin's quota the cache may take. */
 export const TILE_CACHE_QUOTA_SHARE = 0.1;
 
