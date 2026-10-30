@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SHARED_LIQUID_CORNERS, MAX_SHARED_LIQUID_TOTAL, MAX_SHARED_LIQUIDS, parseGmMessage, parseLiquids } from '../../../../src/app/online/protocol/index.ts';
+import { MAX_SHARED_COURSE_POINTS, MAX_SHARED_LIQUID_CORNERS, MAX_SHARED_LIQUID_TOTAL, MAX_SHARED_LIQUIDS, parseGmMessage, parseLiquids } from '../../../../src/app/online/protocol/index.ts';
 
 const HASH = 'a'.repeat(64);
 const MAP = { hash: HASH, size: 10, mime: 'image/png', id: 'e'.repeat(64) };
@@ -57,6 +57,34 @@ describe('the liquids of a floor', () => {
   it('drop what is no flow, no art, a glow off lava and holes that are no areas', () => {
     const read = parseLiquids([pool(1, { flow: { x: 0, y: 0 }, art: 'painted', glow: id(9), holes: [[0, 0, 1, 1, 2, 2], 'hole'] })]);
     expect(read).toEqual([{ id: id(1), liquid: 'water', polygon: SQUARE, colours: COLOURS }]);
+  });
+
+  it('read a river\'s course on flowing water only and its open edges as indices of its outline; an older GM sends neither', () => {
+    const course = [0, 50, 50, 55, 100, 50];
+    const river = parseLiquids([pool(1, { flow: { x: 1, y: 0 }, course, openEdges: [3, 1, 0.5, 'x'] })])![0]!;
+    expect(river.course).toEqual(course);
+    expect(river.openEdges).toEqual([1, 3]);
+    expect(parseLiquids([pool(1, { openEdges: [2, 2, 4, -1] })])![0]!.openEdges).toEqual([2]);
+    const unread = parseLiquids([
+      pool(2, { course }),
+      pool(3, { flow: { x: 1, y: 0 }, course: [0, 0] }),
+      pool(4, { flow: { x: 1, y: 0 }, course: [5, 5, 5, 5] }),
+      pool(5, { flow: { x: 1, y: 0 }, course: [0, 0, 1] }),
+      pool(6, { flow: { x: 1, y: 0 }, course: ring(MAX_SHARED_COURSE_POINTS + 1) }),
+      pool(7, { flow: { x: 1, y: 0 }, course: [0, 0, Number.NaN, 1] }),
+      pool(8, { flow: { x: 1, y: 0 }, openEdges: 'all' }),
+      pool(9, { flow: { x: 1, y: 0 }, openEdges: [0, 1, 2, 3, 0] }),
+    ])!;
+    for (const surface of unread) {
+      expect(surface.course).toBeUndefined();
+      expect(surface.openEdges).toBeUndefined();
+    }
+  });
+
+  it('count a course\'s points with the corners all surfaces of a message may have', () => {
+    const course = ring(MAX_SHARED_COURSE_POINTS);
+    const rivers = Array.from({ length: Math.ceil(MAX_SHARED_LIQUID_TOTAL / MAX_SHARED_COURSE_POINTS) + 1 }, (_, n) => pool(n + 1, { flow: { x: 1, y: 0 }, course }));
+    expect(parseLiquids(rivers)!.length).toBeLessThan(rivers.length);
   });
 
   it('keep a surface within its corners, holes stopping where the limit is reached', () => {

@@ -234,7 +234,7 @@ export class FloorShare {
   }
 
   private async update(state: SceneState): Promise<void> {
-    if (!state.mapLoaded || state.isMapLoading) return;
+    if (!state.mapLoaded || state.isMapLoading) return this.inputs.mapLoading();
     const lit = isLit(state);
     const refusal = lit && this.ports.lightingSource() === null ? LIGHTING_REFUSAL : null;
     if (refusal !== null) {

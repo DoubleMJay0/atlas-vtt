@@ -25,7 +25,7 @@ export const GRID_SIZE = 70;
 export function sceneState(changes: Partial<SceneState> = {}): SceneState {
   return {
     mapPath: 'Scenes/Cave.atlasmap', mapLoaded: true, isMapLoading: false, background: 'maps/cave.webp', grid: null, isDragging: false, _audioDirty: false,
-    lighting: { enabled: false, ambient: 1 }, heldTokens: {}, exploredMask: null, objects: { tokens: {}, fog: {}, pins: {}, texts: {}, drawings: {}, walls: {}, lights: {}, audios: {} },
+    lighting: { enabled: false, ambient: 1 }, heldTokens: {}, exploredMask: null, exploredEdits: 0, objects: { tokens: {}, fog: {}, pins: {}, texts: {}, drawings: {}, walls: {}, lights: {}, audios: {} },
     ...changes,
   };
 }
