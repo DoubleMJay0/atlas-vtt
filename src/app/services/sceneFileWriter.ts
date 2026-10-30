@@ -114,6 +114,7 @@ export class SceneFileWriter<V> {
         await this.app.vault.process(existingFile, (current) => (isLatest() ? data : current));
       } else if (!this.seenOnDisk.has(path) && this.isBoundTo(path) && isLatest()) {
         await this.app.vault.create(dataPath, data);
+        this.seenOnDisk.add(path);
       }
       // Otherwise the map was deleted, or renamed while this save waited; the
       // store has already scheduled its state for the new path, so recreating
