@@ -216,27 +216,31 @@
 // a ring in the accent that fills as tiles land (`ProcessingRing`) and the word beside it. The map works meanwhile.
 .atlas-asset-processing {
   position: absolute;
-  right: $spacing-s;
-  bottom: $spacing-s;
-  z-index: 2;
-  display: inline-flex;
+  inset: 0;
+  // Under the checkbox, the tag menu and the badges, which keep their place and the pointer.
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: $spacing-xs;
-  max-width: calc(100% - 2 * #{$spacing-s});
-  // The ring's round end keeps its own distance from the capsule's curve; the text's straight end needs it given.
-  padding: $spacing-xs $spacing-s $spacing-xs $spacing-xs;
-  border: $border-width-s solid color-mix(in oklch, var(--mono-100) $border-opacity-default, transparent);
-  border-radius: $radius-full;
-  background: color-mix(in oklch, var(--background-primary) 82%, transparent);
-  backdrop-filter: blur(6px);
-  box-shadow: $shadow-sm;
-  color: var(--text-muted);
-  font-size: $font-ui-smaller;
+  justify-content: center;
+  gap: $spacing-s;
+  padding: $spacing-s;
+  // A wash greys the artwork under it; the card's controls above it still take the pointer.
+  background: color-mix(in oklch, var(--background-primary) 55%, transparent);
+  color: var(--text-normal);
+  font-size: $font-ui-small;
+  font-weight: var(--font-semibold);
   line-height: 1;
+  pointer-events: none;
+
+  .atlas-processing-ring {
+    width: 32px;
+    height: 32px;
+  }
 }
 
 .atlas-asset-processing__label {
-  min-width: 0;
+  max-width: 100%;
   @include atlas-truncate;
 }
 
