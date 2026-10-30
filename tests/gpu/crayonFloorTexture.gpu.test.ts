@@ -5,7 +5,9 @@ import { mapLayout } from '../../src/app/dungeons/render/layoutSize';
 import { parseHex } from '../../src/app/dungeons/render/palette';
 import { renderMap } from '../../src/app/dungeons/render/renderMap';
 import { vellumColours } from '../../src/app/dungeons/render/vellum';
-import { visibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
+import { visibleDungeon, type VisibleDungeon } from '../../src/app/dungeons/render/visibleDungeon';
+import { groundsLayout } from '../../src/app/dungeons/render/grounds/groundsShapes';
+import { wayCentre, wayPoint, wayStrength } from '../../src/app/dungeons/render/cave/mouth/wayOut';
 import { DEFAULT_VIEW } from '../../src/app/dungeons/style';
 import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
 
@@ -14,6 +16,8 @@ import { dungeonStyle } from '../../src/app/dungeons/styleCatalog';
  * theme is left the bare paper. Each map is drawn whole; every cell of floor that nothing stands on,
  * away from walls, is read over its middle (clear of the grid's lines), and counts as coloured
  * when most of its pixels lie off the vellum's colour by more than its grain, and its strokes vary.
+ * The narrow places are read too, each over a small window at its middle, clear of the walls' ink
+ * and their shade: one-cell corridors, open doorways, a cave's ways out and a house's lawn.
  */
 
 const PX = 48;
@@ -27,13 +31,50 @@ const COVERED = 0.6;
  */
 const STROKES = 4;
 
-const CASES: [string, DungeonRequest][] = [
-  ['fortress', { seed: 404, theme: 'fortress', tags: ['round', 'colonnades'], floors: 2 }],
-  ['cavern', { seed: 606, theme: 'cavern', tags: ['medium', 'wet'], floors: 2 }],
-  ['mansion', { seed: 16, theme: 'mansion', tags: [], floors: 2 }],
-  ['mansion with cellar', { seed: 2, theme: 'mansion', tags: ['large'], floors: 3 }],
-  ['forest', { seed: 606, theme: 'forest', tags: ['medium', 'dry'], floors: 1 }],
+const CASES: [string, DungeonRequest, string[]][] = [
+  ['fortress', { seed: 404, theme: 'fortress', tags: ['round', 'colonnades'], floors: 2 }, ['doorway']],
+  ['cavern', { seed: 606, theme: 'cavern', tags: ['medium', 'wet'], floors: 2 }, ['corridor', 'way out']],
+  ['mansion', { seed: 16, theme: 'mansion', tags: [], floors: 2 }, ['corridor', 'doorway', 'lawn']],
+  ['mansion with cellar', { seed: 2, theme: 'mansion', tags: ['large'], floors: 3 }, ['lawn']],
+  ['forest', { seed: 606, theme: 'forest', tags: ['medium', 'dry'], floors: 1 }, []],
 ];
+
+/** A narrow place's window, in cells, and the least it is from a wall's line. */
+const WINDOW = 0.3;
+const CLEAR = 0.3;
+/** The spread a window of hand strokes keeps: bare paper reads 0 to 2.9 there (beside a door's jamb), coloured floors 4.8 to 14. */
+const WINDOW_STROKES = 4;
+
+interface Spot {
+  kind: string;
+  x: number;
+  y: number;
+}
+
+/** The middles of the narrow places of a floor: one-cell corridors, open doorways, a cave's ways out and a house's lawn. */
+function narrowSpots(dungeon: VisibleDungeon, busy: ReadonlySet<string>): Spot[] {
+  const free = (x: number, y: number): boolean => !busy.has(`${Math.floor(x)},${Math.floor(y)}`);
+  const spots: Spot[] = [];
+  for (const room of dungeon.rooms) {
+    if (room.kind !== 'corridor' || Math.min(room.w, room.h) !== 1) continue;
+    for (let k = 0; k < room.w * room.h; k++) spots.push({ kind: 'corridor', x: room.x + (k % room.w) + 0.5, y: room.y + Math.floor(k / room.w) + 0.5 });
+  }
+  for (const door of dungeon.doors) if (door.kind === 'opening') spots.push({ kind: 'doorway', x: door.x + 0.5, y: door.y + 0.5 });
+  const inside = spots.filter((s) => free(s.x, s.y) && dungeon.field.distance(s.x, s.y) <= -CLEAR);
+  for (const way of dungeon.ways) {
+    for (const u of [0.8, 1.2, 1.6]) {
+      const p = wayPoint(way, u, wayCentre(way, u));
+      if (dungeon.field.distance(p.x, p.y) > CLEAR && wayStrength(way, p) >= 0.5) inside.push({ kind: 'way out', ...p });
+    }
+  }
+  const grounds = groundsLayout(dungeon.floor);
+  const ways = new Set(grounds?.wayCells.map((c) => `${Math.floor(c.x)},${Math.floor(c.y)}`));
+  for (const c of grounds?.lawnCells ?? []) {
+    const p = { x: Math.floor(c.x) + 0.5, y: Math.floor(c.y) + 0.5 };
+    if (!ways.has(`${Math.floor(c.x)},${Math.floor(c.y)}`) && dungeon.field.distance(p.x, p.y) > 1.5) inside.push({ kind: 'lawn', ...p });
+  }
+  return inside;
+}
 
 interface CellReading {
   covered: number;
@@ -63,8 +104,9 @@ function readCell(data: Uint8ClampedArray, width: number, x0: number, y0: number
 describe('crayon floors are coloured in', () => {
   const style = dungeonStyle('crayon');
   const paper = parseHex(vellumColours(style.colors.paper).inner);
-  for (const [name, request] of CASES) {
+  for (const [name, request, narrowKinds] of CASES) {
     it(name, () => {
+      const kinds: string[] = [];
       const model = generateDungeon(request);
       const layout = mapLayout(model, PX, DEFAULT_VIEW);
       for (let floor = 0; floor < model.floors.length; floor++) {
@@ -94,9 +136,20 @@ describe('crayon floors are coloured in', () => {
             if (cell.covered < COVERED || cell.spread < STROKES) bare.push(`${cx},${cy} (${cell.covered.toFixed(2)}, ${cell.spread.toFixed(1)})`);
           }
         }
+        const narrow = narrowSpots(dungeon, busy);
+        for (const spot of narrow) {
+          const size = Math.round(PX * WINDOW);
+          const at = Math.round((spot.x - layout.originCell.x) * PX - size / 2);
+          const top = Math.round((spot.y - layout.originCell.y) * PX - size / 2);
+          const reading = readCell(data, canvas.width, at, top, size, paper);
+          if (reading.spread < WINDOW_STROKES) bare.push(`${spot.kind} at ${spot.x.toFixed(1)},${spot.y.toFixed(1)} (${reading.spread.toFixed(1)})`);
+        }
+        kinds.push(...narrow.map((spot) => spot.kind));
         expect(open, `${name} floor ${floor}: open floor cells`).toBeGreaterThan(10);
-        expect(bare, `${name} floor ${floor}: ${bare.length} of ${open} open cells left bare`).toEqual([]);
+        expect(bare, `${name} floor ${floor}: ${bare.length} of ${open} open cells and ${narrow.length} narrow places left bare`).toEqual([]);
       }
+      // Each case reads the narrow places it is chosen for.
+      for (const kind of narrowKinds) expect(kinds, `${name}: ${kind}`).toContain(kind);
     });
   }
 });
