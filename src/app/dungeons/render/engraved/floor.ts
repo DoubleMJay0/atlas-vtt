@@ -1,4 +1,4 @@
-import { traceShapes } from '../geometry';
+import { traceShapes, type FloorShape } from '../geometry';
 import type { ArtScene } from '../art/artScene';
 import { viewBounds } from '../art/artScene';
 import { floorStones } from '../art/floorStones';
@@ -19,12 +19,17 @@ export function drawFloor(scene: ArtScene, pens: Pens): void {
   drawFloorJoints(scene, pens);
 }
 
-/** The joints of the floor's stones alone, over whatever the floor is. */
-export function drawFloorJoints(scene: ArtScene, pens: Pens): void {
+/** The joints of the floor's stones alone, over whatever the floor is; only on the floors `within` if given. */
+export function drawFloorJoints(scene: ArtScene, pens: Pens, within?: readonly FloorShape[]): void {
   const { ctx, dungeon, style } = scene.env;
   const seed = dungeon.model.seed;
   ctx.save();
   clipFloors(scene);
+  if (within) {
+    ctx.beginPath();
+    traceShapes(ctx, within);
+    ctx.clip();
+  }
   ctx.beginPath();
   const stones = floorStones(style.floor, viewBounds(scene.frame, 1), seed, (x, y) => dungeon.field.distance(x, y) < 0.9);
   for (const { poly } of stones) {

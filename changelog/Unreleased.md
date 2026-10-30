@@ -3,6 +3,7 @@
 - Generated dungeons, caves and manors have a new default style, Crayon: pencil lines and hatching on vellum, coloured in with wax crayon like the village map of the Lockwood Manor collection. Its water, lava and acid move as hand-drawn crayon strokes that fade in and out on their own
 
 ## Improved
+- Crayon maps colour in every floor by hand, as forest clearings are: grey flagstones in fortresses and halls, packed earth in stables, bare rock in caves and out along their ways out, wooden boards in a manor's rooms with stone in its kitchen, scullery, bathrooms and cellar, and a meadow on a manor's lawns. Large maps of several levels in Crayon take a few seconds longer to create
 - Graphics settings, a page in the command palette (also behind Graphics settings… in the lighting tool's menu): the three quality presets as tabs, with what each draws on hover, and below them every choice a preset makes, so one thing can be set away from a preset: the lighting picture, its detail, bounced light, flames, shadow softness, how often water and lava move, and the lit map's resolution on a high-resolution screen. The settings page's Lighting row is gone
 - Atlas asks the computer for its faster graphics chip where there are two, as Foundry and Owlbear Rodeo do
 - Saver lighting quality draws each light from the area it lights instead of tracing it on the graphics card, so a lit map runs smoothly on weak and software graphics; shadows keep a soft edge

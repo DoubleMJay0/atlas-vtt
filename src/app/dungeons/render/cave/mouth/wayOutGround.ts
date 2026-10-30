@@ -25,19 +25,27 @@ const FAINTEST = 0.02;
 const STEPS = [0.1, 0.35, 0.6, 0.85];
 const STEP_ALPHA = 0.4;
 
-interface Ground {
+/** A way out's trodden ground: how strongly it shows at a point (1 at the mouth, 0 past its end) and where it can. */
+export interface WayGround {
   way: WayOut;
   strength: (p: Vec) => number;
   bounds: Bounds;
 }
+type Ground = WayGround;
 
-function groundsOf(scene: ArtScene): Ground[] {
+/** The ring round all of a way out's ground, out to where it fades to nothing. */
+export function wayGroundRing(scene: ArtScene, way: WayOut): Vec[] {
+  return groundRing(scene.env.dungeon.field, way, FAINTEST);
+}
+
+/** The ground of every way out of the floor on show. */
+export function groundsOf(scene: ArtScene): Ground[] {
   const { dungeon } = scene.env;
   const distance = groundDistance(dungeon.field);
   return dungeon.ways.map((way) => ({
     way,
     strength: (p: Vec) => wayStrength(way, p, distance),
-    bounds: grown(pointsBounds(groundRing(dungeon.field, way, FAINTEST)), 0.05),
+    bounds: grown(pointsBounds(wayGroundRing(scene, way)), 0.05),
   }));
 }
 
