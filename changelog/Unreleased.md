@@ -5,6 +5,7 @@
 - Fog: Cloud reveal in the fog tool's menu shows players the fog as clouds in a colour you pick, which part over what you reveal and drift in over what you cover. While you paint or erase fog, players keep seeing the fog from before, and your changes reach them at once when you switch to another tool, at an online table too. Contributed by ISorokaI
 
 ## Improved
+- Dice rolls stand in the top right corner of the map, over the widgets, instead of moving down below them
 - Maps are drawn with WebGL only. Where it cannot start, a notice says which setting to turn on instead of a map without lights and effects
 - The grid is drawn by the graphics card from its measurements alone, so a dotted or dashed grid costs no more than a solid one on any map, and cell numbers are made only for the cells in view: a gigapixel map with the smallest cells and a dotted, numbered grid pans and zooms as smoothly as a small one, where before such a grid could freeze Obsidian. Grid lines wider than a pixel now lie centred on their cells; before they lay to one side by half their width, and dashes on a square grid now sit centred on every cell edge
 - Cell numbers no longer stutter the moment they appear when zooming in: all of them are drawn as one shape instead of one text each

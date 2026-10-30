@@ -129,7 +129,7 @@ describe('a widget bar with many widgets', () => {
         expect(deck.top).toBeCloseTo(view.top + INSET, 0);
         expect(top.left).toBeGreaterThanOrEqual(view.left + INSET - 0.5);
         expect(deck.bottom).toBeLessThanOrEqual(view.top + TRACKER_CLEARANCE);
-        expect(boxOf(query('.atlas-dice-rolls')).top).toBeGreaterThanOrEqual(deck.bottom + INSET - 0.5);
+        expect(boxOf(query('.atlas-dice-rolls')).top, 'a roll lies over the deck, in its corner').toBeLessThanOrEqual(deck.top + 0.5);
 
         (opener as HTMLElement).click();
         await settled();
@@ -161,6 +161,8 @@ describe('a widget bar with many widgets', () => {
   it('takes the first press on the stack for itself, not for the top card', async () => {
     mount(640, LABELS.length, TABS.length);
     await settled();
+    // A roll lies over the stack while it shows.
+    (query('.atlas-dice-rolls') as HTMLElement).style.display = 'none';
     const box = boxOf(query('.atlas-widget'));
     const point = document.elementFromPoint(box.left + (box.right - box.left) / 2, box.top + (box.bottom - box.top) / 2);
     expect(point?.closest('.atlas-widget-stack-opener')).not.toBeNull();
