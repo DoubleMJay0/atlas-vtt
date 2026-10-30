@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { Container, type BitmapText, type Mesh } from 'pixi.js';
+import { Container, type Mesh } from 'pixi.js';
 import { GridSystem } from '../../src/app/grid/GridSystem';
 import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
 import { fakeMapImageView, settleGridColor } from '../helpers/fakeMapImageView';
@@ -59,10 +59,9 @@ it('draws a dotted grid of a gigapixel map as one quad, whatever the view shows 
 });
 
 /** The cell numbers the grid shows, by their text. */
-function shownNumbers(grid: GridSystem): string[] {
-  const numbers = grid.getGridSprite()!.children.find((child) => child.label === 'cell-numbers');
-  expect(numbers).toBeDefined();
-  return numbers!.visible ? numbers!.children.filter((label) => label.visible).map((label) => (label as BitmapText).text) : [];
+function shownNumbers(grid: GridSystem): readonly string[] {
+  expect(grid.getGridSprite()!.children.find((child) => child.label === 'cell-numbers')).toBeDefined();
+  return grid.cellLabels();
 }
 
 it('numbers no cell while the numbers are too small to read', async () => {
@@ -75,7 +74,6 @@ it('numbers no cell while the numbers are too small to read', async () => {
   try {
     await settleGridColor();
     expect(shownNumbers(grid)).toEqual([]);
-    expect(grid.getGridSprite()!.children.find((child) => child.label === 'cell-numbers')!.children).toHaveLength(0);
   } finally { grid.destroy(); }
 });
 

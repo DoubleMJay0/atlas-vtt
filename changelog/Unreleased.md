@@ -7,6 +7,7 @@
 ## Improved
 - Maps are drawn with WebGL only. Where it cannot start, a notice says which setting to turn on instead of a map without lights and effects
 - The grid is drawn by the graphics card from its measurements alone, so a dotted or dashed grid costs no more than a solid one on any map, and cell numbers are made only for the cells in view: a gigapixel map with the smallest cells and a dotted, numbered grid pans and zooms as smoothly as a small one, where before such a grid could freeze Obsidian. Grid lines wider than a pixel now lie centred on their cells; before they lay to one side by half their width, and dashes on a square grid now sit centred on every cell edge
+- Cell numbers no longer stutter the moment they appear when zooming in: all of them are drawn as one shape instead of one text each
 - Crayon maps colour in every floor by hand, as forest clearings are: grey flagstones in fortresses and halls, packed earth in stables, bare rock in caves and out along their ways out, wooden boards in a manor's rooms with stone in its kitchen, scullery, bathrooms and cellar, and a meadow on a manor's lawns. Large maps of several levels in Crayon take a few seconds longer to create
 - Russian translation of the GM's side of online play: the online panel on the map, the online account, the table's commands and notices. Contributed by ISorokaI
 - Russian translation of native statblocks: the statblock beside a note, creating statblocks, the template gallery, Fantasy Statblocks imports and the collection's Statblocks tab. Contributed by ISorokaI

@@ -298,6 +298,7 @@ export class GridSystem implements UnlitGrid {
 
   /** Clean up grid-only resources */
   private destroyGridResources(): void {
+    const labels = this.cellNumberLabels;
     this.cellNumberLabels = null;
     this.markBacking = null;
     const mesh = this.mesh;
@@ -333,6 +334,7 @@ export class GridSystem implements UnlitGrid {
           destroyTree(spriteToDestroy);
         }
         mesh?.destroy();
+        labels?.destroy();
       } catch {
         // Silently ignore destruction errors
       }
@@ -392,6 +394,11 @@ export class GridSystem implements UnlitGrid {
   /** Returns the grid container: its lines and, on a numbered grid, the cell numbers */
   public getGridSprite(): Container | null {
     return this.gridSprite;
+  }
+
+  /** The texts of the cell numbers shown. */
+  public cellLabels(): readonly string[] {
+    return this.cellNumberLabels?.labels ?? [];
   }
 
   /** Completely destroy */

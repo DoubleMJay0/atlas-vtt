@@ -1,8 +1,10 @@
-import { BitmapText, Cache, Container, DynamicBitmapFont, TextStyle } from 'pixi.js';
+import { Cache, Container, DynamicBitmapFont, TextStyle } from 'pixi.js';
 import { cellNumberAnchor, cellNumberFontSize } from './cellNumbering';
 import type { CellLattice, CellNumberFormat, MapRect } from './cellNumbering';
+import { CellNumberMesh, type PlacedLabel } from './cellNumberMesh';
 import { cellNumberer, type CellNumberer } from './cellNumbersInRect';
 import type { GridBounds } from './gridLineStyle';
+import type { Point } from './hexGeometry';
 
 /** A rect in world units. */
 export interface WorldRect {
@@ -11,7 +13,6 @@ export interface WorldRect {
   width: number;
   height: number;
 }
-import type { Point } from './hexGeometry';
 
 /**
  * Glyph atlas sizes in device pixels. Labels read from the smallest atlas at
@@ -25,9 +26,9 @@ const MIN_SCREEN_FONT_SIZE = 7;
 /**
  * Labels shown at once. A readable number needs a cell of at least `MIN_SCREEN_FONT_SIZE / 0.16`,
  * about 44 CSS pixels, so a 2560 × 1440 view holds some 1,900 numbered cells and even a
- * 7680 × 4320 one about 17,000: only a view larger than any screen holds more. Each label is a
- * text of its own, laid out on the CPU, so a view that would need more shows none rather than
- * stall, and the margin around the view shrinks before the labels in view go.
+ * 7680 × 4320 one about 17,000: only a view larger than any screen holds more. The labels are
+ * glyph quads of one mesh (`CellNumberMesh`), laid out on the CPU, so a view that would need more
+ * shows none rather than stall, and the margin around the view shrinks before the labels in view go.
  */
 const MAX_LABELS = 20_000;
 /** How far past the view labels are made, in the view's longer side, from the largest to none. */
@@ -48,10 +49,10 @@ function rasterSizeFor(devicePixels: number): RasterSize {
  * take the grid colour as a tint. Built like `BitmapFontManager.install`, but
  * without mipmaps: a mip level is picked for any downscale and blurs the digits.
  */
-function ensureCellNumberFont(size: RasterSize): string {
-  const name = fontName(size);
-  const cacheKey = `${name}-bitmap`;
-  if (Cache.has(cacheKey)) return name;
+function ensureCellNumberFont(size: RasterSize): DynamicBitmapFont {
+  const cacheKey = `${fontName(size)}-bitmap`;
+  const cached = Cache.get<DynamicBitmapFont>(cacheKey);
+  if (cached) return cached;
   const font = new DynamicBitmapFont({
     style: new TextStyle({ fontFamily: 'Arial, sans-serif', fontSize: size, fontWeight: 'bold', fill: 0xffffff }),
     overrideFill: false,
@@ -63,7 +64,14 @@ function ensureCellNumberFont(size: RasterSize): string {
   font.ensureCharacters('0123456789');
   Cache.set(cacheKey, font);
   font.once('destroy', () => Cache.remove(cacheKey));
-  return name;
+  return font;
+}
+
+/** The name under which PIXI's own text finds the digit atlas of `size`, for tests that draw it as the oracle. */
+export function cellNumberFontFamilyForTest(size: number): string {
+  const rasterSize = rasterSizeFor(size);
+  ensureCellNumberFont(rasterSize);
+  return fontName(rasterSize);
 }
 
 export interface CellNumberLabelStyle {
@@ -87,8 +95,8 @@ export interface CellNumberSource {
 
 /**
  * The numbers of a grid, laid out in the grid container's local space for the cells in view and
- * a margin around it, from a pool of labels that pans and zooms reuse; none while too small to
- * read. Numbers stay those of the whole map (`cellNumberer`).
+ * a margin around it, as glyph quads of one mesh that a pan past the margin or a zoom lays out
+ * again; none while too small to read. Numbers stay those of the whole map (`cellNumberer`).
  *
  * The margin is the view's longer side on every side: the player window renders this container
  * with its own camera (`withPlayerSafeFrame`), which frames everything the GM's view shows in
@@ -102,13 +110,11 @@ export class CellNumberLabels {
   private readonly map: GridBounds;
   private readonly size: number;
   private readonly localOrigin: Point;
-  private readonly color: number;
   private readonly fontSize: number;
   private rasterSize: RasterSize;
-  /** The labels shown, by cell key. */
-  private shown = new Map<string, BitmapText>();
-  /** Hidden labels, kept for the next cells that come into view. */
-  private readonly pool: BitmapText[] = [];
+  private readonly mesh: CellNumberMesh;
+  /** The labels shown. */
+  private shown: PlacedLabel[] = [];
   /** What the shown labels were made for: the view with its margin (unclipped) and the zoom; null to lay out at the next view. */
   private reach: { bounds: GridBounds; zoom: number } | null = null;
   private lastView: CellNumberView | null = null;
@@ -119,16 +125,31 @@ export class CellNumberLabels {
     this.map = { minX: map.x, minY: map.y, maxX: map.x + map.width, maxY: map.y + map.height };
     this.size = lattice.size;
     this.localOrigin = localOrigin;
-    this.color = style.color;
     this.fontSize = cellNumberFontSize(lattice.size);
     this.container = new Container({ label: 'cell-numbers', eventMode: 'none', interactiveChildren: false });
     this.container.alpha = style.opacity;
+    this.mesh = new CellNumberMesh(this.container, style.color);
     this.rasterSize = rasterSizeFor(this.fontSize * view.zoom * view.pixelRatio);
     this.setView(view);
   }
 
+  /** The atlas size the labels read from, for tests that draw the oracle in the same font. */
+  get rasterSizeForTest(): number {
+    return this.rasterSize;
+  }
+
+  /** The texts of the labels shown. */
+  get labels(): readonly string[] {
+    return this.container.visible ? this.shown.map((label) => label.text) : [];
+  }
+
   setOpacity(opacity: number): void {
     this.container.alpha = opacity;
+  }
+
+  /** Frees the labels' geometry; the container itself goes with the grid's tree. */
+  destroy(): void {
+    this.mesh.destroy();
   }
 
   private isReadable(zoom: number): boolean {
@@ -146,17 +167,20 @@ export class CellNumberLabels {
       this.hideAll();
       return;
     }
-    this.pickRaster(view);
-    if (this.reach && (!view.world || !leftReach(this.reach.bounds, this.reach.zoom, view.world, view.zoom))) return;
+    const rasterChanged = this.pickRaster(view);
+    if (this.reach && (!view.world || !leftReach(this.reach.bounds, this.reach.zoom, view.world, view.zoom))) {
+      if (rasterChanged) this.draw();
+      return;
+    }
     this.layOut(view);
   }
 
-  private pickRaster({ zoom, pixelRatio }: CellNumberView): void {
+  /** Picks the atlas for the labels' size on screen; whether it changed. */
+  private pickRaster({ zoom, pixelRatio }: CellNumberView): boolean {
     const rasterSize = rasterSizeFor(this.fontSize * zoom * pixelRatio);
-    if (rasterSize === this.rasterSize) return;
+    if (rasterSize === this.rasterSize) return false;
     this.rasterSize = rasterSize;
-    const fontFamily = ensureCellNumberFont(rasterSize);
-    for (const label of this.shown.values()) label.style.fontFamily = fontFamily;
+    return true;
   }
 
   /** Labels the cells of the view and as much margin around it as `MAX_LABELS` allows; none where the view alone holds more. */
@@ -170,27 +194,16 @@ export class CellNumberLabels {
     }
     const onMap = clipped(region, this.map);
     const cells = onMap ? this.numberIn({ x: onMap.minX, y: onMap.minY, width: onMap.maxX - onMap.minX, height: onMap.maxY - onMap.minY }) : [];
-    // Cells still in reach keep their labels; the others' go back to the pool before new ones are taken.
-    const next = new Map<string, BitmapText>();
-    for (const cell of cells) {
-      const kept = this.shown.get(cell.key);
-      if (!kept) continue;
-      this.shown.delete(cell.key);
-      next.set(cell.key, kept);
-    }
-    for (const label of this.shown.values()) this.release(label);
-    const fontFamily = ensureCellNumberFont(this.rasterSize);
-    for (const cell of cells) {
-      if (next.has(cell.key)) continue;
-      const label = this.takeLabel(fontFamily);
+    this.shown = cells.map((cell) => {
       const anchor = cellNumberAnchor(this.size, cell.center);
-      label.text = cell.label;
-      label.position.set(anchor.x - this.localOrigin.x, anchor.y - this.localOrigin.y);
-      label.visible = true;
-      next.set(cell.key, label);
-    }
-    this.shown = next;
+      return { text: cell.label, x: anchor.x - this.localOrigin.x, y: anchor.y - this.localOrigin.y };
+    });
+    this.draw();
     this.reach = { bounds: region, zoom: view.zoom };
+  }
+
+  private draw(): void {
+    this.mesh.set(this.shown, ensureCellNumberFont(this.rasterSize), this.fontSize);
   }
 
   /** About how many cells lie in `bounds` on the map, at most. */
@@ -200,27 +213,10 @@ export class CellNumberLabels {
     return (onMap.maxX - onMap.minX) * (onMap.maxY - onMap.minY) * cellsPerArea(this.size);
   }
 
-  private takeLabel(fontFamily: string): BitmapText {
-    const pooled = this.pool.pop();
-    if (pooled) {
-      if (pooled.style.fontFamily !== fontFamily) pooled.style.fontFamily = fontFamily;
-      return pooled;
-    }
-    const label = new BitmapText({ text: '', style: { fontFamily, fontSize: this.fontSize } });
-    label.anchor.set(0.5);
-    label.tint = this.color;
-    this.container.addChild(label);
-    return label;
-  }
-
-  private release(label: BitmapText): void {
-    label.visible = false;
-    this.pool.push(label);
-  }
-
   private hideAll(): void {
-    for (const label of this.shown.values()) this.release(label);
-    this.shown.clear();
+    if (this.shown.length === 0) return;
+    this.shown = [];
+    this.draw();
     this.reach = null;
   }
 }

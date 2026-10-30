@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from 'vitest';
-import type { BitmapText } from 'pixi.js';
 import { CellNumberLabels, type CellNumberView } from '../../src/app/grid/cellNumberLabels';
 import { squareLattice } from '../../src/app/grid/squareLattice';
 import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
@@ -20,8 +19,8 @@ function labels(view: CellNumberView): CellNumberLabels {
   return new CellNumberLabels({ lattice: squareLattice(100, 0, 0), map: MAP, format: 'sequential' }, { x: 0, y: 0 }, { color: 0xffffff, opacity: 1 }, view);
 }
 
-function shown(numbers: CellNumberLabels): BitmapText[] {
-  return numbers.container.visible ? (numbers.container.children as BitmapText[]).filter((label) => label.visible) : [];
+function shown(numbers: CellNumberLabels): readonly string[] {
+  return numbers.labels;
 }
 
 const view = (x: number, y: number, zoom = 1): CellNumberView => ({ zoom, pixelRatio: 1, world: { x, y, width: 1000, height: 500 } });
@@ -31,19 +30,19 @@ it('labels only the cells in the view and a margin of its longer side around it,
   // 3,000 × 2,500 world pixels around the view: 30 × 25 cells of the map's million.
   expect(shown(numbers)).toHaveLength(30 * 25);
   // Cell (490, 490) is the 490,491st in reading order of a map 1,000 cells wide.
-  expect(shown(numbers).map((label) => label.text)).toContain('490491');
+  expect(shown(numbers)).toContain('490491');
 });
 
-it('keeps the labels while the view stays inside what they were made for, and reuses them past it', () => {
+it('keeps the labels while the view stays inside what they were made for, and lays them out again past it', () => {
   const numbers = labels(view(50_000, 50_000));
   const first = shown(numbers);
   numbers.setView(view(50_400, 50_300));
   expect(shown(numbers)).toEqual(first);
 
   numbers.setView(view(52_500, 50_000));
-  // Half of the cells stayed in reach and kept their labels; the others came from the pool.
+  // Half of the cells stayed in reach; all are drawn as one mesh of glyph quads.
   expect(shown(numbers)).toHaveLength(30 * 25);
-  expect(numbers.container.children).toHaveLength(30 * 25);
+  expect(numbers.container.children).toHaveLength(1);
   expect(shown(numbers).filter((label) => first.includes(label)).length).toBeGreaterThan(0);
 });
 
