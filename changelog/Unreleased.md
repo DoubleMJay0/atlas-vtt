@@ -10,6 +10,7 @@
 - On Balanced and Saver lighting quality, a high-resolution screen draws the lit map at standard resolution, which takes the graphics less work; the edges of what players see never reach further
 
 ## Fixed
+- Online play: in a browser that cannot use WebGL, a lit scene no longer breaks for good once a magical darkness is placed; players are told the lighting cannot run there
 - Generated caves and forests: every way up or down can be walked onto from its front, also when players move their own tokens online; before, its front could lie in a pocket reached only past the way's sides, or behind a lone tree
 - Online play: players see the resource wheels beside a token that are shown to them, as Atlas's player window shows them; before, the browser drew only the bars
 - Several lights together no longer wash the map out to white: the brightest light at a spot shows as it always did, and every further torch adds less and less
