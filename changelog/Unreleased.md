@@ -1,40 +1,47 @@
 ## New
-- The Mosaic Canvas: maps of up to a gigapixel, seven times the largest maps Owlbear Rodeo takes, and up to 65535 pixels along one side for very wide or tall maps; before, a map was scaled down to 144 megapixels and 16383 pixels a side. Every pixel is kept: a map that fits stays the file you imported, and one scaled down is written losslessly, as PNG where it is wider than a WebP can be. The largest maps, past what the browser engine can open at once, are read by Atlas itself in rows, a plain JPEG or a PNG saved without interlacing: the scene shows within seconds from a first pass and sharpens as the rest is cut into tiles, and players online stream only the tiles they look at. An image that large in another form is refused with a sentence that says how to export it, and an image that large placed in the vault by hand no longer risks taking the window down when its scene opens
-- The dungeon generator makes forests: clearings in the woods joined by narrow glades, drawn as one mass of treetops along every clearing, with lone trees that give cover, brooks, streams and broad rivers that wander or meander through meadows along their banks, widen where streams join them, part round gravel islands, now and then flow into a lake, and are bridged only where a road crosses them, their water on animated maps flowing round every bend; a cart road or footpath runs through the map's entrances from one edge to another, through the clearings and round the lakes, and now and then a footpath branches off it, joining it as a fork in a track does; every road and footpath runs off the map or into another road, never stopping in a clearing or at a river's bank. Every map style draws its own forest: a dark wood by lantern light, a burnt one in Ember, snowbound firs in Rime, autumn in Ochre, Umber and Oxblood, a bog in Cistern, a misty pine wood in Flint, each with its own trees, ground, roads and water, and caves on the levels below
-- Generated dungeons, caves and manors have a new default style, Crayon: pencil lines and hatching on vellum, coloured in with wax crayon like the village map of the Lockwood Manor collection. Its water, lava and acid move as hand-drawn crayon strokes that fade in and out on their own
+
+**New Feature: Mosaic Canvas**
+- Maps of up to 1,000 megapixels and 65,535 pixels a side, up to 20 million squares in one scene. Atlas now works with maps roughly seven times the largest maps other virtual tabletops take
+- No megabyte limit: a 200 MB map or a 2 GB one imports as it is, and every pixel is kept
+- How it works: Atlas reads the map once and cuts it into tesserae using pyramid tiling, small lossless tiles laid in a pyramid from a thumbnail of the whole map down to every pixel of the original. The scene opens within seconds and sharpens as the finer tesserae are cut
+-  Processing indicator shown in the asset manager
+
+**New Feature: Forests**
+- The dungeon generator makes forests: clearings joined by glades, lone trees for cover, brooks, rivers, lakes and roads
+- Multi-level forest maps use caves as underground levels
+
+**New Feature: Crayon Style**
+- New default style for all generated map types: pencil lines and hatching on vellum, coloured in with wax crayon
+
+**General**
+- Graphics settings page in the command palette: three quality presets as tabs
+- Dice volume in Atlas' settings; slide it down to turn dice sounds off. Contributed by ISorokaI
 
 ## Improved
-- Dice rolls stand in the top right corner of the map, over the widgets, instead of moving down below them
-- Maps are drawn with WebGL only. Where it cannot start, a notice says which setting to turn on instead of a map without lights and effects
-- The grid is drawn by the graphics card from its measurements alone, so a dotted or dashed grid costs no more than a solid one on any map, and cell numbers are made only for the cells in view: a gigapixel map with the smallest cells and a dotted, numbered grid pans and zooms as smoothly as a small one, where before such a grid could freeze Obsidian. Grid lines wider than a pixel now lie centred on their cells; before they lay to one side by half their width, and dashes on a square grid now sit centred on every cell edge
-- Cell numbers no longer stutter the moment they appear when zooming in: all of them are drawn as one shape instead of one text each
-- Grid detection on a map whose tiles are still being cut waits for them and says so, instead of a search that stands still for minutes; a map or scene card whose map is still being cut shows Processing over its artwork, with a ring that fills as the tiles land
-- Crayon maps colour in every floor by hand, as forest clearings are: grey flagstones in fortresses and halls, packed earth in stables, bare rock in caves and out along their ways out, wooden boards in a manor's rooms with stone in its kitchen, scullery, bathrooms and cellar, and a meadow on a manor's lawns. Large maps of several levels in Crayon take a few seconds longer to create
-- Russian translation of the GM's side of online play: the online panel on the map, the online account, the table's commands and notices. Contributed by ISorokaI
-- Russian translation of native statblocks: the statblock beside a note, creating statblocks, the template gallery, Fantasy Statblocks imports and the collection's Statblocks tab. Contributed by ISorokaI
-- Russian translation of the statblock template editor. Contributed by ISorokaI
-- Russian translation of random tables, campaigns, quests, recovery actions, initiative rules and dynamic lighting. Contributed by ISorokaI
-- Russian translation of the dungeon generator, scene levels, stairs and openings, animated maps and multi-floor Universal VTT imports. Contributed by ISorokaI
-- Russian translation of the dice lab, the initiative tracker's new options, the encounter builder, statblock counters and other newer texts. Contributed by ISorokaI
-- Graphics settings, a page in the command palette (also behind Graphics settings… in the lighting tool's menu): the three quality presets as tabs, with what each draws on hover, and below them every choice a preset makes, so one thing can be set away from a preset: the lighting picture, its detail, bounced light, flames, shadow softness, how often water and lava move, and the lit map's resolution on a high-resolution screen. The settings page's Lighting row is gone
-- Atlas asks the computer for its faster graphics chip where there are two, as Foundry and Owlbear Rodeo do
-- Saver lighting quality draws each light from the area it lights instead of tracing it on the graphics card, so a lit map runs smoothly on weak and software graphics; shadows keep a soft edge
-- A device without a lighting quality chosen in the settings starts on one picked for its graphics: Balanced on graphics built into the processor, Saver where WebGL draws on the CPU
-- On Balanced and Saver lighting quality, a high-resolution screen draws the lit map at standard resolution, which takes the graphics less work; the edges of what players see never reach further
-- Dice volume: set how loud dice are in Atlas' settings (Dice) or the command palette's dice settings, or slide it all the way down to turn their sounds off. It applies to thrown dice and to result cards. Contributed by ISorokaI
+- Optimised grid drawing with Mosaic Canvas
+- Saver lighting quality runs smoother on low-power machines
+- Improvements to Dynamic Lighting performance and visuals
+- Russian translation of online play, native statblocks, the template editor, random tables, campaigns, the dungeon generator, scene levels and the dice lab. Contributed by ISorokaI
 
 ## Fixed
-- The number badge on look-alike tokens keeps its size to the token on a very fine grid, where it used to be larger than the token itself
-- Widgets that do not fit beside the scene tabs lie stacked in the corner of the map instead of wrapping into a column over the initiative tracker. A click spreads them out; Escape or a click elsewhere gathers them again, with the widget you used last on top. Their hotkeys keep working while stacked
-- Online play: room pins of a generated dungeon that you make readable by players now show on the players' page, so they can open the room's notes
-- Create scenes from several selected maps at once: each map gets a scene of its own, named like the map. A deleted scene no longer comes back in the asset manager
-- Online play: in a browser that cannot use WebGL, lit scenes stay hidden and players are told why, instead of showing and then vanishing once a magical darkness is placed
-- Online play: what a player types into a table on their character sheet stays, also in a table they fill in for the first time; before, the cell went empty again once they confirmed it
-- Generated caves and forests: every way up or down can be walked onto from its front, also when players move their own tokens online; before, its front could lie in a pocket reached only past the way's sides, or behind a lone tree
-- Online play: players see the resource wheels beside a token that are shown to them, as Atlas's player window shows them; before, the browser drew only the bars
-- Several lights together no longer wash the map out to white: the brightest light at a spot shows as it always did, and every further torch adds less and less
-- Moving a token that carries a light no longer stutters as badly on large maps with many walls
-- Dragging a token that sees no longer builds new graphics objects for its sight every frame, so each step of a drag costs less on large generated dungeons
-- A pinned statblock scrolled down can be moved up again: it no longer stops at an invisible edge where its scrolled-away name would be. Contributed by ISorokaI
-- Menus in Edit Token, such as Add sense, open at their button instead of at the top left of the window. Contributed by ISorokaI
-- Online play: areas players have explored no longer black out now and then while they move on; what they have seen stays remembered until the GM forgets or erases it
+- Widgets that do not fit beside the scene tabs stack in the map's corner instead of covering the initiative tracker
+- Create scenes from several selected maps at once
+- Fixed a bug where a deleted scene would re-appear
+- The number badge on look-alike tokens no longer grows past the token on a very fine grid
+- Menus in Edit Token open at their button. Contributed by ISorokaI
+- A pinned statblock scrolled down can be moved up again. Contributed by ISorokaI
+
+## Atlas Online
+- Room pins of a generated dungeon readable by players show on the players' page
+- Players see the resource wheels shown to them, not only the bars
+- Explored areas no longer black out while players move on
+- Fixed bug where values typed into a table on the character sheet would disappear
+- Several improvements to mobile UI
+
+## Important changes
+- Atlas draws with WebGL only. Where it cannot start, a new notice will display why
+
+
+Thanks to my Patreon supporters Aaron, Andrew, Bradley Bell, Carl Corneil, Chris Del Gigante, Daria Ambrose, Deus Ex Minima, Dewwww, George Young, Giodude, Hannes Pingel, Ionazh, Kevin Hait, Krangal, Markus Baumann, Michael Breuer, Pavel Zinoviev, s g, SamDark, Scaradeus, ShonkyMapCo, Silo Slate, Tim, Voider Elf, Xethgnur and Zack Samuels. You mean everything to me :heart:
+
+Help me develop Atlas: https://www.patreon.com/cw/atlas_vtt
