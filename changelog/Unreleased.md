@@ -21,7 +21,7 @@
 
 ## Fixed
 - The number badge on look-alike tokens keeps its size to the token on a very fine grid, where it used to be larger than the token itself
-- Widgets that do not fit beside the scene tabs lie stacked in the corner of the map instead of wrapping into a column over the initiative tracker. A click spreads them out; Escape or a click elsewhere gathers them again. Their hotkeys keep working while stacked
+- Widgets that do not fit beside the scene tabs lie stacked in the corner of the map instead of wrapping into a column over the initiative tracker. A click spreads them out; Escape or a click elsewhere gathers them again, with the widget you used last on top. Their hotkeys keep working while stacked
 - Online play: room pins of a generated dungeon that you make readable by players now show on the players' page, so they can open the room's notes
 - Create scenes from several selected maps at once: each map gets a scene of its own, named like the map. A deleted scene no longer comes back in the asset manager
 - Online play: in a browser that cannot use WebGL, lit scenes stay hidden and players are told why, instead of showing and then vanishing once a magical darkness is placed

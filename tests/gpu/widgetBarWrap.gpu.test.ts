@@ -179,6 +179,32 @@ describe('a widget bar with many widgets', () => {
     expect(barState()).toBe('closed');
   });
 
+  it('lays the widget used last on top of the stack', async () => {
+    mount(640, LABELS.length, TABS.length);
+    await settled();
+    const topLabel = (): string | null => {
+      const box = boxOf(query('.atlas-widget-stack-opener'));
+      const layer = (card: HTMLElement): number => Number(getComputedStyle(card).zIndex) || 0;
+      const tops = [...document.querySelectorAll<HTMLElement>('.atlas-widget')].sort((a, b) => layer(b) - layer(a));
+      expect(boxOf(tops[0]!).right).toBeCloseTo(box.right, 0);
+      expect(getComputedStyle(tops[0]!).opacity).toBe('1');
+      return tops[0]!.querySelector('.atlas-widget-label-text')!.textContent;
+    };
+    expect(topLabel()).toBe(LABELS[0]);
+    const use = async (index: number): Promise<void> => {
+      (query('.atlas-widget-stack-opener') as HTMLElement).click();
+      await settled();
+      document.querySelectorAll<HTMLElement>('.atlas-widget-btn')[index * 2]!.click();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await settled();
+    };
+    await use(5);
+    expect(topLabel()).toBe(LABELS[5]);
+    await use(2);
+    expect(topLabel()).toBe(LABELS[2]);
+    await page.screenshot({ path: '__screenshots__/atlas-widget-stack-last-used.png', element: leaf });
+  });
+
   it('never stacks one widget, however narrow the view and however many the tabs', async () => {
     const view = mount(360, 1, TABS.length);
     await settled();

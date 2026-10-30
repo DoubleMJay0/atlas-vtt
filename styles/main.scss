@@ -309,8 +309,8 @@
         visibility: hidden;
       }
 
-      // Stacked: the first card on top, two more showing their edges below it,
-      // and the rest under them unseen; the bar keeps room for those edges, so
+      // Stacked: the widget used last on top, two more showing their edges below
+      // it, and the rest under them unseen (`data-stack-depth`, useWidgetStack); the bar keeps room for those edges, so
       // the dice rolls hang below them. A pointer over the stack fans them.
       $stack-step: 5px;
 
@@ -329,26 +329,25 @@
           transform: translateY(2 * $stack-step);
           transform-origin: top right;
 
-          &:nth-child(1) {
+          &[data-stack-depth='0'] {
             z-index: 3;
             opacity: 1;
             transform: none;
           }
 
-          &:nth-child(2) {
+          &[data-stack-depth='1'] {
             z-index: 2;
             opacity: 1;
             transform: translateY($stack-step) rotate(-1.6deg);
           }
 
-          &:nth-child(3) {
+          &[data-stack-depth='2'] {
             z-index: 1;
             opacity: 1;
             transform: translateY(2 * $stack-step) rotate(1.2deg);
           }
 
-          // What the GM must see comes to the top: the card a held key steers, a timer that ran out.
-          &.widget-key-held,
+          // A timer that ran out comes to the top by itself.
           &.timer-expired {
             z-index: 4;
             opacity: 1;
@@ -358,11 +357,11 @@
       }
 
       > .atlas-widget-bar[data-stack='closed']:has(.atlas-widget-stack-opener:hover) > .atlas-widget-container > .atlas-widget {
-        &:nth-child(2) {
+        &[data-stack-depth='1'] {
           transform: translateY(2 * $stack-step) rotate(-3.5deg);
         }
 
-        &:nth-child(3) {
+        &[data-stack-depth='2'] {
           transform: translateY(4 * $stack-step) rotate(2.6deg);
         }
       }

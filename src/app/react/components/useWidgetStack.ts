@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type RefObject } from 'react';
 import { MOTION_EASE_OUT, MOTION_SLOW_MS, prefersReducedMotion } from '../../utils/motion';
 
 /**
@@ -9,6 +9,8 @@ const TAB_BAR_KEEPS = 240;
 /** The delay between one card and the next as the stack spreads or gathers. */
 const CARD_STAGGER_MS = 18;
 const MAX_STAGGER_MS = 200;
+/** How many cards of a stack show: the top one and the edges of two under it. */
+const SHOWN_DEPTHS = 3;
 
 interface WidgetStack {
   /** Holds the bar's element, which comes and goes with the widgets. */
@@ -18,6 +20,10 @@ interface WidgetStack {
   /** How the stack lies; unset while the widgets stand in one row. */
   state: 'closed' | 'open' | undefined;
   spread: () => void;
+  /** Puts this widget on top of the stack: the one the GM used last. */
+  raise: (id: string) => void;
+  /** `raise` for the card a click on the rows landed on. */
+  raiseClicked: (event: MouseEvent<HTMLElement>) => void;
   barStyle: CSSProperties | undefined;
 }
 
@@ -52,18 +58,40 @@ function roomForRow(topBar: HTMLElement): number {
  * number of tabs, and stay clear of the initiative tracker below; one widget never stacks. A click
  * on the stack spreads the cards into rows over everything for the moment the GM looks at them, and
  * a press elsewhere, Escape or focus leaving them gathers them again. Outside the top bar (a bar
- * mounted on its own) the cards simply wrap.
+ * mounted on its own) the cards simply wrap. The widget used last lies on top, the one before it
+ * under it (`ids` are the cards' widgets, in the order of the rows).
  */
-export function useWidgetStack(count: number, content: unknown): WidgetStack {
+export function useWidgetStack(ids: readonly string[], content: unknown): WidgetStack {
   const [bar, barRef] = useState<HTMLElement | null>(null);
   const [rows, rowsRef] = useState<HTMLElement | null>(null);
   const [stacked, setStacked] = useState(false);
   const [viewWidth, setViewWidth] = useState(0);
   const [held, setHeld] = useState<{ width: number; height: number } | null>(null);
+  const [recent, setRecent] = useState<readonly string[]>([]);
   const openerRef = useRef<HTMLButtonElement>(null);
   const cardsBefore = useRef<Map<Element, DOMRect> | null>(null);
   const refocus = useRef(false);
   const open = held !== null;
+  const count = ids.length;
+
+  const raise = useCallback((id: string) => {
+    setRecent((current) => (current[0] === id ? current : [id, ...current.filter((other) => other !== id)]));
+  }, []);
+
+  function raiseClicked(event: MouseEvent<HTMLElement>): void {
+    const path = event.nativeEvent.composedPath();
+    const clicked = ids[[...event.currentTarget.children].findIndex((card) => path.includes(card))];
+    if (clicked !== undefined) raise(clicked);
+  }
+
+  // The cards are the widgets' own components; their place in the stack is set on them here, where
+  // React leaves it alone (`widget-bar.scss` and `main.scss` read it).
+  useLayoutEffect(() => {
+    const order = [...recent.filter((id) => ids.includes(id)), ...ids.filter((id) => !recent.includes(id))];
+    [...(rows?.children ?? [])].forEach((card, index) => {
+      card.setAttribute('data-stack-depth', String(Math.min(order.indexOf(ids[index] ?? ''), SHOWN_DEPTHS)));
+    });
+  }, [rows, recent, ids]);
 
   const remember = useCallback(() => {
     cardsBefore.current = new Map([...(rows?.children ?? [])].map((card) => [card, card.getBoundingClientRect()]));
@@ -150,5 +178,5 @@ export function useWidgetStack(count: number, content: unknown): WidgetStack {
   const barStyle = held ? { '--atlas-widget-room': `${viewWidth}px`, ...held } as CSSProperties : undefined;
   const stackedState = open ? 'open' : 'closed';
 
-  return { barRef, openerRef, rowsRef, state: stacked ? stackedState : undefined, spread, barStyle };
+  return { barRef, openerRef, rowsRef, state: stacked ? stackedState : undefined, spread, raise, raiseClicked, barStyle };
 }
