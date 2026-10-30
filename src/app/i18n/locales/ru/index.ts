@@ -36,6 +36,7 @@ import { picker } from './picker';
 import { settings } from './settings';
 import { snapshots } from './snapshots';
 import { statblock } from './statblock';
+import { statblockEditor } from './statblockEditor';
 import { switcher } from './switcher';
 import { tabs } from './tabs';
 import { timer } from './timer';
@@ -142,6 +143,7 @@ export const ru: Translation = {
   ...settings,
   ...snapshots,
   ...statblock,
+  ...statblockEditor,
   ...switcher,
   ...tabs,
   ...timer,

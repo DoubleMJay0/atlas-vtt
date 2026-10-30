@@ -43,6 +43,7 @@ import { snapshots } from './snapshots';
 import { levels } from './levels';
 import { openings } from './openings';
 import { statblock } from './statblock';
+import { statblockEditor } from './statblockEditor';
 import { switcher } from './switcher';
 import { tabs } from './tabs';
 import { timer } from './timer';
@@ -151,6 +152,7 @@ export const en = {
   ...levels,
   ...openings,
   ...statblock,
+  ...statblockEditor,
   ...switcher,
   ...tabs,
   ...timer,
