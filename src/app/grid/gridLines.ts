@@ -101,7 +101,7 @@ export class GridLines {
     this.look.trace(context, width, arm);
     return lineType === 'dotted'
       ? context.fill({ color, alpha })
-      : context.stroke({ width, color, alpha, alignment: 0, cap: 'round', join: 'miter' });
+      : context.stroke({ width, color, alpha, alignment: 0.5, cap: 'round', join: 'miter' });
   }
 
   private release(): void {

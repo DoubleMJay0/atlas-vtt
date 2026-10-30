@@ -10,14 +10,17 @@ import { createHexLayout, hexCellExtent, isHexGridType, nearestHexCenter } from 
 import type { HexLayout } from './hexGeometry';
 import { contrastColorForPixels } from './gridContrastColor';
 import { snapTokenCenter } from './gridPlacement';
-import { numberCells, type CellLattice, type CellNumberStyle } from './cellNumbering';
+import type { CellLattice, CellNumberStyle } from './cellNumbering';
 import { hexLattice } from './hexLattice';
 import { cssColorToHexNumber, getObsidianAccentColor } from '../pixi/utils/colorUtils';
 import { squareLattice } from './squareLattice';
 import { CellNumberLabels, type CellNumberView } from './cellNumberLabels';
 import { destroyTree } from '../pixi/utils/destroyTree';
 import { applyGridMark, createMarkBacking, type GridMarkColor, type UnlitGrid } from './gridLightingMark';
-import { cellsOf, drawnPerCell, drawRegionFor, marksIn, MAX_GRID_MARKS, MAX_NUMBERED_CELLS, needsRedraw, type WorldRect } from './gridDrawRegion';
+import { marksIn, MAX_GRID_MARKS, type WorldRect } from './gridDrawRegion';
+import { GridMesh } from './shader/GridMesh';
+import type { GridShaderLook } from './shader/gridShader';
+import { usesCanvasRenderer } from '../pixi/utils/rendererType';
 import type { MapImageView } from '../pixi/mapImage/mapImageView';
 import type { PixelRect } from '../pixi/mapImage/pyramid';
 
@@ -74,16 +77,11 @@ export class GridSystem implements UnlitGrid {
   private readonly onViewportZoomed = (): void => {
     this.cellNumberLabels?.setView(this.numberView());
   };
-  /** The part of the map a per-cell style (dashed, dotted) was drawn for, and the zoom it was drawn at; null where the whole grid is drawn. */
-  private drawnRegion: GridBounds | null = null;
-  private drawnZoom = 1;
-  /** What the last drawing covers and the style it was drawn in, for whoever checks the drawing (tests). */
-  private drawnGrid: { bounds: GridBounds; lineType: GridLineType } | null = null;
-  /** Every frame: a view that left the drawn region, or zoomed away from it, has the region drawn again. */
+  /** The lines on a WebGL renderer; null on the Canvas renderer, whose lines are a `GridLines` Graphics. */
+  private mesh: GridMesh | null = null;
+  /** Every frame the cell numbers follow the view (the lines need nothing: the shader reads each render's own camera). */
   private readonly followView = (): void => {
-    if (!this.drawnRegion || this.isDestroying || !this.options.enabled) return;
-    const view = this.visibleWorld();
-    if (view && needsRedraw(this.drawnRegion, this.drawnZoom, view, this.viewport.scale.x)) this.createGrid();
+    if (!this.isDestroying && this.options.enabled) this.cellNumberLabels?.setView(this.numberView());
   };
   /** The map the grid overlays: its world rect bounds the grid, and the grid lies just above its layer. */
   private map: MapImageView;
@@ -142,11 +140,6 @@ export class GridSystem implements UnlitGrid {
     this.createGrid();
   }
 
-  /** The bounds the grid was last drawn for and the style it was drawn in; null before the first drawing. */
-  get drawing(): { bounds: GridBounds; lineType: GridLineType } | null {
-    return this.drawnGrid;
-  }
-
   /** What the viewport shows, in world units; null for a viewport that cannot say (a test's). */
   private visibleWorld(): WorldRect | null {
     if (typeof this.viewport.getVisibleBounds !== 'function') return null;
@@ -184,44 +177,24 @@ export class GridSystem implements UnlitGrid {
 
     // One cell of padding around the map; the mask clips the overflow.
     const padding = hexLayout ? Math.max(hexCellExtent(hexLayout).width, hexCellExtent(hexLayout).height) : size;
-    const whole: GridBounds = {
+    const bounds: GridBounds = {
       minX: mapX - padding,
       minY: mapY - padding,
       maxX: mapX + mapWidth + padding,
       maxY: mapY + mapHeight + padding,
     };
-    // A style drawn per cell is drawn for the view alone, and solid where even the view holds too many marks.
-    const view = drawnPerCell(lineType) ? this.visibleWorld() : null;
-    const region = view ? drawRegionFor(whole, view) : null;
-    const drawnType: GridLineType = region && marksIn(region, size, lineType) > MAX_GRID_MARKS ? 'solid' : lineType;
-    const bounds = region && drawnType !== 'solid' ? region : whole;
-    this.drawnRegion = bounds === whole ? null : bounds;
-    this.drawnZoom = this.viewport.scale.x;
-    this.drawnGrid = { bounds, lineType: drawnType };
-
-    const lines = new GridLines({
-      lineType: drawnType,
-      lineWidth: lineWidth!,
-      color: gridColor,
-      alpha: isAligning ? Math.min(alpha! * 1.5, 1) : alpha!,
-      markerArm: gridMarkerArmLength(size),
-      trace: (path, thickness, arm) => {
-        if (hexLayout) drawHexGrid(path, bounds, hexLayout, drawnType, thickness, arm);
-        else drawSquareGrid(path, bounds, size, offsetX, offsetY, drawnType, thickness, arm);
-      },
-    });
+    const look = { lineType, lineWidth: lineWidth!, color: gridColor, alpha: isAligning ? Math.min(alpha! * 1.5, 1) : alpha!, markerArm: gridMarkerArmLength(size) };
 
     const grid = new Container({ label: 'grid', eventMode: 'none', interactiveChildren: false });
-    grid.addChild(lines.graphics);
+    grid.addChild(this.createLines(bounds, look, hexLayout));
     grid.position.set(bounds.minX, bounds.minY);
 
-    // A text per cell: a map of more cells than `MAX_NUMBERED_CELLS` shows none, since the numbers could not be read at a zoom that showed them anyway.
+    // Labels for the cells in and around the view alone, which `followView` keeps up with.
     const cellNumbers = this.options.cellNumbers;
-    if (cellNumbers && cellsOf(mapWidth, mapHeight, size) <= MAX_NUMBERED_CELLS) {
+    if (cellNumbers) {
       const lattice: CellLattice = hexLayout ? hexLattice(hexLayout) : squareLattice(size, offsetX, offsetY);
       this.cellNumberLabels = new CellNumberLabels(
-        numberCells(lattice, mapRect, cellNumbers.format),
-        lattice.size,
+        { lattice, map: mapRect, format: cellNumbers.format },
         { x: bounds.minX, y: bounds.minY },
         { color: gridColor, opacity: cellNumbers.opacity },
         this.numberView(),
@@ -269,8 +242,35 @@ export class GridSystem implements UnlitGrid {
     this.viewport.dirty = true;
   }
 
+  /**
+   * The lines, in coordinates local to the grid container at `bounds.minX/minY`. A WebGL renderer
+   * draws them with the grid shader, one quad whatever the map's size; the Canvas renderer runs no
+   * shader and draws them as a Graphics, solid where a dashed or dotted grid would hold more marks
+   * than `MAX_GRID_MARKS`, since a dot a pixel apart is a line anyway.
+   */
+  private createLines(bounds: GridBounds, look: Omit<GridShaderLook, 'kind' | 'cell' | 'offsetX' | 'offsetY'>, hexLayout: HexLayout | null): Container {
+    const { size, offsetX = 0, offsetY = 0, type = 'square' } = this.options;
+    if (!usesCanvasRenderer(this.app.renderer)) {
+      this.mesh = new GridMesh(
+        { minX: 0, minY: 0, maxX: bounds.maxX - bounds.minX, maxY: bounds.maxY - bounds.minY },
+        { ...look, kind: type, cell: size, offsetX: offsetX - bounds.minX, offsetY: offsetY - bounds.minY },
+      );
+      return this.mesh.view;
+    }
+    const drawnType: GridLineType = look.lineType !== 'solid' && marksIn(bounds, size, look.lineType) > MAX_GRID_MARKS ? 'solid' : look.lineType;
+    const lines = new GridLines({
+      ...look,
+      lineType: drawnType,
+      trace: (path, thickness, arm) => {
+        if (hexLayout) drawHexGrid(path, bounds, hexLayout, drawnType, thickness, arm);
+        else drawSquareGrid(path, bounds, size, offsetX, offsetY, drawnType, thickness, arm);
+      },
+    });
+    return lines.graphics;
+  }
+
   private numberView(): CellNumberView {
-    return { zoom: this.viewport.scale.x, pixelRatio: this.app.renderer.resolution };
+    return { zoom: this.viewport.scale.x, pixelRatio: this.app.renderer.resolution, world: this.visibleWorld() };
   }
 
   /**
@@ -319,6 +319,8 @@ export class GridSystem implements UnlitGrid {
   private destroyGridResources(): void {
     this.cellNumberLabels = null;
     this.markBacking = null;
+    const mesh = this.mesh;
+    this.mesh = null;
     if (!this.gridSprite) return;
 
     this.gridSprite.visible = false;
@@ -349,6 +351,7 @@ export class GridSystem implements UnlitGrid {
         if (!spriteToDestroy.destroyed) {
           destroyTree(spriteToDestroy);
         }
+        mesh?.destroy();
       } catch {
         // Silently ignore destruction errors
       }

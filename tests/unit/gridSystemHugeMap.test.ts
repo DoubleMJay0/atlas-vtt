@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { Container } from 'pixi.js';
+import { Container, Graphics, type BitmapText, type Mesh } from 'pixi.js';
+import { drawSquareGrid } from '../../src/app/grid/squareGridDrawer';
+vi.mock('../../src/app/grid/squareGridDrawer', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/app/grid/squareGridDrawer')>();
+  return { ...real, drawSquareGrid: vi.fn(real.drawSquareGrid) };
+});
+
 import { GridSystem } from '../../src/app/grid/GridSystem';
 import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
 import { fakeMapImageView, settleGridColor } from '../helpers/fakeMapImageView';
@@ -28,29 +34,61 @@ function stage(view: { x: number; y: number; width: number; height: number }): {
 
 const SIDE = 31622;
 
-it('draws a dotted grid of a gigapixel map for the view alone, and again once the view leaves that part', async () => {
+/** The grid's lines: one mesh on a WebGL renderer, a Graphics on the Canvas renderer. */
+function lines(grid: GridSystem): Container {
+  const found = grid.getGridSprite()!.getChildByLabel('grid-lines');
+  expect(found).toBeDefined();
+  return found!;
+}
+
+it('draws a dotted grid of a gigapixel map as one quad, whatever the view shows of it', async () => {
   restoreGraphics = stubJsdomGraphics();
   const { viewport, app, frame, look } = stage({ x: 10000, y: 12000, width: 1500, height: 900 });
   const map = fakeMapImageView(SIDE, SIDE);
   viewport.addChild(map.layer);
-  const grid = new GridSystem(app, viewport as never, map, { type: 'square', size: 70, lineType: 'dotted' });
+  const grid = new GridSystem(app, viewport as never, map, { type: 'square', size: 8, lineType: 'dotted' });
   try {
     await settleGridColor();
-    // The view with a view's margin on every side: 4,500 × 2,700 of the 31,622 px map, not all of it.
-    expect(grid.drawing).toEqual({ lineType: 'dotted', bounds: { minX: 8500, minY: 11100, maxX: 13000, maxY: 13800 } });
+    const mesh = lines(grid) as Mesh;
+    expect(mesh.geometry.getBuffer('aPosition').data).toHaveLength(8);
+    // The quad is the map with a cell of padding: a 31,622 px map, four million cells, is four corners.
+    expect([...mesh.geometry.getBuffer('aPosition').data]).toEqual([0, 0, SIDE + 16, 0, SIDE + 16, SIDE + 16, 0, SIDE + 16]);
     const before = grid.getGridSprite();
-    look({ x: 10200, y: 12100, width: 1500, height: 900 });
+    look({ x: 0, y: 0, width: SIDE, height: SIDE }, 0.05);
     frame();
+    look({ x: 20000, y: 12000, width: 150, height: 90 }, 10);
+    frame();
+    // Nothing is drawn again for a view: the shader reads each render's own camera.
     expect(grid.getGridSprite()).toBe(before);
-    look({ x: 20000, y: 12000, width: 1500, height: 900 });
-    frame();
-    await settleGridColor();
-    expect(grid.getGridSprite()).not.toBe(before);
-    expect(grid.drawing!.bounds).toEqual({ minX: 18500, minY: 11100, maxX: 23000, maxY: 13800 });
+    expect(lines(grid)).toBe(mesh);
   } finally { grid.destroy(); }
 });
 
-it('draws the dots as solid lines where the view holds too many of them, and leaves the numbers off a map of too many cells', async () => {
+it('draws the Canvas renderer, which runs no shader, a dotted grid of too many marks as solid lines', async () => {
+  restoreGraphics = stubJsdomGraphics();
+  const { viewport, app } = stage({ x: 0, y: 0, width: SIDE, height: SIDE });
+  (app as { renderer: { name?: string } }).renderer.name = 'canvas';
+  const map = fakeMapImageView(SIDE, SIDE);
+  viewport.addChild(map.layer);
+  const grid = new GridSystem(app, viewport as never, map, { type: 'square', size: 8, lineType: 'dotted' });
+  try {
+    await settleGridColor();
+    const graphics = lines(grid) as Graphics;
+    expect(graphics).toBeInstanceOf(Graphics);
+    // The Graphics traces its lines when it is rendered: a Canvas renderer at resolution 1.
+    graphics.onRender!({ name: 'canvas', renderTarget: { renderTarget: { resolution: 1 } } } as never);
+    expect(drawSquareGrid).toHaveBeenCalledWith(expect.anything(), { minX: -8, minY: -8, maxX: SIDE + 8, maxY: SIDE + 8 }, 8, 0, 0, 'solid', expect.anything(), expect.anything());
+  } finally { grid.destroy(); }
+});
+
+/** The cell numbers the grid shows, by their text. */
+function shownNumbers(grid: GridSystem): string[] {
+  const numbers = grid.getGridSprite()!.children.find((child) => child.label === 'cell-numbers');
+  expect(numbers).toBeDefined();
+  return numbers!.visible ? numbers!.children.filter((label) => label.visible).map((label) => (label as BitmapText).text) : [];
+}
+
+it('numbers no cell while the numbers are too small to read', async () => {
   restoreGraphics = stubJsdomGraphics();
   // The whole gigapixel map in view: 31,622 / 8 cells across, far past the marks a region may hold.
   const { viewport, app } = stage({ x: 0, y: 0, width: SIDE, height: SIDE });
@@ -59,19 +97,30 @@ it('draws the dots as solid lines where the view holds too many of them, and lea
   const grid = new GridSystem(app, viewport as never, map, { type: 'square', size: 8, lineType: 'dotted', cellNumbers: { format: 'column-row', opacity: 0.8 } });
   try {
     await settleGridColor();
-    expect(grid.drawing).toEqual({ lineType: 'solid', bounds: { minX: -8, minY: -8, maxX: SIDE + 8, maxY: SIDE + 8 } });
-    expect(grid.getGridSprite()!.children.find((child) => child.label === 'cell-numbers')).toBeUndefined();
+    expect(shownNumbers(grid)).toEqual([]);
+    expect(grid.getGridSprite()!.children.find((child) => child.label === 'cell-numbers')!.children).toHaveLength(0);
   } finally { grid.destroy(); }
 });
 
-it('draws a solid grid whole, whatever the view', async () => {
+it('numbers the cells in and around the view of a gigapixel map once they can be read, as the whole map numbers them', async () => {
   restoreGraphics = stubJsdomGraphics();
-  const { viewport, app } = stage({ x: 10000, y: 12000, width: 1500, height: 900 });
+  const { viewport, app, frame, look } = stage({ x: 0, y: 0, width: SIDE, height: SIDE });
   const map = fakeMapImageView(SIDE, SIDE);
   viewport.addChild(map.layer);
-  const grid = new GridSystem(app, viewport as never, map, { type: 'square', size: 70, lineType: 'solid' });
+  const grid = new GridSystem(app, viewport as never, map, { type: 'square', size: 8, cellNumbers: { format: 'column-row', opacity: 0.8 } });
   try {
     await settleGridColor();
-    expect(grid.drawing).toEqual({ lineType: 'solid', bounds: { minX: -70, minY: -70, maxX: SIDE + 70, maxY: SIDE + 70 } });
+    // Zoom 8: a 1,500 × 900 screen shows 187.5 × 112.5 world pixels, about 23 × 14 cells.
+    look({ x: 10000, y: 12000, width: 187.5, height: 112.5 }, 8);
+    frame();
+    const numbers = shownNumbers(grid);
+    // The view with its longer side on every side: 562.5 × 487.5 world pixels, some 70 × 61 cells, not 3,953².
+    expect(numbers.length).toBeGreaterThan(70 * 60);
+    expect(numbers.length).toBeLessThan(72 * 63);
+    // Cell 1250, 1500 is column 1251, row 1501 of a map 3,953 cells wide: four digits each.
+    expect(numbers).toContain('12511501');
+    look({ x: 0, y: 0, width: SIDE, height: SIDE }, 1);
+    frame();
+    expect(shownNumbers(grid)).toEqual([]);
   } finally { grid.destroy(); }
 });
