@@ -3,11 +3,10 @@ import type { GridBounds } from '../gridLineStyle';
 import { createGridShader, type GridShaderLook } from './gridShader';
 
 /**
- * The grid's lines on a WebGL renderer: one quad over the grid's bounds, drawn by `gridShaderGlsl`
+ * The grid's lines: one quad over the grid's bounds, drawn by `gridShaderGlsl`
  * from the lattice alone. Its cost is the pixels it covers, whatever the map's size or the cell's,
  * and nothing is built per zoom: every render reads its own pixel size, so the GM's canvas, the
- * player frame and a thumbnail each get the grid for their camera. The Canvas renderer, which runs
- * no shader, keeps `GridLines`.
+ * player frame and a thumbnail each get the grid for their camera.
  */
 export class GridMesh {
   readonly view: Mesh<Geometry, Shader>;

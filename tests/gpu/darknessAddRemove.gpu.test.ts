@@ -121,7 +121,7 @@ describe('a source of magical darkness added and deleted again', () => {
 
   it.each([...LIGHTING_QUALITY_LEVELS])('leaves the lit map as it was at %s', async (level) => {
     const said = listenToConsole();
-    const view = await openLitView({ preference: 'webgl', pane: PANE, map: MAP, quality: LIGHTING_QUALITY[level], resolution: 2 });
+    const view = await openLitView({ pane: PANE, map: MAP, quality: LIGHTING_QUALITY[level], resolution: 2 });
     cleanup.push(() => view.dispose());
     const watch = watchGl((view.app.renderer as WebGLRenderer).gl);
     cleanup.push(() => watch.stop());
@@ -158,7 +158,7 @@ describe('a source of magical darkness added and deleted again', () => {
 
   it('keeps drawing while a token walks along walls into and out of the darkness and the quality changes under it', async () => {
     const said = listenToConsole();
-    const view = await openLitView({ preference: 'webgl', pane: PANE, map: MAP, quality: LIGHTING_QUALITY.saver, resolution: 2 });
+    const view = await openLitView({ pane: PANE, map: MAP, quality: LIGHTING_QUALITY.saver, resolution: 2 });
     cleanup.push(() => view.dispose());
     const watch = watchGl((view.app.renderer as WebGLRenderer).gl);
     cleanup.push(() => watch.stop());

@@ -29,9 +29,9 @@ void main() {
 // with one arm per edge at every vertex (dotted). Distances are measured in map units and turned
 // into device pixels with the pixel's own size, read from the derivatives, so each render draws the
 // grid for its own camera: the GM's canvas, the player frame and a thumbnail alike, with nothing
-// built per zoom. A line thinner than a device pixel is drawn one pixel wide and as much fainter,
-// as the Canvas renderer's drawing is (`lineDrawing`); a dotted marker widens to a pixel too, its
-// arms never shorter than it is thick, and keeps its ink.
+// built per zoom. A line thinner than a device pixel is drawn one pixel wide and as much fainter
+// (without samples such a line fell between pixel centres and vanished at some zooms); a dotted
+// marker widens to a pixel too, its arms never shorter than it is thick, and keeps its ink.
 //
 // A hex lattice is read in the frame of a pointy-top hex at the origin (a flat-top lattice is the
 // same frame with the axes swapped, which measures the same distances); the hex's symmetry folds

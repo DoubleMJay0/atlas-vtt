@@ -11,7 +11,7 @@ export const TILE_TEXTURE_BUDGET_BYTES = 160 * 1024 * 1024;
 /** Tile textures uploaded per frame at most, so a burst of arrivals never stalls one frame. */
 export const TILE_UPLOADS_PER_FRAME = 4;
 
-/** The part of a renderer the cache uses; the Canvas renderer's `initSource` does nothing. */
+/** The part of a renderer the cache uses. */
 export interface TileUploader {
   texture: { initSource(source: TextureSource): unknown };
 }

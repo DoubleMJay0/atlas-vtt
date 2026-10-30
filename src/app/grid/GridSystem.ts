@@ -1,11 +1,8 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import type { RenderLayer } from 'pixi.js';
-import { drawSquareGrid } from './squareGridDrawer';
-import { drawHexGrid } from './hexGridDrawer';
 import { gridMarkerArmLength } from './gridLineStyle';
 import type { GridBounds, GridLineType } from './gridLineStyle';
-import { GridLines } from './gridLines';
 import { createHexLayout, hexCellExtent, isHexGridType, nearestHexCenter } from './hexGeometry';
 import type { HexLayout } from './hexGeometry';
 import { contrastColorForPixels } from './gridContrastColor';
@@ -14,13 +11,11 @@ import type { CellLattice, CellNumberStyle } from './cellNumbering';
 import { hexLattice } from './hexLattice';
 import { cssColorToHexNumber, getObsidianAccentColor } from '../pixi/utils/colorUtils';
 import { squareLattice } from './squareLattice';
-import { CellNumberLabels, type CellNumberView } from './cellNumberLabels';
+import { CellNumberLabels, type CellNumberView, type WorldRect } from './cellNumberLabels';
 import { destroyTree } from '../pixi/utils/destroyTree';
 import { applyGridMark, createMarkBacking, type GridMarkColor, type UnlitGrid } from './gridLightingMark';
-import { marksIn, MAX_GRID_MARKS, type WorldRect } from './gridDrawRegion';
 import { GridMesh } from './shader/GridMesh';
 import type { GridShaderLook } from './shader/gridShader';
-import { usesCanvasRenderer } from '../pixi/utils/rendererType';
 import type { MapImageView } from '../pixi/mapImage/mapImageView';
 import type { PixelRect } from '../pixi/mapImage/pyramid';
 
@@ -77,7 +72,7 @@ export class GridSystem implements UnlitGrid {
   private readonly onViewportZoomed = (): void => {
     this.cellNumberLabels?.setView(this.numberView());
   };
-  /** The lines on a WebGL renderer; null on the Canvas renderer, whose lines are a `GridLines` Graphics. */
+  /** The lines: one quad with the grid shader. */
   private mesh: GridMesh | null = null;
   /** Every frame the cell numbers follow the view (the lines need nothing: the shader reads each render's own camera). */
   private readonly followView = (): void => {
@@ -186,7 +181,7 @@ export class GridSystem implements UnlitGrid {
     const look = { lineType, lineWidth: lineWidth!, color: gridColor, alpha: isAligning ? Math.min(alpha! * 1.5, 1) : alpha!, markerArm: gridMarkerArmLength(size) };
 
     const grid = new Container({ label: 'grid', eventMode: 'none', interactiveChildren: false });
-    grid.addChild(this.createLines(bounds, look, hexLayout));
+    grid.addChild(this.createLines(bounds, look));
     grid.position.set(bounds.minX, bounds.minY);
 
     // Labels for the cells in and around the view alone, which `followView` keeps up with.
@@ -243,30 +238,16 @@ export class GridSystem implements UnlitGrid {
   }
 
   /**
-   * The lines, in coordinates local to the grid container at `bounds.minX/minY`. A WebGL renderer
-   * draws them with the grid shader, one quad whatever the map's size; the Canvas renderer runs no
-   * shader and draws them as a Graphics, solid where a dashed or dotted grid would hold more marks
-   * than `MAX_GRID_MARKS`, since a dot a pixel apart is a line anyway.
+   * The lines, in coordinates local to the grid container at `bounds.minX/minY`: one quad drawn by
+   * the grid shader, whatever the map's size or the cell's.
    */
-  private createLines(bounds: GridBounds, look: Omit<GridShaderLook, 'kind' | 'cell' | 'offsetX' | 'offsetY'>, hexLayout: HexLayout | null): Container {
+  private createLines(bounds: GridBounds, look: Omit<GridShaderLook, 'kind' | 'cell' | 'offsetX' | 'offsetY'>): Container {
     const { size, offsetX = 0, offsetY = 0, type = 'square' } = this.options;
-    if (!usesCanvasRenderer(this.app.renderer)) {
-      this.mesh = new GridMesh(
-        { minX: 0, minY: 0, maxX: bounds.maxX - bounds.minX, maxY: bounds.maxY - bounds.minY },
-        { ...look, kind: type, cell: size, offsetX: offsetX - bounds.minX, offsetY: offsetY - bounds.minY },
-      );
-      return this.mesh.view;
-    }
-    const drawnType: GridLineType = look.lineType !== 'solid' && marksIn(bounds, size, look.lineType) > MAX_GRID_MARKS ? 'solid' : look.lineType;
-    const lines = new GridLines({
-      ...look,
-      lineType: drawnType,
-      trace: (path, thickness, arm) => {
-        if (hexLayout) drawHexGrid(path, bounds, hexLayout, drawnType, thickness, arm);
-        else drawSquareGrid(path, bounds, size, offsetX, offsetY, drawnType, thickness, arm);
-      },
-    });
-    return lines.graphics;
+    this.mesh = new GridMesh(
+      { minX: 0, minY: 0, maxX: bounds.maxX - bounds.minX, maxY: bounds.maxY - bounds.minY },
+      { ...look, kind: type, cell: size, offsetX: offsetX - bounds.minX, offsetY: offsetY - bounds.minY },
+    );
+    return this.mesh.view;
   }
 
   private numberView(): CellNumberView {

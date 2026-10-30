@@ -1,7 +1,6 @@
 import '../setup/obsidianDom';
-import { Container, Graphics, RenderTexture, type WebGLRenderer } from 'pixi.js';
+import { Container, Graphics, GraphicsContext, RenderTexture, type WebGLRenderer } from 'pixi.js';
 import { afterEach, describe, expect, it } from 'vitest';
-import { GridLines } from '../../src/app/grid/gridLines';
 import { gridMarkerArmLength, type GridBounds, type GridLineType } from '../../src/app/grid/gridLineStyle';
 import { applyGridMark, createMarkBacking } from '../../src/app/grid/gridLightingMark';
 import { createHexLayout, isHexGridType } from '../../src/app/grid/hexGeometry';
@@ -14,7 +13,7 @@ import { createTestRenderer, readRgba } from '../../src/app/pixi/lighting/engine
 /**
  * The grid shader draws what the Graphics drawers draw: the same lines, dashes and markers at the
  * same places, for every grid type and style, at several zooms, and erases the scene's alpha the same
- * way while the lighting marks the grid. The drawers are the Canvas renderer's grid and the oracle.
+ * way while the lighting marks the grid. The drawers, which grid detection reads the lattice from, are the oracle.
  */
 
 const SIZE = 384;
@@ -50,16 +49,20 @@ function placed(child: Container, zoom: number): Container {
 const WORLD = 1200;
 const bounds: GridBounds = { minX: 0, minY: 0, maxX: WORLD, maxY: WORLD };
 
+/**
+ * The oracle: the lattice traced by the drawers grid detection reads it from (`gridTemplate.ts`),
+ * stroked or filled as the Graphics grid was drawn before the shader (strokes centred on the
+ * lattice, round caps; markers filled).
+ */
 function graphicsGrid(type: GridType, lineType: GridLineType, lineWidth: number): Container {
   const layout = isHexGridType(type) ? createHexLayout(type, CELL, OFFSET.x, OFFSET.y) : null;
-  const lines = new GridLines({
-    lineType, lineWidth, color: 0xffffff, alpha: 1, markerArm: gridMarkerArmLength(CELL),
-    trace: (path, thickness, arm) => {
-      if (layout) drawHexGrid(path, bounds, layout, lineType, thickness, arm);
-      else drawSquareGrid(path, bounds, CELL, OFFSET.x, OFFSET.y, lineType, thickness, arm);
-    },
-  });
-  return lines.graphics;
+  const arm = gridMarkerArmLength(CELL);
+  const context = new GraphicsContext();
+  if (layout) drawHexGrid(context, bounds, layout, lineType, lineWidth, arm);
+  else drawSquareGrid(context, bounds, CELL, OFFSET.x, OFFSET.y, lineType, lineWidth, arm);
+  if (lineType === 'dotted') context.fill({ color: 0xffffff, alpha: 1 });
+  else context.stroke({ width: lineWidth, color: 0xffffff, alpha: 1, alignment: 0.5, cap: 'round', join: 'miter' });
+  return new Graphics({ context });
 }
 
 function shaderGrid(type: GridType, lineType: GridLineType, lineWidth: number): GridMesh {

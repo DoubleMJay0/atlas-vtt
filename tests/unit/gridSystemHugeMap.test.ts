@@ -1,12 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { Container, Graphics, type BitmapText, type Mesh } from 'pixi.js';
-import { drawSquareGrid } from '../../src/app/grid/squareGridDrawer';
-vi.mock('../../src/app/grid/squareGridDrawer', async (importOriginal) => {
-  const real = await importOriginal<typeof import('../../src/app/grid/squareGridDrawer')>();
-  return { ...real, drawSquareGrid: vi.fn(real.drawSquareGrid) };
-});
-
+import { Container, type BitmapText, type Mesh } from 'pixi.js';
 import { GridSystem } from '../../src/app/grid/GridSystem';
 import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
 import { fakeMapImageView, settleGridColor } from '../helpers/fakeMapImageView';
@@ -34,7 +28,7 @@ function stage(view: { x: number; y: number; width: number; height: number }): {
 
 const SIDE = 31622;
 
-/** The grid's lines: one mesh on a WebGL renderer, a Graphics on the Canvas renderer. */
+/** The grid's lines: one mesh. */
 function lines(grid: GridSystem): Container {
   const found = grid.getGridSprite()!.getChildByLabel('grid-lines');
   expect(found).toBeDefined();
@@ -61,23 +55,6 @@ it('draws a dotted grid of a gigapixel map as one quad, whatever the view shows 
     // Nothing is drawn again for a view: the shader reads each render's own camera.
     expect(grid.getGridSprite()).toBe(before);
     expect(lines(grid)).toBe(mesh);
-  } finally { grid.destroy(); }
-});
-
-it('draws the Canvas renderer, which runs no shader, a dotted grid of too many marks as solid lines', async () => {
-  restoreGraphics = stubJsdomGraphics();
-  const { viewport, app } = stage({ x: 0, y: 0, width: SIDE, height: SIDE });
-  (app as { renderer: { name?: string } }).renderer.name = 'canvas';
-  const map = fakeMapImageView(SIDE, SIDE);
-  viewport.addChild(map.layer);
-  const grid = new GridSystem(app, viewport as never, map, { type: 'square', size: 8, lineType: 'dotted' });
-  try {
-    await settleGridColor();
-    const graphics = lines(grid) as Graphics;
-    expect(graphics).toBeInstanceOf(Graphics);
-    // The Graphics traces its lines when it is rendered: a Canvas renderer at resolution 1.
-    graphics.onRender!({ name: 'canvas', renderTarget: { renderTarget: { resolution: 1 } } } as never);
-    expect(drawSquareGrid).toHaveBeenCalledWith(expect.anything(), { minX: -8, minY: -8, maxX: SIDE + 8, maxY: SIDE + 8 }, 8, 0, 0, 'solid', expect.anything(), expect.anything());
   } finally { grid.destroy(); }
 });
 

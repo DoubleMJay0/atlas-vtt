@@ -2,8 +2,15 @@ import { BitmapText, Cache, Container, DynamicBitmapFont, TextStyle } from 'pixi
 import { cellNumberAnchor, cellNumberFontSize } from './cellNumbering';
 import type { CellLattice, CellNumberFormat, MapRect } from './cellNumbering';
 import { cellNumberer, type CellNumberer } from './cellNumbersInRect';
-import type { WorldRect } from './gridDrawRegion';
 import type { GridBounds } from './gridLineStyle';
+
+/** A rect in world units. */
+export interface WorldRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 import type { Point } from './hexGeometry';
 
 /**

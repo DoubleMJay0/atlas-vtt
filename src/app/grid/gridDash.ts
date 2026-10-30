@@ -1,8 +1,8 @@
 /**
  * How a cell edge is dashed, by its length alone, so every edge of a grid shows the same rhythm:
  * two dashes centred on the edge, one where two would be too short, none on an edge too short for
- * one. The grid drawers and the grid shader both draw from this, so the Canvas renderer's grid and
- * the shader's dash alike.
+ * one. The grid shader draws from this, and so do the drawers that grid detection and the
+ * shader's tests read the lattice from, so all of them dash alike.
  */
 export interface DashPattern {
   /** Dashes per edge: 0, 1 or 2. */

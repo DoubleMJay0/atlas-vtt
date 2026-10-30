@@ -53,7 +53,6 @@ import type { BarsSpan, TokenGroupContainer } from './token-renderer/types';
 import type { TokenPreview } from './tokenPlacement/PlacementGhost';
 import type { TokenInput } from '../types/viewState';
 import { setCanvasCursor } from './utils/canvasCursor';
-import { usesCanvasRenderer } from './utils/rendererType';
 import { markHandled, resetHandled } from './utils/handledEvents';
 import { watchClick } from './utils/clickRelease';
 import type { HexLinkPointerHandlers } from './hexLinks/HexLinkInteraction';
@@ -285,7 +284,6 @@ export class TokenRenderer {
       ticker: () => this.pixiApp?.ticker ?? null,
       reducedMotion: () => prefersReducedMotion(this.viewport.options?.events?.domElement ?? document.body),
       defeated: (state) => defeatedCombatants(state.initiative.entries, sceneTokens(everyLevelObjects(state)), this.resourceDefsProvider()),
-      canMask: () => !this.pixiApp?.renderer || !usesCanvasRenderer(this.pixiApp.renderer),
     });
     this.collectionSync = new TokenCollectionSync(obsApp, store.getState, {
       refreshRules: () => this.refreshCollectionRules(),
