@@ -6,6 +6,7 @@ import { ASSET_USES, type AssetStoring } from './assets/assetUses.ts';
 import { Pacer, type PacerClock } from '../marks/index.ts';
 import { sharedFog, sharedLightingScene, sharedSight } from './sceneInputs.ts';
 import { SequencedList } from './sequencedList.ts';
+import { ExploredRemovals } from './exploredRemovals.ts';
 import { levelObjects } from '../../levels/levelObjects';
 import { levelExploredMask } from '../../levels/sceneLevels';
 
@@ -28,6 +29,8 @@ export const INPUT_INTERVAL_MS = 66;
 export const EXPLORED_INTERVAL_MS = 5_000;
 
 const PNG_DATA_URL = 'data:image/png;base64,';
+
+const loading = (state: SceneState): boolean => !state.mapLoaded || state.isMapLoading;
 
 /** The PNG bytes of a saved explored memory (a data URL), or null for none or anything else. */
 function maskBytes(mask: string | null): Uint8Array<ArrayBuffer> | null {
@@ -74,15 +77,10 @@ export class InputShare {
   private readonly lightAliases = new Map<string, string>();
   /** The random ids of the shared scene's fog operations, by their keys in the store. */
   private readonly fogAliases = new Map<string, string>();
-  /** The saved explored memory players were sent last (a data URL), with its stored reference where it went by one; null before one was. */
-  private mask: { readonly source: string | null; readonly ref: AssetRef | null } | null = null;
-  /** The count of edits by hand (`exploredEdits`) and the explored memory saved, as last looked at; null before. */
-  private seen: { readonly edits: number; readonly source: string | null } | null = null;
-  /**
-   * The GM took memory away by hand on this floor (an edit, its undo or redo): `edited` until the
-   * save that holds it, then `saved` until that went to players, as one that replaces theirs.
-   */
-  private cut: 'none' | 'edited' | 'saved' = 'none';
+  /** The saved explored memory players were sent last (a data URL), with its stored reference where it went by one and the count of removals it went with; null before one was. */
+  private mask: { readonly source: string | null; readonly ref: AssetRef | null; readonly serial: number } | null = null;
+  /** The times the GM took memory away from this floor, sent with every explored memory. */
+  private readonly removals: ExploredRemovals;
   private readonly pacer: Pacer;
   private readonly exploredPacer: Pacer;
   /** The fog and sight inputs sent: whole for a new scene, a joiner or a player who asks, else as deltas. */
@@ -96,6 +94,7 @@ export class InputShare {
     this.exploredPacer = new Pacer(ports, EXPLORED_INTERVAL_MS, () => void this.flushExplored());
     this.fog = new SequencedList('fog', ports);
     this.sight = new SequencedList('sight', ports);
+    this.removals = new ExploredRemovals(() => store.shown?.() ?? true);
   }
 
   /** The shared scene the inputs belong to; null sends none. */
@@ -110,8 +109,7 @@ export class InputShare {
     this.lighting = null;
     this.releaseMask();
     this.mask = null;
-    this.seen = null;
-    this.cut = 'none';
+    this.removals.reset();
     this.pacer.cancel();
     this.exploredPacer.cancel();
     this.update();
@@ -123,22 +121,19 @@ export class InputShare {
     this.pacer.request();
     if (!this.scene.lit) return;
     const state = this.store.getState();
-    this.watchCuts(state);
-    if (levelExploredMask(state) !== this.mask?.source) this.exploredPacer.request();
+    if (loading(state)) return this.removals.loading();
+    this.removals.observe(state);
+    if (this.exploredChanged(state)) this.exploredPacer.request();
   }
 
-  /**
-   * Notes an edit by hand of this floor's memory, made while the GM's view shows it, and the save
-   * after it. Sight only ever adds to the memory; a save that holds an edit may have taken some away.
-   */
-  private watchCuts(state: SceneState): void {
-    const seen = this.seen;
-    const source = levelExploredMask(state);
-    this.seen = { edits: state.exploredEdits, source };
-    if (seen === null) return;
-    if (state.exploredEdits !== seen.edits) {
-      if (this.store.shown?.() ?? true) this.cut = 'edited';
-    } else if (this.cut === 'edited' && source !== seen.source) this.cut = 'saved';
+  /** The scene's map is loading: nothing goes out, and what the load ends with is compared with what was before it. */
+  mapLoading(): void {
+    if (this.scene?.lit === true) this.removals.loading();
+  }
+
+  /** Whether the memory saved, or the count of removals, is another than players were sent last. */
+  private exploredChanged(state: SceneState): boolean {
+    return levelExploredMask(state) !== this.mask?.source || this.removals.serial !== this.mask.serial;
   }
 
   /** The last inputs again, whole, to one player or to all. */
@@ -204,23 +199,23 @@ export class InputShare {
    */
   private async flushExplored(): Promise<void> {
     const scene = this.scene;
-    const source = levelExploredMask(this.store.getState());
-    if (scene === null || !scene.lit || source === this.mask?.source) return;
-    // A memory forgotten while it could not be written goes as none (`ExploredMemory.reset`).
-    const replace = this.cut === 'saved' || (source === null && (this.mask?.source ?? null) !== null);
+    const state = this.store.getState();
+    // A load clears the memory before it reads the scene's: what it ends with goes once it is done.
+    if (scene === null || !scene.lit || loading(state) || !this.exploredChanged(state)) return;
+    const source = levelExploredMask(state);
     const bytes = maskBytes(source);
     const inline = bytes !== null && bytes.length <= EXPLORED_INLINE_BYTES;
     const ref = bytes === null || inline ? null : ((await this.ports.stored?.refOf(bytes, 'image/png', ASSET_USES.explored)) ?? null);
-    // A newer memory or another scene came meanwhile: this one is not sent.
-    if (this.scene !== scene || levelExploredMask(this.store.getState()) !== source) {
+    // A newer memory, another scene or a load came meanwhile: this one is not sent.
+    if (this.scene !== scene || loading(this.store.getState()) || levelExploredMask(this.store.getState()) !== source) {
       if (ref !== null) this.ports.stored?.release(ref);
       return;
     }
     // The memory it replaces need not go up any more, nor be told of.
     if (this.mask?.ref?.id !== ref?.id) this.releaseMask();
-    this.mask = { source, ref };
-    if (this.cut === 'saved') this.cut = 'none';
-    this.publish({ t: 'explored', scene: scene.id, ...(inline ? { png: toBase64(bytes) } : ref !== null && { mask: ref }), ...(replace && { replace: true }) });
+    const serial = this.removals.serial;
+    this.mask = { source, ref, serial };
+    this.publish({ t: 'explored', scene: scene.id, ...(inline ? { png: toBase64(bytes) } : ref !== null && { mask: ref }), serial });
   }
 
   /** Lets go of the stored explored memory players were sent last. */

@@ -12,8 +12,11 @@ const mask = (name: string): string => `data:image/png;base64,${btoa(name)}`;
 const LIT = { lighting: { enabled: true, ambient: 0.2 } };
 const MAP = new Map([['maps/cave.webp', new Uint8Array(64)], ['maps/upper.webp', new Uint8Array(32)]]);
 
-/** The explored messages players got, whether each replaces their memory. */
-const replaces = (table: ShareHarness): boolean[] => table.sent.flatMap(({ body }) => (body.t === 'explored' ? [(body as Explored).replace === true] : []));
+const explored = (table: ShareHarness): Explored[] => table.sent.flatMap(({ body }) => (body.t === 'explored' ? [body] : []));
+/** The count of removals each explored message players got carries. */
+const serials = (table: ShareHarness): (number | undefined)[] => explored(table).map((body) => body.serial);
+/** The memory each explored message players got holds, by the name `mask` gave it; null for none. */
+const memories = (table: ShareHarness): (string | null)[] => explored(table).map((body) => (body.png === undefined ? null : atob(body.png)));
 
 async function shared(state: SceneState): Promise<ShareHarness> {
   const table = shareHarness(state, MAP);
@@ -29,14 +32,20 @@ async function then(table: ShareHarness, changes: Partial<SceneState>): Promise<
   await table.advance(EXPLORED_INTERVAL_MS + 100);
 }
 
+/** The scene's map loads again (a snapshot restored, the scene reopened): cleared while it loads, then `changes`. */
+async function reload(table: ShareHarness, changes: Partial<SceneState>): Promise<void> {
+  await then(table, { isMapLoading: true, exploredMask: null, exploredEdits: 0 });
+  await then(table, { isMapLoading: false, ...changes });
+}
+
 describe('an explored memory the GM saves', () => {
-  it('is added to the players\' memory while sight alone made it, so a save older than what they saw takes nothing away', async () => {
+  it('keeps its count of removals while sight alone made it, so players add it to what they saw since', async () => {
     const table = await shared(sceneState({ ...LIT, exploredMask: mask('first') }));
     await then(table, { exploredMask: mask('more') });
-    expect(replaces(table)).toEqual([false, false]);
+    expect(serials(table)).toEqual([0, 0]);
   });
 
-  it('replaces theirs once it holds memory the GM took away by hand, and only that save', async () => {
+  it('counts a removal with the save that holds memory the GM took away by hand, and every save after carries it', async () => {
     const table = await shared(sceneState({ ...LIT, exploredMask: mask('first') }));
     // Forget: the edit is counted at once, the memory saved after it.
     await table.set({ ...table.state(), exploredEdits: 1 });
@@ -45,18 +54,55 @@ describe('an explored memory the GM saves', () => {
     // Undo of it is an edit too.
     await table.set({ ...table.state(), exploredEdits: 0 });
     await then(table, { exploredMask: mask('back') });
-    expect(replaces(table)).toEqual([false, true, false, true]);
-    const sent = table.sent.flatMap(({ body }) => (body.t === 'explored' ? [body] : []));
+    expect(serials(table)).toEqual([0, 1, 1, 2]);
+    const sent = explored(table);
     expect(parseGmMessage(JSON.parse(JSON.stringify(sent[1])))).toEqual(sent[1]);
   });
 
-  it('replaces theirs where the memory went as none after it was some', async () => {
+  it('counts a removal where the memory went as none after it was some, or was switched off', async () => {
     const table = await shared(sceneState({ ...LIT, exploredMask: mask('first') }));
     await then(table, { exploredMask: null });
-    expect(replaces(table)).toEqual([false, true]);
+    await then(table, { exploredMask: mask('again') });
+    await then(table, { lighting: { ...LIT.lighting, exploredMemory: false } });
+    expect(serials(table)).toEqual([0, 1, 1, 2]);
+    expect(memories(table)).toEqual(['first', null, 'again', 'again']);
   });
 
-  it('is not made a replacement by an edit of a floor the players are not on', async () => {
+  it('counts a removal where a load ends with another memory than before it (a snapshot restored), and sends nothing while it loads', async () => {
+    const table = await shared(sceneState({ ...LIT, exploredMask: mask('A') }));
+    await then(table, { exploredMask: mask('AB') });
+    await reload(table, { exploredMask: mask('A') });
+    expect(memories(table)).toEqual(['A', 'AB', 'A']);
+    expect(serials(table)).toEqual([0, 0, 1]);
+  });
+
+  it('counts one removal where a load after edits by hand ends with another memory, its count of edits starting over', async () => {
+    const table = await shared(sceneState({ ...LIT, exploredMask: mask('A') }));
+    await then(table, { exploredMask: mask('AB') });
+    await table.set({ ...table.state(), exploredEdits: 3 });
+    await reload(table, { exploredMask: mask('A') });
+    await then(table, { exploredMask: mask('AC') });
+    expect(serials(table)).toEqual([0, 0, 1, 1]);
+  });
+
+  it('sends nothing while the map loads, though a save was waiting to go, and the memory once the load is done', async () => {
+    const table = await shared(sceneState({ ...LIT, exploredMask: mask('A') }));
+    await table.set({ ...table.state(), exploredMask: mask('AB') });
+    await table.set({ ...table.state(), exploredMask: mask('ABC') });
+    await then(table, { isMapLoading: true, exploredMask: null, exploredEdits: 0 });
+    expect(memories(table)).toEqual(['A', 'AB']);
+    await then(table, { isMapLoading: false, exploredMask: mask('ABC') });
+    expect(memories(table)).toEqual(['A', 'AB', 'ABC']);
+  });
+
+  it('counts none where a load ends with the memory it began with (the scene reopened, the GM back from another tab)', async () => {
+    const table = await shared(sceneState({ ...LIT, exploredMask: mask('A') }));
+    await reload(table, { exploredMask: mask('A') });
+    await then(table, { exploredMask: mask('AB') });
+    expect(serials(table)).toEqual([0, 0]);
+  });
+
+  it('is not counted by an edit of a floor the players are not on', async () => {
     const levels: SceneLevel[] = [
       { id: 'ground', name: 'Ground', elevation: { bottom: 0, top: 10 }, background: 'maps/cave.webp' },
       { id: 'upper', name: 'Upper', elevation: { bottom: 10, top: 20 }, background: 'maps/upper.webp' },
@@ -71,6 +117,13 @@ describe('an explored memory the GM saves', () => {
     await then(table, { exploredEdits: 1, exploredMasks: { upper: mask('upper forgotten') } });
     await table.set({ ...table.state(), viewedLevel: 'ground' });
     await then(table, { exploredMask: mask('ground seen') });
-    expect(replaces(table)).toEqual([false, false]);
+    expect(serials(table)).toEqual([0, 0]);
+  });
+
+  it('is refused by players where its count is no whole number', () => {
+    expect(parseGmMessage({ t: 'explored', scene: 's1', serial: -1 })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene: 's1', serial: 1.5 })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene: 's1', serial: '1' })).toBeNull();
+    expect(parseGmMessage({ t: 'explored', scene: 's1', serial: 2 })).toEqual({ t: 'explored', scene: 's1', serial: 2 });
   });
 });
