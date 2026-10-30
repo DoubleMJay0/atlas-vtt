@@ -10,6 +10,8 @@ import { CounterWidgetDisplay } from './CounterWidgetDisplay';
 import { ClockWidgetDisplay } from './ClockWidgetDisplay';
 import { isSteppedWidget, stepCounter } from '../../utils/counterWidget';
 import { isWidgetOn } from '../../utils/widgetActivation';
+import { useWidgetStack } from './useWidgetStack';
+import { t } from '../../i18n';
 
 interface ResponsiveWidgetBarProps {
   isPlayerView?: boolean;
@@ -295,6 +297,8 @@ export function ResponsiveWidgetBar({ isPlayerView = false, store, viewId, widge
     ...(isPlayerView ? {} : { timerPlayPause: () => controlHeldTimer('togglePlay'), timerReset: () => controlHeldTimer('reset') }),
   };
 
+  const stack = useWidgetStack(visibleWidgets.length, storedWidgetSettings);
+
   // For player view, always show widgets regardless of globalVisible setting
   if (!isPlayerView && storedWidgetSettings?.globalVisible === false) {
     return null;
@@ -307,9 +311,12 @@ export function ResponsiveWidgetBar({ isPlayerView = false, store, viewId, widge
     <div
       onMouseEnter={() => handleInteraction()}
       onMouseLeave={resetActiveTimer}
-      className={`atlas-widget-bar ${isActive ? 'active' : 'passive'}`}
+      ref={stack.barRef}
+      style={stack.barStyle}
+      className={`atlas-widget-bar ${isActive || stack.state === 'open' ? 'active' : 'passive'}`}
+      data-stack={stack.state}
     >
-      <div className="atlas-widget-container">
+      <div ref={stack.rowsRef} className="atlas-widget-container" tabIndex={-1} inert={stack.state === 'closed'}>
         {visibleWidgets.map((widget, index) => {
           const position = index < 5 ? index + 1 : null;
           const shared = {
@@ -336,6 +343,17 @@ export function ResponsiveWidgetBar({ isPlayerView = false, store, viewId, widge
           return <CounterWidgetDisplay key={widget.id} widget={widget} onValueChange={handleCounterValueChange} {...shared} />;
         })}
       </div>
+      {stack.state === 'closed' && (
+        <button
+          ref={stack.openerRef}
+          type="button"
+          className="atlas-widget-stack-opener"
+          aria-label={t('widgets.spreadStack', { count: visibleWidgets.length })}
+          onClick={stack.spread}
+        >
+          <span className="atlas-widget-stack-count">{visibleWidgets.length}</span>
+        </button>
+      )}
     </div>
   );
 }

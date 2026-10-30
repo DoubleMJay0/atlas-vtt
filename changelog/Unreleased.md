@@ -20,6 +20,7 @@
 - Dice volume: set how loud dice are in Atlas' settings (Dice) or the command palette's dice settings, or slide it all the way down to turn their sounds off. It applies to thrown dice and to result cards. Contributed by ISorokaI
 
 ## Fixed
+- Widgets that do not fit beside the scene tabs lie stacked in the corner of the map instead of wrapping into a column over the initiative tracker. A click spreads them out; Escape or a click elsewhere gathers them again. Their hotkeys keep working while stacked
 - Online play: room pins of a generated dungeon that you make readable by players now show on the players' page, so they can open the room's notes
 - Create scenes from several selected maps at once: each map gets a scene of its own, named like the map. A deleted scene no longer comes back in the asset manager
 - Online play: in a browser that cannot use WebGL, lit scenes stay hidden and players are told why, instead of showing and then vanishing once a magical darkness is placed
