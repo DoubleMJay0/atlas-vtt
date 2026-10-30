@@ -58,6 +58,12 @@ import { text } from './text';
 import { audio } from './audio';
 import { drawing } from './drawing';
 import { editToken } from './editToken';
+import { tables } from './tables';
+import { campaign } from './campaign';
+import { quest } from './quest';
+import { rest } from './rest';
+import { initRules } from './initRules';
+import { recoveryEditor } from './recoveryEditor';
 import { hex } from './hex';
 import { light } from './light';
 import { mapIcon } from './mapIcon';
@@ -187,6 +193,12 @@ export const ru: Translation = {
   ...wall,
   ...sceneLight,
   ...vision,
+  ...tables,
+  ...campaign,
+  ...quest,
+  ...rest,
+  ...initRules,
+  ...recoveryEditor,
   ...dungeon,
   ...dungeonProp,
   ...dungeonScene,
