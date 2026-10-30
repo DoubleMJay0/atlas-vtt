@@ -59,7 +59,7 @@ const mapUi = ({ tabs, widgets, levels }: Layout): string => `
           <div class="atlas-top-bar-start__below"><div class="atlas-online-log-tab-host"></div></div>
         </div>
         <div class="atlas-top-bar-end">
-          ${widgets > 0 ? `<div class="atlas-widget-bar active"><div class="atlas-widget-container">${LABELS.slice(0, widgets).map(card).join('')}</div></div>` : ''}
+          ${widgets > 0 ? `<div class="atlas-widget-bar active"${widgets > 2 ? ' data-stack="closed"' : ''}><div class="atlas-widget-container">${LABELS.slice(0, widgets).map(card).join('')}</div></div>` : ''}
           <div class="atlas-dice-rolls atlas-vtt-plugin"><div class="atlas-dice-roll"><div class="atlas-dice-roll__sheet" style="height: 200px"></div></div></div>
         </div>
       </div>
