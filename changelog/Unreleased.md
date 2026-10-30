@@ -14,4 +14,5 @@
 - Several lights together no longer wash the map out to white: the brightest light at a spot shows as it always did, and every further torch adds less and less
 - Moving a token that carries a light no longer stutters as badly on large maps with many walls
 - Dragging a token that sees no longer builds new graphics objects for its sight every frame, so each step of a drag costs less on large generated dungeons
+- A pinned statblock scrolled down can be moved up again: it no longer stops at an invisible edge where its scrolled-away name would be. Contributed by ISorokaI
 - Menus in Edit Token, such as Add sense, open at their button instead of at the top left of the window. Contributed by ISorokaI
