@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { type App } from 'obsidian';
 import { runUvttGroupImport, type ChooseFloors } from '../../../../import/uvtt/runUvttGroupImport';
+import { formatList, t } from '../../../../i18n';
 import { isUvttFileName } from '../../../../import/uvtt/uvttFileNames';
 import { openCreatedScene } from '../../../../import/openCreatedScene';
 import { runVideoMapImport } from '../../../../import/videoMaps/runVideoMapImport';
@@ -58,10 +59,7 @@ function overManager(event: DragEvent): DataTransfer | null {
 }
 
 function sayNotMaps(files: readonly File[]): void {
-  const names = files.map((file) => file.name);
-  const last = names.pop();
-  const which = names.length > 0 ? `${names.join(', ')} and ${last} are not maps` : `${last} is not a map`;
-  showNotice(`${which} Atlas can import. Drop a .dd2vtt, .uvtt or .df2vtt file, or a WebM or MP4 video.`);
+  showNotice(t('uvtt.notMaps', { count: files.length, files: formatList(files.map((file) => file.name)) }));
 }
 
 /**

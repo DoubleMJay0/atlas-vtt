@@ -36,6 +36,7 @@ import { NO_ASSIGNMENTS, type TokenAssignments } from '../../campaigns/players/t
 import { appCampaignChoices } from './campaignChoices.ts';
 import { DASHBOARD_VIEW_TYPE } from '../../dashboard-view';
 import { DEFAULT_SETTINGS, onlineSettingsSections, readSettings, type OnlineSettings } from './settings.ts';
+import { t } from '../../i18n';
 import { secretSaltStore } from './account/saltStore.ts';
 import { AssetSalt } from './assets/assetSalt.ts';
 import { AssetStoreClient } from './assets/storeClient.ts';
@@ -47,7 +48,7 @@ const LOG_SAVE_MS = 10_000;
 /** How often the tab the table's log stands on and Atlas's image display are looked for. */
 const SYNC_MS = 1_000;
 
-const tokensText = (count: number): string => (count === 1 ? '1 token' : `${count} tokens`);
+const tokensText = (count: number): string => t('online.tokens', { count });
 
 /**
  * Online play: shares the scene of an Atlas map tab with players in their browsers. A child of the
@@ -248,7 +249,7 @@ export class OnlineFeature extends Component {
     this.command('copy-online-table-link', (checking) => {
       const link = this.online.link();
       if (link === null) return false;
-      if (!checking) void copyText(activeDocument.body, link).then((copied) => showNotice(copied ? 'Join link copied.' : 'The link could not be copied.'));
+      if (!checking) void copyText(activeDocument.body, link).then((copied) => showNotice(copied ? t('online.linkCopiedNotice') : t('online.linkCopyFailed')));
       return true;
     });
     this.command('make-selected-player-tokens', (checking) => this.markSelected(checking, true));
@@ -369,8 +370,8 @@ export class OnlineFeature extends Component {
     if (checking) return true;
     const count = this.online.markSelected(player);
     if (count === null) return true;
-    if (count === 0) showNotice('Select tokens on the map first.');
-    else showNotice(player ? `Player tokens: ${tokensText(count)}. Assign each to a player in the online panel.` : `${tokensText(count)} now belong to the GM.`);
+    if (count === 0) showNotice(t('online.selectTokensFirst'));
+    else showNotice(player ? t('online.madePlayerTokens', { tokens: tokensText(count) }) : t('online.madeGmTokens', { tokens: tokensText(count) }));
     return true;
   }
 }
