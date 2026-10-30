@@ -30,6 +30,7 @@ import { initiative } from './initiative';
 import { initRules } from './initRules';
 import { loot } from './loot';
 import { tables } from './tables';
+import { templateEditor } from './templateEditor';
 import { lpv } from './lpv';
 import { map } from './map';
 import { mapFeature } from './mapFeature';
@@ -137,6 +138,7 @@ export const en = {
   ...initRules,
   ...loot,
   ...tables,
+  ...templateEditor,
   ...lpv,
   ...map,
   ...mapFeature,

@@ -58,6 +58,7 @@ import { text } from './text';
 import { audio } from './audio';
 import { drawing } from './drawing';
 import { editToken } from './editToken';
+import { templateEditor } from './templateEditor';
 import { tables } from './tables';
 import { campaign } from './campaign';
 import { quest } from './quest';
@@ -193,6 +194,7 @@ export const ru: Translation = {
   ...wall,
   ...sceneLight,
   ...vision,
+  ...templateEditor,
   ...tables,
   ...campaign,
   ...quest,
