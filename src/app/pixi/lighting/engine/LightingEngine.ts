@@ -1,5 +1,6 @@
 import { Container, Graphics, Matrix, Rectangle, Texture, type Renderer } from 'pixi.js';
-import { exploredMemoryOn } from '../../../lighting/sceneLightingOptions';
+import { exploredMemoryOn, mistOf } from '../../../lighting/sceneLightingOptions';
+import { mistOctaves } from '../MistClock';
 import { DEFAULT_LIGHTING_QUALITY, type LightingQuality } from '../../../lighting/lightingQuality';
 import type { UnlitGrid } from '../../../grid/gridLightingMark';
 import { destroyTree } from '../../utils/destroyTree';
@@ -153,6 +154,7 @@ export class LightingEngine {
     composite.setAmbient(scene.ambient, scene.ambientColor, ambientLift(scene));
     composite.setMemoryShown(exploredMemoryOn(scene));
     composite.setMemoryColours(scene.exploredColor, scene.unexploredColor);
+    composite.setMist(mistOf(scene), scene.cellSize ?? scene.sightRadius * 2, mistOctaves(this.quality));
     composite.setUnexploredImage(scene.unexploredTexture ?? null, scene.unexploredPlacement ?? new Matrix(1 / scene.bounds.width, 0, 0, 1 / scene.bounds.height), scene.unexploredSoftness ?? 0);
   }
 
@@ -284,6 +286,11 @@ export class LightingEngine {
     if (area?.width === this.coverage?.width && area?.height === this.coverage?.height) return;
     this.coverage = area;
     this.drawBounds();
+  }
+
+  /** Where the mist's motion stands (`MistClock`): it churns and drifts on in the next render. */
+  setMistClock(seconds: number, offset: { x: number; y: number }): void {
+    this.composite?.setMistClock(seconds, offset);
   }
 
   /** The caller owns `texture`; set its replacement before destroying it. */

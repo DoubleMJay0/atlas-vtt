@@ -1,5 +1,5 @@
 import type { Texture } from 'pixi.js';
-import type { MapVideoMode } from '../mapImage/video/mapVideoPlayback';
+import type { MapVideoMode } from '../mosaicCanvas/video/mapVideoPlayback';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
 import type { AmbientLight, LightReach, Sight } from '../../vision/sight';
 import type { HideableLayer } from '../playerSafeFrame';

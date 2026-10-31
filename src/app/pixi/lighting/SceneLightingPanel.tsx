@@ -17,12 +17,14 @@ import {
   sightOnDropOn,
   tokenVisionOn,
   unexploredSoftnessOf,
+  mistOf,
   MAX_UNEXPLORED_SOFTNESS,
 } from '../../lighting/sceneLightingOptions';
 import type { DarkSightLook } from '../../types/lightingTypes';
 import type { SegmentedOption } from '../../packages/components/primitives/SegmentedControl';
 import { ChoiceField, ColorField, ImageField, SliderField, TintField, ToggleField } from './lightingPanelFields';
 import { pickUnexploredImage } from './UnexploredImageModal';
+import { MistFields } from './MistFields';
 import { levelUnexploredImage, levelUnexploredImageChanges } from '../../lighting/levelUnexploredImages';
 import { hasLevels, levelById, viewedLevelId } from '../../levels/sceneLevels';
 import { levelLabel } from '../../react/components/levels/levelEditing';
@@ -128,12 +130,13 @@ function SceneLightingPanel({ app }: { app: App }): React.ReactElement {
           onClear={() => setFogMap(null)} />
         {/* Shown while there is no fog map too, disabled, so the panel keeps its shape. Set on release: each step redraws the composite only, but stays one change. */}
         <SliderField label={t('sceneLight.unexploredSoftness')} value={softness} min={0} max={MAX_UNEXPLORED_SOFTNESS} step={0.5}
-          display={t('sceneLight.unexploredSoftnessCells', { count: softness })} disabled={fogMap === null}
+          display={t('sceneLight.unexploredSoftnessCells', { count: softness })} disabled={fogMap === null && mistOf(lighting) === null}
           onChange={setDraggedSoftness}
           onCommit={(cells) => {
             setDraggedSoftness(null);
             setSceneLighting({ unexploredSoftness: cells });
           }} />
+        <MistFields lighting={lighting} setSceneLighting={setSceneLighting} />
         <SliderField label={t('sceneLight.litFrom')} value={threshold} min={0} max={100} step={1} display={`${threshold} %`}
           onChange={setDragged}
           onCommit={(percent) => {

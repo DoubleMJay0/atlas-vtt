@@ -1,2 +1,3 @@
 ## New
 - Show players an image or a video of your own where they have seen nothing yet, instead of a plain colour: a fog map that hints at landmarks and paths while light and sight reveal the real map. Choose it in Lighting settings → Unexplored image, for each level of a scene its own; it lies exactly over that level's map, so give it the map's proportions. A video plays as animated maps do. Fade into the image sets how softly a light's edge blends into it
+- Mist: drifting mist over all the players do not see, thinning where light and sight push it back. Turn it on in Lighting settings → Mist, and set its density, speed, the way it drifts and its colour. It moves while maps are animated, as smoothly as the graphics quality lets water and lava

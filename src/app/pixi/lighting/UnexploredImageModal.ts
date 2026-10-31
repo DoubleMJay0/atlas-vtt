@@ -1,6 +1,6 @@
 import { FuzzySuggestModal, type App, type TFile } from 'obsidian';
 import { isVaultImage } from '../../utils/vaultImage';
-import { isVideoMapPath } from '../mapImage/video/videoMapFiles';
+import { isVideoMapPath } from '../mosaicCanvas/video/videoMapFiles';
 import { t } from '../../i18n';
 
 /**

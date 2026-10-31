@@ -1,7 +1,7 @@
 import { Color, Matrix, Texture, UniformGroup, type Filter } from 'pixi.js';
 import { CompositeUpscale } from './compositeUpscale';
 import { BOUNCE, DARKNESS, EXPOSURE, PURKINJE, wallBand, wallCore } from '../../../lighting/lightingConstants';
-import { DEFAULT_AMBIENT_COLOR, DEFAULT_EXPLORED_COLOR, DEFAULT_UNEXPLORED_COLOR } from '../../../lighting/sceneLightingOptions';
+import { DEFAULT_AMBIENT_COLOR, DEFAULT_EXPLORED_COLOR, DEFAULT_UNEXPLORED_COLOR, type Mist } from '../../../lighting/sceneLightingOptions';
 import { srgbToLinear } from '../../../lighting/srgb';
 import type { GridMarkColor } from '../../../grid/gridLightingMark';
 import { ENGINE_SHADERS } from './engineShaders';
@@ -80,6 +80,13 @@ export interface CompositeFilter {
    * world pixels of the fade into it at a light's edge. The caller owns the texture.
    */
   setUnexploredImage(texture: Texture | null, placement: Matrix, softness: number): void;
+  /**
+   * Mist over what the players do not see now (`mistOf`), null for none; `cell` is the grid's cell in
+   * world px, which sizes it, and `octaves` (1–5) how much detail it is drawn with.
+   */
+  setMist(mist: Mist | null, cell: number, octaves: number): void;
+  /** Where the mist's motion stands: seconds it has churned (wrapped) and cells it has drifted. */
+  setMistClock(seconds: number, offset: { x: number; y: number }): void;
   /** The caller owns `texture` and rebinds before destroying it. */
   setExplored(texture: Texture): void;
   /** The marked grid's colour (`UnlitGrid`), or null while no grid is marked and shown. */
@@ -108,6 +115,9 @@ export function createCompositeFilter(world: EngineWorld, explored: Texture): Co
   const exploredTint = new Float32Array([1, 1, 1]);
   const unexplored = new Float32Array(3);
   const unexploredUv = new Matrix();
+  const mistColor = new Float32Array(3);
+  const mistOffset = new Float32Array(2);
+  let mistKey = '';
   const greyTint = new Float32Array(3);
   const darkTint = new Float32Array([1, 1, 1]);
   const gridColor = new Float32Array(3);
@@ -136,6 +146,13 @@ export function createCompositeFilter(world: EngineWorld, explored: Texture): Co
     uUnexplored: { value: unexplored, type: 'vec3<f32>' },
     uHasUnexploredImage: { value: 0, type: 'f32' },
     uUnexploredSoftness: { value: 0, type: 'f32' },
+    uMist: { value: 0, type: 'f32' },
+    uMistDensity: { value: 0, type: 'f32' },
+    uMistColor: { value: mistColor, type: 'vec3<f32>' },
+    uMistTime: { value: 0, type: 'f32' },
+    uMistOffset: { value: mistOffset, type: 'vec2<f32>' },
+    uMistCell: { value: 70, type: 'f32' },
+    uMistOctaves: { value: 4, type: 'f32' },
     uUnexploredUv: { value: unexploredUv, type: 'mat3x3<f32>' },
     uGreyKeep: { value: 0, type: 'f32' },
     uGreyTint: { value: greyTint, type: 'vec3<f32>' },
@@ -259,6 +276,26 @@ export function createCompositeFilter(world: EngineWorld, explored: Texture): Co
     setMemoryColours(explored, unexploredColor): void {
       setLinear(exploredTint, explored ?? DEFAULT_EXPLORED_COLOR);
       setLinear(unexplored, unexploredColor ?? DEFAULT_UNEXPLORED_COLOR);
+      group.update();
+    },
+    setMist(mist, cell, octaves): void {
+      const key = mist ? `${mist.density}|${mist.color}|${cell}|${octaves}` : '';
+      if (key === mistKey) return;
+      mistKey = key;
+      u.uMist = mist ? 1 : 0;
+      if (mist) {
+        u.uMistDensity = mist.density;
+        setLinear(mistColor, mist.color);
+        u.uMistCell = Math.max(cell, 1);
+        u.uMistOctaves = octaves;
+      }
+      group.update();
+    },
+    setMistClock(seconds, offset): void {
+      if (u.uMist === 0) return;
+      u.uMistTime = seconds;
+      mistOffset[0] = offset.x;
+      mistOffset[1] = offset.y;
       group.update();
     },
     setUnexploredImage(texture, placement, softness): void {

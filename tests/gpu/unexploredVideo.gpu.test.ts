@@ -3,7 +3,7 @@ import { LightingEngine } from '../../src/app/pixi/lighting/engine/LightingEngin
 import type { EngineScene } from '../../src/app/pixi/lighting/engine/types';
 import { createTestRenderer, renderThroughEngine } from '../../src/app/pixi/lighting/engine/__tests__/gpuTestUtils';
 import { UnexploredImage } from '../../src/app/pixi/lighting/UnexploredImage';
-import { openVideoElement } from '../../src/app/pixi/mapImage/video/videoElement';
+import { openVideoElement } from '../../src/app/pixi/mosaicCanvas/video/videoElement';
 import { SEES_ALL } from '../../src/app/vision/sight';
 import { videoMapWebm } from '../fixtures/videoMapFixture';
 

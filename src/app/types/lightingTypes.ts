@@ -27,6 +27,16 @@ export interface SceneLighting {
   levelUnexploredImages?: Record<string, string>;
   /** Width in grid cells of the fade from the map a light reveals into that image; unset is 1.5. Read with `unexploredSoftnessOf`. */
   unexploredSoftness?: number;
+  /** Drifting mist over what the players do not see now (the fog map, memory, the dark); unset is off. Read with `mistOf`. */
+  unexploredMist?: boolean;
+  /** How thick the mist is, 0–1; unset is 0.5. */
+  unexploredMistDensity?: number;
+  /** How fast it churns and drifts, 0–3 times its own pace; unset is 1. */
+  unexploredMistSpeed?: number;
+  /** The way it drifts, in degrees clockwise from the map's right (0) on screen; unset is 0. */
+  unexploredMistAngle?: number;
+  /** Its colour, `#rrggbb`; unset is a pale grey. */
+  unexploredMistColor?: string;
   /** Ambient light (0–1) from which everything in sight counts as lit, dimly at least; below it the scene is dark. Unset is 0.25. */
   litThreshold?: number;
   /** A dragged token sees and shines from where its drag began until it is dropped; unset is off: sight and light follow the drag. */

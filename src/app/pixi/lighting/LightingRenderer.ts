@@ -4,7 +4,8 @@ import type { StoreApi } from 'zustand/vanilla';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
 import { DEFAULT_LIGHTING_QUALITY, type LightingQuality, type LightingQualitySource } from '../../lighting/lightingQuality';
-import { sceneLook, type SceneLook } from '../../lighting/sceneLightingOptions';
+import { mistOf, sceneLook, type SceneLook } from '../../lighting/sceneLightingOptions';
+import { MistClock } from './MistClock';
 import type { SceneLighting } from '../../types/lightingTypes';
 import type { ViewState } from '../../types/viewState';
 import { SEES_ALL, type AmbientLight, type AmbientZone, type LightReach, type Sight } from '../../vision/sight';
@@ -42,7 +43,7 @@ function animationView(viewport: Viewport, screen: { width: number; height: numb
   const [width, height] = [screen.width / scaleX, screen.height / scaleY];
   return { minX: left - width / 2, minY: top - height / 2, maxX: left + width * 1.5, maxY: top + height * 1.5 };
 }
-import type { MapVideoMode } from '../mapImage/video/mapVideoPlayback';
+import type { MapVideoMode } from '../mosaicCanvas/video/mapVideoPlayback';
 import { UnexploredImage, unexploredLook, type DrawnMapImage, type ReadUnexploredImage } from './UnexploredImage';
 import { levelUnexploredImage } from '../../lighting/levelUnexploredImages';
 
@@ -159,8 +160,10 @@ export class LightingRenderer implements SceneLightingView {
   private readonly unexploredImage: UnexploredImage | null;
   /** The fog map texture the engine was last given. */
   private unexploredTexture: Texture | null = null;
-  /** How the view's animated map plays, which a video fog map follows while the scene is lit. */
+  /** How the view's animated map plays, which a video fog map and the mist follow while the scene is lit. */
   private videoMode: MapVideoMode = 'pause';
+  /** How far the scene's mist has churned and drifted. */
+  private readonly mistClock = new MistClock();
   private stopped = false;
   /** A scene build worked out new sight; reported once the guarded work is over. */
   private sightChanged = false;
@@ -424,6 +427,8 @@ export class LightingRenderer implements SceneLightingView {
     });
     // The engine holds the current fog map: the one it replaced can go.
     this.unexploredImage?.release();
+    // A composite built anew starts the mist where it stands.
+    this.engine.setMistClock(this.mistClock.time, this.mistClock.drift);
     this.levelsBelow?.update(state, bounds, { sight: model.sight, gmSight });
     if (this.levelsBelow?.failed()) this.engine.fail(new Error('The lighting of a level below stopped'));
     requestRender(this.deps.app);
@@ -493,10 +498,26 @@ export class LightingRenderer implements SceneLightingView {
     if (rest !== null && now >= rest) this.update(this.deps.store.getState());
     if (this.memory.stampDue(now)) requestRender(this.deps.app);
     if (!this.layer.visible) return;
+    this.animateMist(now);
     const view = animationView(this.deps.viewport, this.deps.app.renderer.screen);
     this.levelsBelow?.animate(now, view);
     if (!this.engine.busy()) return;
     if (this.engine.animate(now, view)) requestRender(this.deps.app);
+  }
+
+  /**
+   * The mist moves while maps are animated and someone sees the view (as its animated map plays),
+   * at the frames a second the quality gives liquids, and only in a lit scene that has it.
+   */
+  private animateMist(now: number): void {
+    const mist = this.lastScene ? mistOf(this.deps.store.getState().lighting) : null;
+    if (!mist || this.videoMode !== 'play') {
+      this.mistClock.hold();
+      return;
+    }
+    if (!this.mistClock.advance(now, mist, this.quality.liquidFps)) return;
+    this.engine.setMistClock(this.mistClock.time, this.mistClock.drift);
+    requestRender(this.deps.app);
   }
 
   destroy(): void {

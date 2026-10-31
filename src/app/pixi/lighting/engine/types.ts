@@ -66,7 +66,7 @@ export interface EngineZone {
  * ambient light, and how the players' view shows what no token sees now (unset options keep
  * their defaults, which draw exactly as before the options existed).
  */
-export interface EngineScene extends Pick<SceneLighting, 'ambientColor' | 'exploredMemory' | 'exploredColor' | 'unexploredColor' | 'litThreshold' | 'brightThreshold' | 'darkSightLook' | 'darkSightTint'> {
+export interface EngineScene extends Pick<SceneLighting, 'ambientColor' | 'exploredMemory' | 'exploredColor' | 'unexploredColor' | 'litThreshold' | 'brightThreshold' | 'darkSightLook' | 'darkSightTint' | 'unexploredMist' | 'unexploredMistDensity' | 'unexploredMistSpeed' | 'unexploredMistAngle' | 'unexploredMistColor'> {
   bounds: MapBounds;
   /** The map image; bounce reads its colours (mid grey without one). */
   albedo: Texture | null;

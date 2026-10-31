@@ -99,6 +99,18 @@ describe('SceneLightingPanel', () => {
     expect(store.getState().lighting).not.toHaveProperty('unexploredImage');
   });
 
+  it('turns the mist on, and off again as no choice at all, with its settings shown disabled while it is off', () => {
+    const { store } = renderPanel();
+    const density = (): HTMLElement => screen.getByRole('slider', { name: 'Mist density' });
+    expect(density().getAttribute('data-disabled')).not.toBeNull();
+    fireEvent.click(toggleOf('Mist'));
+    expect(store.getState().lighting.unexploredMist).toBe(true);
+    fireEvent.keyDown(density(), { key: 'ArrowRight' });
+    expect(store.getState().lighting.unexploredMistDensity).toBe(0.51);
+    fireEvent.click(toggleOf('Mist'));
+    expect(store.getState().lighting).not.toHaveProperty('unexploredMist');
+  });
+
   it('sets from how much ambient light the scene counts as lit', () => {
     const { store, setSceneLighting } = renderPanel();
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Counts as lit from' }), { key: 'ArrowRight' });

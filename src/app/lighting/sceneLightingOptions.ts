@@ -18,7 +18,7 @@ export const DARK_SIGHT_LOOKS: readonly DarkSightLook[] = ['system', 'grey', 'co
  * The scene options the composite draws with; the others decide what is seen and recorded. The
  * thresholds are among them: where dim light is perceived as bright, dim ambient light is raised.
  */
-export type SceneLook = Pick<SceneLighting, 'ambient' | 'ambientColor' | 'exploredMemory' | 'exploredColor' | 'unexploredColor' | 'litThreshold' | 'brightThreshold' | 'darkSightLook' | 'darkSightTint'>;
+export type SceneLook = Pick<SceneLighting, 'ambient' | 'ambientColor' | 'exploredMemory' | 'exploredColor' | 'unexploredColor' | 'litThreshold' | 'brightThreshold' | 'darkSightLook' | 'darkSightTint' | 'unexploredMist' | 'unexploredMistDensity' | 'unexploredMistSpeed' | 'unexploredMistAngle' | 'unexploredMistColor'>;
 
 export function tokenVisionOn(lighting: Pick<SceneLighting, 'tokenVision'>): boolean {
   return lighting.tokenVision !== false;
@@ -87,6 +87,34 @@ export function unexploredSoftnessOf(lighting: Pick<SceneLighting, 'unexploredSo
   return typeof cells === 'number' && Number.isFinite(cells) ? Math.min(MAX_UNEXPLORED_SOFTNESS, Math.max(0, cells)) : DEFAULT_UNEXPLORED_SOFTNESS;
 }
 
+/** The mist's colour where the scene sets none: a pale, cold grey. */
+export const DEFAULT_MIST_COLOR = '#c9ced3';
+export const DEFAULT_MIST_DENSITY = 0.5;
+export const DEFAULT_MIST_SPEED = 1;
+export const MAX_MIST_SPEED = 3;
+
+/** How the scene's mist over what the players do not see looks, every option read with its default; null while it is off. */
+export interface Mist {
+  density: number;
+  speed: number;
+  /** Degrees clockwise from the map's right. */
+  angle: number;
+  color: string;
+}
+
+const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+export function mistOf(lighting: Pick<SceneLighting, 'unexploredMist' | 'unexploredMistDensity' | 'unexploredMistSpeed' | 'unexploredMistAngle' | 'unexploredMistColor'>): Mist | null {
+  if (lighting.unexploredMist !== true) return null;
+  return {
+    density: finite(lighting.unexploredMistDensity) ? clamp(lighting.unexploredMistDensity, 0, 1) : DEFAULT_MIST_DENSITY,
+    speed: finite(lighting.unexploredMistSpeed) ? clamp(lighting.unexploredMistSpeed, 0, MAX_MIST_SPEED) : DEFAULT_MIST_SPEED,
+    angle: finite(lighting.unexploredMistAngle) ? ((lighting.unexploredMistAngle % 360) + 360) % 360 : 0,
+    color: isHexColor(lighting.unexploredMistColor) ? lighting.unexploredMistColor : DEFAULT_MIST_COLOR,
+  };
+}
+
 /** A threshold within 0..1; anything that is not a number falls back to the default. */
 export function clampLitThreshold(value: number): number {
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : DEFAULT_LIT_THRESHOLD;
@@ -108,7 +136,9 @@ export function brightThresholdOf(lighting: Pick<SceneLighting, 'litThreshold' |
 }
 
 /** The options `lighting` sets for the composite; unset ones stay unset, so the composite keeps its defaults. */
-export function sceneLook({ ambient, ambientColor, exploredMemory, exploredColor, unexploredColor, litThreshold, brightThreshold, darkSightLook, darkSightTint }: SceneLighting): SceneLook {
+export function sceneLook(lighting: SceneLighting): SceneLook {
+  const { ambient, ambientColor, exploredMemory, exploredColor, unexploredColor, litThreshold, brightThreshold, darkSightLook, darkSightTint } = lighting;
+  const { unexploredMist, unexploredMistDensity, unexploredMistSpeed, unexploredMistAngle, unexploredMistColor } = lighting;
   return {
     ambient,
     ...(ambientColor !== undefined && { ambientColor }),
@@ -119,10 +149,15 @@ export function sceneLook({ ambient, ambientColor, exploredMemory, exploredColor
     ...(brightThreshold !== undefined && { brightThreshold }),
     ...(darkSightLook !== undefined && { darkSightLook }),
     ...(darkSightTint !== undefined && { darkSightTint }),
+    ...(unexploredMist !== undefined && { unexploredMist }),
+    ...(unexploredMistDensity !== undefined && { unexploredMistDensity }),
+    ...(unexploredMistSpeed !== undefined && { unexploredMistSpeed }),
+    ...(unexploredMistAngle !== undefined && { unexploredMistAngle }),
+    ...(unexploredMistColor !== undefined && { unexploredMistColor }),
   };
 }
 
-const COLOR_FIELDS = ['ambientColor', 'exploredColor', 'unexploredColor', 'darkSightTint'] as const;
+const COLOR_FIELDS = ['ambientColor', 'exploredColor', 'unexploredColor', 'darkSightTint', 'unexploredMistColor'] as const;
 
 /**
  * A scene's lighting as loaded from its map file: missing fields take their defaults, and a colour

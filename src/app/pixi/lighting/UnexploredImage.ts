@@ -3,9 +3,9 @@ import { worldToImage, type ImageSize, type MapStretch } from '../../grid/mapStr
 import { unexploredSoftnessOf } from '../../lighting/sceneLightingOptions';
 import type { SceneLighting } from '../../types/lightingTypes';
 import { decodedSource, type DecodedImage } from '../decodedImage';
-import { MapVideoLayer } from '../mapImage/video/MapVideoLayer';
-import type { MapVideoMode } from '../mapImage/video/mapVideoPlayback';
-import type { OpenedVideo } from '../mapImage/video/videoElement';
+import { MapVideoLayer } from '../mosaicCanvas/video/MapVideoLayer';
+import type { MapVideoMode } from '../mosaicCanvas/video/mapVideoPlayback';
+import type { OpenedVideo } from '../mosaicCanvas/video/videoElement';
 import type { EngineScene } from './engine/types';
 
 /** A fog map as read from the vault: a still image, decoded, or a video (an animated fog map) with its first frame decoded. */
@@ -50,15 +50,13 @@ export function unexploredPlacement({ size, stretch }: DrawnMapImage): Matrix {
 /**
  * What the engine draws a level's fog map with (`EngineScene`): its texture (none: the unexplored
  * colour), where it lies (unset: over the lit world, until the map image is drawn), and the width
- * of the fade into it in world pixels.
+ * of the fade into it (and into the mist) in world pixels.
  */
 export function unexploredLook(texture: Texture | null, scene: { lighting: Pick<SceneLighting, 'unexploredSoftness'>; grid?: { size?: number } | null | undefined }, image: DrawnMapImage | null): Pick<EngineScene, 'unexploredTexture' | 'unexploredSoftness' | 'unexploredPlacement'> {
-  if (!texture) return { unexploredTexture: null };
-  return {
-    unexploredTexture: texture,
-    unexploredSoftness: unexploredSoftnessOf(scene.lighting) * (scene.grid?.size ?? DEFAULT_CELL_SIZE),
-    ...(image && { unexploredPlacement: unexploredPlacement(image) }),
-  };
+  // The fade is the mist's too, which needs no fog map.
+  const unexploredSoftness = unexploredSoftnessOf(scene.lighting) * (scene.grid?.size ?? DEFAULT_CELL_SIZE);
+  if (!texture) return { unexploredTexture: null, unexploredSoftness };
+  return { unexploredTexture: texture, unexploredSoftness, ...(image && { unexploredPlacement: unexploredPlacement(image) }) };
 }
 
 /** A fog map ready to draw: its texture, and what plays and frees it. */

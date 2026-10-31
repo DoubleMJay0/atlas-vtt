@@ -225,6 +225,13 @@ uniform sampler2D uUnexploredImage;
 uniform float uHasUnexploredImage;
 uniform float uUnexploredSoftness;
 uniform mat3 uUnexploredUv;
+uniform float uMist;
+uniform float uMistDensity;
+uniform vec3 uMistColor;
+uniform float uMistTime;
+uniform vec2 uMistOffset;
+uniform float uMistCell;
+uniform float uMistOctaves;
 uniform float uGreyKeep;
 uniform vec3 uGreyTint;
 uniform vec3 uDarkTint;
@@ -359,6 +366,47 @@ vec3 unexploredAt(vec2 w) {
   return mix(uUnexplored, toLinear(straight), fog.a);
 }
 
+// Mist (uMist): value noise in cells of three grid cells (uMistCell world px a cell), its fractal
+// sum of uMistOctaves octaves (the quality's) warped by two more of itself, so it churns and curls
+// instead of sliding. uMistTime (seconds, wrapped) turns it, uMistOffset (cells) drifts it.
+float mistHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float mistValue(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = p - i;
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mistHash(i), mistHash(i + vec2(1.0, 0.0)), u.x), mix(mistHash(i + vec2(0.0, 1.0)), mistHash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+// Fractal value noise within 0..1.
+float mistFbm(vec2 p) {
+  float sum = 0.0;
+  float amp = 0.5;
+  float total = 0.0;
+  for (int o = 0; o < 5; o++) {
+    if (float(o) >= uMistOctaves) break;
+    sum += amp * mistValue(p);
+    total += amp;
+    p = mat2(1.6, 1.2, -1.2, 1.6) * p + vec2(5.3, 1.7);
+    amp *= 0.5;
+  }
+  return sum / max(total, 1e-4);
+}
+
+// How much mist covers world point w, 0..1: thick banks and thin veils, their share set by uMistDensity.
+float mistAt(vec2 w) {
+  vec2 p = (w / uMistCell + uMistOffset) / 3.0;
+  float t = uMistTime;
+  vec2 q = vec2(mistFbm(p + vec2(0.0, 0.07 * t)), mistFbm(p + vec2(5.2, 1.3) - vec2(0.05 * t)));
+  float n = mistFbm(p + 1.8 * q + vec2(0.03 * t, -0.02 * t));
+  float low = mix(0.7, 0.2, uMistDensity);
+  return smoothstep(low, low + 0.45, n) * mix(0.45, 0.95, uMistDensity);
+}
+
 // How far light shows the players the map, from no light to the grid's measure of lit.
 float revealedBy(vec3 light) {
   return smoothstep(0.01, 0.06, dot(light, LUMA));
@@ -487,16 +535,20 @@ ${traced ? TRACED_FACES_GLSL : ''}
   // vision and memory: the map shows exactly where light or a sense reveals it, the fog map
   // (or memory) everywhere else, and the two cross-fade over a light's last glow. Its pale parts
   // never shine through a lit map.
-  if (uMode > 0.5 && uHasUnexploredImage > 0.5) {
-    float softLight = max(uAllSeen, sight.r) * softRevealed(world, ambient, revealedBy(light));
-    inSight = mix(memory, visible, max(softLight, bySense));
+  // How much of the pixel the players see now, faded in from a light's edge where a fog map or mist lies beyond it.
+  float revealedHere = max(byLight, bySense);
+  if (uMode > 0.5 && (uHasUnexploredImage > 0.5 || uMist > 0.5)) {
+    revealedHere = max(max(uAllSeen, sight.r) * softRevealed(world, ambient, revealedBy(light)), bySense);
   }
+  if (uMode > 0.5 && uHasUnexploredImage > 0.5) inSight = mix(memory, visible, revealedHere);
   // The players see the veil only where the darkness takes something from their picture: ambient
   // light, a light's light (blue of the darkness map), or what a sense that does not see in it
   // would show. Over unlit floor and over memory there is none: it would give away where the
   // darkness is although nothing is swallowed there.
   float taken = max(max(clamp(dot(ambientGiven, LUMA) * 50.0, 0.0, 1.0), dark.b), max(sight.g, sight.b) * (1.0 - clamp(dark.g * 2.0, 0.0, 1.0)));
   vec3 player = mix(memory, inSight + uVeil * (dark.r * taken), seen);
+  // Mist drifts over all the players do not see now (the fog map, memory, the dark) and thins where light and sight push it back.
+  if (uMode > 0.5 && uMist > 0.5) player = mix(player, uMistColor, mistAt(world) * (1.0 - seen * revealedHere));
   visible += uVeil * dark.r;
 
   // The GM always sees the map and every light at full strength: a dim floor screen-blended under
@@ -512,7 +564,7 @@ ${traced ? TRACED_FACES_GLSL : ''}
   float memoryShown = explored * MEMORY_SHOWN;
   float shownHere = uMode > 0.5 ? mix(memoryShown, max(liveShown, recalls * memoryShown), seen) : liveShown;
   // A fog map is no darkness: drawn up from fewer pixels it blends as the picture, and so does a light's fade into it.
-  if (uMode > 0.5 && uHasUnexploredImage > 0.5) shownHere = max(shownHere, dot(color, LUMA));
+  if (uMode > 0.5 && (uHasUnexploredImage > 0.5 || uMist > 0.5)) shownHere = max(shownHere, dot(color, LUMA));
   vec3 shown = toSrgb(color);
   if (grid > 0.0) {
     // The players see the grid where a light or a sense shows them the map, or where they remember it; never over what they have not seen.

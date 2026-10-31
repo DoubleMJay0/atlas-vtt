@@ -1,7 +1,7 @@
 import { normalizePath, type App } from 'obsidian';
 import { decodeImage, imageMimeType } from '../decodedImage';
-import { isVideoMapPath, videoMimeType } from '../mapImage/video/videoMapFiles';
-import { openVideoElement } from '../mapImage/video/videoElement';
+import { isVideoMapPath, videoMimeType } from '../mosaicCanvas/video/videoMapFiles';
+import { openVideoElement } from '../mosaicCanvas/video/videoElement';
 import type { ReadUnexploredImage } from './UnexploredImage';
 
 /**
